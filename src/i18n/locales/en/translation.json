@@ -170,6 +170,10 @@
             "name": "Transcribe Shortcut",
             "description": "The keyboard shortcut to record and transcribe your voice."
           },
+          "transcribe_toggle": {
+            "name": "Hands-free Dictation",
+            "description": "Press once to start recording, press again to stop and transcribe. No holding needed — great for long dictation."
+          },
           "cancel": {
             "name": "Cancel Shortcut",
             "description": "The keyboard shortcut to cancel the current recording."
@@ -208,10 +212,6 @@
       "pushToTalk": {
         "label": "Push To Talk",
         "description": "Hold to record, release to stop"
-      },
-      "tapToLock": {
-        "label": "Tap to Lock",
-        "description": "Quickly tap the shortcut to keep recording hands-free until you tap it again. Holding still works as normal push-to-talk."
       }
     },
     "models": {
@@ -712,7 +712,7 @@
   "overlay": {
     "transcribing": "Transcribing...",
     "processing": "Processing...",
-    "locked": "Recording — tap hotkey to stop"
+    "locked": "Recording — press hotkey to stop"
   },
   "assistant": {
     "title": "Assistant",
@@ -741,7 +741,7 @@
     },
     "status": {
       "listening": "Listening...",
-      "locked": "Listening — tap hotkey to stop",
+      "locked": "Listening — press hotkey to stop",
       "transcribing": "Transcribing...",
       "thinking": "Thinking..."
     }

@@ -272,12 +272,12 @@ pub fn set_assistant_panel_collapsed(app: AppHandle, collapsed: bool) -> Result<
     Ok(())
 }
 
+/// Arm (or disarm) a screenshot for the NEXT assistant turn — typed or
+/// voice. One-shot: consumed by the next turn.
 #[tauri::command]
 #[specta::specta]
-pub fn set_tap_to_lock(app: AppHandle, enabled: bool) -> Result<(), String> {
-    let mut settings = get_settings(&app);
-    settings.tap_to_lock = enabled;
-    write_settings(&app, settings);
+pub fn set_assistant_screen_armed(app: AppHandle, armed: bool) -> Result<(), String> {
+    assistant::set_screen_armed(&app, armed);
     Ok(())
 }
 
@@ -289,7 +289,7 @@ pub fn assistant_toggle_voice(app: AppHandle) -> Result<(), String> {
     let coordinator = app
         .try_state::<crate::TranscriptionCoordinator>()
         .ok_or_else(|| "Coordinator not initialized".to_string())?;
-    coordinator.send_input("assistant", "pill", true, false, false);
+    coordinator.send_input("assistant", "pill", true, false);
     Ok(())
 }
 

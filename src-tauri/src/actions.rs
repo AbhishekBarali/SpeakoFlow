@@ -783,7 +783,8 @@ impl ShortcutAction for AssistantAction {
                     change_tray_icon(&ah, TrayIconState::Idle);
 
                     let settings = crate::settings::get_settings(&ah);
-                    let wants_screen = binding_id == "assistant_vision"
+                    let wants_screen = crate::assistant::take_screen_armed(&ah)
+                        || binding_id == "assistant_vision"
                         || crate::assistant::wants_screen_context(&transcription);
                     let screenshot = if wants_screen && settings.assistant_screenshot_enabled {
                         let captured = tauri::async_runtime::spawn_blocking(
@@ -873,6 +874,12 @@ pub static ACTION_MAP: Lazy<HashMap<String, Arc<dyn ShortcutAction>>> = Lazy::ne
     let mut map = HashMap::new();
     map.insert(
         "transcribe".to_string(),
+        Arc::new(TranscribeAction {
+            post_process: false,
+        }) as Arc<dyn ShortcutAction>,
+    );
+    map.insert(
+        "transcribe_toggle".to_string(),
         Arc::new(TranscribeAction {
             post_process: false,
         }) as Arc<dyn ShortcutAction>,

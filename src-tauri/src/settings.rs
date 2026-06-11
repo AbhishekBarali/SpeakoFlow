@@ -476,8 +476,6 @@ pub struct AppSettings {
     pub assistant_accent: String,
     #[serde(default = "default_assistant_panel_size")]
     pub assistant_panel_size: String,
-    #[serde(default = "default_tap_to_lock")]
-    pub tap_to_lock: bool,
 }
 
 fn default_model() -> String {
@@ -750,10 +748,6 @@ fn default_assistant_panel_size() -> String {
     "standard".to_string()
 }
 
-fn default_tap_to_lock() -> bool {
-    true
-}
-
 /// System prompt for the spoken summary: instead of reading the whole answer
 /// aloud, the model produces a brief conversational recap.
 fn default_assistant_tts_prompt() -> String {
@@ -917,6 +911,18 @@ pub fn get_default_settings() -> AppSettings {
             current_binding: default_shortcut.to_string(),
         },
     );
+    bindings.insert(
+        "transcribe_toggle".to_string(),
+        ShortcutBinding {
+            id: "transcribe_toggle".to_string(),
+            name: "Hands-free Dictation".to_string(),
+            description:
+                "Press once to start recording, press again to stop and transcribe. No need to hold anything."
+                    .to_string(),
+            default_binding: "f9".to_string(),
+            current_binding: "f9".to_string(),
+        },
+    );
     #[cfg(target_os = "windows")]
     let default_post_process_shortcut = "ctrl+shift+space";
     #[cfg(target_os = "macos")]
@@ -1072,7 +1078,6 @@ pub fn get_default_settings() -> AppSettings {
         assistant_font_size: default_assistant_font_size(),
         assistant_accent: default_assistant_accent(),
         assistant_panel_size: default_assistant_panel_size(),
-        tap_to_lock: default_tap_to_lock(),
     }
 }
 

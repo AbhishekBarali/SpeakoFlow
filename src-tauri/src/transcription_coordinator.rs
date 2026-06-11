@@ -9,11 +9,6 @@ use tauri::{AppHandle, Manager};
 
 const DEBOUNCE: Duration = Duration::from_millis(30);
 
-/// Press shorter than this counts as a "tap" — with tap-to-lock enabled the
-/// recording keeps running hands-free until the hotkey is tapped again
-/// (Wispr Flow style). Longer presses behave as classic push-to-talk.
-const LOCK_TAP_MAX: Duration = Duration::from_millis(500);
-
 /// Commands processed sequentially by the coordinator thread.
 enum Command {
     Input {
@@ -21,7 +16,6 @@ enum Command {
         hotkey_string: String,
         is_pressed: bool,
         push_to_talk: bool,
-        tap_to_lock: bool,
     },
     Cancel {
         recording_was_active: bool,
@@ -45,6 +39,7 @@ pub struct TranscriptionCoordinator {
 
 pub fn is_transcribe_binding(id: &str) -> bool {
     id == "transcribe"
+        || id == "transcribe_toggle"
         || id == "transcribe_with_post_process"
         || id == "assistant"
         || id == "assistant_vision"
@@ -58,11 +53,6 @@ impl TranscriptionCoordinator {
             let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 let mut stage = Stage::Idle;
                 let mut last_press: Option<Instant> = None;
-                // Tap-to-lock state: when the press that started a recording
-                // was a quick tap, the release is ignored and the recording
-                // stays active until the next press.
-                let mut press_started: Option<Instant> = None;
-                let mut locked = false;
 
                 while let Ok(cmd) = rx.recv() {
                     match cmd {
@@ -71,7 +61,6 @@ impl TranscriptionCoordinator {
                             hotkey_string,
                             is_pressed,
                             push_to_talk,
-                            tap_to_lock,
                         } => {
                             // Debounce rapid-fire press events (key repeat / double-tap).
                             // Releases always pass through for push-to-talk.
@@ -85,46 +74,25 @@ impl TranscriptionCoordinator {
                             }
 
                             if push_to_talk {
-                                if is_pressed {
-                                    match &stage {
-                                        Stage::Idle => {
-                                            start(&app, &mut stage, &binding_id, &hotkey_string);
-                                            press_started = Some(Instant::now());
-                                            locked = false;
-                                        }
-                                        Stage::Recording(id) if id == &binding_id && locked => {
-                                            // Second tap ends a locked recording.
-                                            locked = false;
-                                            stop(&app, &mut stage, &binding_id, &hotkey_string);
-                                        }
-                                        _ => {
-                                            debug!("Ignoring press for '{binding_id}': busy")
-                                        }
-                                    }
-                                } else if matches!(&stage, Stage::Recording(id) if id == &binding_id)
+                                // Hold to record, release to stop. Simple.
+                                if is_pressed && matches!(stage, Stage::Idle) {
+                                    start(&app, &mut stage, &binding_id, &hotkey_string);
+                                } else if !is_pressed
+                                    && matches!(&stage, Stage::Recording(id) if id == &binding_id)
                                 {
-                                    if locked {
-                                        // Release after the lock-ending tap; nothing to do.
-                                    } else if tap_to_lock
-                                        && press_started
-                                            .map_or(false, |t| t.elapsed() < LOCK_TAP_MAX)
-                                    {
-                                        locked = true;
-                                        // Tell overlays/panels to show the
-                                        // hands-free indicator.
-                                        use tauri::Emitter;
-                                        let _ = app.emit("recording-locked", true);
-                                        debug!(
-                                            "Tap-to-lock engaged for '{binding_id}'; tap again to stop"
-                                        );
-                                    } else {
-                                        stop(&app, &mut stage, &binding_id, &hotkey_string);
-                                    }
+                                    stop(&app, &mut stage, &binding_id, &hotkey_string);
                                 }
                             } else if is_pressed {
+                                // Toggle: press starts, pressing again stops.
                                 match &stage {
                                     Stage::Idle => {
                                         start(&app, &mut stage, &binding_id, &hotkey_string);
+                                        // Hands-free recording engaged — let
+                                        // overlays show "press again to stop".
+                                        if matches!(stage, Stage::Recording(_)) {
+                                            use tauri::Emitter;
+                                            let _ = app.emit("recording-locked", true);
+                                        }
                                     }
                                     Stage::Recording(id) if id == &binding_id => {
                                         stop(&app, &mut stage, &binding_id, &hotkey_string);
@@ -143,12 +111,10 @@ impl TranscriptionCoordinator {
                                 && (recording_was_active || matches!(stage, Stage::Recording(_)))
                             {
                                 stage = Stage::Idle;
-                                locked = false;
                             }
                         }
                         Command::ProcessingFinished => {
                             stage = Stage::Idle;
-                            locked = false;
                         }
                     }
                 }
@@ -170,7 +136,6 @@ impl TranscriptionCoordinator {
         hotkey_string: &str,
         is_pressed: bool,
         push_to_talk: bool,
-        tap_to_lock: bool,
     ) {
         if self
             .tx
@@ -179,7 +144,6 @@ impl TranscriptionCoordinator {
                 hotkey_string: hotkey_string.to_string(),
                 is_pressed,
                 push_to_talk,
-                tap_to_lock,
             })
             .is_err()
         {

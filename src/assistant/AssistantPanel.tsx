@@ -186,6 +186,12 @@ const AssistantPanel: React.FC = () => {
       );
 
       track(
+        await listen<boolean>("assistant-screen-armed", (e) => {
+          setAttachScreen(e.payload);
+        }),
+      );
+
+      track(
         await listen<{ role: string; content: string }[]>(
           "assistant-conversation",
           (e) => {
@@ -246,6 +252,9 @@ const AssistantPanel: React.FC = () => {
     setAttachScreen(false);
     try {
       if (withScreen) {
+        // Consume the backend armed flag too, so it doesn't double-fire on
+        // a later voice turn.
+        await commands.setAssistantScreenArmed(false);
         await commands.assistantSendTextWithScreen(text);
       } else {
         await commands.assistantSendText(text);
@@ -439,7 +448,13 @@ const AssistantPanel: React.FC = () => {
         {screenshotEnabled && (
           <button
             className={`assistant-attach-button${attachScreen ? " armed" : ""}`}
-            onClick={() => setAttachScreen((v) => !v)}
+            onClick={() => {
+              const next = !attachScreen;
+              setAttachScreen(next);
+              // Sync to backend so voice turns (hotkey or pill mic) attach
+              // the screenshot too.
+              void commands.setAssistantScreenArmed(next);
+            }}
             title={
               attachScreen
                 ? t("assistant.detachScreen")

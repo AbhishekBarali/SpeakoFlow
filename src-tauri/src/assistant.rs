@@ -35,6 +35,24 @@ pub fn panel_size_for(preset: &str) -> (f64, f64) {
 /// Whether the panel is currently collapsed to the pill.
 static PILL_MODE: AtomicBool = AtomicBool::new(false);
 
+/// One-shot "attach a screenshot to the next turn" flag, set by the panel's
+/// camera button. Applies to BOTH typed and voice turns.
+static SCREEN_ARMED: AtomicBool = AtomicBool::new(false);
+
+pub fn set_screen_armed(app: &AppHandle, armed: bool) {
+    SCREEN_ARMED.store(armed, Ordering::SeqCst);
+    let _ = app.emit("assistant-screen-armed", armed);
+}
+
+/// Consume the armed flag (returns true at most once per arm).
+pub fn take_screen_armed(app: &AppHandle) -> bool {
+    let armed = SCREEN_ARMED.swap(false, Ordering::SeqCst);
+    if armed {
+        let _ = app.emit("assistant-screen-armed", false);
+    }
+    armed
+}
+
 /// Appended to the stored user message when a screenshot was sent with it.
 /// The panel strips it for display and shows a chip instead; on later turns
 /// it tells the model a screenshot accompanied that message.
