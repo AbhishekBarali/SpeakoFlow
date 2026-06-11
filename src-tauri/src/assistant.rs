@@ -387,9 +387,13 @@ pub async fn run_assistant_turn(app: AppHandle, user_text: String, screenshot: O
     // Build the request: stable system prompt → history → new user msg.
     // (Cache-friendly: the prefix only ever grows by appending.) History is
     // capped (newest first wins) so request bodies stay small — critical for
-    // Azure, whose parser rejects oversized payloads.
-    const MAX_HISTORY_MESSAGES: usize = 12;
-    const MAX_HISTORY_CHARS: usize = 24_000;
+    // Azure, whose parser rejects oversized payloads. Screenshot turns get a
+    // much tighter cap: the image already dominates the body budget.
+    let (max_history_messages, max_history_chars) = if screenshot.is_some() {
+        (4usize, 6_000usize)
+    } else {
+        (12usize, 24_000usize)
+    };
     let mut messages: Vec<Value> = Vec::new();
     messages.push(json!({
         "role": "system",
@@ -400,9 +404,9 @@ pub async fn run_assistant_turn(app: AppHandle, user_text: String, screenshot: O
         let history = conversation.messages.lock().unwrap();
         let mut kept: Vec<&ChatMessage> = Vec::new();
         let mut chars = 0usize;
-        for message in history.iter().rev().take(MAX_HISTORY_MESSAGES) {
+        for message in history.iter().rev().take(max_history_messages) {
             chars += message.content.len();
-            if chars > MAX_HISTORY_CHARS && !kept.is_empty() {
+            if chars > max_history_chars && !kept.is_empty() {
                 break;
             }
             kept.push(message);

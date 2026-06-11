@@ -10,22 +10,23 @@ use std::io::Cursor;
 use xcap::Monitor;
 
 /// Hard ceiling for the **base64 data URL** (what actually lands in the
-/// JSON). Azure's request parser rejects bodies once a JSON string passes
-/// ~128 KiB ("Unterminated string ... image_url.url"), so the encoded form
-/// — raw JPEG × 4/3 — must stay clearly below that, with headroom for the
-/// prompt and history.
-const TARGET_ENCODED_BYTES: usize = 96 * 1024;
+/// JSON). Azure's gateway has rejected bodies at inconsistent sizes
+/// (observed cuts at ~140 KB–416 KB), so we stay FAR below the smallest
+/// observed failure: ≤48 KB encoded keeps the whole request body around
+/// ~60 KB. Vision models downscale to 512–768px tiles internally anyway,
+/// so the extra resolution was mostly wasted bytes.
+const TARGET_ENCODED_BYTES: usize = 48 * 1024;
 
 /// (longest edge, jpeg quality) attempts, best first. The first encoding
 /// whose base64 fits TARGET_ENCODED_BYTES wins; later rungs are
 /// guaranteed-small fallbacks.
 const ENCODE_LADDER: [(u32, u8); 6] = [
-    (1568, 70),
-    (1408, 62),
-    (1280, 56),
-    (1152, 50),
-    (1024, 45),
-    (896, 38),
+    (1280, 52),
+    (1152, 48),
+    (1024, 44),
+    (896, 40),
+    (768, 36),
+    (640, 32),
 ];
 
 fn scaled(img: &DynamicImage, max_dim: u32) -> DynamicImage {
@@ -100,10 +101,10 @@ mod tests {
         match result {
             Ok(url) => {
                 assert!(url.starts_with("data:image/jpeg;base64,"));
-                // The full data URL must stay under Azure's ~128 KiB JSON
-                // string cap with headroom for prompt + history.
+                // The full data URL must stay far below every observed
+                // provider cutoff, with headroom for prompt + history.
                 assert!(
-                    url.len() <= 100 * 1024,
+                    url.len() <= 52 * 1024,
                     "data url too large: {} KB",
                     url.len() / 1024
                 );
