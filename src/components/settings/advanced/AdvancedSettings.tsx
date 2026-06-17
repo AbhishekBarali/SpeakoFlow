@@ -4,6 +4,7 @@ import { ShowOverlay } from "../ShowOverlay";
 import { ModelUnloadTimeoutSetting } from "../ModelUnloadTimeout";
 import { CustomWords } from "../CustomWords";
 import { SettingsGroup } from "../../ui/SettingsGroup";
+import { MoreOptions } from "../../ui/MoreOptions";
 import { StartHidden } from "../StartHidden";
 import { AutostartToggle } from "../AutostartToggle";
 import { ShowTrayIcon } from "../ShowTrayIcon";
@@ -29,24 +30,30 @@ export const AdvancedSettings: React.FC = () => {
   return (
     <div className="max-w-3xl w-full mx-auto space-y-6">
       <SettingsGroup title={t("settings.advanced.groups.app")}>
-        <StartHidden descriptionMode="tooltip" grouped={true} />
         <AutostartToggle descriptionMode="tooltip" grouped={true} />
+        <StartHidden descriptionMode="tooltip" grouped={true} />
         <ShowTrayIcon descriptionMode="tooltip" grouped={true} />
-        <ShowOverlay descriptionMode="tooltip" grouped={true} />
-        <ModelUnloadTimeoutSetting descriptionMode="tooltip" grouped={true} />
-        <ExperimentalToggle descriptionMode="tooltip" grouped={true} />
+        <MoreOptions>
+          <ShowOverlay descriptionMode="tooltip" grouped={true} />
+          <ModelUnloadTimeoutSetting descriptionMode="tooltip" grouped={true} />
+          <ExperimentalToggle descriptionMode="tooltip" grouped={true} />
+        </MoreOptions>
       </SettingsGroup>
 
       <SettingsGroup title={t("settings.advanced.groups.output")}>
         <PasteMethodSetting descriptionMode="tooltip" grouped={true} />
-        <TypingToolSetting descriptionMode="tooltip" grouped={true} />
-        <ClipboardHandlingSetting descriptionMode="tooltip" grouped={true} />
-        <AutoSubmit descriptionMode="tooltip" grouped={true} />
+        <MoreOptions>
+          <TypingToolSetting descriptionMode="tooltip" grouped={true} />
+          <ClipboardHandlingSetting descriptionMode="tooltip" grouped={true} />
+          <AutoSubmit descriptionMode="tooltip" grouped={true} />
+        </MoreOptions>
       </SettingsGroup>
 
       <SettingsGroup title={t("settings.advanced.groups.transcription")}>
         <CustomWords descriptionMode="tooltip" grouped />
-        <AppendTrailingSpace descriptionMode="tooltip" grouped={true} />
+        <MoreOptions>
+          <AppendTrailingSpace descriptionMode="tooltip" grouped={true} />
+        </MoreOptions>
       </SettingsGroup>
 
       <SettingsGroup title={t("settings.advanced.groups.history")}>

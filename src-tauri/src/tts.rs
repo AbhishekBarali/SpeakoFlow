@@ -93,6 +93,10 @@ pub async fn speak_remote_epoch(
             debug!("TTS audio fetched: {} KB", audio_bytes.len() / 1024);
             let volume = settings.audio_feedback_volume;
             let device = settings.selected_output_device.clone();
+            // Let the panel know audio is playing so it can show a Stop button
+            // even though the turn itself is already idle.
+            use tauri::Emitter;
+            let _ = app.emit("assistant-tts-playing", true);
             // rodio playback blocks; run it off the async runtime.
             let _ = tauri::async_runtime::spawn_blocking(move || {
                 if let Err(e) = play_audio_bytes(audio_bytes, device, volume, epoch) {
@@ -100,6 +104,7 @@ pub async fn speak_remote_epoch(
                 }
             })
             .await;
+            let _ = app.emit("assistant-tts-playing", false);
         }
         Err(e) => {
             error!("TTS request failed: {}", e);

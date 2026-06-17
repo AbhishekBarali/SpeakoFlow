@@ -53,17 +53,17 @@ export const Slider: React.FC<SliderProps> = ({
             value={value}
             onChange={handleChange}
             disabled={disabled}
-            className="flex-grow h-2 rounded-lg appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-logo-primary disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-grow h-2 rounded-full appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-ink/20 disabled:opacity-50 disabled:cursor-not-allowed"
             style={{
               background: `linear-gradient(to right, var(--color-background-ui) ${
                 ((value - min) / (max - min)) * 100
-              }%, rgba(128, 128, 128, 0.2) ${
+              }%, var(--color-hairline) ${
                 ((value - min) / (max - min)) * 100
               }%)`,
             }}
           />
           {showValue && (
-            <span className="text-sm font-medium text-text/90 w-12 text-end">
+            <span className="text-sm font-medium text-ink w-12 text-end">
               {formatValue(value)}
             </span>
           )}

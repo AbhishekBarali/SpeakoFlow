@@ -354,3 +354,29 @@ pub async fn assistant_list_azure_voices(
     let settings = get_settings(&app);
     crate::tts::list_azure_voices(&settings).await
 }
+
+/// Stop the current assistant turn: cancels in-flight generation and silences
+/// any spoken summary that is playing or about to play.
+#[tauri::command]
+#[specta::specta]
+pub fn assistant_stop(app: AppHandle) -> Result<(), String> {
+    crate::tts::stop_remote();
+    use tauri::Emitter;
+    // Tell the panel webview to stop local (Kokoro) playback too.
+    let _ = app.emit("assistant-tts-stop", ());
+    if let Some(conversation) = app.try_state::<assistant::AssistantConversation>() {
+        conversation.request_cancel();
+    }
+    Ok(())
+}
+
+/// How many prior messages the model receives as conversation context.
+#[tauri::command]
+#[specta::specta]
+pub fn set_assistant_max_history_messages(app: AppHandle, count: u32) -> Result<(), String> {
+    let mut settings = get_settings(&app);
+    settings.assistant_max_history_messages = count.min(200);
+    write_settings(&app, settings);
+    emit_settings_changed(&app);
+    Ok(())
+}

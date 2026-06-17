@@ -108,6 +108,7 @@ export const AssistantSettings: React.FC = () => {
 
   const [model, setModel] = useState("");
   const [systemPrompt, setSystemPrompt] = useState("");
+  const [historyLimit, setHistoryLimit] = useState("12");
   const [ttsPrompt, setTtsPrompt] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
@@ -185,6 +186,17 @@ export const AssistantSettings: React.FC = () => {
   useEffect(() => {
     setSystemPrompt(settings?.assistant_system_prompt ?? "");
   }, [settings?.assistant_system_prompt]);
+
+  useEffect(() => {
+    setHistoryLimit(String(settings?.assistant_max_history_messages ?? 12));
+  }, [settings?.assistant_max_history_messages]);
+
+  const handleHistoryLimitBlur = async () => {
+    const parsed = Math.max(0, Math.min(200, parseInt(historyLimit, 10) || 0));
+    setHistoryLimit(String(parsed));
+    await commands.setAssistantMaxHistoryMessages(parsed);
+    await refreshSettings();
+  };
 
   useEffect(() => {
     setTtsPrompt(settings?.assistant_tts_prompt ?? "");
@@ -834,6 +846,23 @@ export const AssistantSettings: React.FC = () => {
             onBlur={handlePromptBlur}
             className="w-full"
             rows={5}
+          />
+        </SettingContainer>
+        <SettingContainer
+          title={t("settings.assistant.memory.label")}
+          description={t("settings.assistant.memory.description")}
+          descriptionMode="tooltip"
+          layout="horizontal"
+          grouped={true}
+        >
+          <Input
+            type="number"
+            min={0}
+            max={200}
+            value={historyLimit}
+            onChange={(e) => setHistoryLimit(e.target.value)}
+            onBlur={handleHistoryLimitBlur}
+            className="w-[120px]"
           />
         </SettingContainer>
       </SettingsGroup>

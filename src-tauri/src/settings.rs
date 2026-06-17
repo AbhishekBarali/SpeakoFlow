@@ -468,6 +468,8 @@ pub struct AppSettings {
     pub assistant_tts_remote_voice: String,
     #[serde(default = "default_assistant_tts_kokoro_dtype")]
     pub assistant_tts_kokoro_dtype: String,
+    #[serde(default = "default_assistant_max_history_messages")]
+    pub assistant_max_history_messages: u32,
     #[serde(default = "default_assistant_tts_prompt")]
     pub assistant_tts_prompt: String,
     #[serde(default = "default_assistant_panel_opacity")]
@@ -752,6 +754,11 @@ fn default_assistant_tts_kokoro_dtype() -> String {
     "fp32".to_string()
 }
 
+fn default_assistant_max_history_messages() -> u32 {
+    // How many prior messages (user+assistant) the model sees as context.
+    12
+}
+
 fn default_assistant_panel_size() -> String {
     "standard".to_string()
 }
@@ -816,6 +823,11 @@ fn ensure_assistant_defaults(settings: &mut AppSettings) -> bool {
         "fp32" | "fp16" | "q8" | "q4" | "q4f16"
     ) {
         settings.assistant_tts_kokoro_dtype = default_assistant_tts_kokoro_dtype();
+        changed = true;
+    }
+    // Keep conversation memory in a sane range (0 = no memory, 200 hard cap).
+    if settings.assistant_max_history_messages > 200 {
+        settings.assistant_max_history_messages = 200;
         changed = true;
     }
     if !matches!(
@@ -1089,6 +1101,7 @@ pub fn get_default_settings() -> AppSettings {
         assistant_tts_model: default_assistant_tts_model(),
         assistant_tts_remote_voice: default_assistant_tts_remote_voice(),
         assistant_tts_kokoro_dtype: default_assistant_tts_kokoro_dtype(),
+        assistant_max_history_messages: default_assistant_max_history_messages(),
         assistant_tts_prompt: default_assistant_tts_prompt(),
         assistant_panel_opacity: default_assistant_panel_opacity(),
         assistant_font_size: default_assistant_font_size(),

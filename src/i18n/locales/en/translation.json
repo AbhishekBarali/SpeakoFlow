@@ -1,4 +1,9 @@
 {
+  "common": {
+    "noOptionsFound": "No options found",
+    "showAdvanced": "Show advanced options",
+    "showLess": "Show less"
+  },
   "tray": {
     "settings": "Settings...",
     "checkUpdates": "Check for Updates...",
@@ -530,11 +535,11 @@
       "title": "About",
       "version": {
         "title": "Version",
-        "description": "Current version of Handy"
+        "description": "Current version of SpeakoFlow"
       },
       "appDataDirectory": {
         "title": "App Data Directory",
-        "description": "Location where Handy stores its data"
+        "description": "Location where SpeakoFlow stores its data"
       },
       "sourceCode": {
         "title": "Source Code",
@@ -548,10 +553,15 @@
       },
       "acknowledgments": {
         "title": "Acknowledgments",
+        "handy": {
+          "title": "Handy",
+          "description": "The open-source app SpeakoFlow is built on",
+          "details": "SpeakoFlow began as a fork of Handy by CJ Pais. Huge thanks to the original project and its contributors for the foundation."
+        },
         "whisper": {
           "title": "Whisper.cpp",
           "description": "High-performance inference of OpenAI's Whisper automatic speech recognition model",
-          "details": "Handy uses Whisper.cpp for fast, local speech-to-text processing. Thanks to the amazing work by Georgi Gerganov and contributors."
+          "details": "SpeakoFlow uses Whisper.cpp for fast, local speech-to-text processing. Thanks to the amazing work by Georgi Gerganov and contributors."
         }
       }
     },
@@ -576,6 +586,10 @@
         "title": "System Prompt",
         "label": "Assistant System Prompt",
         "description": "Sets the assistant's behavior. Keep it stable — changing it invalidates the provider-side prompt cache."
+      },
+      "memory": {
+        "label": "Conversation memory",
+        "description": "How many recent messages (your messages + the assistant's replies) are sent back as context on each turn. Higher remembers more of the conversation but costs more tokens and can slow responses. 0 means each question is answered with no memory of prior turns. Screenshot turns are capped lower automatically."
       },
       "vision": {
         "title": "Screen Vision",
@@ -736,6 +750,7 @@
     "inputPlaceholder": "Type a message...",
     "inputPlaceholderScreen": "Ask about your screen...",
     "send": "Send",
+    "stop": "Stop",
     "clear": "Clear conversation",
     "hide": "Hide panel",
     "copy": "Copy",

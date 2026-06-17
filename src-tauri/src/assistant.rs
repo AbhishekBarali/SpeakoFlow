@@ -11,9 +11,10 @@ use log::{debug, error};
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter, Manager, WebviewWindowBuilder};
 use tauri_plugin_store::StoreExt;
+use tokio::sync::Notify;
 
 pub const PANEL_LABEL: &str = "assistant_panel";
 const PANEL_MARGIN: f64 = 24.0;
@@ -87,6 +88,8 @@ pub struct AssistantConversation {
     pub messages: Mutex<Vec<ChatMessage>>,
     /// Guards against duplicate concurrent turns (double-fired hotkeys etc).
     busy: AtomicBool,
+    /// Notified when the user presses Stop, to cancel an in-flight turn.
+    cancel: Arc<Notify>,
 }
 
 impl AssistantConversation {
@@ -94,7 +97,13 @@ impl AssistantConversation {
         Self {
             messages: Mutex::new(Vec::new()),
             busy: AtomicBool::new(false),
+            cancel: Arc::new(Notify::new()),
         }
+    }
+
+    /// Cancel the current assistant turn (if any). Safe to call when idle.
+    pub fn request_cancel(&self) {
+        self.cancel.notify_waiters();
     }
 }
 
@@ -390,9 +399,14 @@ pub async fn run_assistant_turn(app: AppHandle, user_text: String, screenshot: O
     // Azure, whose parser rejects oversized payloads. Screenshot turns get a
     // much tighter cap: the image already dominates the body budget.
     let (max_history_messages, max_history_chars) = if screenshot.is_some() {
-        (4usize, 6_000usize)
+        // Screenshot turns keep a tight cap regardless of the user setting:
+        // the image already dominates the payload budget.
+        (
+            (settings.assistant_max_history_messages as usize).min(4),
+            6_000usize,
+        )
     } else {
-        (12usize, 24_000usize)
+        (settings.assistant_max_history_messages as usize, 24_000usize)
     };
     let mut messages: Vec<Value> = Vec::new();
     messages.push(json!({
@@ -452,15 +466,56 @@ pub async fn run_assistant_turn(app: AppHandle, user_text: String, screenshot: O
         screenshot.is_some()
     );
 
-    let app_for_tokens = app.clone();
-    let result =
-        llm_client::send_chat_stream(&provider, api_key.clone(), &model, messages, move |token| {
-            let _ = app_for_tokens.emit("assistant-token", token.to_string());
-        })
-        .await;
+    let cancel = {
+        let conversation = app.state::<AssistantConversation>();
+        conversation.cancel.clone()
+    };
 
-    match result {
-        Ok(full_text) => {
+    // Accumulate streamed tokens so a cancelled turn can keep the partial reply.
+    let partial = Arc::new(Mutex::new(String::new()));
+    let partial_cb = partial.clone();
+    let app_for_tokens = app.clone();
+    let stream_fut = llm_client::send_chat_stream(
+        &provider,
+        api_key.clone(),
+        &model,
+        messages,
+        move |token| {
+            if let Ok(mut buf) = partial_cb.lock() {
+                buf.push_str(token);
+            }
+            let _ = app_for_tokens.emit("assistant-token", token.to_string());
+        },
+    );
+    tokio::pin!(stream_fut);
+
+    // Race the stream against a Stop request. notify_waiters wakes this select.
+    let outcome = tokio::select! {
+        result = &mut stream_fut => Some(result),
+        _ = cancel.notified() => None,
+    };
+
+    match outcome {
+        None => {
+            // User pressed Stop. Silence any spoken summary already playing and
+            // keep whatever text was generated so far (like a cancelled chat).
+            crate::tts::stop_remote();
+            let partial_text = partial
+                .lock()
+                .map(|b| b.trim().to_string())
+                .unwrap_or_default();
+            if !partial_text.is_empty() {
+                let conversation = app.state::<AssistantConversation>();
+                let mut history = conversation.messages.lock().unwrap();
+                history.push(ChatMessage {
+                    role: "assistant".to_string(),
+                    content: partial_text,
+                });
+            }
+            emit_conversation(&app);
+            debug!("Assistant turn cancelled by user");
+        }
+        Some(Ok(full_text)) => {
             {
                 let conversation = app.state::<AssistantConversation>();
                 let mut history = conversation.messages.lock().unwrap();
@@ -475,7 +530,7 @@ pub async fn run_assistant_turn(app: AppHandle, user_text: String, screenshot: O
                 spawn_tts_summary(&app, &settings, &provider, api_key, &model, full_text);
             }
         }
-        Err(e) => {
+        Some(Err(e)) => {
             error!("Assistant request failed: {}", e);
             let message = if e.contains("Unterminated string") && screenshot.is_some() {
                 "The request was cut off by the provider — the screenshot made it too large for this endpoint. It will be compressed harder next time; please try again.".to_string()

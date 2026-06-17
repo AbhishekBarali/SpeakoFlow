@@ -40,10 +40,8 @@ const ModelDropdown: React.FC<ModelDropdownProps> = ({
               }}
               tabIndex={0}
               role="button"
-              className={`w-full px-3 py-2 text-start hover:bg-mid-gray/10 transition-colors cursor-pointer focus:outline-none ${
-                currentModelId === model.id
-                  ? "bg-logo-primary/10 text-logo-primary"
-                  : ""
+              className={`w-full px-3 py-2 text-start hover:bg-surface-strong transition-colors cursor-pointer focus:outline-none ${
+                currentModelId === model.id ? "bg-surface-strong text-ink" : ""
               }`}
             >
               <div className="flex items-center justify-between">

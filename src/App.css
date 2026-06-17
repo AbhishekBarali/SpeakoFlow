@@ -1,64 +1,130 @@
 @import "tailwindcss";
 
+/*
+ * Design system — editorial / atmospheric.
+ * Off-white canvas, warm near-black ink, hairline rules, soft pastel
+ * gradient orbs as the only color moments. Display runs EB Garamond (light,
+ * editorial); body/UI runs Inter. Inspired by the ElevenLabs design language.
+ */
 @theme {
-  /* Design tokens */
-  --color-text: #0f0f0f;
-  --color-background: #fbfbfb;
-  --color-background-ui: #da5893;
-  --color-logo-primary: #faa2ca;
-  --color-logo-stroke: #382731;
+  /* === Surfaces === */
+  --color-canvas: #f5f5f5; /* page floor (off-white) */
+  --color-canvas-soft: #fafafa; /* alternating bands */
+  --color-surface: #ffffff; /* cards */
+  --color-surface-strong: #f0efed; /* badges, plates, hover fills */
+
+  /* === Ink / text === */
+  --color-ink: #0c0a09; /* display + primary text */
+  --color-ink-soft: #292524; /* primary CTA fill, emphasis */
+  --color-body: #4e4e4e; /* running text */
+  --color-muted: #777169; /* sub-titles, captions */
+  --color-muted-soft: #a8a29e; /* disabled, hints */
+
+  /* === Hairlines === */
+  --color-hairline: #e7e5e4; /* default 1px divider */
+  --color-hairline-strong: #d6d3d1; /* stronger panel outline */
+
+  /* === Atmospheric gradient stops (decoration only) === */
+  --color-orb-mint: #a7e5d3;
+  --color-orb-peach: #f4c5a8;
+  --color-orb-lavender: #c8b8e0;
+  --color-orb-sky: #a8c8e8;
+  --color-orb-rose: #e8b8c4;
+
+  /* === Semantic === */
+  --color-success: #16a34a;
+  --color-error: #dc2626;
+
+  /* === On-color text === */
+  --color-on-primary: #ffffff; /* text on the ink pill */
+
+  /* === Toggle switch ===
+   * Kept separate from the primary action color so the "on" state never
+   * blows out to pure white in dark mode. The knob always contrasts. */
+  --color-toggle-track-on: #292524; /* ink track when on */
+  --color-toggle-knob-on: #ffffff; /* knob when on */
+
+  /* === Back-compat aliases ===
+   * Many leaf components still reference these original token names.
+   * Re-point them at the new palette so the whole app stays coherent
+   * without touching every file. */
+  --color-background: var(--color-canvas);
+  --color-text: var(--color-ink);
+  --color-background-ui: var(--color-ink-soft); /* primary action = ink pill */
+  --color-logo-primary: var(--color-ink-soft); /* accent / active = ink */
+  --color-logo-stroke: #292524;
   --color-text-stroke: #f6f6f6;
-  --color-mid-gray: #808080;
+  /* warm gray: at /20 opacity it lands ≈ #e7e6e4 (hairline); solid it reads as a muted label */
+  --color-mid-gray: #8a827a;
+
+  /* === Type families === */
+  --font-sans:
+    "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: "EB Garamond", "Iowan Old Style", "Times New Roman", serif;
 }
 
 :root {
-  /* Typography */
+  /* Typography baseline */
+  font-family: var(--font-sans);
   font-size: 15px;
-  line-height: 24px;
+  line-height: 1.5;
   font-weight: 400;
+  letter-spacing: 0.01em;
 
-  /* Colors - Light Theme */
-  /* --color-text: #0f0f0f;
-  --color-background: #fbfbfb;
-  --color-logo-primary: #FAA2CA;
-  --color-logo-stroke: #382731;
-  --color-text-stroke: #f6f6f6; */
-
-  /* Typography settings */
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   -webkit-text-size-adjust: 100%;
 
-  --scrollbar-thumb: color-mix(in srgb, var(--color-text), transparent 85%);
+  --scrollbar-thumb: color-mix(in srgb, var(--color-text), transparent 88%);
   --scrollbar-thumb-hover: color-mix(
     in srgb,
     var(--color-text),
-    transparent 70%
+    transparent 72%
   );
 
-  /* Apply colors */
   color: var(--color-text);
   background-color: var(--color-background);
 }
 
-.container {
-  margin: 0;
-  padding-top: 10vh;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  text-align: center;
+/* Display face — editorial serif, used with restraint on headings only. */
+.font-display {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: -0.01em;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    /* Colors - Dark Theme */
-    --color-text: #fbfbfb;
-    --color-background: #2c2b29;
-    --color-logo-primary: #f28cbb;
-    --color-logo-stroke: #fad1ed;
+    /* Dark inversion — warm near-black surfaces, off-white ink. */
+    --color-canvas: #0c0a09;
+    --color-canvas-soft: #161311;
+    --color-surface: #1c1917;
+    --color-surface-strong: #292524;
+
+    --color-ink: #fafaf9;
+    --color-ink-soft: #f5f5f4;
+    --color-body: #d6d3d1;
+    --color-muted: #a8a29e;
+    --color-muted-soft: #78716c;
+
+    --color-hairline: #292524;
+    --color-hairline-strong: #44403c;
+
+    --color-on-primary: #0c0a09;
+
+    /* Toggle: soft light track + dark knob so it reads as "on" without glaring */
+    --color-toggle-track-on: #b8b2ab;
+    --color-toggle-knob-on: #1c1917;
+
+    /* aliases */
+    --color-background: var(--color-canvas);
+    --color-text: var(--color-ink);
+    --color-background-ui: #fafaf9; /* primary pill inverts to light in dark mode */
+    --color-logo-primary: #e7e5e4;
+    --color-logo-stroke: #e7e5e4;
+    --color-mid-gray: #8a827a;
   }
 }
 
@@ -94,6 +160,16 @@
 @layer utilities {
   .text-stroke {
     -webkit-text-stroke: 2px var(--color-text-stroke);
+  }
+
+  /* Soft atmospheric gradient orb — pure decoration, never holds content. */
+  .orb {
+    position: absolute;
+    border-radius: 9999px;
+    filter: blur(64px);
+    opacity: 0.45;
+    pointer-events: none;
+    z-index: 0;
   }
 }
 

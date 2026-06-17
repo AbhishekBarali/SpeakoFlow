@@ -20,6 +20,8 @@
     "postinstall": "bun scripts/check-nix-deps.ts"
   },
   "dependencies": {
+    "@fontsource/eb-garamond": "^5.2.7",
+    "@fontsource/inter": "^5.2.8",
     "@tailwindcss/vite": "^4.1.16",
     "@tauri-apps/api": "^2.10.0",
     "@tauri-apps/plugin-autostart": "~2.5.1",

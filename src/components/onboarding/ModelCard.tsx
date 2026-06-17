@@ -88,18 +88,18 @@ const ModelCard: React.FC<ModelCardProps> = ({
 
   const getVariantClasses = () => {
     if (status === "active") {
-      return "border-2 border-logo-primary/50 bg-logo-primary/10";
+      return "border-2 border-ink bg-surface-strong";
     }
     if (isFeatured) {
-      return "border-2 border-logo-primary/25 bg-logo-primary/5";
+      return "border border-ink/30 bg-surface shadow-[0_1px_2px_rgba(12,10,9,0.04)]";
     }
-    return "border-2 border-mid-gray/20";
+    return "border border-hairline bg-surface";
   };
 
   const getInteractiveClasses = () => {
     if (!isClickable) return "";
     if (disabled) return "opacity-50 cursor-not-allowed";
-    return "cursor-pointer hover:border-logo-primary/50 hover:bg-logo-primary/5 hover:shadow-lg hover:scale-[1.01] active:scale-[0.99] group";
+    return "cursor-pointer hover:border-ink/40 hover:shadow-md hover:scale-[1.01] active:scale-[0.99] group";
   };
 
   const handleClick = () => {

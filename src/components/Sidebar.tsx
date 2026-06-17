@@ -9,7 +9,7 @@ import {
   Cpu,
   MessageCircle,
 } from "lucide-react";
-import HandyTextLogo from "./icons/HandyTextLogo";
+import Wordmark from "./Wordmark";
 import HandyHand from "./icons/HandyHand";
 import { useSettings } from "../hooks/useSettings";
 import {
@@ -108,34 +108,33 @@ export const Sidebar: React.FC<SidebarProps> = ({
     .map(([id, config]) => ({ id: id as SidebarSection, ...config }));
 
   return (
-    <div className="flex flex-col w-40 h-full border-e border-mid-gray/20 items-center px-2">
-      <HandyTextLogo width={120} className="m-4" />
-      <div className="flex flex-col w-full items-center gap-1 pt-2 border-t border-mid-gray/20">
+    <div className="flex flex-col w-44 h-full border-e border-hairline bg-canvas-soft px-3 py-4">
+      <Wordmark className="text-2xl mx-2 mb-5 mt-1" />
+      <nav className="flex flex-col w-full gap-0.5">
         {availableSections.map((section) => {
           const Icon = section.icon;
           const isActive = activeSection === section.id;
 
           return (
-            <div
+            <button
               key={section.id}
-              className={`flex gap-2 items-center p-2 w-full rounded-lg cursor-pointer transition-colors ${
+              type="button"
+              aria-current={isActive ? "page" : undefined}
+              className={`flex gap-2.5 items-center px-3 py-2 w-full rounded-xl cursor-pointer transition-colors text-start ${
                 isActive
-                  ? "bg-logo-primary/80"
-                  : "hover:bg-mid-gray/20 hover:opacity-100 opacity-85"
+                  ? "bg-surface text-ink font-medium border border-hairline shadow-[0_1px_2px_rgba(12,10,9,0.04)]"
+                  : "text-muted hover:text-ink hover:bg-surface-strong border border-transparent"
               }`}
               onClick={() => onSectionChange(section.id)}
             >
-              <Icon width={24} height={24} className="shrink-0" />
-              <p
-                className="text-sm font-medium truncate"
-                title={t(section.labelKey)}
-              >
+              <Icon width={18} height={18} className="shrink-0" />
+              <span className="text-sm truncate" title={t(section.labelKey)}>
                 {t(section.labelKey)}
-              </p>
-            </div>
+              </span>
+            </button>
           );
         })}
-      </div>
+      </nav>
     </div>
   );
 };

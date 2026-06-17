@@ -331,8 +331,19 @@ pub fn run(cli_args: CliArgs) {
                 args.push(' ');
             }
             args.push_str("--autoplay-policy=no-user-gesture-required");
-            std::env::set_var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", args);
         }
+        // Keep audio and timers alive when the panel is hidden or occluded.
+        // Without this, WebView2 marks the (frequently hidden) panel window as
+        // occluded and suspends its media, so Kokoro TTS only played when the
+        // panel happened to be visible/foreground — e.g. right after opening it
+        // via the shortcut — and stayed silent otherwise.
+        if !args.contains("CalculateNativeWinOcclusion") {
+            if !args.is_empty() {
+                args.push(' ');
+            }
+            args.push_str("--disable-features=CalculateNativeWinOcclusion");
+        }
+        std::env::set_var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", args);
     }
 
     // Parse console logging directives from RUST_LOG, falling back to info-level logging
@@ -471,6 +482,8 @@ pub fn run(cli_args: CliArgs) {
             commands::assistant::assistant_speak,
             commands::assistant::assistant_test_tts,
             commands::assistant::assistant_list_azure_voices,
+            commands::assistant::assistant_stop,
+            commands::assistant::set_assistant_max_history_messages,
             helpers::clamshell::is_laptop,
         ])
         .events(collect_events![managers::history::HistoryUpdatePayload,]);
@@ -560,7 +573,7 @@ pub fn run(cli_args: CliArgs) {
             // for portable mode (redirects WebView2 cache to portable Data dir)
             let mut win_builder =
                 tauri::WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::App("/".into()))
-                    .title("Handy")
+                    .title("SpeakoFlow")
                     .inner_size(680.0, 570.0)
                     .min_inner_size(680.0, 570.0)
                     .resizable(true)

@@ -91,6 +91,7 @@ const AssistantPanel: React.FC = () => {
   const [attachScreen, setAttachScreen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [locked, setLocked] = useState(false);
+  const [ttsPlaying, setTtsPlaying] = useState(false);
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const sendingRef = useRef(false);
@@ -222,6 +223,18 @@ const AssistantPanel: React.FC = () => {
       );
 
       track(
+        await listen("assistant-tts-stop", () => {
+          tts.stop();
+        }),
+      );
+
+      track(
+        await listen<boolean>("assistant-tts-playing", (e) => {
+          setTtsPlaying(e.payload);
+        }),
+      );
+
+      track(
         await listen<boolean>("assistant-collapsed", (e) => {
           setCollapsed(e.payload);
         }),
@@ -243,6 +256,9 @@ const AssistantPanel: React.FC = () => {
   }, [refreshSettings]);
 
   const busy = state !== "idle";
+  const ttsActive =
+    ttsPlaying || tts.status === "speaking" || tts.status === "loading";
+  const showStop = busy || ttsActive;
 
   const sendText = useCallback(async () => {
     const text = input.trim();
@@ -272,6 +288,16 @@ const AssistantPanel: React.FC = () => {
     setError(null);
     setStream("");
     await commands.assistantClearConversation();
+  }, [tts]);
+
+  const stopTurn = useCallback(async () => {
+    tts.stop();
+    setTtsPlaying(false);
+    try {
+      await commands.assistantStop();
+    } catch {
+      // ignore — stop is best-effort
+    }
   }, [tts]);
 
   const hidePanel = useCallback(async () => {
@@ -483,11 +509,15 @@ const AssistantPanel: React.FC = () => {
         />
         <button
           className="assistant-send-button"
-          onClick={sendText}
-          disabled={!input.trim() || busy}
-          title={t("assistant.send")}
+          onClick={showStop ? stopTurn : sendText}
+          disabled={!showStop && !input.trim()}
+          title={showStop ? t("assistant.stop") : t("assistant.send")}
         >
-          <ArrowUp size={16} strokeWidth={2.5} />
+          {showStop ? (
+            <Square size={15} strokeWidth={2.5} />
+          ) : (
+            <ArrowUp size={16} strokeWidth={2.5} />
+          )}
         </button>
       </div>
     </div>

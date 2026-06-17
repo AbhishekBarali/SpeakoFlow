@@ -25,10 +25,8 @@ const IconButton: React.FC<{
   <button
     onClick={onClick}
     disabled={disabled}
-    className={`p-1.5 rounded-md flex items-center justify-center transition-colors cursor-pointer disabled:cursor-not-allowed disabled:text-text/20 ${
-      active
-        ? "text-logo-primary hover:text-logo-primary/80"
-        : "text-text/50 hover:text-logo-primary"
+    className={`p-1.5 rounded-lg flex items-center justify-center transition-colors cursor-pointer disabled:cursor-not-allowed disabled:text-muted-soft/50 ${
+      active ? "text-ink hover:text-ink/80" : "text-muted hover:text-ink"
     }`}
     title={title}
   >
@@ -273,9 +271,9 @@ export const HistorySettings: React.FC = () => {
   return (
     <div className="max-w-3xl w-full mx-auto space-y-6">
       <div className="space-y-2">
-        <div className="px-4 flex items-center justify-between">
+        <div className="px-1 flex items-center justify-between">
           <div>
-            <h2 className="text-xs font-medium text-mid-gray uppercase tracking-wide">
+            <h2 className="text-[11px] font-semibold text-muted uppercase tracking-[0.14em]">
               {t("settings.history.title")}
             </h2>
           </div>
@@ -284,7 +282,7 @@ export const HistorySettings: React.FC = () => {
             label={t("settings.history.openFolder")}
           />
         </div>
-        <div className="bg-background border border-mid-gray/20 rounded-lg overflow-visible">
+        <div className="bg-surface border border-hairline rounded-2xl overflow-visible shadow-[0_1px_2px_rgba(12,10,9,0.04)]">
           {content}
         </div>
       </div>

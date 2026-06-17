@@ -42,3 +42,10 @@ blob-report/
 
 # Nix build output
 result
+
+# Knowledge-graph analysis output (regenerated locally)
+graphify-out/
+
+# Editor / agent tooling
+.kiro/
+.agents/

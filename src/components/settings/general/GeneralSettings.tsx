@@ -4,6 +4,7 @@ import { type } from "@tauri-apps/plugin-os";
 import { MicrophoneSelector } from "../MicrophoneSelector";
 import { ShortcutInput } from "../ShortcutInput";
 import { SettingsGroup } from "../../ui/SettingsGroup";
+import { MoreOptions } from "../../ui/MoreOptions";
 import { OutputDeviceSelector } from "../OutputDeviceSelector";
 import { PushToTalk } from "../PushToTalk";
 import { AudioFeedback } from "../AudioFeedback";
@@ -31,14 +32,16 @@ export const GeneralSettings: React.FC = () => {
       <ModelSettingsCard />
       <SettingsGroup title={t("settings.sound.title")}>
         <MicrophoneSelector descriptionMode="tooltip" grouped={true} />
-        <MuteWhileRecording descriptionMode="tooltip" grouped={true} />
         <AudioFeedback descriptionMode="tooltip" grouped={true} />
-        <OutputDeviceSelector
-          descriptionMode="tooltip"
-          grouped={true}
-          disabled={!audioFeedbackEnabled}
-        />
-        <VolumeSlider disabled={!audioFeedbackEnabled} />
+        <MoreOptions>
+          <MuteWhileRecording descriptionMode="tooltip" grouped={true} />
+          <OutputDeviceSelector
+            descriptionMode="tooltip"
+            grouped={true}
+            disabled={!audioFeedbackEnabled}
+          />
+          <VolumeSlider disabled={!audioFeedbackEnabled} />
+        </MoreOptions>
       </SettingsGroup>
     </div>
   );

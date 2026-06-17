@@ -258,9 +258,9 @@ function App() {
           unstyled: true,
           classNames: {
             toast:
-              "bg-background border border-mid-gray/20 rounded-lg shadow-lg px-4 py-3 flex items-center gap-3 text-sm",
+              "bg-surface border border-hairline rounded-xl shadow-lg px-4 py-3 flex items-center gap-3 text-sm",
             title: "font-medium",
-            description: "text-mid-gray",
+            description: "text-muted",
           },
         }}
       />
@@ -272,9 +272,38 @@ function App() {
         />
         {/* Scrollable content area */}
         <div className="flex-1 flex flex-col overflow-hidden">
-          <div className="flex-1 overflow-y-auto">
-            <div className="flex flex-col items-center p-4 gap-4">
+          <div className="flex-1 overflow-y-auto overflow-x-hidden relative">
+            {/* Atmospheric gradient orbs — the only color moment on the canvas */}
+            <div
+              className="orb"
+              style={{
+                width: "360px",
+                height: "360px",
+                top: "-170px",
+                insetInlineEnd: "-90px",
+                background:
+                  "radial-gradient(circle at 30% 30%, var(--color-orb-lavender), transparent 70%)",
+              }}
+            />
+            <div
+              className="orb"
+              style={{
+                width: "300px",
+                height: "300px",
+                top: "-130px",
+                insetInlineStart: "-120px",
+                opacity: 0.28,
+                background:
+                  "radial-gradient(circle at 70% 40%, var(--color-orb-mint), transparent 72%)",
+              }}
+            />
+            <div className="relative z-10 flex flex-col items-center px-6 py-8 gap-6">
               <AccessibilityPermissions />
+              <header className="max-w-3xl w-full mx-auto">
+                <h1 className="font-display text-[2rem] leading-tight text-ink">
+                  {t(SECTIONS_CONFIG[currentSection].labelKey)}
+                </h1>
+              </header>
               {renderSettingsContent(currentSection)}
             </div>
           </div>
