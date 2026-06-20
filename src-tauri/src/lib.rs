@@ -587,7 +587,10 @@ pub fn run(cli_args: CliArgs) {
             let mut win_builder =
                 tauri::WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::App("/".into()))
                     .title("SpeakoFlow")
-                    .inner_size(680.0, 570.0)
+                    // Open a bit wider/taller so content (max-w-3xl) breathes
+                    // next to the sidebar instead of feeling cramped. Min stays
+                    // smaller so users can still shrink the window.
+                    .inner_size(900.0, 680.0)
                     .min_inner_size(680.0, 570.0)
                     .resizable(true)
                     .maximizable(false)

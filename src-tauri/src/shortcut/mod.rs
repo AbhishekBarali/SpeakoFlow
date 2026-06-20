@@ -542,6 +542,12 @@ pub fn change_theme_setting(app: AppHandle, theme: String) -> Result<(), String>
         let _ = window.set_theme(window_theme);
     }
 
+    // The assistant panel is a separate webview that only re-reads its
+    // settings (and re-applies the appearance) when it hears this event.
+    // Without it, toggling light/dark in settings leaves the panel stuck on
+    // whatever theme it loaded with.
+    let _ = app.emit("assistant-settings-changed", ());
+
     Ok(())
 }
 
