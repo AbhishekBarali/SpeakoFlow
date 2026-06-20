@@ -406,6 +406,41 @@ impl Drop for BusyReset {
     }
 }
 
+/// Detect provider errors that mean "the selected model can't accept images".
+/// Covers the bundled llama.cpp engine / LM Studio / Ollama ("image input is
+/// not supported", "mmproj") as well as OpenAI / Azure / other OpenAI-compatible
+/// gateways that reject image content. Only consulted on screenshot turns, so
+/// matching image/vision keywords broadly is safe.
+fn is_vision_unsupported_error(error: &str) -> bool {
+    let e = error.to_lowercase();
+    e.contains("image input is not supported")
+        || e.contains("mmproj")
+        || e.contains("does not support image")
+        || e.contains("not support image")
+        || e.contains("support image input")
+        || e.contains("image_url")
+        || e.contains("multimodal")
+        || (e.contains("vision") && (e.contains("not") || e.contains("unsupported")))
+}
+
+/// A clear, actionable message for when a screenshot was sent to a model that
+/// can't see images. The built-in provider gets a tailored hint because its
+/// vision models work as soon as the multimodal projector is installed, so the
+/// problem there is a missing component rather than an incapable model.
+fn vision_unsupported_message(provider_id: &str, model: &str) -> String {
+    if provider_id == "builtin" && crate::managers::model::mmproj_for(model).is_some() {
+        format!(
+            "The built-in model '{}' supports vision, but its image component isn't installed yet. Re-download it from the model manager to enable screen vision, or ask again without a screenshot.",
+            model
+        )
+    } else {
+        format!(
+            "The selected model '{}' doesn't support vision — it can't read screenshots. Pick a vision-capable model in Settings → Assistant (e.g. gpt-4o-mini, gpt-4.1-mini, gemini-flash, claude, or a multimodal local model), or ask again without a screenshot.",
+            model
+        )
+    }
+}
+
 /// Run one assistant turn: record the user message, stream the LLM answer to
 /// the panel via events, and append the reply to the conversation history.
 ///
@@ -641,6 +676,8 @@ pub async fn run_assistant_turn(app: AppHandle, user_text: String, screenshot: O
             error!("Assistant request failed: {}", e);
             let message = if e.contains("Unterminated string") && screenshot.is_some() {
                 "The request was cut off by the provider — the screenshot made it too large for this endpoint. It will be compressed harder next time; please try again.".to_string()
+            } else if screenshot.is_some() && is_vision_unsupported_error(&e) {
+                vision_unsupported_message(&provider.id, &model)
             } else if screenshot.is_some() {
                 format!(
                     "{}\n\nNote: a screenshot was attached — make sure the selected model supports image input (e.g. gpt-4o-mini, gpt-4.1-mini, gemini-flash, claude, llava).",
