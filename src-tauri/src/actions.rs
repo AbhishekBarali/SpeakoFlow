@@ -63,7 +63,11 @@ fn build_system_prompt(prompt_template: &str) -> String {
     prompt_template.replace("${output}", "").trim().to_string()
 }
 
-async fn post_process_transcription(settings: &AppSettings, transcription: &str) -> Option<String> {
+async fn post_process_transcription(
+    app: &AppHandle,
+    settings: &AppSettings,
+    transcription: &str,
+) -> Option<String> {
     let provider = match settings.active_post_process_provider().cloned() {
         Some(provider) => provider,
         None => {
@@ -124,6 +128,19 @@ async fn post_process_transcription(settings: &AppSettings, transcription: &str)
         .get(&provider.id)
         .cloned()
         .unwrap_or_default();
+
+    // The built-in provider is backed by the bundled llama.cpp engine; make
+    // sure it is running and serving the selected model before requesting.
+    if provider.id == "builtin" {
+        let manager = app.state::<std::sync::Arc<crate::managers::local_llm::LocalLlmManager>>();
+        if let Err(e) = manager.ensure_running(&model).await {
+            error!(
+                "Built-in LLM engine failed to start for post-processing: {}",
+                e
+            );
+            return None;
+        }
+    }
 
     // Disable reasoning for providers where post-processing rarely benefits from it.
     // - custom: top-level reasoning_effort (works for local OpenAI-compat servers)
@@ -361,7 +378,8 @@ pub(crate) async fn process_transcription_output(
     }
 
     if post_process {
-        if let Some(processed_text) = post_process_transcription(&settings, &final_text).await {
+        if let Some(processed_text) = post_process_transcription(app, &settings, &final_text).await
+        {
             post_processed_text = Some(processed_text.clone());
             final_text = processed_text;
 

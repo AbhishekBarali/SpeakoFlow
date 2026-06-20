@@ -64,12 +64,7 @@ pub async fn speak_remote(app: &AppHandle, settings: &AppSettings, text: String)
 /// Like [`speak_remote`] but tagged with a caller-captured epoch, so a cancel
 /// that occurred while the spoken summary was still being generated also
 /// suppresses playback.
-pub async fn speak_remote_epoch(
-    app: &AppHandle,
-    settings: &AppSettings,
-    text: String,
-    epoch: u64,
-) {
+pub async fn speak_remote_epoch(app: &AppHandle, settings: &AppSettings, text: String, epoch: u64) {
     // Superseded before we even started (e.g. disabled during generation).
     if current_epoch() != epoch {
         debug!("TTS request superseded before fetch; skipping");
@@ -369,7 +364,10 @@ async fn fetch_azure_speech(settings: &AppSettings, text: &str) -> Result<Vec<u8
         .header("Content-Type", "application/ssml+xml")
         // Highest-quality MP3 Azure offers: 48 kHz, 192 kbps. The previous
         // 24 kHz/48 kbps profile sounded crunchy on speech.
-        .header("X-Microsoft-OutputFormat", "audio-48khz-192kbitrate-mono-mp3")
+        .header(
+            "X-Microsoft-OutputFormat",
+            "audio-48khz-192kbitrate-mono-mp3",
+        )
         .header("User-Agent", "Handy")
         .body(ssml)
         .send()

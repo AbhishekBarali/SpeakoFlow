@@ -122,7 +122,7 @@ fn should_force_show_permissions_window(app: &AppHandle) -> bool {
         let has_downloaded_models = model_manager
             .get_available_models()
             .iter()
-            .any(|model| model.is_downloaded);
+            .any(|model| model.is_downloaded && model.engine_type.is_transcription());
 
         if !has_downloaded_models {
             return false;
@@ -159,6 +159,12 @@ fn initialize_core_logic(app_handle: &AppHandle) {
     let history_manager =
         Arc::new(HistoryManager::new(app_handle).expect("Failed to initialize history manager"));
 
+    // Built-in local LLM engine (manages the bundled llama.cpp sidecar).
+    let local_llm_manager = Arc::new(
+        managers::local_llm::LocalLlmManager::new(app_handle)
+            .expect("Failed to initialize local LLM manager"),
+    );
+
     // Apply accelerator preferences before any model loads
     managers::transcription::apply_accelerator_settings(app_handle);
 
@@ -167,6 +173,7 @@ fn initialize_core_logic(app_handle: &AppHandle) {
     app_handle.manage(model_manager.clone());
     app_handle.manage(transcription_manager.clone());
     app_handle.manage(history_manager.clone());
+    app_handle.manage(local_llm_manager.clone());
 
     // Note: Shortcuts are NOT initialized here.
     // The frontend is responsible for calling the `initialize_shortcuts` command
@@ -428,6 +435,9 @@ pub fn run(cli_args: CliArgs) {
             commands::models::is_model_loading,
             commands::models::has_any_models_available,
             commands::models::has_any_models_or_downloads,
+            commands::local_llm::get_local_llm_status,
+            commands::local_llm::start_local_llm,
+            commands::local_llm::stop_local_llm,
             commands::audio::update_microphone_mode,
             commands::audio::get_microphone_mode,
             commands::audio::get_windows_microphone_permission_status,
@@ -453,6 +463,8 @@ pub fn run(cli_args: CliArgs) {
             commands::history::retry_history_entry_transcription,
             commands::history::update_history_limit,
             commands::history::update_recording_retention_period,
+            commands::history::get_assistant_history_entries,
+            commands::history::delete_assistant_history_entry,
             commands::assistant::assistant_send_text,
             commands::assistant::assistant_send_text_with_screen,
             commands::assistant::assistant_get_conversation,

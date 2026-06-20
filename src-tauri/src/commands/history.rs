@@ -1,10 +1,10 @@
 use crate::actions::process_transcription_output;
 use crate::managers::{
-    history::{HistoryManager, PaginatedHistory},
+    history::{HistoryManager, PaginatedAssistantHistory, PaginatedHistory},
     transcription::TranscriptionManager,
 };
 use std::sync::Arc;
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 #[tauri::command]
 #[specta::specta]
@@ -150,5 +150,42 @@ pub async fn update_recording_retention_period(
         .cleanup_old_entries()
         .map_err(|e| e.to_string())?;
 
+    Ok(())
+}
+
+/// Page through saved assistant conversations (newest first).
+#[tauri::command]
+#[specta::specta]
+pub async fn get_assistant_history_entries(
+    _app: AppHandle,
+    history_manager: State<'_, Arc<HistoryManager>>,
+    cursor: Option<i64>,
+    limit: Option<usize>,
+) -> Result<PaginatedAssistantHistory, String> {
+    history_manager
+        .get_assistant_history_entries(cursor, limit)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Delete a single saved assistant conversation.
+#[tauri::command]
+#[specta::specta]
+pub async fn delete_assistant_history_entry(
+    app: AppHandle,
+    history_manager: State<'_, Arc<HistoryManager>>,
+    id: i64,
+) -> Result<(), String> {
+    history_manager
+        .delete_assistant_session(id)
+        .map_err(|e| e.to_string())?;
+
+    // If this was the conversation currently open in the panel, detach it so
+    // the next turn re-saves instead of updating the deleted row.
+    if let Some(conversation) = app.try_state::<crate::assistant::AssistantConversation>() {
+        conversation.forget_session_if(id);
+    }
+
+    let _ = app.emit("assistant-history-updated", ());
     Ok(())
 }

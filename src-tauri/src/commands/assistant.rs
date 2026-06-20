@@ -60,6 +60,9 @@ pub fn assistant_clear_conversation(app: AppHandle) -> Result<(), String> {
         .lock()
         .map_err(|e| format!("Conversation lock poisoned: {}", e))?
         .clear();
+    // Detach from the saved row so the next turn starts a new conversation in
+    // history rather than appending to the one the user just cleared.
+    conversation.reset_session();
     assistant::emit_conversation(&app);
     Ok(())
 }
@@ -206,7 +209,10 @@ pub fn set_assistant_accent(app: AppHandle, accent: String) -> Result<(), String
 #[tauri::command]
 #[specta::specta]
 pub fn set_assistant_tts_engine(app: AppHandle, engine: String) -> Result<(), String> {
-    if !matches!(engine.as_str(), "kokoro" | "openai" | "elevenlabs" | "azure") {
+    if !matches!(
+        engine.as_str(),
+        "kokoro" | "openai" | "elevenlabs" | "azure"
+    ) {
         return Err(format!("Unknown TTS engine: {}", engine));
     }
     // Switching engine mid-playback should stop the current clip.

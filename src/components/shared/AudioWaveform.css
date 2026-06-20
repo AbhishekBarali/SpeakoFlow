@@ -1,0 +1,103 @@
+/* AudioWaveform — a mirrored, rounded-cap waveform with a soft warm
+ * atmospheric bloom. Self-contained: colours come from CSS variables with
+ * editorial defaults (off-white bars, warm peach/amber glow) so it reads the
+ * same inside the recording overlay and the assistant panel.
+ *
+ * Tunable via:
+ *   --wave-bar     bar fill (vertical gradient recommended)
+ *   --wave-glow    bloom colour
+ *   --wave-energy  0..1 live intensity (set inline from the signal)
+ *   --bar-gap      spacing between bars (set inline per size)
+ */
+
+.audio-waveform {
+  --wave-bar: linear-gradient(to top, #d8cab6, #fafaf9 70%);
+  --wave-glow: #f4c5a8;
+
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+}
+
+.wave-bloom {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 150%;
+  height: 320%;
+  transform: translate(-50%, -50%)
+    scale(calc(0.7 + 0.3 * var(--wave-energy, 0)));
+  background: radial-gradient(
+    ellipse at center,
+    var(--wave-glow) 0%,
+    transparent 68%
+  );
+  opacity: calc(0.05 + 0.4 * var(--wave-energy, 0));
+  filter: blur(7px);
+  pointer-events: none;
+  transition:
+    opacity 220ms ease-out,
+    transform 220ms ease-out;
+  z-index: 0;
+}
+
+.wave-bars {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--bar-gap, 3px);
+}
+
+.wave-bar {
+  flex: none;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--wave-bar);
+  transition: height 90ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  will-change: height;
+}
+
+/* ---- Idle "breathing" — gentle staggered bob when the signal is quiet ---- */
+
+.audio-waveform.is-idle .wave-bar {
+  animation: wave-breathe-sm 1500ms ease-in-out infinite;
+  animation-delay: calc(var(--i) * 90ms);
+}
+
+.audio-waveform.md.is-idle .wave-bar {
+  animation-name: wave-breathe-md;
+}
+
+@keyframes wave-breathe-sm {
+  0%,
+  100% {
+    height: 3px;
+  }
+  50% {
+    height: 9px;
+  }
+}
+
+@keyframes wave-breathe-md {
+  0%,
+  100% {
+    height: 4px;
+  }
+  50% {
+    height: 13px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .audio-waveform.is-idle .wave-bar {
+    animation: none;
+    height: 5px;
+  }
+  .wave-bar {
+    transition: none;
+  }
+}

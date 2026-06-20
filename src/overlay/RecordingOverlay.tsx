@@ -1,11 +1,8 @@
 import { listen } from "@tauri-apps/api/event";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import {
-  MicrophoneIcon,
-  TranscriptionIcon,
-  CancelIcon,
-} from "../components/icons";
+import { Mic, AudioLines, Sparkles, X } from "lucide-react";
+import { AudioWaveform } from "../components/shared";
 import "./RecordingOverlay.css";
 import { commands } from "@/bindings";
 import i18n, { syncLanguageFromSettings } from "@/i18n";
@@ -13,13 +10,15 @@ import { getLanguageDirection } from "@/lib/utils/rtl";
 
 type OverlayState = "recording" | "transcribing" | "processing";
 
+/** Warm off-white that matches the editorial ink-on-dark palette. */
+const ICON_COLOR = "#f5f5f4";
+
 const RecordingOverlay: React.FC = () => {
   const { t } = useTranslation();
   const [isVisible, setIsVisible] = useState(false);
   const [state, setState] = useState<OverlayState>("recording");
   const [locked, setLocked] = useState(false);
-  const [levels, setLevels] = useState<number[]>(Array(16).fill(0));
-  const smoothedLevelsRef = useRef<number[]>(Array(16).fill(0));
+  const [levels, setLevels] = useState<number[]>([]);
   const direction = getLanguageDirection(i18n.language);
 
   useEffect(() => {
@@ -47,18 +46,10 @@ const RecordingOverlay: React.FC = () => {
         setLocked(e.payload);
       });
 
-      // Listen for mic-level updates
+      // Listen for mic-level updates. Smoothing + resampling is handled
+      // inside AudioWaveform, so we just forward the raw payload.
       const unlistenLevel = await listen<number[]>("mic-level", (event) => {
-        const newLevels = event.payload as number[];
-
-        // Apply smoothing to reduce jitter
-        const smoothed = smoothedLevelsRef.current.map((prev, i) => {
-          const target = newLevels[i] || 0;
-          return prev * 0.7 + target * 0.3; // Smooth transition
-        });
-
-        smoothedLevelsRef.current = smoothed;
-        setLevels(smoothed.slice(0, 9));
+        setLevels(event.payload as number[]);
       });
 
       // Cleanup function
@@ -73,58 +64,59 @@ const RecordingOverlay: React.FC = () => {
     setupEventListeners();
   }, []);
 
-  const getIcon = () => {
-    if (state === "recording") {
-      return <MicrophoneIcon />;
-    } else {
-      return <TranscriptionIcon />;
+  const isRecording = state === "recording";
+
+  // Clean Lucide glyphs, matching the icon language of the rest of the app.
+  const renderIcon = () => {
+    if (isRecording) {
+      return <Mic size={17} strokeWidth={2} color={ICON_COLOR} />;
     }
+    if (state === "processing") {
+      return <Sparkles size={16} strokeWidth={2} color={ICON_COLOR} />;
+    }
+    return <AudioLines size={17} strokeWidth={2} color={ICON_COLOR} />;
   };
 
   return (
     <div
       dir={direction}
-      className={`recording-overlay ${isVisible ? "fade-in" : ""}`}
+      className={`recording-overlay ${state} ${isVisible ? "fade-in" : ""}`}
     >
-      <div className="overlay-left">{getIcon()}</div>
+      <div className="overlay-left">
+        <span className={`overlay-icon ${state}`}>{renderIcon()}</span>
+      </div>
 
       <div className="overlay-middle">
-        {state === "recording" && locked && (
-          <div className="locked-text">{t("overlay.locked")}</div>
+        {isRecording && locked && (
+          <div className="overlay-text">{t("overlay.locked")}</div>
         )}
-        {state === "recording" && !locked && (
-          <div className="bars-container">
-            {levels.map((v, i) => (
-              <div
-                key={i}
-                className="bar"
-                style={{
-                  height: `${Math.min(20, 4 + Math.pow(v, 0.7) * 16)}px`, // Cap at 20px max height
-                  transition: "height 60ms ease-out, opacity 120ms ease-out",
-                  opacity: Math.max(0.2, v * 1.7), // Minimum opacity for visibility
-                }}
-              />
-            ))}
-          </div>
+        {isRecording && !locked && (
+          <AudioWaveform
+            levels={levels}
+            size="sm"
+            barCount={15}
+            active={isVisible}
+          />
         )}
         {state === "transcribing" && (
-          <div className="transcribing-text">{t("overlay.transcribing")}</div>
+          <div className="overlay-text shimmer">{t("overlay.transcribing")}</div>
         )}
         {state === "processing" && (
-          <div className="transcribing-text">{t("overlay.processing")}</div>
+          <div className="overlay-text shimmer">{t("overlay.processing")}</div>
         )}
       </div>
 
       <div className="overlay-right">
-        {state === "recording" && (
-          <div
+        {isRecording && (
+          <button
+            type="button"
             className="cancel-button"
             onClick={() => {
               commands.cancelOperation();
             }}
           >
-            <CancelIcon />
-          </div>
+            <X size={16} strokeWidth={2.5} color={ICON_COLOR} />
+          </button>
         )}
       </div>
     </div>

@@ -1,12 +1,31 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { convertFileSrc } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { readFile } from "@tauri-apps/plugin-fs";
-import { Check, Copy, FolderOpen, RotateCcw, Star, Trash2 } from "lucide-react";
+import {
+  Check,
+  ChevronDown,
+  ChevronRight,
+  Copy,
+  FolderOpen,
+  Camera,
+  MessageCircle,
+  RotateCcw,
+  Star,
+  Trash2,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import {
   commands,
   events,
+  type AssistantHistoryEntry,
   type HistoryEntry,
   type HistoryUpdatePayload,
 } from "@/bindings";
@@ -14,6 +33,22 @@ import { useOsType } from "@/hooks/useOsType";
 import { formatDateTime } from "@/utils/dateFormat";
 import { AudioPlayer } from "../../ui/AudioPlayer";
 import { Button } from "../../ui/Button";
+
+/** Must match SCREENSHOT_MARKER in src-tauri/src/assistant.rs */
+const SCREENSHOT_MARKER = "[screenshot attached]";
+
+/** Strip the screenshot marker the backend appends to stored user messages. */
+const cleanMessageContent = (
+  raw: string,
+): { text: string; screenshot: boolean } => {
+  if (raw.endsWith(SCREENSHOT_MARKER)) {
+    return {
+      text: raw.slice(0, -SCREENSHOT_MARKER.length).trimEnd(),
+      screenshot: true,
+    };
+  }
+  return { text: raw, screenshot: false };
+};
 
 const IconButton: React.FC<{
   onClick: () => void;
@@ -57,6 +92,15 @@ const OpenRecordingsButton: React.FC<OpenRecordingsButtonProps> = ({
   </Button>
 );
 
+/**
+ * A single item in the unified history feed. Transcriptions and assistant
+ * conversations are interleaved by time; `sortTime` is the seconds-epoch used
+ * for ordering (last activity for conversations, recording time otherwise).
+ */
+type FeedItem =
+  | { kind: "transcription"; sortTime: number; entry: HistoryEntry }
+  | { kind: "assistant"; sortTime: number; session: AssistantHistoryEntry };
+
 export const HistorySettings: React.FC = () => {
   const { t } = useTranslation();
   const osType = useOsType();
@@ -66,6 +110,17 @@ export const HistorySettings: React.FC = () => {
   const sentinelRef = useRef<HTMLDivElement>(null);
   const entriesRef = useRef<HistoryEntry[]>([]);
   const loadingRef = useRef(false);
+
+  // Assistant conversations are stored separately from transcriptions, so we
+  // load them as their own list and merge for display. They are few and
+  // capped on the backend, so a single fetch (no pagination) is enough.
+  const [assistantSessions, setAssistantSessions] = useState<
+    AssistantHistoryEntry[]
+  >([]);
+  const [assistantLoaded, setAssistantLoaded] = useState(false);
+  const [expandedAssistant, setExpandedAssistant] = useState<Set<number>>(
+    new Set(),
+  );
 
   // Keep ref in sync for use in IntersectionObserver callback
   useEffect(() => {
@@ -99,12 +154,28 @@ export const HistorySettings: React.FC = () => {
     }
   }, []);
 
+  const loadAssistantSessions = useCallback(async () => {
+    try {
+      const result = await commands.getAssistantHistoryEntries(null, null);
+      if (result.status === "ok") {
+        setAssistantSessions(result.data.entries);
+      }
+    } catch (error) {
+      console.error("Failed to load assistant history:", error);
+    } finally {
+      setAssistantLoaded(true);
+    }
+  }, []);
+
   // Initial load
   useEffect(() => {
     loadPage();
-  }, [loadPage]);
+    loadAssistantSessions();
+  }, [loadPage, loadAssistantSessions]);
 
-  // Infinite scroll via IntersectionObserver
+  // Infinite scroll via IntersectionObserver. Pagination tracks only
+  // transcriptions (cursor = last transcription id); assistant sessions are
+  // already fully loaded, so they just interleave into the sorted feed.
   useEffect(() => {
     if (loading) return;
 
@@ -147,6 +218,18 @@ export const HistorySettings: React.FC = () => {
       unlisten.then((fn) => fn());
     };
   }, []);
+
+  // Listen for assistant conversation changes (the panel is a separate window,
+  // so a turn there can't update this list directly). Refetch on each signal —
+  // expansion state is keyed by id, so it survives the reload.
+  useEffect(() => {
+    const unlisten = listen("assistant-history-updated", () => {
+      loadAssistantSessions();
+    });
+    return () => {
+      unlisten.then((fn) => fn());
+    };
+  }, [loadAssistantSessions]);
 
   const toggleSaved = async (id: number) => {
     // Optimistic update
@@ -221,6 +304,54 @@ export const HistorySettings: React.FC = () => {
     }
   };
 
+  const toggleExpandAssistant = useCallback((id: number) => {
+    setExpandedAssistant((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }, []);
+
+  const copyConversation = useCallback(
+    (session: AssistantHistoryEntry) => {
+      const text = session.messages
+        .map((message) => {
+          const { text: body } = cleanMessageContent(message.content);
+          const label =
+            message.role === "user"
+              ? t("settings.history.roleUser")
+              : t("settings.history.roleAssistant");
+          return `${label}: ${body}`;
+        })
+        .join("\n\n");
+      void copyToClipboard(text);
+    },
+    [t],
+  );
+
+  const deleteAssistantSession = useCallback(
+    async (id: number) => {
+      // Optimistically remove
+      setAssistantSessions((prev) => prev.filter((s) => s.id !== id));
+      setExpandedAssistant((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+      const result = await commands.deleteAssistantHistoryEntry(id);
+      if (result.status !== "ok") {
+        // Reload on failure to restore the optimistic removal
+        loadAssistantSessions();
+        throw new Error(String(result.error));
+      }
+    },
+    [loadAssistantSessions],
+  );
+
   const openRecordingsFolder = async () => {
     try {
       const result = await commands.openRecordingsFolder();
@@ -232,15 +363,33 @@ export const HistorySettings: React.FC = () => {
     }
   };
 
+  // Merge transcriptions and assistant conversations into a single feed,
+  // newest activity first.
+  const feed = useMemo<FeedItem[]>(() => {
+    const items: FeedItem[] = [];
+    for (const entry of entries) {
+      items.push({ kind: "transcription", sortTime: entry.timestamp, entry });
+    }
+    for (const session of assistantSessions) {
+      items.push({
+        kind: "assistant",
+        sortTime: session.updated_at,
+        session,
+      });
+    }
+    items.sort((a, b) => b.sortTime - a.sortTime);
+    return items;
+  }, [entries, assistantSessions]);
+
   let content: React.ReactNode;
 
-  if (loading) {
+  if (loading || !assistantLoaded) {
     content = (
       <div className="px-4 py-3 text-center text-text/60">
         {t("settings.history.loading")}
       </div>
     );
-  } else if (entries.length === 0) {
+  } else if (feed.length === 0) {
     content = (
       <div className="px-4 py-3 text-center text-text/60">
         {t("settings.history.empty")}
@@ -250,17 +399,30 @@ export const HistorySettings: React.FC = () => {
     content = (
       <>
         <div className="divide-y divide-mid-gray/20">
-          {entries.map((entry) => (
-            <HistoryEntryComponent
-              key={entry.id}
-              entry={entry}
-              onToggleSaved={() => toggleSaved(entry.id)}
-              onCopyText={() => copyToClipboard(entry.transcription_text)}
-              getAudioUrl={getAudioUrl}
-              deleteAudio={deleteAudioEntry}
-              retryTranscription={retryHistoryEntry}
-            />
-          ))}
+          {feed.map((item) =>
+            item.kind === "transcription" ? (
+              <HistoryEntryComponent
+                key={`t-${item.entry.id}`}
+                entry={item.entry}
+                onToggleSaved={() => toggleSaved(item.entry.id)}
+                onCopyText={() =>
+                  copyToClipboard(item.entry.transcription_text)
+                }
+                getAudioUrl={getAudioUrl}
+                deleteAudio={deleteAudioEntry}
+                retryTranscription={retryHistoryEntry}
+              />
+            ) : (
+              <AssistantHistoryEntryComponent
+                key={`a-${item.session.id}`}
+                session={item.session}
+                expanded={expandedAssistant.has(item.session.id)}
+                onToggleExpand={() => toggleExpandAssistant(item.session.id)}
+                onCopyConversation={() => copyConversation(item.session)}
+                onDelete={() => deleteAssistantSession(item.session.id)}
+              />
+            ),
+          )}
         </div>
         {/* Sentinel for infinite scroll */}
         <div ref={sentinelRef} className="h-1" />
@@ -438,6 +600,141 @@ const HistoryEntryComponent: React.FC<HistoryEntryProps> = ({
       </p>
 
       <AudioPlayer onLoadRequest={handleLoadAudio} className="w-full" />
+    </div>
+  );
+};
+
+interface AssistantHistoryEntryProps {
+  session: AssistantHistoryEntry;
+  expanded: boolean;
+  onToggleExpand: () => void;
+  onCopyConversation: () => void;
+  onDelete: () => Promise<void>;
+}
+
+/**
+ * Assistant conversations render as collapsible entries: a header with the
+ * date and an "Assistant" badge, a one-line preview when collapsed, and the
+ * full turn-by-turn transcript when expanded. No audio or re-transcribe
+ * controls — these are chats, not recordings.
+ */
+const AssistantHistoryEntryComponent: React.FC<AssistantHistoryEntryProps> = ({
+  session,
+  expanded,
+  onToggleExpand,
+  onCopyConversation,
+  onDelete,
+}) => {
+  const { t, i18n } = useTranslation();
+  const [showCopied, setShowCopied] = useState(false);
+
+  const formattedDate = formatDateTime(
+    String(session.updated_at),
+    i18n.language,
+  );
+
+  const handleCopy = () => {
+    onCopyConversation();
+    setShowCopied(true);
+    setTimeout(() => setShowCopied(false), 2000);
+  };
+
+  const handleDelete = async () => {
+    try {
+      await onDelete();
+    } catch (error) {
+      console.error("Failed to delete assistant conversation:", error);
+      toast.error(t("settings.history.deleteAssistantError"));
+    }
+  };
+
+  return (
+    <div className="px-4 py-2 pb-5 flex flex-col gap-3">
+      <div className="flex justify-between items-center gap-2">
+        <button
+          onClick={onToggleExpand}
+          className="flex items-center gap-2 min-w-0 text-left cursor-pointer text-muted hover:text-ink transition-colors"
+          title={
+            expanded
+              ? t("settings.history.hideConversation")
+              : t("settings.history.showConversation")
+          }
+        >
+          {expanded ? (
+            <ChevronDown width={15} height={15} className="shrink-0" />
+          ) : (
+            <ChevronRight width={15} height={15} className="shrink-0" />
+          )}
+          <span className="text-sm font-medium text-ink">{formattedDate}</span>
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium uppercase tracking-wide bg-mid-gray/15 text-muted shrink-0">
+            <MessageCircle width={10} height={10} />
+            {t("settings.history.assistantLabel")}
+          </span>
+        </button>
+        <div className="flex items-center shrink-0">
+          <IconButton
+            onClick={handleCopy}
+            title={t("settings.history.copyConversation")}
+          >
+            {showCopied ? (
+              <Check width={16} height={16} />
+            ) : (
+              <Copy width={16} height={16} />
+            )}
+          </IconButton>
+          <IconButton
+            onClick={handleDelete}
+            title={t("settings.history.delete")}
+          >
+            <Trash2 width={16} height={16} />
+          </IconButton>
+        </div>
+      </div>
+
+      {!expanded && (
+        <button
+          onClick={onToggleExpand}
+          className="text-left cursor-pointer flex flex-col gap-1"
+        >
+          <p className="text-sm text-text/90 line-clamp-2 break-words">
+            {session.title}
+          </p>
+          <span className="text-xs text-muted">
+            {t("settings.history.messageCount", {
+              count: session.messages.length,
+            })}
+          </span>
+        </button>
+      )}
+
+      {expanded && (
+        <div className="flex flex-col gap-3 pb-1">
+          {session.messages.map((message, index) => {
+            const { text, screenshot } = cleanMessageContent(message.content);
+            const isUser = message.role === "user";
+            return (
+              <div key={index} className="flex flex-col gap-1">
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-muted">
+                  {isUser
+                    ? t("settings.history.roleUser")
+                    : t("settings.history.roleAssistant")}
+                </span>
+                {text.length > 0 && (
+                  <p className="text-sm text-text/90 select-text whitespace-pre-wrap break-words">
+                    {text}
+                  </p>
+                )}
+                {screenshot && (
+                  <span className="inline-flex items-center gap-1 text-xs text-muted">
+                    <Camera width={11} height={11} />
+                    {t("settings.history.screenshotAttached")}
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };

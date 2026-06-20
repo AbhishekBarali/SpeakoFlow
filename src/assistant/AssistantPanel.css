@@ -1,6 +1,11 @@
-/* Assistant panel — glassy floating card inside a transparent window.
+/* Assistant panel — a floating editorial card that speaks the same language
+ * as the main SpeakoFlow window: warm near-black surfaces, off-white ink,
+ * hairline rules, EB Garamond for the title, and the accent used only as an
+ * atmospheric moment (orb glow, send action, status, focus) rather than as
+ * saturated chrome everywhere.
+ *
  * Customizable via CSS variables set from settings:
- *   --accent-from / --accent-to  (accent gradient)
+ *   --accent-from / --accent-to  (accent — the single colour moment)
  *   --panel-alpha                (surface opacity 0.5–1)
  *   --msg-font-size              (message text size)
  */
@@ -11,35 +16,56 @@
   --panel-alpha: 1;
   --msg-font-size: 13.5px;
 
-  --panel-radius: 16px;
-  --surface: rgb(252 252 253 / calc(0.92 * var(--panel-alpha)));
-  --surface-strong: rgb(255 255 255 / calc(0.85 * var(--panel-alpha)));
-  --border: rgba(20, 20, 30, 0.1);
-  --border-strong: rgba(20, 20, 30, 0.14);
-  --text: #1c1c27;
-  --text-muted: rgba(28, 28, 39, 0.55);
-  --bubble-assistant: rgba(20, 20, 30, 0.045);
-  --bubble-error-bg: rgba(225, 29, 72, 0.08);
-  --bubble-error-text: #be123c;
+  --font-ui: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text",
+    "Segoe UI", Roboto, sans-serif;
+  --font-display: "EB Garamond", "Iowan Old Style", "Times New Roman", serif;
+
+  --panel-radius: 18px;
+
+  /* Light editorial palette (matches the main app's :root) */
+  --panel-surface: rgb(255 255 255 / calc(0.97 * var(--panel-alpha)));
+  --surface-strong: #f0efed;
+  --surface-inset: #faf9f8;
+  --ink: #0c0a09;
+  --body: #4e4e4e;
+  --muted: #777169;
+  --muted-soft: #a8a29e;
+  --hairline: #e7e5e4;
+  --hairline-strong: #d6d3d1;
+
+  /* Primary "ink pill" — used for the user's own messages */
+  --ink-pill-bg: #292524;
+  --ink-pill-fg: #ffffff;
+
+  --error-bg: rgba(220, 38, 38, 0.08);
+  --error-text: #b91c1c;
+
   --shadow:
-    0 0 0 1px var(--border), 0 4px 16px rgba(15, 15, 30, 0.12),
-    0 12px 40px rgba(15, 15, 30, 0.18);
+    0 0 0 1px var(--hairline), 0 1px 2px rgba(12, 10, 9, 0.05),
+    0 16px 40px rgba(12, 10, 9, 0.14);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --surface: rgb(24 24 32 / calc(0.92 * var(--panel-alpha)));
-    --surface-strong: rgb(32 32 42 / calc(0.85 * var(--panel-alpha)));
-    --border: rgba(255, 255, 255, 0.09);
-    --border-strong: rgba(255, 255, 255, 0.14);
-    --text: #ececf1;
-    --text-muted: rgba(236, 236, 241, 0.5);
-    --bubble-assistant: rgba(255, 255, 255, 0.06);
-    --bubble-error-bg: rgba(244, 63, 94, 0.12);
-    --bubble-error-text: #fda4af;
+    --panel-surface: rgb(28 25 23 / calc(0.96 * var(--panel-alpha)));
+    --surface-strong: #292524;
+    --surface-inset: #100d0c;
+    --ink: #fafaf9;
+    --body: #d6d3d1;
+    --muted: #a8a29e;
+    --muted-soft: #78716c;
+    --hairline: #292524;
+    --hairline-strong: #44403c;
+
+    --ink-pill-bg: #fafaf9;
+    --ink-pill-fg: #0c0a09;
+
+    --error-bg: rgba(244, 63, 94, 0.13);
+    --error-text: #fda4af;
+
     --shadow:
-      0 0 0 1px var(--border), 0 4px 16px rgba(0, 0, 0, 0.35),
-      0 12px 40px rgba(0, 0, 0, 0.45);
+      0 0 0 1px var(--hairline), 0 1px 2px rgba(0, 0, 0, 0.4),
+      0 18px 44px rgba(0, 0, 0, 0.5);
   }
 }
 
@@ -47,31 +73,69 @@
   box-sizing: border-box;
 }
 
+/* ---------- Panel shell ---------- */
+
 .assistant-panel {
+  position: relative;
   width: 100%;
   height: 100%;
   display: flex;
   flex-direction: column;
-  font-family:
-    -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI",
-    Roboto, sans-serif;
-  color: var(--text);
-  background: var(--surface);
-  backdrop-filter: blur(28px) saturate(1.6);
-  -webkit-backdrop-filter: blur(28px) saturate(1.6);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  letter-spacing: 0.01em;
+  color: var(--ink);
+  background: var(--panel-surface);
+  backdrop-filter: blur(24px) saturate(1.4);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
   border-radius: var(--panel-radius);
   box-shadow: var(--shadow);
   overflow: hidden;
+  animation: panel-in 0.22s ease-out;
+}
+
+/* Atmospheric accent orb — the only colour moment on the surface, drifting
+ * behind the header just like the gradient orbs on the main canvas. */
+.assistant-panel::before {
+  content: "";
+  position: absolute;
+  top: -90px;
+  inset-inline-end: -70px;
+  width: 240px;
+  height: 240px;
+  border-radius: 9999px;
+  background: radial-gradient(
+    circle at 35% 35%,
+    var(--accent-from),
+    transparent 68%
+  );
+  opacity: 0.14;
+  filter: blur(36px);
+  pointer-events: none;
+  z-index: 0;
+}
+
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    transform: scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 /* ---------- Header ---------- */
 
 .assistant-header {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 10px 10px 14px;
-  border-bottom: 1px solid var(--border);
+  padding: 11px 10px 11px 16px;
+  border-bottom: 1px solid var(--hairline);
   user-select: none;
   cursor: grab;
   flex-shrink: 0;
@@ -80,18 +144,20 @@
 .assistant-title {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.01em;
+  gap: 9px;
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--ink);
 }
 
 .assistant-status-dot {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   background: linear-gradient(135deg, var(--accent-from), var(--accent-to));
-  box-shadow: 0 0 6px color-mix(in srgb, var(--accent-from) 60%, transparent);
+  box-shadow: 0 0 7px color-mix(in srgb, var(--accent-from) 65%, transparent);
 }
 
 .assistant-status-dot.busy {
@@ -105,19 +171,21 @@
     opacity: 1;
   }
   50% {
-    transform: scale(1.35);
-    opacity: 0.6;
+    transform: scale(1.4);
+    opacity: 0.55;
   }
 }
 
 .assistant-state-chip {
+  font-family: var(--font-ui);
   font-size: 10.5px;
   font-weight: 500;
-  color: var(--text-muted);
-  background: var(--bubble-assistant);
-  border: 1px solid var(--border);
+  letter-spacing: 0.02em;
+  color: var(--muted);
+  background: var(--surface-strong);
+  border: 1px solid var(--hairline);
   border-radius: 999px;
-  padding: 2px 8px;
+  padding: 2px 9px;
   animation: chip-in 0.18s ease-out;
 }
 
@@ -142,12 +210,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   border: none;
-  border-radius: 8px;
+  border-radius: 9px;
   background: transparent;
-  color: var(--text-muted);
+  color: var(--muted);
   cursor: pointer;
   transition:
     background 0.15s ease,
@@ -155,17 +223,18 @@
 }
 
 .assistant-icon-button:hover {
-  background: var(--bubble-assistant);
-  color: var(--text);
+  background: var(--surface-strong);
+  color: var(--ink);
 }
 
 .assistant-icon-button.close:hover {
-  background: rgba(225, 29, 72, 0.12);
-  color: #e11d48;
+  background: rgba(220, 38, 38, 0.14);
+  color: #ef4444;
 }
 
 .assistant-icon-button.active {
-  color: var(--accent-from);
+  color: var(--ink);
+  background: var(--surface-strong);
 }
 
 .assistant-icon-button.pulsing {
@@ -175,14 +244,16 @@
 /* ---------- Messages ---------- */
 
 .assistant-messages {
+  position: relative;
+  z-index: 1;
   flex: 1;
   overflow-y: auto;
-  padding: 14px;
+  padding: 16px 14px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 9px;
   scrollbar-width: thin;
-  scrollbar-color: var(--border-strong) transparent;
+  scrollbar-color: var(--hairline-strong) transparent;
 }
 
 .assistant-empty {
@@ -191,19 +262,21 @@
   align-items: center;
   justify-content: center;
   text-align: center;
-  color: var(--text-muted);
-  font-size: 12.5px;
-  line-height: 1.6;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.65;
   white-space: pre-line;
-  padding: 0 24px;
+  padding: 0 26px;
 }
 
 .assistant-message {
   position: relative;
   max-width: 86%;
-  border-radius: 14px;
-  padding: 8px 12px;
-  animation: bubble-in 0.18s ease-out;
+  border-radius: 16px;
+  padding: 9px 13px;
+  font-size: var(--msg-font-size);
+  line-height: 1.55;
+  animation: bubble-in 0.2s ease-out;
 }
 
 @keyframes bubble-in {
@@ -219,33 +292,31 @@
 
 .assistant-message.user {
   align-self: flex-end;
-  background: linear-gradient(135deg, var(--accent-from), var(--accent-to));
-  color: #fff;
-  border-bottom-right-radius: 5px;
+  background: var(--ink-pill-bg);
+  color: var(--ink-pill-fg);
+  border-bottom-right-radius: 6px;
 }
 
 .assistant-message.assistant {
   align-self: flex-start;
-  background: var(--bubble-assistant);
-  border: 1px solid var(--border);
-  border-bottom-left-radius: 5px;
+  background: var(--surface-strong);
+  border: 1px solid var(--hairline);
+  color: var(--ink);
+  border-bottom-left-radius: 6px;
 }
 
 .assistant-message.error {
-  background: var(--bubble-error-bg);
-  border: 1px solid
-    color-mix(in srgb, var(--bubble-error-text) 30%, transparent);
-  color: var(--bubble-error-text);
+  align-self: flex-start;
+  background: var(--error-bg);
+  border: 1px solid color-mix(in srgb, var(--error-text) 30%, transparent);
+  color: var(--error-text);
 }
 
 .assistant-message-content {
-  font-size: var(--msg-font-size);
-  line-height: 1.55;
   white-space: pre-wrap;
   word-break: break-word;
 }
 
-/* Markdown elements inside assistant bubbles */
 .assistant-message.assistant .assistant-message-content {
   white-space: normal;
 }
@@ -265,7 +336,7 @@
 .assistant-message-content ul,
 .assistant-message-content ol {
   margin: 4px 0 8px;
-  padding-left: 20px;
+  padding-inline-start: 20px;
 }
 
 .assistant-message-content li {
@@ -276,25 +347,27 @@
 .assistant-message-content h2,
 .assistant-message-content h3,
 .assistant-message-content h4 {
-  font-size: 1.05em;
-  font-weight: 650;
-  margin: 10px 0 6px;
+  font-family: var(--font-display);
+  font-size: 1.15em;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  margin: 11px 0 6px;
 }
 
 .assistant-message-content code {
-  font-family: "Cascadia Code", Consolas, monospace;
-  font-size: 0.92em;
-  background: var(--bubble-assistant);
-  border: 1px solid var(--border);
+  font-family: "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+  font-size: 0.9em;
+  background: var(--surface-inset);
+  border: 1px solid var(--hairline);
   border-radius: 5px;
   padding: 1px 5px;
 }
 
 .assistant-message-content pre {
-  background: var(--bubble-assistant);
-  border: 1px solid var(--border);
-  border-radius: 9px;
-  padding: 9px 11px;
+  background: var(--surface-inset);
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  padding: 10px 12px;
   margin: 6px 0 8px;
   overflow-x: auto;
 }
@@ -307,116 +380,57 @@
 
 .assistant-message-content blockquote {
   margin: 6px 0 8px;
-  padding: 2px 0 2px 10px;
-  border-left: 3px solid var(--accent-from);
-  color: var(--text-muted);
+  padding: 2px 0 2px 11px;
+  border-inline-start: 3px solid var(--hairline-strong);
+  color: var(--muted);
 }
 
 .assistant-message-content a {
-  color: var(--accent-from);
-}
-
-/* ---------- Pill (collapsed) mode ---------- */
-
-.assistant-pill {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 0 10px 0 8px;
-  font-family:
-    -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI",
-    Roboto, sans-serif;
-  color: var(--text);
-  background: var(--surface);
-  backdrop-filter: blur(28px) saturate(1.6);
-  -webkit-backdrop-filter: blur(28px) saturate(1.6);
-  border-radius: 999px;
-  box-shadow: var(--shadow);
-  overflow: hidden;
-  user-select: none;
-  cursor: grab;
-}
-
-.pill-mic {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 38px;
-  height: 38px;
-  flex-shrink: 0;
-  border: none;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent-from), var(--accent-to));
-  color: #fff;
-  cursor: pointer;
-  transition:
-    transform 0.15s ease,
-    box-shadow 0.15s ease;
-}
-
-.pill-mic:hover {
-  transform: scale(1.06);
-  box-shadow: 0 4px 14px color-mix(in srgb, var(--accent-from) 50%, transparent);
-}
-
-.pill-mic.recording {
-  background: linear-gradient(135deg, #ef4444, #f97316);
-  animation: dot-pulse 1.2s ease-in-out infinite;
-}
-
-.pill-mic.working {
-  animation: dot-pulse 1.2s ease-in-out infinite;
-}
-
-.pill-status {
-  flex: 1;
-  min-width: 0;
-  font-size: 12px;
-  font-weight: 550;
-  color: var(--text-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-color: var(--hairline-strong);
 }
 
 .screen-chip {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  margin-top: 6px;
+  margin-top: 7px;
   font-size: 10.5px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.85);
-  background: rgba(0, 0, 0, 0.18);
+  letter-spacing: 0.02em;
+  color: color-mix(in srgb, var(--ink-pill-fg) 75%, transparent);
+  background: color-mix(in srgb, var(--ink-pill-fg) 14%, transparent);
   border-radius: 999px;
   padding: 2px 8px;
 }
 
 .assistant-message.assistant .screen-chip {
-  color: var(--text-muted);
-  background: var(--bubble-assistant);
+  color: var(--muted);
+  background: var(--surface-inset);
+  border: 1px solid var(--hairline);
 }
 
 .bubble-copy {
   position: absolute;
   top: 6px;
-  right: -30px;
+  inset-inline-end: -32px;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
-  border: 1px solid var(--border);
-  border-radius: 7px;
-  background: var(--surface-strong);
-  color: var(--text-muted);
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  background: var(--panel-surface);
+  color: var(--muted);
   cursor: pointer;
   opacity: 0;
   transition:
     opacity 0.15s ease,
-    color 0.15s ease;
+    color 0.15s ease,
+    background 0.15s ease;
 }
 
 .assistant-message:hover .bubble-copy {
@@ -424,61 +438,41 @@
 }
 
 .bubble-copy:hover {
-  color: var(--text);
+  color: var(--ink);
+  background: var(--surface-strong);
 }
 
-/* ---------- Listening / typing indicators ---------- */
+/* ---------- Listening / transcribing ---------- */
 
 .assistant-listening {
   align-self: flex-start;
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 12px;
+  gap: 11px;
+  font-size: 12.5px;
   font-weight: 500;
-  color: var(--text-muted);
-  background: var(--bubble-assistant);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 6px 14px;
-  animation: bubble-in 0.18s ease-out;
+  color: var(--muted);
+  background: var(--surface-strong);
+  border: 1px solid var(--hairline);
+  border-radius: 16px;
+  border-bottom-left-radius: 6px;
+  padding: 7px 14px 7px 12px;
+  animation: bubble-in 0.2s ease-out;
 }
 
-.listening-ring {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: #ef4444;
-  animation: ring-pulse 1.4s ease-out infinite;
-}
-
-.assistant-listening.transcribing .listening-ring {
-  background: var(--accent-from);
-}
-
-@keyframes ring-pulse {
-  0% {
-    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.45);
-  }
-  70% {
-    box-shadow: 0 0 0 8px rgba(239, 68, 68, 0);
-  }
-  100% {
-    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
-  }
-}
+/* ---------- Typing dots ---------- */
 
 .assistant-message.typing {
   display: flex;
   gap: 4px;
-  padding: 11px 14px;
+  padding: 12px 14px;
 }
 
 .typing-dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--text-muted);
+  background: var(--muted);
   animation: typing-bounce 1.2s ease-in-out infinite;
 }
 
@@ -506,11 +500,13 @@
 /* ---------- Input row ---------- */
 
 .assistant-input-row {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 12px 12px;
-  border-top: 1px solid var(--border);
+  padding: 11px 12px 13px;
+  border-top: 1px solid var(--hairline);
   flex-shrink: 0;
 }
 
@@ -518,13 +514,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
+  width: 36px;
+  height: 36px;
   flex-shrink: 0;
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--hairline-strong);
   border-radius: 11px;
   background: var(--surface-strong);
-  color: var(--text-muted);
+  color: var(--muted);
   cursor: pointer;
   transition:
     color 0.15s ease,
@@ -533,7 +529,8 @@
 }
 
 .assistant-attach-button:hover {
-  color: var(--text);
+  color: var(--ink);
+  border-color: var(--muted-soft);
 }
 
 .assistant-attach-button.armed {
@@ -545,13 +542,14 @@
 .assistant-input {
   flex: 1;
   min-width: 0;
-  height: 34px;
-  padding: 0 12px;
-  font-size: 13px;
+  height: 36px;
+  padding: 0 13px;
+  font-size: 13.5px;
   font-family: inherit;
-  color: var(--text);
+  letter-spacing: 0.01em;
+  color: var(--ink);
   background: var(--surface-strong);
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--hairline-strong);
   border-radius: 11px;
   outline: none;
   transition:
@@ -560,25 +558,25 @@
 }
 
 .assistant-input::placeholder {
-  color: var(--text-muted);
+  color: var(--muted-soft);
 }
 
 .assistant-input:focus {
-  border-color: var(--accent-from);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-from) 18%, transparent);
+  border-color: color-mix(in srgb, var(--accent-from) 60%, var(--hairline-strong));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-from) 16%, transparent);
 }
 
 .assistant-send-button {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
+  width: 36px;
+  height: 36px;
   flex-shrink: 0;
   border: none;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent-from), var(--accent-to));
-  color: #fff;
+  background: var(--ink-pill-bg);
+  color: var(--ink-pill-fg);
   cursor: pointer;
   transition:
     transform 0.15s ease,
@@ -588,10 +586,94 @@
 
 .assistant-send-button:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px color-mix(in srgb, var(--accent-from) 45%, transparent);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.24);
 }
 
 .assistant-send-button:disabled {
   opacity: 0.4;
   cursor: default;
+}
+
+/* ---------- Pill (collapsed) mode ---------- */
+
+.assistant-pill {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 0 12px 0 9px;
+  font-family: var(--font-ui);
+  color: var(--ink);
+  background: var(--panel-surface);
+  backdrop-filter: blur(24px) saturate(1.4);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  border-radius: 999px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  user-select: none;
+  cursor: grab;
+}
+
+.pill-mic {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--ink-pill-bg);
+  color: var(--ink-pill-fg);
+  cursor: pointer;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease,
+    background 0.15s ease;
+}
+
+.pill-mic:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28);
+}
+
+.pill-mic.recording {
+  background: linear-gradient(135deg, #ef4444, #f97316);
+  color: #fff;
+  animation: dot-pulse 1.2s ease-in-out infinite;
+}
+
+.pill-mic.working {
+  animation: dot-pulse 1.2s ease-in-out infinite;
+}
+
+.pill-wave {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pill-status {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: var(--body);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .assistant-panel,
+  .assistant-message,
+  .assistant-listening,
+  .assistant-state-chip {
+    animation: none;
+  }
 }

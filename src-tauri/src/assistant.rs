@@ -90,6 +90,10 @@ pub struct AssistantConversation {
     busy: AtomicBool,
     /// Notified when the user presses Stop, to cancel an in-flight turn.
     cancel: Arc<Notify>,
+    /// Row id of the conversation as persisted in the history database, or
+    /// `None` before the first save and after the conversation is cleared.
+    /// Lets each turn update the same row instead of creating duplicates.
+    session_id: Mutex<Option<i64>>,
 }
 
 impl AssistantConversation {
@@ -98,12 +102,32 @@ impl AssistantConversation {
             messages: Mutex::new(Vec::new()),
             busy: AtomicBool::new(false),
             cancel: Arc::new(Notify::new()),
+            session_id: Mutex::new(None),
         }
     }
 
     /// Cancel the current assistant turn (if any). Safe to call when idle.
     pub fn request_cancel(&self) {
         self.cancel.notify_waiters();
+    }
+
+    /// Forget the persisted-session pointer so the next turn starts a brand
+    /// new history row. Called when the conversation is cleared.
+    pub fn reset_session(&self) {
+        if let Ok(mut id) = self.session_id.lock() {
+            *id = None;
+        }
+    }
+
+    /// Drop the session pointer only if it matches `id` — used when a
+    /// conversation is deleted from the History view while still active, so
+    /// the next turn re-saves instead of updating a now-deleted row.
+    pub fn forget_session_if(&self, id: i64) {
+        if let Ok(mut current) = self.session_id.lock() {
+            if *current == Some(id) {
+                *current = None;
+            }
+        }
     }
 }
 
@@ -134,6 +158,59 @@ pub fn emit_conversation(app: &AppHandle) {
         history.clone()
     };
     let _ = app.emit("assistant-conversation", snapshot);
+}
+
+/// Persist the current conversation to the history database so it shows up in
+/// the History view (and survives the panel window being recreated). Upserts
+/// against the session's row: creates one on the first turn, updates it on
+/// every turn after. Best-effort — a storage failure must never break a chat.
+///
+/// Emits a lightweight `assistant-history-updated` event afterward so the
+/// (separate) main window's History view can refresh.
+pub fn persist_assistant_session(app: &AppHandle) {
+    let Some(hm) = app.try_state::<Arc<crate::managers::history::HistoryManager>>() else {
+        return;
+    };
+
+    let conversation = app.state::<AssistantConversation>();
+    let messages = match conversation.messages.lock() {
+        Ok(guard) => guard.clone(),
+        Err(_) => return,
+    };
+    if messages.is_empty() {
+        return;
+    }
+
+    let mut session_id = match conversation.session_id.lock() {
+        Ok(guard) => guard,
+        Err(_) => return,
+    };
+
+    let saved = match *session_id {
+        Some(id) => match hm.update_assistant_session(id, &messages) {
+            Ok(Some(entry)) => Some(entry),
+            // Row vanished (deleted in the UI) — start a fresh one.
+            Ok(None) => hm.create_assistant_session(&messages).ok(),
+            Err(e) => {
+                error!("Failed to update assistant session {}: {}", id, e);
+                None
+            }
+        },
+        None => match hm.create_assistant_session(&messages) {
+            Ok(entry) => Some(entry),
+            Err(e) => {
+                error!("Failed to create assistant session: {}", e);
+                None
+            }
+        },
+    };
+
+    if let Some(entry) = saved {
+        *session_id = Some(entry.id);
+    }
+    drop(session_id);
+
+    let _ = app.emit("assistant-history-updated", ());
 }
 
 // ---------------------------------------------------------------------------
@@ -406,7 +483,10 @@ pub async fn run_assistant_turn(app: AppHandle, user_text: String, screenshot: O
             6_000usize,
         )
     } else {
-        (settings.assistant_max_history_messages as usize, 24_000usize)
+        (
+            settings.assistant_max_history_messages as usize,
+            24_000usize,
+        )
     };
     let mut messages: Vec<Value> = Vec::new();
     messages.push(json!({
@@ -456,7 +536,25 @@ pub async fn run_assistant_turn(app: AppHandle, user_text: String, screenshot: O
         });
     }
     emit_conversation(&app);
+    // Save right after the user message so the question is preserved even if
+    // the model errors out before replying.
+    persist_assistant_session(&app);
     emit_state(&app, "thinking");
+
+    // The built-in provider is backed by the bundled llama.cpp engine. Ensure
+    // it is running and serving the selected model before streaming. The user
+    // message is already shown and the panel shows "thinking" during load.
+    if provider.id == "builtin" {
+        let manager = app.state::<Arc<crate::managers::local_llm::LocalLlmManager>>();
+        if let Err(e) = manager.ensure_running(&model).await {
+            let _ = app.emit(
+                "assistant-error",
+                format!("Built-in model couldn't start: {}", e),
+            );
+            emit_state(&app, "idle");
+            return;
+        }
+    }
 
     debug!(
         "Assistant turn: provider '{}', model '{}', {} messages, screenshot: {}",
@@ -475,18 +573,13 @@ pub async fn run_assistant_turn(app: AppHandle, user_text: String, screenshot: O
     let partial = Arc::new(Mutex::new(String::new()));
     let partial_cb = partial.clone();
     let app_for_tokens = app.clone();
-    let stream_fut = llm_client::send_chat_stream(
-        &provider,
-        api_key.clone(),
-        &model,
-        messages,
-        move |token| {
+    let stream_fut =
+        llm_client::send_chat_stream(&provider, api_key.clone(), &model, messages, move |token| {
             if let Ok(mut buf) = partial_cb.lock() {
                 buf.push_str(token);
             }
             let _ = app_for_tokens.emit("assistant-token", token.to_string());
-        },
-    );
+        });
     tokio::pin!(stream_fut);
 
     // Race the stream against a Stop request. notify_waiters wakes this select.
@@ -513,6 +606,7 @@ pub async fn run_assistant_turn(app: AppHandle, user_text: String, screenshot: O
                 });
             }
             emit_conversation(&app);
+            persist_assistant_session(&app);
             debug!("Assistant turn cancelled by user");
         }
         Some(Ok(full_text)) => {
@@ -525,6 +619,7 @@ pub async fn run_assistant_turn(app: AppHandle, user_text: String, screenshot: O
                 });
             }
             emit_conversation(&app);
+            persist_assistant_session(&app);
 
             if settings.assistant_tts_enabled {
                 spawn_tts_summary(&app, &settings, &provider, api_key, &model, full_text);

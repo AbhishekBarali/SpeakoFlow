@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { commands, type AppSettings } from "@/bindings";
 import { syncLanguageFromSettings } from "@/i18n";
+import { AudioWaveform } from "@/components/shared";
 import { useKokoroTts } from "./useKokoroTts";
 import "./AssistantPanel.css";
 
@@ -93,6 +94,7 @@ const AssistantPanel: React.FC = () => {
   const [locked, setLocked] = useState(false);
   const [ttsPlaying, setTtsPlaying] = useState(false);
   const [settings, setSettings] = useState<AppSettings | null>(null);
+  const [micLevels, setMicLevels] = useState<number[]>([]);
   const listRef = useRef<HTMLDivElement>(null);
   const sendingRef = useRef(false);
 
@@ -184,6 +186,14 @@ const AssistantPanel: React.FC = () => {
       track(
         await listen<boolean>("recording-locked", (e) => {
           setLocked(e.payload);
+        }),
+      );
+
+      // Live microphone levels (broadcast to all windows during recording)
+      // drive the waveform shown while the assistant is listening.
+      track(
+        await listen<number[]>("mic-level", (e) => {
+          setMicLevels(e.payload);
         }),
       );
 
@@ -344,15 +354,30 @@ const AssistantPanel: React.FC = () => {
               : t("assistant.pill.talk")
           }
         >
-          {state === "listening" ? <Square size={16} /> : <Mic size={18} />}
+          {state === "listening" ? (
+            <Square size={15} strokeWidth={2.5} />
+          ) : (
+            <Mic size={17} strokeWidth={2} />
+          )}
         </button>
-        <span className="pill-status" data-tauri-drag-region>
-          {tts.status === "loading"
-            ? t("assistant.tts.loadingShort", { progress: tts.progress })
-            : busy
-              ? t(`assistant.status.${state}`)
-              : t("assistant.pill.idle")}
-        </span>
+        {state === "listening" ? (
+          <div className="pill-wave" data-tauri-drag-region>
+            <AudioWaveform
+              levels={micLevels}
+              size="sm"
+              barCount={13}
+              active={true}
+            />
+          </div>
+        ) : (
+          <span className="pill-status" data-tauri-drag-region>
+            {tts.status === "loading"
+              ? t("assistant.tts.loadingShort", { progress: tts.progress })
+              : busy
+                ? t(`assistant.status.${state}`)
+                : t("assistant.pill.idle")}
+          </span>
+        )}
         <button
           className="assistant-icon-button"
           onClick={() => collapse(false)}
@@ -451,7 +476,12 @@ const AssistantPanel: React.FC = () => {
         )}
         {(state === "listening" || state === "transcribing") && (
           <div className={`assistant-listening ${state}`}>
-            <span className="listening-ring" />
+            <AudioWaveform
+              levels={micLevels}
+              size="md"
+              barCount={16}
+              active={state === "listening"}
+            />
             {state === "listening" && locked
               ? t("assistant.status.locked")
               : t(`assistant.status.${state}`)}

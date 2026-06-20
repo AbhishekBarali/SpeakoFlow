@@ -10,6 +10,8 @@ use std::path::PathBuf;
 use tauri::AppHandle;
 use tauri_specta::Event;
 
+use crate::llm_client::ChatMessage;
+
 /// Database migrations for transcription history.
 /// Each migration is applied in order. The library tracks which migrations
 /// have been applied using SQLite's user_version pragma.
@@ -31,11 +33,46 @@ static MIGRATIONS: &[M] = &[
     M::up("ALTER TABLE transcription_history ADD COLUMN post_processed_text TEXT;"),
     M::up("ALTER TABLE transcription_history ADD COLUMN post_process_prompt TEXT;"),
     M::up("ALTER TABLE transcription_history ADD COLUMN post_process_requested BOOLEAN NOT NULL DEFAULT 0;"),
+    // Assistant conversations live alongside transcriptions but in their own
+    // table: one row per conversation session, with the messages stored as a
+    // JSON array. `timestamp` is when the conversation started, `updated_at`
+    // is the last turn — the History view sorts by the latter so an active
+    // chat stays near the top.
+    M::up(
+        "CREATE TABLE IF NOT EXISTS assistant_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL,
+            title TEXT NOT NULL,
+            messages TEXT NOT NULL
+        );",
+    ),
 ];
 
 #[derive(Clone, Debug, Serialize, Deserialize, Type)]
 pub struct PaginatedHistory {
     pub entries: Vec<HistoryEntry>,
+    pub has_more: bool,
+}
+
+/// A persisted assistant conversation. One row per session; `messages` is the
+/// ordered turn-by-turn transcript (the same `{role, content}` shape the
+/// assistant panel renders).
+#[derive(Clone, Debug, Serialize, Deserialize, Type)]
+pub struct AssistantHistoryEntry {
+    pub id: i64,
+    /// When the conversation was first saved (seconds since epoch).
+    pub timestamp: i64,
+    /// When the most recent turn was added (seconds since epoch).
+    pub updated_at: i64,
+    /// Short label derived from the first user message.
+    pub title: String,
+    pub messages: Vec<ChatMessage>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, Type)]
+pub struct PaginatedAssistantHistory {
+    pub entries: Vec<AssistantHistoryEntry>,
     pub has_more: bool,
 }
 
@@ -646,6 +683,198 @@ impl HistoryManager {
         } else {
             format!("Recording {}", timestamp)
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // Assistant conversation history
+    // -----------------------------------------------------------------------
+
+    /// Keep at most this many assistant conversations so the table can't grow
+    /// without bound. Generous on purpose — conversations are small JSON rows
+    /// and users expect their chat history to stick around.
+    const ASSISTANT_SESSION_CAP: i64 = 500;
+
+    fn map_assistant_entry(row: &rusqlite::Row<'_>) -> rusqlite::Result<AssistantHistoryEntry> {
+        let messages_json: String = row.get("messages")?;
+        // A malformed row shouldn't take down the whole list — fall back to an
+        // empty transcript rather than erroring the query.
+        let messages = serde_json::from_str::<Vec<ChatMessage>>(&messages_json).unwrap_or_default();
+        Ok(AssistantHistoryEntry {
+            id: row.get("id")?,
+            timestamp: row.get("timestamp")?,
+            updated_at: row.get("updated_at")?,
+            title: row.get("title")?,
+            messages,
+        })
+    }
+
+    /// Derive a short, human-readable title from the first user message.
+    fn derive_assistant_title(messages: &[ChatMessage]) -> String {
+        let raw = messages
+            .iter()
+            .find(|m| m.role == "user")
+            .map(|m| m.content.as_str())
+            .unwrap_or("");
+        // Stored user messages may carry the screenshot marker; drop it.
+        let cleaned = raw.replace(crate::assistant::SCREENSHOT_MARKER, "");
+        let trimmed = cleaned.trim();
+        if trimmed.is_empty() {
+            return "Conversation".to_string();
+        }
+        let title: String = trimmed.chars().take(80).collect();
+        if trimmed.chars().count() > 80 {
+            format!("{}…", title)
+        } else {
+            title
+        }
+    }
+
+    /// Insert a new assistant conversation row and return it.
+    pub fn create_assistant_session(
+        &self,
+        messages: &[ChatMessage],
+    ) -> Result<AssistantHistoryEntry> {
+        let now = Utc::now().timestamp();
+        let title = Self::derive_assistant_title(messages);
+        let messages_json = serde_json::to_string(messages)?;
+
+        let conn = self.get_connection()?;
+        conn.execute(
+            "INSERT INTO assistant_history (timestamp, updated_at, title, messages)
+             VALUES (?1, ?2, ?3, ?4)",
+            params![now, now, &title, &messages_json],
+        )?;
+        let id = conn.last_insert_rowid();
+
+        self.cleanup_assistant_sessions()?;
+
+        debug!("Saved assistant session with id {}", id);
+
+        Ok(AssistantHistoryEntry {
+            id,
+            timestamp: now,
+            updated_at: now,
+            title,
+            messages: messages.to_vec(),
+        })
+    }
+
+    /// Update an existing assistant conversation in place. Returns `Ok(None)`
+    /// when the row no longer exists (e.g. it was deleted from the History
+    /// view), so the caller can decide to create a fresh session instead.
+    pub fn update_assistant_session(
+        &self,
+        id: i64,
+        messages: &[ChatMessage],
+    ) -> Result<Option<AssistantHistoryEntry>> {
+        let now = Utc::now().timestamp();
+        let title = Self::derive_assistant_title(messages);
+        let messages_json = serde_json::to_string(messages)?;
+
+        let conn = self.get_connection()?;
+        let updated = conn.execute(
+            "UPDATE assistant_history
+             SET updated_at = ?1, title = ?2, messages = ?3
+             WHERE id = ?4",
+            params![now, &title, &messages_json, id],
+        )?;
+
+        if updated == 0 {
+            return Ok(None);
+        }
+
+        let timestamp: i64 = conn.query_row(
+            "SELECT timestamp FROM assistant_history WHERE id = ?1",
+            params![id],
+            |row| row.get(0),
+        )?;
+
+        Ok(Some(AssistantHistoryEntry {
+            id,
+            timestamp,
+            updated_at: now,
+            title,
+            messages: messages.to_vec(),
+        }))
+    }
+
+    /// Page through assistant conversations, newest first (keyset pagination
+    /// on `id`, mirroring `get_history_entries`).
+    pub async fn get_assistant_history_entries(
+        &self,
+        cursor: Option<i64>,
+        limit: Option<usize>,
+    ) -> Result<PaginatedAssistantHistory> {
+        let conn = self.get_connection()?;
+        let limit = limit.map(|l| l.min(200));
+
+        let mut entries: Vec<AssistantHistoryEntry> = match (cursor, limit) {
+            (Some(cursor_id), Some(lim)) => {
+                let fetch_count = (lim + 1) as i64;
+                let mut stmt = conn.prepare(
+                    "SELECT id, timestamp, updated_at, title, messages
+                     FROM assistant_history
+                     WHERE id < ?1
+                     ORDER BY id DESC
+                     LIMIT ?2",
+                )?;
+                let result = stmt
+                    .query_map(params![cursor_id, fetch_count], Self::map_assistant_entry)?
+                    .collect::<std::result::Result<Vec<_>, _>>()?;
+                result
+            }
+            (None, Some(lim)) => {
+                let fetch_count = (lim + 1) as i64;
+                let mut stmt = conn.prepare(
+                    "SELECT id, timestamp, updated_at, title, messages
+                     FROM assistant_history
+                     ORDER BY id DESC
+                     LIMIT ?1",
+                )?;
+                let result = stmt
+                    .query_map(params![fetch_count], Self::map_assistant_entry)?
+                    .collect::<std::result::Result<Vec<_>, _>>()?;
+                result
+            }
+            (_, None) => {
+                let mut stmt = conn.prepare(
+                    "SELECT id, timestamp, updated_at, title, messages
+                     FROM assistant_history
+                     ORDER BY id DESC",
+                )?;
+                let result = stmt
+                    .query_map([], Self::map_assistant_entry)?
+                    .collect::<std::result::Result<Vec<_>, _>>()?;
+                result
+            }
+        };
+
+        let has_more = limit.is_some_and(|lim| entries.len() > lim);
+        if has_more {
+            entries.pop();
+        }
+
+        Ok(PaginatedAssistantHistory { entries, has_more })
+    }
+
+    pub fn delete_assistant_session(&self, id: i64) -> Result<()> {
+        let conn = self.get_connection()?;
+        conn.execute("DELETE FROM assistant_history WHERE id = ?1", params![id])?;
+        debug!("Deleted assistant session with id: {}", id);
+        Ok(())
+    }
+
+    /// Trim the oldest conversations beyond [`Self::ASSISTANT_SESSION_CAP`].
+    fn cleanup_assistant_sessions(&self) -> Result<()> {
+        let conn = self.get_connection()?;
+        conn.execute(
+            "DELETE FROM assistant_history
+             WHERE id NOT IN (
+                 SELECT id FROM assistant_history ORDER BY id DESC LIMIT ?1
+             )",
+            params![Self::ASSISTANT_SESSION_CAP],
+        )?;
+        Ok(())
     }
 }
 

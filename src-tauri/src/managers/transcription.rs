@@ -377,6 +377,17 @@ impl TranscriptionManager {
                 })?;
                 LoadedEngine::Cohere(engine)
             }
+            // Not transcription engines — these are handled by their own
+            // subsystems (LocalLlmManager / the assistant webview) and must
+            // never be loaded as the active recording model.
+            EngineType::LlamaCpp | EngineType::Kokoro => {
+                let error_msg = format!(
+                    "Model {} is not a transcription model and cannot be loaded for recording",
+                    model_id
+                );
+                emit_loading_failed(&error_msg);
+                return Err(anyhow::anyhow!(error_msg));
+            }
         };
 
         // Update the current engine and model ID

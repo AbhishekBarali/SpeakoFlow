@@ -17,7 +17,7 @@ use std::time::{Duration, Instant};
 use tar::Archive;
 use tauri::{AppHandle, Emitter, Manager};
 
-#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
 pub enum EngineType {
     Whisper,
     Parakeet,
@@ -27,6 +27,42 @@ pub enum EngineType {
     GigaAM,
     Canary,
     Cohere,
+    /// Local large-language-model engine (GGUF served via the bundled
+    /// llama.cpp sidecar). Not a transcription engine.
+    LlamaCpp,
+    /// Local text-to-speech engine (Kokoro, runs in the assistant webview).
+    /// Not a transcription engine.
+    Kokoro,
+}
+
+impl EngineType {
+    /// Whether this engine transcribes speech to text. Only transcription
+    /// engines are eligible to be the "active" model used by the recording
+    /// pipeline; LLM and TTS engines are managed independently.
+    pub fn is_transcription(&self) -> bool {
+        !matches!(self, EngineType::LlamaCpp | EngineType::Kokoro)
+    }
+}
+
+/// For vision (multimodal) LLM models, the companion multimodal projector that
+/// llama.cpp's server needs (passed via `--mmproj`). Returns the local filename
+/// to save it as and the download URL, or `None` for text-only models.
+pub fn mmproj_for(model_id: &str) -> Option<(&'static str, &'static str)> {
+    match model_id {
+        "qwen3.5-2b" => Some((
+            "mmproj-Qwen_Qwen3.5-2B-f16.gguf",
+            "https://huggingface.co/bartowski/Qwen_Qwen3.5-2B-GGUF/resolve/main/mmproj-Qwen_Qwen3.5-2B-f16.gguf",
+        )),
+        "qwen3.5-4b" => Some((
+            "mmproj-Qwen_Qwen3.5-4B-f16.gguf",
+            "https://huggingface.co/bartowski/Qwen_Qwen3.5-4B-GGUF/resolve/main/mmproj-Qwen_Qwen3.5-4B-f16.gguf",
+        )),
+        "gemma-3-4b" => Some((
+            "mmproj-gemma-3-4b-it-f16.gguf",
+            "https://huggingface.co/ggml-org/gemma-3-4b-it-GGUF/resolve/main/mmproj-model-f16.gguf",
+        )),
+        _ => None,
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
@@ -610,6 +646,180 @@ impl ModelManager {
             },
         );
 
+        // ---------------------------------------------------------------
+        // Local Large Language Models (GGUF), served by the bundled
+        // llama.cpp engine. Single-file downloads reusing the Whisper
+        // pipeline; vision models additionally fetch a companion mmproj
+        // projector (see `mmproj_for`). Used by the "Built-in" provider.
+        // ---------------------------------------------------------------
+
+        // Broad multilingual tag so LLM entries stay visible under the
+        // language filter; these models are all multilingual.
+        let llm_languages: Vec<String> = vec![
+            "en", "zh", "zh-Hans", "zh-Hant", "de", "es", "fr", "it", "pt", "ru", "ja", "ko", "ar",
+            "hi", "vi", "id", "tr", "pl", "nl",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+
+        // Gemma 3 1B — text only, tiny, runs on virtually any machine.
+        available_models.insert(
+            "gemma-3-1b".to_string(),
+            ModelInfo {
+                id: "gemma-3-1b".to_string(),
+                name: "Gemma 3 1B".to_string(),
+                description:
+                    "Tiny and fast. Runs on almost any machine. Text only — great for cleaning up transcripts."
+                        .to_string(),
+                filename: "gemma-3-1b-it-Q4_K_M.gguf".to_string(),
+                url: Some(
+                    "https://huggingface.co/ggml-org/gemma-3-1b-it-GGUF/resolve/main/gemma-3-1b-it-Q4_K_M.gguf"
+                        .to_string(),
+                ),
+                sha256: None, // GGUF hashes not pinned; verification skipped
+                size_mb: 806,
+                is_downloaded: false,
+                is_downloading: false,
+                partial_size: 0,
+                is_directory: false,
+                engine_type: EngineType::LlamaCpp,
+                accuracy_score: 0.45,
+                speed_score: 0.97,
+                supports_translation: false,
+                is_recommended: false,
+                supported_languages: llm_languages.clone(),
+                supports_language_selection: false,
+                is_custom: false,
+            },
+        );
+
+        // Qwen3.5 2B — newest small multimodal model (text + vision).
+        available_models.insert(
+            "qwen3.5-2b".to_string(),
+            ModelInfo {
+                id: "qwen3.5-2b".to_string(),
+                name: "Qwen3.5 2B (Vision)".to_string(),
+                description:
+                    "Newest small model. Sees images, so the assistant can read your screen. Fast on most laptops."
+                        .to_string(),
+                filename: "Qwen_Qwen3.5-2B-Q4_K_M.gguf".to_string(),
+                url: Some(
+                    "https://huggingface.co/bartowski/Qwen_Qwen3.5-2B-GGUF/resolve/main/Qwen_Qwen3.5-2B-Q4_K_M.gguf"
+                        .to_string(),
+                ),
+                sha256: None,
+                size_mb: 2350,
+                is_downloaded: false,
+                is_downloading: false,
+                partial_size: 0,
+                is_directory: false,
+                engine_type: EngineType::LlamaCpp,
+                accuracy_score: 0.58,
+                speed_score: 0.82,
+                supports_translation: false,
+                is_recommended: false,
+                supported_languages: llm_languages.clone(),
+                supports_language_selection: false,
+                is_custom: false,
+            },
+        );
+
+        // Qwen3.5 4B — newest, strongest small multimodal model. Default.
+        available_models.insert(
+            "qwen3.5-4b".to_string(),
+            ModelInfo {
+                id: "qwen3.5-4b".to_string(),
+                name: "Qwen3.5 4B (Vision)".to_string(),
+                description:
+                    "Recommended. Newest, strongest compact model — fast, multilingual, and sees images. ~5 GB RAM."
+                        .to_string(),
+                filename: "Qwen_Qwen3.5-4B-Q4_K_M.gguf".to_string(),
+                url: Some(
+                    "https://huggingface.co/bartowski/Qwen_Qwen3.5-4B-GGUF/resolve/main/Qwen_Qwen3.5-4B-Q4_K_M.gguf"
+                        .to_string(),
+                ),
+                sha256: None,
+                size_mb: 3900,
+                is_downloaded: false,
+                is_downloading: false,
+                partial_size: 0,
+                is_directory: false,
+                engine_type: EngineType::LlamaCpp,
+                accuracy_score: 0.74,
+                speed_score: 0.62,
+                supports_translation: false,
+                is_recommended: true,
+                supported_languages: llm_languages.clone(),
+                supports_language_selection: false,
+                is_custom: false,
+            },
+        );
+
+        // Gemma 3 4B — Google multimodal (text + vision), clean output.
+        available_models.insert(
+            "gemma-3-4b".to_string(),
+            ModelInfo {
+                id: "gemma-3-4b".to_string(),
+                name: "Gemma 3 4B (Vision)".to_string(),
+                description:
+                    "Google's multimodal model. Sees images and gives clean, reliable answers. ~5 GB RAM."
+                        .to_string(),
+                filename: "gemma-3-4b-it-Q4_K_M.gguf".to_string(),
+                url: Some(
+                    "https://huggingface.co/ggml-org/gemma-3-4b-it-GGUF/resolve/main/gemma-3-4b-it-Q4_K_M.gguf"
+                        .to_string(),
+                ),
+                sha256: None,
+                size_mb: 3350,
+                is_downloaded: false,
+                is_downloading: false,
+                partial_size: 0,
+                is_directory: false,
+                engine_type: EngineType::LlamaCpp,
+                accuracy_score: 0.70,
+                speed_score: 0.60,
+                supports_translation: false,
+                is_recommended: false,
+                supported_languages: llm_languages,
+                supports_language_selection: false,
+                is_custom: false,
+            },
+        );
+
+        // ---------------------------------------------------------------
+        // Text-to-Speech. Kokoro runs locally inside the assistant panel
+        // webview (kokoro-js / WebGPU) and manages its own weights, so it is
+        // surfaced here as a built-in, always-available model rather than a
+        // pipeline download. `update_download_status` keeps it marked as
+        // downloaded.
+        // ---------------------------------------------------------------
+        available_models.insert(
+            "kokoro-82m".to_string(),
+            ModelInfo {
+                id: "kokoro-82m".to_string(),
+                name: "Kokoro".to_string(),
+                description: "Built-in local voice for the assistant. No download required."
+                    .to_string(),
+                filename: "kokoro-82m".to_string(),
+                url: None,
+                sha256: None,
+                size_mb: 0,
+                is_downloaded: true, // managed by the webview; always available
+                is_downloading: false,
+                partial_size: 0,
+                is_directory: false,
+                engine_type: EngineType::Kokoro,
+                accuracy_score: 0.0,
+                speed_score: 0.0,
+                supports_translation: false,
+                is_recommended: true,
+                supported_languages: vec!["en".to_string()],
+                supports_language_selection: false,
+                is_custom: false,
+            },
+        );
+
         // Auto-discover custom Whisper models (.bin files) in the models directory
         if let Err(e) = Self::discover_custom_whisper_models(&models_dir, &mut available_models) {
             warn!("Failed to discover custom models: {}", e);
@@ -723,6 +933,14 @@ impl ModelManager {
         let mut models = self.available_models.lock().unwrap();
 
         for model in models.values_mut() {
+            // Built-in TTS (Kokoro) is managed by the assistant webview and is
+            // always considered available; there is no file on disk to check.
+            if model.engine_type == EngineType::Kokoro {
+                model.is_downloaded = true;
+                model.is_downloading = false;
+                model.partial_size = 0;
+                continue;
+            }
             if model.is_directory {
                 // For directory-based models, check if the directory exists
                 let model_path = self.models_dir.join(&model.filename);
@@ -793,9 +1011,14 @@ impl ModelManager {
 
         // If no model is selected, pick the first downloaded one
         if settings.selected_model.is_empty() {
-            // Find the first available (downloaded) model
+            // Find the first available (downloaded) transcription model. LLM and
+            // TTS models live in the same catalog but must never be auto-selected
+            // as the active transcription model.
             let models = self.available_models.lock().unwrap();
-            if let Some(available_model) = models.values().find(|model| model.is_downloaded) {
+            if let Some(available_model) = models
+                .values()
+                .find(|model| model.is_downloaded && model.engine_type.is_transcription())
+            {
                 info!(
                     "Auto-selecting model: {} ({})",
                     available_model.id, available_model.name
@@ -984,6 +1207,70 @@ impl ModelManager {
         Ok(format!("{:x}", hasher.finalize()))
     }
 
+    /// Download a companion file (e.g. a vision projector) to `dest`,
+    /// streaming with progress events under `model_id`. No resume; on cancel
+    /// the partial is removed. Skips if `dest` already exists.
+    async fn download_companion(
+        &self,
+        model_id: &str,
+        url: &str,
+        dest: &std::path::Path,
+        cancel_flag: &Arc<AtomicBool>,
+    ) -> Result<()> {
+        if dest.exists() {
+            return Ok(());
+        }
+        let file_name = dest
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("mmproj.gguf");
+        let tmp = self.models_dir.join(format!("{}.partial", file_name));
+
+        let client = reqwest::Client::new();
+        let response = client.get(url).send().await?;
+        if !response.status().is_success() {
+            return Err(anyhow::anyhow!(
+                "Failed to download projector: HTTP {}",
+                response.status()
+            ));
+        }
+        let total = response.content_length().unwrap_or(0);
+        let mut downloaded: u64 = 0;
+        let mut stream = response.bytes_stream();
+        let mut file = std::fs::File::create(&tmp)?;
+        let mut last_emit = Instant::now();
+        while let Some(chunk) = stream.next().await {
+            if cancel_flag.load(Ordering::Relaxed) {
+                drop(file);
+                let _ = fs::remove_file(&tmp);
+                return Ok(());
+            }
+            let chunk = chunk?;
+            file.write_all(&chunk)?;
+            downloaded += chunk.len() as u64;
+            if last_emit.elapsed() >= Duration::from_millis(100) {
+                let _ = self.app_handle.emit(
+                    "model-download-progress",
+                    &DownloadProgress {
+                        model_id: model_id.to_string(),
+                        downloaded,
+                        total,
+                        percentage: if total > 0 {
+                            (downloaded as f64 / total as f64) * 100.0
+                        } else {
+                            0.0
+                        },
+                    },
+                );
+                last_emit = Instant::now();
+            }
+        }
+        file.flush()?;
+        drop(file);
+        fs::rename(&tmp, dest)?;
+        Ok(())
+    }
+
     pub async fn download_model(&self, model_id: &str) -> Result<()> {
         let model_info = {
             let models = self.available_models.lock().unwrap();
@@ -1006,6 +1293,16 @@ impl ModelManager {
             // Clean up any partial file that might exist
             if partial_path.exists() {
                 let _ = fs::remove_file(&partial_path);
+            }
+            // Ensure the vision projector is present for multimodal models
+            // (e.g. if a previous run downloaded the weights but not the mmproj).
+            if let Some((mmproj_name, mmproj_url)) = mmproj_for(model_id) {
+                let mmproj_path = self.models_dir.join(mmproj_name);
+                if !mmproj_path.exists() {
+                    let flag = Arc::new(AtomicBool::new(false));
+                    self.download_companion(model_id, mmproj_url, &mmproj_path, &flag)
+                        .await?;
+                }
             }
             self.update_download_status()?;
             return Ok(());
@@ -1300,6 +1597,18 @@ impl ModelManager {
             fs::rename(&partial_path, &model_path)?;
         }
 
+        // For vision LLMs, fetch the companion multimodal projector now that
+        // the main weights are in place. Reuses the same cancel flag so the
+        // Cancel button aborts it too.
+        if let Some((mmproj_name, mmproj_url)) = mmproj_for(model_id) {
+            let mmproj_path = self.models_dir.join(mmproj_name);
+            if !mmproj_path.exists() {
+                info!("Downloading vision projector for {}", model_id);
+                self.download_companion(model_id, mmproj_url, &mmproj_path, &cancel_flag)
+                    .await?;
+            }
+        }
+
         // Disarm the guard — success path does its own cleanup because it
         // additionally sets is_downloaded = true.
         cleanup.disarmed = true;
@@ -1370,6 +1679,20 @@ impl ModelManager {
             fs::remove_file(&partial_path)?;
             info!("Partial file deleted successfully");
             deleted_something = true;
+        }
+
+        // Remove the companion vision projector (and its partial) for
+        // multimodal models so deletion frees all associated files.
+        if let Some((mmproj_name, _)) = mmproj_for(model_id) {
+            let mmproj_path = self.models_dir.join(mmproj_name);
+            if mmproj_path.exists() {
+                info!("Deleting vision projector at: {:?}", mmproj_path);
+                let _ = fs::remove_file(&mmproj_path);
+            }
+            let mmproj_partial = self.models_dir.join(format!("{}.partial", mmproj_name));
+            if mmproj_partial.exists() {
+                let _ = fs::remove_file(&mmproj_partial);
+            }
         }
 
         if !deleted_something {

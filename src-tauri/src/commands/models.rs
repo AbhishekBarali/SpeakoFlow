@@ -90,6 +90,15 @@ pub fn switch_active_model(app: &AppHandle, model_id: &str) -> Result<(), String
         .get_model_info(model_id)
         .ok_or_else(|| format!("Model not found: {}", model_id))?;
 
+    // Only transcription models can be the active recording model. LLM/TTS
+    // models share the catalog but are managed independently.
+    if !model_info.engine_type.is_transcription() {
+        return Err(format!(
+            "Model '{}' is not a transcription model and cannot be set as the active model",
+            model_id
+        ));
+    }
+
     if !model_info.is_downloaded {
         return Err(format!("Model not downloaded: {}", model_id));
     }
@@ -196,7 +205,11 @@ pub async fn has_any_models_available(
     model_manager: State<'_, Arc<ModelManager>>,
 ) -> Result<bool, String> {
     let models = model_manager.get_available_models();
-    Ok(models.iter().any(|m| m.is_downloaded))
+    // Onboarding/first-run is about transcription models only; LLM and TTS
+    // entries (e.g. always-available Kokoro) must not count here.
+    Ok(models
+        .iter()
+        .any(|m| m.is_downloaded && m.engine_type.is_transcription()))
 }
 
 #[tauri::command]
@@ -205,8 +218,10 @@ pub async fn has_any_models_or_downloads(
     model_manager: State<'_, Arc<ModelManager>>,
 ) -> Result<bool, String> {
     let models = model_manager.get_available_models();
-    // Return true if any models are downloaded OR if any downloads are in progress
-    Ok(models.iter().any(|m| m.is_downloaded))
+    // Return true if any transcription models are downloaded
+    Ok(models
+        .iter()
+        .any(|m| m.is_downloaded && m.engine_type.is_transcription()))
 }
 
 #[tauri::command]

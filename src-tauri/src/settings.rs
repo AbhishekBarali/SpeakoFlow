@@ -649,6 +649,18 @@ fn default_post_process_providers() -> Vec<PostProcessProvider> {
         supports_structured_output: true,
     });
 
+    // Built-in local LLM (no setup, no API key). Served by the bundled
+    // llama.cpp sidecar on a loopback port; the LocalLlmManager starts it on
+    // demand against the GGUF model the user downloads from the Models tab.
+    providers.push(PostProcessProvider {
+        id: "builtin".to_string(),
+        label: "Built-in (Local)".to_string(),
+        base_url: "http://127.0.0.1:11435/v1".to_string(),
+        allow_base_url_edit: false,
+        models_endpoint: Some("/models".to_string()),
+        supports_structured_output: false,
+    });
+
     // Local OpenAI-compatible servers (Ollama, LM Studio, llama.cpp, vLLM)
     providers.push(PostProcessProvider {
         id: "local".to_string(),

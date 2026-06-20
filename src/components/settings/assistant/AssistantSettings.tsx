@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { RefreshCw, Volume2 } from "lucide-react";
-import { commands, type AzureVoice } from "@/bindings";
+import { RefreshCw, Volume2, ArrowUp } from "lucide-react";
+import { commands, type AzureVoice, type LocalLlmStatus } from "@/bindings";
 import {
   Dropdown,
   SettingContainer,
@@ -14,6 +14,8 @@ import { Input } from "../../ui/Input";
 import { ShortcutInput } from "../ShortcutInput";
 import { useSettings } from "../../../hooks/useSettings";
 import { useKokoroTts } from "../../../assistant/useKokoroTts";
+import { useModelStore } from "@/stores/modelStore";
+import { getModelCategory } from "@/lib/utils/modelCategory";
 
 const KOKORO_DTYPES = [
   { value: "fp32", label: "fp32 (best quality, WebGPU)" },
@@ -59,39 +61,45 @@ const PanelPreview: React.FC<{
   const { t } = useTranslation();
   const [from, to] = ACCENTS[accent] ?? ACCENTS.violet;
   const fs = FONT_SIZES[fontSize] ?? FONT_SIZES.medium;
+  const accentGradient = `linear-gradient(135deg, ${from}, ${to})`;
 
   return (
     <div
-      className="rounded-2xl border border-mid-gray/20 p-3 flex flex-col gap-2"
+      className="rounded-2xl border border-hairline bg-surface p-3 flex flex-col gap-2"
       style={{ opacity: Math.max(opacity, 0.5) }}
     >
+      <div className="flex items-center gap-2 pb-1">
+        <span
+          className="w-1.5 h-1.5 rounded-full shrink-0"
+          style={{ background: accentGradient }}
+        />
+        <span className="font-display text-[15px] leading-none text-ink">
+          {t("assistant.title")}
+        </span>
+      </div>
       <div
-        className="self-end max-w-[75%] rounded-2xl rounded-br-md px-3 py-1.5 text-white"
-        style={{
-          background: `linear-gradient(135deg, ${from}, ${to})`,
-          fontSize: fs,
-        }}
+        className="self-end max-w-[75%] rounded-2xl rounded-br-md px-3 py-1.5 bg-background-ui text-on-primary"
+        style={{ fontSize: fs }}
       >
         {t("settings.assistant.appearance.previewUser")}
       </div>
       <div
-        className="self-start max-w-[75%] rounded-2xl rounded-bl-md px-3 py-1.5 bg-mid-gray/10 border border-mid-gray/20"
+        className="self-start max-w-[75%] rounded-2xl rounded-bl-md px-3 py-1.5 bg-surface-strong border border-hairline text-ink"
         style={{ fontSize: fs }}
       >
         {t("settings.assistant.appearance.previewAssistant")}
       </div>
       <div className="flex items-center gap-2 mt-1">
         <div
-          className="flex-1 h-8 rounded-xl border border-mid-gray/30 px-3 flex items-center text-mid-gray"
+          className="flex-1 h-9 rounded-xl border border-hairline-strong bg-surface-strong px-3 flex items-center text-muted-soft"
           style={{ fontSize: fs }}
         >
           {t("assistant.inputPlaceholder")}
         </div>
         <div
-          className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm"
-          style={{ background: `linear-gradient(135deg, ${from}, ${to})` }}
+          className="w-9 h-9 rounded-full flex items-center justify-center bg-background-ui text-on-primary shrink-0"
         >
-          ↑
+          <ArrowUp size={15} strokeWidth={2.5} />
         </div>
       </div>
     </div>
@@ -105,6 +113,40 @@ export const AssistantSettings: React.FC = () => {
   const providers = settings?.post_process_providers || [];
   const selectedProviderId = settings?.assistant_provider_id || "custom";
   const selectedProvider = providers.find((p) => p.id === selectedProviderId);
+
+  // Built-in (local) provider: model is chosen from downloaded LLM models and
+  // there is no API key. The engine is the bundled llama.cpp sidecar.
+  const isBuiltin = selectedProviderId === "builtin";
+  const { models } = useModelStore();
+  const llmModels = useMemo(
+    () =>
+      models.filter((m) => getModelCategory(m) === "llm" && m.is_downloaded),
+    [models],
+  );
+  const [localLlmStatus, setLocalLlmStatus] = useState<LocalLlmStatus | null>(
+    null,
+  );
+  useEffect(() => {
+    if (!isBuiltin) return;
+    let active = true;
+    void commands.getLocalLlmStatus().then((res) => {
+      if (active && res.status === "ok") setLocalLlmStatus(res.data);
+    });
+    return () => {
+      active = false;
+    };
+  }, [isBuiltin]);
+
+  // Only Kokoro (local) TTS is offered for now. Migrate any previously-selected
+  // cloud engine to Kokoro so the UI and the backend stay in sync (otherwise a
+  // stale "openai"/"azure" setting would still drive spoken summaries).
+  useEffect(() => {
+    if (settings && (settings.assistant_tts_engine ?? "kokoro") !== "kokoro") {
+      void commands
+        .setAssistantTtsEngine("kokoro")
+        .then(() => refreshSettings());
+    }
+  }, [settings, refreshSettings]);
 
   const [model, setModel] = useState("");
   const [systemPrompt, setSystemPrompt] = useState("");
@@ -292,39 +334,91 @@ export const AssistantSettings: React.FC = () => {
           </SettingContainer>
         )}
 
-        <SettingContainer
-          title={t("settings.assistant.provider.apiKeyLabel")}
-          description={t("settings.assistant.provider.apiKeyDescription")}
-          descriptionMode="tooltip"
-          layout="horizontal"
-          grouped={true}
-        >
-          <Input
-            type="password"
-            value={apiKey}
-            onChange={(e) => setApiKey(e.target.value)}
-            onBlur={handleApiKeyBlur}
-            placeholder={t("settings.assistant.provider.apiKeyPlaceholder")}
-            className="min-w-[320px]"
-          />
-        </SettingContainer>
+        {!isBuiltin && (
+          <SettingContainer
+            title={t("settings.assistant.provider.apiKeyLabel")}
+            description={t("settings.assistant.provider.apiKeyDescription")}
+            descriptionMode="tooltip"
+            layout="horizontal"
+            grouped={true}
+          >
+            <Input
+              type="password"
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              onBlur={handleApiKeyBlur}
+              placeholder={t("settings.assistant.provider.apiKeyPlaceholder")}
+              className="min-w-[320px]"
+            />
+          </SettingContainer>
+        )}
 
-        <SettingContainer
-          title={t("settings.assistant.provider.modelLabel")}
-          description={t("settings.assistant.provider.modelDescription")}
-          descriptionMode="tooltip"
-          layout="horizontal"
-          grouped={true}
-        >
-          <Input
-            type="text"
-            value={model}
-            onChange={(e) => setModel(e.target.value)}
-            onBlur={handleModelBlur}
-            placeholder={t("settings.assistant.provider.modelPlaceholder")}
-            className="min-w-[320px]"
-          />
-        </SettingContainer>
+        {isBuiltin ? (
+          <SettingContainer
+            title={t("settings.assistant.provider.modelLabel")}
+            description={t(
+              "settings.assistant.provider.builtinModelDescription",
+            )}
+            descriptionMode="tooltip"
+            layout="horizontal"
+            grouped={true}
+          >
+            <div className="flex flex-col items-end gap-1">
+              {llmModels.length > 0 ? (
+                <Dropdown
+                  options={llmModels.map((m) => ({
+                    value: m.id,
+                    label: m.name,
+                  }))}
+                  selectedValue={model}
+                  onSelect={(value) => {
+                    setModel(value);
+                    void setAndRefresh(
+                      commands.changeAssistantModelSetting(
+                        selectedProviderId,
+                        value,
+                      ),
+                    );
+                  }}
+                  placeholder={t(
+                    "settings.assistant.provider.builtinModelPlaceholder",
+                  )}
+                  className="min-w-[320px]"
+                />
+              ) : (
+                <span className="text-xs text-muted-soft max-w-[360px] text-right">
+                  {t("settings.assistant.provider.builtinNoModels")}
+                </span>
+              )}
+              {localLlmStatus && !localLlmStatus.engine_present ? (
+                <span className="text-xs text-amber-500 max-w-[360px] text-right">
+                  {t("settings.assistant.provider.builtinEngineMissing")}
+                </span>
+              ) : (
+                <span className="text-xs text-muted-soft max-w-[360px] text-right">
+                  {t("settings.assistant.provider.builtinReady")}
+                </span>
+              )}
+            </div>
+          </SettingContainer>
+        ) : (
+          <SettingContainer
+            title={t("settings.assistant.provider.modelLabel")}
+            description={t("settings.assistant.provider.modelDescription")}
+            descriptionMode="tooltip"
+            layout="horizontal"
+            grouped={true}
+          >
+            <Input
+              type="text"
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+              onBlur={handleModelBlur}
+              placeholder={t("settings.assistant.provider.modelPlaceholder")}
+              className="min-w-[320px]"
+            />
+          </SettingContainer>
+        )}
       </SettingsGroup>
 
       <SettingsGroup title={t("settings.assistant.vision.title")}>
@@ -362,20 +456,8 @@ export const AssistantSettings: React.FC = () => {
                 value: "kokoro",
                 label: t("settings.assistant.tts.engines.kokoro"),
               },
-              {
-                value: "openai",
-                label: t("settings.assistant.tts.engines.openai"),
-              },
-              {
-                value: "elevenlabs",
-                label: t("settings.assistant.tts.engines.elevenlabs"),
-              },
-              {
-                value: "azure",
-                label: t("settings.assistant.tts.engines.azure"),
-              },
             ]}
-            selectedValue={settings?.assistant_tts_engine ?? "kokoro"}
+            selectedValue="kokoro"
             onSelect={(engine) =>
               setAndRefresh(commands.setAssistantTtsEngine(engine))
             }
