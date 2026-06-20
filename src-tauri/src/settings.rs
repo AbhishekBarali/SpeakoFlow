@@ -517,6 +517,12 @@ pub struct AppSettings {
     pub assistant_tts_remote_voice: String,
     #[serde(default = "default_assistant_tts_kokoro_dtype")]
     pub assistant_tts_kokoro_dtype: String,
+    /// Playback speed multiplier for spoken assistant summaries. 1.0 is normal;
+    /// 0.5 is half speed, 2.0 is double, etc. Applied locally for Kokoro (via
+    /// the webview audio element) and natively for remote engines where the
+    /// API supports it.
+    #[serde(default = "default_assistant_tts_speed")]
+    pub assistant_tts_speed: f64,
     #[serde(default = "default_assistant_max_history_messages")]
     pub assistant_max_history_messages: u32,
     /// Context window (in tokens) the built-in local LLM engine launches with.
@@ -820,6 +826,12 @@ fn default_assistant_tts_kokoro_dtype() -> String {
     // fp32 is recommended for WebGPU; users on weak/no GPU can pick a
     // quantized dtype (q8/q4/q4f16) for much faster CPU/WASM synthesis.
     "fp32".to_string()
+}
+
+fn default_assistant_tts_speed() -> f64 {
+    // Normal speaking rate. The UI offers presets (0.5x–3x) and free entry;
+    // values are clamped to a sane range when persisted.
+    1.0
 }
 
 fn default_assistant_max_history_messages() -> u32 {
@@ -1165,6 +1177,7 @@ pub fn get_default_settings() -> AppSettings {
         assistant_tts_model: default_assistant_tts_model(),
         assistant_tts_remote_voice: default_assistant_tts_remote_voice(),
         assistant_tts_kokoro_dtype: default_assistant_tts_kokoro_dtype(),
+        assistant_tts_speed: default_assistant_tts_speed(),
         assistant_max_history_messages: default_assistant_max_history_messages(),
         local_llm_context_size: default_local_llm_context_size(),
         assistant_response_length: AssistantResponseLength::default(),

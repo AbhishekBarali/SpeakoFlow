@@ -128,11 +128,14 @@ async fn fetch_openai_speech(settings: &AppSettings, text: &str) -> Result<Vec<u
     };
 
     let client = reqwest::Client::new();
+    // OpenAI-compatible `speed` (0.25x–4x). Pitch is preserved by the service.
+    let speed = settings.assistant_tts_speed.clamp(0.25, 4.0);
     let mut request = client.post(&url).json(&serde_json::json!({
         "model": settings.assistant_tts_model,
         "input": text,
         "voice": settings.assistant_tts_remote_voice,
         "response_format": "mp3",
+        "speed": speed,
     }));
 
     let api_key = settings.assistant_tts_api_key.0.trim();
@@ -182,13 +185,21 @@ async fn fetch_elevenlabs_speech(settings: &AppSettings, text: &str) -> Result<V
     };
 
     let client = reqwest::Client::new();
+    let mut body = serde_json::json!({
+        "text": text,
+        "model_id": model,
+    });
+    // ElevenLabs exposes speed inside `voice_settings`, limited to 0.7x–1.2x.
+    // Only send it when the user actually changed the rate so the voice's own
+    // saved settings (stability, similarity) are otherwise left untouched.
+    let speed = settings.assistant_tts_speed.clamp(0.7, 1.2);
+    if (speed - 1.0).abs() > f64::EPSILON {
+        body["voice_settings"] = serde_json::json!({ "speed": speed });
+    }
     let response = client
         .post(&url)
         .header("xi-api-key", settings.assistant_tts_api_key.0.trim())
-        .json(&serde_json::json!({
-            "text": text,
-            "model_id": model,
-        }))
+        .json(&body)
         .send()
         .await
         .map_err(|e| format!("HTTP request failed: {}", e))?;
@@ -352,11 +363,22 @@ async fn fetch_azure_speech(settings: &AppSettings, text: &str) -> Result<Vec<u8
         "en-US".to_string()
     };
 
+    // Apply playback speed via SSML <prosody rate>. Azure takes a relative
+    // percentage (e.g. +100% ≈ 2x, -50% ≈ 0.5x) and preserves pitch. Wrap only
+    // when the rate actually differs from normal.
+    let escaped_text = xml_escape(text);
+    let inner = if (settings.assistant_tts_speed - 1.0).abs() > f64::EPSILON {
+        let rate = format!("{:+.0}%", (settings.assistant_tts_speed - 1.0) * 100.0);
+        format!("<prosody rate='{}'>{}</prosody>", rate, escaped_text)
+    } else {
+        escaped_text
+    };
+
     let ssml = format!(
-        "<speak version='1.0' xml:lang='{lang}'><voice xml:lang='{lang}' name='{voice}'>{text}</voice></speak>",
+        "<speak version='1.0' xml:lang='{lang}'><voice xml:lang='{lang}' name='{voice}'>{inner}</voice></speak>",
         lang = lang,
         voice = xml_escape(voice),
-        text = xml_escape(text),
+        inner = inner,
     );
 
     let client = reqwest::Client::new();

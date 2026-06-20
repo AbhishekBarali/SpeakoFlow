@@ -41,6 +41,10 @@ const KOKORO_VOICES = [
   { value: "bm_george", label: "George (UK male)" },
 ];
 
+/** Quick-pick playback speeds for the TTS speed control. Users can also type
+ *  an arbitrary value (clamped to 0.25–4 by the backend). */
+const TTS_SPEED_PRESETS = [0.5, 1, 1.5, 2, 3];
+
 const ACCENTS: Record<string, [string, string]> = {
   violet: ["#6366f1", "#8b5cf6"],
   blue: ["#2563eb", "#06b6d4"],
@@ -168,6 +172,8 @@ export const AssistantSettings: React.FC = () => {
   const [ttsApiKey, setTtsApiKey] = useState("");
   const [ttsModel, setTtsModel] = useState("");
   const [ttsRemoteVoice, setTtsRemoteVoice] = useState("");
+  // Manual playback-speed entry (string while editing; committed on blur).
+  const [ttsSpeedInput, setTtsSpeedInput] = useState("1");
 
   // TTS test button state (shared across engines).
   const [testState, setTestState] = useState<
@@ -202,9 +208,10 @@ export const AssistantSettings: React.FC = () => {
   const ttsEngine = settings?.assistant_tts_engine ?? "kokoro";
   const ttsVoice = settings?.assistant_tts_voice ?? "af_heart";
   const ttsDtype = settings?.assistant_tts_kokoro_dtype ?? "fp32";
+  const ttsSpeed = settings?.assistant_tts_speed ?? 1;
   // Lazy (not preloaded) Kokoro instance used only by the Test button in this
   // settings window; force-speaks regardless of the enabled toggle.
-  const kokoroTest = useKokoroTts(false, ttsVoice, ttsDtype);
+  const kokoroTest = useKokoroTts(false, ttsVoice, ttsDtype, ttsSpeed);
 
   const handleTestTts = async () => {
     setTestState("testing");
@@ -272,11 +279,13 @@ export const AssistantSettings: React.FC = () => {
     setTtsApiKey(settings?.assistant_tts_api_key ?? "");
     setTtsModel(settings?.assistant_tts_model ?? "");
     setTtsRemoteVoice(settings?.assistant_tts_remote_voice ?? "");
+    setTtsSpeedInput(String(settings?.assistant_tts_speed ?? 1));
   }, [
     settings?.assistant_tts_base_url,
     settings?.assistant_tts_api_key,
     settings?.assistant_tts_model,
     settings?.assistant_tts_remote_voice,
+    settings?.assistant_tts_speed,
   ]);
 
   const providerOptions = providers
@@ -310,6 +319,25 @@ export const AssistantSettings: React.FC = () => {
   const setAndRefresh = async (promise: Promise<unknown>) => {
     await promise;
     await refreshSettings();
+  };
+
+  const currentTtsSpeed = settings?.assistant_tts_speed ?? 1;
+
+  // Persist a playback speed (preset or typed). The backend clamps to 0.25–4.
+  const commitTtsSpeed = async (value: number) => {
+    const clamped = Math.min(4, Math.max(0.25, value));
+    setTtsSpeedInput(String(clamped));
+    await setAndRefresh(commands.setAssistantTtsSpeed(clamped));
+  };
+
+  const handleTtsSpeedBlur = () => {
+    const parsed = parseFloat(ttsSpeedInput);
+    if (Number.isFinite(parsed)) {
+      void commitTtsSpeed(parsed);
+    } else {
+      // Revert an unparseable entry to the persisted value.
+      setTtsSpeedInput(String(currentTtsSpeed));
+    }
   };
 
   return (
@@ -792,6 +820,47 @@ export const AssistantSettings: React.FC = () => {
             </SettingContainer>
           </>
         )}
+
+        <SettingContainer
+          title={t("settings.assistant.tts.speedLabel")}
+          description={t("settings.assistant.tts.speedDescription")}
+          descriptionMode="tooltip"
+          layout="horizontal"
+          grouped={true}
+        >
+          <div className="flex items-center gap-1.5">
+            {TTS_SPEED_PRESETS.map((preset) => {
+              const active = Math.abs(currentTtsSpeed - preset) < 0.001;
+              return (
+                <button
+                  key={preset}
+                  type="button"
+                  onClick={() => commitTtsSpeed(preset)}
+                  disabled={!settings?.assistant_tts_enabled}
+                  className={`px-2.5 py-1 text-sm font-medium rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                    active
+                      ? "bg-ink text-on-primary"
+                      : "bg-surface-strong text-muted hover:text-ink"
+                  }`}
+                >
+                  {t("settings.assistant.tts.speedValue", { value: preset })}
+                </button>
+              );
+            })}
+            <Input
+              type="number"
+              value={ttsSpeedInput}
+              onChange={(e) => setTtsSpeedInput(e.target.value)}
+              onBlur={handleTtsSpeedBlur}
+              min="0.25"
+              max="4"
+              step="0.1"
+              disabled={!settings?.assistant_tts_enabled}
+              aria-label={t("settings.assistant.tts.speedCustomLabel")}
+              className="w-20"
+            />
+          </div>
+        </SettingContainer>
 
         <SettingContainer
           title={t("settings.assistant.tts.testLabel")}

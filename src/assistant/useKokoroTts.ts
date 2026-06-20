@@ -38,10 +38,15 @@ export function useKokoroTts(
   enabled: boolean,
   voice: string,
   dtype: string = "fp32",
+  speed: number = 1,
 ) {
   const modelRef = useRef<KokoroModel | null>(null);
   const loadingRef = useRef<Promise<KokoroModel> | null>(null);
   const dtypeRef = useRef(dtype);
+  // Latest playback speed, read when each audio chunk starts so changes apply
+  // to the next clip without re-creating the playback callbacks.
+  const speedRef = useRef(speed);
+  speedRef.current = speed;
   const [status, setStatus] = useState<TtsStatus>("off");
   /** Model download progress 0-100 while status === "loading". */
   const [progress, setProgress] = useState(0);
@@ -161,6 +166,12 @@ export function useKokoroTts(
     }
     const url = URL.createObjectURL(next);
     const el = new Audio(url);
+    // Pitch-preserved time-stretch so faster/slower speech still sounds natural
+    // (preservesPitch defaults to true in Chromium, set explicitly for clarity).
+    // Clamp defensively: the setting is already clamped to 0.25–4 on write, but
+    // playbackRate throws for out-of-range values (e.g. a hand-edited config).
+    el.playbackRate = Math.min(4, Math.max(0.25, speedRef.current || 1));
+    el.preservesPitch = true;
     playingRef.current = el;
     const done = () => {
       URL.revokeObjectURL(url);

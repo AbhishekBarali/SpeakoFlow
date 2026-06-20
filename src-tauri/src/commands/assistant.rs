@@ -280,6 +280,20 @@ pub fn set_assistant_tts_kokoro_dtype(app: AppHandle, dtype: String) -> Result<(
     Ok(())
 }
 
+/// Playback speed multiplier for spoken summaries (0.25x–4x). Clamped to that
+/// range so a stray manual entry can't request an unusable rate. The change
+/// takes effect on the next spoken clip rather than interrupting the current
+/// one.
+#[tauri::command]
+#[specta::specta]
+pub fn set_assistant_tts_speed(app: AppHandle, speed: f64) -> Result<(), String> {
+    let mut settings = get_settings(&app);
+    settings.assistant_tts_speed = speed.clamp(0.25, 4.0);
+    write_settings(&app, settings);
+    emit_settings_changed(&app);
+    Ok(())
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn set_assistant_panel_size(app: AppHandle, size: String) -> Result<(), String> {
