@@ -776,7 +776,7 @@ const AssistantHistoryEntryComponent: React.FC<AssistantHistoryEntryProps> = ({
                   className={
                     isUser
                       ? "max-w-[85%] rounded-2xl rounded-br-md bg-ink-soft px-3 py-2 text-sm leading-relaxed text-on-primary select-text whitespace-pre-wrap break-words"
-                      : "max-w-[85%] rounded-2xl rounded-bl-md border border-hairline bg-surface-strong px-3 py-2 text-sm leading-relaxed text-ink select-text break-words"
+                      : "max-w-[85%] rounded-2xl rounded-bl-md border border-hairline-strong bg-surface-strong px-3 py-2 text-sm leading-relaxed text-ink select-text break-words shadow-[0_1px_2px_rgba(12,10,9,0.05)]"
                   }
                 >
                   {isUser ? (

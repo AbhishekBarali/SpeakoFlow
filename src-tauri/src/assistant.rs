@@ -489,9 +489,21 @@ pub async fn run_assistant_turn(app: AppHandle, user_text: String, screenshot: O
         )
     };
     let mut messages: Vec<Value> = Vec::new();
+    let system_content = {
+        let mut content = settings.assistant_system_prompt.clone();
+        // Append the user's response-length preference (if any) so a single
+        // system prompt covers both display and spoken output.
+        if let Some(directive) = settings.assistant_response_length.directive() {
+            if !content.trim().is_empty() {
+                content.push_str("\n\n");
+            }
+            content.push_str(directive);
+        }
+        content
+    };
     messages.push(json!({
         "role": "system",
-        "content": settings.assistant_system_prompt,
+        "content": system_content,
     }));
     {
         let conversation = app.state::<AssistantConversation>();
@@ -622,7 +634,7 @@ pub async fn run_assistant_turn(app: AppHandle, user_text: String, screenshot: O
             persist_assistant_session(&app);
 
             if settings.assistant_tts_enabled {
-                spawn_tts_summary(&app, &settings, &provider, api_key, &model, full_text);
+                spawn_tts_speak(&app, &settings, full_text);
             }
         }
         Some(Err(e)) => {
@@ -644,55 +656,29 @@ pub async fn run_assistant_turn(app: AppHandle, user_text: String, screenshot: O
     emit_state(&app, "idle");
 }
 
-/// Ask the model for a brief spoken summary of its reply and route it to the
-/// configured TTS engine. Fire-and-forget.
-fn spawn_tts_summary(
-    app: &AppHandle,
-    settings: &crate::settings::AppSettings,
-    provider: &crate::settings::PostProcessProvider,
-    api_key: String,
-    model: &str,
-    full_text: String,
-) {
+/// Speak the assistant's reply aloud via the configured TTS engine.
+/// Fire-and-forget. Response length is controlled by the user's
+/// `assistant_response_length` setting (injected into the system prompt), so no
+/// separate summary is generated — we speak the reply directly.
+fn spawn_tts_speak(app: &AppHandle, settings: &crate::settings::AppSettings, full_text: String) {
+    let text = full_text.trim().to_string();
+    if text.is_empty() {
+        return;
+    }
     let app = app.clone();
-    let provider = provider.clone();
-    let model = model.to_string();
-    let tts_prompt = settings.assistant_tts_prompt.clone();
     let settings = settings.clone();
 
     tauri::async_runtime::spawn(async move {
         // Capture the playback epoch up front: if the user disables voice
-        // summaries while this summary is still generating, the epoch bumps and
-        // playback is suppressed.
+        // output while this is queued, the epoch bumps and playback is
+        // suppressed.
         let epoch = crate::tts::current_epoch();
-        match llm_client::send_chat_completion_with_schema(
-            &provider,
-            api_key,
-            &model,
-            full_text,
-            Some(tts_prompt),
-            None,
-            None,
-            None,
-        )
-        .await
-        {
-            Ok(Some(summary)) if !summary.trim().is_empty() => {
-                let summary = summary.trim().to_string();
-                debug!(
-                    "TTS summary ({}): {}",
-                    settings.assistant_tts_engine, summary
-                );
-                if settings.assistant_tts_engine == "kokoro" {
-                    // Local engine lives in the panel webview (kokoro-js); the
-                    // webview hook ignores it when TTS is disabled.
-                    let _ = app.emit("assistant-tts", summary);
-                } else {
-                    crate::tts::speak_remote_epoch(&app, &settings, summary, epoch).await;
-                }
-            }
-            Ok(_) => debug!("TTS summary request returned no content"),
-            Err(e) => debug!("TTS summary request failed: {}", e),
+        if settings.assistant_tts_engine == "kokoro" {
+            // Local engine lives in the panel webview (kokoro-js); the webview
+            // hook ignores it when TTS is disabled.
+            let _ = app.emit("assistant-tts", text);
+        } else {
+            crate::tts::speak_remote_epoch(&app, &settings, text, epoch).await;
         }
     });
 }

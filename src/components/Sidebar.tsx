@@ -1,16 +1,16 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
 import {
-  Cog,
+  SlidersHorizontal,
+  Box,
+  Wrench,
   FlaskConical,
   History,
   Info,
   Sparkles,
-  Cpu,
   MessageCircle,
 } from "lucide-react";
 import Wordmark from "./Wordmark";
-import HandyHand from "./icons/HandyHand";
 import { useSettings } from "../hooks/useSettings";
 import {
   GeneralSettings,
@@ -43,19 +43,19 @@ interface SectionConfig {
 export const SECTIONS_CONFIG = {
   general: {
     labelKey: "sidebar.general",
-    icon: HandyHand,
+    icon: SlidersHorizontal,
     component: GeneralSettings,
     enabled: () => true,
   },
   models: {
     labelKey: "sidebar.models",
-    icon: Cpu,
+    icon: Box,
     component: ModelsSettings,
     enabled: () => true,
   },
   advanced: {
     labelKey: "sidebar.advanced",
-    icon: Cog,
+    icon: Wrench,
     component: AdvancedSettings,
     enabled: () => true,
   },

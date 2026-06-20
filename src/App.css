@@ -15,22 +15,22 @@
  * editorial); body/UI runs Inter. Inspired by the ElevenLabs design language.
  */
 @theme {
-  /* === Surfaces (warm cream) === */
-  --color-canvas: #f5eede; /* page floor (warm ivory) */
-  --color-canvas-soft: #faf4e8; /* alternating bands */
-  --color-surface: #fdf8ee; /* cards (warm off-white, not pure white) */
-  --color-surface-strong: #efe6d3; /* badges, plates, hover fills */
+  /* === Surfaces (soft warm white — premium, airy, not beige) === */
+  --color-canvas: #f4f2ee; /* page floor (soft warm off-white) */
+  --color-canvas-soft: #f9f8f5; /* sidebar / alternating bands */
+  --color-surface: #fdfcfa; /* cards (crisp near-white, faint warmth) */
+  --color-surface-strong: #eeebe4; /* badges, plates, hover fills */
 
   /* === Ink / text (warm near-black) === */
-  --color-ink: #1d160d; /* display + primary text */
-  --color-ink-soft: #34291b; /* primary CTA fill, emphasis */
-  --color-body: #514636; /* running text */
-  --color-muted: #6e6250; /* sub-titles, captions */
-  --color-muted-soft: #a99a82; /* disabled, hints */
+  --color-ink: #2a2622; /* display + primary text */
+  --color-ink-soft: #3d362e; /* primary CTA fill, emphasis */
+  --color-body: #5c5448; /* running text */
+  --color-muted: #7c7466; /* sub-titles, captions */
+  --color-muted-soft: #b7af9f; /* disabled, hints */
 
   /* === Hairlines === */
-  --color-hairline: #e6dcc8; /* default 1px divider */
-  --color-hairline-strong: #d7cab1; /* stronger panel outline */
+  --color-hairline: #e9e5dd; /* default 1px divider */
+  --color-hairline-strong: #dad4c8; /* stronger panel outline */
 
   /* === Atmospheric gradient stops (decoration only) === */
   --color-orb-mint: #a7e5d3;
@@ -44,13 +44,13 @@
   --color-error: #dc2626;
 
   /* === On-color text === */
-  --color-on-primary: #fdf8ee; /* text on the ink pill */
+  --color-on-primary: #fdfcfa; /* text on the ink pill */
 
   /* === Toggle switch ===
    * Kept separate from the primary action color so the "on" state never
    * blows out to pure white in dark mode. The knob always contrasts. */
-  --color-toggle-track-on: #34291b; /* ink track when on */
-  --color-toggle-knob-on: #fdf8ee; /* knob when on */
+  --color-toggle-track-on: #3d362e; /* ink track when on */
+  --color-toggle-knob-on: #fdfcfa; /* knob when on */
 
   /* === Back-compat aliases ===
    * Many leaf components still reference these original token names.
@@ -60,10 +60,10 @@
   --color-text: var(--color-ink);
   --color-background-ui: var(--color-ink-soft); /* primary action = ink pill */
   --color-logo-primary: var(--color-ink-soft); /* accent / active = ink */
-  --color-logo-stroke: #34291b;
-  --color-text-stroke: #fdf8ee;
+  --color-logo-stroke: #3d362e;
+  --color-text-stroke: #fdfcfa;
   /* warm gray: solid it reads as a muted label, at low opacity ≈ a hairline */
-  --color-mid-gray: #92816a;
+  --color-mid-gray: #968c7b;
 
   /* === Type families === */
   --font-sans:
@@ -78,6 +78,9 @@
 }
 
 :root {
+  /* Atmospheric orb opacity — subtle on light, glowier on dark (see .orb) */
+  --orb-opacity: 0.2;
+
   /* Typography baseline */
   font-family: var(--font-sans);
   font-size: 15px;
@@ -115,6 +118,7 @@
  * the stored preference (so a system-dark user never flashes light). */
 :root[data-theme="dark"] {
   color-scheme: dark;
+  --orb-opacity: 0.42;
   --color-canvas: #0c0a09;
   --color-canvas-soft: #161311;
   --color-surface: #1c1917;
@@ -149,6 +153,7 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
     color-scheme: dark;
+    --orb-opacity: 0.42;
     --color-canvas: #0c0a09;
     --color-canvas-soft: #161311;
     --color-surface: #1c1917;
@@ -216,7 +221,7 @@
     position: absolute;
     border-radius: 9999px;
     filter: blur(64px);
-    opacity: 0.45;
+    opacity: var(--orb-opacity, 0.4);
     pointer-events: none;
     z-index: 0;
   }

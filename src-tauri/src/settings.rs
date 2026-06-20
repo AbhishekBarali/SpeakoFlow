@@ -153,6 +153,38 @@ pub enum AutoSubmitKey {
     CmdEnter,
 }
 
+/// Desired length of the assistant's replies. Appended as a directive to the
+/// system prompt at request time, so it works with the single main prompt
+/// (no separate summary layer). `Default` injects nothing.
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum AssistantResponseLength {
+    /// No length directive — use the system prompt as-is.
+    #[default]
+    Default,
+    Short,
+    Medium,
+    Long,
+}
+
+impl AssistantResponseLength {
+    /// The instruction appended to the system prompt, or `None` for `Default`.
+    pub fn directive(&self) -> Option<&'static str> {
+        match self {
+            AssistantResponseLength::Default => None,
+            AssistantResponseLength::Short => Some(
+                "Keep your reply very short — usually one or two sentences. Match the user's intent: a greeting or trivial message gets a brief, friendly reply, never a long one.",
+            ),
+            AssistantResponseLength::Medium => Some(
+                "Keep replies fairly brief — a short paragraph at most. Don't pad simple messages with extra detail.",
+            ),
+            AssistantResponseLength::Long => Some(
+                "Give thorough, detailed replies when the question genuinely calls for it. Still match the user's intent: greetings or trivial messages get a short reply, not filler.",
+            ),
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Type)]
 #[serde(rename_all = "snake_case")]
 pub enum RecordingRetentionPeriod {
@@ -487,8 +519,8 @@ pub struct AppSettings {
     pub assistant_tts_kokoro_dtype: String,
     #[serde(default = "default_assistant_max_history_messages")]
     pub assistant_max_history_messages: u32,
-    #[serde(default = "default_assistant_tts_prompt")]
-    pub assistant_tts_prompt: String,
+    #[serde(default)]
+    pub assistant_response_length: AssistantResponseLength,
     #[serde(default = "default_assistant_panel_opacity")]
     pub assistant_panel_opacity: f64,
     #[serde(default = "default_assistant_font_size")]
@@ -794,12 +826,6 @@ fn default_assistant_panel_size() -> String {
     "standard".to_string()
 }
 
-/// System prompt for the spoken summary: instead of reading the whole answer
-/// aloud, the model produces a brief conversational recap.
-fn default_assistant_tts_prompt() -> String {
-    "The user just received the following assistant answer in a chat panel. Speak a brief recap: one to three short conversational sentences (roughly 25-60 words) covering the key points or the direct answer. Talk naturally, as if quickly telling a friend. Plain text only: no markdown, no lists, no headings, no code.".to_string()
-}
-
 fn default_assistant_panel_opacity() -> f64 {
     1.0
 }
@@ -866,10 +892,6 @@ fn ensure_assistant_defaults(settings: &mut AppSettings) -> bool {
         "compact" | "standard" | "large"
     ) {
         settings.assistant_panel_size = default_assistant_panel_size();
-        changed = true;
-    }
-    if settings.assistant_tts_prompt.trim().is_empty() {
-        settings.assistant_tts_prompt = default_assistant_tts_prompt();
         changed = true;
     }
     if !(0.5..=1.0).contains(&settings.assistant_panel_opacity) {
@@ -1133,7 +1155,7 @@ pub fn get_default_settings() -> AppSettings {
         assistant_tts_remote_voice: default_assistant_tts_remote_voice(),
         assistant_tts_kokoro_dtype: default_assistant_tts_kokoro_dtype(),
         assistant_max_history_messages: default_assistant_max_history_messages(),
-        assistant_tts_prompt: default_assistant_tts_prompt(),
+        assistant_response_length: AssistantResponseLength::default(),
         assistant_panel_opacity: default_assistant_panel_opacity(),
         assistant_font_size: default_assistant_font_size(),
         assistant_accent: default_assistant_accent(),

@@ -22,27 +22,27 @@
 
   --panel-radius: 18px;
 
-  /* Light editorial palette — warm cream, matches the main app's :root */
-  --panel-surface: rgb(253 248 238 / calc(0.97 * var(--panel-alpha)));
-  --surface-strong: #efe6d3;
-  --surface-inset: #f7f1e6;
-  --ink: #1d160d;
-  --body: #514636;
-  --muted: #6e6250;
-  --muted-soft: #a99a82;
-  --hairline: #e6dcc8;
-  --hairline-strong: #d7cab1;
+  /* Light editorial palette — soft warm white, matches the main app's :root */
+  --panel-surface: rgb(253 252 250 / calc(0.97 * var(--panel-alpha)));
+  --surface-strong: #eeebe4;
+  --surface-inset: #f6f4ef;
+  --ink: #2a2622;
+  --body: #5c5448;
+  --muted: #7c7466;
+  --muted-soft: #b7af9f;
+  --hairline: #e9e5dd;
+  --hairline-strong: #dad4c8;
 
   /* Primary "ink pill" — used for the user's own messages */
-  --ink-pill-bg: #34291b;
-  --ink-pill-fg: #fdf8ee;
+  --ink-pill-bg: #3d362e;
+  --ink-pill-fg: #fdfcfa;
 
   --error-bg: rgba(220, 38, 38, 0.08);
   --error-text: #b91c1c;
 
   --shadow:
-    0 0 0 1px var(--hairline), 0 1px 2px rgba(40, 30, 15, 0.05),
-    0 16px 40px rgba(40, 30, 15, 0.14);
+    0 0 0 1px var(--hairline), 0 1px 2px rgba(40, 34, 28, 0.05),
+    0 16px 40px rgba(40, 34, 28, 0.14);
 }
 
 /* Dark inversion — applied when the user explicitly chooses Dark, with the

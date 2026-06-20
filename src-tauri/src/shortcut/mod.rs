@@ -531,6 +531,17 @@ pub fn change_theme_setting(app: AppHandle, theme: String) -> Result<(), String>
     };
     settings.theme = parsed;
     settings::write_settings(&app, settings);
+
+    // Keep the native window (title bar) theme in sync with the choice.
+    let window_theme = match parsed {
+        Theme::Light => Some(tauri::Theme::Light),
+        Theme::Dark => Some(tauri::Theme::Dark),
+        Theme::System => None,
+    };
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.set_theme(window_theme);
+    }
+
     Ok(())
 }
 

@@ -478,7 +478,7 @@ pub fn run(cli_args: CliArgs) {
             commands::assistant::set_assistant_screenshot_enabled,
             commands::assistant::set_assistant_tts_enabled,
             commands::assistant::set_assistant_tts_voice,
-            commands::assistant::change_assistant_tts_prompt_setting,
+            commands::assistant::set_assistant_response_length,
             commands::assistant::set_assistant_panel_opacity,
             commands::assistant::set_assistant_font_size,
             commands::assistant::set_assistant_accent,
@@ -597,9 +597,19 @@ pub fn run(cli_args: CliArgs) {
                 win_builder = win_builder.data_directory(data_dir.join("webview"));
             }
 
-            win_builder.build()?;
+            let main_webview = win_builder.build()?;
 
             let mut settings = get_settings(&app.handle());
+
+            // Match the native window (title bar) theme to the appearance
+            // choice so it doesn't stay dark while the UI is light. System
+            // maps to None, which lets the OS drive the title bar.
+            let window_theme = match settings.theme {
+                settings::Theme::Light => Some(tauri::Theme::Light),
+                settings::Theme::Dark => Some(tauri::Theme::Dark),
+                settings::Theme::System => None,
+            };
+            let _ = main_webview.set_theme(window_theme);
 
             // CLI --debug flag overrides debug_mode and log level (runtime-only, not persisted)
             if cli_args.debug {

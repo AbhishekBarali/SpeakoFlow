@@ -1,7 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { RefreshCw, Volume2, ArrowUp } from "lucide-react";
-import { commands, type AzureVoice, type LocalLlmStatus } from "@/bindings";
+import {
+  commands,
+  type AzureVoice,
+  type LocalLlmStatus,
+  type AssistantResponseLength,
+} from "@/bindings";
 import {
   Dropdown,
   SettingContainer,
@@ -51,6 +56,24 @@ const FONT_SIZES: Record<string, string> = {
   large: "14.5px",
 };
 
+/** Rotating set of playful lines spoken by the "Test voice" button. One is
+ *  picked at random on each press instead of always saying the same thing.
+ *  These are intentionally not translated — they're meme sample lines. */
+const TEST_PHRASES = [
+  "Wagwan brother.",
+  "Hi! This is a test of Handy's voice output.",
+  "Ayo, is this thing on?",
+  "Greetings, human. Your voice assistant has entered the chat.",
+  "Testing, testing, one two... yeah we good.",
+  "Beep boop, I am definitely not a robot.",
+  "Loud and clear, captain.",
+  "Yo, mic check. Sounding crispy.",
+];
+
+/** Pick a random sample line for the voice test. */
+const randomTestPhrase = (): string =>
+  TEST_PHRASES[Math.floor(Math.random() * TEST_PHRASES.length)];
+
 /** Live preview of the assistant panel using the current appearance
  *  settings — mirrors the bubble/input styling of the real panel. */
 const PanelPreview: React.FC<{
@@ -96,9 +119,7 @@ const PanelPreview: React.FC<{
         >
           {t("assistant.inputPlaceholder")}
         </div>
-        <div
-          className="w-9 h-9 rounded-full flex items-center justify-center bg-background-ui text-on-primary shrink-0"
-        >
+        <div className="w-9 h-9 rounded-full flex items-center justify-center bg-background-ui text-on-primary shrink-0">
           <ArrowUp size={15} strokeWidth={2.5} />
         </div>
       </div>
@@ -140,7 +161,6 @@ export const AssistantSettings: React.FC = () => {
   const [model, setModel] = useState("");
   const [systemPrompt, setSystemPrompt] = useState("");
   const [historyLimit, setHistoryLimit] = useState("12");
-  const [ttsPrompt, setTtsPrompt] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
   const [ttsBaseUrl, setTtsBaseUrl] = useState("");
@@ -188,12 +208,12 @@ export const AssistantSettings: React.FC = () => {
   const handleTestTts = async () => {
     setTestState("testing");
     setTestError(null);
-    const phrase = t("settings.assistant.tts.testPhrase");
+    const phrase = randomTestPhrase();
     try {
       if (ttsEngine === "kokoro") {
         await kokoroTest.speak(phrase, true);
       } else {
-        const res = await commands.assistantTestTts();
+        const res = await commands.assistantTestTts(phrase);
         if (res.status === "error") {
           setTestState("error");
           setTestError(res.error);
@@ -230,13 +250,11 @@ export const AssistantSettings: React.FC = () => {
   };
 
   useEffect(() => {
-    setTtsPrompt(settings?.assistant_tts_prompt ?? "");
     setTtsBaseUrl(settings?.assistant_tts_base_url ?? "");
     setTtsApiKey(settings?.assistant_tts_api_key ?? "");
     setTtsModel(settings?.assistant_tts_model ?? "");
     setTtsRemoteVoice(settings?.assistant_tts_remote_voice ?? "");
   }, [
-    settings?.assistant_tts_prompt,
     settings?.assistant_tts_base_url,
     settings?.assistant_tts_api_key,
     settings?.assistant_tts_model,
@@ -268,11 +286,6 @@ export const AssistantSettings: React.FC = () => {
 
   const handleBaseUrlBlur = async () => {
     await commands.changePostProcessBaseUrlSetting(selectedProviderId, baseUrl);
-    await refreshSettings();
-  };
-
-  const handleTtsPromptBlur = async () => {
-    await commands.changeAssistantTtsPromptSetting(ttsPrompt);
     await refreshSettings();
   };
 
@@ -771,23 +784,6 @@ export const AssistantSettings: React.FC = () => {
             )}
           </div>
         </SettingContainer>
-
-        <SettingContainer
-          title={t("settings.assistant.tts.promptLabel")}
-          description={t("settings.assistant.tts.promptDescription")}
-          descriptionMode="tooltip"
-          layout="stacked"
-          grouped={true}
-        >
-          <Textarea
-            value={ttsPrompt}
-            onChange={(e) => setTtsPrompt(e.target.value)}
-            onBlur={handleTtsPromptBlur}
-            className="w-full"
-            rows={3}
-            disabled={!settings?.assistant_tts_enabled}
-          />
-        </SettingContainer>
       </SettingsGroup>
 
       <SettingsGroup title={t("settings.assistant.appearance.title")}>
@@ -929,6 +925,42 @@ export const AssistantSettings: React.FC = () => {
             onBlur={handlePromptBlur}
             className="w-full"
             rows={5}
+          />
+        </SettingContainer>
+        <SettingContainer
+          title={t("settings.assistant.responseLength.label")}
+          description={t("settings.assistant.responseLength.description")}
+          descriptionMode="tooltip"
+          layout="horizontal"
+          grouped={true}
+        >
+          <Dropdown
+            options={[
+              {
+                value: "default",
+                label: t("settings.assistant.responseLength.options.default"),
+              },
+              {
+                value: "short",
+                label: t("settings.assistant.responseLength.options.short"),
+              },
+              {
+                value: "medium",
+                label: t("settings.assistant.responseLength.options.medium"),
+              },
+              {
+                value: "long",
+                label: t("settings.assistant.responseLength.options.long"),
+              },
+            ]}
+            selectedValue={settings?.assistant_response_length ?? "default"}
+            onSelect={(value) =>
+              setAndRefresh(
+                commands.setAssistantResponseLength(
+                  value as AssistantResponseLength,
+                ),
+              )
+            }
           />
         </SettingContainer>
         <SettingContainer

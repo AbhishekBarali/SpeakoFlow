@@ -306,9 +306,8 @@ function App() {
                 height: "300px",
                 top: "-130px",
                 insetInlineStart: "-120px",
-                opacity: 0.28,
                 background:
-                  "radial-gradient(circle at 70% 40%, var(--color-orb-mint), transparent 72%)",
+                  "radial-gradient(circle at 70% 40%, var(--color-orb-peach), transparent 72%)",
               }}
             />
             <div className="relative z-10 flex flex-col items-center px-6 py-8 gap-6">

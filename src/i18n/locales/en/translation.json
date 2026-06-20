@@ -591,7 +591,19 @@
           "title": "Whisper.cpp",
           "description": "High-performance inference of OpenAI's Whisper automatic speech recognition model",
           "details": "SpeakoFlow uses Whisper.cpp for fast, local speech-to-text processing. Thanks to the amazing work by Georgi Gerganov and contributors."
-        }
+        },
+        "llamacpp": {
+          "title": "llama.cpp",
+          "description": "The engine powering the built-in local language model",
+          "details": "SpeakoFlow runs local LLMs with llama.cpp. Thanks to Georgi Gerganov and the ggml community for making fast, on-device inference possible."
+        },
+        "kokoro": {
+          "title": "Kokoro",
+          "description": "The local text-to-speech voice for the assistant",
+          "details": "SpeakoFlow speaks replies using the Kokoro TTS model, running entirely on your device. Thanks to the Kokoro project and its contributors."
+        },
+        "previous": "Previous",
+        "next": "Next"
       }
     },
     "assistant": {
@@ -625,6 +637,16 @@
         "label": "Conversation memory",
         "description": "How many recent messages (your messages + the assistant's replies) are sent back as context on each turn. Higher remembers more of the conversation but costs more tokens and can slow responses. 0 means each question is answered with no memory of prior turns. Screenshot turns are capped lower automatically."
       },
+      "responseLength": {
+        "label": "Response length",
+        "description": "Controls how long replies are. The model still matches your intent — a quick \"hi\" gets a short reply even on Long. \"No effect\" leaves your system prompt untouched.",
+        "options": {
+          "default": "No effect",
+          "short": "Short",
+          "medium": "Medium",
+          "long": "Long"
+        }
+      },
       "vision": {
         "title": "Screen Vision",
         "enableLabel": "Allow screenshots",
@@ -632,8 +654,8 @@
       },
       "tts": {
         "title": "Voice Output (TTS)",
-        "enableLabel": "Speak a short summary",
-        "enableDescription": "After each answer, a tiny extra request asks the model for a brief takeaway, which is spoken aloud. The full answer is never read out.",
+        "enableLabel": "Speak responses aloud",
+        "enableDescription": "Reads the assistant's reply out loud. Use the Response length option (under System Prompt) to keep spoken replies short.",
         "engineLabel": "TTS engine",
         "engineDescription": "Kokoro runs locally and free (uses your GPU via WebGPU). The OpenAI-compatible engine works with OpenAI, Azure OpenAI, Groq, or any local server exposing /audio/speech. ElevenLabs uses your ElevenLabs API key. Azure AI Speech uses a regional Neural TTS endpoint with SSML voices.",
         "engines": {

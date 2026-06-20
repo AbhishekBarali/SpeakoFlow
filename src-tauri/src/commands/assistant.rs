@@ -165,9 +165,12 @@ pub fn set_assistant_tts_voice(app: AppHandle, voice: String) -> Result<(), Stri
 
 #[tauri::command]
 #[specta::specta]
-pub fn change_assistant_tts_prompt_setting(app: AppHandle, prompt: String) -> Result<(), String> {
+pub fn set_assistant_response_length(
+    app: AppHandle,
+    length: crate::settings::AssistantResponseLength,
+) -> Result<(), String> {
     let mut settings = get_settings(&app);
-    settings.assistant_tts_prompt = prompt;
+    settings.assistant_response_length = length;
     write_settings(&app, settings);
     emit_settings_changed(&app);
     Ok(())
@@ -339,14 +342,21 @@ pub async fn assistant_speak(app: AppHandle, text: String) -> Result<(), String>
 /// (The local kokoro engine is tested in-webview, not through this command.)
 #[tauri::command]
 #[specta::specta]
-pub async fn assistant_test_tts(app: AppHandle) -> Result<(), String> {
+pub async fn assistant_test_tts(app: AppHandle, text: String) -> Result<(), String> {
     let settings = get_settings(&app);
     if settings.assistant_tts_engine == "kokoro" {
         return Err("Kokoro is tested locally in the browser, not via this command".to_string());
     }
     // Interrupt anything currently playing before the test clip.
     crate::tts::stop_remote();
-    let sample = "Hi! This is a test of Handy's voice output.".to_string();
+    // The phrase is chosen at random on the frontend (a rotating set of fun
+    // sample lines) so the spoken test matches the kokoro path. Fall back to a
+    // sensible default if the caller passes nothing.
+    let sample = if text.trim().is_empty() {
+        "Hi! This is a test of Handy's voice output.".to_string()
+    } else {
+        text
+    };
     crate::tts::test_remote(&settings, sample).await
 }
 
