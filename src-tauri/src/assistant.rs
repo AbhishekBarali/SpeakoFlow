@@ -661,8 +661,11 @@ pub async fn run_assistant_turn(app: AppHandle, user_text: String, screenshot: O
 /// `assistant_response_length` setting (injected into the system prompt), so no
 /// separate summary is generated — we speak the reply directly.
 fn spawn_tts_speak(app: &AppHandle, settings: &crate::settings::AppSettings, full_text: String) {
-    let text = full_text.trim().to_string();
-    if text.is_empty() {
+    // The full reply is spoken verbatim, so strip Markdown, code blocks, links
+    // and emojis first — otherwise the engine reads symbols and code aloud. The
+    // on-screen reply is unaffected; this only cleans the spoken copy.
+    let text = crate::tts::sanitize_for_speech(&full_text);
+    if text.trim().is_empty() {
         return;
     }
     let app = app.clone();
