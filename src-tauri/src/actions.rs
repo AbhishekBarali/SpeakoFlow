@@ -713,6 +713,10 @@ impl ShortcutAction for AssistantAction {
         // Show the panel right away so the user sees the listening state.
         crate::assistant::show_assistant_panel(app);
         crate::assistant::emit_state(app, "listening");
+        // Tell the floating panel whether this turn will capture the screen
+        // so it can show a "vision" indicator. The actual capture decision is
+        // re-evaluated at stop, but the dedicated vision binding always does.
+        let _ = app.emit("assistant-vision-active", binding_id == "assistant_vision");
 
         change_tray_icon(app, TrayIconState::Recording);
         show_recording_overlay(app);

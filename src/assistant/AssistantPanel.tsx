@@ -18,6 +18,11 @@ import {
 } from "lucide-react";
 import { commands, type AppSettings } from "@/bindings";
 import { syncLanguageFromSettings } from "@/i18n";
+import {
+  applyThemePreference,
+  watchSystemTheme,
+  type ThemePreference,
+} from "@/lib/theme";
 import { AudioWaveform } from "@/components/shared";
 import { useKokoroTts } from "./useKokoroTts";
 import "./AssistantPanel.css";
@@ -95,6 +100,7 @@ const AssistantPanel: React.FC = () => {
   const [ttsPlaying, setTtsPlaying] = useState(false);
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [micLevels, setMicLevels] = useState<number[]>([]);
+  const [visionActive, setVisionActive] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
   const sendingRef = useRef(false);
 
@@ -133,7 +139,16 @@ const AssistantPanel: React.FC = () => {
       "--msg-font-size",
       FONT_SIZES[settings.assistant_font_size ?? "medium"] ?? FONT_SIZES.medium,
     );
+    // Apply the appearance preference so the panel recolors with the toggle.
+    applyThemePreference((settings.theme ?? "system") as ThemePreference);
   }, [settings]);
+
+  // Follow OS theme changes while the preference is "system".
+  const themePreference = (settings?.theme ?? "system") as ThemePreference;
+  useEffect(
+    () => watchSystemTheme(() => themePreference),
+    [themePreference],
+  );
 
   // Auto-scroll to bottom on new content
   useEffect(() => {
@@ -180,6 +195,10 @@ const AssistantPanel: React.FC = () => {
           if (e.payload.state !== "idle") {
             setError(null);
           }
+          // The turn finished — drop the screen-vision indicator.
+          if (e.payload.state === "idle") {
+            setVisionActive(false);
+          }
         }),
       );
 
@@ -200,6 +219,14 @@ const AssistantPanel: React.FC = () => {
       track(
         await listen<boolean>("assistant-screen-armed", (e) => {
           setAttachScreen(e.payload);
+        }),
+      );
+
+      // Whether the in-flight turn is a screen-vision turn (e.g. the
+      // "Assistant + Screen" shortcut), so the panel/pill can show it.
+      track(
+        await listen<boolean>("assistant-vision-active", (e) => {
+          setVisionActive(e.payload);
         }),
       );
 
@@ -333,6 +360,10 @@ const AssistantPanel: React.FC = () => {
 
   const showTypingDots = state === "thinking" && stream === "";
 
+  // Screen-vision is active either because the user armed the camera, or
+  // because this turn came from the "Assistant + Screen" shortcut.
+  const screenActive = visionActive || attachScreen;
+
   const ttsTitle =
     tts.status === "loading"
       ? t("assistant.tts.loadingShort", { progress: tts.progress })
@@ -343,23 +374,33 @@ const AssistantPanel: React.FC = () => {
   if (collapsed) {
     return (
       <div className="assistant-pill" data-tauri-drag-region>
-        <button
-          className={`pill-mic${state === "listening" ? " recording" : ""}${
-            state === "transcribing" || state === "thinking" ? " working" : ""
-          }`}
-          onClick={toggleVoice}
-          title={
-            state === "listening"
-              ? t("assistant.pill.stop")
-              : t("assistant.pill.talk")
-          }
-        >
-          {state === "listening" ? (
-            <Square size={15} strokeWidth={2.5} />
-          ) : (
-            <Mic size={17} strokeWidth={2} />
+        <div className="pill-mic-wrap">
+          <button
+            className={`pill-mic${state === "listening" ? " recording" : ""}${
+              state === "transcribing" || state === "thinking" ? " working" : ""
+            }`}
+            onClick={toggleVoice}
+            title={
+              state === "listening"
+                ? t("assistant.pill.stop")
+                : t("assistant.pill.talk")
+            }
+          >
+            {state === "listening" ? (
+              <Square size={15} strokeWidth={2.5} />
+            ) : (
+              <Mic size={17} strokeWidth={2} />
+            )}
+          </button>
+          {screenActive && (
+            <span
+              className="pill-screen-badge"
+              title={t("assistant.screenAttached")}
+            >
+              <Camera size={10} strokeWidth={2.5} />
+            </span>
           )}
-        </button>
+        </div>
         {state === "listening" ? (
           <div className="pill-wave" data-tauri-drag-region>
             <AudioWaveform
@@ -482,9 +523,14 @@ const AssistantPanel: React.FC = () => {
               barCount={16}
               active={state === "listening"}
             />
-            {state === "listening" && locked
-              ? t("assistant.status.locked")
-              : t(`assistant.status.${state}`)}
+            <span className="listening-label">
+              {screenActive && (
+                <Camera size={13} strokeWidth={2} className="listening-cam" />
+              )}
+              {state === "listening" && locked
+                ? t("assistant.status.locked")
+                : t(`assistant.status.${state}`)}
+            </span>
           </div>
         )}
         {showTypingDots && (

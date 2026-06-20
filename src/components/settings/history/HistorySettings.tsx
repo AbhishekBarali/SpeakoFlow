@@ -21,6 +21,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import ReactMarkdown, { type Components } from "react-markdown";
 import { toast } from "sonner";
 import {
   commands,
@@ -48,6 +49,60 @@ const cleanMessageContent = (
     };
   }
   return { text: raw, screenshot: false };
+};
+
+/**
+ * Markdown styling for assistant replies in the expanded conversation —
+ * mirrors the assistant panel so bold, lists, code, etc. render properly
+ * instead of leaking raw markdown syntax.
+ */
+const assistantMarkdown: Components = {
+  p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+  ul: ({ children }) => (
+    <ul className="mb-2 list-disc space-y-1 ps-5 last:mb-0">{children}</ul>
+  ),
+  ol: ({ children }) => (
+    <ol className="mb-2 list-decimal space-y-1 ps-5 last:mb-0">{children}</ol>
+  ),
+  li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+  strong: ({ children }) => (
+    <strong className="font-semibold text-ink">{children}</strong>
+  ),
+  em: ({ children }) => <em className="italic">{children}</em>,
+  h1: ({ children }) => (
+    <p className="mb-1 mt-2 font-semibold first:mt-0">{children}</p>
+  ),
+  h2: ({ children }) => (
+    <p className="mb-1 mt-2 font-semibold first:mt-0">{children}</p>
+  ),
+  h3: ({ children }) => (
+    <p className="mb-1 mt-2 font-semibold first:mt-0">{children}</p>
+  ),
+  a: ({ href, children }) => (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer noopener"
+      className="underline decoration-hairline-strong underline-offset-2 hover:text-ink"
+    >
+      {children}
+    </a>
+  ),
+  code: ({ children }) => (
+    <code className="rounded bg-mid-gray/15 px-1 py-0.5 font-mono text-[0.85em]">
+      {children}
+    </code>
+  ),
+  pre: ({ children }) => (
+    <pre className="my-2 overflow-x-auto rounded-lg border border-hairline bg-mid-gray/10 p-3 text-[0.85em] [&_code]:bg-transparent [&_code]:p-0">
+      {children}
+    </pre>
+  ),
+  blockquote: ({ children }) => (
+    <blockquote className="my-2 border-s-2 border-hairline-strong ps-3 text-muted">
+      {children}
+    </blockquote>
+  ),
 };
 
 const IconButton: React.FC<{
@@ -708,28 +763,42 @@ const AssistantHistoryEntryComponent: React.FC<AssistantHistoryEntryProps> = ({
       )}
 
       {expanded && (
-        <div className="flex flex-col gap-3 pb-1">
+        <div className="flex flex-col gap-2 pt-0.5">
           {session.messages.map((message, index) => {
             const { text, screenshot } = cleanMessageContent(message.content);
             const isUser = message.role === "user";
             return (
-              <div key={index} className="flex flex-col gap-1">
-                <span className="text-[10px] font-semibold uppercase tracking-wide text-muted">
-                  {isUser
-                    ? t("settings.history.roleUser")
-                    : t("settings.history.roleAssistant")}
-                </span>
-                {text.length > 0 && (
-                  <p className="text-sm text-text/90 select-text whitespace-pre-wrap break-words">
-                    {text}
-                  </p>
-                )}
-                {screenshot && (
-                  <span className="inline-flex items-center gap-1 text-xs text-muted">
-                    <Camera width={11} height={11} />
-                    {t("settings.history.screenshotAttached")}
-                  </span>
-                )}
+              <div
+                key={index}
+                className={`flex ${isUser ? "justify-end" : "justify-start"}`}
+              >
+                <div
+                  className={
+                    isUser
+                      ? "max-w-[85%] rounded-2xl rounded-br-md bg-ink-soft px-3 py-2 text-sm leading-relaxed text-on-primary select-text whitespace-pre-wrap break-words"
+                      : "max-w-[85%] rounded-2xl rounded-bl-md border border-hairline bg-surface-strong px-3 py-2 text-sm leading-relaxed text-ink select-text break-words"
+                  }
+                >
+                  {isUser ? (
+                    text
+                  ) : (
+                    <ReactMarkdown components={assistantMarkdown}>
+                      {text}
+                    </ReactMarkdown>
+                  )}
+                  {screenshot && (
+                    <span
+                      className={`mt-1.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                        isUser
+                          ? "bg-on-primary/15 text-on-primary/80"
+                          : "bg-mid-gray/15 text-muted"
+                      }`}
+                    >
+                      <Camera width={10} height={10} />
+                      {t("settings.history.screenshotAttached")}
+                    </span>
+                  )}
+                </div>
               </div>
             );
           })}

@@ -257,6 +257,23 @@ impl SoundTheme {
     }
 }
 
+/// UI appearance preference. `System` follows the OS; `Light` / `Dark` pin the
+/// theme regardless of the OS setting. Serialized lowercase ("light", "dark",
+/// "system") to match the `data-theme` attribute the frontend sets on <html>.
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Type)]
+#[serde(rename_all = "lowercase")]
+pub enum Theme {
+    Light,
+    Dark,
+    System,
+}
+
+impl Default for Theme {
+    fn default() -> Self {
+        Theme::System
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Type)]
 #[serde(rename_all = "snake_case")]
 pub enum TypingTool {
@@ -480,6 +497,8 @@ pub struct AppSettings {
     pub assistant_accent: String,
     #[serde(default = "default_assistant_panel_size")]
     pub assistant_panel_size: String,
+    #[serde(default)]
+    pub theme: Theme,
 }
 
 fn default_model() -> String {
@@ -1119,6 +1138,7 @@ pub fn get_default_settings() -> AppSettings {
         assistant_font_size: default_assistant_font_size(),
         assistant_accent: default_assistant_accent(),
         assistant_panel_size: default_assistant_panel_size(),
+        theme: Theme::System,
     }
 }
 

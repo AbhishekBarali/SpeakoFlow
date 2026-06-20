@@ -37,9 +37,9 @@ const ENGINE_PORT: u16 = 11435;
 /// on the small models this feature targets.
 const CONTEXT_SIZE: u32 = 4096;
 
-/// Max time to wait for the engine to load a model and start accepting
-/// connections. Large models on slow disks can take a while on first load.
-const READY_TIMEOUT: Duration = Duration::from_secs(90);
+/// Max time to wait for the engine to load a model and start serving. Large
+/// models, slow disks, and first-run GPU shader compilation can take a while.
+const READY_TIMEOUT: Duration = Duration::from_secs(180);
 
 #[derive(Debug, Clone, Serialize, Type)]
 pub struct LocalLlmStatus {
@@ -96,6 +96,25 @@ impl LocalLlmManager {
             "llama-server.exe"
         } else {
             "llama-server"
+        }
+    }
+
+    /// Path to the engine's captured stdout/stderr log.
+    fn engine_log_path(&self) -> PathBuf {
+        self.models_dir.join("engine").join("llama-server.log")
+    }
+
+    /// Read the last `max_lines` lines of the engine log, for surfacing the
+    /// real failure reason (bad arg, missing DLL, model load error, ...).
+    fn engine_log_tail(&self, max_lines: usize) -> Option<String> {
+        let content = std::fs::read_to_string(self.engine_log_path()).ok()?;
+        let lines: Vec<&str> = content.lines().collect();
+        let start = lines.len().saturating_sub(max_lines);
+        let tail = lines[start..].join("\n");
+        if tail.trim().is_empty() {
+            None
+        } else {
+            Some(tail)
         }
     }
 
@@ -421,11 +440,22 @@ impl LocalLlmManager {
                 Ok(())
             }
             Err(e) => {
-                error!("Built-in LLM engine failed to become ready: {}", e);
+                // Surface the engine's real output so the failure is actionable
+                // (e.g. unsupported flag, missing GPU runtime, model load error).
+                let detail = match self.engine_log_tail(20) {
+                    Some(tail) => format!(
+                        "{}\n\nEngine log ({}):\n{}",
+                        e,
+                        self.engine_log_path().display(),
+                        tail
+                    ),
+                    None => e.clone(),
+                };
+                error!("Built-in LLM engine failed to become ready: {}", detail);
                 self.stop();
-                self.set_error(Some(e.clone()));
+                self.set_error(Some(detail.clone()));
                 self.emit_status();
-                Err(e)
+                Err(detail)
             }
         }
     }
@@ -471,7 +501,20 @@ impl LocalLlmManager {
             cmd.arg("--mmproj").arg(mmproj);
         }
 
-        cmd.stdout(Stdio::null()).stderr(Stdio::null());
+        // Capture the engine's output to a log file so failures (bad argument,
+        // missing DLL, model load error) are diagnosable instead of silent.
+        let log_path = self.engine_log_path();
+        if let Some(parent) = log_path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        let (stdout, stderr) = match std::fs::File::create(&log_path) {
+            Ok(f) => match f.try_clone() {
+                Ok(f2) => (Stdio::from(f), Stdio::from(f2)),
+                Err(_) => (Stdio::from(f), Stdio::null()),
+            },
+            Err(_) => (Stdio::null(), Stdio::null()),
+        };
+        cmd.stdout(stdout).stderr(stderr);
 
         // Don't pop up a console window on Windows.
         #[cfg(windows)]
@@ -484,9 +527,43 @@ impl LocalLlmManager {
         cmd.spawn()
     }
 
-    /// Poll the loopback port until the engine accepts connections (it only
-    /// binds after the model has finished loading), or time out. Runs on a
-    /// blocking thread so the async runtime is never stalled.
+    /// Probe the engine's `/health` endpoint with a minimal raw HTTP request
+    /// (no async/blocking-client deps needed). Returns true only on HTTP 200,
+    /// which llama-server reports once the model is fully loaded. While loading
+    /// it returns 503, so we keep waiting.
+    fn check_health(addr: &SocketAddr) -> bool {
+        use std::io::{Read, Write};
+
+        let mut stream = match TcpStream::connect_timeout(addr, Duration::from_millis(800)) {
+            Ok(s) => s,
+            Err(_) => return false,
+        };
+        let _ = stream.set_read_timeout(Some(Duration::from_millis(1500)));
+        let _ = stream.set_write_timeout(Some(Duration::from_millis(1500)));
+
+        let request = "GET /health HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n";
+        if stream.write_all(request.as_bytes()).is_err() {
+            return false;
+        }
+
+        let mut buf = [0u8; 256];
+        match stream.read(&mut buf) {
+            Ok(n) if n > 0 => {
+                let resp = String::from_utf8_lossy(&buf[..n]);
+                // Status line looks like "HTTP/1.1 200 OK" when ready.
+                resp.lines()
+                    .next()
+                    .and_then(|line| line.split_whitespace().nth(1))
+                    .map(|code| code == "200")
+                    .unwrap_or(false)
+            }
+            _ => false,
+        }
+    }
+
+    /// Wait until the engine has fully loaded the model and `/health` returns
+    /// 200, or time out. Runs on a blocking thread so the async runtime is
+    /// never stalled.
     async fn wait_until_ready(&self) -> Result<(), String> {
         let addr = SocketAddr::from(([127, 0, 0, 1], self.port));
         let state = self.state.clone();
@@ -510,7 +587,11 @@ impl LocalLlmManager {
                     }
                 }
 
-                if TcpStream::connect_timeout(&addr, Duration::from_millis(800)).is_ok() {
+                // The engine accepts TCP connections before the model is
+                // loaded, so a bare connect check fires too early (causes a
+                // 503 "Loading model" on the first request). Poll /health and
+                // only proceed once it reports the model is ready (HTTP 200).
+                if Self::check_health(&addr) {
                     return Ok(());
                 }
                 if start.elapsed() > READY_TIMEOUT {

@@ -22,31 +22,57 @@
 
   --panel-radius: 18px;
 
-  /* Light editorial palette (matches the main app's :root) */
-  --panel-surface: rgb(255 255 255 / calc(0.97 * var(--panel-alpha)));
-  --surface-strong: #f0efed;
-  --surface-inset: #faf9f8;
-  --ink: #0c0a09;
-  --body: #4e4e4e;
-  --muted: #777169;
-  --muted-soft: #a8a29e;
-  --hairline: #e7e5e4;
-  --hairline-strong: #d6d3d1;
+  /* Light editorial palette — warm cream, matches the main app's :root */
+  --panel-surface: rgb(253 248 238 / calc(0.97 * var(--panel-alpha)));
+  --surface-strong: #efe6d3;
+  --surface-inset: #f7f1e6;
+  --ink: #1d160d;
+  --body: #514636;
+  --muted: #6e6250;
+  --muted-soft: #a99a82;
+  --hairline: #e6dcc8;
+  --hairline-strong: #d7cab1;
 
   /* Primary "ink pill" — used for the user's own messages */
-  --ink-pill-bg: #292524;
-  --ink-pill-fg: #ffffff;
+  --ink-pill-bg: #34291b;
+  --ink-pill-fg: #fdf8ee;
 
   --error-bg: rgba(220, 38, 38, 0.08);
   --error-text: #b91c1c;
 
   --shadow:
-    0 0 0 1px var(--hairline), 0 1px 2px rgba(12, 10, 9, 0.05),
-    0 16px 40px rgba(12, 10, 9, 0.14);
+    0 0 0 1px var(--hairline), 0 1px 2px rgba(40, 30, 15, 0.05),
+    0 16px 40px rgba(40, 30, 15, 0.14);
+}
+
+/* Dark inversion — applied when the user explicitly chooses Dark, with the
+ * same token set mirrored under the media query for the pre-JS moment. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --panel-surface: rgb(28 25 23 / calc(0.96 * var(--panel-alpha)));
+  --surface-strong: #292524;
+  --surface-inset: #100d0c;
+  --ink: #fafaf9;
+  --body: #d6d3d1;
+  --muted: #a8a29e;
+  --muted-soft: #78716c;
+  --hairline: #292524;
+  --hairline-strong: #44403c;
+
+  --ink-pill-bg: #fafaf9;
+  --ink-pill-fg: #0c0a09;
+
+  --error-bg: rgba(244, 63, 94, 0.13);
+  --error-text: #fda4af;
+
+  --shadow:
+    0 0 0 1px var(--hairline), 0 1px 2px rgba(0, 0, 0, 0.4),
+    0 18px 44px rgba(0, 0, 0, 0.5);
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme]) {
+    color-scheme: dark;
     --panel-surface: rgb(28 25 23 / calc(0.96 * var(--panel-alpha)));
     --surface-strong: #292524;
     --surface-inset: #100d0c;
@@ -448,7 +474,7 @@
   align-self: flex-start;
   display: flex;
   align-items: center;
-  gap: 11px;
+  gap: 10px;
   font-size: 12.5px;
   font-weight: 500;
   color: var(--muted);
@@ -458,6 +484,17 @@
   border-bottom-left-radius: 6px;
   padding: 7px 14px 7px 12px;
   animation: bubble-in 0.2s ease-out;
+}
+
+.listening-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.listening-cam {
+  color: var(--accent-from);
+  flex-shrink: 0;
 }
 
 /* ---------- Typing dots ---------- */
@@ -534,9 +571,9 @@
 }
 
 .assistant-attach-button.armed {
-  background: linear-gradient(135deg, var(--accent-from), var(--accent-to));
+  background: var(--ink-pill-bg);
   border-color: transparent;
-  color: #fff;
+  color: var(--ink-pill-fg);
 }
 
 .assistant-input {
@@ -632,6 +669,29 @@
     transform 0.15s ease,
     box-shadow 0.15s ease,
     background 0.15s ease;
+}
+
+.pill-mic-wrap {
+  position: relative;
+  flex-shrink: 0;
+  display: flex;
+}
+
+/* Small "vision" badge on the mic when a screenshot is part of the turn. */
+.pill-screen-badge {
+  position: absolute;
+  bottom: -2px;
+  inset-inline-end: -2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent-from), var(--accent-to));
+  color: #fff;
+  box-shadow: 0 0 0 2px var(--panel-surface);
+  animation: chip-in 0.18s ease-out;
 }
 
 .pill-mic:hover {

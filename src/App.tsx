@@ -17,6 +17,11 @@ import { useSettings } from "./hooks/useSettings";
 import { useSettingsStore } from "./stores/settingsStore";
 import { commands } from "@/bindings";
 import { getLanguageDirection, initializeRTL } from "@/lib/utils/rtl";
+import {
+  applyThemePreference,
+  watchSystemTheme,
+  type ThemePreference,
+} from "@/lib/theme";
 
 type OnboardingStep = "accessibility" | "model" | "done";
 
@@ -54,6 +59,15 @@ function App() {
   useEffect(() => {
     initializeRTL(i18n.language);
   }, [i18n.language]);
+
+  // Apply the appearance preference (light / dark / system) to <html>. The
+  // CSS reacts to the resolved data-theme attribute. While the preference is
+  // "system", watchSystemTheme keeps it aligned with live OS theme changes.
+  const themePreference = (settings?.theme ?? "system") as ThemePreference;
+  useEffect(() => {
+    applyThemePreference(themePreference);
+  }, [themePreference]);
+  useEffect(() => watchSystemTheme(() => themePreference), [themePreference]);
 
   // Initialize Enigo, shortcuts, and refresh audio devices when main app loads
   useEffect(() => {

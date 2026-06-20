@@ -137,17 +137,6 @@ export const AssistantSettings: React.FC = () => {
     };
   }, [isBuiltin]);
 
-  // Only Kokoro (local) TTS is offered for now. Migrate any previously-selected
-  // cloud engine to Kokoro so the UI and the backend stay in sync (otherwise a
-  // stale "openai"/"azure" setting would still drive spoken summaries).
-  useEffect(() => {
-    if (settings && (settings.assistant_tts_engine ?? "kokoro") !== "kokoro") {
-      void commands
-        .setAssistantTtsEngine("kokoro")
-        .then(() => refreshSettings());
-    }
-  }, [settings, refreshSettings]);
-
   const [model, setModel] = useState("");
   const [systemPrompt, setSystemPrompt] = useState("");
   const [historyLimit, setHistoryLimit] = useState("12");
@@ -456,8 +445,20 @@ export const AssistantSettings: React.FC = () => {
                 value: "kokoro",
                 label: t("settings.assistant.tts.engines.kokoro"),
               },
+              {
+                value: "openai",
+                label: t("settings.assistant.tts.engines.openai"),
+              },
+              {
+                value: "elevenlabs",
+                label: t("settings.assistant.tts.engines.elevenlabs"),
+              },
+              {
+                value: "azure",
+                label: t("settings.assistant.tts.engines.azure"),
+              },
             ]}
-            selectedValue="kokoro"
+            selectedValue={settings?.assistant_tts_engine ?? "kokoro"}
             onSelect={(engine) =>
               setAndRefresh(commands.setAssistantTtsEngine(engine))
             }

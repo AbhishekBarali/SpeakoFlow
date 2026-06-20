@@ -4,6 +4,13 @@
     "showAdvanced": "Show advanced options",
     "showLess": "Show less"
   },
+  "appearance": {
+    "title": "Appearance",
+    "description": "Choose a light, dark, or system-matched theme for the app and assistant panel.",
+    "system": "System",
+    "light": "Light",
+    "dark": "Dark"
+  },
   "tray": {
     "settings": "Settings...",
     "checkUpdates": "Check for Updates...",
