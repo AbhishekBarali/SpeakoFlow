@@ -19,7 +19,16 @@ pub async fn assistant_send_text(app: AppHandle, text: String) -> Result<(), Str
 pub async fn assistant_send_text_with_screen(app: AppHandle, text: String) -> Result<(), String> {
     let settings = get_settings(&app);
     let screenshot = if settings.assistant_screenshot_enabled {
-        match tauri::async_runtime::spawn_blocking(crate::screenshot::capture_screen_data_url).await
+        // Tiny body only for Azure's gateway; loopback (built-in/local engine)
+        // gets a balanced image, cloud gets the sharp one.
+        let profile = settings
+            .active_assistant_provider()
+            .map(|p| crate::screenshot::CaptureProfile::for_base_url(&p.base_url))
+            .unwrap_or(crate::screenshot::CaptureProfile::Generous);
+        match tauri::async_runtime::spawn_blocking(move || {
+            crate::screenshot::capture_screen_data_url(profile)
+        })
+        .await
         {
             Ok(Ok(url)) => Some(url),
             Ok(Err(e)) => {
@@ -415,4 +424,81 @@ pub fn set_assistant_max_history_messages(app: AppHandle, count: u32) -> Result<
     write_settings(&app, settings);
     emit_settings_changed(&app);
     Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Web search
+// ---------------------------------------------------------------------------
+
+/// Enable or disable web search for the assistant. When enabled, a fast local
+/// heuristic still decides per-question whether a search is actually run, so
+/// casual chat stays instant.
+#[tauri::command]
+#[specta::specta]
+pub fn set_assistant_web_search_enabled(app: AppHandle, enabled: bool) -> Result<(), String> {
+    let mut settings = get_settings(&app);
+    settings.assistant_web_search_enabled = enabled;
+    write_settings(&app, settings);
+    emit_settings_changed(&app);
+    Ok(())
+}
+
+/// Choose the search backend: "duckduckgo" (free, no key), "firecrawl", or
+/// "brave".
+#[tauri::command]
+#[specta::specta]
+pub fn set_assistant_web_search_provider(app: AppHandle, provider: String) -> Result<(), String> {
+    if !matches!(provider.as_str(), "duckduckgo" | "firecrawl" | "brave") {
+        return Err(format!("Unknown web search provider: {}", provider));
+    }
+    let mut settings = get_settings(&app);
+    settings.assistant_web_search_provider = provider;
+    write_settings(&app, settings);
+    emit_settings_changed(&app);
+    Ok(())
+}
+
+/// How many results to feed the model (clamped to 1–8 to stay fast and cheap).
+#[tauri::command]
+#[specta::specta]
+pub fn set_assistant_web_search_max_results(app: AppHandle, count: u32) -> Result<(), String> {
+    let mut settings = get_settings(&app);
+    settings.assistant_web_search_max_results = count.clamp(1, 8);
+    write_settings(&app, settings);
+    emit_settings_changed(&app);
+    Ok(())
+}
+
+/// Store the API key for a keyed search provider ("firecrawl" or "brave").
+#[tauri::command]
+#[specta::specta]
+pub fn set_assistant_web_search_api_key(
+    app: AppHandle,
+    provider: String,
+    api_key: String,
+) -> Result<(), String> {
+    if !matches!(provider.as_str(), "firecrawl" | "brave") {
+        return Err(format!(
+            "Provider '{}' does not use an API key for web search",
+            provider
+        ));
+    }
+    let mut settings = get_settings(&app);
+    settings.web_search_api_keys.insert(provider, api_key);
+    write_settings(&app, settings);
+    emit_settings_changed(&app);
+    Ok(())
+}
+
+/// Run a one-off web search with the current settings and return the results,
+/// so the settings UI can offer a "Test search" button and surface any error
+/// (missing key, rate limit) inline.
+#[tauri::command]
+#[specta::specta]
+pub async fn assistant_test_web_search(
+    app: AppHandle,
+    query: String,
+) -> Result<Vec<crate::web_search::SearchResult>, String> {
+    let settings = get_settings(&app);
+    crate::web_search::search(&settings, &query).await
 }

@@ -576,7 +576,9 @@
     "off": "關",
     "yes": "是",
     "no": "否",
-    "noOptionsFound": "未找到選項"
+    "noOptionsFound": "未找到選項",
+    "showAdvanced": "顯示進階選項",
+    "showLess": "收合"
   },
   "accessibility": {
     "permissionsRequired": "需要輔助使用權限",

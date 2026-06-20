@@ -5,7 +5,9 @@ use crate::audio_toolkit::{is_microphone_access_denied, is_no_input_device_error
 use crate::managers::audio::AudioRecordingManager;
 use crate::managers::history::HistoryManager;
 use crate::managers::transcription::TranscriptionManager;
-use crate::settings::{get_settings, AppSettings, APPLE_INTELLIGENCE_PROVIDER_ID};
+use crate::settings::{
+    get_settings, AppSettings, ModelUnloadTimeout, APPLE_INTELLIGENCE_PROVIDER_ID,
+};
 use crate::shortcut;
 use crate::tray::{change_tray_icon, TrayIconState};
 use crate::utils::{
@@ -61,6 +63,25 @@ fn strip_invisible_chars(s: &str) -> String {
 /// Removes `${output}` placeholder since the transcription is sent as the user message.
 fn build_system_prompt(prompt_template: &str) -> String {
     prompt_template.replace("${output}", "").trim().to_string()
+}
+
+/// Kick off loading the built-in LLM engine in the background so its (slow)
+/// first-time load overlaps with recording + transcription instead of blocking
+/// the first response. Errors are ignored here; the real request path surfaces
+/// them and retries. No-op unless the built-in provider is the active one.
+fn prewarm_builtin_llm(app: &AppHandle, model: String) {
+    let manager = app
+        .state::<Arc<crate::managers::local_llm::LocalLlmManager>>()
+        .inner()
+        .clone();
+    tauri::async_runtime::spawn(async move {
+        if let Err(e) = manager.ensure_running(&model).await {
+            debug!(
+                "Built-in LLM prewarm failed (will retry on first use): {}",
+                e
+            );
+        }
+    });
 }
 
 async fn post_process_transcription(
@@ -131,7 +152,10 @@ async fn post_process_transcription(
 
     // The built-in provider is backed by the bundled llama.cpp engine; make
     // sure it is running and serving the selected model before requesting.
-    if provider.id == "builtin" {
+    // Built-in provider: ensure the engine is running, then hold an activity
+    // guard for the rest of the request so the idle watcher won't unload it
+    // mid-generation.
+    let _llm_activity_guard = if provider.id == "builtin" {
         let manager = app.state::<std::sync::Arc<crate::managers::local_llm::LocalLlmManager>>();
         if let Err(e) = manager.ensure_running(&model).await {
             error!(
@@ -140,7 +164,10 @@ async fn post_process_transcription(
             );
             return None;
         }
-    }
+        Some(manager.begin_request())
+    } else {
+        None
+    };
 
     // Disable reasoning for providers where post-processing rarely benefits from it.
     // - custom: top-level reasoning_effort (works for local OpenAI-compat servers)
@@ -428,6 +455,23 @@ impl ShortcutAction for TranscribeAction {
 
         // Get the microphone mode to determine audio feedback timing
         let settings = get_settings(app);
+
+        // Prewarm the built-in LLM during recording (when this action will
+        // post-process with it) so its load overlaps with recording +
+        // transcription instead of stalling the first response.
+        if self.post_process && settings.local_llm_unload_timeout != ModelUnloadTimeout::Immediately
+        {
+            if let Some(provider) = settings.active_post_process_provider() {
+                if provider.id == "builtin" {
+                    if let Some(model) = settings.post_process_models.get("builtin") {
+                        if !model.trim().is_empty() {
+                            prewarm_builtin_llm(app, model.clone());
+                        }
+                    }
+                }
+            }
+        }
+
         let is_always_on = settings.always_on_microphone;
         debug!("Microphone mode - always_on: {}", is_always_on);
 
@@ -710,6 +754,23 @@ impl ShortcutAction for AssistantAction {
             }
         });
 
+        // Prewarm the built-in LLM during recording (when the assistant uses
+        // it) so its load overlaps with recording + transcription.
+        {
+            let settings = get_settings(app);
+            if settings.local_llm_unload_timeout != ModelUnloadTimeout::Immediately {
+                if let Some(provider) = settings.active_assistant_provider() {
+                    if provider.id == "builtin" {
+                        if let Some(model) = settings.assistant_models.get("builtin") {
+                            if !model.trim().is_empty() {
+                                prewarm_builtin_llm(app, model.clone());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         // Show the panel right away so the user sees the listening state.
         crate::assistant::show_assistant_panel(app);
         crate::assistant::emit_state(app, "listening");
@@ -809,9 +870,15 @@ impl ShortcutAction for AssistantAction {
                         || binding_id == "assistant_vision"
                         || crate::assistant::wants_screen_context(&transcription);
                     let screenshot = if wants_screen && settings.assistant_screenshot_enabled {
-                        let captured = tauri::async_runtime::spawn_blocking(
-                            crate::screenshot::capture_screen_data_url,
-                        )
+                        // Tiny body only for Azure; loopback (built-in/local
+                        // engine) gets a balanced image, cloud gets the sharp one.
+                        let profile = settings
+                            .active_assistant_provider()
+                            .map(|p| crate::screenshot::CaptureProfile::for_base_url(&p.base_url))
+                            .unwrap_or(crate::screenshot::CaptureProfile::Generous);
+                        let captured = tauri::async_runtime::spawn_blocking(move || {
+                            crate::screenshot::capture_screen_data_url(profile)
+                        })
                         .await;
                         match captured {
                             Ok(Ok(data_url)) => Some(data_url),

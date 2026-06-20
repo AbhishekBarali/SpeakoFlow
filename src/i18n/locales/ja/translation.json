@@ -576,7 +576,9 @@
     "off": "オフ",
     "yes": "はい",
     "no": "いいえ",
-    "noOptionsFound": "オプションが見つかりません"
+    "noOptionsFound": "オプションが見つかりません",
+    "showAdvanced": "詳細オプションを表示",
+    "showLess": "表示を減らす"
   },
   "accessibility": {
     "permissionsRequired": "アクセシビリティ権限が必要です",

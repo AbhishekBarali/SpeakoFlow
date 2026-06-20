@@ -7,7 +7,8 @@
 
 use crate::llm_client::{self, ChatMessage};
 use crate::settings::get_settings;
-use log::{debug, error};
+use crate::web_search;
+use log::{debug, error, warn};
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -90,6 +91,12 @@ pub struct AssistantConversation {
     busy: AtomicBool,
     /// Notified when the user presses Stop, to cancel an in-flight turn.
     cancel: Arc<Notify>,
+    /// Sticky cancel flag for the current turn. `Notify::notify_waiters` only
+    /// wakes waiters registered *at that instant*, so a Stop pressed outside the
+    /// streaming `select!` (e.g. while a web search is running, or in the race
+    /// between the stream finishing and TTS starting) would otherwise be lost.
+    /// This flag is set alongside the notify and checked at each turn stage.
+    cancelled: AtomicBool,
     /// Row id of the conversation as persisted in the history database, or
     /// `None` before the first save and after the conversation is cleared.
     /// Lets each turn update the same row instead of creating duplicates.
@@ -102,12 +109,26 @@ impl AssistantConversation {
             messages: Mutex::new(Vec::new()),
             busy: AtomicBool::new(false),
             cancel: Arc::new(Notify::new()),
+            cancelled: AtomicBool::new(false),
             session_id: Mutex::new(None),
         }
     }
 
+    /// Mark the start of a new turn: clears any leftover cancel signal so a
+    /// Stop from a previous turn can never suppress this one.
+    pub fn begin_turn(&self) {
+        self.cancelled.store(false, Ordering::SeqCst);
+    }
+
+    /// Whether the current turn has been cancelled by the user.
+    pub fn is_cancelled(&self) -> bool {
+        self.cancelled.load(Ordering::SeqCst)
+    }
+
     /// Cancel the current assistant turn (if any). Safe to call when idle.
+    /// Sets the sticky flag *and* wakes the streaming select.
     pub fn request_cancel(&self) {
+        self.cancelled.store(true, Ordering::SeqCst);
         self.cancel.notify_waiters();
     }
 
@@ -441,6 +462,25 @@ fn vision_unsupported_message(provider_id: &str, model: &str) -> String {
     }
 }
 
+/// Fixed clause appended to the system prompt so the model knows a live clock
+/// is being supplied (and to use it for "today/now/latest" questions). It's
+/// byte-identical every turn — the changing timestamp goes in the user message
+/// instead — so it doesn't disturb provider-side prompt caching.
+const TIME_AWARENESS_NOTE: &str = "The user's current local date and time is provided at the top of their message. Treat it as the present moment for any time-related question (today, now, this week, how long ago, latest, etc.) — never guess the date from your training data.";
+
+/// The current local date/time line prepended to each request's user message.
+/// LLMs have no clock, so this is the production-standard way to keep "what's
+/// the date / what time is it / how many days until X" answers correct: inject
+/// the real time fresh on every turn, with an explicit UTC offset so the model
+/// can reason across time zones. (Kept in the user message rather than the
+/// cached system prefix so it never invalidates prompt caching.)
+fn current_datetime_line() -> String {
+    let now = chrono::Local::now();
+    // e.g. "Current date and time: Saturday, June 20, 2026, 2:34 PM (UTC+05:30)."
+    now.format("Current date and time: %A, %B %-d, %Y, %-I:%M %p (UTC%:z).")
+        .to_string()
+}
+
 /// Run one assistant turn: record the user message, stream the LLM answer to
 /// the panel via events, and append the reply to the conversation history.
 ///
@@ -470,6 +510,9 @@ pub async fn run_assistant_turn(app: AppHandle, user_text: String, screenshot: O
         }
     }
     let _busy = BusyReset(app.clone());
+
+    // Fresh turn: clear any leftover cancel signal from a previous Stop.
+    app.state::<AssistantConversation>().begin_turn();
 
     let settings = get_settings(&app);
 
@@ -505,6 +548,72 @@ pub async fn run_assistant_turn(app: AppHandle, user_text: String, screenshot: O
         .cloned()
         .unwrap_or_default();
 
+    // Record the user message (text marker instead of raw image data) and show
+    // it in the panel immediately — before any web search runs, so the bubble
+    // appears right away while results are being fetched.
+    {
+        let conversation = app.state::<AssistantConversation>();
+        let mut history = conversation.messages.lock().unwrap();
+        let stored = if screenshot.is_some() {
+            format!("{}\n\n{}", user_text, SCREENSHOT_MARKER)
+        } else {
+            user_text.clone()
+        };
+        history.push(ChatMessage {
+            role: "user".to_string(),
+            content: stored,
+        });
+    }
+    emit_conversation(&app);
+    // Save right after the user message so the question is preserved even if
+    // the model (or the search) errors out before replying.
+    persist_assistant_session(&app);
+
+    // Optional web search. Runs only when enabled, when this isn't a screenshot
+    // turn (those are about the screen, not the web), and when a fast local
+    // heuristic judges the question worth searching. Any failure or timeout
+    // degrades gracefully — we simply answer without web context rather than
+    // breaking the turn.
+    let web_context: Option<String> = if settings.assistant_web_search_enabled
+        && screenshot.is_none()
+        && web_search::should_search(&user_text)
+    {
+        emit_state(&app, "searching");
+        // Race the search against a Stop press: a slow/rate-limited search must
+        // never trap the user in the "searching" state with no way out.
+        let cancel = app.state::<AssistantConversation>().cancel.clone();
+        let search_result = tokio::select! {
+            r = web_search::search(&settings, &user_text) => Some(r),
+            _ = cancel.notified() => None,
+        };
+        match search_result {
+            Some(Ok(results)) if !results.is_empty() => {
+                debug!("Web search returned {} results", results.len());
+                Some(web_search::format_results_for_prompt(&user_text, &results))
+            }
+            Some(Ok(_)) => {
+                debug!("Web search returned no results; answering without web context");
+                None
+            }
+            Some(Err(e)) => {
+                warn!("Web search failed ({}); answering without web context", e);
+                None
+            }
+            None => None, // cancelled during search; handled just below
+        }
+    } else {
+        None
+    };
+
+    // If the user pressed Stop during the search (or anytime up to here), abort
+    // before spending a model call. The question stays in the panel/history.
+    if app.state::<AssistantConversation>().is_cancelled() {
+        debug!("Assistant turn cancelled before generation");
+        crate::tts::stop_remote();
+        emit_state(&app, "idle");
+        return;
+    }
+
     // Build the request: stable system prompt → history → new user msg.
     // (Cache-friendly: the prefix only ever grows by appending.) History is
     // capped (newest first wins) so request bodies stay small — critical for
@@ -526,6 +635,12 @@ pub async fn run_assistant_turn(app: AppHandle, user_text: String, screenshot: O
     let mut messages: Vec<Value> = Vec::new();
     let system_content = {
         let mut content = settings.assistant_system_prompt.clone();
+        // Always note that a live date/time accompanies the user's message, so
+        // time-relative answers are correct. Fixed text → cache-safe.
+        if !content.trim().is_empty() {
+            content.push_str("\n\n");
+        }
+        content.push_str(TIME_AWARENESS_NOTE);
         // Append the user's response-length preference (if any) so a single
         // system prompt covers both display and spoken output.
         if let Some(directive) = settings.assistant_response_length.directive() {
@@ -533,6 +648,14 @@ pub async fn run_assistant_turn(app: AppHandle, user_text: String, screenshot: O
                 content.push_str("\n\n");
             }
             content.push_str(directive);
+        }
+        // On web-search turns, tell the model to ground its answer in (and
+        // cite) the results that are prepended to the user's message below.
+        if web_context.is_some() {
+            if !content.trim().is_empty() {
+                content.push_str("\n\n");
+            }
+            content.push_str(web_search::WEB_SEARCH_SYSTEM_DIRECTIVE);
         }
         content
     };
@@ -545,7 +668,9 @@ pub async fn run_assistant_turn(app: AppHandle, user_text: String, screenshot: O
         let history = conversation.messages.lock().unwrap();
         let mut kept: Vec<&ChatMessage> = Vec::new();
         let mut chars = 0usize;
-        for message in history.iter().rev().take(max_history_messages) {
+        // Skip the just-recorded user message (pushed above); it's appended
+        // explicitly below with the proper request content.
+        for message in history.iter().rev().skip(1).take(max_history_messages) {
             chars += message.content.len();
             if chars > max_history_chars && !kept.is_empty() {
                 break;
@@ -556,42 +681,40 @@ pub async fn run_assistant_turn(app: AppHandle, user_text: String, screenshot: O
             messages.push(json!({"role": message.role, "content": message.content}));
         }
     }
+    // Per-turn context prepended to the user's message for the request only
+    // (never stored in history): the live date/time always, plus web results
+    // when present. Keeping this in the user message rather than the cached
+    // system prefix means the timestamp stays fresh every turn without
+    // invalidating provider-side prompt caching.
+    let mut preamble = current_datetime_line();
+    if let Some(ctx) = &web_context {
+        preamble.push_str("\n\n");
+        preamble.push_str(ctx);
+    }
+    let user_content = format!("{}\n\n{}", preamble, user_text);
+
     match &screenshot {
         Some(data_url) => messages.push(json!({
             "role": "user",
             "content": [
-                {"type": "text", "text": user_text},
+                {"type": "text", "text": user_content},
                 {"type": "image_url", "image_url": {"url": data_url}}
             ]
         })),
-        None => messages.push(json!({"role": "user", "content": user_text})),
+        None => {
+            messages.push(json!({"role": "user", "content": user_content}));
+        }
     }
 
-    // Record the user message (text marker instead of raw image data) and
-    // show it in the panel immediately.
-    {
-        let conversation = app.state::<AssistantConversation>();
-        let mut history = conversation.messages.lock().unwrap();
-        let stored = if screenshot.is_some() {
-            format!("{}\n\n{}", user_text, SCREENSHOT_MARKER)
-        } else {
-            user_text.clone()
-        };
-        history.push(ChatMessage {
-            role: "user".to_string(),
-            content: stored,
-        });
-    }
-    emit_conversation(&app);
-    // Save right after the user message so the question is preserved even if
-    // the model errors out before replying.
-    persist_assistant_session(&app);
     emit_state(&app, "thinking");
 
     // The built-in provider is backed by the bundled llama.cpp engine. Ensure
     // it is running and serving the selected model before streaming. The user
     // message is already shown and the panel shows "thinking" during load.
-    if provider.id == "builtin" {
+    // Built-in provider: ensure the engine is running, then hold an activity
+    // guard across the streamed turn so the idle watcher won't unload it
+    // mid-generation.
+    let _llm_activity_guard = if provider.id == "builtin" {
         let manager = app.state::<Arc<crate::managers::local_llm::LocalLlmManager>>();
         if let Err(e) = manager.ensure_running(&model).await {
             let _ = app.emit(
@@ -601,7 +724,10 @@ pub async fn run_assistant_turn(app: AppHandle, user_text: String, screenshot: O
             emit_state(&app, "idle");
             return;
         }
-    }
+        Some(manager.begin_request())
+    } else {
+        None
+    };
 
     debug!(
         "Assistant turn: provider '{}', model '{}', {} messages, screenshot: {}",
@@ -668,7 +794,11 @@ pub async fn run_assistant_turn(app: AppHandle, user_text: String, screenshot: O
             emit_conversation(&app);
             persist_assistant_session(&app);
 
-            if settings.assistant_tts_enabled {
+            // A Stop that lands in the tiny gap between the stream finishing and
+            // here must still suppress the spoken reply.
+            if app.state::<AssistantConversation>().is_cancelled() {
+                crate::tts::stop_remote();
+            } else if settings.assistant_tts_enabled {
                 spawn_tts_speak(&app, &settings, full_text);
             }
         }
@@ -705,14 +835,22 @@ fn spawn_tts_speak(app: &AppHandle, settings: &crate::settings::AppSettings, ful
     if text.trim().is_empty() {
         return;
     }
+    // Capture the playback epoch *now*, at turn completion — NOT inside the
+    // spawned task. A Stop pressed in the window between completion and the task
+    // actually running bumps the epoch; capturing it here lets us detect that
+    // and skip the stale reply ("the new one waiting"). Capturing inside the
+    // task would read the already-bumped value and play anyway.
+    let epoch = crate::tts::current_epoch();
     let app = app.clone();
     let settings = settings.clone();
 
     tauri::async_runtime::spawn(async move {
-        // Capture the playback epoch up front: if the user disables voice
-        // output while this is queued, the epoch bumps and playback is
-        // suppressed.
-        let epoch = crate::tts::current_epoch();
+        // Superseded by a Stop (or TTS disable) before we got here? Don't speak.
+        // This covers Kokoro too, which otherwise has no epoch gate of its own.
+        if crate::tts::current_epoch() != epoch {
+            debug!("TTS superseded before playback; skipping");
+            return;
+        }
         if settings.assistant_tts_engine == "kokoro" {
             // Local engine lives in the panel webview (kokoro-js); the webview
             // hook ignores it when TTS is disabled.

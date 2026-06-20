@@ -1,3 +1,4 @@
+use crate::huggingface::{self, HfModelSummary, HfRepoFiles};
 use crate::managers::model::{ModelInfo, ModelManager};
 use crate::managers::transcription::{ModelStateEvent, TranscriptionManager};
 use crate::settings::{get_settings, write_settings, ModelUnloadTimeout};
@@ -233,4 +234,45 @@ pub async fn cancel_download(
     model_manager
         .cancel_download(&model_id)
         .map_err(|e| e.to_string())
+}
+
+/// Search the Hugging Face Hub for GGUF language-model repositories.
+///
+/// An empty query returns the most-downloaded GGUF repos as a default browse
+/// list. Used by the "Add custom model" flow in the Models tab.
+#[tauri::command]
+#[specta::specta]
+pub async fn search_huggingface_models(query: String) -> Result<Vec<HfModelSummary>, String> {
+    huggingface::search_gguf_models(&query).await
+}
+
+/// List the downloadable `.gguf` files (model weights and vision projectors)
+/// in a Hugging Face repo, with sizes, so the user can pick a quantization.
+#[tauri::command]
+#[specta::specta]
+pub async fn list_huggingface_gguf_files(repo_id: String) -> Result<HfRepoFiles, String> {
+    huggingface::list_repo_gguf_files(&repo_id).await
+}
+
+/// Register a user-chosen GGUF model from the Hub as a custom local LLM and
+/// persist it. The frontend then downloads it via the normal `download_model`
+/// command. `mmproj_filename` (optional) is the repo's vision projector.
+#[tauri::command]
+#[specta::specta]
+pub async fn add_custom_llm_model(
+    app_handle: AppHandle,
+    model_manager: State<'_, Arc<ModelManager>>,
+    repo_id: String,
+    filename: String,
+    size_mb: u64,
+    mmproj_filename: Option<String>,
+) -> Result<ModelInfo, String> {
+    let info = model_manager
+        .add_custom_llm_model(&repo_id, &filename, size_mb, mmproj_filename)
+        .map_err(|e| e.to_string())?;
+
+    // Refresh any open Models views so the new entry appears immediately.
+    let _ = app_handle.emit("model-state-changed", ());
+
+    Ok(info)
 }

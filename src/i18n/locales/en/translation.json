@@ -1,9 +1,4 @@
 {
-  "common": {
-    "noOptionsFound": "No options found",
-    "showAdvanced": "Show advanced options",
-    "showLess": "Show less"
-  },
   "appearance": {
     "title": "Appearance",
     "description": "Choose a light, dark, or system-matched theme for the app and assistant panel.",
@@ -245,7 +240,7 @@
       },
       "categoryDescriptions": {
         "stt": "Select a transcription model or download additional models. Different models offer varying levels of accuracy and speed.",
-        "llm": "Download a local language model to power the built-in assistant and transcript cleanup. It runs fully on your device — no API key, no setup.",
+        "llm": "A local language model for the built-in assistant and transcript cleanup. Runs fully on your device, no setup.",
         "tts": "Voices for the assistant's spoken replies. Kokoro runs locally on your device."
       },
       "llmHint": "After downloading, select this model in the Assistant tab under the Built-in (Local) provider.",
@@ -256,7 +251,28 @@
         "translation": "Translation",
         "allLanguages": "All Languages"
       },
-      "noModelsMatch": "No models match this filter."
+      "noModelsMatch": "No models match this filter.",
+      "customModel": {
+        "addButton": "Add custom model",
+        "title": "Add a custom model",
+        "subtitle": "Search Hugging Face for any GGUF model and run it locally.",
+        "searchPlaceholder": "Search Hugging Face for GGUF models...",
+        "searching": "Searching Hugging Face...",
+        "searchError": "Search failed. Check your connection and try again.",
+        "noResults": "No models found. Try a different search.",
+        "downloads": "{{value}} downloads",
+        "visionBadge": "Vision",
+        "back": "Back to results",
+        "loadingFiles": "Loading available files...",
+        "repoFilesError": "Could not load files for this model.",
+        "noGgufFiles": "This repository has no downloadable .gguf files.",
+        "selectQuant": "Choose a version to download",
+        "enableVision": "Enable vision (image support)",
+        "enableVisionHint": "Downloads an extra projector file so the model can see images.",
+        "add": "Add",
+        "adding": "Adding...",
+        "addError": "Could not add this model. Please try again."
+      }
     },
     "sound": {
       "title": "Sound",
@@ -656,6 +672,28 @@
         "enableLabel": "Allow screenshots",
         "enableDescription": "The Assistant + Screen shortcut and the panel's camera button capture your screen and send it with your question. Saying things like \"what's on my screen\" or \"look at this error\" also auto-attaches a capture. Requires a vision-capable model (e.g. gpt-4o-mini, gemini-flash). Disable to guarantee nothing is ever captured."
       },
+      "webSearch": {
+        "title": "Web Search",
+        "enableLabel": "Allow web search",
+        "enableDescription": "When on, the assistant can look things up on the web for current or factual questions (news, prices, weather, who/what/when). It only searches when a question actually needs it, so casual chat stays instant. Answers cite their sources.",
+        "providerLabel": "Search provider",
+        "providerDescription": "DuckDuckGo is free and needs no account. Firecrawl and Brave use your own API key and can return cleaner results. All return short snippets only — pages are never fully downloaded, so answers stay fast and cheap on tokens.",
+        "providers": {
+          "duckduckgo": "DuckDuckGo (free, no key)",
+          "firecrawl": "Firecrawl",
+          "brave": "Brave Search"
+        },
+        "apiKeyLabel": "API Key",
+        "apiKeyDescription": "API key for the selected search provider. Not needed for DuckDuckGo.",
+        "apiKeyPlaceholder": "Enter API key...",
+        "maxResultsLabel": "Results to use",
+        "maxResultsDescription": "How many search results to send the model (1–8). Fewer is faster and uses fewer tokens; more gives broader coverage.",
+        "testLabel": "Test search",
+        "testDescription": "Run a sample search with the current provider and key to confirm it works.",
+        "testButton": "Test search",
+        "testing": "Searching...",
+        "testResult": "Got {{count}} results."
+      },
       "tts": {
         "title": "Voice Output (TTS)",
         "enableLabel": "Speak responses aloud",
@@ -774,7 +812,9 @@
     "off": "Off",
     "yes": "Yes",
     "no": "No",
-    "noOptionsFound": "No options found"
+    "noOptionsFound": "No options found",
+    "showAdvanced": "Show advanced options",
+    "showLess": "Show less"
   },
   "accessibility": {
     "permissionsRequired": "Accessibility Permissions Required",
@@ -821,6 +861,10 @@
     "screenAttached": "Screen",
     "attachScreen": "Attach a screenshot of your screen",
     "detachScreen": "Don't attach screenshot",
+    "webSearch": {
+      "enable": "Enable web search",
+      "disable": "Disable web search"
+    },
     "tts": {
       "enable": "Enable voice summaries",
       "disable": "Disable voice summaries",
@@ -838,6 +882,7 @@
       "listening": "Listening...",
       "locked": "Listening — press hotkey to stop",
       "transcribing": "Transcribing...",
+      "searching": "Searching the web...",
       "thinking": "Thinking..."
     }
   }

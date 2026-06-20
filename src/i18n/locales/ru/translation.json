@@ -576,7 +576,9 @@
     "off": "Выключенный",
     "yes": "Да",
     "no": "Нет",
-    "noOptionsFound": "Вариантов не найдено"
+    "noOptionsFound": "Вариантов не найдено",
+    "showAdvanced": "Показать дополнительные параметры",
+    "showLess": "Показать меньше"
   },
   "accessibility": {
     "permissionsRequired": "Требуются разрешения на доступ",

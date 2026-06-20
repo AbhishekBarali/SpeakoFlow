@@ -576,7 +576,9 @@
     "off": "Вимк.",
     "yes": "Так",
     "no": "Ні",
-    "noOptionsFound": "Опцій не знайдено"
+    "noOptionsFound": "Опцій не знайдено",
+    "showAdvanced": "Показати додаткові параметри",
+    "showLess": "Показати менше"
   },
   "accessibility": {
     "permissionsRequired": "Потрібні права доступу",

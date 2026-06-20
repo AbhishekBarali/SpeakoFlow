@@ -23,9 +23,12 @@ export function getTranslatedModelDescription(
   model: ModelInfo,
   t: TFunction,
 ): string {
-  // Custom models use a generic translation key
+  // Custom models use their own description when available (e.g. the source
+  // repo for a user-added GGUF model), falling back to a generic label.
   if (model.is_custom) {
-    return t("onboarding.customModelDescription");
+    return model.description?.trim()
+      ? model.description
+      : t("onboarding.customModelDescription");
   }
   const translationKey = `onboarding.models.${model.id}.description`;
   const translated = t(translationKey, { defaultValue: "" });

@@ -8,6 +8,7 @@ pub mod cli;
 mod clipboard;
 mod commands;
 mod helpers;
+mod huggingface;
 mod input;
 mod llm_client;
 mod managers;
@@ -22,6 +23,7 @@ mod tray;
 mod tray_i18n;
 mod tts;
 mod utils;
+mod web_search;
 
 pub use cli::CliArgs;
 #[cfg(debug_assertions)]
@@ -174,6 +176,10 @@ fn initialize_core_logic(app_handle: &AppHandle) {
     app_handle.manage(transcription_manager.clone());
     app_handle.manage(history_manager.clone());
     app_handle.manage(local_llm_manager.clone());
+
+    // Start the idle watcher that unloads the built-in LLM after it has been
+    // idle for the configured timeout, freeing RAM/VRAM when it's not in use.
+    managers::local_llm::LocalLlmManager::spawn_idle_watcher(&local_llm_manager);
 
     // Note: Shortcuts are NOT initialized here.
     // The frontend is responsible for calling the `initialize_shortcuts` command
@@ -436,10 +442,14 @@ pub fn run(cli_args: CliArgs) {
             commands::models::is_model_loading,
             commands::models::has_any_models_available,
             commands::models::has_any_models_or_downloads,
+            commands::models::search_huggingface_models,
+            commands::models::list_huggingface_gguf_files,
+            commands::models::add_custom_llm_model,
             commands::local_llm::get_local_llm_status,
             commands::local_llm::start_local_llm,
             commands::local_llm::stop_local_llm,
             commands::local_llm::set_local_llm_context_size,
+            commands::local_llm::set_local_llm_unload_timeout,
             commands::audio::update_microphone_mode,
             commands::audio::get_microphone_mode,
             commands::audio::get_windows_microphone_permission_status,
@@ -499,6 +509,11 @@ pub fn run(cli_args: CliArgs) {
             commands::assistant::assistant_list_azure_voices,
             commands::assistant::assistant_stop,
             commands::assistant::set_assistant_max_history_messages,
+            commands::assistant::set_assistant_web_search_enabled,
+            commands::assistant::set_assistant_web_search_provider,
+            commands::assistant::set_assistant_web_search_max_results,
+            commands::assistant::set_assistant_web_search_api_key,
+            commands::assistant::assistant_test_web_search,
             helpers::clamshell::is_laptop,
         ])
         .events(collect_events![managers::history::HistoryUpdatePayload,]);

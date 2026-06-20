@@ -418,6 +418,27 @@
   text-decoration-color: var(--hairline-strong);
 }
 
+.assistant-message-content table {
+  border-collapse: collapse;
+  display: block;
+  overflow-x: auto;
+  max-width: 100%;
+  margin: 6px 0 8px;
+  font-size: 0.95em;
+}
+
+.assistant-message-content th,
+.assistant-message-content td {
+  border: 1px solid var(--hairline);
+  padding: 4px 8px;
+  text-align: left;
+}
+
+.assistant-message-content th {
+  background: var(--surface-inset);
+  font-weight: 600;
+}
+
 .screen-chip {
   display: inline-flex;
   align-items: center;

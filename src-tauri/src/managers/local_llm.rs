@@ -25,8 +25,9 @@ use specta::Type;
 use std::net::{SocketAddr, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime};
 use tauri::{AppHandle, Emitter, Manager};
 
 /// Loopback port the bundled engine listens on. Deliberately different from
@@ -77,6 +78,12 @@ pub struct LocalLlmManager {
     /// Serializes concurrent `ensure_running` calls (e.g. two assistant turns
     /// fired in quick succession) so only one start happens at a time.
     start_lock: tokio::sync::Mutex<()>,
+    /// Last time the engine was used (ms since the Unix epoch); drives the
+    /// idle-unload watcher.
+    last_activity: Arc<AtomicU64>,
+    /// Number of in-flight LLM requests. The idle watcher never unloads while
+    /// this is greater than zero, so a long generation can't be cut off.
+    in_flight: Arc<AtomicUsize>,
 }
 
 impl LocalLlmManager {
@@ -95,6 +102,8 @@ impl LocalLlmManager {
                 last_error: None,
             })),
             start_lock: tokio::sync::Mutex::new(()),
+            last_activity: Arc::new(AtomicU64::new(Self::now_ms())),
+            in_flight: Arc::new(AtomicUsize::new(0)),
         })
     }
 
@@ -388,6 +397,10 @@ impl LocalLlmManager {
         // Only one start sequence at a time.
         let _start_guard = self.start_lock.lock().await;
 
+        // Count this as activity so the idle watcher measures from now (covers
+        // prewarm, which calls ensure_running before any request is made).
+        self.touch_activity();
+
         // Fast path: already serving this model and the process is alive.
         {
             let mut st = self.state.lock().unwrap();
@@ -471,14 +484,14 @@ impl LocalLlmManager {
     /// On-disk path to the model's vision projector, if it's a multimodal
     /// model and the projector has been downloaded.
     fn mmproj_path_for(&self, model_id: &str) -> Option<PathBuf> {
-        crate::managers::model::mmproj_for(model_id).and_then(|(name, _)| {
-            let path = self.models_dir.join(name);
-            if path.is_file() {
-                Some(path)
-            } else {
-                None
-            }
-        })
+        let model_manager = self.app_handle.state::<Arc<ModelManager>>();
+        let (name, _) = model_manager.resolve_mmproj(model_id)?;
+        let path = self.models_dir.join(name);
+        if path.is_file() {
+            Some(path)
+        } else {
+            None
+        }
     }
 
     /// The context window to launch the engine with: the user's configured
@@ -511,7 +524,11 @@ impl LocalLlmManager {
             .arg("999")
             // Use the model's embedded Jinja chat template — needed for correct
             // prompting, tool calls, and reasoning separation on modern models.
-            .arg("--jinja");
+            .arg("--jinja")
+            // Discourage the short repetition loops small models fall into
+            // (e.g. printing "Repeat: ..." and re-emitting the same sentence).
+            .arg("--repeat-penalty")
+            .arg("1.1");
 
         // Flash Attention in "auto" mode: the engine enables it only on backends
         // that support it and silently falls back to standard attention
@@ -684,6 +701,105 @@ impl LocalLlmManager {
         if let Err(e) = self.app_handle.emit("local-llm-status", &status) {
             warn!("Failed to emit local-llm-status event: {}", e);
         }
+    }
+
+    /// Current time in milliseconds since the Unix epoch.
+    fn now_ms() -> u64 {
+        SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as u64
+    }
+
+    /// Reset the idle timer to "now". Called on every engine use (prewarm,
+    /// `ensure_running`, and at the start/end of each request) so the watcher
+    /// only unloads after a genuine idle period.
+    pub fn touch_activity(&self) {
+        self.last_activity.store(Self::now_ms(), Ordering::Relaxed);
+    }
+
+    /// Mark the start of an LLM request. Increments the in-flight counter (so
+    /// the idle watcher won't unload mid-request) and refreshes the idle timer.
+    /// The returned guard decrements the counter and refreshes the timer again
+    /// on drop, so the idle countdown restarts from the end of the request.
+    pub fn begin_request(&self) -> LlmActivityGuard {
+        self.in_flight.fetch_add(1, Ordering::SeqCst);
+        self.touch_activity();
+        LlmActivityGuard {
+            in_flight: self.in_flight.clone(),
+            last_activity: self.last_activity.clone(),
+        }
+    }
+
+    /// Spawn the background watcher that unloads the engine once it has been
+    /// idle for longer than `local_llm_unload_timeout`. Holds only a weak ref,
+    /// so it exits automatically when the manager is dropped (app shutdown).
+    /// Mirrors the transcription manager's idle watcher.
+    pub fn spawn_idle_watcher(manager: &Arc<Self>) {
+        let weak = Arc::downgrade(manager);
+        std::thread::spawn(move || loop {
+            std::thread::sleep(Duration::from_secs(10));
+            match weak.upgrade() {
+                Some(manager) => manager.idle_check_and_maybe_stop(),
+                None => break,
+            }
+        });
+    }
+
+    /// Stop the engine if it has been idle longer than the configured timeout.
+    /// Never unloads while a request is in flight, or when the timeout is set to
+    /// `Never`.
+    fn idle_check_and_maybe_stop(&self) {
+        let timeout = crate::settings::get_settings(&self.app_handle).local_llm_unload_timeout;
+        let Some(limit_seconds) = timeout.to_seconds() else {
+            return; // `Never` — keep the engine resident.
+        };
+
+        // Keep the engine alive while a request is in flight, and keep the idle
+        // timer fresh so a long generation can't be unloaded out from under us.
+        if self.in_flight.load(Ordering::SeqCst) > 0 {
+            self.touch_activity();
+            return;
+        }
+
+        // Only act if the engine is actually running.
+        {
+            let mut st = self.state.lock().unwrap();
+            let running = match st.child.as_mut() {
+                Some(child) => matches!(child.try_wait(), Ok(None)),
+                None => false,
+            };
+            if !running {
+                return;
+            }
+        }
+
+        let idle_ms = Self::now_ms().saturating_sub(self.last_activity.load(Ordering::Relaxed));
+        if idle_ms >= limit_seconds.saturating_mul(1000) {
+            info!(
+                "Built-in LLM idle for {}s (limit {}s); unloading to free memory",
+                idle_ms / 1000,
+                limit_seconds
+            );
+            self.stop();
+            self.emit_status();
+        }
+    }
+}
+
+/// RAII guard returned by [`LocalLlmManager::begin_request`]. Decrements the
+/// in-flight counter and refreshes the idle timer when dropped, so the idle
+/// countdown starts from the moment the request finishes.
+pub struct LlmActivityGuard {
+    in_flight: Arc<AtomicUsize>,
+    last_activity: Arc<AtomicU64>,
+}
+
+impl Drop for LlmActivityGuard {
+    fn drop(&mut self) {
+        self.in_flight.fetch_sub(1, Ordering::SeqCst);
+        self.last_activity
+            .store(LocalLlmManager::now_ms(), Ordering::Relaxed);
     }
 }
 

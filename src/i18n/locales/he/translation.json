@@ -576,7 +576,9 @@
     "off": "כבוי",
     "yes": "כן",
     "no": "לא",
-    "noOptionsFound": "לא נמצאו אפשרויות"
+    "noOptionsFound": "לא נמצאו אפשרויות",
+    "showAdvanced": "הצג אפשרויות מתקדמות",
+    "showLess": "הצג פחות"
   },
   "accessibility": {
     "permissionsRequired": "נדרשות הרשאות נגישות",

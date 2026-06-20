@@ -80,7 +80,17 @@ Dev machine: Windows 11 desktop (Ryzen 7 7700X, RTX 4070 Ti SUPER). Final target
 
 - Added **Local (Ollama / LM Studio)** preset with editable base URL alongside OpenAI / Azure / Groq / OpenRouter / Anthropic / custom
 
-## Currently testing
+## Phase 1.7 — Web search (done)
+
+Optional, opt-in web search so the assistant can answer current/factual questions ("who is the prime minister of…", prices, weather, news) instead of guessing from stale model knowledge.
+
+- **Three backends**: **DuckDuckGo** (free, no key, default — keyless HTML endpoint parsed server-side), **Firecrawl** (`/v2/search`), and **Brave** (`/res/v1/web/search`). All three return **snippets only** — result pages are never fetched/scraped, so a search is one HTTP round-trip and the model only ever sees short titles + snippets.
+- **Built for speed & few tokens**: results, per-snippet length, and request time are all capped (6 s timeout, ~220 chars/snippet, 1–8 results). A failed/slow search degrades gracefully — the turn just answers without web context rather than stalling.
+- **No tool-calling**: search runs *inline before* the single LLM call, so it works with any small OpenAI-compatible model. A fast local heuristic (`should_search`) decides per-question whether to search at all — factual/time-sensitive questions yes; greetings, code, math, translation, rewriting no — so casual chat stays instant.
+- Results are prepended to the request message with a "cite as [1], [2]" directive; stored history keeps only the clean user text (results never burn tokens on later turns, mirroring the screenshot-marker trick).
+- **UI**: a globe toggle in the panel input row, a new "searching the web…" status, and a Settings → Assistant → Web Search section (enable, provider, API key for keyed providers, results count, and a "Test search" button).
+
+
 
 - Screen vision end-to-end against Azure with the 48 KB budget
 - Kokoro vs remote TTS latency comparison

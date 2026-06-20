@@ -576,7 +576,9 @@
     "off": "Изкл.",
     "yes": "Да",
     "no": "Не",
-    "noOptionsFound": "Няма намерени опции"
+    "noOptionsFound": "Няма намерени опции",
+    "showAdvanced": "Показване на разширени опции",
+    "showLess": "Показване на по-малко"
   },
   "accessibility": {
     "permissionsRequired": "Необходими са разрешения за достъпност",

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ask } from "@tauri-apps/plugin-dialog";
-import { ChevronDown, Globe } from "lucide-react";
+import { ChevronDown, Globe, Plus } from "lucide-react";
 import type { ModelCardStatus } from "@/components/onboarding";
 import { ModelCard } from "@/components/onboarding";
 import { useModelStore } from "@/stores/modelStore";
@@ -12,6 +12,8 @@ import {
   type ModelCategory,
 } from "@/lib/utils/modelCategory";
 import { commands, type ModelInfo } from "@/bindings";
+import { Button } from "@/components/ui/Button";
+import { AddCustomModelDialog } from "./AddCustomModelDialog";
 
 // check if model supports a language based on its supported_languages list
 const modelSupportsLanguage = (model: ModelInfo, langCode: string): boolean => {
@@ -24,6 +26,7 @@ export const ModelsSettings: React.FC = () => {
   const { t } = useTranslation();
   const [switchingModelId, setSwitchingModelId] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<ModelCategory>("stt");
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [languageFilter, setLanguageFilter] = useState("all");
   const [languageDropdownOpen, setLanguageDropdownOpen] = useState(false);
   const [languageSearch, setLanguageSearch] = useState("");
@@ -390,6 +393,16 @@ export const ModelsSettings: React.FC = () => {
                   )}
                 </div>
               )}
+              {categoryFilter === "llm" && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setAddDialogOpen(true)}
+                >
+                  <Plus className="w-4 h-4" />
+                  {t("settings.models.customModel.addButton")}
+                </Button>
+              )}
             </div>
             {downloadedModels.map((model: ModelInfo) => (
               <ModelCard
@@ -439,6 +452,10 @@ export const ModelsSettings: React.FC = () => {
           {t("settings.models.noModelsMatch")}
         </div>
       )}
+      <AddCustomModelDialog
+        open={addDialogOpen}
+        onClose={() => setAddDialogOpen(false)}
+      />
     </div>
   );
 };

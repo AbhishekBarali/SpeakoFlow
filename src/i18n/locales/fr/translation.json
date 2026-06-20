@@ -576,7 +576,9 @@
     "off": "Désactivé",
     "yes": "Oui",
     "no": "Non",
-    "noOptionsFound": "Aucune option trouvée"
+    "noOptionsFound": "Aucune option trouvée",
+    "showAdvanced": "Afficher les options avancées",
+    "showLess": "Afficher moins"
   },
   "accessibility": {
     "permissionsRequired": "Autorisations d'accessibilité requises",

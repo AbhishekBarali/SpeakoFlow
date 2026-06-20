@@ -436,6 +436,11 @@ pub struct AppSettings {
     pub custom_words: Vec<String>,
     #[serde(default)]
     pub model_unload_timeout: ModelUnloadTimeout,
+    /// Idle timeout after which the built-in local LLM engine (llama.cpp
+    /// sidecar) is unloaded to free RAM/VRAM. Mirrors `model_unload_timeout`
+    /// but applies to the LLM used for post-processing and the assistant.
+    #[serde(default = "default_local_llm_unload_timeout")]
+    pub local_llm_unload_timeout: ModelUnloadTimeout,
     #[serde(default = "default_word_correction_threshold")]
     pub word_correction_threshold: f64,
     #[serde(default = "default_history_limit")]
@@ -540,6 +545,24 @@ pub struct AppSettings {
     pub assistant_accent: String,
     #[serde(default = "default_assistant_panel_size")]
     pub assistant_panel_size: String,
+    /// Whether the assistant may search the web. When on, an automatic
+    /// heuristic decides per-question whether a search is actually worthwhile
+    /// (factual/time-sensitive questions yes; chit-chat, code, math no), so
+    /// casual messages stay instant.
+    #[serde(default)]
+    pub assistant_web_search_enabled: bool,
+    /// Which search backend to use: "duckduckgo" (free, no key), "firecrawl",
+    /// or "brave".
+    #[serde(default = "default_assistant_web_search_provider")]
+    pub assistant_web_search_provider: String,
+    /// How many results to feed the model. Kept small to stay fast and cheap on
+    /// tokens; clamped to 1–8 at search time.
+    #[serde(default = "default_assistant_web_search_max_results")]
+    pub assistant_web_search_max_results: u32,
+    /// API keys for the keyed search providers, keyed by provider id
+    /// ("firecrawl", "brave"). DuckDuckGo needs none.
+    #[serde(default = "default_web_search_api_keys")]
+    pub web_search_api_keys: SecretMap,
     #[serde(default)]
     pub theme: Theme,
 }
@@ -845,6 +868,13 @@ fn default_local_llm_context_size() -> u32 {
     crate::managers::local_llm::DEFAULT_CONTEXT_SIZE
 }
 
+fn default_local_llm_unload_timeout() -> ModelUnloadTimeout {
+    // Same default as the transcription model: unload after 5 minutes idle so
+    // the built-in LLM frees RAM/VRAM when unused, while staying warm during
+    // active use. Paired with prewarm-on-record, reloads stay mostly hidden.
+    ModelUnloadTimeout::Min5
+}
+
 fn default_assistant_panel_size() -> String {
     "standard".to_string()
 }
@@ -859,6 +889,23 @@ fn default_assistant_font_size() -> String {
 
 fn default_assistant_accent() -> String {
     "violet".to_string()
+}
+
+fn default_assistant_web_search_provider() -> String {
+    // Free and keyless by default so web search works out of the box.
+    "duckduckgo".to_string()
+}
+
+fn default_assistant_web_search_max_results() -> u32 {
+    // Few results keep the prompt small and the round-trip fast.
+    4
+}
+
+fn default_web_search_api_keys() -> SecretMap {
+    let mut map = HashMap::new();
+    map.insert("firecrawl".to_string(), String::new());
+    map.insert("brave".to_string(), String::new());
+    SecretMap(map)
 }
 
 fn ensure_assistant_defaults(settings: &mut AppSettings) -> bool {
@@ -931,6 +978,29 @@ fn ensure_assistant_defaults(settings: &mut AppSettings) -> bool {
     if settings.assistant_accent.trim().is_empty() {
         settings.assistant_accent = default_assistant_accent();
         changed = true;
+    }
+    // Web search: validate provider and backfill API-key slots for keyed
+    // providers so the settings UI always has entries to bind to.
+    if !matches!(
+        settings.assistant_web_search_provider.as_str(),
+        "duckduckgo" | "firecrawl" | "brave"
+    ) {
+        settings.assistant_web_search_provider = default_assistant_web_search_provider();
+        changed = true;
+    }
+    if settings.assistant_web_search_max_results == 0
+        || settings.assistant_web_search_max_results > 8
+    {
+        settings.assistant_web_search_max_results = default_assistant_web_search_max_results();
+        changed = true;
+    }
+    for provider_id in ["firecrawl", "brave"] {
+        if !settings.web_search_api_keys.contains_key(provider_id) {
+            settings
+                .web_search_api_keys
+                .insert(provider_id.to_string(), String::new());
+            changed = true;
+        }
     }
     changed
 }
@@ -1130,6 +1200,7 @@ pub fn get_default_settings() -> AppSettings {
         log_level: default_log_level(),
         custom_words: Vec::new(),
         model_unload_timeout: ModelUnloadTimeout::default(),
+        local_llm_unload_timeout: default_local_llm_unload_timeout(),
         word_correction_threshold: default_word_correction_threshold(),
         history_limit: default_history_limit(),
         recording_retention_period: default_recording_retention_period(),
@@ -1185,6 +1256,10 @@ pub fn get_default_settings() -> AppSettings {
         assistant_font_size: default_assistant_font_size(),
         assistant_accent: default_assistant_accent(),
         assistant_panel_size: default_assistant_panel_size(),
+        assistant_web_search_enabled: false,
+        assistant_web_search_provider: default_assistant_web_search_provider(),
+        assistant_web_search_max_results: default_assistant_web_search_max_results(),
+        web_search_api_keys: default_web_search_api_keys(),
         theme: Theme::System,
     }
 }

@@ -576,7 +576,9 @@
     "off": "Kapalı",
     "yes": "Evet",
     "no": "Hayır",
-    "noOptionsFound": "Seçenek bulunamadı"
+    "noOptionsFound": "Seçenek bulunamadı",
+    "showAdvanced": "Gelişmiş seçenekleri göster",
+    "showLess": "Daha az göster"
   },
   "accessibility": {
     "permissionsRequired": "Erişilebilirlik İzinleri Gerekli",

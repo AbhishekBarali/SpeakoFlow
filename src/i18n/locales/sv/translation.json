@@ -576,7 +576,9 @@
     "off": "Av",
     "yes": "Ja",
     "no": "Nej",
-    "noOptionsFound": "Inga alternativ hittades"
+    "noOptionsFound": "Inga alternativ hittades",
+    "showAdvanced": "Visa avancerade alternativ",
+    "showLess": "Visa mindre"
   },
   "accessibility": {
     "permissionsRequired": "Behörigheter för hjälpmedel krävs",

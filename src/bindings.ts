@@ -635,6 +635,45 @@ async hasAnyModelsOrDownloads() : Promise<Result<boolean, string>> {
 }
 },
 /**
+ * Search the Hugging Face Hub for GGUF language-model repositories.
+ * 
+ * An empty query returns the most-downloaded GGUF repos as a default browse
+ * list. Used by the "Add custom model" flow in the Models tab.
+ */
+async searchHuggingfaceModels(query: string) : Promise<Result<HfModelSummary[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("search_huggingface_models", { query }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * List the downloadable `.gguf` files (model weights and vision projectors)
+ * in a Hugging Face repo, with sizes, so the user can pick a quantization.
+ */
+async listHuggingfaceGgufFiles(repoId: string) : Promise<Result<HfRepoFiles, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("list_huggingface_gguf_files", { repoId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Register a user-chosen GGUF model from the Hub as a custom local LLM and
+ * persist it. The frontend then downloads it via the normal `download_model`
+ * command. `mmproj_filename` (optional) is the repo's vision projector.
+ */
+async addCustomLlmModel(repoId: string, filename: string, sizeMb: number, mmprojFilename: string | null) : Promise<Result<ModelInfo, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("add_custom_llm_model", { repoId, filename, sizeMb, mmprojFilename }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * Current status of the built-in LLM engine (running, which model, whether an
  * engine binary is present, etc.).
  */
@@ -684,6 +723,16 @@ async setLocalLlmContextSize(size: number) : Promise<Result<null, string>> {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+/**
+ * Set the idle timeout after which the built-in local LLM engine is unloaded
+ * to free RAM/VRAM. `Never` keeps it resident once started; shorter values
+ * free memory sooner at the cost of a reload on the next use (largely hidden
+ * by prewarm-on-record). Only the built-in engine is affected — external
+ * providers (Ollama / LM Studio / cloud) manage their own lifecycle.
+ */
+async setLocalLlmUnloadTimeout(timeout: ModelUnloadTimeout) : Promise<void> {
+    await TAURI_INVOKE("set_local_llm_unload_timeout", { timeout });
 },
 async updateMicrophoneMode(alwaysOn: boolean) : Promise<Result<null, string>> {
     try {
@@ -1179,6 +1228,66 @@ async setAssistantMaxHistoryMessages(count: number) : Promise<Result<null, strin
 }
 },
 /**
+ * Enable or disable web search for the assistant. When enabled, a fast local
+ * heuristic still decides per-question whether a search is actually run, so
+ * casual chat stays instant.
+ */
+async setAssistantWebSearchEnabled(enabled: boolean) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_assistant_web_search_enabled", { enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Choose the search backend: "duckduckgo" (free, no key), "firecrawl", or
+ * "brave".
+ */
+async setAssistantWebSearchProvider(provider: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_assistant_web_search_provider", { provider }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * How many results to feed the model (clamped to 1–8 to stay fast and cheap).
+ */
+async setAssistantWebSearchMaxResults(count: number) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_assistant_web_search_max_results", { count }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Store the API key for a keyed search provider ("firecrawl" or "brave").
+ */
+async setAssistantWebSearchApiKey(provider: string, apiKey: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_assistant_web_search_api_key", { provider, apiKey }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Run a one-off web search with the current settings and return the results,
+ * so the settings UI can offer a "Test search" button and surface any error
+ * (missing key, rate limit) inline.
+ */
+async assistantTestWebSearch(query: string) : Promise<Result<SearchResult[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("assistant_test_web_search", { query }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * Stub implementation for non-macOS platforms
  * Always returns false since laptop detection is macOS-specific
  */
@@ -1207,7 +1316,13 @@ historyUpdatePayload: "history-update-payload"
 
 /** user-defined types **/
 
-export type AppSettings = { bindings: Partial<{ [key in string]: ShortcutBinding }>; push_to_talk: boolean; audio_feedback: boolean; audio_feedback_volume?: number; sound_theme?: SoundTheme; start_hidden?: boolean; autostart_enabled?: boolean; update_checks_enabled?: boolean; selected_model?: string; always_on_microphone?: boolean; selected_microphone?: string | null; clamshell_microphone?: string | null; selected_output_device?: string | null; translate_to_english?: boolean; selected_language?: string; overlay_position?: OverlayPosition; debug_mode?: boolean; log_level?: LogLevel; custom_words?: string[]; model_unload_timeout?: ModelUnloadTimeout; word_correction_threshold?: number; history_limit?: number; recording_retention_period?: RecordingRetentionPeriod; paste_method?: PasteMethod; clipboard_handling?: ClipboardHandling; auto_submit?: boolean; auto_submit_key?: AutoSubmitKey; post_process_enabled?: boolean; post_process_provider_id?: string; post_process_providers?: PostProcessProvider[]; post_process_api_keys?: SecretMap; post_process_models?: Partial<{ [key in string]: string }>; post_process_prompts?: LLMPrompt[]; post_process_selected_prompt_id?: string | null; mute_while_recording?: boolean; append_trailing_space?: boolean; app_language?: string; experimental_enabled?: boolean; lazy_stream_close?: boolean; keyboard_implementation?: KeyboardImplementation; show_tray_icon?: boolean; paste_delay_ms?: number; typing_tool?: TypingTool; external_script_path: string | null; custom_filler_words?: string[] | null; whisper_accelerator?: WhisperAcceleratorSetting; ort_accelerator?: OrtAcceleratorSetting; whisper_gpu_device?: number; extra_recording_buffer_ms?: number; assistant_provider_id?: string; assistant_models?: Partial<{ [key in string]: string }>; assistant_system_prompt?: string; assistant_screenshot_enabled?: boolean; assistant_tts_enabled?: boolean; assistant_tts_engine?: string; assistant_tts_voice?: string; assistant_tts_base_url?: string; assistant_tts_api_key?: SecretString; assistant_tts_model?: string; assistant_tts_remote_voice?: string; assistant_tts_kokoro_dtype?: string; 
+export type AppSettings = { bindings: Partial<{ [key in string]: ShortcutBinding }>; push_to_talk: boolean; audio_feedback: boolean; audio_feedback_volume?: number; sound_theme?: SoundTheme; start_hidden?: boolean; autostart_enabled?: boolean; update_checks_enabled?: boolean; selected_model?: string; always_on_microphone?: boolean; selected_microphone?: string | null; clamshell_microphone?: string | null; selected_output_device?: string | null; translate_to_english?: boolean; selected_language?: string; overlay_position?: OverlayPosition; debug_mode?: boolean; log_level?: LogLevel; custom_words?: string[]; model_unload_timeout?: ModelUnloadTimeout; 
+/**
+ * Idle timeout after which the built-in local LLM engine (llama.cpp
+ * sidecar) is unloaded to free RAM/VRAM. Mirrors `model_unload_timeout`
+ * but applies to the LLM used for post-processing and the assistant.
+ */
+local_llm_unload_timeout?: ModelUnloadTimeout; word_correction_threshold?: number; history_limit?: number; recording_retention_period?: RecordingRetentionPeriod; paste_method?: PasteMethod; clipboard_handling?: ClipboardHandling; auto_submit?: boolean; auto_submit_key?: AutoSubmitKey; post_process_enabled?: boolean; post_process_provider_id?: string; post_process_providers?: PostProcessProvider[]; post_process_api_keys?: SecretMap; post_process_models?: Partial<{ [key in string]: string }>; post_process_prompts?: LLMPrompt[]; post_process_selected_prompt_id?: string | null; mute_while_recording?: boolean; append_trailing_space?: boolean; app_language?: string; experimental_enabled?: boolean; lazy_stream_close?: boolean; keyboard_implementation?: KeyboardImplementation; show_tray_icon?: boolean; paste_delay_ms?: number; typing_tool?: TypingTool; external_script_path: string | null; custom_filler_words?: string[] | null; whisper_accelerator?: WhisperAcceleratorSetting; ort_accelerator?: OrtAcceleratorSetting; whisper_gpu_device?: number; extra_recording_buffer_ms?: number; assistant_provider_id?: string; assistant_models?: Partial<{ [key in string]: string }>; assistant_system_prompt?: string; assistant_screenshot_enabled?: boolean; assistant_tts_enabled?: boolean; assistant_tts_engine?: string; assistant_tts_voice?: string; assistant_tts_base_url?: string; assistant_tts_api_key?: SecretString; assistant_tts_model?: string; assistant_tts_remote_voice?: string; assistant_tts_kokoro_dtype?: string; 
 /**
  * Playback speed multiplier for spoken assistant summaries. 1.0 is normal;
  * 0.5 is half speed, 2.0 is double, etc. Applied locally for Kokoro (via
@@ -1220,7 +1335,29 @@ assistant_tts_speed?: number; assistant_max_history_messages?: number;
  * Applied when the engine starts; ignored by external providers
  * (Ollama / LM Studio / cloud), which manage their own context.
  */
-local_llm_context_size?: number; assistant_response_length?: AssistantResponseLength; assistant_panel_opacity?: number; assistant_font_size?: string; assistant_accent?: string; assistant_panel_size?: string; theme?: Theme }
+local_llm_context_size?: number; assistant_response_length?: AssistantResponseLength; assistant_panel_opacity?: number; assistant_font_size?: string; assistant_accent?: string; assistant_panel_size?: string; 
+/**
+ * Whether the assistant may search the web. When on, an automatic
+ * heuristic decides per-question whether a search is actually worthwhile
+ * (factual/time-sensitive questions yes; chit-chat, code, math no), so
+ * casual messages stay instant.
+ */
+assistant_web_search_enabled?: boolean; 
+/**
+ * Which search backend to use: "duckduckgo" (free, no key), "firecrawl",
+ * or "brave".
+ */
+assistant_web_search_provider?: string; 
+/**
+ * How many results to feed the model. Kept small to stay fast and cheap on
+ * tokens; clamped to 1–8 at search time.
+ */
+assistant_web_search_max_results?: number; 
+/**
+ * API keys for the keyed search providers, keyed by provider id
+ * ("firecrawl", "brave"). DuckDuckGo needs none.
+ */
+web_search_api_keys?: SecretMap; theme?: Theme }
 /**
  * A persisted assistant conversation. One row per session; `messages` is the
  * ordered turn-by-turn transcript (the same `{role, content}` shape the
@@ -1288,6 +1425,56 @@ export type EngineType = "Whisper" | "Parakeet" | "Moonshine" | "MoonshineStream
  */
 "Kokoro"
 export type GpuDeviceOption = { id: number; name: string; total_vram_mb: number }
+/**
+ * A single `.gguf` file inside a repo.
+ */
+export type HfGgufFile = { 
+/**
+ * File name within the repo, e.g. `Qwen_Qwen3.5-4B-Q4_K_M.gguf`.
+ */
+filename: string; 
+/**
+ * File size in bytes (from the Hub tree listing).
+ */
+size_bytes: number; 
+/**
+ * Short quantization label extracted from the filename, e.g. `Q4_K_M`.
+ */
+quant: string }
+/**
+ * A single repo returned by a Hub model search.
+ */
+export type HfModelSummary = { 
+/**
+ * Canonical repo id, e.g. `bartowski/Qwen_Qwen3.5-4B-GGUF`.
+ */
+id: string; 
+/**
+ * Number of likes (popularity signal shown in the UI).
+ */
+likes: number; 
+/**
+ * Number of downloads (popularity signal shown in the UI).
+ */
+downloads: number; 
+/**
+ * Whether the repo looks like a multimodal/vision model (so the UI can
+ * hint that a projector will be downloaded for image support).
+ */
+is_vision: boolean }
+/**
+ * The downloadable GGUF assets in a repo, split into model weights and vision
+ * projectors (`mmproj-*.gguf`).
+ */
+export type HfRepoFiles = { repo_id: string; 
+/**
+ * Model weight files the user can pick from (one per quantization).
+ */
+gguf_files: HfGgufFile[]; 
+/**
+ * Companion vision projectors, if the repo is multimodal.
+ */
+mmproj_files: HfGgufFile[] }
 export type HistoryEntry = { id: number; file_name: string; timestamp: number; saved: boolean; title: string; transcription_text: string; post_processed_text: string | null; post_process_prompt: string | null; post_process_requested: boolean }
 export type HistoryUpdatePayload = { action: "added"; entry: HistoryEntry } | { action: "updated"; entry: HistoryEntry } | { action: "deleted"; id: number } | { action: "toggled"; id: number }
 /**
@@ -1333,6 +1520,10 @@ export type PasteMethod = "ctrl_v" | "direct" | "none" | "shift_insert" | "ctrl_
 export type PermissionAccess = "allowed" | "denied" | "unknown"
 export type PostProcessProvider = { id: string; label: string; base_url: string; allow_base_url_edit?: boolean; models_endpoint?: string | null; supports_structured_output?: boolean }
 export type RecordingRetentionPeriod = "never" | "preserve_limit" | "days_3" | "weeks_2" | "months_3"
+/**
+ * A single web result, trimmed to the essentials the model needs.
+ */
+export type SearchResult = { title: string; url: string; snippet: string }
 export type SecretMap = Partial<{ [key in string]: string }>
 export type SecretString = string
 export type ShortcutBinding = { id: string; name: string; description: string; default_binding: string; current_binding: string }

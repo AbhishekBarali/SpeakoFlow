@@ -576,7 +576,9 @@
     "off": "إيقاف",
     "yes": "نعم",
     "no": "لا",
-    "noOptionsFound": "لم يتم العثور على خيارات"
+    "noOptionsFound": "لم يتم العثور على خيارات",
+    "showAdvanced": "إظهار الخيارات المتقدمة",
+    "showLess": "إظهار أقل"
   },
   "accessibility": {
     "permissionsRequired": "أذونات إمكانية الوصول مطلوبة",

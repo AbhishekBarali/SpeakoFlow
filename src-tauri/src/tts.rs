@@ -111,6 +111,68 @@ pub async fn speak_remote_epoch(app: &AppHandle, settings: &AppSettings, text: S
     }
 }
 
+/// HTTP client for remote TTS. Forces HTTP/1.1 — some hosted TTS gateways/
+/// proxies emit "upstream connect error / reset before headers / protocol
+/// error" during HTTP/2 negotiation (the same reason the LLM client pins h1) —
+/// and sets connect/overall timeouts so a stalled upstream can't wedge playback.
+fn tts_client() -> Result<reqwest::Client, String> {
+    reqwest::Client::builder()
+        .http1_only()
+        .connect_timeout(Duration::from_secs(10))
+        .timeout(Duration::from_secs(60))
+        .build()
+        .map_err(|e| format!("Failed to build TTS HTTP client: {}", e))
+}
+
+/// Send a TTS request with a few retries. Transient upstream hiccups — 5xx
+/// gateway errors (502/503/504) and connection resets / protocol errors — are
+/// common with hosted TTS proxies and usually clear on a quick retry, so a
+/// one-off blip no longer surfaces as a hard "TTS failed" to the user. Up to 3
+/// attempts with a short linear backoff; anything else returns immediately.
+async fn send_tts_with_retries(
+    request: reqwest::RequestBuilder,
+) -> Result<reqwest::Response, String> {
+    const MAX_ATTEMPTS: u32 = 3;
+    let mut attempt = 0;
+    loop {
+        attempt += 1;
+        // Clone so the request can be replayed; a non-cloneable body (none of
+        // ours) falls back to a single send.
+        let Some(try_req) = request.try_clone() else {
+            return request
+                .send()
+                .await
+                .map_err(|e| format!("HTTP request failed: {}", e));
+        };
+        match try_req.send().await {
+            Ok(resp) => {
+                if resp.status().is_server_error() && attempt < MAX_ATTEMPTS {
+                    debug!(
+                        "TTS upstream {} (attempt {}/{}); retrying",
+                        resp.status(),
+                        attempt,
+                        MAX_ATTEMPTS
+                    );
+                    tokio::time::sleep(Duration::from_millis(300 * attempt as u64)).await;
+                    continue;
+                }
+                return Ok(resp);
+            }
+            Err(e) => {
+                if attempt < MAX_ATTEMPTS {
+                    debug!(
+                        "TTS request error (attempt {}/{}): {}; retrying",
+                        attempt, MAX_ATTEMPTS, e
+                    );
+                    tokio::time::sleep(Duration::from_millis(300 * attempt as u64)).await;
+                    continue;
+                }
+                return Err(format!("HTTP request failed: {}", e));
+            }
+        }
+    }
+}
+
 /// POST {base}/audio/speech — OpenAI-compatible shape.
 ///
 /// If the configured base URL already contains `/audio/speech`, it is used
@@ -127,7 +189,7 @@ async fn fetch_openai_speech(settings: &AppSettings, text: &str) -> Result<Vec<u
         format!("{}/audio/speech", raw.trim_end_matches('/'))
     };
 
-    let client = reqwest::Client::new();
+    let client = tts_client()?;
     // OpenAI-compatible `speed` (0.25x–4x). Pitch is preserved by the service.
     let speed = settings.assistant_tts_speed.clamp(0.25, 4.0);
     let mut request = client.post(&url).json(&serde_json::json!({
@@ -146,10 +208,7 @@ async fn fetch_openai_speech(settings: &AppSettings, text: &str) -> Result<Vec<u
         request = request.bearer_auth(api_key).header("api-key", api_key);
     }
 
-    let response = request
-        .send()
-        .await
-        .map_err(|e| format!("HTTP request failed: {}", e))?;
+    let response = send_tts_with_retries(request).await?;
 
     let status = response.status();
     if !status.is_success() {
@@ -184,7 +243,7 @@ async fn fetch_elevenlabs_speech(settings: &AppSettings, text: &str) -> Result<V
         settings.assistant_tts_model.clone()
     };
 
-    let client = reqwest::Client::new();
+    let client = tts_client()?;
     let mut body = serde_json::json!({
         "text": text,
         "model_id": model,
@@ -196,13 +255,11 @@ async fn fetch_elevenlabs_speech(settings: &AppSettings, text: &str) -> Result<V
     if (speed - 1.0).abs() > f64::EPSILON {
         body["voice_settings"] = serde_json::json!({ "speed": speed });
     }
-    let response = client
+    let request = client
         .post(&url)
         .header("xi-api-key", settings.assistant_tts_api_key.0.trim())
-        .json(&body)
-        .send()
-        .await
-        .map_err(|e| format!("HTTP request failed: {}", e))?;
+        .json(&body);
+    let response = send_tts_with_retries(request).await?;
 
     let status = response.status();
     if !status.is_success() {
@@ -381,8 +438,8 @@ async fn fetch_azure_speech(settings: &AppSettings, text: &str) -> Result<Vec<u8
         inner = inner,
     );
 
-    let client = reqwest::Client::new();
-    let response = client
+    let client = tts_client()?;
+    let request = client
         .post(&url)
         .header("Ocp-Apim-Subscription-Key", api_key)
         .header("Content-Type", "application/ssml+xml")
@@ -393,10 +450,8 @@ async fn fetch_azure_speech(settings: &AppSettings, text: &str) -> Result<Vec<u8
             "audio-48khz-192kbitrate-mono-mp3",
         )
         .header("User-Agent", "Handy")
-        .body(ssml)
-        .send()
-        .await
-        .map_err(|e| format!("HTTP request failed: {}", e))?;
+        .body(ssml);
+    let response = send_tts_with_retries(request).await?;
 
     let status = response.status();
     if !status.is_success() {

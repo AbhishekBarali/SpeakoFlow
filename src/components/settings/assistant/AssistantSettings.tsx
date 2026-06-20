@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { RefreshCw, Volume2, ArrowUp } from "lucide-react";
+import { RefreshCw, Volume2, ArrowUp, Globe } from "lucide-react";
 import {
   commands,
   type AzureVoice,
@@ -175,6 +175,14 @@ export const AssistantSettings: React.FC = () => {
   // Manual playback-speed entry (string while editing; committed on blur).
   const [ttsSpeedInput, setTtsSpeedInput] = useState("1");
 
+  // Web search section state.
+  const [webSearchApiKey, setWebSearchApiKey] = useState("");
+  const [webSearchMaxResults, setWebSearchMaxResults] = useState("4");
+  const [webSearchTest, setWebSearchTest] = useState<
+    "idle" | "testing" | "ok" | "error"
+  >("idle");
+  const [webSearchTestMsg, setWebSearchTestMsg] = useState<string | null>(null);
+
   // TTS test button state (shared across engines).
   const [testState, setTestState] = useState<
     "idle" | "testing" | "ok" | "error"
@@ -340,6 +348,64 @@ export const AssistantSettings: React.FC = () => {
     }
   };
 
+  // --- Web search ---------------------------------------------------------
+  const webSearchProvider =
+    settings?.assistant_web_search_provider ?? "duckduckgo";
+  const webSearchEnabled = settings?.assistant_web_search_enabled ?? false;
+  const webSearchNeedsKey =
+    webSearchProvider === "firecrawl" || webSearchProvider === "brave";
+
+  // Sync the API-key field to the selected provider's stored key.
+  useEffect(() => {
+    setWebSearchApiKey(settings?.web_search_api_keys?.[webSearchProvider] ?? "");
+  }, [settings, webSearchProvider]);
+
+  useEffect(() => {
+    setWebSearchMaxResults(
+      String(settings?.assistant_web_search_max_results ?? 4),
+    );
+  }, [settings?.assistant_web_search_max_results]);
+
+  const handleWebSearchApiKeyBlur = async () => {
+    await commands.setAssistantWebSearchApiKey(webSearchProvider, webSearchApiKey);
+    await refreshSettings();
+  };
+
+  const handleWebSearchMaxResultsBlur = async () => {
+    const parsed = Math.max(
+      1,
+      Math.min(8, parseInt(webSearchMaxResults, 10) || 4),
+    );
+    setWebSearchMaxResults(String(parsed));
+    await commands.setAssistantWebSearchMaxResults(parsed);
+    await refreshSettings();
+  };
+
+  const handleTestWebSearch = async () => {
+    setWebSearchTest("testing");
+    setWebSearchTestMsg(null);
+    try {
+      const res = await commands.assistantTestWebSearch(
+        "who is the prime minister of canada",
+      );
+      if (res.status === "error") {
+        setWebSearchTest("error");
+        setWebSearchTestMsg(res.error);
+        return;
+      }
+      setWebSearchTest("ok");
+      setWebSearchTestMsg(
+        t("settings.assistant.webSearch.testResult", {
+          count: res.data.length,
+        }),
+      );
+      setTimeout(() => setWebSearchTest("idle"), 4000);
+    } catch (e) {
+      setWebSearchTest("error");
+      setWebSearchTestMsg(String(e));
+    }
+  };
+
   return (
     <div className="max-w-3xl w-full mx-auto space-y-6">
       <SettingsGroup title={t("settings.assistant.shortcuts.title")}>
@@ -500,6 +566,117 @@ export const AssistantSettings: React.FC = () => {
           description={t("settings.assistant.vision.enableDescription")}
           grouped={true}
         />
+      </SettingsGroup>
+
+      <SettingsGroup title={t("settings.assistant.webSearch.title")}>
+        <ToggleSwitch
+          checked={webSearchEnabled}
+          onChange={(checked) =>
+            setAndRefresh(commands.setAssistantWebSearchEnabled(checked))
+          }
+          label={t("settings.assistant.webSearch.enableLabel")}
+          description={t("settings.assistant.webSearch.enableDescription")}
+          grouped={true}
+        />
+        <SettingContainer
+          title={t("settings.assistant.webSearch.providerLabel")}
+          description={t("settings.assistant.webSearch.providerDescription")}
+          descriptionMode="tooltip"
+          layout="horizontal"
+          grouped={true}
+        >
+          <Dropdown
+            options={[
+              {
+                value: "duckduckgo",
+                label: t("settings.assistant.webSearch.providers.duckduckgo"),
+              },
+              {
+                value: "firecrawl",
+                label: t("settings.assistant.webSearch.providers.firecrawl"),
+              },
+              {
+                value: "brave",
+                label: t("settings.assistant.webSearch.providers.brave"),
+              },
+            ]}
+            selectedValue={webSearchProvider}
+            onSelect={(provider) =>
+              setAndRefresh(commands.setAssistantWebSearchProvider(provider))
+            }
+            disabled={!webSearchEnabled}
+          />
+        </SettingContainer>
+
+        {webSearchNeedsKey && (
+          <SettingContainer
+            title={t("settings.assistant.webSearch.apiKeyLabel")}
+            description={t("settings.assistant.webSearch.apiKeyDescription")}
+            descriptionMode="tooltip"
+            layout="horizontal"
+            grouped={true}
+          >
+            <Input
+              type="password"
+              value={webSearchApiKey}
+              onChange={(e) => setWebSearchApiKey(e.target.value)}
+              onBlur={handleWebSearchApiKeyBlur}
+              placeholder={t("settings.assistant.webSearch.apiKeyPlaceholder")}
+              className="min-w-[320px]"
+              disabled={!webSearchEnabled}
+            />
+          </SettingContainer>
+        )}
+
+        <SettingContainer
+          title={t("settings.assistant.webSearch.maxResultsLabel")}
+          description={t("settings.assistant.webSearch.maxResultsDescription")}
+          descriptionMode="tooltip"
+          layout="horizontal"
+          grouped={true}
+        >
+          <Input
+            type="number"
+            min={1}
+            max={8}
+            value={webSearchMaxResults}
+            onChange={(e) => setWebSearchMaxResults(e.target.value)}
+            onBlur={handleWebSearchMaxResultsBlur}
+            className="w-[120px]"
+            disabled={!webSearchEnabled}
+          />
+        </SettingContainer>
+
+        <SettingContainer
+          title={t("settings.assistant.webSearch.testLabel")}
+          description={t("settings.assistant.webSearch.testDescription")}
+          descriptionMode="tooltip"
+          layout="horizontal"
+          grouped={true}
+        >
+          <div className="flex flex-col items-end gap-1">
+            <button
+              type="button"
+              onClick={handleTestWebSearch}
+              disabled={!webSearchEnabled || webSearchTest === "testing"}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-mid-gray/30 hover:bg-mid-gray/10 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+            >
+              <Globe size={14} />
+              {webSearchTest === "testing"
+                ? t("settings.assistant.webSearch.testing")
+                : t("settings.assistant.webSearch.testButton")}
+            </button>
+            {webSearchTestMsg && (
+              <span
+                className={`text-xs max-w-[360px] text-right break-words ${
+                  webSearchTest === "error" ? "text-red-500" : "text-muted-soft"
+                }`}
+              >
+                {webSearchTestMsg}
+              </span>
+            )}
+          </div>
+        </SettingContainer>
       </SettingsGroup>
 
       <SettingsGroup title={t("settings.assistant.tts.title")}>

@@ -2,12 +2,14 @@ import { listen } from "@tauri-apps/api/event";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import {
   ArrowUp,
   Camera,
   Check,
   Copy,
   Eraser,
+  Globe,
   Maximize2,
   Mic,
   Minimize2,
@@ -27,7 +29,12 @@ import { AudioWaveform } from "@/components/shared";
 import { useKokoroTts } from "./useKokoroTts";
 import "./AssistantPanel.css";
 
-type AssistantState = "idle" | "listening" | "transcribing" | "thinking";
+type AssistantState =
+  | "idle"
+  | "listening"
+  | "transcribing"
+  | "searching"
+  | "thinking";
 
 interface DisplayMessage {
   role: "user" | "assistant";
@@ -103,12 +110,18 @@ const AssistantPanel: React.FC = () => {
   const [visionActive, setVisionActive] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
   const sendingRef = useRef(false);
+  // Set when the user presses Stop; blocks a TTS event that was emitted just
+  // before the Stop from slipping through (events can arrive slightly out of
+  // order). Cleared as soon as any new turn becomes active, so it never blocks
+  // a legitimate next answer.
+  const suppressTtsRef = useRef(false);
 
   const ttsEnabled = settings?.assistant_tts_enabled ?? false;
   const ttsVoice = settings?.assistant_tts_voice ?? "af_heart";
   const ttsDtype = settings?.assistant_tts_kokoro_dtype ?? "fp32";
   const ttsSpeed = settings?.assistant_tts_speed ?? 1;
   const screenshotEnabled = settings?.assistant_screenshot_enabled ?? true;
+  const webSearchEnabled = settings?.assistant_web_search_enabled ?? false;
   const tts = useKokoroTts(ttsEnabled, ttsVoice, ttsDtype, ttsSpeed);
   const speakRef = useRef(tts.speak);
   speakRef.current = tts.speak;
@@ -195,6 +208,9 @@ const AssistantPanel: React.FC = () => {
           }
           if (e.payload.state !== "idle") {
             setError(null);
+            // A new turn is active — allow its eventual spoken reply through,
+            // clearing any suppression left by a previous Stop.
+            suppressTtsRef.current = false;
           }
           // The turn finished — drop the screen-vision indicator.
           if (e.payload.state === "idle") {
@@ -256,12 +272,15 @@ const AssistantPanel: React.FC = () => {
 
       track(
         await listen<string>("assistant-tts", (e) => {
+          // Ignore a reply that was emitted just before a Stop.
+          if (suppressTtsRef.current) return;
           void speakRef.current(e.payload);
         }),
       );
 
       track(
         await listen("assistant-tts-stop", () => {
+          suppressTtsRef.current = true;
           tts.stop();
         }),
       );
@@ -329,6 +348,8 @@ const AssistantPanel: React.FC = () => {
   }, [tts]);
 
   const stopTurn = useCallback(async () => {
+    // Block any reply that was just emitted, then stop local + remote TTS.
+    suppressTtsRef.current = true;
     tts.stop();
     setTtsPlaying(false);
     try {
@@ -354,12 +375,18 @@ const AssistantPanel: React.FC = () => {
     await commands.assistantToggleVoice();
   }, []);
 
+  const toggleWebSearch = useCallback(async () => {
+    await commands.setAssistantWebSearchEnabled(!webSearchEnabled);
+    await refreshSettings();
+  }, [webSearchEnabled, refreshSettings]);
+
   const collapse = useCallback(async (value: boolean) => {
     await commands.setAssistantPanelCollapsed(value);
     setCollapsed(value);
   }, []);
 
-  const showTypingDots = state === "thinking" && stream === "";
+  const showTypingDots =
+    (state === "thinking" || state === "searching") && stream === "";
 
   // Screen-vision is active either because the user armed the camera, or
   // because this turn came from the "Assistant + Screen" shortcut.
@@ -490,7 +517,9 @@ const AssistantPanel: React.FC = () => {
           <div key={i} className={`assistant-message ${message.role}`}>
             <div className="assistant-message-content">
               {message.role === "assistant" ? (
-                <ReactMarkdown>{message.content}</ReactMarkdown>
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {message.content}
+                </ReactMarkdown>
               ) : (
                 message.content
               )}
@@ -512,7 +541,9 @@ const AssistantPanel: React.FC = () => {
         {stream !== "" && (
           <div className="assistant-message assistant">
             <div className="assistant-message-content">
-              <ReactMarkdown>{stream}</ReactMarkdown>
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {stream}
+              </ReactMarkdown>
             </div>
           </div>
         )}
@@ -549,6 +580,17 @@ const AssistantPanel: React.FC = () => {
       </div>
 
       <div className="assistant-input-row">
+        <button
+          className={`assistant-attach-button${webSearchEnabled ? " armed" : ""}`}
+          onClick={toggleWebSearch}
+          title={
+            webSearchEnabled
+              ? t("assistant.webSearch.disable")
+              : t("assistant.webSearch.enable")
+          }
+        >
+          <Globe size={15} />
+        </button>
         {screenshotEnabled && (
           <button
             className={`assistant-attach-button${attachScreen ? " armed" : ""}`}

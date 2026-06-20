@@ -3,7 +3,7 @@
 use crate::managers::local_llm::{
     LocalLlmManager, LocalLlmStatus, MAX_CONTEXT_SIZE, MIN_CONTEXT_SIZE,
 };
-use crate::settings::{get_settings, write_settings};
+use crate::settings::{get_settings, write_settings, ModelUnloadTimeout};
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, State};
 
@@ -58,4 +58,17 @@ pub fn set_local_llm_context_size(
     // Mirror the assistant settings commands so the panel webview refreshes.
     let _ = app.emit("assistant-settings-changed", ());
     Ok(())
+}
+
+/// Set the idle timeout after which the built-in local LLM engine is unloaded
+/// to free RAM/VRAM. `Never` keeps it resident once started; shorter values
+/// free memory sooner at the cost of a reload on the next use (largely hidden
+/// by prewarm-on-record). Only the built-in engine is affected — external
+/// providers (Ollama / LM Studio / cloud) manage their own lifecycle.
+#[tauri::command]
+#[specta::specta]
+pub fn set_local_llm_unload_timeout(app: AppHandle, timeout: ModelUnloadTimeout) {
+    let mut settings = get_settings(&app);
+    settings.local_llm_unload_timeout = timeout;
+    write_settings(&app, settings);
 }

@@ -88,6 +88,31 @@ pub struct ModelInfo {
     pub is_custom: bool,            // Whether this is a user-provided custom model
 }
 
+/// Persisted metadata for a user-added custom GGUF language model.
+///
+/// Custom LLM models aren't part of the hardcoded catalog, so their definition
+/// (download URL, on-disk filename, optional vision projector) is saved to
+/// `<models_dir>/custom_models.json` and reloaded on startup. This is the
+/// counterpart to disk-scanning custom Whisper discovery, but kept explicit so
+/// we retain the source repo, download URL, and projector info that a bare
+/// `.gguf` file on disk wouldn't tell us.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CustomModelRecord {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub filename: String,
+    pub url: String,
+    pub size_mb: u64,
+    pub repo_id: String,
+    #[serde(default)]
+    pub mmproj_filename: Option<String>,
+    #[serde(default)]
+    pub mmproj_url: Option<String>,
+    #[serde(default)]
+    pub is_vision: bool,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct DownloadProgress {
     pub model_id: String,
@@ -127,6 +152,10 @@ pub struct ModelManager {
     available_models: Mutex<HashMap<String, ModelInfo>>,
     cancel_flags: Arc<Mutex<HashMap<String, Arc<AtomicBool>>>>,
     extracting_models: Arc<Mutex<HashSet<String>>>,
+    /// User-added custom GGUF LLM definitions, keyed by model id. Mirrors the
+    /// custom entries in `available_models` but retains the download URL and
+    /// projector metadata needed to (re)download and serve them.
+    custom_models: Mutex<HashMap<String, CustomModelRecord>>,
 }
 
 impl ModelManager {
@@ -669,9 +698,8 @@ impl ModelManager {
             ModelInfo {
                 id: "gemma-3-1b".to_string(),
                 name: "Gemma 3 1B".to_string(),
-                description:
-                    "Tiny and fast. Runs on almost any machine. Text only — great for cleaning up transcripts."
-                        .to_string(),
+                description: "Tiny and fast. Text only. Great for cleaning up transcripts."
+                    .to_string(),
                 filename: "gemma-3-1b-it-Q4_K_M.gguf".to_string(),
                 url: Some(
                     "https://huggingface.co/ggml-org/gemma-3-1b-it-GGUF/resolve/main/gemma-3-1b-it-Q4_K_M.gguf"
@@ -700,9 +728,7 @@ impl ModelManager {
             ModelInfo {
                 id: "qwen3.5-2b".to_string(),
                 name: "Qwen3.5 2B (Vision)".to_string(),
-                description:
-                    "Newest small model. Sees images, so the assistant can read your screen. Fast on most laptops."
-                        .to_string(),
+                description: "Small, fast, and sees images. Good on most laptops.".to_string(),
                 filename: "Qwen_Qwen3.5-2B-Q4_K_M.gguf".to_string(),
                 url: Some(
                     "https://huggingface.co/bartowski/Qwen_Qwen3.5-2B-GGUF/resolve/main/Qwen_Qwen3.5-2B-Q4_K_M.gguf"
@@ -731,9 +757,8 @@ impl ModelManager {
             ModelInfo {
                 id: "qwen3.5-4b".to_string(),
                 name: "Qwen3.5 4B (Vision)".to_string(),
-                description:
-                    "Recommended. Newest, strongest compact model — fast, multilingual, and sees images. ~5 GB RAM."
-                        .to_string(),
+                description: "Recommended. Fast, multilingual, and sees images. ~5 GB RAM."
+                    .to_string(),
                 filename: "Qwen_Qwen3.5-4B-Q4_K_M.gguf".to_string(),
                 url: Some(
                     "https://huggingface.co/bartowski/Qwen_Qwen3.5-4B-GGUF/resolve/main/Qwen_Qwen3.5-4B-Q4_K_M.gguf"
@@ -762,9 +787,8 @@ impl ModelManager {
             ModelInfo {
                 id: "gemma-3-4b".to_string(),
                 name: "Gemma 3 4B (Vision)".to_string(),
-                description:
-                    "Google's multimodal model. Sees images and gives clean, reliable answers. ~5 GB RAM."
-                        .to_string(),
+                description: "Google's multimodal model. Clean, reliable answers. ~5 GB RAM."
+                    .to_string(),
                 filename: "gemma-3-4b-it-Q4_K_M.gguf".to_string(),
                 url: Some(
                     "https://huggingface.co/ggml-org/gemma-3-4b-it-GGUF/resolve/main/gemma-3-4b-it-Q4_K_M.gguf"
@@ -825,12 +849,21 @@ impl ModelManager {
             warn!("Failed to discover custom models: {}", e);
         }
 
+        // Load user-added custom GGUF LLM models from custom_models.json and
+        // insert them into the catalog alongside the built-in models.
+        let custom_models = Self::load_custom_llm_models(&models_dir, &mut available_models)
+            .unwrap_or_else(|e| {
+                warn!("Failed to load custom LLM models: {}", e);
+                HashMap::new()
+            });
+
         let manager = Self {
             app_handle: app_handle.clone(),
             models_dir,
             available_models: Mutex::new(available_models),
             cancel_flags: Arc::new(Mutex::new(HashMap::new())),
             extracting_models: Arc::new(Mutex::new(HashSet::new())),
+            custom_models: Mutex::new(custom_models),
         };
 
         // Migrate any bundled models to user directory
@@ -1157,6 +1190,236 @@ impl ModelManager {
         Ok(())
     }
 
+    /// Path to the persisted custom-LLM definitions file.
+    fn custom_models_path(models_dir: &Path) -> PathBuf {
+        models_dir.join("custom_models.json")
+    }
+
+    /// Broad multilingual tag list so custom LLM entries display a
+    /// "multi-language" capability like the built-in LLMs. These models are
+    /// generally multilingual; this only affects the capability chip, not
+    /// transcription routing (LLMs are never the active transcription model).
+    fn default_llm_languages() -> Vec<String> {
+        vec![
+            "en", "zh", "zh-Hans", "zh-Hant", "de", "es", "fr", "it", "pt", "ru", "ja", "ko", "ar",
+            "hi", "vi", "id", "tr", "pl", "nl",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect()
+    }
+
+    /// Human-readable card description for a custom model. Derived from the
+    /// source repo (we don't fabricate a marketing blurb), and intentionally
+    /// free of the word "custom" — the Models tab already groups these under
+    /// the user's downloaded models.
+    fn custom_description(repo_id: &str, is_vision: bool) -> String {
+        let mut description = format!("From {} on Hugging Face.", repo_id);
+        if is_vision {
+            description.push_str(" Supports vision.");
+        }
+        description
+    }
+
+    /// Build a `ModelInfo` (catalog entry) from a persisted custom record.
+    /// `is_downloaded` is left false here; `update_download_status` sets it
+    /// based on whether the file is actually present on disk.
+    fn record_to_model_info(record: &CustomModelRecord) -> ModelInfo {
+        ModelInfo {
+            id: record.id.clone(),
+            name: record.name.clone(),
+            // Derive the description so older saved entries pick up the current
+            // wording without needing to be re-added.
+            description: Self::custom_description(&record.repo_id, record.is_vision),
+            filename: record.filename.clone(),
+            url: Some(record.url.clone()),
+            sha256: None, // user-supplied; verification skipped
+            size_mb: record.size_mb,
+            is_downloaded: false,
+            is_downloading: false,
+            partial_size: 0,
+            is_directory: false,
+            engine_type: EngineType::LlamaCpp,
+            accuracy_score: 0.0, // Sentinel: UI hides score bars when both are 0
+            speed_score: 0.0,
+            supports_translation: false,
+            is_recommended: false,
+            supported_languages: Self::default_llm_languages(),
+            supports_language_selection: false,
+            is_custom: true,
+        }
+    }
+
+    /// Load persisted custom GGUF LLM models from `custom_models.json` and
+    /// insert them into `available_models`. Returns the records keyed by id so
+    /// the manager can resolve download URLs and vision projectors later.
+    fn load_custom_llm_models(
+        models_dir: &Path,
+        available_models: &mut HashMap<String, ModelInfo>,
+    ) -> Result<HashMap<String, CustomModelRecord>> {
+        let path = Self::custom_models_path(models_dir);
+        if !path.exists() {
+            return Ok(HashMap::new());
+        }
+
+        let contents = fs::read_to_string(&path)?;
+        let records: Vec<CustomModelRecord> = serde_json::from_str(&contents)
+            .map_err(|e| anyhow::anyhow!("Invalid custom_models.json: {}", e))?;
+
+        let mut map = HashMap::new();
+        for record in records {
+            // Don't let a stale custom entry shadow a built-in model id.
+            if available_models.contains_key(&record.id) && !map.contains_key(&record.id) {
+                warn!(
+                    "Custom model id '{}' collides with an existing model; skipping",
+                    record.id
+                );
+                continue;
+            }
+            info!(
+                "Loaded custom LLM model: {} ({})",
+                record.id, record.filename
+            );
+            available_models.insert(record.id.clone(), Self::record_to_model_info(&record));
+            map.insert(record.id.clone(), record);
+        }
+
+        Ok(map)
+    }
+
+    /// Persist the current set of custom-LLM records to `custom_models.json`.
+    fn save_custom_models(&self) -> Result<()> {
+        let records: Vec<CustomModelRecord> = {
+            let customs = self.custom_models.lock().unwrap();
+            customs.values().cloned().collect()
+        };
+        let path = Self::custom_models_path(&self.models_dir);
+        let json = serde_json::to_string_pretty(&records)?;
+        fs::write(&path, json)?;
+        Ok(())
+    }
+
+    /// Turn an arbitrary string into a filesystem/id-safe slug.
+    fn slugify(input: &str) -> String {
+        let mut slug = String::with_capacity(input.len());
+        let mut prev_dash = false;
+        for ch in input.chars() {
+            if ch.is_ascii_alphanumeric() {
+                slug.push(ch.to_ascii_lowercase());
+                prev_dash = false;
+            } else if !prev_dash {
+                slug.push('-');
+                prev_dash = true;
+            }
+        }
+        slug.trim_matches('-').to_string()
+    }
+
+    /// Generate a friendly display name from the repo id and filename, e.g.
+    /// `bartowski/Qwen_Qwen3.5-4B-GGUF` + `...-Q4_K_M.gguf` -> "Qwen Qwen3.5 4B (Q4_K_M)".
+    fn generate_custom_name(repo_id: &str, filename: &str) -> String {
+        let model_part = repo_id.rsplit('/').next().unwrap_or(repo_id);
+        let base = model_part
+            .trim_end_matches("-GGUF")
+            .trim_end_matches("-gguf")
+            .replace(['_', '-'], " ");
+        let base = base.split_whitespace().collect::<Vec<_>>().join(" ");
+        let quant = crate::huggingface::extract_quant(filename);
+        if quant.is_empty() {
+            base
+        } else {
+            format!("{} ({})", base, quant)
+        }
+    }
+
+    /// Add a user-chosen GGUF model from the Hugging Face Hub as a custom local
+    /// LLM. Registers it in the in-memory catalog and persists it so it
+    /// survives restarts. The caller then downloads it via `download_model`.
+    ///
+    /// `mmproj_filename`, when provided, is the repo's vision projector; it will
+    /// be fetched alongside the weights so multimodal models can see images.
+    pub fn add_custom_llm_model(
+        &self,
+        repo_id: &str,
+        filename: &str,
+        size_mb: u64,
+        mmproj_filename: Option<String>,
+    ) -> Result<ModelInfo> {
+        let repo_id = repo_id.trim();
+        let filename = filename.trim();
+        if repo_id.is_empty() || filename.is_empty() {
+            return Err(anyhow::anyhow!("Repository and file are required"));
+        }
+        if !filename.to_lowercase().ends_with(".gguf") {
+            return Err(anyhow::anyhow!("Selected file must be a .gguf model"));
+        }
+
+        // Generate a unique id, avoiding collisions with built-in or other
+        // custom models (different repos can share a filename).
+        let base_id = format!(
+            "custom-{}",
+            Self::slugify(filename.trim_end_matches(".gguf"))
+        );
+        let id = {
+            let models = self.available_models.lock().unwrap();
+            let mut candidate = base_id.clone();
+            let mut n = 2;
+            while models.contains_key(&candidate) {
+                candidate = format!("{}-{}", base_id, n);
+                n += 1;
+            }
+            candidate
+        };
+
+        let is_vision = mmproj_filename.is_some();
+        let mmproj_url = mmproj_filename
+            .as_ref()
+            .map(|f| crate::huggingface::resolve_url(repo_id, f));
+
+        let record = CustomModelRecord {
+            id: id.clone(),
+            name: Self::generate_custom_name(repo_id, filename),
+            description: Self::custom_description(repo_id, is_vision),
+            filename: filename.to_string(),
+            url: crate::huggingface::resolve_url(repo_id, filename),
+            size_mb,
+            repo_id: repo_id.to_string(),
+            mmproj_filename,
+            mmproj_url,
+            is_vision,
+        };
+
+        let model_info = Self::record_to_model_info(&record);
+
+        {
+            let mut models = self.available_models.lock().unwrap();
+            models.insert(id.clone(), model_info.clone());
+        }
+        {
+            let mut customs = self.custom_models.lock().unwrap();
+            customs.insert(id.clone(), record);
+        }
+        self.save_custom_models()?;
+
+        info!("Added custom LLM model '{}' from {}", id, repo_id);
+        Ok(model_info)
+    }
+
+    /// Resolve the vision projector (filename, download URL) for a model, if
+    /// any. Checks the built-in mapping first, then user-added custom models.
+    pub fn resolve_mmproj(&self, model_id: &str) -> Option<(String, String)> {
+        if let Some((name, url)) = mmproj_for(model_id) {
+            return Some((name.to_string(), url.to_string()));
+        }
+        let customs = self.custom_models.lock().unwrap();
+        customs.get(model_id).and_then(|record| {
+            match (&record.mmproj_filename, &record.mmproj_url) {
+                (Some(filename), Some(url)) => Some((filename.clone(), url.clone())),
+                _ => None,
+            }
+        })
+    }
+
     /// Verifies the SHA256 of `path` against `expected_sha256` (if provided).
     /// On mismatch or read error the partial file is deleted and an error is returned,
     /// so the next download attempt always starts from a clean state.
@@ -1296,11 +1559,11 @@ impl ModelManager {
             }
             // Ensure the vision projector is present for multimodal models
             // (e.g. if a previous run downloaded the weights but not the mmproj).
-            if let Some((mmproj_name, mmproj_url)) = mmproj_for(model_id) {
-                let mmproj_path = self.models_dir.join(mmproj_name);
+            if let Some((mmproj_name, mmproj_url)) = self.resolve_mmproj(model_id) {
+                let mmproj_path = self.models_dir.join(&mmproj_name);
                 if !mmproj_path.exists() {
                     let flag = Arc::new(AtomicBool::new(false));
-                    self.download_companion(model_id, mmproj_url, &mmproj_path, &flag)
+                    self.download_companion(model_id, &mmproj_url, &mmproj_path, &flag)
                         .await?;
                 }
             }
@@ -1600,11 +1863,11 @@ impl ModelManager {
         // For vision LLMs, fetch the companion multimodal projector now that
         // the main weights are in place. Reuses the same cancel flag so the
         // Cancel button aborts it too.
-        if let Some((mmproj_name, mmproj_url)) = mmproj_for(model_id) {
-            let mmproj_path = self.models_dir.join(mmproj_name);
+        if let Some((mmproj_name, mmproj_url)) = self.resolve_mmproj(model_id) {
+            let mmproj_path = self.models_dir.join(&mmproj_name);
             if !mmproj_path.exists() {
                 info!("Downloading vision projector for {}", model_id);
-                self.download_companion(model_id, mmproj_url, &mmproj_path, &cancel_flag)
+                self.download_companion(model_id, &mmproj_url, &mmproj_path, &cancel_flag)
                     .await?;
             }
         }
@@ -1683,8 +1946,8 @@ impl ModelManager {
 
         // Remove the companion vision projector (and its partial) for
         // multimodal models so deletion frees all associated files.
-        if let Some((mmproj_name, _)) = mmproj_for(model_id) {
-            let mmproj_path = self.models_dir.join(mmproj_name);
+        if let Some((mmproj_name, _)) = self.resolve_mmproj(model_id) {
+            let mmproj_path = self.models_dir.join(&mmproj_name);
             if mmproj_path.exists() {
                 info!("Deleting vision projector at: {:?}", mmproj_path);
                 let _ = fs::remove_file(&mmproj_path);
@@ -1705,6 +1968,19 @@ impl ModelManager {
             let mut models = self.available_models.lock().unwrap();
             models.remove(model_id);
             debug!("ModelManager: removed custom model from available models");
+            drop(models);
+
+            // Drop the persisted custom-LLM record too (if it was one) so it
+            // doesn't reappear on the next launch.
+            let was_persisted = {
+                let mut customs = self.custom_models.lock().unwrap();
+                customs.remove(model_id).is_some()
+            };
+            if was_persisted {
+                if let Err(e) = self.save_custom_models() {
+                    warn!("Failed to persist custom model removal: {}", e);
+                }
+            }
         } else {
             // Update download status (marks predefined models as not downloaded)
             self.update_download_status()?;
