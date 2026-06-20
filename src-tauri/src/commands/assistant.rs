@@ -328,6 +328,12 @@ pub fn assistant_toggle_voice(app: AppHandle) -> Result<(), String> {
 #[specta::specta]
 pub async fn assistant_speak(app: AppHandle, text: String) -> Result<(), String> {
     let settings = get_settings(&app);
+    // Same cleanup the auto-summary path uses, so replayed/!test text never
+    // reads out Markdown, code or emojis.
+    let text = crate::tts::sanitize_for_speech(&text);
+    if text.trim().is_empty() {
+        return Ok(());
+    }
     if settings.assistant_tts_engine == "kokoro" {
         use tauri::Emitter;
         let _ = app.emit("assistant-tts", text);

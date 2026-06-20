@@ -19,6 +19,8 @@
 
 use crate::settings::AppSettings;
 use log::{debug, error};
+use once_cell::sync::Lazy;
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::io::Cursor;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -467,5 +469,171 @@ fn truncate(s: &str, max: usize) -> &str {
             end -= 1;
         }
         &s[..end]
+    }
+}
+
+/// Clean LLM / Markdown text so it reads naturally through any TTS engine.
+///
+/// The assistant only ever speaks a short summary, never the on-screen answer,
+/// but that summary can still carry Markdown, inline code, links or emojis that
+/// sound terrible read aloud (or get spelled out symbol by symbol). This strips
+/// the *formatting* while keeping the *words*:
+///
+/// - fenced code blocks are dropped entirely (we never read code out loud)
+/// - inline code keeps its text, only the backticks go (`map()` -> map())
+/// - headings, blockquotes, list bullets, emphasis (`*` `_` `~`) and table
+///   pipes lose their markers but keep their content
+/// - `[text](url)` keeps `text`; bare URLs are dropped
+/// - emoji / pictographs and stray symbol runs (`----`, `====`) are removed
+/// - `_` becomes a space so identifiers like `snake_case` read as two words
+///
+/// It is deliberately conservative — only known noise is touched, normal
+/// punctuation and tokens like `C#` or `foo()` are preserved. If cleaning would
+/// leave nothing speakable, the original (whitespace-collapsed) text is returned
+/// when it still contains pronounceable characters, otherwise an empty string so
+/// the caller can skip playback instead of voicing garbage.
+pub fn sanitize_for_speech(input: &str) -> String {
+    // Fenced code blocks (``` … ``` or ~~~ … ~~~), including the info string.
+    static FENCED_CODE: Lazy<Regex> =
+        Lazy::new(|| Regex::new(r"(?s)```[^\n]*\n?.*?```|~~~[^\n]*\n?.*?~~~").unwrap());
+    // Images first (drop alt + url), then links (keep the visible text).
+    static IMAGE: Lazy<Regex> = Lazy::new(|| Regex::new(r"!\[[^\]]*\]\([^)]*\)").unwrap());
+    static LINK: Lazy<Regex> = Lazy::new(|| Regex::new(r"\[([^\]]+)\]\([^)]*\)").unwrap());
+    static URL: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)\b(?:https?://|www\.)\S+").unwrap());
+    // Inline code: keep the inner text, drop the backticks.
+    static INLINE_CODE: Lazy<Regex> = Lazy::new(|| Regex::new(r"`+([^`]*)`+").unwrap());
+    static HEADING: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?m)^\s{0,3}#{1,6}[ \t]*").unwrap());
+    static BLOCKQUOTE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?m)^[ \t]*>+[ \t]?").unwrap());
+    static LIST_BULLET: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?m)^[ \t]*[-*+][ \t]+").unwrap());
+    // A Markdown table separator row, e.g. `|---|:--:|`.
+    static TABLE_SEP: Lazy<Regex> = Lazy::new(|| {
+        Regex::new(r"(?m)^[ \t]*\|?[ \t]*:?-{2,}:?[ \t]*(\|[ \t]*:?-{2,}:?[ \t]*)+\|?[ \t]*$")
+            .unwrap()
+    });
+    // Horizontal-rule / divider runs of dashes or equals signs.
+    static DASH_RUN: Lazy<Regex> = Lazy::new(|| Regex::new(r"-{2,}|={2,}").unwrap());
+    // Leftover emphasis / table markers. Note: `#` is intentionally NOT here so
+    // tokens like `C#` / `F#` survive (heading `#` is already handled above).
+    static EMPHASIS: Lazy<Regex> = Lazy::new(|| Regex::new(r"[*~`|]+").unwrap());
+    // Emoji & common pictographs / dingbats / arrows / flags / selectors.
+    static EMOJI: Lazy<Regex> = Lazy::new(|| {
+        Regex::new(concat!(
+            "[",
+            r"\x{1F000}-\x{1FAFF}", // emoticons, transport, pictographs, symbols ext-A …
+            r"\x{2600}-\x{27BF}",   // misc symbols + dingbats
+            r"\x{2300}-\x{23FF}",   // misc technical (⌚ ⏰ …)
+            r"\x{2B00}-\x{2BFF}",   // misc symbols and arrows
+            r"\x{2190}-\x{21FF}",   // arrows
+            r"\x{1F1E6}-\x{1F1FF}", // regional indicators (flag letters)
+            r"\x{FE00}-\x{FE0F}",   // variation selectors
+            r"\x{200D}",            // zero-width joiner
+            r"\x{20E3}",            // combining enclosing keycap
+            r"\x{2122}\x{2139}\x{3030}\x{303D}\x{3297}\x{3299}",
+            "]"
+        ))
+        .unwrap()
+    });
+    static WS: Lazy<Regex> = Lazy::new(|| Regex::new(r"\s+").unwrap());
+
+    let mut text = FENCED_CODE.replace_all(input, " ").into_owned();
+    text = IMAGE.replace_all(&text, " ").into_owned();
+    text = LINK.replace_all(&text, "$1").into_owned();
+    text = URL.replace_all(&text, " ").into_owned();
+    text = INLINE_CODE.replace_all(&text, "$1").into_owned();
+    text = HEADING.replace_all(&text, "").into_owned();
+    text = BLOCKQUOTE.replace_all(&text, "").into_owned();
+    text = TABLE_SEP.replace_all(&text, " ").into_owned();
+    text = LIST_BULLET.replace_all(&text, "").into_owned();
+    text = DASH_RUN.replace_all(&text, " ").into_owned();
+    text = text.replace('_', " ");
+    text = EMPHASIS.replace_all(&text, "").into_owned();
+    text = EMOJI.replace_all(&text, "").into_owned();
+
+    let cleaned = WS.replace_all(text.trim(), " ").into_owned();
+    let cleaned = cleaned.trim();
+
+    if cleaned.is_empty() {
+        // Over-aggressive strip: only fall back to the raw text if it actually
+        // contains something pronounceable, otherwise let the caller skip.
+        if input.chars().any(|c| c.is_alphanumeric()) {
+            return WS.replace_all(input.trim(), " ").into_owned();
+        }
+        return String::new();
+    }
+    cleaned.to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::sanitize_for_speech;
+
+    #[test]
+    fn keeps_plain_prose_unchanged() {
+        let s = "Use the map function to double each item.";
+        assert_eq!(sanitize_for_speech(s), s);
+    }
+
+    #[test]
+    fn strips_emphasis_markers_keeps_words() {
+        assert_eq!(
+            sanitize_for_speech("This is **bold** and *italic* text."),
+            "This is bold and italic text."
+        );
+    }
+
+    #[test]
+    fn keeps_inline_code_text() {
+        assert_eq!(sanitize_for_speech("Call `foo()` now."), "Call foo() now.");
+    }
+
+    #[test]
+    fn removes_fenced_code_block_but_keeps_surrounding_prose() {
+        let input = "Here is how:\n```rust\nlet x = 1;\n```\nThat's it.";
+        let out = sanitize_for_speech(input);
+        assert!(!out.contains("let x"), "code leaked: {out}");
+        assert!(out.contains("Here is how"));
+        assert!(out.contains("That's it."));
+    }
+
+    #[test]
+    fn keeps_link_text_drops_url() {
+        assert_eq!(
+            sanitize_for_speech("See [the docs](https://example.com/page) here."),
+            "See the docs here."
+        );
+    }
+
+    #[test]
+    fn drops_bare_urls() {
+        assert_eq!(
+            sanitize_for_speech("Go to https://example.com now"),
+            "Go to now"
+        );
+    }
+
+    #[test]
+    fn removes_emoji() {
+        assert_eq!(sanitize_for_speech("Nice 👍 work 🎉"), "Nice work");
+    }
+
+    #[test]
+    fn underscores_become_spaces() {
+        assert_eq!(sanitize_for_speech("Set my_var here"), "Set my var here");
+    }
+
+    #[test]
+    fn preserves_c_sharp_token() {
+        assert_eq!(sanitize_for_speech("Use C# for this"), "Use C# for this");
+    }
+
+    #[test]
+    fn strips_heading_marker() {
+        assert_eq!(sanitize_for_speech("# Title"), "Title");
+    }
+
+    #[test]
+    fn symbols_only_returns_empty() {
+        assert_eq!(sanitize_for_speech("***"), "");
+        assert_eq!(sanitize_for_speech("```\n```"), "");
     }
 }
