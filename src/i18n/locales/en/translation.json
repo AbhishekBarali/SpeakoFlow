@@ -150,6 +150,8 @@
     "modelError": "Model Error",
     "modelUnloaded": "Model Unloaded",
     "noModelDownloadRequired": "No Model - Download Required",
+    "llmSelectModel": "Select assistant model",
+    "llmModelTitle": "Assistant model: {{model}}",
     "deleteModel": "Delete {{modelName}}",
     "downloadSpeed": "{{speed}} MB/s",
     "cancel": "Cancel",

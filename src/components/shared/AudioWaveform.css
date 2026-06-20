@@ -21,6 +21,16 @@
   line-height: 0;
 }
 
+/* Light mode: the panel surface is a warm near-white, so the off-white bars
+ * above wash out and become invisible. Swap to deeper beige/taupe tones (and a
+ * slightly warmer bloom) so the waveform reads clearly against the light card.
+ * Scoped to data-theme="light" so the always-dark recording overlay, which
+ * never sets that attribute, keeps its off-white bars. */
+:root[data-theme="light"] .audio-waveform {
+  --wave-bar: linear-gradient(to top, #a3937d, #c9bba4 72%);
+  --wave-glow: #e8a982;
+}
+
 .wave-bloom {
   position: absolute;
   left: 50%;

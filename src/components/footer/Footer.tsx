@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { getVersion } from "@tauri-apps/api/app";
 
 import ModelSelector from "../model-selector";
+import LlmModelSelector from "./LlmModelSelector";
 import UpdateChecker from "../update-checker";
 
 const Footer: React.FC = () => {
@@ -26,6 +27,7 @@ const Footer: React.FC = () => {
       <div className="flex justify-between items-center text-xs px-5 pb-3 text-muted">
         <div className="flex items-center gap-4">
           <ModelSelector />
+          <LlmModelSelector />
         </div>
 
         {/* Update Status */}
