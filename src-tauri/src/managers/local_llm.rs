@@ -33,9 +33,17 @@ use tauri::{AppHandle, Emitter, Manager};
 /// Ollama's default (11434) so a user's existing Ollama install is untouched.
 const ENGINE_PORT: u16 = 11435;
 
-/// Context window passed to the engine. Kept modest so memory stays reasonable
-/// on the small models this feature targets.
-const CONTEXT_SIZE: u32 = 4096;
+/// Default context window if the user hasn't chosen one. Kept modest so memory
+/// stays reasonable on the small models this feature targets.
+pub const DEFAULT_CONTEXT_SIZE: u32 = 4096;
+
+/// Lower bound for the user-configurable context window (tokens). Below this a
+/// model can't hold a useful prompt.
+pub const MIN_CONTEXT_SIZE: u32 = 512;
+
+/// Upper bound for the user-configurable context window (tokens). Caps memory
+/// use on low-end / CPU-only machines while leaving headroom for capable GPUs.
+pub const MAX_CONTEXT_SIZE: u32 = 32_768;
 
 /// Max time to wait for the engine to load a model and start serving. Large
 /// models, slow disks, and first-run GPU shader compilation can take a while.
@@ -473,12 +481,22 @@ impl LocalLlmManager {
         })
     }
 
+    /// The context window to launch the engine with: the user's configured
+    /// value clamped to a safe range, or the default if settings can't be read.
+    fn configured_context_size(&self) -> u32 {
+        crate::settings::get_settings(&self.app_handle)
+            .local_llm_context_size
+            .clamp(MIN_CONTEXT_SIZE, MAX_CONTEXT_SIZE)
+    }
+
     fn spawn_server(
         &self,
         engine: &Path,
         gguf: &Path,
         mmproj: Option<&Path>,
     ) -> std::io::Result<Child> {
+        let context_size = self.configured_context_size();
+
         let mut cmd = Command::new(engine);
         cmd.arg("-m")
             .arg(gguf)
@@ -487,13 +505,23 @@ impl LocalLlmManager {
             .arg("--port")
             .arg(self.port.to_string())
             .arg("-c")
-            .arg(CONTEXT_SIZE.to_string())
+            .arg(context_size.to_string())
             // Offload as many layers to the GPU as fit; CPU-only builds ignore this.
             .arg("-ngl")
             .arg("999")
             // Use the model's embedded Jinja chat template — needed for correct
             // prompting, tool calls, and reasoning separation on modern models.
             .arg("--jinja");
+
+        // Flash Attention in "auto" mode: the engine enables it only on backends
+        // that support it and silently falls back to standard attention
+        // otherwise — safe on CPU-only machines and every GPU type, while cutting
+        // KV-cache memory and speeding up attention where available. Passed via
+        // the env var rather than the `-fa` CLI flag so that older cached engine
+        // builds (which predate the `-fa on|off|auto` syntax) ignore it instead
+        // of failing to start. `auto` is already llama.cpp's default; this just
+        // pins the intent against any future default change.
+        cmd.env("LLAMA_ARG_FLASH_ATTN", "auto");
 
         // Multimodal models need their vision projector to "see" images
         // (the assistant's screenshot feature).

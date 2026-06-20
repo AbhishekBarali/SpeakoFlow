@@ -161,6 +161,7 @@ export const AssistantSettings: React.FC = () => {
   const [model, setModel] = useState("");
   const [systemPrompt, setSystemPrompt] = useState("");
   const [historyLimit, setHistoryLimit] = useState("12");
+  const [contextSize, setContextSize] = useState("4096");
   const [apiKey, setApiKey] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
   const [ttsBaseUrl, setTtsBaseUrl] = useState("");
@@ -246,6 +247,23 @@ export const AssistantSettings: React.FC = () => {
     const parsed = Math.max(0, Math.min(200, parseInt(historyLimit, 10) || 0));
     setHistoryLimit(String(parsed));
     await commands.setAssistantMaxHistoryMessages(parsed);
+    await refreshSettings();
+  };
+
+  // Built-in local engine context window. Mirrors the history-limit pattern:
+  // local input state, clamped + persisted on blur. Only shown for the
+  // built-in provider (external providers manage their own context).
+  useEffect(() => {
+    setContextSize(String(settings?.local_llm_context_size ?? 4096));
+  }, [settings?.local_llm_context_size]);
+
+  const handleContextSizeBlur = async () => {
+    const parsed = Math.max(
+      512,
+      Math.min(32768, parseInt(contextSize, 10) || 4096),
+    );
+    setContextSize(String(parsed));
+    await commands.setLocalLlmContextSize(parsed);
     await refreshSettings();
   };
 
@@ -418,6 +436,27 @@ export const AssistantSettings: React.FC = () => {
               onBlur={handleModelBlur}
               placeholder={t("settings.assistant.provider.modelPlaceholder")}
               className="min-w-[320px]"
+            />
+          </SettingContainer>
+        )}
+
+        {isBuiltin && (
+          <SettingContainer
+            title={t("settings.assistant.provider.contextSizeLabel")}
+            description={t("settings.assistant.provider.contextSizeDescription")}
+            descriptionMode="tooltip"
+            layout="horizontal"
+            grouped={true}
+          >
+            <Input
+              type="number"
+              min={512}
+              max={32768}
+              step={512}
+              value={contextSize}
+              onChange={(e) => setContextSize(e.target.value)}
+              onBlur={handleContextSizeBlur}
+              className="w-[120px]"
             />
           </SettingContainer>
         )}

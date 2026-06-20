@@ -669,6 +669,22 @@ async stopLocalLlm() : Promise<Result<null, string>> {
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * Set the context window (in tokens) for the built-in local LLM engine.
+ * 
+ * The value is clamped to a safe range and only read when the engine starts,
+ * so any running engine is stopped here; the next assistant or post-processing
+ * turn restarts it with the new size. External providers (Ollama / LM Studio /
+ * cloud) are unaffected — they manage their own context.
+ */
+async setLocalLlmContextSize(size: number) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_local_llm_context_size", { size }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async updateMicrophoneMode(alwaysOn: boolean) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("update_microphone_mode", { alwaysOn }) };
@@ -1177,7 +1193,13 @@ historyUpdatePayload: "history-update-payload"
 
 /** user-defined types **/
 
-export type AppSettings = { bindings: Partial<{ [key in string]: ShortcutBinding }>; push_to_talk: boolean; audio_feedback: boolean; audio_feedback_volume?: number; sound_theme?: SoundTheme; start_hidden?: boolean; autostart_enabled?: boolean; update_checks_enabled?: boolean; selected_model?: string; always_on_microphone?: boolean; selected_microphone?: string | null; clamshell_microphone?: string | null; selected_output_device?: string | null; translate_to_english?: boolean; selected_language?: string; overlay_position?: OverlayPosition; debug_mode?: boolean; log_level?: LogLevel; custom_words?: string[]; model_unload_timeout?: ModelUnloadTimeout; word_correction_threshold?: number; history_limit?: number; recording_retention_period?: RecordingRetentionPeriod; paste_method?: PasteMethod; clipboard_handling?: ClipboardHandling; auto_submit?: boolean; auto_submit_key?: AutoSubmitKey; post_process_enabled?: boolean; post_process_provider_id?: string; post_process_providers?: PostProcessProvider[]; post_process_api_keys?: SecretMap; post_process_models?: Partial<{ [key in string]: string }>; post_process_prompts?: LLMPrompt[]; post_process_selected_prompt_id?: string | null; mute_while_recording?: boolean; append_trailing_space?: boolean; app_language?: string; experimental_enabled?: boolean; lazy_stream_close?: boolean; keyboard_implementation?: KeyboardImplementation; show_tray_icon?: boolean; paste_delay_ms?: number; typing_tool?: TypingTool; external_script_path: string | null; custom_filler_words?: string[] | null; whisper_accelerator?: WhisperAcceleratorSetting; ort_accelerator?: OrtAcceleratorSetting; whisper_gpu_device?: number; extra_recording_buffer_ms?: number; assistant_provider_id?: string; assistant_models?: Partial<{ [key in string]: string }>; assistant_system_prompt?: string; assistant_screenshot_enabled?: boolean; assistant_tts_enabled?: boolean; assistant_tts_engine?: string; assistant_tts_voice?: string; assistant_tts_base_url?: string; assistant_tts_api_key?: SecretString; assistant_tts_model?: string; assistant_tts_remote_voice?: string; assistant_tts_kokoro_dtype?: string; assistant_max_history_messages?: number; assistant_response_length?: AssistantResponseLength; assistant_panel_opacity?: number; assistant_font_size?: string; assistant_accent?: string; assistant_panel_size?: string; theme?: Theme }
+export type AppSettings = { bindings: Partial<{ [key in string]: ShortcutBinding }>; push_to_talk: boolean; audio_feedback: boolean; audio_feedback_volume?: number; sound_theme?: SoundTheme; start_hidden?: boolean; autostart_enabled?: boolean; update_checks_enabled?: boolean; selected_model?: string; always_on_microphone?: boolean; selected_microphone?: string | null; clamshell_microphone?: string | null; selected_output_device?: string | null; translate_to_english?: boolean; selected_language?: string; overlay_position?: OverlayPosition; debug_mode?: boolean; log_level?: LogLevel; custom_words?: string[]; model_unload_timeout?: ModelUnloadTimeout; word_correction_threshold?: number; history_limit?: number; recording_retention_period?: RecordingRetentionPeriod; paste_method?: PasteMethod; clipboard_handling?: ClipboardHandling; auto_submit?: boolean; auto_submit_key?: AutoSubmitKey; post_process_enabled?: boolean; post_process_provider_id?: string; post_process_providers?: PostProcessProvider[]; post_process_api_keys?: SecretMap; post_process_models?: Partial<{ [key in string]: string }>; post_process_prompts?: LLMPrompt[]; post_process_selected_prompt_id?: string | null; mute_while_recording?: boolean; append_trailing_space?: boolean; app_language?: string; experimental_enabled?: boolean; lazy_stream_close?: boolean; keyboard_implementation?: KeyboardImplementation; show_tray_icon?: boolean; paste_delay_ms?: number; typing_tool?: TypingTool; external_script_path: string | null; custom_filler_words?: string[] | null; whisper_accelerator?: WhisperAcceleratorSetting; ort_accelerator?: OrtAcceleratorSetting; whisper_gpu_device?: number; extra_recording_buffer_ms?: number; assistant_provider_id?: string; assistant_models?: Partial<{ [key in string]: string }>; assistant_system_prompt?: string; assistant_screenshot_enabled?: boolean; assistant_tts_enabled?: boolean; assistant_tts_engine?: string; assistant_tts_voice?: string; assistant_tts_base_url?: string; assistant_tts_api_key?: SecretString; assistant_tts_model?: string; assistant_tts_remote_voice?: string; assistant_tts_kokoro_dtype?: string; assistant_max_history_messages?: number; 
+/**
+ * Context window (in tokens) the built-in local LLM engine launches with.
+ * Applied when the engine starts; ignored by external providers
+ * (Ollama / LM Studio / cloud), which manage their own context.
+ */
+local_llm_context_size?: number; assistant_response_length?: AssistantResponseLength; assistant_panel_opacity?: number; assistant_font_size?: string; assistant_accent?: string; assistant_panel_size?: string; theme?: Theme }
 /**
  * A persisted assistant conversation. One row per session; `messages` is the
  * ordered turn-by-turn transcript (the same `{role, content}` shape the

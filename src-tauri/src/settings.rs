@@ -519,6 +519,11 @@ pub struct AppSettings {
     pub assistant_tts_kokoro_dtype: String,
     #[serde(default = "default_assistant_max_history_messages")]
     pub assistant_max_history_messages: u32,
+    /// Context window (in tokens) the built-in local LLM engine launches with.
+    /// Applied when the engine starts; ignored by external providers
+    /// (Ollama / LM Studio / cloud), which manage their own context.
+    #[serde(default = "default_local_llm_context_size")]
+    pub local_llm_context_size: u32,
     #[serde(default)]
     pub assistant_response_length: AssistantResponseLength,
     #[serde(default = "default_assistant_panel_opacity")]
@@ -820,6 +825,12 @@ fn default_assistant_tts_kokoro_dtype() -> String {
 fn default_assistant_max_history_messages() -> u32 {
     // How many prior messages (user+assistant) the model sees as context.
     12
+}
+
+fn default_local_llm_context_size() -> u32 {
+    // Mirrors LocalLlmManager's default; kept modest so memory stays reasonable
+    // on the small models this feature targets.
+    crate::managers::local_llm::DEFAULT_CONTEXT_SIZE
 }
 
 fn default_assistant_panel_size() -> String {
@@ -1155,6 +1166,7 @@ pub fn get_default_settings() -> AppSettings {
         assistant_tts_remote_voice: default_assistant_tts_remote_voice(),
         assistant_tts_kokoro_dtype: default_assistant_tts_kokoro_dtype(),
         assistant_max_history_messages: default_assistant_max_history_messages(),
+        local_llm_context_size: default_local_llm_context_size(),
         assistant_response_length: AssistantResponseLength::default(),
         assistant_panel_opacity: default_assistant_panel_opacity(),
         assistant_font_size: default_assistant_font_size(),

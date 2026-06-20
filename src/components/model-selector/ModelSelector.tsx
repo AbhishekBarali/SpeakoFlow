@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { listen } from "@tauri-apps/api/event";
 import { commands } from "@/bindings";
 import { getTranslatedModelName } from "../../lib/utils/modelTranslation";
+import { getModelCategory } from "../../lib/utils/modelCategory";
 import { useModelStore } from "../../stores/modelStore";
 import ModelStatusButton from "./ModelStatusButton";
 import ModelDropdown from "./ModelDropdown";
@@ -253,10 +254,10 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({ onError }) => {
           onClick={() => setShowModelDropdown(!showModelDropdown)}
         />
 
-        {/* Model Dropdown */}
+        {/* Model Dropdown — transcription (STT) models only */}
         {showModelDropdown && (
           <ModelDropdown
-            models={models}
+            models={models.filter((m) => getModelCategory(m) === "stt")}
             currentModelId={displayModelId}
             onModelSelect={handleModelSelect}
           />

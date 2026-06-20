@@ -439,6 +439,7 @@ pub fn run(cli_args: CliArgs) {
             commands::local_llm::get_local_llm_status,
             commands::local_llm::start_local_llm,
             commands::local_llm::stop_local_llm,
+            commands::local_llm::set_local_llm_context_size,
             commands::audio::update_microphone_mode,
             commands::audio::get_microphone_mode,
             commands::audio::get_windows_microphone_permission_status,

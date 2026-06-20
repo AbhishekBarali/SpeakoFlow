@@ -5,12 +5,13 @@ import { ChevronDown, Globe } from "lucide-react";
 import type { ModelCardStatus } from "@/components/onboarding";
 import { ModelCard } from "@/components/onboarding";
 import { useModelStore } from "@/stores/modelStore";
+import { useSettings } from "@/hooks/useSettings";
 import { LANGUAGES } from "@/lib/constants/languages.ts";
 import {
   getModelCategory,
   type ModelCategory,
 } from "@/lib/utils/modelCategory";
-import type { ModelInfo } from "@/bindings";
+import { commands, type ModelInfo } from "@/bindings";
 
 // check if model supports a language based on its supported_languages list
 const modelSupportsLanguage = (model: ModelInfo, langCode: string): boolean => {
@@ -42,6 +43,11 @@ export const ModelsSettings: React.FC = () => {
     selectModel,
     deleteModel,
   } = useModelStore();
+  const { settings, refreshSettings } = useSettings();
+
+  // The active local LLM is the model assigned to the built-in provider in the
+  // Assistant settings. Used to show/select the "Active" Language Model here.
+  const activeLlmId = settings?.assistant_models?.["builtin"] ?? "";
 
   // click outside handler for language dropdown
   useEffect(() => {
@@ -95,10 +101,15 @@ export const ModelsSettings: React.FC = () => {
     if (switchingModelId === modelId) {
       return "switching";
     }
-    if (modelId === currentModel) {
+    const model = models.find((m: ModelInfo) => m.id === modelId);
+    const category = model ? getModelCategory(model) : "stt";
+    // STT uses the recording model; LLM uses the built-in assistant model.
+    if (category === "stt" && modelId === currentModel) {
       return "active";
     }
-    const model = models.find((m: ModelInfo) => m.id === modelId);
+    if (category === "llm" && modelId === activeLlmId) {
+      return "active";
+    }
     if (model?.is_downloaded) {
       return "available";
     }
@@ -116,13 +127,25 @@ export const ModelsSettings: React.FC = () => {
   };
 
   const handleModelSelect = async (modelId: string) => {
-    // Only transcription models can be the active recording model; LLM/TTS
-    // models are selected elsewhere (Assistant tab) and are not "active" here.
     const model = models.find((m: ModelInfo) => m.id === modelId);
-    if (model && getModelCategory(model) !== "stt") return;
+    const category = model ? getModelCategory(model) : "stt";
+    // TTS (Kokoro) has no "active" selection here — it is configured per
+    // engine in the Assistant tab.
+    if (category === "tts") return;
+
     setSwitchingModelId(modelId);
     try {
-      await selectModel(modelId);
+      if (category === "llm") {
+        // Assign the model to the built-in (local) assistant provider and make
+        // that provider active, mirroring the footer LLM selector.
+        await commands.changeAssistantModelSetting("builtin", modelId);
+        if (settings?.assistant_provider_id !== "builtin") {
+          await commands.setAssistantProvider("builtin");
+        }
+        await refreshSettings();
+      } else {
+        await selectModel(modelId);
+      }
     } finally {
       setSwitchingModelId(null);
     }
@@ -135,7 +158,9 @@ export const ModelsSettings: React.FC = () => {
   const handleModelDelete = async (modelId: string) => {
     const model = models.find((m: ModelInfo) => m.id === modelId);
     const modelName = model?.name || modelId;
-    const isActive = modelId === currentModel;
+    const category = model ? getModelCategory(model) : "stt";
+    const isActive =
+      category === "llm" ? modelId === activeLlmId : modelId === currentModel;
 
     const confirmed = await ask(
       isActive
@@ -193,10 +218,15 @@ export const ModelsSettings: React.FC = () => {
       }
     }
 
+    // The "active" model depends on the category: STT uses the recording
+    // model, LLM uses the built-in assistant model.
+    const activeIdForCategory =
+      categoryFilter === "llm" ? activeLlmId : currentModel;
+
     // Sort: active model first, then non-custom, then custom at the bottom
     downloaded.sort((a, b) => {
-      if (a.id === currentModel) return -1;
-      if (b.id === currentModel) return 1;
+      if (a.id === activeIdForCategory) return -1;
+      if (b.id === activeIdForCategory) return 1;
       if (a.is_custom !== b.is_custom) return a.is_custom ? 1 : -1;
       return 0;
     });
@@ -205,7 +235,14 @@ export const ModelsSettings: React.FC = () => {
       downloadedModels: downloaded,
       availableModels: available,
     };
-  }, [filteredModels, downloadingModels, extractingModels, currentModel]);
+  }, [
+    filteredModels,
+    downloadingModels,
+    extractingModels,
+    currentModel,
+    activeLlmId,
+    categoryFilter,
+  ]);
 
   if (loading) {
     return (

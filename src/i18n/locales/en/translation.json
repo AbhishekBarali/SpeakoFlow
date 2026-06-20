@@ -628,7 +628,9 @@
         "builtinModelPlaceholder": "Select a downloaded model",
         "builtinNoModels": "No local models yet. Download one from the Models tab under \"Language Model\".",
         "builtinReady": "Runs fully on your device. No API key, no setup.",
-        "builtinEngineMissing": "First use downloads a small local engine automatically (one time), then runs fully offline. No setup needed."
+        "builtinEngineMissing": "First use downloads a small local engine automatically (one time), then runs fully offline. No setup needed.",
+        "contextSizeLabel": "Context window",
+        "contextSizeDescription": "How many tokens the built-in local model keeps in context (prompt + reply). Larger remembers more but uses more memory and runs slower — especially on CPU-only machines; smaller is faster and lighter. Applies on the next request. Default 4096."
       },
       "systemPrompt": {
         "title": "System Prompt",
