@@ -2783,7 +2783,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_actions",
-      "community": 31,
+      "community": 135,
       "norm_label": "actions.rs"
     },
     {
@@ -2793,7 +2793,7 @@
       "source_location": "L27",
       "_origin": "ast",
       "id": "src_actions_recordingerrorevent",
-      "community": 31,
+      "community": 135,
       "norm_label": "recordingerrorevent"
     },
     {
@@ -2803,7 +2803,7 @@
       "source_location": "L28",
       "_origin": "ast",
       "id": "src_tauri_src_actions_rs_string",
-      "community": 31,
+      "community": 135,
       "norm_label": "string"
     },
     {
@@ -2813,7 +2813,7 @@
       "source_location": "L29",
       "_origin": "ast",
       "id": "src_tauri_src_actions_rs_option",
-      "community": 31,
+      "community": 135,
       "norm_label": "option"
     },
     {
@@ -2893,7 +2893,7 @@
       "source_location": "L58",
       "_origin": "ast",
       "id": "src_actions_strip_invisible_chars",
-      "community": 31,
+      "community": 135,
       "norm_label": "strip_invisible_chars()"
     },
     {
@@ -2903,7 +2903,7 @@
       "source_location": "L64",
       "_origin": "ast",
       "id": "src_actions_build_system_prompt",
-      "community": 31,
+      "community": 135,
       "norm_label": "build_system_prompt()"
     },
     {
@@ -2933,7 +2933,7 @@
       "source_location": "L87",
       "_origin": "ast",
       "id": "src_actions_post_process_transcription",
-      "community": 31,
+      "community": 135,
       "norm_label": "post_process_transcription()"
     },
     {
@@ -2943,7 +2943,7 @@
       "source_location": "L87",
       "_origin": "ast",
       "id": "src_tauri_src_actions_rs_appsettings",
-      "community": 31,
+      "community": 135,
       "norm_label": "appsettings"
     },
     {
@@ -2953,7 +2953,7 @@
       "source_location": "L343",
       "_origin": "ast",
       "id": "src_actions_maybe_convert_chinese_variant",
-      "community": 31,
+      "community": 135,
       "norm_label": "maybe_convert_chinese_variant()"
     },
     {
@@ -2963,7 +2963,7 @@
       "source_location": "L387",
       "_origin": "ast",
       "id": "src_actions_processedtranscription",
-      "community": 31,
+      "community": 135,
       "norm_label": "processedtranscription"
     },
     {
@@ -2973,7 +2973,7 @@
       "source_location": "L393",
       "_origin": "ast",
       "id": "src_actions_process_transcription_output",
-      "community": 31,
+      "community": 135,
       "norm_label": "process_transcription_output()"
     },
     {
@@ -3673,7 +3673,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_audio_feedback",
-      "community": 31,
+      "community": 129,
       "norm_label": "audio_feedback.rs"
     },
     {
@@ -3683,7 +3683,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "src_audio_feedback_soundtype",
-      "community": 31,
+      "community": 129,
       "norm_label": "soundtype"
     },
     {
@@ -3693,7 +3693,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "src_audio_feedback_resolve_sound_path",
-      "community": 31,
+      "community": 129,
       "norm_label": "resolve_sound_path()"
     },
     {
@@ -3703,7 +3703,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "src_tauri_src_audio_feedback_rs_apphandle",
-      "community": 31,
+      "community": 129,
       "norm_label": "apphandle"
     },
     {
@@ -3713,7 +3713,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "src_tauri_src_audio_feedback_rs_appsettings",
-      "community": 31,
+      "community": 129,
       "norm_label": "appsettings"
     },
     {
@@ -3723,7 +3723,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "src_tauri_src_audio_feedback_rs_option",
-      "community": 31,
+      "community": 129,
       "norm_label": "option"
     },
     {
@@ -3733,7 +3733,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "src_tauri_src_audio_feedback_rs_pathbuf",
-      "community": 31,
+      "community": 129,
       "norm_label": "pathbuf"
     },
     {
@@ -3743,7 +3743,7 @@
       "source_location": "L32",
       "_origin": "ast",
       "id": "src_audio_feedback_get_sound_path",
-      "community": 31,
+      "community": 129,
       "norm_label": "get_sound_path()"
     },
     {
@@ -3753,7 +3753,7 @@
       "source_location": "L32",
       "_origin": "ast",
       "id": "src_tauri_src_audio_feedback_rs_string",
-      "community": 31,
+      "community": 129,
       "norm_label": "string"
     },
     {
@@ -3763,7 +3763,7 @@
       "source_location": "L41",
       "_origin": "ast",
       "id": "src_audio_feedback_get_sound_base_dir",
-      "community": 31,
+      "community": 129,
       "norm_label": "get_sound_base_dir()"
     },
     {
@@ -3773,7 +3773,7 @@
       "source_location": "L41",
       "_origin": "ast",
       "id": "basedirectory",
-      "community": 31,
+      "community": 129,
       "norm_label": "basedirectory"
     },
     {
@@ -3783,7 +3783,7 @@
       "source_location": "L48",
       "_origin": "ast",
       "id": "src_audio_feedback_play_feedback_sound",
-      "community": 31,
+      "community": 129,
       "norm_label": "play_feedback_sound()"
     },
     {
@@ -3793,7 +3793,7 @@
       "source_location": "L58",
       "_origin": "ast",
       "id": "src_audio_feedback_play_feedback_sound_blocking",
-      "community": 31,
+      "community": 129,
       "norm_label": "play_feedback_sound_blocking()"
     },
     {
@@ -3803,7 +3803,7 @@
       "source_location": "L68",
       "_origin": "ast",
       "id": "src_audio_feedback_play_test_sound",
-      "community": 31,
+      "community": 129,
       "norm_label": "play_test_sound()"
     },
     {
@@ -3813,7 +3813,7 @@
       "source_location": "L75",
       "_origin": "ast",
       "id": "src_audio_feedback_play_sound_async",
-      "community": 31,
+      "community": 129,
       "norm_label": "play_sound_async()"
     },
     {
@@ -3823,7 +3823,7 @@
       "source_location": "L84",
       "_origin": "ast",
       "id": "src_audio_feedback_play_sound_blocking",
-      "community": 31,
+      "community": 129,
       "norm_label": "play_sound_blocking()"
     },
     {
@@ -3833,7 +3833,7 @@
       "source_location": "L84",
       "_origin": "ast",
       "id": "src_tauri_src_audio_feedback_rs_path",
-      "community": 31,
+      "community": 129,
       "norm_label": "path"
     },
     {
@@ -3843,7 +3843,7 @@
       "source_location": "L90",
       "_origin": "ast",
       "id": "src_audio_feedback_play_sound_at_path",
-      "community": 31,
+      "community": 129,
       "norm_label": "play_sound_at_path()"
     },
     {
@@ -3853,7 +3853,7 @@
       "source_location": "L90",
       "_origin": "ast",
       "id": "src_tauri_src_audio_feedback_rs_result",
-      "community": 31,
+      "community": 129,
       "norm_label": "result"
     },
     {
@@ -3863,7 +3863,7 @@
       "source_location": "L90",
       "_origin": "ast",
       "id": "src_tauri_src_audio_feedback_rs_box",
-      "community": 31,
+      "community": 129,
       "norm_label": "box"
     },
     {
@@ -3873,7 +3873,7 @@
       "source_location": "L90",
       "_origin": "ast",
       "id": "src_tauri_src_audio_feedback_rs_error",
-      "community": 31,
+      "community": 129,
       "norm_label": "error"
     },
     {
@@ -3883,7 +3883,7 @@
       "source_location": "L97",
       "_origin": "ast",
       "id": "src_audio_feedback_play_audio_file",
-      "community": 31,
+      "community": 129,
       "norm_label": "play_audio_file()"
     },
     {
@@ -4443,7 +4443,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "audio_resampler",
-      "community": 12,
+      "community": 16,
       "norm_label": "resampler.rs"
     },
     {
@@ -4453,7 +4453,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "audio_resampler_frameresampler",
-      "community": 12,
+      "community": 16,
       "norm_label": "frameresampler"
     },
     {
@@ -4463,7 +4463,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "src_tauri_src_audio_toolkit_audio_resampler_rs_option",
-      "community": 12,
+      "community": 16,
       "norm_label": "option"
     },
     {
@@ -4473,7 +4473,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "fftfixedin",
-      "community": 12,
+      "community": 16,
       "norm_label": "fftfixedin"
     },
     {
@@ -4483,7 +4483,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "src_tauri_src_audio_toolkit_audio_resampler_rs_vec",
-      "community": 12,
+      "community": 16,
       "norm_label": "vec"
     },
     {
@@ -4493,7 +4493,7 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "audio_resampler_frameresampler_new",
-      "community": 12,
+      "community": 16,
       "norm_label": ".new()"
     },
     {
@@ -4503,7 +4503,7 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "duration",
-      "community": 12,
+      "community": 16,
       "norm_label": "duration"
     },
     {
@@ -4513,7 +4513,7 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "src_tauri_src_audio_toolkit_audio_resampler_rs_self",
-      "community": 12,
+      "community": 16,
       "norm_label": "self"
     },
     {
@@ -4523,7 +4523,7 @@
       "source_location": "L37",
       "_origin": "ast",
       "id": "audio_resampler_frameresampler_push",
-      "community": 12,
+      "community": 16,
       "norm_label": ".push()"
     },
     {
@@ -4533,7 +4533,7 @@
       "source_location": "L37",
       "_origin": "ast",
       "id": "src_tauri_src_audio_toolkit_audio_resampler_rs_fnmut",
-      "community": 12,
+      "community": 16,
       "norm_label": "fnmut"
     },
     {
@@ -4543,7 +4543,7 @@
       "source_location": "L66",
       "_origin": "ast",
       "id": "audio_resampler_frameresampler_finish",
-      "community": 12,
+      "community": 16,
       "norm_label": ".finish()"
     },
     {
@@ -4553,7 +4553,7 @@
       "source_location": "L86",
       "_origin": "ast",
       "id": "audio_resampler_frameresampler_emit_frames",
-      "community": 12,
+      "community": 16,
       "norm_label": ".emit_frames()"
     },
     {
@@ -6883,7 +6883,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "commands_history",
-      "community": 31,
+      "community": 130,
       "norm_label": "history.rs"
     },
     {
@@ -6893,7 +6893,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "commands_history_get_history_entries",
-      "community": 31,
+      "community": 130,
       "norm_label": "get_history_entries()"
     },
     {
@@ -6903,7 +6903,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "src_tauri_src_commands_history_rs_apphandle",
-      "community": 31,
+      "community": 130,
       "norm_label": "apphandle"
     },
     {
@@ -6913,7 +6913,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "src_tauri_src_commands_history_rs_state",
-      "community": 31,
+      "community": 130,
       "norm_label": "state"
     },
     {
@@ -6923,7 +6923,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "src_tauri_src_commands_history_rs_arc",
-      "community": 31,
+      "community": 130,
       "norm_label": "arc"
     },
     {
@@ -6933,7 +6933,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "historymanager",
-      "community": 31,
+      "community": 130,
       "norm_label": "historymanager"
     },
     {
@@ -6943,7 +6943,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "src_tauri_src_commands_history_rs_option",
-      "community": 31,
+      "community": 130,
       "norm_label": "option"
     },
     {
@@ -6953,7 +6953,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "src_tauri_src_commands_history_rs_result",
-      "community": 31,
+      "community": 130,
       "norm_label": "result"
     },
     {
@@ -6963,7 +6963,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "paginatedhistory",
-      "community": 31,
+      "community": 130,
       "norm_label": "paginatedhistory"
     },
     {
@@ -6973,7 +6973,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "src_tauri_src_commands_history_rs_string",
-      "community": 31,
+      "community": 130,
       "norm_label": "string"
     },
     {
@@ -6983,7 +6983,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "commands_history_toggle_history_entry_saved",
-      "community": 31,
+      "community": 130,
       "norm_label": "toggle_history_entry_saved()"
     },
     {
@@ -6993,7 +6993,7 @@
       "source_location": "L38",
       "_origin": "ast",
       "id": "commands_history_get_audio_file_path",
-      "community": 31,
+      "community": 130,
       "norm_label": "get_audio_file_path()"
     },
     {
@@ -7003,7 +7003,7 @@
       "source_location": "L51",
       "_origin": "ast",
       "id": "commands_history_delete_history_entry",
-      "community": 31,
+      "community": 130,
       "norm_label": "delete_history_entry()"
     },
     {
@@ -7013,7 +7013,7 @@
       "source_location": "L64",
       "_origin": "ast",
       "id": "commands_history_retry_history_entry_transcription",
-      "community": 31,
+      "community": 130,
       "norm_label": "retry_history_entry_transcription()"
     },
     {
@@ -7023,7 +7023,7 @@
       "source_location": "L64",
       "_origin": "ast",
       "id": "src_tauri_src_commands_history_rs_transcriptionmanager",
-      "community": 31,
+      "community": 130,
       "norm_label": "transcriptionmanager"
     },
     {
@@ -7033,7 +7033,7 @@
       "source_location": "L111",
       "_origin": "ast",
       "id": "commands_history_update_history_limit",
-      "community": 31,
+      "community": 130,
       "norm_label": "update_history_limit()"
     },
     {
@@ -7043,7 +7043,7 @@
       "source_location": "L129",
       "_origin": "ast",
       "id": "commands_history_update_recording_retention_period",
-      "community": 31,
+      "community": 130,
       "norm_label": "update_recording_retention_period()"
     },
     {
@@ -7053,7 +7053,7 @@
       "source_location": "L159",
       "_origin": "ast",
       "id": "commands_history_get_assistant_history_entries",
-      "community": 31,
+      "community": 130,
       "norm_label": "get_assistant_history_entries()"
     },
     {
@@ -7063,7 +7063,7 @@
       "source_location": "L159",
       "_origin": "ast",
       "id": "paginatedassistanthistory",
-      "community": 31,
+      "community": 130,
       "norm_label": "paginatedassistanthistory"
     },
     {
@@ -7073,7 +7073,7 @@
       "source_location": "L174",
       "_origin": "ast",
       "id": "commands_history_delete_assistant_history_entry",
-      "community": 31,
+      "community": 130,
       "norm_label": "delete_assistant_history_entry()"
     },
     {
@@ -11323,7 +11323,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_overlay",
-      "community": 31,
+      "community": 44,
       "norm_label": "overlay.rs"
     },
     {
@@ -11333,7 +11333,7 @@
       "source_location": "L49",
       "_origin": "ast",
       "id": "src_overlay_update_gtk_layer_shell_anchors",
-      "community": 31,
+      "community": 44,
       "norm_label": "update_gtk_layer_shell_anchors()"
     },
     {
@@ -11343,7 +11343,7 @@
       "source_location": "L49",
       "_origin": "ast",
       "id": "src_tauri_src_overlay_rs_webviewwindow",
-      "community": 31,
+      "community": 44,
       "norm_label": "webviewwindow"
     },
     {
@@ -11353,7 +11353,7 @@
       "source_location": "L74",
       "_origin": "ast",
       "id": "src_overlay_env_flag_enabled",
-      "community": 31,
+      "community": 44,
       "norm_label": "env_flag_enabled()"
     },
     {
@@ -11363,7 +11363,7 @@
       "source_location": "L87",
       "_origin": "ast",
       "id": "src_overlay_init_gtk_layer_shell",
-      "community": 31,
+      "community": 44,
       "norm_label": "init_gtk_layer_shell()"
     },
     {
@@ -11373,7 +11373,7 @@
       "source_location": "L115",
       "_origin": "ast",
       "id": "src_overlay_force_overlay_topmost",
-      "community": 31,
+      "community": 44,
       "norm_label": "force_overlay_topmost()"
     },
     {
@@ -11383,7 +11383,7 @@
       "source_location": "L142",
       "_origin": "ast",
       "id": "src_overlay_get_monitor_with_cursor",
-      "community": 31,
+      "community": 44,
       "norm_label": "get_monitor_with_cursor()"
     },
     {
@@ -11393,7 +11393,7 @@
       "source_location": "L142",
       "_origin": "ast",
       "id": "src_tauri_src_overlay_rs_apphandle",
-      "community": 31,
+      "community": 44,
       "norm_label": "apphandle"
     },
     {
@@ -11403,7 +11403,7 @@
       "source_location": "L142",
       "_origin": "ast",
       "id": "src_tauri_src_overlay_rs_option",
-      "community": 31,
+      "community": 44,
       "norm_label": "option"
     },
     {
@@ -11413,7 +11413,7 @@
       "source_location": "L142",
       "_origin": "ast",
       "id": "src_tauri_src_overlay_rs_monitor",
-      "community": 31,
+      "community": 44,
       "norm_label": "monitor"
     },
     {
@@ -11423,7 +11423,7 @@
       "source_location": "L172",
       "_origin": "ast",
       "id": "src_overlay_is_mouse_within_monitor",
-      "community": 31,
+      "community": 44,
       "norm_label": "is_mouse_within_monitor()"
     },
     {
@@ -11433,7 +11433,7 @@
       "source_location": "L172",
       "_origin": "ast",
       "id": "physicalposition",
-      "community": 31,
+      "community": 44,
       "norm_label": "physicalposition"
     },
     {
@@ -11443,7 +11443,7 @@
       "source_location": "L172",
       "_origin": "ast",
       "id": "physicalsize",
-      "community": 31,
+      "community": 44,
       "norm_label": "physicalsize"
     },
     {
@@ -11453,7 +11453,7 @@
       "source_location": "L203",
       "_origin": "ast",
       "id": "src_overlay_calculate_overlay_position",
-      "community": 31,
+      "community": 44,
       "norm_label": "calculate_overlay_position()"
     },
     {
@@ -11463,7 +11463,7 @@
       "source_location": "L226",
       "_origin": "ast",
       "id": "src_overlay_create_recording_overlay",
-      "community": 31,
+      "community": 44,
       "norm_label": "create_recording_overlay()"
     },
     {
@@ -11473,7 +11473,7 @@
       "source_location": "L322",
       "_origin": "ast",
       "id": "src_overlay_show_overlay_state",
-      "community": 31,
+      "community": 44,
       "norm_label": "show_overlay_state()"
     },
     {
@@ -11483,7 +11483,7 @@
       "source_location": "L343",
       "_origin": "ast",
       "id": "src_overlay_show_recording_overlay",
-      "community": 31,
+      "community": 44,
       "norm_label": "show_recording_overlay()"
     },
     {
@@ -11493,7 +11493,7 @@
       "source_location": "L348",
       "_origin": "ast",
       "id": "src_overlay_show_transcribing_overlay",
-      "community": 31,
+      "community": 44,
       "norm_label": "show_transcribing_overlay()"
     },
     {
@@ -11503,7 +11503,7 @@
       "source_location": "L353",
       "_origin": "ast",
       "id": "src_overlay_show_processing_overlay",
-      "community": 31,
+      "community": 44,
       "norm_label": "show_processing_overlay()"
     },
     {
@@ -11513,7 +11513,7 @@
       "source_location": "L358",
       "_origin": "ast",
       "id": "src_overlay_update_overlay_position",
-      "community": 31,
+      "community": 44,
       "norm_label": "update_overlay_position()"
     },
     {
@@ -11523,7 +11523,7 @@
       "source_location": "L373",
       "_origin": "ast",
       "id": "src_overlay_hide_recording_overlay",
-      "community": 31,
+      "community": 44,
       "norm_label": "hide_recording_overlay()"
     },
     {
@@ -11533,7 +11533,7 @@
       "source_location": "L388",
       "_origin": "ast",
       "id": "src_overlay_emit_levels",
-      "community": 31,
+      "community": 44,
       "norm_label": "emit_levels()"
     },
     {
@@ -11543,7 +11543,7 @@
       "source_location": "L388",
       "_origin": "ast",
       "id": "src_tauri_src_overlay_rs_vec",
-      "community": 31,
+      "community": 44,
       "norm_label": "vec"
     },
     {
@@ -14743,7 +14743,7 @@
       "source_location": "L65",
       "_origin": "ast",
       "id": "src_tray_change_tray_icon",
-      "community": 39,
+      "community": 31,
       "norm_label": "change_tray_icon()"
     },
     {
@@ -16673,7 +16673,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "src_bindings_commands",
-      "community": 4,
+      "community": 90,
       "norm_label": "commands"
     },
     {
@@ -16693,7 +16693,7 @@
       "source_location": "L1319",
       "_origin": "ast",
       "id": "src_bindings_appsettings",
-      "community": 134,
+      "community": 4,
       "norm_label": "appsettings"
     },
     {
@@ -16713,7 +16713,7 @@
       "source_location": "L1384",
       "_origin": "ast",
       "id": "src_bindings_assistantresponselength",
-      "community": 4,
+      "community": 3,
       "norm_label": "assistantresponselength"
     },
     {
@@ -16723,7 +16723,7 @@
       "source_location": "L1389",
       "_origin": "ast",
       "id": "src_bindings_audiodevice",
-      "community": 134,
+      "community": 4,
       "norm_label": "audiodevice"
     },
     {
@@ -16733,7 +16733,7 @@
       "source_location": "L1390",
       "_origin": "ast",
       "id": "src_bindings_autosubmitkey",
-      "community": 19,
+      "community": 4,
       "norm_label": "autosubmitkey"
     },
     {
@@ -16753,7 +16753,7 @@
       "source_location": "L1395",
       "_origin": "ast",
       "id": "src_bindings_azurevoice",
-      "community": 4,
+      "community": 3,
       "norm_label": "azurevoice"
     },
     {
@@ -16783,7 +16783,7 @@
       "source_location": "L1414",
       "_origin": "ast",
       "id": "src_bindings_clipboardhandling",
-      "community": 19,
+      "community": 17,
       "norm_label": "clipboardhandling"
     },
     {
@@ -16903,7 +16903,7 @@
       "source_location": "L1490",
       "_origin": "ast",
       "id": "src_bindings_localllmstatus",
-      "community": 4,
+      "community": 3,
       "norm_label": "localllmstatus"
     },
     {
@@ -16913,7 +16913,7 @@
       "source_location": "L1511",
       "_origin": "ast",
       "id": "src_bindings_loglevel",
-      "community": 6,
+      "community": 17,
       "norm_label": "loglevel"
     },
     {
@@ -16953,7 +16953,7 @@
       "source_location": "L1515",
       "_origin": "ast",
       "id": "src_bindings_ortacceleratorsetting",
-      "community": 134,
+      "community": 4,
       "norm_label": "ortacceleratorsetting"
     },
     {
@@ -17013,7 +17013,7 @@
       "source_location": "L1521",
       "_origin": "ast",
       "id": "src_bindings_postprocessprovider",
-      "community": 4,
+      "community": 25,
       "norm_label": "postprocessprovider"
     },
     {
@@ -17023,7 +17023,7 @@
       "source_location": "L1522",
       "_origin": "ast",
       "id": "src_bindings_recordingretentionperiod",
-      "community": 19,
+      "community": 17,
       "norm_label": "recordingretentionperiod"
     },
     {
@@ -17093,7 +17093,7 @@
       "source_location": "L1537",
       "_origin": "ast",
       "id": "src_bindings_typingtool",
-      "community": 4,
+      "community": 90,
       "norm_label": "typingtool"
     },
     {
@@ -17103,7 +17103,7 @@
       "source_location": "L1538",
       "_origin": "ast",
       "id": "src_bindings_whisperacceleratorsetting",
-      "community": 134,
+      "community": 4,
       "norm_label": "whisperacceleratorsetting"
     },
     {
@@ -17253,7 +17253,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "components_wordmark",
-      "community": 6,
+      "community": 131,
       "norm_label": "wordmark.tsx"
     },
     {
@@ -17263,7 +17263,7 @@
       "source_location": "L4",
       "_origin": "ast",
       "id": "components_wordmark_wordmarkprops",
-      "community": 6,
+      "community": 131,
       "norm_label": "wordmarkprops"
     },
     {
@@ -17273,7 +17273,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "components_wordmark_wordmark",
-      "community": 6,
+      "community": 131,
       "norm_label": "wordmark()"
     },
     {
@@ -17653,7 +17653,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "onboarding_accessibilityonboarding",
-      "community": 6,
+      "community": 131,
       "norm_label": "accessibilityonboarding.tsx"
     },
     {
@@ -17663,7 +17663,7 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "onboarding_accessibilityonboarding_accessibilityonboardingprops",
-      "community": 6,
+      "community": 131,
       "norm_label": "accessibilityonboardingprops"
     },
     {
@@ -17673,7 +17673,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "onboarding_accessibilityonboarding_permissionstatus",
-      "community": 6,
+      "community": 131,
       "norm_label": "permissionstatus"
     },
     {
@@ -17683,7 +17683,7 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "onboarding_accessibilityonboarding_permissionplatform",
-      "community": 6,
+      "community": 131,
       "norm_label": "permissionplatform"
     },
     {
@@ -17693,7 +17693,7 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "onboarding_accessibilityonboarding_permissionsstate",
-      "community": 6,
+      "community": 131,
       "norm_label": "permissionsstate"
     },
     {
@@ -17703,7 +17703,7 @@
       "source_location": "L28",
       "_origin": "ast",
       "id": "onboarding_accessibilityonboarding_accessibilityonboarding",
-      "community": 6,
+      "community": 131,
       "norm_label": "accessibilityonboarding()"
     },
     {
@@ -17893,7 +17893,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "settings_appdatadirectory",
-      "community": 3,
+      "community": 17,
       "norm_label": "appdatadirectory.tsx"
     },
     {
@@ -17903,7 +17903,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "settings_appdatadirectory_appdatadirectoryprops",
-      "community": 3,
+      "community": 17,
       "norm_label": "appdatadirectoryprops"
     },
     {
@@ -17913,7 +17913,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "settings_appdatadirectory_appdatadirectory",
-      "community": 3,
+      "community": 17,
       "norm_label": "appdatadirectory()"
     },
     {
@@ -17923,7 +17923,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "settings_applanguageselector",
-      "community": 3,
+      "community": 17,
       "norm_label": "applanguageselector.tsx"
     },
     {
@@ -17933,7 +17933,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "settings_applanguageselector_applanguageselectorprops",
-      "community": 3,
+      "community": 17,
       "norm_label": "applanguageselectorprops"
     },
     {
@@ -17943,7 +17943,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "settings_applanguageselector_applanguageselector",
-      "community": 3,
+      "community": 17,
       "norm_label": "applanguageselector"
     },
     {
@@ -17953,7 +17953,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "settings_appearanceselector",
-      "community": 134,
+      "community": 6,
       "norm_label": "appearanceselector.tsx"
     },
     {
@@ -17963,7 +17963,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "settings_appearanceselector_appearanceselectorprops",
-      "community": 134,
+      "community": 6,
       "norm_label": "appearanceselectorprops"
     },
     {
@@ -17973,7 +17973,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "settings_appearanceselector_appearanceselector",
-      "community": 134,
+      "community": 6,
       "norm_label": "appearanceselector"
     },
     {
@@ -18013,7 +18013,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "settings_audiofeedback",
-      "community": 134,
+      "community": 6,
       "norm_label": "audiofeedback.tsx"
     },
     {
@@ -18023,7 +18023,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "settings_audiofeedback_audiofeedbackprops",
-      "community": 134,
+      "community": 6,
       "norm_label": "audiofeedbackprops"
     },
     {
@@ -18033,7 +18033,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "settings_audiofeedback_audiofeedback",
-      "community": 134,
+      "community": 6,
       "norm_label": "audiofeedback"
     },
     {
@@ -18043,7 +18043,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "settings_autosubmit",
-      "community": 19,
+      "community": 4,
       "norm_label": "autosubmit.tsx"
     },
     {
@@ -18053,7 +18053,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "settings_autosubmit_autosubmitprops",
-      "community": 19,
+      "community": 4,
       "norm_label": "autosubmitprops"
     },
     {
@@ -18063,7 +18063,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "settings_autosubmit_autosubmitoptionvalue",
-      "community": 19,
+      "community": 4,
       "norm_label": "autosubmitoptionvalue"
     },
     {
@@ -18073,7 +18073,7 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "settings_autosubmit_autosubmit",
-      "community": 19,
+      "community": 4,
       "norm_label": "autosubmit"
     },
     {
@@ -18133,7 +18133,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "settings_clamshellmicrophoneselector_clamshellmicrophoneselector",
-      "community": 90,
+      "community": 6,
       "norm_label": "clamshellmicrophoneselector"
     },
     {
@@ -18143,7 +18143,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "settings_clipboardhandling",
-      "community": 19,
+      "community": 17,
       "norm_label": "clipboardhandling.tsx"
     },
     {
@@ -18153,7 +18153,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "settings_clipboardhandling_clipboardhandlingprops",
-      "community": 19,
+      "community": 17,
       "norm_label": "clipboardhandlingprops"
     },
     {
@@ -18163,7 +18163,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "settings_clipboardhandling_clipboardhandlingsetting",
-      "community": 19,
+      "community": 17,
       "norm_label": "clipboardhandlingsetting"
     },
     {
@@ -18173,7 +18173,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "settings_customwords",
-      "community": 3,
+      "community": 17,
       "norm_label": "customwords.tsx"
     },
     {
@@ -18183,7 +18183,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "settings_customwords_customwordsprops",
-      "community": 3,
+      "community": 17,
       "norm_label": "customwordsprops"
     },
     {
@@ -18193,7 +18193,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "settings_customwords_customwords",
-      "community": 3,
+      "community": 17,
       "norm_label": "customwords"
     },
     {
@@ -18303,7 +18303,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "settings_historylimit",
-      "community": 19,
+      "community": 6,
       "norm_label": "historylimit.tsx"
     },
     {
@@ -18313,7 +18313,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "settings_historylimit_historylimitprops",
-      "community": 19,
+      "community": 6,
       "norm_label": "historylimitprops"
     },
     {
@@ -18323,7 +18323,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "settings_historylimit_historylimit",
-      "community": 19,
+      "community": 6,
       "norm_label": "historylimit()"
     },
     {
@@ -18393,7 +18393,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "settings_microphoneselector",
-      "community": 90,
+      "community": 6,
       "norm_label": "microphoneselector.tsx"
     },
     {
@@ -18403,7 +18403,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "settings_microphoneselector_microphoneselectorprops",
-      "community": 90,
+      "community": 6,
       "norm_label": "microphoneselectorprops"
     },
     {
@@ -18413,7 +18413,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "settings_microphoneselector_microphoneselector",
-      "community": 90,
+      "community": 6,
       "norm_label": "microphoneselector"
     },
     {
@@ -18443,7 +18443,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "settings_modelunloadtimeout_modelunloadtimeoutsetting",
-      "community": 4,
+      "community": 6,
       "norm_label": "modelunloadtimeoutsetting()"
     },
     {
@@ -18453,7 +18453,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "settings_mutewhilerecording",
-      "community": 134,
+      "community": 6,
       "norm_label": "mutewhilerecording.tsx"
     },
     {
@@ -18463,7 +18463,7 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "settings_mutewhilerecording_mutewhilerecordingtoggleprops",
-      "community": 134,
+      "community": 6,
       "norm_label": "mutewhilerecordingtoggleprops"
     },
     {
@@ -18473,7 +18473,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "settings_mutewhilerecording_mutewhilerecording",
-      "community": 134,
+      "community": 6,
       "norm_label": "mutewhilerecording"
     },
     {
@@ -18483,7 +18483,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "settings_outputdeviceselector",
-      "community": 134,
+      "community": 6,
       "norm_label": "outputdeviceselector.tsx"
     },
     {
@@ -18493,7 +18493,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "settings_outputdeviceselector_outputdeviceselectorprops",
-      "community": 134,
+      "community": 6,
       "norm_label": "outputdeviceselectorprops"
     },
     {
@@ -18503,7 +18503,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "settings_outputdeviceselector_outputdeviceselector",
-      "community": 134,
+      "community": 6,
       "norm_label": "outputdeviceselector"
     },
     {
@@ -18693,7 +18693,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "postprocessingsettingsapi_usepostprocessproviderstate",
-      "community": 4,
+      "community": 25,
       "norm_label": "usepostprocessproviderstate.ts"
     },
     {
@@ -18703,7 +18703,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "postprocessingsettingsapi_usepostprocessproviderstate_postprocessproviderstate",
-      "community": 4,
+      "community": 25,
       "norm_label": "postprocessproviderstate"
     },
     {
@@ -18763,7 +18763,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "settings_pushtotalk",
-      "community": 134,
+      "community": 6,
       "norm_label": "pushtotalk.tsx"
     },
     {
@@ -18773,7 +18773,7 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "settings_pushtotalk_pushtotalkprops",
-      "community": 134,
+      "community": 6,
       "norm_label": "pushtotalkprops"
     },
     {
@@ -18783,7 +18783,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "settings_pushtotalk_pushtotalk",
-      "community": 134,
+      "community": 6,
       "norm_label": "pushtotalk"
     },
     {
@@ -18793,7 +18793,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "settings_recordingretentionperiod",
-      "community": 19,
+      "community": 17,
       "norm_label": "recordingretentionperiod.tsx"
     },
     {
@@ -18803,7 +18803,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "settings_recordingretentionperiod_recordingretentionperiodprops",
-      "community": 19,
+      "community": 17,
       "norm_label": "recordingretentionperiodprops"
     },
     {
@@ -18813,7 +18813,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "settings_recordingretentionperiod_recordingretentionperiodselector",
-      "community": 19,
+      "community": 17,
       "norm_label": "recordingretentionperiodselector"
     },
     {
@@ -18843,7 +18843,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "settings_shortcutinput_shortcutinput",
-      "community": 90,
+      "community": 6,
       "norm_label": "shortcutinput()"
     },
     {
@@ -18933,7 +18933,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "settings_soundpicker_soundpicker",
-      "community": 6,
+      "community": 131,
       "norm_label": "soundpicker()"
     },
     {
@@ -18973,7 +18973,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "settings_translatetoenglish",
-      "community": 90,
+      "community": 26,
       "norm_label": "translatetoenglish.tsx"
     },
     {
@@ -18983,7 +18983,7 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "settings_translatetoenglish_translatetoenglishprops",
-      "community": 90,
+      "community": 26,
       "norm_label": "translatetoenglishprops"
     },
     {
@@ -18993,7 +18993,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "settings_translatetoenglish_translatetoenglish",
-      "community": 90,
+      "community": 26,
       "norm_label": "translatetoenglish"
     },
     {
@@ -19003,7 +19003,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "settings_typingtool",
-      "community": 4,
+      "community": 90,
       "norm_label": "typingtool.tsx"
     },
     {
@@ -19013,7 +19013,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "settings_typingtool_typingtoolprops",
-      "community": 4,
+      "community": 90,
       "norm_label": "typingtoolprops"
     },
     {
@@ -19023,7 +19023,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "settings_typingtool_alltoollabels",
-      "community": 4,
+      "community": 90,
       "norm_label": "alltoollabels"
     },
     {
@@ -19033,7 +19033,7 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "settings_typingtool_typingtoolsetting",
-      "community": 4,
+      "community": 90,
       "norm_label": "typingtoolsetting"
     },
     {
@@ -19073,7 +19073,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "settings_volumeslider",
-      "community": 134,
+      "community": 6,
       "norm_label": "volumeslider.tsx"
     },
     {
@@ -19083,7 +19083,7 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "settings_volumeslider_volumeslider",
-      "community": 134,
+      "community": 6,
       "norm_label": "volumeslider()"
     },
     {
@@ -19093,7 +19093,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "about_aboutsettings",
-      "community": 3,
+      "community": 17,
       "norm_label": "aboutsettings.tsx"
     },
     {
@@ -19103,7 +19103,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "about_aboutsettings_acknowledgments",
-      "community": 3,
+      "community": 17,
       "norm_label": "acknowledgments"
     },
     {
@@ -19113,7 +19113,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "about_aboutsettings_aboutsettings",
-      "community": 3,
+      "community": 6,
       "norm_label": "aboutsettings()"
     },
     {
@@ -19143,7 +19143,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "assistant_assistantsettings",
-      "community": 4,
+      "community": 3,
       "norm_label": "assistantsettings.tsx"
     },
     {
@@ -19153,7 +19153,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "assistant_assistantsettings_kokoro_dtypes",
-      "community": 4,
+      "community": 3,
       "norm_label": "kokoro_dtypes"
     },
     {
@@ -19163,7 +19163,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "assistant_assistantsettings_kokoro_voices",
-      "community": 4,
+      "community": 3,
       "norm_label": "kokoro_voices"
     },
     {
@@ -19173,7 +19173,7 @@
       "source_location": "L46",
       "_origin": "ast",
       "id": "assistant_assistantsettings_tts_speed_presets",
-      "community": 4,
+      "community": 3,
       "norm_label": "tts_speed_presets"
     },
     {
@@ -19183,7 +19183,7 @@
       "source_location": "L48",
       "_origin": "ast",
       "id": "assistant_assistantsettings_accents",
-      "community": 4,
+      "community": 3,
       "norm_label": "accents"
     },
     {
@@ -19193,7 +19193,7 @@
       "source_location": "L57",
       "_origin": "ast",
       "id": "assistant_assistantsettings_font_sizes",
-      "community": 4,
+      "community": 3,
       "norm_label": "font_sizes"
     },
     {
@@ -19203,7 +19203,7 @@
       "source_location": "L66",
       "_origin": "ast",
       "id": "assistant_assistantsettings_test_phrases",
-      "community": 4,
+      "community": 3,
       "norm_label": "test_phrases"
     },
     {
@@ -19213,7 +19213,7 @@
       "source_location": "L78",
       "_origin": "ast",
       "id": "assistant_assistantsettings_randomtestphrase",
-      "community": 4,
+      "community": 3,
       "norm_label": "randomtestphrase()"
     },
     {
@@ -19223,7 +19223,7 @@
       "source_location": "L83",
       "_origin": "ast",
       "id": "assistant_assistantsettings_panelpreview",
-      "community": 4,
+      "community": 3,
       "norm_label": "panelpreview()"
     },
     {
@@ -19243,7 +19243,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "debug_debugpaths",
-      "community": 19,
+      "community": 17,
       "norm_label": "debugpaths.tsx"
     },
     {
@@ -19253,7 +19253,7 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "debug_debugpaths_debugpathsprops",
-      "community": 19,
+      "community": 17,
       "norm_label": "debugpathsprops"
     },
     {
@@ -19263,7 +19263,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "debug_debugpaths_debugpaths",
-      "community": 19,
+      "community": 17,
       "norm_label": "debugpaths()"
     },
     {
@@ -19333,7 +19333,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "debug_logdirectory",
-      "community": 3,
+      "community": 17,
       "norm_label": "logdirectory.tsx"
     },
     {
@@ -19343,7 +19343,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "debug_logdirectory_logdirectoryprops",
-      "community": 3,
+      "community": 17,
       "norm_label": "logdirectoryprops"
     },
     {
@@ -19353,7 +19353,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "debug_logdirectory_logdirectory",
-      "community": 3,
+      "community": 17,
       "norm_label": "logdirectory()"
     },
     {
@@ -19363,7 +19363,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "debug_loglevelselector",
-      "community": 6,
+      "community": 17,
       "norm_label": "loglevelselector.tsx"
     },
     {
@@ -19373,7 +19373,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "debug_loglevelselector_log_level_options",
-      "community": 6,
+      "community": 17,
       "norm_label": "log_level_options"
     },
     {
@@ -19383,7 +19383,7 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "debug_loglevelselector_loglevelselectorprops",
-      "community": 6,
+      "community": 17,
       "norm_label": "loglevelselectorprops"
     },
     {
@@ -19393,7 +19393,7 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "debug_loglevelselector_loglevelselector",
-      "community": 6,
+      "community": 17,
       "norm_label": "loglevelselector()"
     },
     {
@@ -19493,7 +19493,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "debug_index",
-      "community": 3,
+      "community": 17,
       "norm_label": "index.ts"
     },
     {
@@ -19503,7 +19503,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "general_generalsettings",
-      "community": 134,
+      "community": 6,
       "norm_label": "generalsettings.tsx"
     },
     {
@@ -19613,7 +19613,7 @@
       "source_location": "L159",
       "_origin": "ast",
       "id": "history_historysettings_historysettings",
-      "community": 90,
+      "community": 6,
       "norm_label": "historysettings()"
     },
     {
@@ -19663,7 +19663,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "settings_index",
-      "community": 90,
+      "community": 6,
       "norm_label": "index.ts"
     },
     {
@@ -19753,7 +19753,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "models_modelssettings_modelssettings",
-      "community": 26,
+      "community": 6,
       "norm_label": "modelssettings()"
     },
     {
@@ -19823,7 +19823,7 @@
       "source_location": "L426",
       "_origin": "ast",
       "id": "post_processing_postprocessingsettings_postprocessingsettings",
-      "community": 25,
+      "community": 6,
       "norm_label": "postprocessingsettings()"
     },
     {
@@ -19933,7 +19933,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "ui_alert",
-      "community": 25,
+      "community": 141,
       "norm_label": "alert.tsx"
     },
     {
@@ -19943,7 +19943,7 @@
       "source_location": "L4",
       "_origin": "ast",
       "id": "ui_alert_alertvariant",
-      "community": 25,
+      "community": 141,
       "norm_label": "alertvariant"
     },
     {
@@ -19953,7 +19953,7 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "ui_alert_alertprops",
-      "community": 25,
+      "community": 141,
       "norm_label": "alertprops"
     },
     {
@@ -19963,7 +19963,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "ui_alert_variantstyles",
-      "community": 25,
+      "community": 141,
       "norm_label": "variantstyles"
     },
     {
@@ -19973,7 +19973,7 @@
       "source_location": "L40",
       "_origin": "ast",
       "id": "ui_alert_varianticons",
-      "community": 25,
+      "community": 141,
       "norm_label": "varianticons"
     },
     {
@@ -19983,7 +19983,7 @@
       "source_location": "L47",
       "_origin": "ast",
       "id": "ui_alert_alert",
-      "community": 25,
+      "community": 141,
       "norm_label": "alert()"
     },
     {
@@ -20053,7 +20053,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "ui_button",
-      "community": 3,
+      "community": 17,
       "norm_label": "button.tsx"
     },
     {
@@ -20063,7 +20063,7 @@
       "source_location": "L3",
       "_origin": "ast",
       "id": "ui_button_buttonprops",
-      "community": 3,
+      "community": 17,
       "norm_label": "buttonprops"
     },
     {
@@ -20073,7 +20073,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "ui_button_button",
-      "community": 3,
+      "community": 17,
       "norm_label": "button()"
     },
     {
@@ -20183,7 +20183,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "ui_pathdisplay",
-      "community": 3,
+      "community": 17,
       "norm_label": "pathdisplay.tsx"
     },
     {
@@ -20193,7 +20193,7 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "ui_pathdisplay_pathdisplayprops",
-      "community": 3,
+      "community": 17,
       "norm_label": "pathdisplayprops"
     },
     {
@@ -20203,7 +20203,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "ui_pathdisplay_pathdisplay",
-      "community": 3,
+      "community": 17,
       "norm_label": "pathdisplay()"
     },
     {
@@ -20323,7 +20323,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "ui_settingcontainer",
-      "community": 19,
+      "community": 17,
       "norm_label": "settingcontainer.tsx"
     },
     {
@@ -20333,7 +20333,7 @@
       "source_location": "L4",
       "_origin": "ast",
       "id": "ui_settingcontainer_settingcontainerprops",
-      "community": 19,
+      "community": 17,
       "norm_label": "settingcontainerprops"
     },
     {
@@ -20343,7 +20343,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "ui_settingcontainer_infoicon",
-      "community": 19,
+      "community": 17,
       "norm_label": "infoicon()"
     },
     {
@@ -20353,7 +20353,7 @@
       "source_location": "L34",
       "_origin": "ast",
       "id": "ui_settingcontainer_settingcontainer",
-      "community": 19,
+      "community": 17,
       "norm_label": "settingcontainer()"
     },
     {
@@ -20423,7 +20423,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "ui_textdisplay",
-      "community": 19,
+      "community": 3,
       "norm_label": "textdisplay.tsx"
     },
     {
@@ -20433,7 +20433,7 @@
       "source_location": "L4",
       "_origin": "ast",
       "id": "ui_textdisplay_textdisplayprops",
-      "community": 19,
+      "community": 3,
       "norm_label": "textdisplayprops"
     },
     {
@@ -20443,7 +20443,7 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "ui_textdisplay_textdisplay",
-      "community": 19,
+      "community": 3,
       "norm_label": "textdisplay()"
     },
     {
@@ -20453,7 +20453,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "ui_textarea",
-      "community": 19,
+      "community": 3,
       "norm_label": "textarea.tsx"
     },
     {
@@ -20463,7 +20463,7 @@
       "source_location": "L3",
       "_origin": "ast",
       "id": "ui_textarea_textareaprops",
-      "community": 19,
+      "community": 3,
       "norm_label": "textareaprops"
     },
     {
@@ -20473,7 +20473,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "ui_textarea_textarea",
-      "community": 19,
+      "community": 3,
       "norm_label": "textarea()"
     },
     {
@@ -20513,7 +20513,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "ui_tooltip",
-      "community": 19,
+      "community": 3,
       "norm_label": "tooltip.tsx"
     },
     {
@@ -20523,7 +20523,7 @@
       "source_location": "L4",
       "_origin": "ast",
       "id": "ui_tooltip_tooltipposition",
-      "community": 19,
+      "community": 3,
       "norm_label": "tooltipposition"
     },
     {
@@ -20533,7 +20533,7 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "ui_tooltip_tooltipcoords",
-      "community": 19,
+      "community": 3,
       "norm_label": "tooltipcoords"
     },
     {
@@ -20543,7 +20543,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "ui_tooltip_tooltipprops",
-      "community": 19,
+      "community": 3,
       "norm_label": "tooltipprops"
     },
     {
@@ -20553,7 +20553,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "ui_tooltip_tooltip",
-      "community": 19,
+      "community": 3,
       "norm_label": "tooltip()"
     },
     {
@@ -20563,7 +20563,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "ui_index",
-      "community": 19,
+      "community": 3,
       "norm_label": "index.ts"
     },
     {
@@ -20573,7 +20573,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "update_checker_updatechecker",
-      "community": 4,
+      "community": 6,
       "norm_label": "updatechecker.tsx"
     },
     {
@@ -20583,7 +20583,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "update_checker_updatechecker_updatecheckerprops",
-      "community": 4,
+      "community": 6,
       "norm_label": "updatecheckerprops"
     },
     {
@@ -20593,7 +20593,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "update_checker_updatechecker_updatechecker",
-      "community": 4,
+      "community": 6,
       "norm_label": "updatechecker()"
     },
     {
@@ -20633,7 +20633,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "hooks_usesettings",
-      "community": 134,
+      "community": 6,
       "norm_label": "usesettings.ts"
     },
     {
@@ -20643,7 +20643,7 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "hooks_usesettings_usesettingsreturn",
-      "community": 134,
+      "community": 4,
       "norm_label": "usesettingsreturn"
     },
     {
@@ -21233,7 +21233,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "stores_settingsstore",
-      "community": 134,
+      "community": 4,
       "norm_label": "settingsstore.ts"
     },
     {
@@ -21243,7 +21243,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "stores_settingsstore_settingsstore",
-      "community": 134,
+      "community": 4,
       "norm_label": "settingsstore"
     },
     {
@@ -21253,7 +21253,7 @@
       "source_location": "L70",
       "_origin": "ast",
       "id": "stores_settingsstore_default_audio_device",
-      "community": 134,
+      "community": 4,
       "norm_label": "default_audio_device"
     },
     {
@@ -21263,7 +21263,7 @@
       "source_location": "L76",
       "_origin": "ast",
       "id": "stores_settingsstore_settingupdaters",
-      "community": 134,
+      "community": 4,
       "norm_label": "settingupdaters"
     },
     {
@@ -21273,7 +21273,7 @@
       "source_location": "L161",
       "_origin": "ast",
       "id": "stores_settingsstore_usesettingsstore",
-      "community": 6,
+      "community": 131,
       "norm_label": "usesettingsstore"
     },
     {
@@ -22193,7 +22193,7 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "contributing_feature_freeze",
-      "community": 87,
+      "community": 134,
       "norm_label": "\u26a0\ufe0f feature freeze"
     },
     {
@@ -22203,7 +22203,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "contributing_philosophy",
-      "community": 87,
+      "community": 134,
       "norm_label": "\ud83d\udcd6 philosophy"
     },
     {
@@ -22213,7 +22213,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "contributing_getting_started",
-      "community": 129,
+      "community": 87,
       "norm_label": "\ud83d\ude80 getting started"
     },
     {
@@ -22223,7 +22223,7 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "contributing_prerequisites",
-      "community": 129,
+      "community": 87,
       "norm_label": "prerequisites"
     },
     {
@@ -22233,7 +22233,7 @@
       "source_location": "L30",
       "_origin": "ast",
       "id": "contributing_setting_up_your_development_environment",
-      "community": 129,
+      "community": 87,
       "norm_label": "setting up your development environment"
     },
     {
@@ -22243,7 +22243,7 @@
       "source_location": "L69",
       "_origin": "ast",
       "id": "contributing_understanding_the_codebase",
-      "community": 129,
+      "community": 87,
       "norm_label": "understanding the codebase"
     },
     {
@@ -22313,7 +22313,7 @@
       "source_location": "L144",
       "_origin": "ast",
       "id": "contributing_making_code_contributions",
-      "community": 87,
+      "community": 134,
       "norm_label": "\ud83d\udd27 making code contributions"
     },
     {
@@ -22323,7 +22323,7 @@
       "source_location": "L146",
       "_origin": "ast",
       "id": "contributing_before_you_start",
-      "community": 87,
+      "community": 134,
       "norm_label": "before you start"
     },
     {
@@ -22333,7 +22333,7 @@
       "source_location": "L165",
       "_origin": "ast",
       "id": "contributing_development_workflow",
-      "community": 87,
+      "community": 134,
       "norm_label": "development workflow"
     },
     {
@@ -22343,7 +22343,7 @@
       "source_location": "L231",
       "_origin": "ast",
       "id": "contributing_ai_assistance_disclosure",
-      "community": 87,
+      "community": 134,
       "norm_label": "ai assistance disclosure"
     },
     {
@@ -22353,7 +22353,7 @@
       "source_location": "L241",
       "_origin": "ast",
       "id": "contributing_code_style_guidelines",
-      "community": 87,
+      "community": 134,
       "norm_label": "code style guidelines"
     },
     {
@@ -22363,7 +22363,7 @@
       "source_location": "L266",
       "_origin": "ast",
       "id": "contributing_testing_your_changes",
-      "community": 87,
+      "community": 134,
       "norm_label": "testing your changes"
     },
     {
@@ -22463,7 +22463,7 @@
       "source_location": "L28",
       "_origin": "ast",
       "id": "contributing_translations_adding_a_new_language",
-      "community": 44,
+      "community": 60,
       "norm_label": "adding a new language"
     },
     {
@@ -22473,7 +22473,7 @@
       "source_location": "L30",
       "_origin": "ast",
       "id": "contributing_translations_step_1_create_the_language_folder",
-      "community": 44,
+      "community": 60,
       "norm_label": "step 1: create the language folder"
     },
     {
@@ -22483,7 +22483,7 @@
       "source_location": "L47",
       "_origin": "ast",
       "id": "contributing_translations_step_2_copy_the_english_file",
-      "community": 44,
+      "community": 60,
       "norm_label": "step 2: copy the english file"
     },
     {
@@ -22493,7 +22493,7 @@
       "source_location": "L53",
       "_origin": "ast",
       "id": "contributing_translations_step_3_translate_the_values",
-      "community": 44,
+      "community": 60,
       "norm_label": "step 3: translate the values"
     },
     {
@@ -22503,7 +22503,7 @@
       "source_location": "L73",
       "_origin": "ast",
       "id": "contributing_translations_step_4_register_your_language",
-      "community": 44,
+      "community": 60,
       "norm_label": "step 4: register your language"
     },
     {
@@ -22513,7 +22513,7 @@
       "source_location": "L90",
       "_origin": "ast",
       "id": "contributing_translations_step_5_test_your_translation",
-      "community": 44,
+      "community": 60,
       "norm_label": "step 5: test your translation"
     },
     {
@@ -22523,7 +22523,7 @@
       "source_location": "L97",
       "_origin": "ast",
       "id": "contributing_translations_step_6_submit_a_pull_request",
-      "community": 44,
+      "community": 60,
       "norm_label": "step 6: submit a pull request"
     },
     {
@@ -23073,7 +23073,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "readme_what_it_does",
-      "community": 54,
+      "community": 140,
       "norm_label": "what it does"
     },
     {
@@ -23083,7 +23083,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "readme_dictation_local_offline",
-      "community": 54,
+      "community": 140,
       "norm_label": "\ud83c\udf99\ufe0f dictation (local, offline)"
     },
     {
@@ -23093,7 +23093,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "readme_assistant_panel_the_ultra_part",
-      "community": 54,
+      "community": 140,
       "norm_label": "\ud83e\udd16 assistant panel (the \"ultra\" part)"
     },
     {
@@ -23103,34 +23103,44 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "readme_screen_vision",
-      "community": 54,
+      "community": 140,
       "norm_label": "\ud83d\udc41\ufe0f screen vision"
+    },
+    {
+      "label": "\ud83c\udf10 Web search (optional)",
+      "file_type": "document",
+      "source_file": "README.md",
+      "source_location": "L29",
+      "_origin": "ast",
+      "id": "readme_web_search_optional",
+      "community": 140,
+      "norm_label": "\ud83c\udf10 web search (optional)"
     },
     {
       "label": "\ud83d\udd0a Spoken answers (TTS)",
       "file_type": "document",
       "source_file": "README.md",
-      "source_location": "L29",
+      "source_location": "L38",
       "_origin": "ast",
       "id": "readme_spoken_answers_tts",
-      "community": 54,
+      "community": 140,
       "norm_label": "\ud83d\udd0a spoken answers (tts)"
     },
     {
       "label": "\ud83c\udfa8 Make it yours",
       "file_type": "document",
       "source_file": "README.md",
-      "source_location": "L37",
+      "source_location": "L49",
       "_origin": "ast",
       "id": "readme_make_it_yours",
-      "community": 54,
+      "community": 140,
       "norm_label": "\ud83c\udfa8 make it yours"
     },
     {
       "label": "What's different from Handy?",
       "file_type": "document",
       "source_file": "README.md",
-      "source_location": "L43",
+      "source_location": "L55",
       "_origin": "ast",
       "id": "readme_what_s_different_from_handy",
       "community": 54,
@@ -23140,7 +23150,7 @@
       "label": "Default hotkeys",
       "file_type": "document",
       "source_file": "README.md",
-      "source_location": "L57",
+      "source_location": "L71",
       "_origin": "ast",
       "id": "readme_default_hotkeys",
       "community": 54,
@@ -23150,7 +23160,7 @@
       "label": "Getting started",
       "file_type": "document",
       "source_file": "README.md",
-      "source_location": "L67",
+      "source_location": "L85",
       "_origin": "ast",
       "id": "readme_getting_started",
       "community": 54,
@@ -23160,7 +23170,7 @@
       "label": "Building from source",
       "file_type": "document",
       "source_file": "README.md",
-      "source_location": "L76",
+      "source_location": "L96",
       "_origin": "ast",
       "id": "readme_building_from_source",
       "community": 54,
@@ -23170,7 +23180,7 @@
       "label": "Privacy model",
       "file_type": "document",
       "source_file": "README.md",
-      "source_location": "L86",
+      "source_location": "L106",
       "_origin": "ast",
       "id": "readme_privacy_model",
       "community": 54,
@@ -23180,7 +23190,7 @@
       "label": "Credits & license",
       "file_type": "document",
       "source_file": "README.md",
-      "source_location": "L93",
+      "source_location": "L115",
       "_origin": "ast",
       "id": "readme_credits_license",
       "community": 54,
@@ -24108,7 +24118,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 87,
+      "community": 134,
       "norm_label": "contributing guide",
       "id": "contributing_guide"
     },
@@ -24121,7 +24131,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 87,
+      "community": 134,
       "norm_label": "bug reporting process",
       "id": "contributing_bug_reporting"
     },
@@ -24135,7 +24145,7 @@
       "author": null,
       "contributor": null,
       "rationale": "Feature ideas go to GitHub Discussions rather than Issues, keeping issues focused on actionable bugs.",
-      "community": 87,
+      "community": 134,
       "norm_label": "feature requests via discussions",
       "id": "contributing_feature_requests"
     },
@@ -24244,7 +24254,7 @@
       "author": null,
       "contributor": null,
       "rationale": "Whisper/Parakeet run on GPU or CPU and audio never leaves the machine; includes a hands-free F9 toggle.",
-      "community": 66,
+      "community": 54,
       "norm_label": "local offline dictation",
       "id": "readme_dictation"
     },
@@ -24465,7 +24475,7 @@
       "author": null,
       "contributor": null,
       "rationale": "Transparent borderless Vite entry for the recording overlay, loading /src/overlay/main.tsx.",
-      "community": 66,
+      "community": 54,
       "norm_label": "recording overlay window",
       "id": "overlay_index_recording_overlay"
     },
@@ -24478,7 +24488,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 66,
+      "community": 54,
       "norm_label": "overlay entry (overlay/main.tsx)",
       "id": "overlay_main_entry"
     }
@@ -25177,9 +25187,9 @@
       "source_file": "package.json",
       "source_location": "L47",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "package_dependencies",
-      "target": "package_dependencies_remark_gfm",
-      "confidence_score": 1.0
+      "target": "package_dependencies_remark_gfm"
     },
     {
       "relation": "contains",
@@ -27437,9 +27447,9 @@
       "source_file": "src-tauri/src/actions.rs",
       "source_location": "L72",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_actions",
-      "target": "src_actions_prewarm_builtin_llm",
-      "confidence_score": 1.0
+      "target": "src_actions_prewarm_builtin_llm"
     },
     {
       "relation": "contains",
@@ -27573,9 +27583,9 @@
       "source_location": "L72",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "src_actions_prewarm_builtin_llm",
-      "target": "src_tauri_src_actions_rs_string",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_actions_rs_string"
     },
     {
       "relation": "references",
@@ -27793,9 +27803,9 @@
       "source_file": "src-tauri/src/actions.rs",
       "source_location": "L766",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_actions_assistantaction_start",
-      "target": "src_actions_prewarm_builtin_llm",
-      "confidence_score": 1.0
+      "target": "src_actions_prewarm_builtin_llm"
     },
     {
       "relation": "references",
@@ -27804,9 +27814,9 @@
       "source_location": "L72",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "src_actions_prewarm_builtin_llm",
-      "target": "src_tauri_src_actions_rs_apphandle",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_actions_rs_apphandle"
     },
     {
       "relation": "calls",
@@ -27815,9 +27825,9 @@
       "source_file": "src-tauri/src/actions.rs",
       "source_location": "L468",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_actions_transcribeaction_start",
-      "target": "src_actions_prewarm_builtin_llm",
-      "confidence_score": 1.0
+      "target": "src_actions_prewarm_builtin_llm"
     },
     {
       "relation": "references",
@@ -28490,9 +28500,9 @@
       "source_file": "src-tauri/src/assistant.rs",
       "source_location": "L477",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_assistant",
-      "target": "src_assistant_current_datetime_line",
-      "confidence_score": 1.0
+      "target": "src_assistant_current_datetime_line"
     },
     {
       "relation": "contains",
@@ -28921,9 +28931,9 @@
       "source_file": "src-tauri/src/assistant.rs",
       "source_location": "L119",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_assistant_assistantconversation",
-      "target": "src_assistant_assistantconversation_begin_turn",
-      "confidence_score": 1.0
+      "target": "src_assistant_assistantconversation_begin_turn"
     },
     {
       "relation": "method",
@@ -28941,9 +28951,9 @@
       "source_file": "src-tauri/src/assistant.rs",
       "source_location": "L124",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_assistant_assistantconversation",
-      "target": "src_assistant_assistantconversation_is_cancelled",
-      "confidence_score": 1.0
+      "target": "src_assistant_assistantconversation_is_cancelled"
     },
     {
       "relation": "method",
@@ -29125,9 +29135,9 @@
       "source_file": "src-tauri/src/assistant.rs",
       "source_location": "L515",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_assistant_run_assistant_turn",
-      "target": "src_assistant_assistantconversation_begin_turn",
-      "confidence_score": 1.0
+      "target": "src_assistant_assistantconversation_begin_turn"
     },
     {
       "relation": "calls",
@@ -29136,9 +29146,9 @@
       "source_file": "src-tauri/src/assistant.rs",
       "source_location": "L610",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_assistant_run_assistant_turn",
-      "target": "src_assistant_assistantconversation_is_cancelled",
-      "confidence_score": 1.0
+      "target": "src_assistant_assistantconversation_is_cancelled"
     },
     {
       "relation": "references",
@@ -29158,9 +29168,9 @@
       "source_location": "L477",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "src_assistant_current_datetime_line",
-      "target": "src_tauri_src_assistant_rs_string",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_assistant_rs_string"
     },
     {
       "relation": "references",
@@ -29431,9 +29441,9 @@
       "source_file": "src-tauri/src/assistant.rs",
       "source_location": "L689",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_assistant_run_assistant_turn",
-      "target": "src_assistant_current_datetime_line",
-      "confidence_score": 1.0
+      "target": "src_assistant_current_datetime_line"
     },
     {
       "relation": "calls",
@@ -31425,9 +31435,9 @@
       "source_location": "L22",
       "weight": 1.0,
       "context": "import",
+      "confidence_score": 1.0,
       "source": "src_web_search",
-      "target": "duration",
-      "confidence_score": 1.0
+      "target": "duration"
     },
     {
       "relation": "calls",
@@ -34988,9 +34998,9 @@
       "source_file": "src-tauri/src/commands/assistant.rs",
       "source_location": "L498",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "commands_assistant",
-      "target": "commands_assistant_assistant_test_web_search",
-      "confidence_score": 1.0
+      "target": "commands_assistant_assistant_test_web_search"
     },
     {
       "relation": "contains",
@@ -35238,9 +35248,9 @@
       "source_file": "src-tauri/src/commands/assistant.rs",
       "source_location": "L475",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "commands_assistant",
-      "target": "commands_assistant_set_assistant_web_search_api_key",
-      "confidence_score": 1.0
+      "target": "commands_assistant_set_assistant_web_search_api_key"
     },
     {
       "relation": "contains",
@@ -35248,9 +35258,9 @@
       "source_file": "src-tauri/src/commands/assistant.rs",
       "source_location": "L438",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "commands_assistant",
-      "target": "commands_assistant_set_assistant_web_search_enabled",
-      "confidence_score": 1.0
+      "target": "commands_assistant_set_assistant_web_search_enabled"
     },
     {
       "relation": "contains",
@@ -35258,9 +35268,9 @@
       "source_file": "src-tauri/src/commands/assistant.rs",
       "source_location": "L464",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "commands_assistant",
-      "target": "commands_assistant_set_assistant_web_search_max_results",
-      "confidence_score": 1.0
+      "target": "commands_assistant_set_assistant_web_search_max_results"
     },
     {
       "relation": "contains",
@@ -35268,9 +35278,9 @@
       "source_file": "src-tauri/src/commands/assistant.rs",
       "source_location": "L450",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "commands_assistant",
-      "target": "commands_assistant_set_assistant_web_search_provider",
-      "confidence_score": 1.0
+      "target": "commands_assistant_set_assistant_web_search_provider"
     },
     {
       "relation": "contains",
@@ -35410,9 +35420,9 @@
       "source_location": "L498",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "commands_assistant_assistant_test_web_search",
-      "target": "src_tauri_src_commands_assistant_rs_apphandle",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_commands_assistant_rs_apphandle"
     },
     {
       "relation": "references",
@@ -35685,9 +35695,9 @@
       "source_location": "L475",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "commands_assistant_set_assistant_web_search_api_key",
-      "target": "src_tauri_src_commands_assistant_rs_apphandle",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_commands_assistant_rs_apphandle"
     },
     {
       "relation": "references",
@@ -35696,9 +35706,9 @@
       "source_location": "L438",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "commands_assistant_set_assistant_web_search_enabled",
-      "target": "src_tauri_src_commands_assistant_rs_apphandle",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_commands_assistant_rs_apphandle"
     },
     {
       "relation": "references",
@@ -35707,9 +35717,9 @@
       "source_location": "L464",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "commands_assistant_set_assistant_web_search_max_results",
-      "target": "src_tauri_src_commands_assistant_rs_apphandle",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_commands_assistant_rs_apphandle"
     },
     {
       "relation": "references",
@@ -35718,9 +35728,9 @@
       "source_location": "L450",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "commands_assistant_set_assistant_web_search_provider",
-      "target": "src_tauri_src_commands_assistant_rs_apphandle",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_commands_assistant_rs_apphandle"
     },
     {
       "relation": "references",
@@ -35817,9 +35827,9 @@
       "source_location": "L498",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "commands_assistant_assistant_test_web_search",
-      "target": "src_tauri_src_commands_assistant_rs_string",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_commands_assistant_rs_string"
     },
     {
       "relation": "references",
@@ -36081,9 +36091,9 @@
       "source_location": "L475",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "commands_assistant_set_assistant_web_search_api_key",
-      "target": "src_tauri_src_commands_assistant_rs_string",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_commands_assistant_rs_string"
     },
     {
       "relation": "references",
@@ -36092,9 +36102,9 @@
       "source_location": "L438",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "commands_assistant_set_assistant_web_search_enabled",
-      "target": "src_tauri_src_commands_assistant_rs_string",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_commands_assistant_rs_string"
     },
     {
       "relation": "references",
@@ -36103,9 +36113,9 @@
       "source_location": "L464",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "commands_assistant_set_assistant_web_search_max_results",
-      "target": "src_tauri_src_commands_assistant_rs_string",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_commands_assistant_rs_string"
     },
     {
       "relation": "references",
@@ -36114,9 +36124,9 @@
       "source_location": "L450",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "commands_assistant_set_assistant_web_search_provider",
-      "target": "src_tauri_src_commands_assistant_rs_string",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_commands_assistant_rs_string"
     },
     {
       "relation": "references",
@@ -36213,9 +36223,9 @@
       "source_location": "L498",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "commands_assistant_assistant_test_web_search",
-      "target": "src_tauri_src_commands_assistant_rs_result",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_commands_assistant_rs_result"
     },
     {
       "relation": "references",
@@ -36477,9 +36487,9 @@
       "source_location": "L475",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "commands_assistant_set_assistant_web_search_api_key",
-      "target": "src_tauri_src_commands_assistant_rs_result",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_commands_assistant_rs_result"
     },
     {
       "relation": "references",
@@ -36488,9 +36498,9 @@
       "source_location": "L438",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "commands_assistant_set_assistant_web_search_enabled",
-      "target": "src_tauri_src_commands_assistant_rs_result",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_commands_assistant_rs_result"
     },
     {
       "relation": "references",
@@ -36499,9 +36509,9 @@
       "source_location": "L464",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "commands_assistant_set_assistant_web_search_max_results",
-      "target": "src_tauri_src_commands_assistant_rs_result",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_commands_assistant_rs_result"
     },
     {
       "relation": "references",
@@ -36510,9 +36520,9 @@
       "source_location": "L450",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "commands_assistant_set_assistant_web_search_provider",
-      "target": "src_tauri_src_commands_assistant_rs_result",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_commands_assistant_rs_result"
     },
     {
       "relation": "references",
@@ -36576,9 +36586,9 @@
       "source_location": "L498",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "commands_assistant_assistant_test_web_search",
-      "target": "src_tauri_src_commands_assistant_rs_vec",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_commands_assistant_rs_vec"
     },
     {
       "relation": "calls",
@@ -36829,9 +36839,9 @@
       "source_file": "src-tauri/src/commands/assistant.rs",
       "source_location": "L489",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "commands_assistant_set_assistant_web_search_api_key",
-      "target": "commands_assistant_emit_settings_changed",
-      "confidence_score": 1.0
+      "target": "commands_assistant_emit_settings_changed"
     },
     {
       "relation": "calls",
@@ -36840,9 +36850,9 @@
       "source_file": "src-tauri/src/commands/assistant.rs",
       "source_location": "L442",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "commands_assistant_set_assistant_web_search_enabled",
-      "target": "commands_assistant_emit_settings_changed",
-      "confidence_score": 1.0
+      "target": "commands_assistant_emit_settings_changed"
     },
     {
       "relation": "calls",
@@ -36851,9 +36861,9 @@
       "source_file": "src-tauri/src/commands/assistant.rs",
       "source_location": "L468",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "commands_assistant_set_assistant_web_search_max_results",
-      "target": "commands_assistant_emit_settings_changed",
-      "confidence_score": 1.0
+      "target": "commands_assistant_emit_settings_changed"
     },
     {
       "relation": "calls",
@@ -36862,9 +36872,9 @@
       "source_file": "src-tauri/src/commands/assistant.rs",
       "source_location": "L457",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "commands_assistant_set_assistant_web_search_provider",
-      "target": "commands_assistant_emit_settings_changed",
-      "confidence_score": 1.0
+      "target": "commands_assistant_emit_settings_changed"
     },
     {
       "relation": "calls",
@@ -37368,9 +37378,9 @@
       "source_location": "L498",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "commands_assistant_assistant_test_web_search",
-      "target": "searchresult",
-      "confidence_score": 1.0
+      "target": "searchresult"
     },
     {
       "relation": "calls",
@@ -39072,9 +39082,9 @@
       "source_file": "src-tauri/src/commands/local_llm.rs",
       "source_location": "L70",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "commands_local_llm",
-      "target": "commands_local_llm_set_local_llm_unload_timeout",
-      "confidence_score": 1.0
+      "target": "commands_local_llm_set_local_llm_unload_timeout"
     },
     {
       "relation": "contains",
@@ -39389,9 +39399,9 @@
       "source_location": "L70",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "commands_local_llm_set_local_llm_unload_timeout",
-      "target": "src_tauri_src_commands_local_llm_rs_apphandle",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_commands_local_llm_rs_apphandle"
     },
     {
       "relation": "calls",
@@ -39422,9 +39432,9 @@
       "source_location": "L70",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "commands_local_llm_set_local_llm_unload_timeout",
-      "target": "src_tauri_src_commands_local_llm_rs_modelunloadtimeout",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_commands_local_llm_rs_modelunloadtimeout"
     },
     {
       "relation": "contains",
@@ -39979,9 +39989,9 @@
       "source_file": "src-tauri/src/commands/models.rs",
       "source_location": "L262",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "commands_models",
-      "target": "commands_models_add_custom_llm_model",
-      "confidence_score": 1.0
+      "target": "commands_models_add_custom_llm_model"
     },
     {
       "relation": "contains",
@@ -40089,9 +40099,9 @@
       "source_file": "src-tauri/src/commands/models.rs",
       "source_location": "L253",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "commands_models",
-      "target": "commands_models_list_huggingface_gguf_files",
-      "confidence_score": 1.0
+      "target": "commands_models_list_huggingface_gguf_files"
     },
     {
       "relation": "contains",
@@ -40099,9 +40109,9 @@
       "source_file": "src-tauri/src/commands/models.rs",
       "source_location": "L245",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "commands_models",
-      "target": "commands_models_search_huggingface_models",
-      "confidence_score": 1.0
+      "target": "commands_models_search_huggingface_models"
     },
     {
       "relation": "contains",
@@ -40240,9 +40250,9 @@
       "source_location": "L262",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "commands_models_add_custom_llm_model",
-      "target": "src_tauri_src_commands_models_rs_state",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_commands_models_rs_state"
     },
     {
       "relation": "references",
@@ -40350,9 +40360,9 @@
       "source_location": "L262",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "commands_models_add_custom_llm_model",
-      "target": "src_tauri_src_commands_models_rs_arc",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_commands_models_rs_arc"
     },
     {
       "relation": "references",
@@ -40460,9 +40470,9 @@
       "source_location": "L262",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "commands_models_add_custom_llm_model",
-      "target": "src_tauri_src_commands_models_rs_modelmanager",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_commands_models_rs_modelmanager"
     },
     {
       "relation": "references",
@@ -40548,9 +40558,9 @@
       "source_location": "L262",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "commands_models_add_custom_llm_model",
-      "target": "src_tauri_src_commands_models_rs_result",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_commands_models_rs_result"
     },
     {
       "relation": "references",
@@ -40658,9 +40668,9 @@
       "source_location": "L253",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "commands_models_list_huggingface_gguf_files",
-      "target": "src_tauri_src_commands_models_rs_result",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_commands_models_rs_result"
     },
     {
       "relation": "references",
@@ -40669,9 +40679,9 @@
       "source_location": "L245",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "commands_models_search_huggingface_models",
-      "target": "src_tauri_src_commands_models_rs_result",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_commands_models_rs_result"
     },
     {
       "relation": "references",
@@ -40702,9 +40712,9 @@
       "source_location": "L245",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "commands_models_search_huggingface_models",
-      "target": "src_tauri_src_commands_models_rs_vec",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_commands_models_rs_vec"
     },
     {
       "relation": "references",
@@ -40713,9 +40723,9 @@
       "source_location": "L262",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "commands_models_add_custom_llm_model",
-      "target": "modelinfo",
-      "confidence_score": 1.0
+      "target": "modelinfo"
     },
     {
       "relation": "references",
@@ -40735,9 +40745,9 @@
       "source_location": "L262",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "commands_models_add_custom_llm_model",
-      "target": "src_tauri_src_commands_models_rs_string",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_commands_models_rs_string"
     },
     {
       "relation": "references",
@@ -40845,9 +40855,9 @@
       "source_location": "L253",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "commands_models_list_huggingface_gguf_files",
-      "target": "src_tauri_src_commands_models_rs_string",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_commands_models_rs_string"
     },
     {
       "relation": "references",
@@ -40856,9 +40866,9 @@
       "source_location": "L245",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "commands_models_search_huggingface_models",
-      "target": "src_tauri_src_commands_models_rs_string",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_commands_models_rs_string"
     },
     {
       "relation": "references",
@@ -40911,9 +40921,9 @@
       "source_location": "L262",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "commands_models_add_custom_llm_model",
-      "target": "src_tauri_src_commands_models_rs_option",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_commands_models_rs_option"
     },
     {
       "relation": "references",
@@ -40944,9 +40954,9 @@
       "source_location": "L262",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "commands_models_add_custom_llm_model",
-      "target": "src_tauri_src_commands_models_rs_apphandle",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_commands_models_rs_apphandle"
     },
     {
       "relation": "references",
@@ -41131,9 +41141,9 @@
       "source_location": "L245",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "commands_models_search_huggingface_models",
-      "target": "hfmodelsummary",
-      "confidence_score": 1.0
+      "target": "hfmodelsummary"
     },
     {
       "relation": "references",
@@ -41142,9 +41152,9 @@
       "source_location": "L253",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "commands_models_list_huggingface_gguf_files",
-      "target": "hfrepofiles",
-      "confidence_score": 1.0
+      "target": "hfrepofiles"
     },
     {
       "relation": "contains",
@@ -41292,9 +41302,9 @@
       "source_location": "L15",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "commands_transcription_set_model_unload_timeout",
-      "target": "src_tauri_src_commands_transcription_rs_modelunloadtimeout",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_commands_transcription_rs_modelunloadtimeout"
     },
     {
       "relation": "references",
@@ -41474,9 +41484,9 @@
       "source_file": "src-tauri/src/huggingface.rs",
       "source_location": "L72",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_huggingface",
-      "target": "src_huggingface_extract_quant",
-      "confidence_score": 1.0
+      "target": "src_huggingface_extract_quant"
     },
     {
       "relation": "contains",
@@ -41484,9 +41494,9 @@
       "source_file": "src-tauri/src/huggingface.rs",
       "source_location": "L290",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_huggingface",
-      "target": "src_huggingface_extract_quant_handles_common_patterns",
-      "confidence_score": 1.0
+      "target": "src_huggingface_extract_quant_handles_common_patterns"
     },
     {
       "relation": "contains",
@@ -41494,9 +41504,9 @@
       "source_file": "src-tauri/src/huggingface.rs",
       "source_location": "L298",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_huggingface",
-      "target": "src_huggingface_extract_quant_returns_empty_when_unknown",
-      "confidence_score": 1.0
+      "target": "src_huggingface_extract_quant_returns_empty_when_unknown"
     },
     {
       "relation": "contains",
@@ -41504,9 +41514,9 @@
       "source_file": "src-tauri/src/huggingface.rs",
       "source_location": "L39",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_huggingface",
-      "target": "src_huggingface_hfgguffile",
-      "confidence_score": 1.0
+      "target": "src_huggingface_hfgguffile"
     },
     {
       "relation": "contains",
@@ -41514,9 +41524,9 @@
       "source_file": "src-tauri/src/huggingface.rs",
       "source_location": "L25",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_huggingface",
-      "target": "src_huggingface_hfmodelsummary",
-      "confidence_score": 1.0
+      "target": "src_huggingface_hfmodelsummary"
     },
     {
       "relation": "contains",
@@ -41524,9 +41534,9 @@
       "source_file": "src-tauri/src/huggingface.rs",
       "source_location": "L51",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_huggingface",
-      "target": "src_huggingface_hfrepofiles",
-      "confidence_score": 1.0
+      "target": "src_huggingface_hfrepofiles"
     },
     {
       "relation": "contains",
@@ -41534,9 +41544,9 @@
       "source_file": "src-tauri/src/huggingface.rs",
       "source_location": "L201",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_huggingface",
-      "target": "src_huggingface_list_repo_gguf_files",
-      "confidence_score": 1.0
+      "target": "src_huggingface_list_repo_gguf_files"
     },
     {
       "relation": "contains",
@@ -41544,9 +41554,9 @@
       "source_file": "src-tauri/src/huggingface.rs",
       "source_location": "L128",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_huggingface",
-      "target": "src_huggingface_rawhfmodel",
-      "confidence_score": 1.0
+      "target": "src_huggingface_rawhfmodel"
     },
     {
       "relation": "contains",
@@ -41554,9 +41564,9 @@
       "source_file": "src-tauri/src/huggingface.rs",
       "source_location": "L190",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_huggingface",
-      "target": "src_huggingface_rawtreeentry",
-      "confidence_score": 1.0
+      "target": "src_huggingface_rawtreeentry"
     },
     {
       "relation": "contains",
@@ -41564,9 +41574,9 @@
       "source_file": "src-tauri/src/huggingface.rs",
       "source_location": "L61",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_huggingface",
-      "target": "src_huggingface_resolve_url",
-      "confidence_score": 1.0
+      "target": "src_huggingface_resolve_url"
     },
     {
       "relation": "contains",
@@ -41574,9 +41584,9 @@
       "source_file": "src-tauri/src/huggingface.rs",
       "source_location": "L303",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_huggingface",
-      "target": "src_huggingface_resolve_url_matches_hub_format",
-      "confidence_score": 1.0
+      "target": "src_huggingface_resolve_url_matches_hub_format"
     },
     {
       "relation": "contains",
@@ -41584,9 +41594,9 @@
       "source_file": "src-tauri/src/huggingface.rs",
       "source_location": "L144",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_huggingface",
-      "target": "src_huggingface_search_gguf_models",
-      "confidence_score": 1.0
+      "target": "src_huggingface_search_gguf_models"
     },
     {
       "relation": "contains",
@@ -41594,9 +41604,9 @@
       "source_file": "src-tauri/src/huggingface.rs",
       "source_location": "L110",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_huggingface",
-      "target": "src_huggingface_tags_indicate_vision",
-      "confidence_score": 1.0
+      "target": "src_huggingface_tags_indicate_vision"
     },
     {
       "relation": "contains",
@@ -41604,9 +41614,9 @@
       "source_file": "src-tauri/src/huggingface.rs",
       "source_location": "L311",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_huggingface",
-      "target": "src_huggingface_vision_detection_reads_tags_and_pipeline",
-      "confidence_score": 1.0
+      "target": "src_huggingface_vision_detection_reads_tags_and_pipeline"
     },
     {
       "relation": "references",
@@ -41615,9 +41625,9 @@
       "source_location": "L27",
       "weight": 1.0,
       "context": "field",
+      "confidence_score": 1.0,
       "source": "src_huggingface_hfmodelsummary",
-      "target": "src_tauri_src_huggingface_rs_string",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_huggingface_rs_string"
     },
     {
       "relation": "references",
@@ -41626,9 +41636,9 @@
       "source_location": "L144",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "src_huggingface_search_gguf_models",
-      "target": "src_huggingface_hfmodelsummary",
-      "confidence_score": 1.0
+      "target": "src_huggingface_hfmodelsummary"
     },
     {
       "relation": "references",
@@ -41637,9 +41647,9 @@
       "source_location": "L72",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "src_huggingface_extract_quant",
-      "target": "src_tauri_src_huggingface_rs_string",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_huggingface_rs_string"
     },
     {
       "relation": "references",
@@ -41648,9 +41658,9 @@
       "source_location": "L45",
       "weight": 1.0,
       "context": "field",
+      "confidence_score": 1.0,
       "source": "src_huggingface_hfgguffile",
-      "target": "src_tauri_src_huggingface_rs_string",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_huggingface_rs_string"
     },
     {
       "relation": "references",
@@ -41659,9 +41669,9 @@
       "source_location": "L52",
       "weight": 1.0,
       "context": "field",
+      "confidence_score": 1.0,
       "source": "src_huggingface_hfrepofiles",
-      "target": "src_tauri_src_huggingface_rs_string",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_huggingface_rs_string"
     },
     {
       "relation": "references",
@@ -41670,9 +41680,9 @@
       "source_location": "L201",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "src_huggingface_list_repo_gguf_files",
-      "target": "src_tauri_src_huggingface_rs_string",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_huggingface_rs_string"
     },
     {
       "relation": "references",
@@ -41681,9 +41691,9 @@
       "source_location": "L137",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "src_huggingface_rawhfmodel",
-      "target": "src_tauri_src_huggingface_rs_string",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_huggingface_rs_string"
     },
     {
       "relation": "references",
@@ -41692,9 +41702,9 @@
       "source_location": "L193",
       "weight": 1.0,
       "context": "field",
+      "confidence_score": 1.0,
       "source": "src_huggingface_rawtreeentry",
-      "target": "src_tauri_src_huggingface_rs_string",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_huggingface_rs_string"
     },
     {
       "relation": "references",
@@ -41703,9 +41713,9 @@
       "source_location": "L61",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "src_huggingface_resolve_url",
-      "target": "src_tauri_src_huggingface_rs_string",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_huggingface_rs_string"
     },
     {
       "relation": "references",
@@ -41714,9 +41724,9 @@
       "source_location": "L144",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "src_huggingface_search_gguf_models",
-      "target": "src_tauri_src_huggingface_rs_string",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_huggingface_rs_string"
     },
     {
       "relation": "references",
@@ -41725,9 +41735,9 @@
       "source_location": "L110",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "src_huggingface_tags_indicate_vision",
-      "target": "src_tauri_src_huggingface_rs_string",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_huggingface_rs_string"
     },
     {
       "relation": "references",
@@ -41736,9 +41746,9 @@
       "source_location": "L56",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "src_huggingface_hfrepofiles",
-      "target": "src_huggingface_hfgguffile",
-      "confidence_score": 1.0
+      "target": "src_huggingface_hfgguffile"
     },
     {
       "relation": "references",
@@ -41747,9 +41757,9 @@
       "source_location": "L56",
       "weight": 1.0,
       "context": "field",
+      "confidence_score": 1.0,
       "source": "src_huggingface_hfrepofiles",
-      "target": "src_tauri_src_huggingface_rs_vec",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_huggingface_rs_vec"
     },
     {
       "relation": "references",
@@ -41758,9 +41768,9 @@
       "source_location": "L201",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "src_huggingface_list_repo_gguf_files",
-      "target": "src_huggingface_hfrepofiles",
-      "confidence_score": 1.0
+      "target": "src_huggingface_hfrepofiles"
     },
     {
       "relation": "references",
@@ -41769,9 +41779,9 @@
       "source_location": "L135",
       "weight": 1.0,
       "context": "field",
+      "confidence_score": 1.0,
       "source": "src_huggingface_rawhfmodel",
-      "target": "src_tauri_src_huggingface_rs_vec",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_huggingface_rs_vec"
     },
     {
       "relation": "references",
@@ -41780,9 +41790,9 @@
       "source_location": "L144",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "src_huggingface_search_gguf_models",
-      "target": "src_tauri_src_huggingface_rs_vec",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_huggingface_rs_vec"
     },
     {
       "relation": "calls",
@@ -41791,9 +41801,9 @@
       "source_file": "src-tauri/src/huggingface.rs",
       "source_location": "L246",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_huggingface_list_repo_gguf_files",
-      "target": "src_huggingface_extract_quant",
-      "confidence_score": 1.0
+      "target": "src_huggingface_extract_quant"
     },
     {
       "relation": "calls",
@@ -41802,9 +41812,9 @@
       "source_file": "src-tauri/src/huggingface.rs",
       "source_location": "L181",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_huggingface_search_gguf_models",
-      "target": "src_huggingface_tags_indicate_vision",
-      "confidence_score": 1.0
+      "target": "src_huggingface_tags_indicate_vision"
     },
     {
       "relation": "references",
@@ -41813,9 +41823,9 @@
       "source_location": "L110",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "src_huggingface_tags_indicate_vision",
-      "target": "src_tauri_src_huggingface_rs_option",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_huggingface_rs_option"
     },
     {
       "relation": "references",
@@ -41824,9 +41834,9 @@
       "source_location": "L137",
       "weight": 1.0,
       "context": "field",
+      "confidence_score": 1.0,
       "source": "src_huggingface_rawhfmodel",
-      "target": "src_tauri_src_huggingface_rs_option",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_huggingface_rs_option"
     },
     {
       "relation": "references",
@@ -41835,9 +41845,9 @@
       "source_location": "L144",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "src_huggingface_search_gguf_models",
-      "target": "src_tauri_src_huggingface_rs_result",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_huggingface_rs_result"
     },
     {
       "relation": "references",
@@ -41846,9 +41856,9 @@
       "source_location": "L201",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "src_huggingface_list_repo_gguf_files",
-      "target": "src_tauri_src_huggingface_rs_result",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_huggingface_rs_result"
     },
     {
       "relation": "contains",
@@ -43211,9 +43221,9 @@
       "source_location": "L106",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "src_llm_client_create_client",
-      "target": "src_tauri_src_llm_client_rs_client",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_llm_client_rs_client"
     },
     {
       "relation": "calls",
@@ -45835,9 +45845,9 @@
       "source_file": "src-tauri/src/managers/local_llm.rs",
       "source_location": "L793",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "managers_local_llm",
-      "target": "managers_local_llm_llmactivityguard",
-      "confidence_score": 1.0
+      "target": "managers_local_llm_llmactivityguard"
     },
     {
       "relation": "contains",
@@ -46162,9 +46172,9 @@
       "source_location": "L86",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "managers_local_llm_localllmmanager",
-      "target": "atomicusize",
-      "confidence_score": 1.0
+      "target": "atomicusize"
     },
     {
       "relation": "method",
@@ -46172,9 +46182,9 @@
       "source_file": "src-tauri/src/managers/local_llm.rs",
       "source_location": "L725",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "managers_local_llm_localllmmanager",
-      "target": "managers_local_llm_localllmmanager_begin_request",
-      "confidence_score": 1.0
+      "target": "managers_local_llm_localllmmanager_begin_request"
     },
     {
       "relation": "method",
@@ -46332,9 +46342,9 @@
       "source_file": "src-tauri/src/managers/local_llm.rs",
       "source_location": "L752",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "managers_local_llm_localllmmanager",
-      "target": "managers_local_llm_localllmmanager_idle_check_and_maybe_stop",
-      "confidence_score": 1.0
+      "target": "managers_local_llm_localllmmanager_idle_check_and_maybe_stop"
     },
     {
       "relation": "method",
@@ -46362,9 +46372,9 @@
       "source_file": "src-tauri/src/managers/local_llm.rs",
       "source_location": "L707",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "managers_local_llm_localllmmanager",
-      "target": "managers_local_llm_localllmmanager_now_ms",
-      "confidence_score": 1.0
+      "target": "managers_local_llm_localllmmanager_now_ms"
     },
     {
       "relation": "method",
@@ -46402,9 +46412,9 @@
       "source_file": "src-tauri/src/managers/local_llm.rs",
       "source_location": "L738",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "managers_local_llm_localllmmanager",
-      "target": "managers_local_llm_localllmmanager_spawn_idle_watcher",
-      "confidence_score": 1.0
+      "target": "managers_local_llm_localllmmanager_spawn_idle_watcher"
     },
     {
       "relation": "method",
@@ -46442,9 +46452,9 @@
       "source_file": "src-tauri/src/managers/local_llm.rs",
       "source_location": "L717",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "managers_local_llm_localllmmanager",
-      "target": "managers_local_llm_localllmmanager_touch_activity",
-      "confidence_score": 1.0
+      "target": "managers_local_llm_localllmmanager_touch_activity"
     },
     {
       "relation": "method",
@@ -46485,9 +46495,9 @@
       "source_location": "L83",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "managers_local_llm_localllmmanager",
-      "target": "src_tauri_src_managers_local_llm_rs_atomicu64",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_managers_local_llm_rs_atomicu64"
     },
     {
       "relation": "implements",
@@ -46616,9 +46626,9 @@
       "source_location": "L795",
       "weight": 1.0,
       "context": "field",
+      "confidence_score": 1.0,
       "source": "managers_local_llm_llmactivityguard",
-      "target": "src_tauri_src_managers_local_llm_rs_arc",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_managers_local_llm_rs_arc"
     },
     {
       "relation": "references",
@@ -46627,9 +46637,9 @@
       "source_location": "L738",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "managers_local_llm_localllmmanager_spawn_idle_watcher",
-      "target": "src_tauri_src_managers_local_llm_rs_arc",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_managers_local_llm_rs_arc"
     },
     {
       "relation": "references",
@@ -46638,9 +46648,9 @@
       "source_location": "L795",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "managers_local_llm_llmactivityguard",
-      "target": "src_tauri_src_managers_local_llm_rs_atomicu64",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_managers_local_llm_rs_atomicu64"
     },
     {
       "relation": "references",
@@ -46649,9 +46659,9 @@
       "source_location": "L794",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "managers_local_llm_llmactivityguard",
-      "target": "atomicusize",
-      "confidence_score": 1.0
+      "target": "atomicusize"
     },
     {
       "relation": "calls",
@@ -46682,9 +46692,9 @@
       "source_file": "src-tauri/src/managers/local_llm.rs",
       "source_location": "L105",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "managers_local_llm_localllmmanager_new",
-      "target": "managers_local_llm_localllmmanager_now_ms",
-      "confidence_score": 1.0
+      "target": "managers_local_llm_localllmmanager_now_ms"
     },
     {
       "relation": "references",
@@ -46825,9 +46835,9 @@
       "source_location": "L738",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "managers_local_llm_localllmmanager_spawn_idle_watcher",
-      "target": "src_tauri_src_managers_local_llm_rs_self",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_managers_local_llm_rs_self"
     },
     {
       "relation": "calls",
@@ -47111,9 +47121,9 @@
       "source_file": "src-tauri/src/managers/local_llm.rs",
       "source_location": "L402",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "managers_local_llm_localllmmanager_ensure_running",
-      "target": "managers_local_llm_localllmmanager_touch_activity",
-      "confidence_score": 1.0
+      "target": "managers_local_llm_localllmmanager_touch_activity"
     },
     {
       "relation": "calls",
@@ -47177,9 +47187,9 @@
       "source_file": "src-tauri/src/managers/local_llm.rs",
       "source_location": "L784",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "managers_local_llm_localllmmanager_idle_check_and_maybe_stop",
-      "target": "managers_local_llm_localllmmanager_stop",
-      "confidence_score": 1.0
+      "target": "managers_local_llm_localllmmanager_stop"
     },
     {
       "relation": "calls",
@@ -47199,9 +47209,9 @@
       "source_file": "src-tauri/src/managers/local_llm.rs",
       "source_location": "L785",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "managers_local_llm_localllmmanager_idle_check_and_maybe_stop",
-      "target": "managers_local_llm_localllmmanager_emit_status",
-      "confidence_score": 1.0
+      "target": "managers_local_llm_localllmmanager_emit_status"
     },
     {
       "relation": "calls",
@@ -47210,9 +47220,9 @@
       "source_file": "src-tauri/src/managers/local_llm.rs",
       "source_location": "L802",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "managers_local_llm_llmactivityguard_drop",
-      "target": "managers_local_llm_localllmmanager_now_ms",
-      "confidence_score": 1.0
+      "target": "managers_local_llm_localllmmanager_now_ms"
     },
     {
       "relation": "calls",
@@ -47221,9 +47231,9 @@
       "source_file": "src-tauri/src/managers/local_llm.rs",
       "source_location": "L777",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "managers_local_llm_localllmmanager_idle_check_and_maybe_stop",
-      "target": "managers_local_llm_localllmmanager_now_ms",
-      "confidence_score": 1.0
+      "target": "managers_local_llm_localllmmanager_now_ms"
     },
     {
       "relation": "calls",
@@ -47232,9 +47242,9 @@
       "source_file": "src-tauri/src/managers/local_llm.rs",
       "source_location": "L718",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "managers_local_llm_localllmmanager_touch_activity",
-      "target": "managers_local_llm_localllmmanager_now_ms",
-      "confidence_score": 1.0
+      "target": "managers_local_llm_localllmmanager_now_ms"
     },
     {
       "relation": "calls",
@@ -47243,9 +47253,9 @@
       "source_file": "src-tauri/src/managers/local_llm.rs",
       "source_location": "L727",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "managers_local_llm_localllmmanager_begin_request",
-      "target": "managers_local_llm_localllmmanager_touch_activity",
-      "confidence_score": 1.0
+      "target": "managers_local_llm_localllmmanager_touch_activity"
     },
     {
       "relation": "calls",
@@ -47254,9 +47264,9 @@
       "source_file": "src-tauri/src/managers/local_llm.rs",
       "source_location": "L761",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "managers_local_llm_localllmmanager_idle_check_and_maybe_stop",
-      "target": "managers_local_llm_localllmmanager_touch_activity",
-      "confidence_score": 1.0
+      "target": "managers_local_llm_localllmmanager_touch_activity"
     },
     {
       "relation": "references",
@@ -47265,9 +47275,9 @@
       "source_location": "L725",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "managers_local_llm_localllmmanager_begin_request",
-      "target": "llmactivityguard",
-      "confidence_score": 1.0
+      "target": "llmactivityguard"
     },
     {
       "relation": "calls",
@@ -47276,9 +47286,9 @@
       "source_file": "src-tauri/src/managers/local_llm.rs",
       "source_location": "L743",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "managers_local_llm_localllmmanager_spawn_idle_watcher",
-      "target": "managers_local_llm_localllmmanager_idle_check_and_maybe_stop",
-      "confidence_score": 1.0
+      "target": "managers_local_llm_localllmmanager_idle_check_and_maybe_stop"
     },
     {
       "relation": "method",
@@ -47286,9 +47296,9 @@
       "source_file": "src-tauri/src/managers/local_llm.rs",
       "source_location": "L799",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "managers_local_llm_llmactivityguard",
-      "target": "managers_local_llm_llmactivityguard_drop",
-      "confidence_score": 1.0
+      "target": "managers_local_llm_llmactivityguard_drop"
     },
     {
       "relation": "implements",
@@ -47296,9 +47306,9 @@
       "source_file": "src-tauri/src/managers/local_llm.rs",
       "source_location": "L798",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "managers_local_llm_llmactivityguard",
-      "target": "src_tauri_src_managers_local_llm_rs_drop",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_managers_local_llm_rs_drop"
     },
     {
       "relation": "contains",
@@ -47306,9 +47316,9 @@
       "source_file": "src-tauri/src/managers/model.rs",
       "source_location": "L100",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "managers_model",
-      "target": "managers_model_custommodelrecord",
-      "confidence_score": 1.0
+      "target": "managers_model_custommodelrecord"
     },
     {
       "relation": "contains",
@@ -47555,9 +47565,9 @@
       "source_file": "src-tauri/src/managers/model.rs",
       "source_location": "L1411",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "managers_model_modelmanager_resolve_mmproj",
-      "target": "managers_model_mmproj_for",
-      "confidence_score": 1.0
+      "target": "managers_model_mmproj_for"
     },
     {
       "relation": "references",
@@ -47566,9 +47576,9 @@
       "source_location": "L111",
       "weight": 1.0,
       "context": "field",
+      "confidence_score": 1.0,
       "source": "managers_model_custommodelrecord",
-      "target": "src_tauri_src_managers_model_rs_option",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_managers_model_rs_option"
     },
     {
       "relation": "references",
@@ -47588,9 +47598,9 @@
       "source_location": "L1341",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "managers_model_modelmanager_add_custom_llm_model",
-      "target": "src_tauri_src_managers_model_rs_option",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_managers_model_rs_option"
     },
     {
       "relation": "references",
@@ -47610,9 +47620,9 @@
       "source_location": "L1410",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "managers_model_modelmanager_resolve_mmproj",
-      "target": "src_tauri_src_managers_model_rs_option",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_managers_model_rs_option"
     },
     {
       "relation": "references",
@@ -47676,9 +47686,9 @@
       "source_location": "L1341",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "managers_model_modelmanager_add_custom_llm_model",
-      "target": "managers_model_modelinfo",
-      "confidence_score": 1.0
+      "target": "managers_model_modelinfo"
     },
     {
       "relation": "references",
@@ -47720,9 +47730,9 @@
       "source_location": "L1256",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "managers_model_modelmanager_load_custom_llm_models",
-      "target": "managers_model_modelinfo",
-      "confidence_score": 1.0
+      "target": "managers_model_modelinfo"
     },
     {
       "relation": "references",
@@ -47731,9 +47741,9 @@
       "source_location": "L1227",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "managers_model_modelmanager_record_to_model_info",
-      "target": "managers_model_modelinfo",
-      "confidence_score": 1.0
+      "target": "managers_model_modelinfo"
     },
     {
       "relation": "references",
@@ -47742,9 +47752,9 @@
       "source_location": "L111",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "managers_model_custommodelrecord",
-      "target": "src_tauri_src_managers_model_rs_string",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_managers_model_rs_string"
     },
     {
       "relation": "references",
@@ -47786,9 +47796,9 @@
       "source_location": "L1341",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "managers_model_modelmanager_add_custom_llm_model",
-      "target": "src_tauri_src_managers_model_rs_string",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_managers_model_rs_string"
     },
     {
       "relation": "references",
@@ -47808,9 +47818,9 @@
       "source_location": "L1216",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "managers_model_modelmanager_custom_description",
-      "target": "src_tauri_src_managers_model_rs_string",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_managers_model_rs_string"
     },
     {
       "relation": "references",
@@ -47819,9 +47829,9 @@
       "source_location": "L1202",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "managers_model_modelmanager_default_llm_languages",
-      "target": "src_tauri_src_managers_model_rs_string",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_managers_model_rs_string"
     },
     {
       "relation": "references",
@@ -47841,9 +47851,9 @@
       "source_location": "L1320",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "managers_model_modelmanager_generate_custom_name",
-      "target": "src_tauri_src_managers_model_rs_string",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_managers_model_rs_string"
     },
     {
       "relation": "references",
@@ -47852,9 +47862,9 @@
       "source_location": "L1256",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "managers_model_modelmanager_load_custom_llm_models",
-      "target": "src_tauri_src_managers_model_rs_string",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_managers_model_rs_string"
     },
     {
       "relation": "references",
@@ -47863,9 +47873,9 @@
       "source_location": "L1410",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "managers_model_modelmanager_resolve_mmproj",
-      "target": "src_tauri_src_managers_model_rs_string",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_managers_model_rs_string"
     },
     {
       "relation": "references",
@@ -47874,9 +47884,9 @@
       "source_location": "L1303",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "managers_model_modelmanager_slugify",
-      "target": "src_tauri_src_managers_model_rs_string",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_managers_model_rs_string"
     },
     {
       "relation": "references",
@@ -47885,9 +47895,9 @@
       "source_location": "L1202",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "managers_model_modelmanager_default_llm_languages",
-      "target": "src_tauri_src_managers_model_rs_vec",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_managers_model_rs_vec"
     },
     {
       "relation": "references",
@@ -47907,9 +47917,9 @@
       "source_location": "L158",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "managers_model_modelmanager",
-      "target": "managers_model_custommodelrecord",
-      "confidence_score": 1.0
+      "target": "managers_model_custommodelrecord"
     },
     {
       "relation": "references",
@@ -47918,9 +47928,9 @@
       "source_location": "L1256",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "managers_model_modelmanager_load_custom_llm_models",
-      "target": "managers_model_custommodelrecord",
-      "confidence_score": 1.0
+      "target": "managers_model_custommodelrecord"
     },
     {
       "relation": "references",
@@ -47929,9 +47939,9 @@
       "source_location": "L1227",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "managers_model_modelmanager_record_to_model_info",
-      "target": "managers_model_custommodelrecord",
-      "confidence_score": 1.0
+      "target": "managers_model_custommodelrecord"
     },
     {
       "relation": "references",
@@ -48017,9 +48027,9 @@
       "source_location": "L1256",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "managers_model_modelmanager_load_custom_llm_models",
-      "target": "src_tauri_src_managers_model_rs_hashmap",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_managers_model_rs_hashmap"
     },
     {
       "relation": "references",
@@ -48103,9 +48113,9 @@
       "source_file": "src-tauri/src/managers/model.rs",
       "source_location": "L1971",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "managers_model_modelmanager_delete_model",
-      "target": "managers_model_downloadcleanup_a_drop",
-      "confidence_score": 1.0
+      "target": "managers_model_downloadcleanup_a_drop"
     },
     {
       "relation": "calls",
@@ -48146,9 +48156,9 @@
       "source_file": "src-tauri/src/managers/model.rs",
       "source_location": "L1341",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "managers_model_modelmanager",
-      "target": "managers_model_modelmanager_add_custom_llm_model",
-      "confidence_score": 1.0
+      "target": "managers_model_modelmanager_add_custom_llm_model"
     },
     {
       "relation": "method",
@@ -48186,9 +48196,9 @@
       "source_file": "src-tauri/src/managers/model.rs",
       "source_location": "L1216",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "managers_model_modelmanager",
-      "target": "managers_model_modelmanager_custom_description",
-      "confidence_score": 1.0
+      "target": "managers_model_modelmanager_custom_description"
     },
     {
       "relation": "method",
@@ -48196,9 +48206,9 @@
       "source_file": "src-tauri/src/managers/model.rs",
       "source_location": "L1194",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "managers_model_modelmanager",
-      "target": "managers_model_modelmanager_custom_models_path",
-      "confidence_score": 1.0
+      "target": "managers_model_modelmanager_custom_models_path"
     },
     {
       "relation": "method",
@@ -48206,9 +48216,9 @@
       "source_file": "src-tauri/src/managers/model.rs",
       "source_location": "L1202",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "managers_model_modelmanager",
-      "target": "managers_model_modelmanager_default_llm_languages",
-      "confidence_score": 1.0
+      "target": "managers_model_modelmanager_default_llm_languages"
     },
     {
       "relation": "method",
@@ -48256,9 +48266,9 @@
       "source_file": "src-tauri/src/managers/model.rs",
       "source_location": "L1320",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "managers_model_modelmanager",
-      "target": "managers_model_modelmanager_generate_custom_name",
-      "confidence_score": 1.0
+      "target": "managers_model_modelmanager_generate_custom_name"
     },
     {
       "relation": "method",
@@ -48296,9 +48306,9 @@
       "source_file": "src-tauri/src/managers/model.rs",
       "source_location": "L1256",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "managers_model_modelmanager",
-      "target": "managers_model_modelmanager_load_custom_llm_models",
-      "confidence_score": 1.0
+      "target": "managers_model_modelmanager_load_custom_llm_models"
     },
     {
       "relation": "method",
@@ -48336,9 +48346,9 @@
       "source_file": "src-tauri/src/managers/model.rs",
       "source_location": "L1227",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "managers_model_modelmanager",
-      "target": "managers_model_modelmanager_record_to_model_info",
-      "confidence_score": 1.0
+      "target": "managers_model_modelmanager_record_to_model_info"
     },
     {
       "relation": "method",
@@ -48346,9 +48356,9 @@
       "source_file": "src-tauri/src/managers/model.rs",
       "source_location": "L1410",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "managers_model_modelmanager",
-      "target": "managers_model_modelmanager_resolve_mmproj",
-      "confidence_score": 1.0
+      "target": "managers_model_modelmanager_resolve_mmproj"
     },
     {
       "relation": "method",
@@ -48356,9 +48366,9 @@
       "source_file": "src-tauri/src/managers/model.rs",
       "source_location": "L1291",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "managers_model_modelmanager",
-      "target": "managers_model_modelmanager_save_custom_models",
-      "confidence_score": 1.0
+      "target": "managers_model_modelmanager_save_custom_models"
     },
     {
       "relation": "method",
@@ -48366,9 +48376,9 @@
       "source_file": "src-tauri/src/managers/model.rs",
       "source_location": "L1303",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "managers_model_modelmanager",
-      "target": "managers_model_modelmanager_slugify",
-      "confidence_score": 1.0
+      "target": "managers_model_modelmanager_slugify"
     },
     {
       "relation": "method",
@@ -48430,9 +48440,9 @@
       "source_location": "L1194",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "managers_model_modelmanager_custom_models_path",
-      "target": "src_tauri_src_managers_model_rs_pathbuf",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_managers_model_rs_pathbuf"
     },
     {
       "relation": "references",
@@ -48518,9 +48528,9 @@
       "source_file": "src-tauri/src/managers/model.rs",
       "source_location": "L1262",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "managers_model_modelmanager_load_custom_llm_models",
-      "target": "managers_model_modelmanager_new",
-      "confidence_score": 1.0
+      "target": "managers_model_modelmanager_new"
     },
     {
       "relation": "calls",
@@ -48639,9 +48649,9 @@
       "source_location": "L1341",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "managers_model_modelmanager_add_custom_llm_model",
-      "target": "src_tauri_src_managers_model_rs_result",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_managers_model_rs_result"
     },
     {
       "relation": "references",
@@ -48738,9 +48748,9 @@
       "source_location": "L1256",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "managers_model_modelmanager_load_custom_llm_models",
-      "target": "src_tauri_src_managers_model_rs_result",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_managers_model_rs_result"
     },
     {
       "relation": "references",
@@ -48771,9 +48781,9 @@
       "source_location": "L1291",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "managers_model_modelmanager_save_custom_models",
-      "target": "src_tauri_src_managers_model_rs_result",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_managers_model_rs_result"
     },
     {
       "relation": "references",
@@ -48925,9 +48935,9 @@
       "source_location": "L1194",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "managers_model_modelmanager_custom_models_path",
-      "target": "src_tauri_src_managers_model_rs_path",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_managers_model_rs_path"
     },
     {
       "relation": "references",
@@ -48947,9 +48957,9 @@
       "source_location": "L1256",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "managers_model_modelmanager_load_custom_llm_models",
-      "target": "src_tauri_src_managers_model_rs_path",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_managers_model_rs_path"
     },
     {
       "relation": "references",
@@ -48969,9 +48979,9 @@
       "source_file": "src-tauri/src/managers/model.rs",
       "source_location": "L1260",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "managers_model_modelmanager_load_custom_llm_models",
-      "target": "managers_model_modelmanager_custom_models_path",
-      "confidence_score": 1.0
+      "target": "managers_model_modelmanager_custom_models_path"
     },
     {
       "relation": "calls",
@@ -48980,9 +48990,9 @@
       "source_file": "src-tauri/src/managers/model.rs",
       "source_location": "L1296",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "managers_model_modelmanager_save_custom_models",
-      "target": "managers_model_modelmanager_custom_models_path",
-      "confidence_score": 1.0
+      "target": "managers_model_modelmanager_custom_models_path"
     },
     {
       "relation": "calls",
@@ -48991,9 +49001,9 @@
       "source_file": "src-tauri/src/managers/model.rs",
       "source_location": "L1247",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "managers_model_modelmanager_record_to_model_info",
-      "target": "managers_model_modelmanager_default_llm_languages",
-      "confidence_score": 1.0
+      "target": "managers_model_modelmanager_default_llm_languages"
     },
     {
       "relation": "calls",
@@ -49002,9 +49012,9 @@
       "source_file": "src-tauri/src/managers/model.rs",
       "source_location": "L1382",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "managers_model_modelmanager_add_custom_llm_model",
-      "target": "managers_model_modelmanager_custom_description",
-      "confidence_score": 1.0
+      "target": "managers_model_modelmanager_custom_description"
     },
     {
       "relation": "calls",
@@ -49013,9 +49023,9 @@
       "source_file": "src-tauri/src/managers/model.rs",
       "source_location": "L1233",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "managers_model_modelmanager_record_to_model_info",
-      "target": "managers_model_modelmanager_custom_description",
-      "confidence_score": 1.0
+      "target": "managers_model_modelmanager_custom_description"
     },
     {
       "relation": "calls",
@@ -49024,9 +49034,9 @@
       "source_file": "src-tauri/src/managers/model.rs",
       "source_location": "L1392",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "managers_model_modelmanager_add_custom_llm_model",
-      "target": "managers_model_modelmanager_record_to_model_info",
-      "confidence_score": 1.0
+      "target": "managers_model_modelmanager_record_to_model_info"
     },
     {
       "relation": "calls",
@@ -49035,9 +49045,9 @@
       "source_file": "src-tauri/src/managers/model.rs",
       "source_location": "L1283",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "managers_model_modelmanager_load_custom_llm_models",
-      "target": "managers_model_modelmanager_record_to_model_info",
-      "confidence_score": 1.0
+      "target": "managers_model_modelmanager_record_to_model_info"
     },
     {
       "relation": "calls",
@@ -49046,9 +49056,9 @@
       "source_file": "src-tauri/src/managers/model.rs",
       "source_location": "L1402",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "managers_model_modelmanager_add_custom_llm_model",
-      "target": "managers_model_modelmanager_save_custom_models",
-      "confidence_score": 1.0
+      "target": "managers_model_modelmanager_save_custom_models"
     },
     {
       "relation": "calls",
@@ -49057,9 +49067,9 @@
       "source_file": "src-tauri/src/managers/model.rs",
       "source_location": "L1980",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "managers_model_modelmanager_delete_model",
-      "target": "managers_model_modelmanager_save_custom_models",
-      "confidence_score": 1.0
+      "target": "managers_model_modelmanager_save_custom_models"
     },
     {
       "relation": "calls",
@@ -49068,9 +49078,9 @@
       "source_file": "src-tauri/src/managers/model.rs",
       "source_location": "L1381",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "managers_model_modelmanager_add_custom_llm_model",
-      "target": "managers_model_modelmanager_generate_custom_name",
-      "confidence_score": 1.0
+      "target": "managers_model_modelmanager_generate_custom_name"
     },
     {
       "relation": "calls",
@@ -49079,9 +49089,9 @@
       "source_file": "src-tauri/src/managers/model.rs",
       "source_location": "L1949",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "managers_model_modelmanager_delete_model",
-      "target": "managers_model_modelmanager_resolve_mmproj",
-      "confidence_score": 1.0
+      "target": "managers_model_modelmanager_resolve_mmproj"
     },
     {
       "relation": "calls",
@@ -49090,9 +49100,9 @@
       "source_file": "src-tauri/src/managers/model.rs",
       "source_location": "L1562",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "managers_model_modelmanager_download_model",
-      "target": "managers_model_modelmanager_resolve_mmproj",
-      "confidence_score": 1.0
+      "target": "managers_model_modelmanager_resolve_mmproj"
     },
     {
       "relation": "calls",
@@ -51602,9 +51612,9 @@
       "source_file": "src-tauri/src/screenshot.rs",
       "source_location": "L48",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_screenshot",
-      "target": "src_screenshot_captureprofile",
-      "confidence_score": 1.0
+      "target": "src_screenshot_captureprofile"
     },
     {
       "relation": "contains",
@@ -51664,9 +51674,9 @@
       "source_location": "L98",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "src_screenshot_capture_screen_data_url",
-      "target": "src_screenshot_captureprofile",
-      "confidence_score": 1.0
+      "target": "src_screenshot_captureprofile"
     },
     {
       "relation": "method",
@@ -51674,9 +51684,9 @@
       "source_file": "src-tauri/src/screenshot.rs",
       "source_location": "L60",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_screenshot_captureprofile",
-      "target": "src_screenshot_captureprofile_for_base_url",
-      "confidence_score": 1.0
+      "target": "src_screenshot_captureprofile_for_base_url"
     },
     {
       "relation": "references",
@@ -51685,9 +51695,9 @@
       "source_location": "L60",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "src_screenshot_captureprofile_for_base_url",
-      "target": "src_tauri_src_screenshot_rs_self",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_screenshot_rs_self"
     },
     {
       "relation": "calls",
@@ -52091,9 +52101,9 @@
       "source_file": "src-tauri/src/settings.rs",
       "source_location": "L899",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_settings",
-      "target": "src_settings_default_assistant_web_search_max_results",
-      "confidence_score": 1.0
+      "target": "src_settings_default_assistant_web_search_max_results"
     },
     {
       "relation": "contains",
@@ -52101,9 +52111,9 @@
       "source_file": "src-tauri/src/settings.rs",
       "source_location": "L894",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_settings",
-      "target": "src_settings_default_assistant_web_search_provider",
-      "confidence_score": 1.0
+      "target": "src_settings_default_assistant_web_search_provider"
     },
     {
       "relation": "contains",
@@ -52171,9 +52181,9 @@
       "source_file": "src-tauri/src/settings.rs",
       "source_location": "L871",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_settings",
-      "target": "src_settings_default_local_llm_unload_timeout",
-      "confidence_score": 1.0
+      "target": "src_settings_default_local_llm_unload_timeout"
     },
     {
       "relation": "contains",
@@ -52381,9 +52391,9 @@
       "source_file": "src-tauri/src/settings.rs",
       "source_location": "L904",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_settings",
-      "target": "src_settings_default_web_search_api_keys",
-      "confidence_score": 1.0
+      "target": "src_settings_default_web_search_api_keys"
     },
     {
       "relation": "contains",
@@ -53162,9 +53172,9 @@
       "source_location": "L894",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "src_settings_default_assistant_web_search_provider",
-      "target": "src_tauri_src_settings_rs_string",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_settings_rs_string"
     },
     {
       "relation": "references",
@@ -53503,9 +53513,9 @@
       "source_location": "L871",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "src_settings_default_local_llm_unload_timeout",
-      "target": "src_settings_modelunloadtimeout",
-      "confidence_score": 1.0
+      "target": "src_settings_modelunloadtimeout"
     },
     {
       "relation": "implements",
@@ -53963,9 +53973,9 @@
       "source_file": "src-tauri/src/settings.rs",
       "source_location": "L904",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_settings_default_web_search_api_keys",
-      "target": "src_settings_secretmap",
-      "confidence_score": 1.0
+      "target": "src_settings_secretmap"
     },
     {
       "relation": "calls",
@@ -54831,9 +54841,9 @@
       "source_file": "src-tauri/src/settings.rs",
       "source_location": "L1203",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_settings_get_default_settings",
-      "target": "src_settings_default_local_llm_unload_timeout",
-      "confidence_score": 1.0
+      "target": "src_settings_default_local_llm_unload_timeout"
     },
     {
       "relation": "calls",
@@ -54930,9 +54940,9 @@
       "source_file": "src-tauri/src/settings.rs",
       "source_location": "L988",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_settings_ensure_assistant_defaults",
-      "target": "src_settings_default_assistant_web_search_provider",
-      "confidence_score": 1.0
+      "target": "src_settings_default_assistant_web_search_provider"
     },
     {
       "relation": "calls",
@@ -54941,9 +54951,9 @@
       "source_file": "src-tauri/src/settings.rs",
       "source_location": "L1260",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_settings_get_default_settings",
-      "target": "src_settings_default_assistant_web_search_provider",
-      "confidence_score": 1.0
+      "target": "src_settings_default_assistant_web_search_provider"
     },
     {
       "relation": "calls",
@@ -54952,9 +54962,9 @@
       "source_file": "src-tauri/src/settings.rs",
       "source_location": "L994",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_settings_ensure_assistant_defaults",
-      "target": "src_settings_default_assistant_web_search_max_results",
-      "confidence_score": 1.0
+      "target": "src_settings_default_assistant_web_search_max_results"
     },
     {
       "relation": "calls",
@@ -54963,9 +54973,9 @@
       "source_file": "src-tauri/src/settings.rs",
       "source_location": "L1261",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_settings_get_default_settings",
-      "target": "src_settings_default_assistant_web_search_max_results",
-      "confidence_score": 1.0
+      "target": "src_settings_default_assistant_web_search_max_results"
     },
     {
       "relation": "calls",
@@ -54974,9 +54984,9 @@
       "source_file": "src-tauri/src/settings.rs",
       "source_location": "L1262",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_settings_get_default_settings",
-      "target": "src_settings_default_web_search_api_keys",
-      "confidence_score": 1.0
+      "target": "src_settings_default_web_search_api_keys"
     },
     {
       "relation": "calls",
@@ -60656,9 +60666,9 @@
       "source_file": "src-tauri/src/tts.rs",
       "source_location": "L132",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_tts",
-      "target": "src_tts_send_tts_with_retries",
-      "confidence_score": 1.0
+      "target": "src_tts_send_tts_with_retries"
     },
     {
       "relation": "contains",
@@ -60746,9 +60756,9 @@
       "source_file": "src-tauri/src/tts.rs",
       "source_location": "L118",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_tts",
-      "target": "src_tts_tts_client",
-      "confidence_score": 1.0
+      "target": "src_tts_tts_client"
     },
     {
       "relation": "contains",
@@ -60876,9 +60886,9 @@
       "source_location": "L132",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "src_tts_send_tts_with_retries",
-      "target": "src_tauri_src_tts_rs_string",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_tts_rs_string"
     },
     {
       "relation": "references",
@@ -60920,9 +60930,9 @@
       "source_location": "L118",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "src_tts_tts_client",
-      "target": "src_tauri_src_tts_rs_string",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_tts_rs_string"
     },
     {
       "relation": "references",
@@ -61140,9 +61150,9 @@
       "source_file": "src-tauri/src/tts.rs",
       "source_location": "L441",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_tts_fetch_azure_speech",
-      "target": "src_tts_tts_client",
-      "confidence_score": 1.0
+      "target": "src_tts_tts_client"
     },
     {
       "relation": "calls",
@@ -61151,9 +61161,9 @@
       "source_file": "src-tauri/src/tts.rs",
       "source_location": "L246",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_tts_fetch_elevenlabs_speech",
-      "target": "src_tts_tts_client",
-      "confidence_score": 1.0
+      "target": "src_tts_tts_client"
     },
     {
       "relation": "calls",
@@ -61162,9 +61172,9 @@
       "source_file": "src-tauri/src/tts.rs",
       "source_location": "L192",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_tts_fetch_openai_speech",
-      "target": "src_tts_tts_client",
-      "confidence_score": 1.0
+      "target": "src_tts_tts_client"
     },
     {
       "relation": "references",
@@ -61173,9 +61183,9 @@
       "source_location": "L118",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "src_tts_tts_client",
-      "target": "src_tauri_src_tts_rs_client",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_tts_rs_client"
     },
     {
       "relation": "references",
@@ -61184,9 +61194,9 @@
       "source_location": "L118",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "src_tts_tts_client",
-      "target": "src_tauri_src_tts_rs_result",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_tts_rs_result"
     },
     {
       "relation": "references",
@@ -61250,9 +61260,9 @@
       "source_location": "L132",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "src_tts_send_tts_with_retries",
-      "target": "src_tauri_src_tts_rs_result",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_tts_rs_result"
     },
     {
       "relation": "references",
@@ -61272,9 +61282,9 @@
       "source_file": "src-tauri/src/tts.rs",
       "source_location": "L454",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_tts_fetch_azure_speech",
-      "target": "src_tts_send_tts_with_retries",
-      "confidence_score": 1.0
+      "target": "src_tts_send_tts_with_retries"
     },
     {
       "relation": "calls",
@@ -61283,9 +61293,9 @@
       "source_file": "src-tauri/src/tts.rs",
       "source_location": "L262",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_tts_fetch_elevenlabs_speech",
-      "target": "src_tts_send_tts_with_retries",
-      "confidence_score": 1.0
+      "target": "src_tts_send_tts_with_retries"
     },
     {
       "relation": "calls",
@@ -61294,9 +61304,9 @@
       "source_file": "src-tauri/src/tts.rs",
       "source_location": "L211",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_tts_fetch_openai_speech",
-      "target": "src_tts_send_tts_with_retries",
-      "confidence_score": 1.0
+      "target": "src_tts_send_tts_with_retries"
     },
     {
       "relation": "references",
@@ -61305,9 +61315,9 @@
       "source_location": "L132",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "src_tts_send_tts_with_retries",
-      "target": "requestbuilder",
-      "confidence_score": 1.0
+      "target": "requestbuilder"
     },
     {
       "relation": "references",
@@ -61316,9 +61326,9 @@
       "source_location": "L132",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "src_tts_send_tts_with_retries",
-      "target": "response",
-      "confidence_score": 1.0
+      "target": "response"
     },
     {
       "relation": "references",
@@ -61554,9 +61564,9 @@
       "source_location": "L16",
       "weight": 1.0,
       "context": "import",
+      "confidence_score": 1.0,
       "source": "src_web_search",
-      "target": "src_tauri_src_web_search_rs_appsettings",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_web_search_rs_appsettings"
     },
     {
       "relation": "contains",
@@ -61564,9 +61574,9 @@
       "source_file": "src-tauri/src/web_search.rs",
       "source_location": "L590",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_web_search",
-      "target": "src_web_search_clean_html_text",
-      "confidence_score": 1.0
+      "target": "src_web_search_clean_html_text"
     },
     {
       "relation": "contains",
@@ -61574,9 +61584,9 @@
       "source_file": "src-tauri/src/web_search.rs",
       "source_location": "L542",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_web_search",
-      "target": "src_web_search_decode_ddg_url",
-      "confidence_score": 1.0
+      "target": "src_web_search_decode_ddg_url"
     },
     {
       "relation": "contains",
@@ -61584,9 +61594,9 @@
       "source_file": "src-tauri/src/web_search.rs",
       "source_location": "L667",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_web_search",
-      "target": "src_web_search_decode_ddg_url_handles_redirect_and_plain",
-      "confidence_score": 1.0
+      "target": "src_web_search_decode_ddg_url_handles_redirect_and_plain"
     },
     {
       "relation": "contains",
@@ -61594,9 +61604,9 @@
       "source_file": "src-tauri/src/web_search.rs",
       "source_location": "L700",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_web_search",
-      "target": "src_web_search_format_results_are_plain_bullets_without_numbers_or_urls",
-      "confidence_score": 1.0
+      "target": "src_web_search_format_results_are_plain_bullets_without_numbers_or_urls"
     },
     {
       "relation": "contains",
@@ -61604,9 +61614,9 @@
       "source_file": "src-tauri/src/web_search.rs",
       "source_location": "L110",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_web_search",
-      "target": "src_web_search_format_results_for_prompt",
-      "confidence_score": 1.0
+      "target": "src_web_search_format_results_for_prompt"
     },
     {
       "relation": "contains",
@@ -61614,9 +61624,9 @@
       "source_file": "src-tauri/src/web_search.rs",
       "source_location": "L574",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_web_search",
-      "target": "src_web_search_hex_val",
-      "confidence_score": 1.0
+      "target": "src_web_search_hex_val"
     },
     {
       "relation": "contains",
@@ -61624,9 +61634,9 @@
       "source_file": "src-tauri/src/web_search.rs",
       "source_location": "L295",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_web_search",
-      "target": "src_web_search_http_client",
-      "confidence_score": 1.0
+      "target": "src_web_search_http_client"
     },
     {
       "relation": "contains",
@@ -61634,9 +61644,9 @@
       "source_file": "src-tauri/src/web_search.rs",
       "source_location": "L278",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_web_search",
-      "target": "src_web_search_is_simple_math",
-      "confidence_score": 1.0
+      "target": "src_web_search_is_simple_math"
     },
     {
       "relation": "contains",
@@ -61644,9 +61654,9 @@
       "source_file": "src-tauri/src/web_search.rs",
       "source_location": "L490",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_web_search",
-      "target": "src_web_search_parse_duckduckgo_html",
-      "confidence_score": 1.0
+      "target": "src_web_search_parse_duckduckgo_html"
     },
     {
       "relation": "contains",
@@ -61654,9 +61664,9 @@
       "source_file": "src-tauri/src/web_search.rs",
       "source_location": "L680",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_web_search",
-      "target": "src_web_search_parse_duckduckgo_html_extracts_pairs",
-      "confidence_score": 1.0
+      "target": "src_web_search_parse_duckduckgo_html_extracts_pairs"
     },
     {
       "relation": "contains",
@@ -61664,9 +61674,9 @@
       "source_file": "src-tauri/src/web_search.rs",
       "source_location": "L556",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_web_search",
-      "target": "src_web_search_percent_decode",
-      "confidence_score": 1.0
+      "target": "src_web_search_percent_decode"
     },
     {
       "relation": "contains",
@@ -61674,9 +61684,9 @@
       "source_file": "src-tauri/src/web_search.rs",
       "source_location": "L617",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_web_search",
-      "target": "src_web_search_push_result",
-      "confidence_score": 1.0
+      "target": "src_web_search_push_result"
     },
     {
       "relation": "contains",
@@ -61684,9 +61694,9 @@
       "source_file": "src-tauri/src/web_search.rs",
       "source_location": "L64",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_web_search",
-      "target": "src_web_search_search",
-      "confidence_score": 1.0
+      "target": "src_web_search_search"
     },
     {
       "relation": "contains",
@@ -61694,9 +61704,9 @@
       "source_file": "src-tauri/src/web_search.rs",
       "source_location": "L372",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_web_search",
-      "target": "src_web_search_search_brave",
-      "confidence_score": 1.0
+      "target": "src_web_search_search_brave"
     },
     {
       "relation": "contains",
@@ -61704,9 +61714,9 @@
       "source_file": "src-tauri/src/web_search.rs",
       "source_location": "L437",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_web_search",
-      "target": "src_web_search_search_duckduckgo",
-      "confidence_score": 1.0
+      "target": "src_web_search_search_duckduckgo"
     },
     {
       "relation": "contains",
@@ -61714,9 +61724,9 @@
       "source_file": "src-tauri/src/web_search.rs",
       "source_location": "L306",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_web_search",
-      "target": "src_web_search_search_firecrawl",
-      "confidence_score": 1.0
+      "target": "src_web_search_search_firecrawl"
     },
     {
       "relation": "contains",
@@ -61724,9 +61734,9 @@
       "source_file": "src-tauri/src/web_search.rs",
       "source_location": "L44",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_web_search",
-      "target": "src_web_search_searchresult",
-      "confidence_score": 1.0
+      "target": "src_web_search_searchresult"
     },
     {
       "relation": "contains",
@@ -61734,9 +61744,9 @@
       "source_file": "src-tauri/src/web_search.rs",
       "source_location": "L137",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_web_search",
-      "target": "src_web_search_should_search",
-      "confidence_score": 1.0
+      "target": "src_web_search_should_search"
     },
     {
       "relation": "contains",
@@ -61744,9 +61754,9 @@
       "source_file": "src-tauri/src/web_search.rs",
       "source_location": "L636",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_web_search",
-      "target": "src_web_search_should_search_skips_small_talk_and_tasks",
-      "confidence_score": 1.0
+      "target": "src_web_search_should_search_skips_small_talk_and_tasks"
     },
     {
       "relation": "contains",
@@ -61754,9 +61764,9 @@
       "source_file": "src-tauri/src/web_search.rs",
       "source_location": "L658",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_web_search",
-      "target": "src_web_search_should_search_triggers_on_bare_factual_phrases",
-      "confidence_score": 1.0
+      "target": "src_web_search_should_search_triggers_on_bare_factual_phrases"
     },
     {
       "relation": "contains",
@@ -61764,9 +61774,9 @@
       "source_file": "src-tauri/src/web_search.rs",
       "source_location": "L649",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_web_search",
-      "target": "src_web_search_should_search_triggers_on_questions_and_freshness",
-      "confidence_score": 1.0
+      "target": "src_web_search_should_search_triggers_on_questions_and_freshness"
     },
     {
       "relation": "contains",
@@ -61774,9 +61784,9 @@
       "source_file": "src-tauri/src/web_search.rs",
       "source_location": "L607",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_web_search",
-      "target": "src_web_search_truncate_chars",
-      "confidence_score": 1.0
+      "target": "src_web_search_truncate_chars"
     },
     {
       "relation": "references",
@@ -61785,9 +61795,9 @@
       "source_location": "L110",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "src_web_search_format_results_for_prompt",
-      "target": "src_web_search_searchresult",
-      "confidence_score": 1.0
+      "target": "src_web_search_searchresult"
     },
     {
       "relation": "references",
@@ -61796,9 +61806,9 @@
       "source_location": "L490",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "src_web_search_parse_duckduckgo_html",
-      "target": "src_web_search_searchresult",
-      "confidence_score": 1.0
+      "target": "src_web_search_searchresult"
     },
     {
       "relation": "references",
@@ -61807,9 +61817,9 @@
       "source_location": "L617",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "src_web_search_push_result",
-      "target": "src_web_search_searchresult",
-      "confidence_score": 1.0
+      "target": "src_web_search_searchresult"
     },
     {
       "relation": "references",
@@ -61818,9 +61828,9 @@
       "source_location": "L64",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "src_web_search_search",
-      "target": "src_web_search_searchresult",
-      "confidence_score": 1.0
+      "target": "src_web_search_searchresult"
     },
     {
       "relation": "references",
@@ -61829,9 +61839,9 @@
       "source_location": "L372",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "src_web_search_search_brave",
-      "target": "src_web_search_searchresult",
-      "confidence_score": 1.0
+      "target": "src_web_search_searchresult"
     },
     {
       "relation": "references",
@@ -61840,9 +61850,9 @@
       "source_location": "L437",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "src_web_search_search_duckduckgo",
-      "target": "src_web_search_searchresult",
-      "confidence_score": 1.0
+      "target": "src_web_search_searchresult"
     },
     {
       "relation": "references",
@@ -61851,9 +61861,9 @@
       "source_location": "L306",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "src_web_search_search_firecrawl",
-      "target": "src_web_search_searchresult",
-      "confidence_score": 1.0
+      "target": "src_web_search_searchresult"
     },
     {
       "relation": "references",
@@ -61862,9 +61872,9 @@
       "source_location": "L47",
       "weight": 1.0,
       "context": "field",
+      "confidence_score": 1.0,
       "source": "src_web_search_searchresult",
-      "target": "src_tauri_src_web_search_rs_string",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_web_search_rs_string"
     },
     {
       "relation": "references",
@@ -61873,9 +61883,9 @@
       "source_location": "L590",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "src_web_search_clean_html_text",
-      "target": "src_tauri_src_web_search_rs_string",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_web_search_rs_string"
     },
     {
       "relation": "references",
@@ -61884,9 +61894,9 @@
       "source_location": "L542",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "src_web_search_decode_ddg_url",
-      "target": "src_tauri_src_web_search_rs_string",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_web_search_rs_string"
     },
     {
       "relation": "references",
@@ -61895,9 +61905,9 @@
       "source_location": "L110",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "src_web_search_format_results_for_prompt",
-      "target": "src_tauri_src_web_search_rs_string",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_web_search_rs_string"
     },
     {
       "relation": "references",
@@ -61906,9 +61916,9 @@
       "source_location": "L295",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "src_web_search_http_client",
-      "target": "src_tauri_src_web_search_rs_string",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_web_search_rs_string"
     },
     {
       "relation": "references",
@@ -61917,9 +61927,9 @@
       "source_location": "L556",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "src_web_search_percent_decode",
-      "target": "src_tauri_src_web_search_rs_string",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_web_search_rs_string"
     },
     {
       "relation": "references",
@@ -61928,9 +61938,9 @@
       "source_location": "L64",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "src_web_search_search",
-      "target": "src_tauri_src_web_search_rs_string",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_web_search_rs_string"
     },
     {
       "relation": "references",
@@ -61939,9 +61949,9 @@
       "source_location": "L372",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "src_web_search_search_brave",
-      "target": "src_tauri_src_web_search_rs_string",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_web_search_rs_string"
     },
     {
       "relation": "references",
@@ -61950,9 +61960,9 @@
       "source_location": "L437",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "src_web_search_search_duckduckgo",
-      "target": "src_tauri_src_web_search_rs_string",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_web_search_rs_string"
     },
     {
       "relation": "references",
@@ -61961,9 +61971,9 @@
       "source_location": "L306",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "src_web_search_search_firecrawl",
-      "target": "src_tauri_src_web_search_rs_string",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_web_search_rs_string"
     },
     {
       "relation": "references",
@@ -61972,9 +61982,9 @@
       "source_location": "L607",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "src_web_search_truncate_chars",
-      "target": "src_tauri_src_web_search_rs_string",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_web_search_rs_string"
     },
     {
       "relation": "references",
@@ -61983,9 +61993,9 @@
       "source_location": "L64",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "src_web_search_search",
-      "target": "src_tauri_src_web_search_rs_appsettings",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_web_search_rs_appsettings"
     },
     {
       "relation": "references",
@@ -61994,9 +62004,9 @@
       "source_location": "L64",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "src_web_search_search",
-      "target": "src_tauri_src_web_search_rs_result",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_web_search_rs_result"
     },
     {
       "relation": "references",
@@ -62005,9 +62015,9 @@
       "source_location": "L64",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "src_web_search_search",
-      "target": "src_tauri_src_web_search_rs_vec",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_web_search_rs_vec"
     },
     {
       "relation": "calls",
@@ -62016,9 +62026,9 @@
       "source_file": "src-tauri/src/web_search.rs",
       "source_location": "L93",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_web_search_search",
-      "target": "src_web_search_search_brave",
-      "confidence_score": 1.0
+      "target": "src_web_search_search_brave"
     },
     {
       "relation": "calls",
@@ -62027,9 +62037,9 @@
       "source_file": "src-tauri/src/web_search.rs",
       "source_location": "L96",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_web_search_search",
-      "target": "src_web_search_search_duckduckgo",
-      "confidence_score": 1.0
+      "target": "src_web_search_search_duckduckgo"
     },
     {
       "relation": "calls",
@@ -62038,9 +62048,9 @@
       "source_file": "src-tauri/src/web_search.rs",
       "source_location": "L85",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_web_search_search",
-      "target": "src_web_search_search_firecrawl",
-      "confidence_score": 1.0
+      "target": "src_web_search_search_firecrawl"
     },
     {
       "relation": "references",
@@ -62049,9 +62059,9 @@
       "source_location": "L295",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "src_web_search_http_client",
-      "target": "src_tauri_src_web_search_rs_result",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_web_search_rs_result"
     },
     {
       "relation": "references",
@@ -62060,9 +62070,9 @@
       "source_location": "L372",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "src_web_search_search_brave",
-      "target": "src_tauri_src_web_search_rs_result",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_web_search_rs_result"
     },
     {
       "relation": "references",
@@ -62071,9 +62081,9 @@
       "source_location": "L437",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "src_web_search_search_duckduckgo",
-      "target": "src_tauri_src_web_search_rs_result",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_web_search_rs_result"
     },
     {
       "relation": "references",
@@ -62082,9 +62092,9 @@
       "source_location": "L306",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "src_web_search_search_firecrawl",
-      "target": "src_tauri_src_web_search_rs_result",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_web_search_rs_result"
     },
     {
       "relation": "references",
@@ -62093,9 +62103,9 @@
       "source_location": "L490",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "src_web_search_parse_duckduckgo_html",
-      "target": "src_tauri_src_web_search_rs_vec",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_web_search_rs_vec"
     },
     {
       "relation": "references",
@@ -62104,9 +62114,9 @@
       "source_location": "L617",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "src_web_search_push_result",
-      "target": "src_tauri_src_web_search_rs_vec",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_web_search_rs_vec"
     },
     {
       "relation": "references",
@@ -62115,9 +62125,9 @@
       "source_location": "L372",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "src_web_search_search_brave",
-      "target": "src_tauri_src_web_search_rs_vec",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_web_search_rs_vec"
     },
     {
       "relation": "references",
@@ -62126,9 +62136,9 @@
       "source_location": "L437",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "src_web_search_search_duckduckgo",
-      "target": "src_tauri_src_web_search_rs_vec",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_web_search_rs_vec"
     },
     {
       "relation": "references",
@@ -62137,9 +62147,9 @@
       "source_location": "L306",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "src_web_search_search_firecrawl",
-      "target": "src_tauri_src_web_search_rs_vec",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_web_search_rs_vec"
     },
     {
       "relation": "calls",
@@ -62148,9 +62158,9 @@
       "source_file": "src-tauri/src/web_search.rs",
       "source_location": "L713",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_web_search_format_results_are_plain_bullets_without_numbers_or_urls",
-      "target": "src_web_search_format_results_for_prompt",
-      "confidence_score": 1.0
+      "target": "src_web_search_format_results_for_prompt"
     },
     {
       "relation": "calls",
@@ -62159,9 +62169,9 @@
       "source_file": "src-tauri/src/web_search.rs",
       "source_location": "L213",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_web_search_should_search",
-      "target": "src_web_search_is_simple_math",
-      "confidence_score": 1.0
+      "target": "src_web_search_is_simple_math"
     },
     {
       "relation": "references",
@@ -62170,9 +62180,9 @@
       "source_location": "L295",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "src_web_search_http_client",
-      "target": "src_tauri_src_web_search_rs_client",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_web_search_rs_client"
     },
     {
       "relation": "calls",
@@ -62181,9 +62191,9 @@
       "source_file": "src-tauri/src/web_search.rs",
       "source_location": "L384",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_web_search_search_brave",
-      "target": "src_web_search_http_client",
-      "confidence_score": 1.0
+      "target": "src_web_search_http_client"
     },
     {
       "relation": "calls",
@@ -62192,9 +62202,9 @@
       "source_file": "src-tauri/src/web_search.rs",
       "source_location": "L438",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_web_search_search_duckduckgo",
-      "target": "src_web_search_http_client",
-      "confidence_score": 1.0
+      "target": "src_web_search_http_client"
     },
     {
       "relation": "calls",
@@ -62203,9 +62213,9 @@
       "source_file": "src-tauri/src/web_search.rs",
       "source_location": "L318",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_web_search_search_firecrawl",
-      "target": "src_web_search_http_client",
-      "confidence_score": 1.0
+      "target": "src_web_search_http_client"
     },
     {
       "relation": "calls",
@@ -62214,9 +62224,9 @@
       "source_file": "src-tauri/src/web_search.rs",
       "source_location": "L361",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_web_search_search_firecrawl",
-      "target": "src_web_search_push_result",
-      "confidence_score": 1.0
+      "target": "src_web_search_push_result"
     },
     {
       "relation": "calls",
@@ -62225,9 +62235,9 @@
       "source_file": "src-tauri/src/web_search.rs",
       "source_location": "L425",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_web_search_search_brave",
-      "target": "src_web_search_clean_html_text",
-      "confidence_score": 1.0
+      "target": "src_web_search_clean_html_text"
     },
     {
       "relation": "calls",
@@ -62236,9 +62246,9 @@
       "source_file": "src-tauri/src/web_search.rs",
       "source_location": "L426",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_web_search_search_brave",
-      "target": "src_web_search_push_result",
-      "confidence_score": 1.0
+      "target": "src_web_search_push_result"
     },
     {
       "relation": "calls",
@@ -62247,9 +62257,9 @@
       "source_file": "src-tauri/src/web_search.rs",
       "source_location": "L461",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_web_search_search_duckduckgo",
-      "target": "src_web_search_parse_duckduckgo_html",
-      "confidence_score": 1.0
+      "target": "src_web_search_parse_duckduckgo_html"
     },
     {
       "relation": "calls",
@@ -62258,9 +62268,9 @@
       "source_file": "src-tauri/src/web_search.rs",
       "source_location": "L497",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_web_search_parse_duckduckgo_html",
-      "target": "src_web_search_clean_html_text",
-      "confidence_score": 1.0
+      "target": "src_web_search_clean_html_text"
     },
     {
       "relation": "calls",
@@ -62269,9 +62279,9 @@
       "source_file": "src-tauri/src/web_search.rs",
       "source_location": "L498",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_web_search_parse_duckduckgo_html",
-      "target": "src_web_search_decode_ddg_url",
-      "confidence_score": 1.0
+      "target": "src_web_search_decode_ddg_url"
     },
     {
       "relation": "calls",
@@ -62280,9 +62290,9 @@
       "source_file": "src-tauri/src/web_search.rs",
       "source_location": "L531",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_web_search_parse_duckduckgo_html",
-      "target": "src_web_search_push_result",
-      "confidence_score": 1.0
+      "target": "src_web_search_push_result"
     },
     {
       "relation": "calls",
@@ -62291,9 +62301,9 @@
       "source_file": "src-tauri/src/web_search.rs",
       "source_location": "L691",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_web_search_parse_duckduckgo_html_extracts_pairs",
-      "target": "src_web_search_parse_duckduckgo_html",
-      "confidence_score": 1.0
+      "target": "src_web_search_parse_duckduckgo_html"
     },
     {
       "relation": "calls",
@@ -62302,9 +62312,9 @@
       "source_file": "src-tauri/src/web_search.rs",
       "source_location": "L546",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_web_search_decode_ddg_url",
-      "target": "src_web_search_percent_decode",
-      "confidence_score": 1.0
+      "target": "src_web_search_percent_decode"
     },
     {
       "relation": "calls",
@@ -62313,9 +62323,9 @@
       "source_file": "src-tauri/src/web_search.rs",
       "source_location": "L562",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_web_search_percent_decode",
-      "target": "src_web_search_hex_val",
-      "confidence_score": 1.0
+      "target": "src_web_search_hex_val"
     },
     {
       "relation": "references",
@@ -62324,9 +62334,9 @@
       "source_location": "L574",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "src_web_search_hex_val",
-      "target": "src_tauri_src_web_search_rs_option",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_web_search_rs_option"
     },
     {
       "relation": "calls",
@@ -62335,9 +62345,9 @@
       "source_file": "src-tauri/src/web_search.rs",
       "source_location": "L618",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_web_search_push_result",
-      "target": "src_web_search_truncate_chars",
-      "confidence_score": 1.0
+      "target": "src_web_search_truncate_chars"
     },
     {
       "relation": "imports",
@@ -64064,9 +64074,9 @@
       "source_file": "src/components/settings/models/AddCustomModelDialog.tsx",
       "source_location": "L13",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "models_addcustommodeldialog",
-      "target": "src_bindings",
-      "confidence_score": 1.0
+      "target": "src_bindings"
     },
     {
       "relation": "imports_from",
@@ -64454,9 +64464,9 @@
       "source_file": "src/bindings.ts",
       "source_location": "L1431",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_bindings",
-      "target": "src_bindings_hfgguffile",
-      "confidence_score": 1.0
+      "target": "src_bindings_hfgguffile"
     },
     {
       "relation": "contains",
@@ -64464,9 +64474,9 @@
       "source_file": "src/bindings.ts",
       "source_location": "L1447",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_bindings",
-      "target": "src_bindings_hfmodelsummary",
-      "confidence_score": 1.0
+      "target": "src_bindings_hfmodelsummary"
     },
     {
       "relation": "contains",
@@ -64474,9 +64484,9 @@
       "source_file": "src/bindings.ts",
       "source_location": "L1469",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_bindings",
-      "target": "src_bindings_hfrepofiles",
-      "confidence_score": 1.0
+      "target": "src_bindings_hfrepofiles"
     },
     {
       "relation": "contains",
@@ -64684,9 +64694,9 @@
       "source_file": "src/bindings.ts",
       "source_location": "L1526",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_bindings",
-      "target": "src_bindings_searchresult",
-      "confidence_score": 1.0
+      "target": "src_bindings_searchresult"
     },
     {
       "relation": "contains",
@@ -64907,9 +64917,9 @@
       "source_file": "src/components/settings/models/AddCustomModelDialog.tsx",
       "source_location": "L13",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "models_addcustommodeldialog",
-      "target": "src_bindings_commands",
-      "confidence_score": 1.0
+      "target": "src_bindings_commands"
     },
     {
       "relation": "imports",
@@ -65248,9 +65258,9 @@
       "source_file": "src/components/settings/models/AddCustomModelDialog.tsx",
       "source_location": "L13",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "models_addcustommodeldialog",
-      "target": "src_bindings_hfgguffile",
-      "confidence_score": 1.0
+      "target": "src_bindings_hfgguffile"
     },
     {
       "relation": "imports",
@@ -65259,9 +65269,9 @@
       "source_file": "src/components/settings/models/AddCustomModelDialog.tsx",
       "source_location": "L13",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "models_addcustommodeldialog",
-      "target": "src_bindings_hfmodelsummary",
-      "confidence_score": 1.0
+      "target": "src_bindings_hfmodelsummary"
     },
     {
       "relation": "imports",
@@ -65270,9 +65280,9 @@
       "source_file": "src/components/settings/models/AddCustomModelDialog.tsx",
       "source_location": "L13",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "models_addcustommodeldialog",
-      "target": "src_bindings_hfrepofiles",
-      "confidence_score": 1.0
+      "target": "src_bindings_hfrepofiles"
     },
     {
       "relation": "imports",
@@ -73985,9 +73995,9 @@
       "source_file": "src/components/settings/models/AddCustomModelDialog.tsx",
       "source_location": "L38",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "models_addcustommodeldialog",
-      "target": "models_addcustommodeldialog_addcustommodeldialog",
-      "confidence_score": 1.0
+      "target": "models_addcustommodeldialog_addcustommodeldialog"
     },
     {
       "relation": "contains",
@@ -73995,9 +74005,9 @@
       "source_file": "src/components/settings/models/AddCustomModelDialog.tsx",
       "source_location": "L23",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "models_addcustommodeldialog",
-      "target": "models_addcustommodeldialog_addcustommodeldialogprops",
-      "confidence_score": 1.0
+      "target": "models_addcustommodeldialog_addcustommodeldialogprops"
     },
     {
       "relation": "contains",
@@ -74005,9 +74015,9 @@
       "source_file": "src/components/settings/models/AddCustomModelDialog.tsx",
       "source_location": "L35",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "models_addcustommodeldialog",
-      "target": "models_addcustommodeldialog_bytestomb",
-      "confidence_score": 1.0
+      "target": "models_addcustommodeldialog_bytestomb"
     },
     {
       "relation": "contains",
@@ -74015,9 +74025,9 @@
       "source_file": "src/components/settings/models/AddCustomModelDialog.tsx",
       "source_location": "L29",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "models_addcustommodeldialog",
-      "target": "models_addcustommodeldialog_formatcount",
-      "confidence_score": 1.0
+      "target": "models_addcustommodeldialog_formatcount"
     },
     {
       "relation": "imports_from",
@@ -74026,9 +74036,9 @@
       "source_file": "src/components/settings/models/AddCustomModelDialog.tsx",
       "source_location": "L19",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "models_addcustommodeldialog",
-      "target": "stores_modelstore",
-      "confidence_score": 1.0
+      "target": "stores_modelstore"
     },
     {
       "relation": "imports",
@@ -74037,9 +74047,9 @@
       "source_file": "src/components/settings/models/AddCustomModelDialog.tsx",
       "source_location": "L19",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "models_addcustommodeldialog",
-      "target": "stores_modelstore_usemodelstore",
-      "confidence_score": 1.0
+      "target": "stores_modelstore_usemodelstore"
     },
     {
       "relation": "imports_from",
@@ -74048,9 +74058,9 @@
       "source_file": "src/components/settings/models/AddCustomModelDialog.tsx",
       "source_location": "L21",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "models_addcustommodeldialog",
-      "target": "ui_button",
-      "confidence_score": 1.0
+      "target": "ui_button"
     },
     {
       "relation": "imports",
@@ -74059,9 +74069,9 @@
       "source_file": "src/components/settings/models/AddCustomModelDialog.tsx",
       "source_location": "L21",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "models_addcustommodeldialog",
-      "target": "ui_button_button",
-      "confidence_score": 1.0
+      "target": "ui_button_button"
     },
     {
       "relation": "imports_from",
@@ -74070,9 +74080,9 @@
       "source_file": "src/components/settings/models/AddCustomModelDialog.tsx",
       "source_location": "L20",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "models_addcustommodeldialog",
-      "target": "utils_format",
-      "confidence_score": 1.0
+      "target": "utils_format"
     },
     {
       "relation": "imports",
@@ -74081,9 +74091,9 @@
       "source_file": "src/components/settings/models/AddCustomModelDialog.tsx",
       "source_location": "L20",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "models_addcustommodeldialog",
-      "target": "utils_format_formatmodelsize",
-      "confidence_score": 1.0
+      "target": "utils_format_formatmodelsize"
     },
     {
       "relation": "imports_from",
@@ -74092,9 +74102,9 @@
       "source_file": "src/components/settings/models/ModelsSettings.tsx",
       "source_location": "L16",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "models_modelssettings",
-      "target": "models_addcustommodeldialog",
-      "confidence_score": 1.0
+      "target": "models_addcustommodeldialog"
     },
     {
       "relation": "calls",
@@ -74114,9 +74124,9 @@
       "source_file": "src/components/settings/models/ModelsSettings.tsx",
       "source_location": "L16",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "models_modelssettings",
-      "target": "models_addcustommodeldialog_addcustommodeldialog",
-      "confidence_score": 1.0
+      "target": "models_addcustommodeldialog_addcustommodeldialog"
     },
     {
       "relation": "re_exports",
@@ -74232,9 +74242,9 @@
       "source_file": "src/components/settings/models/ModelsSettings.tsx",
       "source_location": "L15",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "models_modelssettings",
-      "target": "ui_button",
-      "confidence_score": 1.0
+      "target": "ui_button"
     },
     {
       "relation": "imports",
@@ -74243,9 +74253,9 @@
       "source_file": "src/components/settings/models/ModelsSettings.tsx",
       "source_location": "L15",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "models_modelssettings",
-      "target": "ui_button_button",
-      "confidence_score": 1.0
+      "target": "ui_button_button"
     },
     {
       "relation": "imports_from",
@@ -78547,6 +78557,16 @@
       "target": "readme_spoken_answers_tts"
     },
     {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "README.md",
+      "source_location": "L29",
+      "weight": 1.0,
+      "source": "readme_what_it_does",
+      "target": "readme_web_search_optional",
+      "confidence_score": 1.0
+    },
+    {
       "relation": "conceptually_related_to",
       "confidence": "INFERRED",
       "confidence_score": 0.9,
@@ -78602,9 +78622,9 @@
       "source_file": "docs/PROGRESS.md",
       "source_location": "L83",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "docs_progress_handy_ultra_development_progress",
-      "target": "docs_progress_phase_1_7_web_search_done",
-      "confidence_score": 1.0
+      "target": "docs_progress_phase_1_7_web_search_done"
     },
     {
       "relation": "contains",
@@ -79829,5 +79849,5 @@
       "source_file": "index.html"
     }
   ],
-  "built_at_commit": "421075f19dc4e8e1ae0301725134b0f777297bd7"
+  "built_at_commit": "863119e00159bfb94d313fc94b9d55e302de3ef2"
 }
