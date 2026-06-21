@@ -2,7 +2,7 @@
 
 **A free, local-first voice assistant for your desktop — dictation, a floating AI chat panel, screen vision, and spoken answers, all from one global hotkey.**
 
-Handy Ultra started as a fork of the excellent [Handy](https://github.com/cjpais/Handy) dictation app and is growing into something different: a full Wispr Flow–style voice assistant that you own. Speech-to-text stays 100 % local; the assistant brain is any OpenAI-compatible LLM you point it at — Azure OpenAI, OpenAI, Groq, OpenRouter, or a fully local Ollama / LM Studio model.
+Handy Ultra started as a fork of the excellent [Handy](https://github.com/cjpais/Handy) dictation app and is growing into something different: a full Wispr Flow–style voice assistant that you own. Speech-to-text stays 100 % local; the assistant brain is any OpenAI-compatible LLM you point it at — OpenAI, Anthropic, Groq, OpenRouter, Z.AI, Cerebras, AWS Bedrock, Azure OpenAI (via a custom endpoint), an Ollama / LM Studio server, or the **built-in local LLM** that runs fully offline with no server to set up.
 
 ## What it does
 
@@ -26,52 +26,72 @@ Handy Ultra started as a fork of the excellent [Handy](https://github.com/cjpais
 - Captures are adaptively compressed to fit strict provider payload limits (verified against Azure's 128 KiB JSON-string cap)
 - One master toggle guarantees nothing is ever captured if you don't want it
 
+### 🌐 Web search (optional)
+
+- Flip on web search and the assistant can answer current, factual questions — prices, weather, news, "who is the prime minister of…" — instead of guessing from stale training data
+- A globe toggle lives right in the panel's input row, so you can turn it on or off per question
+- Three backends:
+  - **DuckDuckGo** — free, no API key, on by default
+  - **Firecrawl** and **Brave** — bring your own key if you prefer them
+- Built for speed and small prompts: only short snippets come back (never full pages), a quick local heuristic skips searches for chit-chat or coding, and a slow search degrades gracefully instead of stalling the answer
+
 ### 🔊 Spoken answers (TTS)
 
-- After each answer, a short spoken summary (1–3 sentences) is generated and read aloud — never the whole wall of text
-- Three engines:
-  - **Kokoro** — free, runs locally in the app via WebGPU, streams sentence-by-sentence
+- The assistant reads its reply aloud — Markdown, code blocks, links, and emoji are stripped first so nothing gets spelled out symbol by symbol
+- Keep spoken replies short with the **Response length** setting (Short / Medium / Long), which shapes the answer itself rather than tacking on a separate summary step
+- Adjustable playback speed (0.25x–4x) with quick presets
+- Four engines:
+  - **Kokoro** — free, runs locally in the app via WebGPU; no key, nothing leaves your machine
   - **OpenAI-compatible** — any `/audio/speech` endpoint: OpenAI, Azure OpenAI, Groq, or a local server
   - **ElevenLabs** — bring your API key and voice ID
+  - **Azure AI Speech** — neural voices (e.g. `en-US-JennyNeural`) via your Speech resource key
 
 ### 🎨 Make it yours
 
 - Six accent colors, three text sizes, three panel sizes, adjustable opacity — with a live preview in settings
-- Configurable system prompt and TTS summary prompt
+- Configurable system prompt and reply-length control (Short / Medium / Long)
 - Every hotkey is rebindable
 
 ## What's different from Handy?
 
-|                                          | Handy | Handy Ultra                                      |
-| ---------------------------------------- | ----- | ------------------------------------------------ |
-| Local dictation                          | ✅    | ✅ (unchanged core)                              |
-| AI assistant chat panel                  | —     | ✅ floating glass panel, streaming               |
-| Screen vision (screenshots to the model) | —     | ✅ hotkey, voice intent, or camera button        |
-| Spoken answer summaries                  | —     | ✅ Kokoro local / OpenAI-compatible / ElevenLabs |
-| Hands-free dictation toggle              | —     | ✅ dedicated F9 binding                          |
-| Local LLM preset (Ollama / LM Studio)    | —     | ✅                                               |
-| Panel customization + pill mode          | —     | ✅                                               |
+|                                          | Handy | Handy Ultra                                            |
+| ---------------------------------------- | ----- | ------------------------------------------------------ |
+| Local dictation                          | ✅    | ✅ (unchanged core)                                    |
+| AI assistant chat panel                  | —     | ✅ floating glass panel, streaming                     |
+| Screen vision (screenshots to the model) | —     | ✅ hotkey, voice intent, or camera button              |
+| Web search                               | —     | ✅ DuckDuckGo (keyless) / Firecrawl / Brave            |
+| Spoken answers (TTS)                      | —     | ✅ Kokoro local / OpenAI-compatible / ElevenLabs / Azure |
+| Hands-free dictation toggle              | —     | ✅ dedicated F9 binding                                |
+| Built-in offline LLM (llama.cpp)         | —     | ✅ runs a downloaded model, no server                  |
+| Local LLM preset (Ollama / LM Studio)    | —     | ✅                                                     |
+| Panel customization + pill mode          | —     | ✅                                                     |
 
-Everything is wired through the same provider system, so one API key works for assistant answers, post-processing, and TTS summaries.
+Everything is wired through the same provider system, so one API key works for assistant answers, dictation post-processing, and remote TTS.
 
 ## Default hotkeys
 
-| Action                        | Shortcut                     |
-| ----------------------------- | ---------------------------- |
-| Dictate (hold)                | `Ctrl + Space`               |
-| Hands-free dictation (toggle) | `F9`                         |
-| Ask the assistant             | `Ctrl + Alt + Space`         |
-| Ask about your screen         | `Ctrl + Alt + Shift + Space` |
-| Show / hide the panel         | `Ctrl + Alt + A`             |
+| Action                          | Shortcut                     |
+| ------------------------------- | ---------------------------- |
+| Dictate (hold)                  | `Ctrl + Space`               |
+| Hands-free dictation (toggle)   | `F9`                         |
+| Dictate with AI post-processing | `Ctrl + Shift + Space`       |
+| Ask the assistant               | `Ctrl + Alt + Space`         |
+| Ask about your screen           | `Ctrl + Alt + Shift + Space` |
+| Show / hide the panel           | `Ctrl + Alt + A`             |
+| Cancel the current recording    | `Esc`                        |
+
+On macOS the modifier defaults to `Option` in place of `Ctrl`/`Alt` (e.g. `Option + Space` to dictate). Every shortcut is rebindable in settings.
 
 ## Getting started
 
 1. Install and launch — pick a transcription model when prompted (Parakeet V3 is a great default)
-2. Open **Settings → Assistant**:
-   - Pick a provider (e.g. _Custom_ for Azure OpenAI, _Local_ for Ollama)
-   - Base URL for Azure: `https://{your-resource}.openai.azure.com/openai/v1` (or your `cognitiveservices.azure.com` domain) — model = your deployment name
+2. Open **Settings → Assistant** and pick a provider:
+   - **Built-in (Local)** — fully offline, no key; just download a small LLM from the model picker and you're set
+   - **Custom** for Azure OpenAI — base URL `https://{your-resource}.openai.azure.com/openai/v1` (or your `cognitiveservices.azure.com` domain), model = your deployment name
+   - **Local** for an Ollama / LM Studio server, or any of the hosted presets (OpenAI, Anthropic, Groq, OpenRouter, Z.AI, Cerebras, AWS Bedrock) with an API key
    - For screen vision, the model must support images (`gpt-4o-mini`, `gpt-4.1-mini`, `gemini-flash`, …)
-3. Press `Ctrl + Alt + Space` and ask something
+3. Optionally enable **Web search** in the same settings page (DuckDuckGo works with no key)
+4. Press `Ctrl + Alt + Space` and ask something
 
 ### Building from source
 
@@ -86,8 +106,10 @@ See [BUILD.md](BUILD.md) for platform prerequisites (Rust, CMake, Vulkan SDK on 
 ## Privacy model
 
 - **Voice → text**: always local, never leaves your machine
-- **Assistant questions + optional screenshots**: sent only to the LLM provider _you_ configure (which can itself be local)
+- **Assistant questions + optional screenshots**: sent only to the LLM provider _you_ configure — which can be the built-in local model or your own Ollama / LM Studio server
+- **Web search** (off by default): when on, only your search query goes to the provider you pick (DuckDuckGo needs no key), and just short snippets come back — your conversation is never sent
 - **TTS**: local by default (Kokoro); remote only if you choose a remote engine
+- **Fully offline option**: pair the Built-in (Local) LLM with Kokoro TTS and web search off, and nothing leaves your machine at all
 - No telemetry, no accounts, no cloud middleman
 
 ## Credits & license
