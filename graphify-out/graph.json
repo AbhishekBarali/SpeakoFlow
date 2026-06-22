@@ -2823,7 +2823,7 @@
       "source_location": "L34",
       "_origin": "ast",
       "id": "src_actions_finishguard",
-      "community": 135,
+      "community": 31,
       "norm_label": "finishguard"
     },
     {
@@ -2833,7 +2833,7 @@
       "source_location": "L35",
       "_origin": "ast",
       "id": "src_tauri_src_actions_rs_drop",
-      "community": 135,
+      "community": 31,
       "norm_label": "drop"
     },
     {
@@ -2843,7 +2843,7 @@
       "source_location": "L36",
       "_origin": "ast",
       "id": "src_actions_finishguard_drop",
-      "community": 135,
+      "community": 31,
       "norm_label": ".drop()"
     },
     {
@@ -2883,7 +2883,7 @@
       "source_location": "L50",
       "_origin": "ast",
       "id": "src_actions_transcribeaction",
-      "community": 135,
+      "community": 31,
       "norm_label": "transcribeaction"
     },
     {
@@ -2993,7 +2993,7 @@
       "source_location": "L579",
       "_origin": "ast",
       "id": "src_actions_transcribeaction_stop",
-      "community": 135,
+      "community": 31,
       "norm_label": ".stop()"
     },
     {
@@ -3637,10 +3637,20 @@
       "norm_label": "current_datetime_line()"
     },
     {
+      "label": "recent_context_for_planner()",
+      "file_type": "code",
+      "source_file": "src-tauri/src/assistant.rs",
+      "source_location": "L489",
+      "_origin": "ast",
+      "id": "src_assistant_recent_context_for_planner",
+      "community": 14,
+      "norm_label": "recent_context_for_planner()"
+    },
+    {
       "label": "run_assistant_turn()",
       "file_type": "code",
       "source_file": "src-tauri/src/assistant.rs",
-      "source_location": "L496",
+      "source_location": "L529",
       "_origin": "ast",
       "id": "src_assistant_run_assistant_turn",
       "community": 14,
@@ -3650,7 +3660,7 @@
       "label": "spawn_tts_speak()",
       "file_type": "code",
       "source_file": "src-tauri/src/assistant.rs",
-      "source_location": "L830",
+      "source_location": "L902",
       "_origin": "ast",
       "id": "src_assistant_spawn_tts_speak",
       "community": 14,
@@ -3660,7 +3670,7 @@
       "label": "AppSettings",
       "file_type": "code",
       "source_file": "src-tauri/src/assistant.rs",
-      "source_location": "L830",
+      "source_location": "L902",
       "_origin": "ast",
       "id": "src_tauri_src_assistant_rs_appsettings",
       "community": 14,
@@ -6917,10 +6927,20 @@
       "norm_label": "set_assistant_web_search_max_results()"
     },
     {
+      "label": "set_assistant_web_search_fetch_content()",
+      "file_type": "code",
+      "source_file": "src-tauri/src/commands/assistant.rs",
+      "source_location": "L477",
+      "_origin": "ast",
+      "id": "commands_assistant_set_assistant_web_search_fetch_content",
+      "community": 2,
+      "norm_label": "set_assistant_web_search_fetch_content()"
+    },
+    {
       "label": "set_assistant_web_search_api_key()",
       "file_type": "code",
       "source_file": "src-tauri/src/commands/assistant.rs",
-      "source_location": "L475",
+      "source_location": "L488",
       "_origin": "ast",
       "id": "commands_assistant_set_assistant_web_search_api_key",
       "community": 2,
@@ -6930,7 +6950,7 @@
       "label": "assistant_test_web_search()",
       "file_type": "code",
       "source_file": "src-tauri/src/commands/assistant.rs",
-      "source_location": "L498",
+      "source_location": "L511",
       "_origin": "ast",
       "id": "commands_assistant_assistant_test_web_search",
       "community": 2,
@@ -6940,7 +6960,7 @@
       "label": "SearchResult",
       "file_type": "code",
       "source_file": "src-tauri/src/commands/assistant.rs",
-      "source_location": "L498",
+      "source_location": "L511",
       "_origin": "ast",
       "id": "searchresult",
       "community": 2,
@@ -8892,7 +8912,7 @@
       "source_file": "src-tauri/src/llm_client.rs",
       "source_location": "L69",
       "_origin": "ast",
-      "id": "postprocessprovider",
+      "id": "src_tauri_src_llm_client_rs_postprocessprovider",
       "community": 20,
       "norm_label": "postprocessprovider"
     },
@@ -12413,7 +12433,7 @@
       "source_location": "L82",
       "_origin": "ast",
       "id": "src_tauri_src_settings_rs_string",
-      "community": 18,
+      "community": 40,
       "norm_label": "string"
     },
     {
@@ -12453,7 +12473,7 @@
       "source_location": "L142",
       "_origin": "ast",
       "id": "src_settings_postprocessprovider",
-      "community": 42,
+      "community": 140,
       "norm_label": "postprocessprovider"
     },
     {
@@ -12463,7 +12483,7 @@
       "source_location": "L149",
       "_origin": "ast",
       "id": "src_tauri_src_settings_rs_option",
-      "community": 42,
+      "community": 140,
       "norm_label": "option"
     },
     {
@@ -12483,7 +12503,7 @@
       "source_location": "L164",
       "_origin": "ast",
       "id": "src_settings_modelunloadtimeout",
-      "community": 42,
+      "community": 140,
       "norm_label": "modelunloadtimeout"
     },
     {
@@ -12523,7 +12543,7 @@
       "source_location": "L206",
       "_origin": "ast",
       "id": "src_settings_assistantresponselength",
-      "community": 42,
+      "community": 140,
       "norm_label": "assistantresponselength"
     },
     {
@@ -12533,7 +12553,7 @@
       "source_location": "L217",
       "_origin": "ast",
       "id": "src_settings_assistantresponselength_directive",
-      "community": 42,
+      "community": 140,
       "norm_label": ".directive()"
     },
     {
@@ -12623,7 +12643,7 @@
       "source_location": "L288",
       "_origin": "ast",
       "id": "src_settings_modelunloadtimeout_to_minutes",
-      "community": 42,
+      "community": 140,
       "norm_label": ".to_minutes()"
     },
     {
@@ -12633,7 +12653,7 @@
       "source_location": "L301",
       "_origin": "ast",
       "id": "src_settings_modelunloadtimeout_to_seconds",
-      "community": 42,
+      "community": 140,
       "norm_label": ".to_seconds()"
     },
     {
@@ -12763,7 +12783,7 @@
       "source_location": "L406",
       "_origin": "ast",
       "id": "src_settings_secretmap",
-      "community": 140,
+      "community": 35,
       "norm_label": "secretmap"
     },
     {
@@ -12803,7 +12823,7 @@
       "source_location": "L419",
       "_origin": "ast",
       "id": "deref",
-      "community": 140,
+      "community": 35,
       "norm_label": "deref"
     },
     {
@@ -12813,7 +12833,7 @@
       "source_location": "L421",
       "_origin": "ast",
       "id": "src_settings_secretmap_deref",
-      "community": 140,
+      "community": 35,
       "norm_label": ".deref()"
     },
     {
@@ -12823,7 +12843,7 @@
       "source_location": "L421",
       "_origin": "ast",
       "id": "target",
-      "community": 140,
+      "community": 35,
       "norm_label": "target"
     },
     {
@@ -12833,7 +12853,7 @@
       "source_location": "L426",
       "_origin": "ast",
       "id": "derefmut",
-      "community": 140,
+      "community": 35,
       "norm_label": "derefmut"
     },
     {
@@ -12843,7 +12863,7 @@
       "source_location": "L427",
       "_origin": "ast",
       "id": "src_settings_secretmap_deref_mut",
-      "community": 140,
+      "community": 35,
       "norm_label": ".deref_mut()"
     },
     {
@@ -12873,7 +12893,7 @@
       "source_location": "L448",
       "_origin": "ast",
       "id": "src_settings_appsettings",
-      "community": 42,
+      "community": 140,
       "norm_label": "appsettings"
     },
     {
@@ -12883,7 +12903,7 @@
       "source_location": "L449",
       "_origin": "ast",
       "id": "src_tauri_src_settings_rs_hashmap",
-      "community": 56,
+      "community": 148,
       "norm_label": "hashmap"
     },
     {
@@ -12900,17 +12920,17 @@
       "label": "default_model()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L623",
+      "source_location": "L629",
       "_origin": "ast",
       "id": "src_settings_default_model",
-      "community": 18,
+      "community": 40,
       "norm_label": "default_model()"
     },
     {
       "label": "default_always_on_microphone()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L627",
+      "source_location": "L633",
       "_origin": "ast",
       "id": "src_settings_default_always_on_microphone",
       "community": 18,
@@ -12920,7 +12940,7 @@
       "label": "default_translate_to_english()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L631",
+      "source_location": "L637",
       "_origin": "ast",
       "id": "src_settings_default_translate_to_english",
       "community": 18,
@@ -12930,7 +12950,7 @@
       "label": "default_start_hidden()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L635",
+      "source_location": "L641",
       "_origin": "ast",
       "id": "src_settings_default_start_hidden",
       "community": 18,
@@ -12940,7 +12960,7 @@
       "label": "default_autostart_enabled()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L639",
+      "source_location": "L645",
       "_origin": "ast",
       "id": "src_settings_default_autostart_enabled",
       "community": 18,
@@ -12950,7 +12970,7 @@
       "label": "default_update_checks_enabled()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L643",
+      "source_location": "L649",
       "_origin": "ast",
       "id": "src_settings_default_update_checks_enabled",
       "community": 18,
@@ -12960,17 +12980,17 @@
       "label": "default_selected_language()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L647",
+      "source_location": "L653",
       "_origin": "ast",
       "id": "src_settings_default_selected_language",
-      "community": 18,
+      "community": 40,
       "norm_label": "default_selected_language()"
     },
     {
       "label": "default_overlay_position()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L651",
+      "source_location": "L657",
       "_origin": "ast",
       "id": "src_settings_default_overlay_position",
       "community": 18,
@@ -12980,7 +13000,7 @@
       "label": "default_debug_mode()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L658",
+      "source_location": "L664",
       "_origin": "ast",
       "id": "src_settings_default_debug_mode",
       "community": 18,
@@ -12990,7 +13010,7 @@
       "label": "default_log_level()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L662",
+      "source_location": "L668",
       "_origin": "ast",
       "id": "src_settings_default_log_level",
       "community": 18,
@@ -13000,7 +13020,7 @@
       "label": "default_word_correction_threshold()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L666",
+      "source_location": "L672",
       "_origin": "ast",
       "id": "src_settings_default_word_correction_threshold",
       "community": 18,
@@ -13010,7 +13030,7 @@
       "label": "default_paste_delay_ms()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L670",
+      "source_location": "L676",
       "_origin": "ast",
       "id": "src_settings_default_paste_delay_ms",
       "community": 18,
@@ -13020,7 +13040,7 @@
       "label": "default_auto_submit()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L674",
+      "source_location": "L680",
       "_origin": "ast",
       "id": "src_settings_default_auto_submit",
       "community": 18,
@@ -13030,7 +13050,7 @@
       "label": "default_history_limit()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L678",
+      "source_location": "L684",
       "_origin": "ast",
       "id": "src_settings_default_history_limit",
       "community": 18,
@@ -13040,7 +13060,7 @@
       "label": "default_recording_retention_period()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L682",
+      "source_location": "L688",
       "_origin": "ast",
       "id": "src_settings_default_recording_retention_period",
       "community": 18,
@@ -13050,7 +13070,7 @@
       "label": "default_audio_feedback_volume()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L686",
+      "source_location": "L692",
       "_origin": "ast",
       "id": "src_settings_default_audio_feedback_volume",
       "community": 18,
@@ -13060,7 +13080,7 @@
       "label": "default_sound_theme()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L690",
+      "source_location": "L696",
       "_origin": "ast",
       "id": "src_settings_default_sound_theme",
       "community": 18,
@@ -13070,7 +13090,7 @@
       "label": "default_post_process_enabled()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L694",
+      "source_location": "L700",
       "_origin": "ast",
       "id": "src_settings_default_post_process_enabled",
       "community": 18,
@@ -13080,7 +13100,7 @@
       "label": "default_app_language()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L698",
+      "source_location": "L704",
       "_origin": "ast",
       "id": "src_settings_default_app_language",
       "community": 18,
@@ -13090,7 +13110,7 @@
       "label": "default_show_tray_icon()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L704",
+      "source_location": "L710",
       "_origin": "ast",
       "id": "src_settings_default_show_tray_icon",
       "community": 18,
@@ -13100,7 +13120,7 @@
       "label": "default_post_process_provider_id()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L708",
+      "source_location": "L714",
       "_origin": "ast",
       "id": "src_settings_default_post_process_provider_id",
       "community": 18,
@@ -13110,47 +13130,47 @@
       "label": "default_post_process_providers()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L712",
+      "source_location": "L718",
       "_origin": "ast",
       "id": "src_settings_default_post_process_providers",
-      "community": 140,
+      "community": 148,
       "norm_label": "default_post_process_providers()"
     },
     {
       "label": "default_post_process_api_keys()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L825",
+      "source_location": "L831",
       "_origin": "ast",
       "id": "src_settings_default_post_process_api_keys",
-      "community": 140,
+      "community": 148,
       "norm_label": "default_post_process_api_keys()"
     },
     {
       "label": "default_model_for_provider()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L833",
+      "source_location": "L839",
       "_origin": "ast",
       "id": "src_settings_default_model_for_provider",
-      "community": 140,
+      "community": 148,
       "norm_label": "default_model_for_provider()"
     },
     {
       "label": "default_post_process_models()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L840",
+      "source_location": "L846",
       "_origin": "ast",
       "id": "src_settings_default_post_process_models",
-      "community": 140,
+      "community": 148,
       "norm_label": "default_post_process_models()"
     },
     {
       "label": "default_true()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L852",
+      "source_location": "L858",
       "_origin": "ast",
       "id": "src_settings_default_true",
       "community": 18,
@@ -13160,7 +13180,7 @@
       "label": "default_text_replacements()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L857",
+      "source_location": "L863",
       "_origin": "ast",
       "id": "src_settings_default_text_replacements",
       "community": 53,
@@ -13170,7 +13190,7 @@
       "label": "default_post_process_prompts()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L861",
+      "source_location": "L867",
       "_origin": "ast",
       "id": "src_settings_default_post_process_prompts",
       "community": 53,
@@ -13180,7 +13200,7 @@
       "label": "default_whisper_gpu_device()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L869",
+      "source_location": "L875",
       "_origin": "ast",
       "id": "src_settings_default_whisper_gpu_device",
       "community": 18,
@@ -13190,7 +13210,7 @@
       "label": "default_typing_tool()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L873",
+      "source_location": "L879",
       "_origin": "ast",
       "id": "src_settings_default_typing_tool",
       "community": 18,
@@ -13200,7 +13220,7 @@
       "label": "default_assistant_provider_id()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L877",
+      "source_location": "L883",
       "_origin": "ast",
       "id": "src_settings_default_assistant_provider_id",
       "community": 18,
@@ -13210,17 +13230,17 @@
       "label": "default_assistant_system_prompt()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L883",
+      "source_location": "L889",
       "_origin": "ast",
       "id": "src_settings_default_assistant_system_prompt",
-      "community": 18,
+      "community": 40,
       "norm_label": "default_assistant_system_prompt()"
     },
     {
       "label": "default_assistant_screenshot_enabled()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L887",
+      "source_location": "L893",
       "_origin": "ast",
       "id": "src_settings_default_assistant_screenshot_enabled",
       "community": 18,
@@ -13230,67 +13250,67 @@
       "label": "default_assistant_tts_voice()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L891",
+      "source_location": "L897",
       "_origin": "ast",
       "id": "src_settings_default_assistant_tts_voice",
-      "community": 18,
+      "community": 40,
       "norm_label": "default_assistant_tts_voice()"
     },
     {
       "label": "default_assistant_tts_engine()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L895",
+      "source_location": "L901",
       "_origin": "ast",
       "id": "src_settings_default_assistant_tts_engine",
-      "community": 18,
+      "community": 40,
       "norm_label": "default_assistant_tts_engine()"
     },
     {
       "label": "default_assistant_tts_base_url()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L899",
+      "source_location": "L905",
       "_origin": "ast",
       "id": "src_settings_default_assistant_tts_base_url",
-      "community": 18,
+      "community": 40,
       "norm_label": "default_assistant_tts_base_url()"
     },
     {
       "label": "default_assistant_tts_model()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L903",
+      "source_location": "L909",
       "_origin": "ast",
       "id": "src_settings_default_assistant_tts_model",
-      "community": 18,
+      "community": 40,
       "norm_label": "default_assistant_tts_model()"
     },
     {
       "label": "default_assistant_tts_remote_voice()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L907",
+      "source_location": "L913",
       "_origin": "ast",
       "id": "src_settings_default_assistant_tts_remote_voice",
-      "community": 18,
+      "community": 40,
       "norm_label": "default_assistant_tts_remote_voice()"
     },
     {
       "label": "default_assistant_tts_kokoro_dtype()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L911",
+      "source_location": "L917",
       "_origin": "ast",
       "id": "src_settings_default_assistant_tts_kokoro_dtype",
-      "community": 18,
+      "community": 40,
       "norm_label": "default_assistant_tts_kokoro_dtype()"
     },
     {
       "label": "default_assistant_tts_speed()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L917",
+      "source_location": "L923",
       "_origin": "ast",
       "id": "src_settings_default_assistant_tts_speed",
       "community": 18,
@@ -13300,7 +13320,7 @@
       "label": "default_assistant_max_history_messages()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L923",
+      "source_location": "L929",
       "_origin": "ast",
       "id": "src_settings_default_assistant_max_history_messages",
       "community": 18,
@@ -13310,7 +13330,7 @@
       "label": "default_local_llm_context_size()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L928",
+      "source_location": "L934",
       "_origin": "ast",
       "id": "src_settings_default_local_llm_context_size",
       "community": 18,
@@ -13320,7 +13340,7 @@
       "label": "default_local_llm_unload_timeout()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L934",
+      "source_location": "L940",
       "_origin": "ast",
       "id": "src_settings_default_local_llm_unload_timeout",
       "community": 18,
@@ -13330,17 +13350,17 @@
       "label": "default_assistant_panel_size()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L941",
+      "source_location": "L947",
       "_origin": "ast",
       "id": "src_settings_default_assistant_panel_size",
-      "community": 18,
+      "community": 40,
       "norm_label": "default_assistant_panel_size()"
     },
     {
       "label": "default_assistant_panel_opacity()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L945",
+      "source_location": "L951",
       "_origin": "ast",
       "id": "src_settings_default_assistant_panel_opacity",
       "community": 18,
@@ -13350,47 +13370,57 @@
       "label": "default_assistant_font_size()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L949",
+      "source_location": "L955",
       "_origin": "ast",
       "id": "src_settings_default_assistant_font_size",
-      "community": 18,
+      "community": 40,
       "norm_label": "default_assistant_font_size()"
     },
     {
       "label": "default_assistant_accent()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L953",
+      "source_location": "L959",
       "_origin": "ast",
       "id": "src_settings_default_assistant_accent",
-      "community": 18,
+      "community": 40,
       "norm_label": "default_assistant_accent()"
     },
     {
       "label": "default_assistant_web_search_provider()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L957",
+      "source_location": "L963",
       "_origin": "ast",
       "id": "src_settings_default_assistant_web_search_provider",
-      "community": 18,
+      "community": 40,
       "norm_label": "default_assistant_web_search_provider()"
     },
     {
       "label": "default_assistant_web_search_max_results()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L962",
+      "source_location": "L968",
       "_origin": "ast",
       "id": "src_settings_default_assistant_web_search_max_results",
       "community": 18,
       "norm_label": "default_assistant_web_search_max_results()"
     },
     {
+      "label": "default_assistant_web_search_fetch_content()",
+      "file_type": "code",
+      "source_file": "src-tauri/src/settings.rs",
+      "source_location": "L974",
+      "_origin": "ast",
+      "id": "src_settings_default_assistant_web_search_fetch_content",
+      "community": 18,
+      "norm_label": "default_assistant_web_search_fetch_content()"
+    },
+    {
       "label": "default_web_search_api_keys()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L967",
+      "source_location": "L979",
       "_origin": "ast",
       "id": "src_settings_default_web_search_api_keys",
       "community": 18,
@@ -13400,27 +13430,27 @@
       "label": "ensure_assistant_defaults()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L974",
+      "source_location": "L986",
       "_origin": "ast",
       "id": "src_settings_ensure_assistant_defaults",
-      "community": 18,
+      "community": 40,
       "norm_label": "ensure_assistant_defaults()"
     },
     {
       "label": "ensure_post_process_defaults()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L1071",
+      "source_location": "L1083",
       "_origin": "ast",
       "id": "src_settings_ensure_post_process_defaults",
-      "community": 140,
+      "community": 148,
       "norm_label": "ensure_post_process_defaults()"
     },
     {
       "label": "get_default_settings()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L1129",
+      "source_location": "L1141",
       "_origin": "ast",
       "id": "src_settings_get_default_settings",
       "community": 18,
@@ -13430,47 +13460,47 @@
       "label": ".active_post_process_provider()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L1333",
+      "source_location": "L1346",
       "_origin": "ast",
       "id": "src_settings_appsettings_active_post_process_provider",
-      "community": 42,
+      "community": 140,
       "norm_label": ".active_post_process_provider()"
     },
     {
       "label": ".active_assistant_provider()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L1339",
+      "source_location": "L1352",
       "_origin": "ast",
       "id": "src_settings_appsettings_active_assistant_provider",
-      "community": 42,
+      "community": 140,
       "norm_label": ".active_assistant_provider()"
     },
     {
       "label": ".post_process_provider()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L1345",
+      "source_location": "L1358",
       "_origin": "ast",
       "id": "src_settings_appsettings_post_process_provider",
-      "community": 42,
+      "community": 140,
       "norm_label": ".post_process_provider()"
     },
     {
       "label": ".post_process_provider_mut()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L1351",
+      "source_location": "L1364",
       "_origin": "ast",
       "id": "src_settings_appsettings_post_process_provider_mut",
-      "community": 42,
+      "community": 140,
       "norm_label": ".post_process_provider_mut()"
     },
     {
       "label": "persist_hydrated_secrets()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L1385",
+      "source_location": "L1398",
       "_origin": "ast",
       "id": "src_settings_persist_hydrated_secrets",
       "community": 42,
@@ -13480,7 +13510,7 @@
       "label": "migrate_plaintext_secrets()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L1430",
+      "source_location": "L1443",
       "_origin": "ast",
       "id": "src_settings_migrate_plaintext_secrets",
       "community": 140,
@@ -13490,7 +13520,7 @@
       "label": "hydrate_secrets()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L1479",
+      "source_location": "L1492",
       "_origin": "ast",
       "id": "src_settings_hydrate_secrets",
       "community": 140,
@@ -13500,7 +13530,7 @@
       "label": "load_or_create_app_settings()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L1502",
+      "source_location": "L1515",
       "_origin": "ast",
       "id": "src_settings_load_or_create_app_settings",
       "community": 140,
@@ -13510,7 +13540,7 @@
       "label": "AppHandle",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L1502",
+      "source_location": "L1515",
       "_origin": "ast",
       "id": "src_tauri_src_settings_rs_apphandle",
       "community": 56,
@@ -13520,7 +13550,7 @@
       "label": "get_settings()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L1565",
+      "source_location": "L1578",
       "_origin": "ast",
       "id": "src_settings_get_settings",
       "community": 2,
@@ -13530,7 +13560,7 @@
       "label": "write_settings()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L1594",
+      "source_location": "L1607",
       "_origin": "ast",
       "id": "src_settings_write_settings",
       "community": 2,
@@ -13540,7 +13570,7 @@
       "label": "get_bindings()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L1611",
+      "source_location": "L1624",
       "_origin": "ast",
       "id": "src_settings_get_bindings",
       "community": 56,
@@ -13550,7 +13580,7 @@
       "label": "get_stored_binding()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L1617",
+      "source_location": "L1630",
       "_origin": "ast",
       "id": "src_settings_get_stored_binding",
       "community": 56,
@@ -13560,7 +13590,7 @@
       "label": "get_history_limit()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L1625",
+      "source_location": "L1638",
       "_origin": "ast",
       "id": "src_settings_get_history_limit",
       "community": 56,
@@ -13570,7 +13600,7 @@
       "label": "get_recording_retention_period()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L1630",
+      "source_location": "L1643",
       "_origin": "ast",
       "id": "src_settings_get_recording_retention_period",
       "community": 56,
@@ -13580,7 +13610,7 @@
       "label": "default_settings_disable_auto_submit()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L1640",
+      "source_location": "L1653",
       "_origin": "ast",
       "id": "src_settings_default_settings_disable_auto_submit",
       "community": 18,
@@ -13590,7 +13620,7 @@
       "label": "debug_output_redacts_api_keys()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L1647",
+      "source_location": "L1660",
       "_origin": "ast",
       "id": "src_settings_debug_output_redacts_api_keys",
       "community": 18,
@@ -13600,7 +13630,7 @@
       "label": "secret_map_debug_redacts_values()",
       "file_type": "code",
       "source_file": "src-tauri/src/settings.rs",
-      "source_location": "L1668",
+      "source_location": "L1681",
       "_origin": "ast",
       "id": "src_settings_secret_map_debug_redacts_values",
       "community": 35,
@@ -15880,7 +15910,7 @@
       "label": "SearchResult",
       "file_type": "code",
       "source_file": "src-tauri/src/web_search.rs",
-      "source_location": "L44",
+      "source_location": "L75",
       "_origin": "ast",
       "id": "src_web_search_searchresult",
       "community": 0,
@@ -15890,17 +15920,127 @@
       "label": "String",
       "file_type": "code",
       "source_file": "src-tauri/src/web_search.rs",
-      "source_location": "L45",
+      "source_location": "L76",
       "_origin": "ast",
       "id": "src_tauri_src_web_search_rs_string",
       "community": 0,
       "norm_label": "string"
     },
     {
+      "label": "SearchPlan",
+      "file_type": "code",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L102",
+      "_origin": "ast",
+      "id": "src_web_search_searchplan",
+      "community": 0,
+      "norm_label": "searchplan"
+    },
+    {
+      "label": "Vec",
+      "file_type": "code",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L108",
+      "_origin": "ast",
+      "id": "src_tauri_src_web_search_rs_vec",
+      "community": 0,
+      "norm_label": "vec"
+    },
+    {
+      "label": "default_freshness()",
+      "file_type": "code",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L114",
+      "_origin": "ast",
+      "id": "src_web_search_default_freshness",
+      "community": 0,
+      "norm_label": "default_freshness()"
+    },
+    {
+      "label": ".raw()",
+      "file_type": "code",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L122",
+      "_origin": "ast",
+      "id": "src_web_search_searchplan_raw",
+      "community": 0,
+      "norm_label": ".raw()"
+    },
+    {
+      "label": "Self",
+      "file_type": "code",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L122",
+      "_origin": "ast",
+      "id": "src_tauri_src_web_search_rs_self",
+      "community": 0,
+      "norm_label": "self"
+    },
+    {
+      "label": ".sanitize()",
+      "file_type": "code",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L136",
+      "_origin": "ast",
+      "id": "src_web_search_searchplan_sanitize",
+      "community": 0,
+      "norm_label": ".sanitize()"
+    },
+    {
+      "label": "plan_search()",
+      "file_type": "code",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L177",
+      "_origin": "ast",
+      "id": "src_web_search_plan_search",
+      "community": 0,
+      "norm_label": "plan_search()"
+    },
+    {
+      "label": "PostProcessProvider",
+      "file_type": "code",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L177",
+      "_origin": "ast",
+      "id": "src_tauri_src_web_search_rs_postprocessprovider",
+      "community": 0,
+      "norm_label": "postprocessprovider"
+    },
+    {
+      "label": "Result",
+      "file_type": "code",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L177",
+      "_origin": "ast",
+      "id": "src_tauri_src_web_search_rs_result",
+      "community": 0,
+      "norm_label": "result"
+    },
+    {
+      "label": "parse_plan()",
+      "file_type": "code",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L249",
+      "_origin": "ast",
+      "id": "src_web_search_parse_plan",
+      "community": 0,
+      "norm_label": "parse_plan()"
+    },
+    {
+      "label": "Option",
+      "file_type": "code",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L249",
+      "_origin": "ast",
+      "id": "src_tauri_src_web_search_rs_option",
+      "community": 0,
+      "norm_label": "option"
+    },
+    {
       "label": "search()",
       "file_type": "code",
       "source_file": "src-tauri/src/web_search.rs",
-      "source_location": "L64",
+      "source_location": "L274",
       "_origin": "ast",
       "id": "src_web_search_search",
       "community": 0,
@@ -15910,37 +16050,77 @@
       "label": "AppSettings",
       "file_type": "code",
       "source_file": "src-tauri/src/web_search.rs",
-      "source_location": "L64",
+      "source_location": "L274",
       "_origin": "ast",
       "id": "src_tauri_src_web_search_rs_appsettings",
       "community": 0,
       "norm_label": "appsettings"
     },
     {
-      "label": "Result",
+      "label": "search_with_plan()",
       "file_type": "code",
       "source_file": "src-tauri/src/web_search.rs",
-      "source_location": "L64",
+      "source_location": "L295",
       "_origin": "ast",
-      "id": "src_tauri_src_web_search_rs_result",
+      "id": "src_web_search_search_with_plan",
       "community": 0,
-      "norm_label": "result"
+      "norm_label": "search_with_plan()"
     },
     {
-      "label": "Vec",
+      "label": "dedupe_key()",
       "file_type": "code",
       "source_file": "src-tauri/src/web_search.rs",
-      "source_location": "L64",
+      "source_location": "L368",
       "_origin": "ast",
-      "id": "src_tauri_src_web_search_rs_vec",
+      "id": "src_web_search_dedupe_key",
       "community": 0,
-      "norm_label": "vec"
+      "norm_label": "dedupe_key()"
+    },
+    {
+      "label": "run_provider_search()",
+      "file_type": "code",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L378",
+      "_origin": "ast",
+      "id": "src_web_search_run_provider_search",
+      "community": 0,
+      "norm_label": "run_provider_search()"
+    },
+    {
+      "label": "freshness_to_tbs()",
+      "file_type": "code",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L425",
+      "_origin": "ast",
+      "id": "src_web_search_freshness_to_tbs",
+      "community": 0,
+      "norm_label": "freshness_to_tbs()"
+    },
+    {
+      "label": "freshness_to_brave()",
+      "file_type": "code",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L436",
+      "_origin": "ast",
+      "id": "src_web_search_freshness_to_brave",
+      "community": 0,
+      "norm_label": "freshness_to_brave()"
+    },
+    {
+      "label": "freshness_to_ddg()",
+      "file_type": "code",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L447",
+      "_origin": "ast",
+      "id": "src_web_search_freshness_to_ddg",
+      "community": 0,
+      "norm_label": "freshness_to_ddg()"
     },
     {
       "label": "format_results_for_prompt()",
       "file_type": "code",
       "source_file": "src-tauri/src/web_search.rs",
-      "source_location": "L110",
+      "source_location": "L469",
       "_origin": "ast",
       "id": "src_web_search_format_results_for_prompt",
       "community": 0,
@@ -15950,7 +16130,7 @@
       "label": "should_search()",
       "file_type": "code",
       "source_file": "src-tauri/src/web_search.rs",
-      "source_location": "L137",
+      "source_location": "L497",
       "_origin": "ast",
       "id": "src_web_search_should_search",
       "community": 0,
@@ -15960,7 +16140,7 @@
       "label": "is_simple_math()",
       "file_type": "code",
       "source_file": "src-tauri/src/web_search.rs",
-      "source_location": "L278",
+      "source_location": "L597",
       "_origin": "ast",
       "id": "src_web_search_is_simple_math",
       "community": 0,
@@ -15970,17 +16150,27 @@
       "label": "http_client()",
       "file_type": "code",
       "source_file": "src-tauri/src/web_search.rs",
-      "source_location": "L295",
+      "source_location": "L614",
       "_origin": "ast",
       "id": "src_web_search_http_client",
       "community": 0,
       "norm_label": "http_client()"
     },
     {
+      "label": "Duration",
+      "file_type": "code",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L614",
+      "_origin": "ast",
+      "id": "src_tauri_src_web_search_rs_duration",
+      "community": 0,
+      "norm_label": "duration"
+    },
+    {
       "label": "Client",
       "file_type": "code",
       "source_file": "src-tauri/src/web_search.rs",
-      "source_location": "L295",
+      "source_location": "L614",
       "_origin": "ast",
       "id": "src_tauri_src_web_search_rs_client",
       "community": 0,
@@ -15990,7 +16180,7 @@
       "label": "search_firecrawl()",
       "file_type": "code",
       "source_file": "src-tauri/src/web_search.rs",
-      "source_location": "L306",
+      "source_location": "L626",
       "_origin": "ast",
       "id": "src_web_search_search_firecrawl",
       "community": 0,
@@ -16000,7 +16190,7 @@
       "label": "search_brave()",
       "file_type": "code",
       "source_file": "src-tauri/src/web_search.rs",
-      "source_location": "L372",
+      "source_location": "L722",
       "_origin": "ast",
       "id": "src_web_search_search_brave",
       "community": 0,
@@ -16010,7 +16200,7 @@
       "label": "search_duckduckgo()",
       "file_type": "code",
       "source_file": "src-tauri/src/web_search.rs",
-      "source_location": "L437",
+      "source_location": "L794",
       "_origin": "ast",
       "id": "src_web_search_search_duckduckgo",
       "community": 0,
@@ -16020,7 +16210,7 @@
       "label": "parse_duckduckgo_html()",
       "file_type": "code",
       "source_file": "src-tauri/src/web_search.rs",
-      "source_location": "L490",
+      "source_location": "L856",
       "_origin": "ast",
       "id": "src_web_search_parse_duckduckgo_html",
       "community": 0,
@@ -16030,7 +16220,7 @@
       "label": "decode_ddg_url()",
       "file_type": "code",
       "source_file": "src-tauri/src/web_search.rs",
-      "source_location": "L542",
+      "source_location": "L908",
       "_origin": "ast",
       "id": "src_web_search_decode_ddg_url",
       "community": 0,
@@ -16040,7 +16230,7 @@
       "label": "percent_decode()",
       "file_type": "code",
       "source_file": "src-tauri/src/web_search.rs",
-      "source_location": "L556",
+      "source_location": "L922",
       "_origin": "ast",
       "id": "src_web_search_percent_decode",
       "community": 0,
@@ -16050,37 +16240,37 @@
       "label": "hex_val()",
       "file_type": "code",
       "source_file": "src-tauri/src/web_search.rs",
-      "source_location": "L574",
+      "source_location": "L940",
       "_origin": "ast",
       "id": "src_web_search_hex_val",
       "community": 0,
       "norm_label": "hex_val()"
     },
     {
-      "label": "Option",
-      "file_type": "code",
-      "source_file": "src-tauri/src/web_search.rs",
-      "source_location": "L574",
-      "_origin": "ast",
-      "id": "src_tauri_src_web_search_rs_option",
-      "community": 0,
-      "norm_label": "option"
-    },
-    {
       "label": "clean_html_text()",
       "file_type": "code",
       "source_file": "src-tauri/src/web_search.rs",
-      "source_location": "L590",
+      "source_location": "L958",
       "_origin": "ast",
       "id": "src_web_search_clean_html_text",
       "community": 0,
       "norm_label": "clean_html_text()"
     },
     {
+      "label": "sanitize_content()",
+      "file_type": "code",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L975",
+      "_origin": "ast",
+      "id": "src_web_search_sanitize_content",
+      "community": 0,
+      "norm_label": "sanitize_content()"
+    },
+    {
       "label": "truncate_chars()",
       "file_type": "code",
       "source_file": "src-tauri/src/web_search.rs",
-      "source_location": "L607",
+      "source_location": "L986",
       "_origin": "ast",
       "id": "src_web_search_truncate_chars",
       "community": 0,
@@ -16090,7 +16280,7 @@
       "label": "push_result()",
       "file_type": "code",
       "source_file": "src-tauri/src/web_search.rs",
-      "source_location": "L617",
+      "source_location": "L996",
       "_origin": "ast",
       "id": "src_web_search_push_result",
       "community": 0,
@@ -16100,37 +16290,77 @@
       "label": "should_search_skips_small_talk_and_tasks()",
       "file_type": "code",
       "source_file": "src-tauri/src/web_search.rs",
-      "source_location": "L636",
+      "source_location": "L1023",
       "_origin": "ast",
       "id": "src_web_search_should_search_skips_small_talk_and_tasks",
       "community": 0,
       "norm_label": "should_search_skips_small_talk_and_tasks()"
     },
     {
-      "label": "should_search_triggers_on_questions_and_freshness()",
+      "label": "should_search_passes_lookups_to_planner()",
       "file_type": "code",
       "source_file": "src-tauri/src/web_search.rs",
-      "source_location": "L649",
+      "source_location": "L1036",
       "_origin": "ast",
-      "id": "src_web_search_should_search_triggers_on_questions_and_freshness",
+      "id": "src_web_search_should_search_passes_lookups_to_planner",
       "community": 0,
-      "norm_label": "should_search_triggers_on_questions_and_freshness()"
+      "norm_label": "should_search_passes_lookups_to_planner()"
     },
     {
-      "label": "should_search_triggers_on_bare_factual_phrases()",
+      "label": "freshness_maps_to_provider_params()",
       "file_type": "code",
       "source_file": "src-tauri/src/web_search.rs",
-      "source_location": "L658",
+      "source_location": "L1045",
       "_origin": "ast",
-      "id": "src_web_search_should_search_triggers_on_bare_factual_phrases",
+      "id": "src_web_search_freshness_maps_to_provider_params",
       "community": 0,
-      "norm_label": "should_search_triggers_on_bare_factual_phrases()"
+      "norm_label": "freshness_maps_to_provider_params()"
+    },
+    {
+      "label": "parse_plan_handles_plain_and_fenced_json()",
+      "file_type": "code",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L1055",
+      "_origin": "ast",
+      "id": "src_web_search_parse_plan_handles_plain_and_fenced_json",
+      "community": 0,
+      "norm_label": "parse_plan_handles_plain_and_fenced_json()"
+    },
+    {
+      "label": "sanitize_dedupes_caps_and_fixes_freshness()",
+      "file_type": "code",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L1069",
+      "_origin": "ast",
+      "id": "src_web_search_sanitize_dedupes_caps_and_fixes_freshness",
+      "community": 0,
+      "norm_label": "sanitize_dedupes_caps_and_fixes_freshness()"
+    },
+    {
+      "label": "sanitize_falls_back_to_raw_when_no_queries()",
+      "file_type": "code",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L1088",
+      "_origin": "ast",
+      "id": "src_web_search_sanitize_falls_back_to_raw_when_no_queries",
+      "community": 0,
+      "norm_label": "sanitize_falls_back_to_raw_when_no_queries()"
+    },
+    {
+      "label": "raw_plan_searches_the_question()",
+      "file_type": "code",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L1103",
+      "_origin": "ast",
+      "id": "src_web_search_raw_plan_searches_the_question",
+      "community": 0,
+      "norm_label": "raw_plan_searches_the_question()"
     },
     {
       "label": "decode_ddg_url_handles_redirect_and_plain()",
       "file_type": "code",
       "source_file": "src-tauri/src/web_search.rs",
-      "source_location": "L667",
+      "source_location": "L1113",
       "_origin": "ast",
       "id": "src_web_search_decode_ddg_url_handles_redirect_and_plain",
       "community": 0,
@@ -16140,21 +16370,21 @@
       "label": "parse_duckduckgo_html_extracts_pairs()",
       "file_type": "code",
       "source_file": "src-tauri/src/web_search.rs",
-      "source_location": "L680",
+      "source_location": "L1126",
       "_origin": "ast",
       "id": "src_web_search_parse_duckduckgo_html_extracts_pairs",
       "community": 0,
       "norm_label": "parse_duckduckgo_html_extracts_pairs()"
     },
     {
-      "label": "format_results_are_plain_bullets_without_numbers_or_urls()",
+      "label": "format_results_use_content_without_numbers_or_urls()",
       "file_type": "code",
       "source_file": "src-tauri/src/web_search.rs",
-      "source_location": "L700",
+      "source_location": "L1146",
       "_origin": "ast",
-      "id": "src_web_search_format_results_are_plain_bullets_without_numbers_or_urls",
+      "id": "src_web_search_format_results_use_content_without_numbers_or_urls",
       "community": 0,
-      "norm_label": "format_results_are_plain_bullets_without_numbers_or_urls()"
+      "norm_label": "format_results_use_content_without_numbers_or_urls()"
     },
     {
       "label": "apple_intelligence.swift",
@@ -17170,7 +17400,7 @@
       "label": "events",
       "file_type": "code",
       "source_file": "src/bindings.ts",
-      "source_location": "L1348",
+      "source_location": "L1361",
       "_origin": "ast",
       "id": "src_bindings_events",
       "community": 32,
@@ -17180,7 +17410,7 @@
       "label": "AppSettings",
       "file_type": "code",
       "source_file": "src/bindings.ts",
-      "source_location": "L1360",
+      "source_location": "L1373",
       "_origin": "ast",
       "id": "src_bindings_appsettings",
       "community": 4,
@@ -17190,7 +17420,7 @@
       "label": "AssistantHistoryEntry",
       "file_type": "code",
       "source_file": "src/bindings.ts",
-      "source_location": "L1415",
+      "source_location": "L1435",
       "_origin": "ast",
       "id": "src_bindings_assistanthistoryentry",
       "community": 32,
@@ -17200,7 +17430,7 @@
       "label": "AssistantResponseLength",
       "file_type": "code",
       "source_file": "src/bindings.ts",
-      "source_location": "L1433",
+      "source_location": "L1453",
       "_origin": "ast",
       "id": "src_bindings_assistantresponselength",
       "community": 3,
@@ -17210,7 +17440,7 @@
       "label": "AudioDevice",
       "file_type": "code",
       "source_file": "src/bindings.ts",
-      "source_location": "L1438",
+      "source_location": "L1458",
       "_origin": "ast",
       "id": "src_bindings_audiodevice",
       "community": 4,
@@ -17220,7 +17450,7 @@
       "label": "AutoSubmitKey",
       "file_type": "code",
       "source_file": "src/bindings.ts",
-      "source_location": "L1439",
+      "source_location": "L1459",
       "_origin": "ast",
       "id": "src_bindings_autosubmitkey",
       "community": 4,
@@ -17230,7 +17460,7 @@
       "label": "AvailableAccelerators",
       "file_type": "code",
       "source_file": "src/bindings.ts",
-      "source_location": "L1440",
+      "source_location": "L1460",
       "_origin": "ast",
       "id": "src_bindings_availableaccelerators",
       "community": 4,
@@ -17240,7 +17470,7 @@
       "label": "AzureVoice",
       "file_type": "code",
       "source_file": "src/bindings.ts",
-      "source_location": "L1444",
+      "source_location": "L1464",
       "_origin": "ast",
       "id": "src_bindings_azurevoice",
       "community": 3,
@@ -17250,7 +17480,7 @@
       "label": "BindingResponse",
       "file_type": "code",
       "source_file": "src/bindings.ts",
-      "source_location": "L1461",
+      "source_location": "L1481",
       "_origin": "ast",
       "id": "src_bindings_bindingresponse",
       "community": 4,
@@ -17260,7 +17490,7 @@
       "label": "Capitalization",
       "file_type": "code",
       "source_file": "src/bindings.ts",
-      "source_location": "L1465",
+      "source_location": "L1485",
       "_origin": "ast",
       "id": "src_bindings_capitalization",
       "community": 25,
@@ -17270,7 +17500,7 @@
       "label": "ChatMessage",
       "file_type": "code",
       "source_file": "src/bindings.ts",
-      "source_location": "L1482",
+      "source_location": "L1502",
       "_origin": "ast",
       "id": "src_bindings_chatmessage",
       "community": 4,
@@ -17280,7 +17510,7 @@
       "label": "ClipboardHandling",
       "file_type": "code",
       "source_file": "src/bindings.ts",
-      "source_location": "L1483",
+      "source_location": "L1503",
       "_origin": "ast",
       "id": "src_bindings_clipboardhandling",
       "community": 17,
@@ -17290,7 +17520,7 @@
       "label": "CustomSounds",
       "file_type": "code",
       "source_file": "src/bindings.ts",
-      "source_location": "L1484",
+      "source_location": "L1504",
       "_origin": "ast",
       "id": "src_bindings_customsounds",
       "community": 4,
@@ -17300,7 +17530,7 @@
       "label": "EngineType",
       "file_type": "code",
       "source_file": "src/bindings.ts",
-      "source_location": "L1485",
+      "source_location": "L1505",
       "_origin": "ast",
       "id": "src_bindings_enginetype",
       "community": 4,
@@ -17310,7 +17540,7 @@
       "label": "GpuDeviceOption",
       "file_type": "code",
       "source_file": "src/bindings.ts",
-      "source_location": "L1496",
+      "source_location": "L1516",
       "_origin": "ast",
       "id": "src_bindings_gpudeviceoption",
       "community": 4,
@@ -17320,7 +17550,7 @@
       "label": "HfGgufFile",
       "file_type": "code",
       "source_file": "src/bindings.ts",
-      "source_location": "L1500",
+      "source_location": "L1520",
       "_origin": "ast",
       "id": "src_bindings_hfgguffile",
       "community": 26,
@@ -17330,7 +17560,7 @@
       "label": "HfModelSummary",
       "file_type": "code",
       "source_file": "src/bindings.ts",
-      "source_location": "L1516",
+      "source_location": "L1536",
       "_origin": "ast",
       "id": "src_bindings_hfmodelsummary",
       "community": 26,
@@ -17340,7 +17570,7 @@
       "label": "HfRepoFiles",
       "file_type": "code",
       "source_file": "src/bindings.ts",
-      "source_location": "L1538",
+      "source_location": "L1558",
       "_origin": "ast",
       "id": "src_bindings_hfrepofiles",
       "community": 26,
@@ -17350,7 +17580,7 @@
       "label": "HistoryEntry",
       "file_type": "code",
       "source_file": "src/bindings.ts",
-      "source_location": "L1547",
+      "source_location": "L1567",
       "_origin": "ast",
       "id": "src_bindings_historyentry",
       "community": 32,
@@ -17360,7 +17590,7 @@
       "label": "HistoryUpdatePayload",
       "file_type": "code",
       "source_file": "src/bindings.ts",
-      "source_location": "L1548",
+      "source_location": "L1568",
       "_origin": "ast",
       "id": "src_bindings_historyupdatepayload",
       "community": 32,
@@ -17370,7 +17600,7 @@
       "label": "ImplementationChangeResult",
       "file_type": "code",
       "source_file": "src/bindings.ts",
-      "source_location": "L1552",
+      "source_location": "L1572",
       "_origin": "ast",
       "id": "src_bindings_implementationchangeresult",
       "community": 4,
@@ -17380,7 +17610,7 @@
       "label": "KeyboardImplementation",
       "file_type": "code",
       "source_file": "src/bindings.ts",
-      "source_location": "L1557",
+      "source_location": "L1577",
       "_origin": "ast",
       "id": "src_bindings_keyboardimplementation",
       "community": 4,
@@ -17390,7 +17620,7 @@
       "label": "LLMPrompt",
       "file_type": "code",
       "source_file": "src/bindings.ts",
-      "source_location": "L1558",
+      "source_location": "L1578",
       "_origin": "ast",
       "id": "src_bindings_llmprompt",
       "community": 4,
@@ -17400,7 +17630,7 @@
       "label": "LocalLlmStatus",
       "file_type": "code",
       "source_file": "src/bindings.ts",
-      "source_location": "L1559",
+      "source_location": "L1579",
       "_origin": "ast",
       "id": "src_bindings_localllmstatus",
       "community": 3,
@@ -17410,7 +17640,7 @@
       "label": "LogLevel",
       "file_type": "code",
       "source_file": "src/bindings.ts",
-      "source_location": "L1580",
+      "source_location": "L1600",
       "_origin": "ast",
       "id": "src_bindings_loglevel",
       "community": 17,
@@ -17420,7 +17650,7 @@
       "label": "ModelInfo",
       "file_type": "code",
       "source_file": "src/bindings.ts",
-      "source_location": "L1581",
+      "source_location": "L1601",
       "_origin": "ast",
       "id": "src_bindings_modelinfo",
       "community": 26,
@@ -17430,7 +17660,7 @@
       "label": "ModelLoadStatus",
       "file_type": "code",
       "source_file": "src/bindings.ts",
-      "source_location": "L1582",
+      "source_location": "L1602",
       "_origin": "ast",
       "id": "src_bindings_modelloadstatus",
       "community": 4,
@@ -17440,7 +17670,7 @@
       "label": "ModelUnloadTimeout",
       "file_type": "code",
       "source_file": "src/bindings.ts",
-      "source_location": "L1583",
+      "source_location": "L1603",
       "_origin": "ast",
       "id": "src_bindings_modelunloadtimeout",
       "community": 17,
@@ -17450,7 +17680,7 @@
       "label": "OrtAcceleratorSetting",
       "file_type": "code",
       "source_file": "src/bindings.ts",
-      "source_location": "L1584",
+      "source_location": "L1604",
       "_origin": "ast",
       "id": "src_bindings_ortacceleratorsetting",
       "community": 4,
@@ -17460,7 +17690,7 @@
       "label": "OverlayPosition",
       "file_type": "code",
       "source_file": "src/bindings.ts",
-      "source_location": "L1585",
+      "source_location": "L1605",
       "_origin": "ast",
       "id": "src_bindings_overlayposition",
       "community": 17,
@@ -17470,7 +17700,7 @@
       "label": "PaginatedAssistantHistory",
       "file_type": "code",
       "source_file": "src/bindings.ts",
-      "source_location": "L1586",
+      "source_location": "L1606",
       "_origin": "ast",
       "id": "src_bindings_paginatedassistanthistory",
       "community": 4,
@@ -17480,7 +17710,7 @@
       "label": "PaginatedHistory",
       "file_type": "code",
       "source_file": "src/bindings.ts",
-      "source_location": "L1587",
+      "source_location": "L1607",
       "_origin": "ast",
       "id": "src_bindings_paginatedhistory",
       "community": 4,
@@ -17490,7 +17720,7 @@
       "label": "PasteMethod",
       "file_type": "code",
       "source_file": "src/bindings.ts",
-      "source_location": "L1588",
+      "source_location": "L1608",
       "_origin": "ast",
       "id": "src_bindings_pastemethod",
       "community": 25,
@@ -17500,7 +17730,7 @@
       "label": "PermissionAccess",
       "file_type": "code",
       "source_file": "src/bindings.ts",
-      "source_location": "L1589",
+      "source_location": "L1609",
       "_origin": "ast",
       "id": "src_bindings_permissionaccess",
       "community": 4,
@@ -17510,7 +17740,7 @@
       "label": "PostProcessProvider",
       "file_type": "code",
       "source_file": "src/bindings.ts",
-      "source_location": "L1590",
+      "source_location": "L1610",
       "_origin": "ast",
       "id": "src_bindings_postprocessprovider",
       "community": 4,
@@ -17520,7 +17750,7 @@
       "label": "RecordingRetentionPeriod",
       "file_type": "code",
       "source_file": "src/bindings.ts",
-      "source_location": "L1591",
+      "source_location": "L1611",
       "_origin": "ast",
       "id": "src_bindings_recordingretentionperiod",
       "community": 17,
@@ -17530,7 +17760,7 @@
       "label": "Replacement",
       "file_type": "code",
       "source_file": "src/bindings.ts",
-      "source_location": "L1601",
+      "source_location": "L1621",
       "_origin": "ast",
       "id": "src_bindings_replacement",
       "community": 4,
@@ -17540,7 +17770,7 @@
       "label": "SearchResult",
       "file_type": "code",
       "source_file": "src/bindings.ts",
-      "source_location": "L1633",
+      "source_location": "L1655",
       "_origin": "ast",
       "id": "src_bindings_searchresult",
       "community": 4,
@@ -17550,7 +17780,7 @@
       "label": "SecretMap",
       "file_type": "code",
       "source_file": "src/bindings.ts",
-      "source_location": "L1634",
+      "source_location": "L1660",
       "_origin": "ast",
       "id": "src_bindings_secretmap",
       "community": 4,
@@ -17560,7 +17790,7 @@
       "label": "SecretString",
       "file_type": "code",
       "source_file": "src/bindings.ts",
-      "source_location": "L1635",
+      "source_location": "L1661",
       "_origin": "ast",
       "id": "src_bindings_secretstring",
       "community": 4,
@@ -17570,7 +17800,7 @@
       "label": "ShortcutBinding",
       "file_type": "code",
       "source_file": "src/bindings.ts",
-      "source_location": "L1636",
+      "source_location": "L1662",
       "_origin": "ast",
       "id": "src_bindings_shortcutbinding",
       "community": 4,
@@ -17580,7 +17810,7 @@
       "label": "SoundTheme",
       "file_type": "code",
       "source_file": "src/bindings.ts",
-      "source_location": "L1637",
+      "source_location": "L1663",
       "_origin": "ast",
       "id": "src_bindings_soundtheme",
       "community": 4,
@@ -17590,7 +17820,7 @@
       "label": "Theme",
       "file_type": "code",
       "source_file": "src/bindings.ts",
-      "source_location": "L1643",
+      "source_location": "L1669",
       "_origin": "ast",
       "id": "src_bindings_theme",
       "community": 4,
@@ -17600,7 +17830,7 @@
       "label": "TypingTool",
       "file_type": "code",
       "source_file": "src/bindings.ts",
-      "source_location": "L1644",
+      "source_location": "L1670",
       "_origin": "ast",
       "id": "src_bindings_typingtool",
       "community": 90,
@@ -17610,7 +17840,7 @@
       "label": "WhisperAcceleratorSetting",
       "file_type": "code",
       "source_file": "src/bindings.ts",
-      "source_location": "L1645",
+      "source_location": "L1671",
       "_origin": "ast",
       "id": "src_bindings_whisperacceleratorsetting",
       "community": 4,
@@ -17620,7 +17850,7 @@
       "label": "WindowsMicrophonePermissionStatus",
       "file_type": "code",
       "source_file": "src/bindings.ts",
-      "source_location": "L1646",
+      "source_location": "L1672",
       "_origin": "ast",
       "id": "src_bindings_windowsmicrophonepermissionstatus",
       "community": 4,
@@ -17630,7 +17860,7 @@
       "label": "__EventObj__",
       "file_type": "code",
       "source_file": "src/bindings.ts",
-      "source_location": "L1657",
+      "source_location": "L1683",
       "_origin": "ast",
       "id": "src_bindings_eventobj",
       "community": 4,
@@ -17640,7 +17870,7 @@
       "label": "Result",
       "file_type": "code",
       "source_file": "src/bindings.ts",
-      "source_location": "L1669",
+      "source_location": "L1695",
       "_origin": "ast",
       "id": "src_bindings_result",
       "community": 4,
@@ -17650,7 +17880,7 @@
       "label": "__makeEvents__()",
       "file_type": "code",
       "source_file": "src/bindings.ts",
-      "source_location": "L1673",
+      "source_location": "L1699",
       "_origin": "ast",
       "id": "src_bindings_makeevents",
       "community": 4,
@@ -20460,7 +20690,7 @@
       "label": "resample()",
       "file_type": "code",
       "source_file": "src/components/shared/AudioWaveform.tsx",
-      "source_location": "L24",
+      "source_location": "L30",
       "_origin": "ast",
       "id": "shared_audiowaveform_resample",
       "community": 137,
@@ -20470,7 +20700,7 @@
       "label": "AudioWaveform()",
       "file_type": "code",
       "source_file": "src/components/shared/AudioWaveform.tsx",
-      "source_location": "L46",
+      "source_location": "L58",
       "_origin": "ast",
       "id": "shared_audiowaveform_audiowaveform",
       "community": 137,
@@ -24047,10 +24277,20 @@
       "norm_label": "phase 1.8 \u2014 secure api-key storage in the os keychain (done)"
     },
     {
-      "label": "Roadmap",
+      "label": "Phase 1.9 \u2014 Web search quality overhaul (done)",
       "file_type": "document",
       "source_file": "docs/PROGRESS.md",
       "source_location": "L108",
+      "_origin": "ast",
+      "id": "docs_progress_phase_1_9_web_search_quality_overhaul_done",
+      "community": 54,
+      "norm_label": "phase 1.9 \u2014 web search quality overhaul (done)"
+    },
+    {
+      "label": "Roadmap",
+      "file_type": "document",
+      "source_file": "docs/PROGRESS.md",
+      "source_location": "L118",
       "_origin": "ast",
       "id": "docs_progress_roadmap",
       "community": 54,
@@ -29368,6 +29608,16 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src-tauri/src/assistant.rs",
+      "source_location": "L489",
+      "weight": 1.0,
+      "source": "src_assistant",
+      "target": "src_assistant_recent_context_for_planner",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/assistant.rs",
       "source_location": "L344",
       "weight": 1.0,
       "confidence_score": 1.0,
@@ -29605,6 +29855,17 @@
       "confidence_score": 1.0,
       "source": "src_assistant_persist_assistant_session",
       "target": "src_tauri_src_assistant_rs_apphandle"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/assistant.rs",
+      "source_location": "L489",
+      "weight": 1.0,
+      "context": "parameter_type",
+      "source": "src_assistant_recent_context_for_planner",
+      "target": "src_tauri_src_assistant_rs_apphandle",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -29891,6 +30152,17 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "src-tauri/src/assistant.rs",
+      "source_location": "L492",
+      "weight": 1.0,
+      "source": "src_assistant_recent_context_for_planner",
+      "target": "src_assistant_assistantconversation_new",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/assistant.rs",
       "source_location": "L411",
       "weight": 1.0,
       "confidence_score": 1.0,
@@ -29951,6 +30223,17 @@
       "confidence_score": 1.0,
       "source": "src_assistant_current_datetime_line",
       "target": "src_tauri_src_assistant_rs_string"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/assistant.rs",
+      "source_location": "L489",
+      "weight": 1.0,
+      "context": "return_type",
+      "source": "src_assistant_recent_context_for_planner",
+      "target": "src_tauri_src_assistant_rs_string",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -30224,6 +30507,17 @@
       "confidence_score": 1.0,
       "source": "src_assistant_run_assistant_turn",
       "target": "src_assistant_current_datetime_line"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/assistant.rs",
+      "source_location": "L629",
+      "weight": 1.0,
+      "source": "src_assistant_run_assistant_turn",
+      "target": "src_assistant_recent_context_for_planner",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -31064,9 +31358,9 @@
       "source_file": "src-tauri/src/audio_toolkit/audio/dsp.rs",
       "source_location": "L65",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "audio_dsp",
-      "target": "audio_dsp_boosts_quiet_audio_toward_target",
-      "confidence_score": 1.0
+      "target": "audio_dsp_boosts_quiet_audio_toward_target"
     },
     {
       "relation": "contains",
@@ -31074,9 +31368,9 @@
       "source_file": "src-tauri/src/audio_toolkit/audio/dsp.rs",
       "source_location": "L84",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "audio_dsp",
-      "target": "audio_dsp_caps_gain_for_near_silent_noise",
-      "confidence_score": 1.0
+      "target": "audio_dsp_caps_gain_for_near_silent_noise"
     },
     {
       "relation": "contains",
@@ -31084,9 +31378,9 @@
       "source_file": "src-tauri/src/audio_toolkit/audio/dsp.rs",
       "source_location": "L75",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "audio_dsp",
-      "target": "audio_dsp_does_not_attenuate_loud_audio",
-      "confidence_score": 1.0
+      "target": "audio_dsp_does_not_attenuate_loud_audio"
     },
     {
       "relation": "contains",
@@ -31094,9 +31388,9 @@
       "source_file": "src-tauri/src/audio_toolkit/audio/dsp.rs",
       "source_location": "L59",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "audio_dsp",
-      "target": "audio_dsp_empty_is_noop",
-      "confidence_score": 1.0
+      "target": "audio_dsp_empty_is_noop"
     },
     {
       "relation": "contains",
@@ -31104,9 +31398,9 @@
       "source_file": "src-tauri/src/audio_toolkit/audio/dsp.rs",
       "source_location": "L21",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "audio_dsp",
-      "target": "audio_dsp_normalize_peak",
-      "confidence_score": 1.0
+      "target": "audio_dsp_normalize_peak"
     },
     {
       "relation": "contains",
@@ -31114,9 +31408,9 @@
       "source_file": "src-tauri/src/audio_toolkit/audio/dsp.rs",
       "source_location": "L101",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "audio_dsp",
-      "target": "audio_dsp_output_is_always_in_range",
-      "confidence_score": 1.0
+      "target": "audio_dsp_output_is_always_in_range"
     },
     {
       "relation": "contains",
@@ -31124,9 +31418,9 @@
       "source_file": "src-tauri/src/audio_toolkit/audio/dsp.rs",
       "source_location": "L94",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "audio_dsp",
-      "target": "audio_dsp_silence_is_noop",
-      "confidence_score": 1.0
+      "target": "audio_dsp_silence_is_noop"
     },
     {
       "relation": "calls",
@@ -31135,9 +31429,9 @@
       "source_file": "src-tauri/src/audio_toolkit/audio/dsp.rs",
       "source_location": "L68",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "audio_dsp_boosts_quiet_audio_toward_target",
-      "target": "audio_dsp_normalize_peak",
-      "confidence_score": 1.0
+      "target": "audio_dsp_normalize_peak"
     },
     {
       "relation": "calls",
@@ -31146,9 +31440,9 @@
       "source_file": "src-tauri/src/audio_toolkit/audio/dsp.rs",
       "source_location": "L87",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "audio_dsp_caps_gain_for_near_silent_noise",
-      "target": "audio_dsp_normalize_peak",
-      "confidence_score": 1.0
+      "target": "audio_dsp_normalize_peak"
     },
     {
       "relation": "calls",
@@ -31157,9 +31451,9 @@
       "source_file": "src-tauri/src/audio_toolkit/audio/dsp.rs",
       "source_location": "L78",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "audio_dsp_does_not_attenuate_loud_audio",
-      "target": "audio_dsp_normalize_peak",
-      "confidence_score": 1.0
+      "target": "audio_dsp_normalize_peak"
     },
     {
       "relation": "calls",
@@ -31168,9 +31462,9 @@
       "source_file": "src-tauri/src/audio_toolkit/audio/dsp.rs",
       "source_location": "L103",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "audio_dsp_output_is_always_in_range",
-      "target": "audio_dsp_normalize_peak",
-      "confidence_score": 1.0
+      "target": "audio_dsp_normalize_peak"
     },
     {
       "relation": "calls",
@@ -31179,9 +31473,9 @@
       "source_file": "src-tauri/src/audio_toolkit/audio/dsp.rs",
       "source_location": "L96",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "audio_dsp_silence_is_noop",
-      "target": "audio_dsp_normalize_peak",
-      "confidence_score": 1.0
+      "target": "audio_dsp_normalize_peak"
     },
     {
       "relation": "calls",
@@ -31384,9 +31678,9 @@
       "source_file": "src-tauri/src/audio_toolkit/audio/recorder.rs",
       "source_location": "L230",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "audio_recorder_audiorecorder",
-      "target": "audio_recorder_audiorecorder_capture_ready_handle",
-      "confidence_score": 1.0
+      "target": "audio_recorder_audiorecorder_capture_ready_handle"
     },
     {
       "relation": "method",
@@ -31508,9 +31802,9 @@
       "source_location": "L43",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "audio_recorder_audiorecorder",
-      "target": "src_tauri_src_audio_toolkit_audio_recorder_rs_condvar",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_audio_toolkit_audio_recorder_rs_condvar"
     },
     {
       "relation": "references",
@@ -31695,9 +31989,9 @@
       "source_location": "L230",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "audio_recorder_audiorecorder_capture_ready_handle",
-      "target": "src_tauri_src_audio_toolkit_audio_recorder_rs_arc",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_audio_toolkit_audio_recorder_rs_arc"
     },
     {
       "relation": "references",
@@ -31717,9 +32011,9 @@
       "source_location": "L230",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "audio_recorder_audiorecorder_capture_ready_handle",
-      "target": "src_tauri_src_audio_toolkit_audio_recorder_rs_mutex",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_audio_toolkit_audio_recorder_rs_mutex"
     },
     {
       "relation": "references",
@@ -31904,9 +32198,9 @@
       "source_location": "L230",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "audio_recorder_audiorecorder_capture_ready_handle",
-      "target": "src_tauri_src_audio_toolkit_audio_recorder_rs_condvar",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_audio_toolkit_audio_recorder_rs_condvar"
     },
     {
       "relation": "references",
@@ -31915,9 +32209,9 @@
       "source_location": "L424",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "audio_recorder_run_consumer",
-      "target": "src_tauri_src_audio_toolkit_audio_recorder_rs_condvar",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_audio_toolkit_audio_recorder_rs_condvar"
     },
     {
       "relation": "calls",
@@ -32288,9 +32582,9 @@
       "source_location": "L2",
       "weight": 1.0,
       "context": "import",
+      "confidence_score": 1.0,
       "source": "audio_resampler",
-      "target": "src_tauri_src_audio_toolkit_audio_resampler_rs_duration",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_audio_toolkit_audio_resampler_rs_duration"
     },
     {
       "relation": "method",
@@ -32372,9 +32666,9 @@
       "source_location": "L16",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "audio_resampler_frameresampler_new",
-      "target": "src_tauri_src_audio_toolkit_audio_resampler_rs_duration",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_audio_toolkit_audio_resampler_rs_duration"
     },
     {
       "relation": "references",
@@ -33319,9 +33613,9 @@
       "source_file": "src-tauri/src/audio_toolkit/replacements.rs",
       "source_location": "L26",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "audio_toolkit_replacements",
-      "target": "audio_toolkit_replacements_apply_replacements",
-      "confidence_score": 1.0
+      "target": "audio_toolkit_replacements_apply_replacements"
     },
     {
       "relation": "contains",
@@ -33329,9 +33623,9 @@
       "source_file": "src-tauri/src/audio_toolkit/replacements.rs",
       "source_location": "L245",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "audio_toolkit_replacements",
-      "target": "audio_toolkit_replacements_capitalization_field_applies",
-      "confidence_score": 1.0
+      "target": "audio_toolkit_replacements_capitalization_field_applies"
     },
     {
       "relation": "contains",
@@ -33339,9 +33633,9 @@
       "source_file": "src-tauri/src/audio_toolkit/replacements.rs",
       "source_location": "L119",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "audio_toolkit_replacements",
-      "target": "audio_toolkit_replacements_capitalize_first",
-      "confidence_score": 1.0
+      "target": "audio_toolkit_replacements_capitalize_first"
     },
     {
       "relation": "contains",
@@ -33349,9 +33643,9 @@
       "source_file": "src-tauri/src/audio_toolkit/replacements.rs",
       "source_location": "L252",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "audio_toolkit_replacements",
-      "target": "audio_toolkit_replacements_date_token_is_expanded",
-      "confidence_score": 1.0
+      "target": "audio_toolkit_replacements_date_token_is_expanded"
     },
     {
       "relation": "contains",
@@ -33359,9 +33653,9 @@
       "source_file": "src-tauri/src/audio_toolkit/replacements.rs",
       "source_location": "L167",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "audio_toolkit_replacements",
-      "target": "audio_toolkit_replacements_disabled_rule_is_skipped",
-      "confidence_score": 1.0
+      "target": "audio_toolkit_replacements_disabled_rule_is_skipped"
     },
     {
       "relation": "contains",
@@ -33369,9 +33663,9 @@
       "source_file": "src-tauri/src/audio_toolkit/replacements.rs",
       "source_location": "L174",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "audio_toolkit_replacements",
-      "target": "audio_toolkit_replacements_empty_search_is_skipped",
-      "confidence_score": 1.0
+      "target": "audio_toolkit_replacements_empty_search_is_skipped"
     },
     {
       "relation": "contains",
@@ -33379,9 +33673,9 @@
       "source_file": "src-tauri/src/audio_toolkit/replacements.rs",
       "source_location": "L74",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "audio_toolkit_replacements",
-      "target": "audio_toolkit_replacements_expand_replacement",
-      "confidence_score": 1.0
+      "target": "audio_toolkit_replacements_expand_replacement"
     },
     {
       "relation": "contains",
@@ -33389,9 +33683,9 @@
       "source_file": "src-tauri/src/audio_toolkit/replacements.rs",
       "source_location": "L190",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "audio_toolkit_replacements",
-      "target": "audio_toolkit_replacements_invalid_regex_is_skipped_not_panicking",
-      "confidence_score": 1.0
+      "target": "audio_toolkit_replacements_invalid_regex_is_skipped_not_panicking"
     },
     {
       "relation": "contains",
@@ -33399,9 +33693,9 @@
       "source_file": "src-tauri/src/audio_toolkit/replacements.rs",
       "source_location": "L153",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "audio_toolkit_replacements",
-      "target": "audio_toolkit_replacements_literal_is_not_treated_as_regex",
-      "confidence_score": 1.0
+      "target": "audio_toolkit_replacements_literal_is_not_treated_as_regex"
     },
     {
       "relation": "contains",
@@ -33409,9 +33703,9 @@
       "source_file": "src-tauri/src/audio_toolkit/replacements.rs",
       "source_location": "L147",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "audio_toolkit_replacements",
-      "target": "audio_toolkit_replacements_literal_replacement",
-      "confidence_score": 1.0
+      "target": "audio_toolkit_replacements_literal_replacement"
     },
     {
       "relation": "contains",
@@ -33419,9 +33713,9 @@
       "source_file": "src-tauri/src/audio_toolkit/replacements.rs",
       "source_location": "L233",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "audio_toolkit_replacements",
-      "target": "audio_toolkit_replacements_magic_capitalize_transform",
-      "confidence_score": 1.0
+      "target": "audio_toolkit_replacements_magic_capitalize_transform"
     },
     {
       "relation": "contains",
@@ -33429,9 +33723,9 @@
       "source_file": "src-tauri/src/audio_toolkit/replacements.rs",
       "source_location": "L227",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "audio_toolkit_replacements",
-      "target": "audio_toolkit_replacements_magic_lowercase_transform",
-      "confidence_score": 1.0
+      "target": "audio_toolkit_replacements_magic_lowercase_transform"
     },
     {
       "relation": "contains",
@@ -33439,9 +33733,9 @@
       "source_file": "src-tauri/src/audio_toolkit/replacements.rs",
       "source_location": "L239",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "audio_toolkit_replacements",
-      "target": "audio_toolkit_replacements_magic_nospace_transform",
-      "confidence_score": 1.0
+      "target": "audio_toolkit_replacements_magic_nospace_transform"
     },
     {
       "relation": "contains",
@@ -33449,9 +33743,9 @@
       "source_file": "src-tauri/src/audio_toolkit/replacements.rs",
       "source_location": "L221",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "audio_toolkit_replacements",
-      "target": "audio_toolkit_replacements_magic_uppercase_transform",
-      "confidence_score": 1.0
+      "target": "audio_toolkit_replacements_magic_uppercase_transform"
     },
     {
       "relation": "contains",
@@ -33459,9 +33753,9 @@
       "source_file": "src-tauri/src/audio_toolkit/replacements.rs",
       "source_location": "L180",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "audio_toolkit_replacements",
-      "target": "audio_toolkit_replacements_regex_replacement",
-      "confidence_score": 1.0
+      "target": "audio_toolkit_replacements_regex_replacement"
     },
     {
       "relation": "contains",
@@ -33469,9 +33763,9 @@
       "source_file": "src-tauri/src/audio_toolkit/replacements.rs",
       "source_location": "L160",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "audio_toolkit_replacements",
-      "target": "audio_toolkit_replacements_replacement_with_dollar_is_literal",
-      "confidence_score": 1.0
+      "target": "audio_toolkit_replacements_replacement_with_dollar_is_literal"
     },
     {
       "relation": "contains",
@@ -33479,9 +33773,9 @@
       "source_file": "src-tauri/src/audio_toolkit/replacements.rs",
       "source_location": "L134",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "audio_toolkit_replacements",
-      "target": "audio_toolkit_replacements_rule",
-      "confidence_score": 1.0
+      "target": "audio_toolkit_replacements_rule"
     },
     {
       "relation": "contains",
@@ -33489,9 +33783,9 @@
       "source_file": "src-tauri/src/audio_toolkit/replacements.rs",
       "source_location": "L200",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "audio_toolkit_replacements",
-      "target": "audio_toolkit_replacements_rules_apply_in_order",
-      "confidence_score": 1.0
+      "target": "audio_toolkit_replacements_rules_apply_in_order"
     },
     {
       "relation": "contains",
@@ -33499,9 +33793,9 @@
       "source_file": "src-tauri/src/audio_toolkit/replacements.rs",
       "source_location": "L261",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "audio_toolkit_replacements",
-      "target": "audio_toolkit_replacements_time_token_is_expanded",
-      "confidence_score": 1.0
+      "target": "audio_toolkit_replacements_time_token_is_expanded"
     },
     {
       "relation": "contains",
@@ -33509,9 +33803,9 @@
       "source_file": "src-tauri/src/audio_toolkit/replacements.rs",
       "source_location": "L214",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "audio_toolkit_replacements",
-      "target": "audio_toolkit_replacements_trim_after_removes_following_whitespace",
-      "confidence_score": 1.0
+      "target": "audio_toolkit_replacements_trim_after_removes_following_whitespace"
     },
     {
       "relation": "contains",
@@ -33519,9 +33813,9 @@
       "source_file": "src-tauri/src/audio_toolkit/replacements.rs",
       "source_location": "L207",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "audio_toolkit_replacements",
-      "target": "audio_toolkit_replacements_trim_before_removes_preceding_whitespace",
-      "confidence_score": 1.0
+      "target": "audio_toolkit_replacements_trim_before_removes_preceding_whitespace"
     },
     {
       "relation": "calls",
@@ -33530,9 +33824,9 @@
       "source_file": "src-tauri/src/audio_toolkit/replacements.rs",
       "source_location": "L60",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "audio_toolkit_replacements_apply_replacements",
-      "target": "audio_toolkit_replacements_expand_replacement",
-      "confidence_score": 1.0
+      "target": "audio_toolkit_replacements_expand_replacement"
     },
     {
       "relation": "references",
@@ -33541,9 +33835,9 @@
       "source_location": "L26",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "audio_toolkit_replacements_apply_replacements",
-      "target": "src_tauri_src_audio_toolkit_replacements_rs_replacement",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_audio_toolkit_replacements_rs_replacement"
     },
     {
       "relation": "references",
@@ -33552,9 +33846,9 @@
       "source_location": "L26",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "audio_toolkit_replacements_apply_replacements",
-      "target": "src_tauri_src_audio_toolkit_replacements_rs_string",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_audio_toolkit_replacements_rs_string"
     },
     {
       "relation": "calls",
@@ -33563,9 +33857,9 @@
       "source_file": "src-tauri/src/audio_toolkit/replacements.rs",
       "source_location": "L254",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "audio_toolkit_replacements_date_token_is_expanded",
-      "target": "audio_toolkit_replacements_apply_replacements",
-      "confidence_score": 1.0
+      "target": "audio_toolkit_replacements_apply_replacements"
     },
     {
       "relation": "calls",
@@ -33574,9 +33868,9 @@
       "source_file": "src-tauri/src/audio_toolkit/replacements.rs",
       "source_location": "L263",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "audio_toolkit_replacements_time_token_is_expanded",
-      "target": "audio_toolkit_replacements_apply_replacements",
-      "confidence_score": 1.0
+      "target": "audio_toolkit_replacements_apply_replacements"
     },
     {
       "relation": "references",
@@ -33585,9 +33879,9 @@
       "source_location": "L134",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "audio_toolkit_replacements_rule",
-      "target": "src_tauri_src_audio_toolkit_replacements_rs_replacement",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_audio_toolkit_replacements_rs_replacement"
     },
     {
       "relation": "references",
@@ -33596,9 +33890,9 @@
       "source_location": "L119",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "audio_toolkit_replacements_capitalize_first",
-      "target": "src_tauri_src_audio_toolkit_replacements_rs_string",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_audio_toolkit_replacements_rs_string"
     },
     {
       "relation": "references",
@@ -33607,9 +33901,9 @@
       "source_location": "L74",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "audio_toolkit_replacements_expand_replacement",
-      "target": "src_tauri_src_audio_toolkit_replacements_rs_string",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_audio_toolkit_replacements_rs_string"
     },
     {
       "relation": "calls",
@@ -33618,9 +33912,9 @@
       "source_file": "src-tauri/src/audio_toolkit/replacements.rs",
       "source_location": "L103",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "audio_toolkit_replacements_expand_replacement",
-      "target": "audio_toolkit_replacements_capitalize_first",
-      "confidence_score": 1.0
+      "target": "audio_toolkit_replacements_capitalize_first"
     },
     {
       "relation": "references",
@@ -33629,9 +33923,9 @@
       "source_location": "L74",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "audio_toolkit_replacements_expand_replacement",
-      "target": "capitalization",
-      "confidence_score": 1.0
+      "target": "capitalization"
     },
     {
       "relation": "calls",
@@ -33640,9 +33934,9 @@
       "source_file": "src-tauri/src/audio_toolkit/replacements.rs",
       "source_location": "L246",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "audio_toolkit_replacements_capitalization_field_applies",
-      "target": "audio_toolkit_replacements_rule",
-      "confidence_score": 1.0
+      "target": "audio_toolkit_replacements_rule"
     },
     {
       "relation": "calls",
@@ -33651,9 +33945,9 @@
       "source_file": "src-tauri/src/audio_toolkit/replacements.rs",
       "source_location": "L168",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "audio_toolkit_replacements_disabled_rule_is_skipped",
-      "target": "audio_toolkit_replacements_rule",
-      "confidence_score": 1.0
+      "target": "audio_toolkit_replacements_rule"
     },
     {
       "relation": "calls",
@@ -33662,9 +33956,9 @@
       "source_file": "src-tauri/src/audio_toolkit/replacements.rs",
       "source_location": "L191",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "audio_toolkit_replacements_invalid_regex_is_skipped_not_panicking",
-      "target": "audio_toolkit_replacements_rule",
-      "confidence_score": 1.0
+      "target": "audio_toolkit_replacements_rule"
     },
     {
       "relation": "calls",
@@ -33673,9 +33967,9 @@
       "source_file": "src-tauri/src/audio_toolkit/replacements.rs",
       "source_location": "L181",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "audio_toolkit_replacements_regex_replacement",
-      "target": "audio_toolkit_replacements_rule",
-      "confidence_score": 1.0
+      "target": "audio_toolkit_replacements_rule"
     },
     {
       "relation": "calls",
@@ -33684,9 +33978,9 @@
       "source_file": "src-tauri/src/audio_toolkit/replacements.rs",
       "source_location": "L215",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "audio_toolkit_replacements_trim_after_removes_following_whitespace",
-      "target": "audio_toolkit_replacements_rule",
-      "confidence_score": 1.0
+      "target": "audio_toolkit_replacements_rule"
     },
     {
       "relation": "calls",
@@ -33695,9 +33989,9 @@
       "source_file": "src-tauri/src/audio_toolkit/replacements.rs",
       "source_location": "L208",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "audio_toolkit_replacements_trim_before_removes_preceding_whitespace",
-      "target": "audio_toolkit_replacements_rule",
-      "confidence_score": 1.0
+      "target": "audio_toolkit_replacements_rule"
     },
     {
       "relation": "contains",
@@ -36600,6 +36894,16 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src-tauri/src/commands/assistant.rs",
+      "source_location": "L477",
+      "weight": 1.0,
+      "source": "commands_assistant",
+      "target": "commands_assistant_set_assistant_web_search_fetch_content",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/commands/assistant.rs",
       "source_location": "L464",
       "weight": 1.0,
       "confidence_score": 1.0,
@@ -37048,6 +37352,17 @@
       "relation": "references",
       "confidence": "EXTRACTED",
       "source_file": "src-tauri/src/commands/assistant.rs",
+      "source_location": "L477",
+      "weight": 1.0,
+      "context": "parameter_type",
+      "source": "commands_assistant_set_assistant_web_search_fetch_content",
+      "target": "src_tauri_src_commands_assistant_rs_apphandle",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/commands/assistant.rs",
       "source_location": "L464",
       "weight": 1.0,
       "context": "parameter_type",
@@ -37444,6 +37759,17 @@
       "relation": "references",
       "confidence": "EXTRACTED",
       "source_file": "src-tauri/src/commands/assistant.rs",
+      "source_location": "L477",
+      "weight": 1.0,
+      "context": "generic_arg",
+      "source": "commands_assistant_set_assistant_web_search_fetch_content",
+      "target": "src_tauri_src_commands_assistant_rs_string",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/commands/assistant.rs",
       "source_location": "L464",
       "weight": 1.0,
       "context": "generic_arg",
@@ -37835,6 +38161,17 @@
       "confidence_score": 1.0,
       "source": "commands_assistant_set_assistant_web_search_enabled",
       "target": "src_tauri_src_commands_assistant_rs_result"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/commands/assistant.rs",
+      "source_location": "L477",
+      "weight": 1.0,
+      "context": "return_type",
+      "source": "commands_assistant_set_assistant_web_search_fetch_content",
+      "target": "src_tauri_src_commands_assistant_rs_result",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -38187,6 +38524,17 @@
       "confidence_score": 1.0,
       "source": "commands_assistant_set_assistant_web_search_enabled",
       "target": "commands_assistant_emit_settings_changed"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/commands/assistant.rs",
+      "source_location": "L481",
+      "weight": 1.0,
+      "source": "commands_assistant_set_assistant_web_search_fetch_content",
+      "target": "commands_assistant_emit_settings_changed",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -38681,6 +39029,28 @@
       "source_location": "L467",
       "weight": 1.0,
       "source": "commands_assistant_set_assistant_web_search_max_results",
+      "target": "src_settings_write_settings"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "src-tauri/src/commands/assistant.rs",
+      "source_location": "L478",
+      "weight": 1.0,
+      "source": "commands_assistant_set_assistant_web_search_fetch_content",
+      "target": "src_settings_get_settings"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "src-tauri/src/commands/assistant.rs",
+      "source_location": "L480",
+      "weight": 1.0,
+      "source": "commands_assistant_set_assistant_web_search_fetch_content",
       "target": "src_settings_write_settings"
     },
     {
@@ -43818,17 +44188,6 @@
       "target": "debug"
     },
     {
-      "relation": "imports_from",
-      "confidence": "EXTRACTED",
-      "source_file": "src-tauri/src/llm_client.rs",
-      "source_location": "L1",
-      "weight": 1.0,
-      "context": "import",
-      "confidence_score": 1.0,
-      "source": "src_llm_client",
-      "target": "postprocessprovider"
-    },
-    {
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src-tauri/src/llm_client.rs",
@@ -43997,6 +44356,17 @@
       "confidence_score": 1.0,
       "source": "src_llm_client",
       "target": "src_llm_client_streamdelta"
+    },
+    {
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/llm_client.rs",
+      "source_location": "L1",
+      "weight": 1.0,
+      "context": "import",
+      "source": "src_llm_client",
+      "target": "src_tauri_src_llm_client_rs_postprocessprovider",
+      "confidence_score": 1.0
     },
     {
       "relation": "imports_from",
@@ -44412,9 +44782,9 @@
       "source_location": "L69",
       "weight": 1.0,
       "context": "parameter_type",
-      "confidence_score": 1.0,
       "source": "src_llm_client_build_headers",
-      "target": "postprocessprovider"
+      "target": "src_tauri_src_llm_client_rs_postprocessprovider",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -44445,9 +44815,9 @@
       "source_location": "L106",
       "weight": 1.0,
       "context": "parameter_type",
-      "confidence_score": 1.0,
       "source": "src_llm_client_create_client",
-      "target": "postprocessprovider"
+      "target": "src_tauri_src_llm_client_rs_postprocessprovider",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -44456,9 +44826,9 @@
       "source_location": "L334",
       "weight": 1.0,
       "context": "parameter_type",
-      "confidence_score": 1.0,
       "source": "src_llm_client_fetch_models",
-      "target": "postprocessprovider"
+      "target": "src_tauri_src_llm_client_rs_postprocessprovider",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -44467,9 +44837,9 @@
       "source_location": "L121",
       "weight": 1.0,
       "context": "parameter_type",
-      "confidence_score": 1.0,
       "source": "src_llm_client_send_chat_completion",
-      "target": "postprocessprovider"
+      "target": "src_tauri_src_llm_client_rs_postprocessprovider",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -44478,9 +44848,9 @@
       "source_location": "L147",
       "weight": 1.0,
       "context": "parameter_type",
-      "confidence_score": 1.0,
       "source": "src_llm_client_send_chat_completion_with_schema",
-      "target": "postprocessprovider"
+      "target": "src_tauri_src_llm_client_rs_postprocessprovider",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -44489,9 +44859,9 @@
       "source_location": "L244",
       "weight": 1.0,
       "context": "parameter_type",
-      "confidence_score": 1.0,
       "source": "src_llm_client_send_chat_stream",
-      "target": "postprocessprovider"
+      "target": "src_tauri_src_llm_client_rs_postprocessprovider",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -45139,9 +45509,9 @@
       "source_file": "src-tauri/src/managers/audio.rs",
       "source_location": "L423",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "managers_audio_audiorecordingmanager",
-      "target": "managers_audio_audiorecordingmanager_wait_for_capture_ready",
-      "confidence_score": 1.0
+      "target": "managers_audio_audiorecordingmanager_wait_for_capture_ready"
     },
     {
       "relation": "references",
@@ -45447,9 +45817,9 @@
       "source_location": "L423",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "managers_audio_audiorecordingmanager_wait_for_capture_ready",
-      "target": "src_tauri_src_managers_audio_rs_duration",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_managers_audio_rs_duration"
     },
     {
       "relation": "calls",
@@ -49822,6 +50192,17 @@
       "target": "src_tauri_src_managers_model_rs_pathbuf"
     },
     {
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L32",
+      "weight": 1.0,
+      "context": "import",
+      "source": "src_web_search",
+      "target": "hashset",
+      "confidence_score": 1.0
+    },
+    {
       "relation": "calls",
       "context": "call",
       "confidence": "EXTRACTED",
@@ -50841,9 +51222,9 @@
       "source_location": "L54",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "managers_transcription_loadingguard",
-      "target": "src_tauri_src_managers_transcription_rs_condvar",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_managers_transcription_rs_condvar"
     },
     {
       "relation": "implements",
@@ -50917,9 +51298,9 @@
       "source_location": "L75",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "managers_transcription_transcriptionmanager",
-      "target": "src_tauri_src_managers_transcription_rs_condvar",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_managers_transcription_rs_condvar"
     },
     {
       "relation": "implements",
@@ -53266,9 +53647,9 @@
       "source_file": "src-tauri/src/settings.rs",
       "source_location": "L99",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_settings",
-      "target": "src_settings_capitalization",
-      "confidence_score": 1.0
+      "target": "src_settings_capitalization"
     },
     {
       "relation": "contains",
@@ -53459,6 +53840,16 @@
       "confidence_score": 1.0,
       "source": "src_settings",
       "target": "src_settings_default_assistant_tts_voice"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/settings.rs",
+      "source_location": "L974",
+      "weight": 1.0,
+      "source": "src_settings",
+      "target": "src_settings_default_assistant_web_search_fetch_content",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -53726,9 +54117,9 @@
       "source_file": "src-tauri/src/settings.rs",
       "source_location": "L857",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_settings",
-      "target": "src_settings_default_text_replacements",
-      "confidence_score": 1.0
+      "target": "src_settings_default_text_replacements"
     },
     {
       "relation": "contains",
@@ -53746,9 +54137,9 @@
       "source_file": "src-tauri/src/settings.rs",
       "source_location": "L852",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_settings",
-      "target": "src_settings_default_true",
-      "confidence_score": 1.0
+      "target": "src_settings_default_true"
     },
     {
       "relation": "contains",
@@ -53886,9 +54277,9 @@
       "source_file": "src-tauri/src/settings.rs",
       "source_location": "L1479",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_settings",
-      "target": "src_settings_hydrate_secrets",
-      "confidence_score": 1.0
+      "target": "src_settings_hydrate_secrets"
     },
     {
       "relation": "contains",
@@ -53936,9 +54327,9 @@
       "source_file": "src-tauri/src/settings.rs",
       "source_location": "L1430",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_settings",
-      "target": "src_settings_migrate_plaintext_secrets",
-      "confidence_score": 1.0
+      "target": "src_settings_migrate_plaintext_secrets"
     },
     {
       "relation": "contains",
@@ -53986,9 +54377,9 @@
       "source_file": "src-tauri/src/settings.rs",
       "source_location": "L1385",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_settings",
-      "target": "src_settings_persist_hydrated_secrets",
-      "confidence_score": 1.0
+      "target": "src_settings_persist_hydrated_secrets"
     },
     {
       "relation": "contains",
@@ -54016,9 +54407,9 @@
       "source_file": "src-tauri/src/settings.rs",
       "source_location": "L119",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_settings",
-      "target": "src_settings_replacement",
-      "confidence_score": 1.0
+      "target": "src_settings_replacement"
     },
     {
       "relation": "contains",
@@ -54696,9 +55087,9 @@
       "source_location": "L123",
       "weight": 1.0,
       "context": "field",
+      "confidence_score": 1.0,
       "source": "src_settings_replacement",
-      "target": "src_tauri_src_settings_rs_string",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_settings_rs_string"
     },
     {
       "relation": "references",
@@ -54751,9 +55142,9 @@
       "source_location": "L138",
       "weight": 1.0,
       "context": "field",
+      "confidence_score": 1.0,
       "source": "src_settings_replacement",
-      "target": "src_settings_capitalization",
-      "confidence_score": 1.0
+      "target": "src_settings_capitalization"
     },
     {
       "relation": "references",
@@ -54762,9 +55153,9 @@
       "source_location": "L489",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "src_settings_appsettings",
-      "target": "src_settings_replacement",
-      "confidence_score": 1.0
+      "target": "src_settings_replacement"
     },
     {
       "relation": "references",
@@ -54773,9 +55164,9 @@
       "source_location": "L857",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "src_settings_default_text_replacements",
-      "target": "src_settings_replacement",
-      "confidence_score": 1.0
+      "target": "src_settings_replacement"
     },
     {
       "relation": "references",
@@ -55420,9 +55811,9 @@
       "source_file": "src-tauri/src/settings.rs",
       "source_location": "L1470",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_settings_migrate_plaintext_secrets",
-      "target": "src_settings_ortacceleratorsetting_default",
-      "confidence_score": 1.0
+      "target": "src_settings_ortacceleratorsetting_default"
     },
     {
       "relation": "calls",
@@ -55431,9 +55822,9 @@
       "source_file": "src-tauri/src/settings.rs",
       "source_location": "L1416",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_settings_persist_hydrated_secrets",
-      "target": "src_settings_ortacceleratorsetting_default",
-      "confidence_score": 1.0
+      "target": "src_settings_ortacceleratorsetting_default"
     },
     {
       "relation": "references",
@@ -55633,9 +56024,9 @@
       "source_file": "src-tauri/src/settings.rs",
       "source_location": "L1498",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_settings_hydrate_secrets",
-      "target": "src_settings_secretstring",
-      "confidence_score": 1.0
+      "target": "src_settings_secretstring"
     },
     {
       "relation": "method",
@@ -55760,9 +56151,9 @@
       "source_location": "L1479",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "src_settings_hydrate_secrets",
-      "target": "src_settings_appsettings",
-      "confidence_score": 1.0
+      "target": "src_settings_appsettings"
     },
     {
       "relation": "references",
@@ -55782,9 +56173,9 @@
       "source_location": "L1430",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "src_settings_migrate_plaintext_secrets",
-      "target": "src_settings_appsettings",
-      "confidence_score": 1.0
+      "target": "src_settings_appsettings"
     },
     {
       "relation": "references",
@@ -55793,9 +56184,9 @@
       "source_location": "L1385",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "src_settings_persist_hydrated_secrets",
-      "target": "src_settings_appsettings",
-      "confidence_score": 1.0
+      "target": "src_settings_appsettings"
     },
     {
       "relation": "references",
@@ -55859,9 +56250,9 @@
       "source_location": "L857",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "src_settings_default_text_replacements",
-      "target": "src_tauri_src_settings_rs_vec",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_settings_rs_vec"
     },
     {
       "relation": "calls",
@@ -56145,9 +56536,9 @@
       "source_file": "src-tauri/src/settings.rs",
       "source_location": "L1266",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_settings_get_default_settings",
-      "target": "src_settings_default_text_replacements",
-      "confidence_score": 1.0
+      "target": "src_settings_default_text_replacements"
     },
     {
       "relation": "calls",
@@ -56539,6 +56930,17 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "src-tauri/src/settings.rs",
+      "source_location": "L1339",
+      "weight": 1.0,
+      "source": "src_settings_get_default_settings",
+      "target": "src_settings_default_assistant_web_search_fetch_content",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/settings.rs",
       "source_location": "L1262",
       "weight": 1.0,
       "confidence_score": 1.0,
@@ -56640,9 +57042,9 @@
       "source_file": "src-tauri/src/settings.rs",
       "source_location": "L1605",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_settings_write_settings",
-      "target": "src_settings_persist_hydrated_secrets",
-      "confidence_score": 1.0
+      "target": "src_settings_persist_hydrated_secrets"
     },
     {
       "relation": "calls",
@@ -56651,9 +57053,9 @@
       "source_file": "src-tauri/src/settings.rs",
       "source_location": "L1555",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_settings_load_or_create_app_settings",
-      "target": "src_settings_migrate_plaintext_secrets",
-      "confidence_score": 1.0
+      "target": "src_settings_migrate_plaintext_secrets"
     },
     {
       "relation": "calls",
@@ -56662,9 +57064,9 @@
       "source_file": "src-tauri/src/settings.rs",
       "source_location": "L1589",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_settings_get_settings",
-      "target": "src_settings_hydrate_secrets",
-      "confidence_score": 1.0
+      "target": "src_settings_hydrate_secrets"
     },
     {
       "relation": "calls",
@@ -56673,9 +57075,9 @@
       "source_file": "src-tauri/src/settings.rs",
       "source_location": "L1560",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_settings_load_or_create_app_settings",
-      "target": "src_settings_hydrate_secrets",
-      "confidence_score": 1.0
+      "target": "src_settings_hydrate_secrets"
     },
     {
       "relation": "references",
@@ -58424,9 +58826,9 @@
       "source_file": "src-tauri/src/shortcut/mod.rs",
       "source_location": "L689",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "shortcut_mod",
-      "target": "shortcut_mod_change_replacements_enabled_setting",
-      "confidence_score": 1.0
+      "target": "shortcut_mod_change_replacements_enabled_setting"
     },
     {
       "relation": "contains",
@@ -58554,9 +58956,9 @@
       "source_file": "src-tauri/src/shortcut/mod.rs",
       "source_location": "L713",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "shortcut_mod",
-      "target": "shortcut_mod_export_text_replacements",
-      "confidence_score": 1.0
+      "target": "shortcut_mod_export_text_replacements"
     },
     {
       "relation": "contains",
@@ -58614,9 +59016,9 @@
       "source_file": "src-tauri/src/shortcut/mod.rs",
       "source_location": "L721",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "shortcut_mod",
-      "target": "shortcut_mod_import_text_replacements",
-      "confidence_score": 1.0
+      "target": "shortcut_mod_import_text_replacements"
     },
     {
       "relation": "contains",
@@ -58784,9 +59186,9 @@
       "source_file": "src-tauri/src/shortcut/mod.rs",
       "source_location": "L698",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "shortcut_mod",
-      "target": "shortcut_mod_update_text_replacements",
-      "confidence_score": 1.0
+      "target": "shortcut_mod_update_text_replacements"
     },
     {
       "relation": "contains",
@@ -59134,9 +59536,9 @@
       "source_location": "L689",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "shortcut_mod_change_replacements_enabled_setting",
-      "target": "src_tauri_src_shortcut_mod_rs_apphandle",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_shortcut_mod_rs_apphandle"
     },
     {
       "relation": "references",
@@ -59453,9 +59855,9 @@
       "source_location": "L698",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "shortcut_mod_update_text_replacements",
-      "target": "src_tauri_src_shortcut_mod_rs_apphandle",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_shortcut_mod_rs_apphandle"
     },
     {
       "relation": "calls",
@@ -59849,9 +60251,9 @@
       "source_location": "L689",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "shortcut_mod_change_replacements_enabled_setting",
-      "target": "src_tauri_src_shortcut_mod_rs_result",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_shortcut_mod_rs_result"
     },
     {
       "relation": "references",
@@ -59992,9 +60394,9 @@
       "source_location": "L713",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "shortcut_mod_export_text_replacements",
-      "target": "src_tauri_src_shortcut_mod_rs_result",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_shortcut_mod_rs_result"
     },
     {
       "relation": "references",
@@ -60014,9 +60416,9 @@
       "source_location": "L721",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "shortcut_mod_import_text_replacements",
-      "target": "src_tauri_src_shortcut_mod_rs_result",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_shortcut_mod_rs_result"
     },
     {
       "relation": "references",
@@ -60124,9 +60526,9 @@
       "source_location": "L698",
       "weight": 1.0,
       "context": "return_type",
+      "confidence_score": 1.0,
       "source": "shortcut_mod_update_text_replacements",
-      "target": "src_tauri_src_shortcut_mod_rs_result",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_shortcut_mod_rs_result"
     },
     {
       "relation": "references",
@@ -60454,9 +60856,9 @@
       "source_location": "L689",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "shortcut_mod_change_replacements_enabled_setting",
-      "target": "src_tauri_src_shortcut_mod_rs_string",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_shortcut_mod_rs_string"
     },
     {
       "relation": "references",
@@ -60597,9 +60999,9 @@
       "source_location": "L713",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "shortcut_mod_export_text_replacements",
-      "target": "src_tauri_src_shortcut_mod_rs_string",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_shortcut_mod_rs_string"
     },
     {
       "relation": "references",
@@ -60652,9 +61054,9 @@
       "source_location": "L721",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "shortcut_mod_import_text_replacements",
-      "target": "src_tauri_src_shortcut_mod_rs_string",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_shortcut_mod_rs_string"
     },
     {
       "relation": "references",
@@ -60773,9 +61175,9 @@
       "source_location": "L698",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "shortcut_mod_update_text_replacements",
-      "target": "src_tauri_src_shortcut_mod_rs_string",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_shortcut_mod_rs_string"
     },
     {
       "relation": "references",
@@ -60982,9 +61384,9 @@
       "source_location": "L698",
       "weight": 1.0,
       "context": "parameter_type",
+      "confidence_score": 1.0,
       "source": "shortcut_mod_update_text_replacements",
-      "target": "src_tauri_src_shortcut_mod_rs_vec",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_shortcut_mod_rs_vec"
     },
     {
       "relation": "calls",
@@ -61092,9 +61494,9 @@
       "source_location": "L698",
       "weight": 1.0,
       "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "shortcut_mod_update_text_replacements",
-      "target": "src_tauri_src_shortcut_mod_rs_replacement",
-      "confidence_score": 1.0
+      "target": "src_tauri_src_shortcut_mod_rs_replacement"
     },
     {
       "relation": "calls",
@@ -63342,6 +63744,17 @@
       "target": "src_tauri_src_web_search_rs_appsettings"
     },
     {
+      "relation": "imports_from",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L33",
+      "weight": 1.0,
+      "context": "import",
+      "source": "src_web_search",
+      "target": "src_tauri_src_web_search_rs_duration",
+      "confidence_score": 1.0
+    },
+    {
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src-tauri/src/web_search.rs",
@@ -63375,11 +63788,21 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src-tauri/src/web_search.rs",
-      "source_location": "L700",
+      "source_location": "L368",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "src_web_search",
-      "target": "src_web_search_format_results_are_plain_bullets_without_numbers_or_urls"
+      "target": "src_web_search_dedupe_key",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L114",
+      "weight": 1.0,
+      "source": "src_web_search",
+      "target": "src_web_search_default_freshness",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -63390,6 +63813,56 @@
       "confidence_score": 1.0,
       "source": "src_web_search",
       "target": "src_web_search_format_results_for_prompt"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L1146",
+      "weight": 1.0,
+      "source": "src_web_search",
+      "target": "src_web_search_format_results_use_content_without_numbers_or_urls",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L1045",
+      "weight": 1.0,
+      "source": "src_web_search",
+      "target": "src_web_search_freshness_maps_to_provider_params",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L436",
+      "weight": 1.0,
+      "source": "src_web_search",
+      "target": "src_web_search_freshness_to_brave",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L447",
+      "weight": 1.0,
+      "source": "src_web_search",
+      "target": "src_web_search_freshness_to_ddg",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L425",
+      "weight": 1.0,
+      "source": "src_web_search",
+      "target": "src_web_search_freshness_to_tbs",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -63445,6 +63918,26 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L249",
+      "weight": 1.0,
+      "source": "src_web_search",
+      "target": "src_web_search_parse_plan",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L1055",
+      "weight": 1.0,
+      "source": "src_web_search",
+      "target": "src_web_search_parse_plan_handles_plain_and_fenced_json",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
       "source_location": "L556",
       "weight": 1.0,
       "confidence_score": 1.0,
@@ -63455,11 +63948,71 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L177",
+      "weight": 1.0,
+      "source": "src_web_search",
+      "target": "src_web_search_plan_search",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
       "source_location": "L617",
       "weight": 1.0,
       "confidence_score": 1.0,
       "source": "src_web_search",
       "target": "src_web_search_push_result"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L1103",
+      "weight": 1.0,
+      "source": "src_web_search",
+      "target": "src_web_search_raw_plan_searches_the_question",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L378",
+      "weight": 1.0,
+      "source": "src_web_search",
+      "target": "src_web_search_run_provider_search",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L975",
+      "weight": 1.0,
+      "source": "src_web_search",
+      "target": "src_web_search_sanitize_content",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L1069",
+      "weight": 1.0,
+      "source": "src_web_search",
+      "target": "src_web_search_sanitize_dedupes_caps_and_fixes_freshness",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L1088",
+      "weight": 1.0,
+      "source": "src_web_search",
+      "target": "src_web_search_sanitize_falls_back_to_raw_when_no_queries",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -63505,6 +64058,26 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L295",
+      "weight": 1.0,
+      "source": "src_web_search",
+      "target": "src_web_search_search_with_plan",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L102",
+      "weight": 1.0,
+      "source": "src_web_search",
+      "target": "src_web_search_searchplan",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
       "source_location": "L44",
       "weight": 1.0,
       "confidence_score": 1.0,
@@ -63525,6 +64098,16 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L1036",
+      "weight": 1.0,
+      "source": "src_web_search",
+      "target": "src_web_search_should_search_passes_lookups_to_planner",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
       "source_location": "L636",
       "weight": 1.0,
       "confidence_score": 1.0,
@@ -63535,31 +64118,22 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src-tauri/src/web_search.rs",
-      "source_location": "L658",
-      "weight": 1.0,
-      "confidence_score": 1.0,
-      "source": "src_web_search",
-      "target": "src_web_search_should_search_triggers_on_bare_factual_phrases"
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "src-tauri/src/web_search.rs",
-      "source_location": "L649",
-      "weight": 1.0,
-      "confidence_score": 1.0,
-      "source": "src_web_search",
-      "target": "src_web_search_should_search_triggers_on_questions_and_freshness"
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "src-tauri/src/web_search.rs",
       "source_location": "L607",
       "weight": 1.0,
       "confidence_score": 1.0,
       "source": "src_web_search",
       "target": "src_web_search_truncate_chars"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L368",
+      "weight": 1.0,
+      "context": "parameter_type",
+      "source": "src_web_search_dedupe_key",
+      "target": "src_web_search_searchresult",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -63593,6 +64167,17 @@
       "confidence_score": 1.0,
       "source": "src_web_search_push_result",
       "target": "src_web_search_searchresult"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L378",
+      "weight": 1.0,
+      "context": "generic_arg",
+      "source": "src_web_search_run_provider_search",
+      "target": "src_web_search_searchresult",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -63637,6 +64222,17 @@
       "confidence_score": 1.0,
       "source": "src_web_search_search_firecrawl",
       "target": "src_web_search_searchresult"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L295",
+      "weight": 1.0,
+      "context": "generic_arg",
+      "source": "src_web_search_search_with_plan",
+      "target": "src_web_search_searchresult",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -63675,6 +64271,28 @@
       "relation": "references",
       "confidence": "EXTRACTED",
       "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L368",
+      "weight": 1.0,
+      "context": "return_type",
+      "source": "src_web_search_dedupe_key",
+      "target": "src_tauri_src_web_search_rs_string",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L114",
+      "weight": 1.0,
+      "context": "return_type",
+      "source": "src_web_search_default_freshness",
+      "target": "src_tauri_src_web_search_rs_string",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
       "source_location": "L110",
       "weight": 1.0,
       "context": "return_type",
@@ -63703,6 +64321,39 @@
       "confidence_score": 1.0,
       "source": "src_web_search_percent_decode",
       "target": "src_tauri_src_web_search_rs_string"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L177",
+      "weight": 1.0,
+      "context": "generic_arg",
+      "source": "src_web_search_plan_search",
+      "target": "src_tauri_src_web_search_rs_string",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L378",
+      "weight": 1.0,
+      "context": "generic_arg",
+      "source": "src_web_search_run_provider_search",
+      "target": "src_tauri_src_web_search_rs_string",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L975",
+      "weight": 1.0,
+      "context": "return_type",
+      "source": "src_web_search_sanitize_content",
+      "target": "src_tauri_src_web_search_rs_string",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -63752,6 +64403,17 @@
       "relation": "references",
       "confidence": "EXTRACTED",
       "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L111",
+      "weight": 1.0,
+      "context": "field",
+      "source": "src_web_search_searchplan",
+      "target": "src_tauri_src_web_search_rs_string",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
       "source_location": "L607",
       "weight": 1.0,
       "context": "return_type",
@@ -63763,12 +64425,274 @@
       "relation": "references",
       "confidence": "EXTRACTED",
       "source_file": "src-tauri/src/web_search.rs",
-      "source_location": "L64",
+      "source_location": "L249",
+      "weight": 1.0,
+      "context": "generic_arg",
+      "source": "src_web_search_parse_plan",
+      "target": "src_web_search_searchplan",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L177",
+      "weight": 1.0,
+      "context": "generic_arg",
+      "source": "src_web_search_plan_search",
+      "target": "src_web_search_searchplan",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L295",
+      "weight": 1.0,
+      "context": "parameter_type",
+      "source": "src_web_search_search_with_plan",
+      "target": "src_web_search_searchplan",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L108",
+      "weight": 1.0,
+      "context": "field",
+      "source": "src_web_search_searchplan",
+      "target": "src_tauri_src_web_search_rs_vec",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L122",
+      "weight": 1.0,
+      "source": "src_web_search_searchplan",
+      "target": "src_web_search_searchplan_raw",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L136",
+      "weight": 1.0,
+      "source": "src_web_search_searchplan",
+      "target": "src_web_search_searchplan_sanitize",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L490",
+      "weight": 1.0,
+      "context": "return_type",
+      "confidence_score": 1.0,
+      "source": "src_web_search_parse_duckduckgo_html",
+      "target": "src_tauri_src_web_search_rs_vec"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L617",
       "weight": 1.0,
       "context": "parameter_type",
       "confidence_score": 1.0,
+      "source": "src_web_search_push_result",
+      "target": "src_tauri_src_web_search_rs_vec"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L378",
+      "weight": 1.0,
+      "context": "generic_arg",
+      "source": "src_web_search_run_provider_search",
+      "target": "src_tauri_src_web_search_rs_vec",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L64",
+      "weight": 1.0,
+      "context": "generic_arg",
+      "confidence_score": 1.0,
       "source": "src_web_search_search",
-      "target": "src_tauri_src_web_search_rs_appsettings"
+      "target": "src_tauri_src_web_search_rs_vec"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L372",
+      "weight": 1.0,
+      "context": "generic_arg",
+      "confidence_score": 1.0,
+      "source": "src_web_search_search_brave",
+      "target": "src_tauri_src_web_search_rs_vec"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L437",
+      "weight": 1.0,
+      "context": "generic_arg",
+      "confidence_score": 1.0,
+      "source": "src_web_search_search_duckduckgo",
+      "target": "src_tauri_src_web_search_rs_vec"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L306",
+      "weight": 1.0,
+      "context": "generic_arg",
+      "confidence_score": 1.0,
+      "source": "src_web_search_search_firecrawl",
+      "target": "src_tauri_src_web_search_rs_vec"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L295",
+      "weight": 1.0,
+      "context": "return_type",
+      "source": "src_web_search_search_with_plan",
+      "target": "src_tauri_src_web_search_rs_vec",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L1104",
+      "weight": 1.0,
+      "source": "src_web_search_raw_plan_searches_the_question",
+      "target": "src_web_search_searchplan_raw",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L122",
+      "weight": 1.0,
+      "context": "return_type",
+      "source": "src_web_search_searchplan_raw",
+      "target": "src_tauri_src_web_search_rs_self",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L240",
+      "weight": 1.0,
+      "source": "src_web_search_plan_search",
+      "target": "src_web_search_searchplan_sanitize",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L1081",
+      "weight": 1.0,
+      "source": "src_web_search_sanitize_dedupes_caps_and_fixes_freshness",
+      "target": "src_web_search_searchplan_sanitize",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L1094",
+      "weight": 1.0,
+      "source": "src_web_search_sanitize_falls_back_to_raw_when_no_queries",
+      "target": "src_web_search_searchplan_sanitize",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L145",
+      "weight": 1.0,
+      "source": "src_web_search_searchplan_sanitize",
+      "target": "src_web_search_truncate_chars",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L177",
+      "weight": 1.0,
+      "context": "parameter_type",
+      "source": "src_web_search_plan_search",
+      "target": "src_tauri_src_web_search_rs_postprocessprovider",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L177",
+      "weight": 1.0,
+      "context": "return_type",
+      "source": "src_web_search_plan_search",
+      "target": "src_tauri_src_web_search_rs_result",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L234",
+      "weight": 1.0,
+      "source": "src_web_search_plan_search",
+      "target": "src_web_search_parse_plan",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L295",
+      "weight": 1.0,
+      "context": "return_type",
+      "confidence_score": 1.0,
+      "source": "src_web_search_http_client",
+      "target": "src_tauri_src_web_search_rs_result"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L378",
+      "weight": 1.0,
+      "context": "return_type",
+      "source": "src_web_search_run_provider_search",
+      "target": "src_tauri_src_web_search_rs_result",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -63785,12 +64709,133 @@
       "relation": "references",
       "confidence": "EXTRACTED",
       "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L372",
+      "weight": 1.0,
+      "context": "return_type",
+      "confidence_score": 1.0,
+      "source": "src_web_search_search_brave",
+      "target": "src_tauri_src_web_search_rs_result"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L437",
+      "weight": 1.0,
+      "context": "return_type",
+      "confidence_score": 1.0,
+      "source": "src_web_search_search_duckduckgo",
+      "target": "src_tauri_src_web_search_rs_result"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L306",
+      "weight": 1.0,
+      "context": "return_type",
+      "confidence_score": 1.0,
+      "source": "src_web_search_search_firecrawl",
+      "target": "src_tauri_src_web_search_rs_result"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L249",
+      "weight": 1.0,
+      "context": "return_type",
+      "source": "src_web_search_parse_plan",
+      "target": "src_tauri_src_web_search_rs_option",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L1057",
+      "weight": 1.0,
+      "source": "src_web_search_parse_plan_handles_plain_and_fenced_json",
+      "target": "src_web_search_parse_plan",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L436",
+      "weight": 1.0,
+      "context": "return_type",
+      "source": "src_web_search_freshness_to_brave",
+      "target": "src_tauri_src_web_search_rs_option",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L447",
+      "weight": 1.0,
+      "context": "return_type",
+      "source": "src_web_search_freshness_to_ddg",
+      "target": "src_tauri_src_web_search_rs_option",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L425",
+      "weight": 1.0,
+      "context": "return_type",
+      "source": "src_web_search_freshness_to_tbs",
+      "target": "src_tauri_src_web_search_rs_option",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L574",
+      "weight": 1.0,
+      "context": "return_type",
+      "confidence_score": 1.0,
+      "source": "src_web_search_hex_val",
+      "target": "src_tauri_src_web_search_rs_option"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L626",
+      "weight": 1.0,
+      "context": "parameter_type",
+      "source": "src_web_search_search_firecrawl",
+      "target": "src_tauri_src_web_search_rs_option",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
       "source_location": "L64",
       "weight": 1.0,
-      "context": "generic_arg",
+      "context": "parameter_type",
       "confidence_score": 1.0,
       "source": "src_web_search_search",
-      "target": "src_tauri_src_web_search_rs_vec"
+      "target": "src_tauri_src_web_search_rs_appsettings"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L281",
+      "weight": 1.0,
+      "source": "src_web_search_search",
+      "target": "src_web_search_run_provider_search",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -63829,111 +64874,122 @@
       "relation": "references",
       "confidence": "EXTRACTED",
       "source_file": "src-tauri/src/web_search.rs",
-      "source_location": "L295",
-      "weight": 1.0,
-      "context": "return_type",
-      "confidence_score": 1.0,
-      "source": "src_web_search_http_client",
-      "target": "src_tauri_src_web_search_rs_result"
-    },
-    {
-      "relation": "references",
-      "confidence": "EXTRACTED",
-      "source_file": "src-tauri/src/web_search.rs",
-      "source_location": "L372",
-      "weight": 1.0,
-      "context": "return_type",
-      "confidence_score": 1.0,
-      "source": "src_web_search_search_brave",
-      "target": "src_tauri_src_web_search_rs_result"
-    },
-    {
-      "relation": "references",
-      "confidence": "EXTRACTED",
-      "source_file": "src-tauri/src/web_search.rs",
-      "source_location": "L437",
-      "weight": 1.0,
-      "context": "return_type",
-      "confidence_score": 1.0,
-      "source": "src_web_search_search_duckduckgo",
-      "target": "src_tauri_src_web_search_rs_result"
-    },
-    {
-      "relation": "references",
-      "confidence": "EXTRACTED",
-      "source_file": "src-tauri/src/web_search.rs",
-      "source_location": "L306",
-      "weight": 1.0,
-      "context": "return_type",
-      "confidence_score": 1.0,
-      "source": "src_web_search_search_firecrawl",
-      "target": "src_tauri_src_web_search_rs_result"
-    },
-    {
-      "relation": "references",
-      "confidence": "EXTRACTED",
-      "source_file": "src-tauri/src/web_search.rs",
-      "source_location": "L490",
-      "weight": 1.0,
-      "context": "return_type",
-      "confidence_score": 1.0,
-      "source": "src_web_search_parse_duckduckgo_html",
-      "target": "src_tauri_src_web_search_rs_vec"
-    },
-    {
-      "relation": "references",
-      "confidence": "EXTRACTED",
-      "source_file": "src-tauri/src/web_search.rs",
-      "source_location": "L617",
+      "source_location": "L378",
       "weight": 1.0,
       "context": "parameter_type",
-      "confidence_score": 1.0,
-      "source": "src_web_search_push_result",
-      "target": "src_tauri_src_web_search_rs_vec"
+      "source": "src_web_search_run_provider_search",
+      "target": "src_tauri_src_web_search_rs_appsettings",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
       "confidence": "EXTRACTED",
       "source_file": "src-tauri/src/web_search.rs",
-      "source_location": "L372",
+      "source_location": "L295",
       "weight": 1.0,
-      "context": "generic_arg",
-      "confidence_score": 1.0,
-      "source": "src_web_search_search_brave",
-      "target": "src_tauri_src_web_search_rs_vec"
-    },
-    {
-      "relation": "references",
-      "confidence": "EXTRACTED",
-      "source_file": "src-tauri/src/web_search.rs",
-      "source_location": "L437",
-      "weight": 1.0,
-      "context": "generic_arg",
-      "confidence_score": 1.0,
-      "source": "src_web_search_search_duckduckgo",
-      "target": "src_tauri_src_web_search_rs_vec"
-    },
-    {
-      "relation": "references",
-      "confidence": "EXTRACTED",
-      "source_file": "src-tauri/src/web_search.rs",
-      "source_location": "L306",
-      "weight": 1.0,
-      "context": "generic_arg",
-      "confidence_score": 1.0,
-      "source": "src_web_search_search_firecrawl",
-      "target": "src_tauri_src_web_search_rs_vec"
+      "context": "parameter_type",
+      "source": "src_web_search_search_with_plan",
+      "target": "src_tauri_src_web_search_rs_appsettings",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "src-tauri/src/web_search.rs",
-      "source_location": "L713",
+      "source_location": "L354",
       "weight": 1.0,
-      "confidence_score": 1.0,
-      "source": "src_web_search_format_results_are_plain_bullets_without_numbers_or_urls",
-      "target": "src_web_search_format_results_for_prompt"
+      "source": "src_web_search_search_with_plan",
+      "target": "src_web_search_dedupe_key",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L324",
+      "weight": 1.0,
+      "source": "src_web_search_search_with_plan",
+      "target": "src_web_search_run_provider_search",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L406",
+      "weight": 1.0,
+      "source": "src_web_search_run_provider_search",
+      "target": "src_web_search_freshness_to_tbs",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L417",
+      "weight": 1.0,
+      "source": "src_web_search_run_provider_search",
+      "target": "src_web_search_search_brave",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L420",
+      "weight": 1.0,
+      "source": "src_web_search_run_provider_search",
+      "target": "src_web_search_search_duckduckgo",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L402",
+      "weight": 1.0,
+      "source": "src_web_search_run_provider_search",
+      "target": "src_web_search_search_firecrawl",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L740",
+      "weight": 1.0,
+      "source": "src_web_search_search_brave",
+      "target": "src_web_search_freshness_to_brave",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L802",
+      "weight": 1.0,
+      "source": "src_web_search_search_duckduckgo",
+      "target": "src_web_search_freshness_to_ddg",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L1161",
+      "weight": 1.0,
+      "source": "src_web_search_format_results_use_content_without_numbers_or_urls",
+      "target": "src_web_search_format_results_for_prompt",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -63956,6 +65012,17 @@
       "confidence_score": 1.0,
       "source": "src_web_search_http_client",
       "target": "src_tauri_src_web_search_rs_client"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L614",
+      "weight": 1.0,
+      "context": "parameter_type",
+      "source": "src_web_search_http_client",
+      "target": "src_tauri_src_web_search_rs_duration",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -64101,15 +65168,26 @@
       "target": "src_web_search_hex_val"
     },
     {
-      "relation": "references",
+      "relation": "calls",
+      "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "src-tauri/src/web_search.rs",
-      "source_location": "L574",
+      "source_location": "L1006",
       "weight": 1.0,
-      "context": "return_type",
-      "confidence_score": 1.0,
-      "source": "src_web_search_hex_val",
-      "target": "src_tauri_src_web_search_rs_option"
+      "source": "src_web_search_push_result",
+      "target": "src_web_search_sanitize_content",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src-tauri/src/web_search.rs",
+      "source_location": "L981",
+      "weight": 1.0,
+      "source": "src_web_search_sanitize_content",
+      "target": "src_web_search_truncate_chars",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -66067,9 +67145,9 @@
       "source_file": "src/components/settings/TextReplacements.tsx",
       "source_location": "L7",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "settings_textreplacements",
-      "target": "src_bindings",
-      "confidence_score": 1.0
+      "target": "src_bindings"
     },
     {
       "relation": "imports_from",
@@ -66168,9 +67246,9 @@
       "source_file": "src/bindings.ts",
       "source_location": "L1465",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_bindings",
-      "target": "src_bindings_capitalization",
-      "confidence_score": 1.0
+      "target": "src_bindings_capitalization"
     },
     {
       "relation": "contains",
@@ -66478,9 +67556,9 @@
       "source_file": "src/bindings.ts",
       "source_location": "L1601",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "src_bindings",
-      "target": "src_bindings_replacement",
-      "confidence_score": 1.0
+      "target": "src_bindings_replacement"
     },
     {
       "relation": "contains",
@@ -66853,9 +67931,9 @@
       "source_file": "src/components/settings/TextReplacements.tsx",
       "source_location": "L6",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "settings_textreplacements",
-      "target": "src_bindings_commands",
-      "confidence_score": 1.0
+      "target": "src_bindings_commands"
     },
     {
       "relation": "imports",
@@ -67062,9 +68140,9 @@
       "source_file": "src/components/settings/TextReplacements.tsx",
       "source_location": "L7",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "settings_textreplacements",
-      "target": "src_bindings_capitalization",
-      "confidence_score": 1.0
+      "target": "src_bindings_capitalization"
     },
     {
       "relation": "imports",
@@ -67359,9 +68437,9 @@
       "source_file": "src/components/settings/TextReplacements.tsx",
       "source_location": "L7",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "settings_textreplacements",
-      "target": "src_bindings_replacement",
-      "confidence_score": 1.0
+      "target": "src_bindings_replacement"
     },
     {
       "relation": "imports",
@@ -67370,9 +68448,9 @@
       "source_file": "src/stores/settingsStore.ts",
       "source_location": "L4",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "stores_settingsstore",
-      "target": "src_bindings_replacement",
-      "confidence_score": 1.0
+      "target": "src_bindings_replacement"
     },
     {
       "relation": "imports",
@@ -73562,9 +74640,9 @@
       "source_file": "src/components/settings/advanced/AdvancedSettings.tsx",
       "source_location": "L6",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "advanced_advancedsettings",
-      "target": "settings_textreplacements",
-      "confidence_score": 1.0
+      "target": "settings_textreplacements"
     },
     {
       "relation": "re_exports",
@@ -73573,9 +74651,9 @@
       "source_file": "src/components/settings/index.ts",
       "source_location": "L24",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "settings_index",
-      "target": "settings_textreplacements",
-      "confidence_score": 1.0
+      "target": "settings_textreplacements"
     },
     {
       "relation": "imports_from",
@@ -73584,9 +74662,9 @@
       "source_file": "src/components/settings/TextReplacements.tsx",
       "source_location": "L8",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "settings_textreplacements",
-      "target": "hooks_usesettings",
-      "confidence_score": 1.0
+      "target": "hooks_usesettings"
     },
     {
       "relation": "imports",
@@ -73595,9 +74673,9 @@
       "source_file": "src/components/settings/TextReplacements.tsx",
       "source_location": "L8",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "settings_textreplacements",
-      "target": "hooks_usesettings_usesettings",
-      "confidence_score": 1.0
+      "target": "hooks_usesettings_usesettings"
     },
     {
       "relation": "contains",
@@ -73605,9 +74683,9 @@
       "source_file": "src/components/settings/TextReplacements.tsx",
       "source_location": "L32",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "settings_textreplacements",
-      "target": "settings_textreplacements_emptyrule",
-      "confidence_score": 1.0
+      "target": "settings_textreplacements_emptyrule"
     },
     {
       "relation": "contains",
@@ -73615,9 +74693,9 @@
       "source_file": "src/components/settings/TextReplacements.tsx",
       "source_location": "L23",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "settings_textreplacements",
-      "target": "settings_textreplacements_nextkey",
-      "confidence_score": 1.0
+      "target": "settings_textreplacements_nextkey"
     },
     {
       "relation": "contains",
@@ -73625,9 +74703,9 @@
       "source_file": "src/components/settings/TextReplacements.tsx",
       "source_location": "L20",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "settings_textreplacements",
-      "target": "settings_textreplacements_row",
-      "confidence_score": 1.0
+      "target": "settings_textreplacements_row"
     },
     {
       "relation": "contains",
@@ -73635,9 +74713,9 @@
       "source_file": "src/components/settings/TextReplacements.tsx",
       "source_location": "L46",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "settings_textreplacements",
-      "target": "settings_textreplacements_sanitizerule",
-      "confidence_score": 1.0
+      "target": "settings_textreplacements_sanitizerule"
     },
     {
       "relation": "contains",
@@ -73645,9 +74723,9 @@
       "source_file": "src/components/settings/TextReplacements.tsx",
       "source_location": "L30",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "settings_textreplacements",
-      "target": "settings_textreplacements_stripkey",
-      "confidence_score": 1.0
+      "target": "settings_textreplacements_stripkey"
     },
     {
       "relation": "contains",
@@ -73655,9 +74733,9 @@
       "source_file": "src/components/settings/TextReplacements.tsx",
       "source_location": "L64",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "settings_textreplacements",
-      "target": "settings_textreplacements_textreplacements",
-      "confidence_score": 1.0
+      "target": "settings_textreplacements_textreplacements"
     },
     {
       "relation": "contains",
@@ -73665,9 +74743,9 @@
       "source_file": "src/components/settings/TextReplacements.tsx",
       "source_location": "L13",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "settings_textreplacements",
-      "target": "settings_textreplacements_textreplacementsprops",
-      "confidence_score": 1.0
+      "target": "settings_textreplacements_textreplacementsprops"
     },
     {
       "relation": "contains",
@@ -73675,9 +74753,9 @@
       "source_file": "src/components/settings/TextReplacements.tsx",
       "source_location": "L25",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "settings_textreplacements",
-      "target": "settings_textreplacements_withkey",
-      "confidence_score": 1.0
+      "target": "settings_textreplacements_withkey"
     },
     {
       "relation": "imports_from",
@@ -73686,9 +74764,9 @@
       "source_file": "src/components/settings/TextReplacements.tsx",
       "source_location": "L10",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "settings_textreplacements",
-      "target": "ui_button",
-      "confidence_score": 1.0
+      "target": "ui_button"
     },
     {
       "relation": "imports",
@@ -73697,9 +74775,9 @@
       "source_file": "src/components/settings/TextReplacements.tsx",
       "source_location": "L10",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "settings_textreplacements",
-      "target": "ui_button_button",
-      "confidence_score": 1.0
+      "target": "ui_button_button"
     },
     {
       "relation": "imports_from",
@@ -73708,9 +74786,9 @@
       "source_file": "src/components/settings/TextReplacements.tsx",
       "source_location": "L9",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "settings_textreplacements",
-      "target": "ui_input",
-      "confidence_score": 1.0
+      "target": "ui_input"
     },
     {
       "relation": "imports",
@@ -73719,9 +74797,9 @@
       "source_file": "src/components/settings/TextReplacements.tsx",
       "source_location": "L9",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "settings_textreplacements",
-      "target": "ui_input_input",
-      "confidence_score": 1.0
+      "target": "ui_input_input"
     },
     {
       "relation": "imports_from",
@@ -73730,9 +74808,9 @@
       "source_file": "src/components/settings/TextReplacements.tsx",
       "source_location": "L11",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "settings_textreplacements",
-      "target": "ui_toggleswitch",
-      "confidence_score": 1.0
+      "target": "ui_toggleswitch"
     },
     {
       "relation": "imports",
@@ -73741,9 +74819,9 @@
       "source_file": "src/components/settings/TextReplacements.tsx",
       "source_location": "L11",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "settings_textreplacements",
-      "target": "ui_toggleswitch_toggleswitch",
-      "confidence_score": 1.0
+      "target": "ui_toggleswitch_toggleswitch"
     },
     {
       "relation": "calls",
@@ -73752,9 +74830,9 @@
       "source_file": "src/components/settings/TextReplacements.tsx",
       "source_location": "L27",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "settings_textreplacements_withkey",
-      "target": "settings_textreplacements_nextkey",
-      "confidence_score": 1.0
+      "target": "settings_textreplacements_nextkey"
     },
     {
       "relation": "calls",
@@ -73763,9 +74841,9 @@
       "source_file": "src/components/settings/TextReplacements.tsx",
       "source_location": "L33",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "settings_textreplacements_emptyrule",
-      "target": "settings_textreplacements_withkey",
-      "confidence_score": 1.0
+      "target": "settings_textreplacements_withkey"
     },
     {
       "relation": "imports",
@@ -73774,9 +74852,9 @@
       "source_file": "src/components/settings/advanced/AdvancedSettings.tsx",
       "source_location": "L6",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "advanced_advancedsettings",
-      "target": "settings_textreplacements_textreplacements",
-      "confidence_score": 1.0
+      "target": "settings_textreplacements_textreplacements"
     },
     {
       "relation": "re_exports",
@@ -73785,9 +74863,9 @@
       "source_file": "src/components/settings/index.ts",
       "source_location": "L24",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "settings_index",
-      "target": "settings_textreplacements_textreplacements",
-      "confidence_score": 1.0
+      "target": "settings_textreplacements_textreplacements"
     },
     {
       "relation": "imports_from",
@@ -80394,9 +81472,9 @@
       "source_file": "README.md",
       "source_location": "L1",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "readme",
-      "target": "readme_speakoflow",
-      "confidence_score": 1.0
+      "target": "readme_speakoflow"
     },
     {
       "relation": "contains",
@@ -80404,9 +81482,9 @@
       "source_file": "README.md",
       "source_location": "L115",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "readme_speakoflow",
-      "target": "readme_credits_license",
-      "confidence_score": 1.0
+      "target": "readme_credits_license"
     },
     {
       "relation": "contains",
@@ -80414,9 +81492,9 @@
       "source_file": "README.md",
       "source_location": "L71",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "readme_speakoflow",
-      "target": "readme_default_hotkeys",
-      "confidence_score": 1.0
+      "target": "readme_default_hotkeys"
     },
     {
       "relation": "contains",
@@ -80424,9 +81502,9 @@
       "source_file": "README.md",
       "source_location": "L85",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "readme_speakoflow",
-      "target": "readme_getting_started",
-      "confidence_score": 1.0
+      "target": "readme_getting_started"
     },
     {
       "relation": "contains",
@@ -80434,9 +81512,9 @@
       "source_file": "README.md",
       "source_location": "L106",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "readme_speakoflow",
-      "target": "readme_privacy_model",
-      "confidence_score": 1.0
+      "target": "readme_privacy_model"
     },
     {
       "relation": "contains",
@@ -80444,9 +81522,9 @@
       "source_file": "README.md",
       "source_location": "L7",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "readme_speakoflow",
-      "target": "readme_what_it_does",
-      "confidence_score": 1.0
+      "target": "readme_what_it_does"
     },
     {
       "relation": "contains",
@@ -80454,9 +81532,9 @@
       "source_file": "README.md",
       "source_location": "L55",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "readme_speakoflow",
-      "target": "readme_what_s_different_from_handy",
-      "confidence_score": 1.0
+      "target": "readme_what_s_different_from_handy"
     },
     {
       "relation": "contains",
@@ -80544,9 +81622,9 @@
       "source_file": "docs/FEATURE_PLAN.md",
       "source_location": "L1",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "docs_feature_plan",
-      "target": "docs_feature_plan_speakoflow_feature_build_plan",
-      "confidence_score": 1.0
+      "target": "docs_feature_plan_speakoflow_feature_build_plan"
     },
     {
       "relation": "contains",
@@ -80554,9 +81632,9 @@
       "source_file": "docs/FEATURE_PLAN.md",
       "source_location": "L34",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "docs_feature_plan_speakoflow_feature_build_plan",
-      "target": "docs_feature_plan_architecture_touchpoints_verified_against_the_code",
-      "confidence_score": 1.0
+      "target": "docs_feature_plan_architecture_touchpoints_verified_against_the_code"
     },
     {
       "relation": "contains",
@@ -80564,9 +81642,9 @@
       "source_file": "docs/FEATURE_PLAN.md",
       "source_location": "L168",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "docs_feature_plan_speakoflow_feature_build_plan",
-      "target": "docs_feature_plan_dependency_map",
-      "confidence_score": 1.0
+      "target": "docs_feature_plan_dependency_map"
     },
     {
       "relation": "contains",
@@ -80574,9 +81652,9 @@
       "source_file": "docs/FEATURE_PLAN.md",
       "source_location": "L64",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "docs_feature_plan_speakoflow_feature_build_plan",
-      "target": "docs_feature_plan_feature_1_deterministic_text_replacements_455_1533",
-      "confidence_score": 1.0
+      "target": "docs_feature_plan_feature_1_deterministic_text_replacements_455_1533"
     },
     {
       "relation": "contains",
@@ -80584,9 +81662,9 @@
       "source_file": "docs/FEATURE_PLAN.md",
       "source_location": "L102",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "docs_feature_plan_speakoflow_feature_build_plan",
-      "target": "docs_feature_plan_feature_2_secure_api_key_storage_in_os_keychain_814",
-      "confidence_score": 1.0
+      "target": "docs_feature_plan_feature_2_secure_api_key_storage_in_os_keychain_814"
     },
     {
       "relation": "contains",
@@ -80594,9 +81672,9 @@
       "source_file": "docs/FEATURE_PLAN.md",
       "source_location": "L143",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "docs_feature_plan_speakoflow_feature_build_plan",
-      "target": "docs_feature_plan_feature_3_eager_streaming_transcription_1515",
-      "confidence_score": 1.0
+      "target": "docs_feature_plan_feature_3_eager_streaming_transcription_1515"
     },
     {
       "relation": "contains",
@@ -80604,9 +81682,9 @@
       "source_file": "docs/FEATURE_PLAN.md",
       "source_location": "L184",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "docs_feature_plan_speakoflow_feature_build_plan",
-      "target": "docs_feature_plan_how_to_go_about_the_update_recommended_sequencing",
-      "confidence_score": 1.0
+      "target": "docs_feature_plan_how_to_go_about_the_update_recommended_sequencing"
     },
     {
       "relation": "contains",
@@ -80614,9 +81692,9 @@
       "source_file": "docs/FEATURE_PLAN.md",
       "source_location": "L12",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "docs_feature_plan_speakoflow_feature_build_plan",
-      "target": "docs_feature_plan_the_three_features",
-      "confidence_score": 1.0
+      "target": "docs_feature_plan_the_three_features"
     },
     {
       "relation": "contains",
@@ -80624,9 +81702,9 @@
       "source_file": "docs/FEATURE_PLAN.md",
       "source_location": "L24",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "docs_feature_plan_the_three_features",
-      "target": "docs_feature_plan_out_of_scope_considered_and_dropped",
-      "confidence_score": 1.0
+      "target": "docs_feature_plan_out_of_scope_considered_and_dropped"
     },
     {
       "relation": "contains",
@@ -80634,9 +81712,9 @@
       "source_file": "docs/FEATURE_PLAN.md",
       "source_location": "L95",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "docs_feature_plan_feature_1_deterministic_text_replacements_455_1533",
-      "target": "docs_feature_plan_independence",
-      "confidence_score": 1.0
+      "target": "docs_feature_plan_independence"
     },
     {
       "relation": "contains",
@@ -80644,9 +81722,9 @@
       "source_file": "docs/FEATURE_PLAN.md",
       "source_location": "L71",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "docs_feature_plan_feature_1_deterministic_text_replacements_455_1533",
-      "target": "docs_feature_plan_what_needs_to_be_done",
-      "confidence_score": 1.0
+      "target": "docs_feature_plan_what_needs_to_be_done"
     },
     {
       "relation": "contains",
@@ -80654,9 +81732,9 @@
       "source_file": "docs/FEATURE_PLAN.md",
       "source_location": "L109",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "docs_feature_plan_feature_2_secure_api_key_storage_in_os_keychain_814",
-      "target": "docs_feature_plan_can_it_be_done_independently_yes_and_kept_simple",
-      "confidence_score": 1.0
+      "target": "docs_feature_plan_can_it_be_done_independently_yes_and_kept_simple"
     },
     {
       "relation": "contains",
@@ -80664,9 +81742,9 @@
       "source_file": "docs/FEATURE_PLAN.md",
       "source_location": "L137",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "docs_feature_plan_feature_2_secure_api_key_storage_in_os_keychain_814",
-      "target": "docs_feature_plan_independence_137",
-      "confidence_score": 1.0
+      "target": "docs_feature_plan_independence_137"
     },
     {
       "relation": "contains",
@@ -80674,9 +81752,9 @@
       "source_file": "docs/FEATURE_PLAN.md",
       "source_location": "L127",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "docs_feature_plan_feature_2_secure_api_key_storage_in_os_keychain_814",
-      "target": "docs_feature_plan_keep_it_simple_scope_guardrails",
-      "confidence_score": 1.0
+      "target": "docs_feature_plan_keep_it_simple_scope_guardrails"
     },
     {
       "relation": "contains",
@@ -80684,9 +81762,9 @@
       "source_file": "docs/FEATURE_PLAN.md",
       "source_location": "L161",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "docs_feature_plan_feature_3_eager_streaming_transcription_1515",
-      "target": "docs_feature_plan_independence_161",
-      "confidence_score": 1.0
+      "target": "docs_feature_plan_independence_161"
     },
     {
       "relation": "contains",
@@ -80694,9 +81772,9 @@
       "source_file": "docs/FEATURE_PLAN.md",
       "source_location": "L148",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "docs_feature_plan_feature_3_eager_streaming_transcription_1515",
-      "target": "docs_feature_plan_what_needs_to_be_done_148",
-      "confidence_score": 1.0
+      "target": "docs_feature_plan_what_needs_to_be_done_148"
     },
     {
       "relation": "contains",
@@ -80704,9 +81782,9 @@
       "source_file": "docs/PROGRESS.md",
       "source_location": "L1",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "docs_progress",
-      "target": "docs_progress_speakoflow_development_progress",
-      "confidence_score": 1.0
+      "target": "docs_progress_speakoflow_development_progress"
     },
     {
       "relation": "contains",
@@ -80714,9 +81792,9 @@
       "source_file": "docs/PROGRESS.md",
       "source_location": "L19",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "docs_progress_speakoflow_development_progress",
-      "target": "docs_progress_phase_0_toolchain_build_done",
-      "confidence_score": 1.0
+      "target": "docs_progress_phase_0_toolchain_build_done"
     },
     {
       "relation": "contains",
@@ -80724,9 +81802,9 @@
       "source_file": "docs/PROGRESS.md",
       "source_location": "L37",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "docs_progress_speakoflow_development_progress",
-      "target": "docs_progress_phase_1_5_reliability_ux_wave_done",
-      "confidence_score": 1.0
+      "target": "docs_progress_phase_1_5_reliability_ux_wave_done"
     },
     {
       "relation": "contains",
@@ -80734,9 +81812,9 @@
       "source_file": "docs/PROGRESS.md",
       "source_location": "L83",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "docs_progress_speakoflow_development_progress",
-      "target": "docs_progress_phase_1_7_web_search_done",
-      "confidence_score": 1.0
+      "target": "docs_progress_phase_1_7_web_search_done"
     },
     {
       "relation": "contains",
@@ -80744,29 +81822,9 @@
       "source_file": "docs/PROGRESS.md",
       "source_location": "L98",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "docs_progress_speakoflow_development_progress",
-      "target": "docs_progress_phase_1_8_secure_api_key_storage_in_the_os_keychain_done",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "docs/PROGRESS.md",
-      "source_location": "L27",
-      "weight": 1.0,
-      "source": "docs_progress_speakoflow_development_progress",
-      "target": "docs_progress_phase_1_assistant_mode_done",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "docs/PROGRESS.md",
-      "source_location": "L5",
-      "weight": 1.0,
-      "source": "docs_progress_speakoflow_development_progress",
-      "target": "docs_progress_project_goal",
-      "confidence_score": 1.0
+      "target": "docs_progress_phase_1_8_secure_api_key_storage_in_the_os_keychain_done"
     },
     {
       "relation": "contains",
@@ -80775,8 +81833,38 @@
       "source_location": "L108",
       "weight": 1.0,
       "source": "docs_progress_speakoflow_development_progress",
-      "target": "docs_progress_roadmap",
+      "target": "docs_progress_phase_1_9_web_search_quality_overhaul_done",
       "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/PROGRESS.md",
+      "source_location": "L27",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "docs_progress_speakoflow_development_progress",
+      "target": "docs_progress_phase_1_assistant_mode_done"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/PROGRESS.md",
+      "source_location": "L5",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "docs_progress_speakoflow_development_progress",
+      "target": "docs_progress_project_goal"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/PROGRESS.md",
+      "source_location": "L108",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "docs_progress_speakoflow_development_progress",
+      "target": "docs_progress_roadmap"
     },
     {
       "relation": "references",
@@ -81971,5 +83059,5 @@
       "source_file": "index.html"
     }
   ],
-  "built_at_commit": "e59840b8e7fc39cea912c30429510a6382dbd71b"
+  "built_at_commit": "70a4b030be876e44c09c38afcec564de0cc18807"
 }
