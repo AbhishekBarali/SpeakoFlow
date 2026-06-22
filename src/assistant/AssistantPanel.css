@@ -16,7 +16,8 @@
   --panel-alpha: 1;
   --msg-font-size: 13.5px;
 
-  --font-ui: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text",
+  --font-ui:
+    "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text",
     "Segoe UI", Roboto, sans-serif;
   --font-display: "EB Garamond", "Iowan Old Style", "Times New Roman", serif;
 
@@ -620,7 +621,11 @@
 }
 
 .assistant-input:focus {
-  border-color: color-mix(in srgb, var(--accent-from) 60%, var(--hairline-strong));
+  border-color: color-mix(
+    in srgb,
+    var(--accent-from) 60%,
+    var(--hairline-strong)
+  );
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-from) 16%, transparent);
 }
 
@@ -678,8 +683,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
+  width: 34px;
+  height: 34px;
   flex-shrink: 0;
   border: none;
   border-radius: 50%;
@@ -687,7 +692,6 @@
   color: var(--ink-pill-fg);
   cursor: pointer;
   transition:
-    transform 0.15s ease,
     box-shadow 0.15s ease,
     background 0.15s ease;
 }
@@ -716,26 +720,33 @@
 }
 
 .pill-mic:hover {
-  transform: scale(1.05);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28);
+  filter: brightness(1.08);
 }
 
 .pill-mic.recording {
   background: linear-gradient(135deg, #ef4444, #f97316);
   color: #fff;
-  animation: dot-pulse 1.2s ease-in-out infinite;
 }
 
-.pill-mic.working {
-  animation: dot-pulse 1.2s ease-in-out infinite;
+/* Stop affordance (a turn is generating, or TTS is reading out a long reply).
+ * Keeps the dark "ink" button — same language as the main panel's stop — so
+ * it reads as "stop the current activity" and stays distinct from the red
+ * recording state. */
+.pill-mic.stopping {
+  background: var(--ink-pill-bg);
+  color: var(--ink-pill-fg);
 }
 
 .pill-wave {
   flex: 1;
   min-width: 0;
+  height: 38px;
   display: flex;
   align-items: center;
   justify-content: center;
+  /* The pill is tiny and rounded; clip so the waveform never touches the
+   * buttons or the rounded edge. */
+  overflow: hidden;
 }
 
 .pill-status {

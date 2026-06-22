@@ -159,10 +159,7 @@ const AssistantPanel: React.FC = () => {
 
   // Follow OS theme changes while the preference is "system".
   const themePreference = (settings?.theme ?? "system") as ThemePreference;
-  useEffect(
-    () => watchSystemTheme(() => themePreference),
-    [themePreference],
-  );
+  useEffect(() => watchSystemTheme(() => themePreference), [themePreference]);
 
   // Auto-scroll to bottom on new content
   useEffect(() => {
@@ -400,21 +397,37 @@ const AssistantPanel: React.FC = () => {
         : t("assistant.tts.enable");
 
   if (collapsed) {
+    const isListening = state === "listening";
+    // Anything the main panel lets you stop — a generating/transcribing turn
+    // or a (possibly long) TTS readout — should be stoppable from the pill too,
+    // without expanding it. Listening is excluded: there the square means
+    // "finish and send", not "cancel".
+    const pillStop = showStop && !isListening;
+    const pillStatus =
+      tts.status === "loading"
+        ? t("assistant.tts.loadingShort", { progress: tts.progress })
+        : busy
+          ? t(`assistant.status.${state}`)
+          : ttsActive
+            ? t("assistant.status.speaking")
+            : t("assistant.pill.idle");
     return (
       <div className="assistant-pill" data-tauri-drag-region>
         <div className="pill-mic-wrap">
           <button
-            className={`pill-mic${state === "listening" ? " recording" : ""}${
-              state === "transcribing" || state === "thinking" ? " working" : ""
+            className={`pill-mic${isListening ? " recording" : ""}${
+              pillStop ? " stopping" : ""
             }`}
-            onClick={toggleVoice}
+            onClick={pillStop ? stopTurn : toggleVoice}
             title={
-              state === "listening"
+              isListening
                 ? t("assistant.pill.stop")
-                : t("assistant.pill.talk")
+                : pillStop
+                  ? t("assistant.stop")
+                  : t("assistant.pill.talk")
             }
           >
-            {state === "listening" ? (
+            {isListening || pillStop ? (
               <Square size={15} strokeWidth={2.5} />
             ) : (
               <Mic size={17} strokeWidth={2} />
@@ -429,22 +442,18 @@ const AssistantPanel: React.FC = () => {
             </span>
           )}
         </div>
-        {state === "listening" ? (
+        {isListening ? (
           <div className="pill-wave" data-tauri-drag-region>
             <AudioWaveform
               levels={micLevels}
-              size="sm"
-              barCount={13}
+              size="md"
+              barCount={21}
               active={true}
             />
           </div>
         ) : (
           <span className="pill-status" data-tauri-drag-region>
-            {tts.status === "loading"
-              ? t("assistant.tts.loadingShort", { progress: tts.progress })
-              : busy
-                ? t(`assistant.status.${state}`)
-                : t("assistant.pill.idle")}
+            {pillStatus}
           </span>
         )}
         <button
@@ -552,7 +561,7 @@ const AssistantPanel: React.FC = () => {
             <AudioWaveform
               levels={micLevels}
               size="md"
-              barCount={16}
+              barCount={29}
               active={state === "listening"}
             />
             <span className="listening-label">

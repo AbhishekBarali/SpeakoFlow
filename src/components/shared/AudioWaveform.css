@@ -1,111 +1,87 @@
-/* AudioWaveform — a mirrored, rounded-cap waveform with a soft warm
- * atmospheric bloom. Self-contained: colours come from CSS variables with
- * editorial defaults (off-white bars, warm peach/amber glow) so it reads the
- * same inside the recording overlay and the assistant panel.
+/* AudioWaveform — a mirrored "voice spindle": rounded-cap bars that arch up
+ * from a centre line, tall in the middle and settling to small dots at the
+ * rim. Self-contained; colours come from CSS variables with editorial
+ * defaults (warm off-white bars) so it reads the same inside the recording
+ * overlay and the assistant pill / panel.
+ *
+ * Heights are a share of the container height and bars flex to fill the
+ * available width, so the parent's box decides the scale.
  *
  * Tunable via:
- *   --wave-bar     bar fill (vertical gradient recommended)
- *   --wave-glow    bloom colour
- *   --wave-energy  0..1 live intensity (set inline from the signal)
- *   --bar-gap      spacing between bars (set inline per size)
+ *   --wave-bar   bar fill (vertical gradient recommended)
+ *   --bar-gap    spacing between bars (set inline per size)
+ *   --bar-w      max bar thickness (set inline per size)
  */
 
 .audio-waveform {
-  --wave-bar: linear-gradient(to top, #d8cab6, #fafaf9 70%);
-  --wave-glow: #f4c5a8;
+  --wave-bar: linear-gradient(to top, #cdbfa8, #fafaf9 75%);
 
   position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 0;
-}
-
-/* Light mode: the panel surface is a warm near-white, so the off-white bars
- * above wash out and become invisible. Swap to deeper beige/taupe tones (and a
- * slightly warmer bloom) so the waveform reads clearly against the light card.
- * Scoped to data-theme="light" so the always-dark recording overlay, which
- * never sets that attribute, keeps its off-white bars. */
-:root[data-theme="light"] .audio-waveform {
-  --wave-bar: linear-gradient(to top, #a3937d, #c9bba4 72%);
-  --wave-glow: #e8a982;
-}
-
-.wave-bloom {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 150%;
-  height: 320%;
-  transform: translate(-50%, -50%)
-    scale(calc(0.7 + 0.3 * var(--wave-energy, 0)));
-  background: radial-gradient(
-    ellipse at center,
-    var(--wave-glow) 0%,
-    transparent 68%
-  );
-  opacity: calc(0.05 + 0.4 * var(--wave-energy, 0));
-  filter: blur(7px);
-  pointer-events: none;
-  transition:
-    opacity 220ms ease-out,
-    transform 220ms ease-out;
-  z-index: 0;
-}
-
-.wave-bars {
-  position: relative;
-  z-index: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: var(--bar-gap, 3px);
+  width: 100%;
+  line-height: 0;
+}
+
+.audio-waveform.sm {
+  height: 24px;
+}
+
+.audio-waveform.md {
+  height: 38px;
+}
+
+/* Light mode: the panel surface is a warm near-white, so off-white bars wash
+ * out. Swap to deeper beige/taupe tones so the waveform reads clearly against
+ * the light card. Scoped to data-theme="light" so the always-dark recording
+ * overlay (which never sets that attribute) keeps its off-white bars. */
+:root[data-theme="light"] .audio-waveform {
+  --wave-bar: linear-gradient(to top, #9c8c75, #c4b59d 72%);
+}
+
+.wave-bars {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--bar-gap, 2px);
+  width: 100%;
+  height: 100%;
 }
 
 .wave-bar {
-  flex: none;
-  height: 4px;
+  flex: 1 1 0;
+  min-width: 1.5px;
+  max-width: var(--bar-w, 2.5px);
+  min-height: 2px;
   border-radius: 999px;
   background: var(--wave-bar);
-  transition: height 90ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  /* Smooth, springy rise/fall as the live signal moves the bars. */
+  transition: height 110ms cubic-bezier(0.22, 0.61, 0.36, 1);
   will-change: height;
 }
 
-/* ---- Idle "breathing" — gentle staggered bob when the signal is quiet ---- */
-
+/* Idle — bars rest as a calm row of dots while a soft sweep of light travels
+ * across them. Opacity only: nothing grows or shrinks. */
 .audio-waveform.is-idle .wave-bar {
-  animation: wave-breathe-sm 1500ms ease-in-out infinite;
-  animation-delay: calc(var(--i) * 90ms);
+  animation: wave-idle-sweep 2.6s ease-in-out infinite;
+  animation-delay: calc(var(--i) * 55ms);
 }
 
-.audio-waveform.md.is-idle .wave-bar {
-  animation-name: wave-breathe-md;
-}
-
-@keyframes wave-breathe-sm {
+@keyframes wave-idle-sweep {
   0%,
   100% {
-    height: 3px;
+    opacity: 0.32;
   }
   50% {
-    height: 9px;
-  }
-}
-
-@keyframes wave-breathe-md {
-  0%,
-  100% {
-    height: 4px;
-  }
-  50% {
-    height: 13px;
+    opacity: 0.72;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .audio-waveform.is-idle .wave-bar {
     animation: none;
-    height: 5px;
+    opacity: 0.5;
   }
   .wave-bar {
     transition: none;

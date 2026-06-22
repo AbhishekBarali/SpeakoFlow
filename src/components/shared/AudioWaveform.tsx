@@ -2,25 +2,31 @@ import React, { useRef } from "react";
 import "./AudioWaveform.css";
 
 export interface AudioWaveformProps {
-  /** Raw amplitude levels (roughly 0..1), any length. Resampled to `barCount`. */
+  /** Raw vocal-spectrum levels (roughly 0..1), any length. */
   levels: number[];
-  /** Number of bars to render. */
+  /** Number of bars to render. Defaults to a sensible value per `size`. */
   barCount?: number;
-  /** Whether audio is actively flowing. When false the bars breathe gently. */
+  /** Whether audio is actively flowing. When false the bars rest as dots. */
   active?: boolean;
-  /** Visual scale — `sm` for the compact overlay pill, `md` for the panel. */
+  /** Visual scale — `sm` for the compact overlay, `md` for the pill / panel. */
   size?: "sm" | "md";
   className?: string;
 }
 
 const SIZES = {
-  sm: { minH: 3, maxH: 18, barW: 3, gap: 2.5 },
-  md: { minH: 4, maxH: 26, barW: 3.5, gap: 3 },
+  sm: { barW: 2.5, gap: 2, bars: 19 },
+  md: { barW: 3, gap: 2, bars: 27 },
 } as const;
 
-/** Resample an arbitrary-length level array to exactly `n` points with
- *  linear interpolation, so the waveform looks the same regardless of how
- *  many bands the backend happens to send. */
+// Resting dot vs. tallest bar, as a share of the container height. Heights are
+// container-relative so one component fills a short overlay chip or a taller
+// pill without per-call tuning.
+const MIN_PCT = 9;
+const MAX_PCT = 96;
+
+/** Resample an arbitrary-length level array to exactly `n` points with linear
+ *  interpolation, so the shape is stable regardless of how many bands the
+ *  backend happens to send. */
 function resample(src: number[], n: number): number[] {
   if (src.length === 0) return new Array(n).fill(0);
   if (src.length === n) return src.slice();
@@ -38,36 +44,43 @@ function resample(src: number[], n: number): number[] {
 }
 
 /**
- * A modern, mirrored audio waveform. Bars grow symmetrically from the
- * centre line with rounded caps and a soft warm atmospheric bloom behind
- * them. Incoming levels are smoothed frame-to-frame so motion feels fluid,
- * and a gentle "breathing" animation plays whenever the signal is quiet.
+ * A mirrored "voice spindle" waveform. The backend streams a 16-band vocal
+ * spectrum; we fold it symmetrically so the loud low-mid bands sit in the
+ * centre and ease out to the quiet highs at both edges, then shape it with a
+ * bell envelope so it always resolves to the elegant centre-weighted
+ * silhouette of a voice burst — tall in the middle, settling to small dots at
+ * the rim. Levels are smoothed frame-to-frame so motion stays fluid.
+ *
+ * Bar heights are a share of the container height and the bars flex to fill the
+ * available width, so the same component looks right in both the short
+ * recording overlay and the taller assistant pill.
  */
 const AudioWaveform: React.FC<AudioWaveformProps> = ({
   levels,
-  barCount = 15,
+  barCount,
   active = true,
   size = "sm",
   className = "",
 }) => {
-  const { minH, maxH, barW, gap } = SIZES[size];
-  const smoothedRef = useRef<number[]>(new Array(barCount).fill(0));
+  const { barW, gap, bars: defaultBars } = SIZES[size];
+  const count = barCount ?? defaultBars;
 
-  // Keep the smoothing buffer in sync with the requested bar count.
-  if (smoothedRef.current.length !== barCount) {
-    smoothedRef.current = new Array(barCount).fill(0);
+  // Unique bands from the centre (low freq, loud) out to one edge.
+  const half = Math.max(2, Math.ceil(count / 2));
+  const smoothedRef = useRef<number[]>(new Array(half).fill(0));
+  if (smoothedRef.current.length !== half) {
+    smoothedRef.current = new Array(half).fill(0);
   }
 
-  const target = resample(levels, barCount);
-  const display = smoothedRef.current.map((prev, i) => {
-    const next = prev * 0.6 + (target[i] ?? 0) * 0.4;
-    return next;
-  });
+  const profile = resample(levels, half);
+  const display = smoothedRef.current.map(
+    (prev, i) => prev * 0.6 + (profile[i] ?? 0) * 0.4,
+  );
   smoothedRef.current = display;
 
-  // Overall energy drives the warmth/intensity of the bloom behind the bars.
   const energy = display.reduce((m, v) => Math.max(m, v), 0);
-  const idle = !active || energy < 0.04;
+  const idle = !active || energy < 0.05;
+  const center = (count - 1) / 2;
 
   return (
     <div
@@ -75,28 +88,32 @@ const AudioWaveform: React.FC<AudioWaveformProps> = ({
       style={
         {
           "--bar-gap": `${gap}px`,
-          "--wave-energy": idle ? 0.12 : Math.min(1, energy * 1.2),
+          "--bar-w": `${barW}px`,
         } as React.CSSProperties
       }
       aria-hidden="true"
     >
-      <span className="wave-bloom" />
       <div className="wave-bars">
-        {display.map((v, i) => {
-          // Gentle centre-weighting so the middle bars arch a touch taller —
-          // reads as more deliberate than a flat row.
-          const window = 0.78 + 0.22 * Math.sin((Math.PI * i) / (barCount - 1));
-          const shaped = Math.pow(Math.min(1, Math.max(0, v)), 0.7) * window;
-          const h = minH + shaped * (maxH - minH);
+        {Array.from({ length: count }, (_, i) => {
+          // 0 at the centre line, 1 at the outer edge.
+          const dist = center === 0 ? 0 : Math.abs(i - center) / center;
+          // Bell envelope: the centre carries the signal, the rim eases to dots.
+          const env = Math.pow(
+            0.5 + 0.5 * Math.cos(Math.PI * Math.min(1, dist)),
+            1.4,
+          );
+          const band = display[Math.round(dist * (half - 1))] ?? 0;
+          const shaped = Math.pow(Math.min(1, Math.max(0, band)), 0.6);
+          const amp = idle ? 0 : shaped * env;
+          const pct = MIN_PCT + amp * (MAX_PCT - MIN_PCT);
           return (
             <span
               key={i}
               className="wave-bar"
               style={
                 {
-                  width: `${barW}px`,
+                  height: `${pct}%`,
                   "--i": i,
-                  ...(idle ? {} : { height: `${h}px` }),
                 } as React.CSSProperties
               }
             />

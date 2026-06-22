@@ -114,7 +114,7 @@ const RecordingOverlay: React.FC = () => {
           <AudioWaveform
             levels={levels}
             size="sm"
-            barCount={15}
+            barCount={17}
             active={isVisible}
           />
         )}

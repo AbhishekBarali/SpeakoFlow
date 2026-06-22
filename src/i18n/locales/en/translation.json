@@ -704,9 +704,9 @@
       "webSearch": {
         "title": "Web Search",
         "enableLabel": "Allow web search",
-        "enableDescription": "When on, the assistant can look things up on the web for current or factual questions (news, prices, weather, who/what/when). It only searches when a question actually needs it, so casual chat stays instant. Answers cite their sources.",
+        "enableDescription": "When on, the assistant can look things up on the web for current or factual questions (news, prices, weather, who/what/when). A capable model decides when a search is actually needed and rewrites your question into focused queries, so casual chat stays instant while real questions get well-grounded answers.",
         "providerLabel": "Search provider",
-        "providerDescription": "DuckDuckGo is free and needs no account. Firecrawl and Brave use your own API key and can return cleaner results. All return short snippets only — pages are never fully downloaded, so answers stay fast and cheap on tokens.",
+        "providerDescription": "Firecrawl gives the best answers: it downloads the full content of the top results so the model reads the actual pages, not just a one-line preview (uses your API key). Brave (your key) and DuckDuckGo (free, no account) return short snippets only. For quality, choose Firecrawl.",
         "providers": {
           "duckduckgo": "DuckDuckGo (free, no key)",
           "firecrawl": "Firecrawl",
@@ -715,8 +715,10 @@
         "apiKeyLabel": "API Key",
         "apiKeyDescription": "API key for the selected search provider. Not needed for DuckDuckGo.",
         "apiKeyPlaceholder": "Enter API key...",
-        "maxResultsLabel": "Results to use",
-        "maxResultsDescription": "How many search results to send the model (1–8). Fewer is faster and uses fewer tokens; more gives broader coverage.",
+        "fetchContentLabel": "Read full pages (best quality)",
+        "fetchContentDescription": "With Firecrawl, download and read the full content of each top result instead of just a short snippet. This is the single biggest quality boost — the model answers from the actual source text. It's slower and uses more Firecrawl credits. No effect on Brave or DuckDuckGo.",
+        "maxResultsLabel": "Sources to use",
+        "maxResultsDescription": "How many search results to read and send the model (1–10). More sources give broader, better-grounded answers; fewer is faster and uses fewer tokens and credits.",
         "testLabel": "Test search",
         "testDescription": "Run a sample search with the current provider and key to confirm it works.",
         "testButton": "Test search",
@@ -913,7 +915,8 @@
       "locked": "Listening — press hotkey to stop",
       "transcribing": "Transcribing...",
       "searching": "Searching the web...",
-      "thinking": "Thinking..."
+      "thinking": "Thinking...",
+      "speaking": "Speaking..."
     }
   }
 }
