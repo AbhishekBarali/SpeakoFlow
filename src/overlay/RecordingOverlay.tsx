@@ -19,6 +19,10 @@ const RecordingOverlay: React.FC = () => {
   const [state, setState] = useState<OverlayState>("recording");
   const [locked, setLocked] = useState(false);
   const [levels, setLevels] = useState<number[]>([]);
+  // Whether the mic has started delivering audio for this recording. Driven by
+  // real mic-level events, so it reflects actual stream readiness rather than a
+  // guessed delay — this is the cue that it's safe to start speaking.
+  const [micLive, setMicLive] = useState(false);
   const direction = getLanguageDirection(i18n.language);
 
   useEffect(() => {
@@ -31,6 +35,9 @@ const RecordingOverlay: React.FC = () => {
         setState(overlayState);
         if (overlayState === "recording") {
           setLocked(false);
+          // Reset readiness each time a new recording starts; the next
+          // mic-level event will flip it back on once the stream is live.
+          setMicLive(false);
         }
         setIsVisible(true);
       });
@@ -50,6 +57,10 @@ const RecordingOverlay: React.FC = () => {
       // inside AudioWaveform, so we just forward the raw payload.
       const unlistenLevel = await listen<number[]>("mic-level", (event) => {
         setLevels(event.payload as number[]);
+        // mic-level updates are produced from real captured samples, so the
+        // first one after a recording starts means the stream is genuinely
+        // live and the user's words will now be captured.
+        setMicLive(true);
       });
 
       // Cleanup function
@@ -83,14 +94,23 @@ const RecordingOverlay: React.FC = () => {
       className={`recording-overlay ${state} ${isVisible ? "fade-in" : ""}`}
     >
       <div className="overlay-left">
-        <span className={`overlay-icon ${state}`}>{renderIcon()}</span>
+        <span
+          className={`overlay-icon ${state}${
+            isRecording && !micLive ? " preparing" : ""
+          }`}
+        >
+          {renderIcon()}
+        </span>
       </div>
 
       <div className="overlay-middle">
         {isRecording && locked && (
           <div className="overlay-text">{t("overlay.locked")}</div>
         )}
-        {isRecording && !locked && (
+        {isRecording && !locked && !micLive && (
+          <div className="overlay-text preparing">{t("overlay.preparing")}</div>
+        )}
+        {isRecording && !locked && micLive && (
           <AudioWaveform
             levels={levels}
             size="sm"
@@ -99,7 +119,9 @@ const RecordingOverlay: React.FC = () => {
           />
         )}
         {state === "transcribing" && (
-          <div className="overlay-text shimmer">{t("overlay.transcribing")}</div>
+          <div className="overlay-text shimmer">
+            {t("overlay.transcribing")}
+          </div>
         )}
         {state === "processing" && (
           <div className="overlay-text shimmer">{t("overlay.processing")}</div>

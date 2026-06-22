@@ -1,4 +1,4 @@
-use crate::audio_toolkit::{apply_custom_words, filter_transcription_output};
+use crate::audio_toolkit::{apply_custom_words, filter_transcription_output, normalize_peak};
 use crate::managers::audio::AudioRecordingManager;
 use crate::managers::model::{EngineType, ModelManager};
 use crate::settings::{
@@ -448,7 +448,7 @@ impl TranscriptionManager {
         current_model.clone()
     }
 
-    pub fn transcribe(&self, audio: Vec<f32>) -> Result<String> {
+    pub fn transcribe(&self, mut audio: Vec<f32>) -> Result<String> {
         #[cfg(debug_assertions)]
         if std::env::var("HANDY_FORCE_TRANSCRIPTION_FAILURE").is_ok() {
             return Err(anyhow::anyhow!(
@@ -467,6 +467,16 @@ impl TranscriptionManager {
             debug!("Empty audio vector");
             self.maybe_unload_immediately("empty audio");
             return Ok(String::new());
+        }
+
+        // Boost quiet captures up toward a healthy level before inference.
+        // Whisper-style models degrade on faint, low-SNR audio (e.g. speaking
+        // away from the mic or outdoors), and this is a cheap O(n) pass that
+        // only ever boosts — already-loud audio is left untouched. Runs once,
+        // off the live capture path, so it adds no recording latency.
+        let applied_gain = normalize_peak(&mut audio, 0.95, 8.0);
+        if applied_gain > 1.0 {
+            debug!("Applied input gain normalization: {:.2}x", applied_gain);
         }
 
         // Check if model is loaded, if not try to load it

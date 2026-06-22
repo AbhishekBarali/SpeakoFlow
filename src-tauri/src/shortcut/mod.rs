@@ -505,6 +505,7 @@ pub fn change_sound_theme_setting(app: AppHandle, theme: String) -> Result<(), S
     let parsed = match theme.as_str() {
         "marimba" => SoundTheme::Marimba,
         "pop" => SoundTheme::Pop,
+        "click" => SoundTheme::Click,
         "custom" => SoundTheme::Custom,
         other => {
             warn!("Invalid sound theme '{}', defaulting to marimba", other);
@@ -681,6 +682,44 @@ pub fn update_custom_words(app: AppHandle, words: Vec<String>) -> Result<(), Str
     settings.custom_words = words;
     settings::write_settings(&app, settings);
     Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn change_replacements_enabled_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    settings.replacements_enabled = enabled;
+    settings::write_settings(&app, settings);
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn update_text_replacements(
+    app: AppHandle,
+    replacements: Vec<settings::Replacement>,
+) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    settings.text_replacements = replacements;
+    settings::write_settings(&app, settings);
+    Ok(())
+}
+
+/// Writes the given contents to a user-chosen path. The path comes from the
+/// frontend's native "save" dialog; file I/O is done here (rather than via the
+/// JS fs plugin) so the user can export anywhere, not just inside `$APPDATA`.
+#[tauri::command]
+#[specta::specta]
+pub fn export_text_replacements(path: String, contents: String) -> Result<(), String> {
+    std::fs::write(&path, contents).map_err(|e| format!("Failed to write file: {e}"))
+}
+
+/// Reads a user-chosen file (selected via the native "open" dialog) and returns
+/// its contents as a string for the frontend to parse.
+#[tauri::command]
+#[specta::specta]
+pub fn import_text_replacements(path: String) -> Result<String, String> {
+    std::fs::read_to_string(&path).map_err(|e| format!("Failed to read file: {e}"))
 }
 
 #[tauri::command]

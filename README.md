@@ -1,8 +1,8 @@
-# Handy Ultra
+# SpeakoFlow
 
 **A free, local-first voice assistant for your desktop — dictation, a floating AI chat panel, screen vision, and spoken answers, all from one global hotkey.**
 
-Handy Ultra started as a fork of the excellent [Handy](https://github.com/cjpais/Handy) dictation app and is growing into something different: a full Wispr Flow–style voice assistant that you own. Speech-to-text stays 100 % local; the assistant brain is any OpenAI-compatible LLM you point it at — OpenAI, Anthropic, Groq, OpenRouter, Z.AI, Cerebras, AWS Bedrock, Azure OpenAI (via a custom endpoint), an Ollama / LM Studio server, or the **built-in local LLM** that runs fully offline with no server to set up.
+SpeakoFlow started as a fork of the excellent [Handy](https://github.com/cjpais/Handy) dictation app and is growing into something different: a full Wispr Flow–style voice assistant that you own. Speech-to-text stays 100 % local; the assistant brain is any OpenAI-compatible LLM you point it at — OpenAI, Anthropic, Groq, OpenRouter, Z.AI, Cerebras, AWS Bedrock, Azure OpenAI (via a custom endpoint), an Ollama / LM Studio server, or the **built-in local LLM** that runs fully offline with no server to set up.
 
 ## What it does
 
@@ -54,7 +54,7 @@ Handy Ultra started as a fork of the excellent [Handy](https://github.com/cjpais
 
 ## What's different from Handy?
 
-|                                          | Handy | Handy Ultra                                            |
+|                                          | Handy | SpeakoFlow                                             |
 | ---------------------------------------- | ----- | ------------------------------------------------------ |
 | Local dictation                          | ✅    | ✅ (unchanged core)                                    |
 | AI assistant chat panel                  | —     | ✅ floating glass panel, streaming                     |

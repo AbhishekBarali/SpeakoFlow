@@ -382,7 +382,7 @@ pub async fn assistant_test_tts(app: AppHandle, text: String) -> Result<(), Stri
     // sample lines) so the spoken test matches the kokoro path. Fall back to a
     // sensible default if the caller passes nothing.
     let sample = if text.trim().is_empty() {
-        "Hi! This is a test of Handy's voice output.".to_string()
+        "Hi! This is a test of SpeakoFlow's voice output.".to_string()
     } else {
         text
     };

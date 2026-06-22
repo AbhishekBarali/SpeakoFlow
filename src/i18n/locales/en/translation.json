@@ -108,7 +108,7 @@
     },
     "permissions": {
       "title": "Permissions Required",
-      "description": "Handy needs a couple of permissions to work properly.",
+      "description": "SpeakoFlow needs a couple of permissions to work properly.",
       "microphone": {
         "title": "Microphone Access",
         "description": "Required to hear your voice for transcription."
@@ -168,7 +168,7 @@
     "general": {
       "title": "General",
       "shortcut": {
-        "title": "Handy Shortcuts",
+        "title": "SpeakoFlow Shortcuts",
         "description": "Configure keyboard shortcuts to trigger speech-to-text recording",
         "loading": "Loading shortcuts...",
         "none": "No shortcuts configured",
@@ -303,6 +303,7 @@
         "app": "App",
         "output": "Output",
         "transcription": "Transcription",
+        "textReplacements": "Text Replacements",
         "history": "History",
         "experimental": "Experimental"
       },
@@ -335,11 +336,11 @@
       },
       "autostart": {
         "label": "Launch on Startup",
-        "description": "Automatically start Handy when you log in to your computer."
+        "description": "Automatically start SpeakoFlow when you log in to your computer."
       },
       "showTrayIcon": {
         "label": "Show Tray Icon",
-        "description": "Display the Handy icon in the system tray."
+        "description": "Display the SpeakoFlow icon in the system tray."
       },
       "overlay": {
         "title": "Overlay Position",
@@ -415,6 +416,34 @@
         "add": "Add",
         "remove": "Remove {{word}}",
         "duplicate": "\"{{word}}\" already exists"
+      },
+      "textReplacements": {
+        "title": "Text Replacements",
+        "description": "Apply rule-based find and replace to the transcript. Runs instantly and offline after any AI post-processing. Use literal text or regular expressions, and magic commands in the replacement.",
+        "empty": "No replacements yet. Add a rule to get started.",
+        "addRule": "Add replacement",
+        "searchPlaceholder": "Find",
+        "replacePlaceholder": "Replace with",
+        "advanced": "Advanced options",
+        "regex": "Regex",
+        "trimBefore": "Trim before",
+        "trimAfter": "Trim after",
+        "enabledLabel": "Enabled",
+        "remove": "Remove rule",
+        "import": "Import",
+        "export": "Export",
+        "importSuccess": "Imported {{count}} replacement rules",
+        "importError": "Could not import: the file is not a valid replacements list",
+        "exportSuccess": "Replacements exported",
+        "exportError": "Could not export replacements",
+        "magicHint": "Magic commands for the replacement: [date], [time], [uppercase], [lowercase], [capitalize], [nospace].",
+        "capitalization": {
+          "label": "Caps",
+          "none": "None",
+          "uppercase": "UPPERCASE",
+          "lowercase": "lowercase",
+          "capitalize": "Capitalize"
+        }
       }
     },
     "postProcessing": {
@@ -514,7 +543,7 @@
       },
       "updateChecks": {
         "label": "Check for Updates",
-        "description": "Automatically check for new versions of Handy"
+        "description": "Automatically check for new versions of SpeakoFlow"
       },
       "soundTheme": {
         "label": "Sound Theme",
@@ -541,7 +570,7 @@
       },
       "alwaysOnMicrophone": {
         "label": "Always-On Microphone",
-        "description": "Keep microphone active for faster response"
+        "description": "Keep the microphone warm so capture is instant and the first words are never clipped. Best on desktops or while plugged in; uses a little more battery since the mic stays active."
       },
       "clamshellMicrophone": {
         "title": "Clamshell Microphone",
@@ -595,7 +624,7 @@
       },
       "supportDevelopment": {
         "title": "Support Development",
-        "description": "Help us continue building Handy",
+        "description": "Help us continue building SpeakoFlow",
         "button": "Donate"
       },
       "acknowledgments": {
@@ -719,7 +748,7 @@
         "testButton": "Test voice",
         "testing": "Testing…",
         "testOk": "Played ✓",
-        "testPhrase": "Hi! This is a test of Handy's voice output.",
+        "testPhrase": "Hi! This is a test of SpeakoFlow's voice output.",
         "baseUrlLabel": "TTS Base URL",
         "baseUrlDescription": "OpenAI-compatible endpoint. You can paste either a base (e.g. https://{resource}.openai.azure.com/openai/v1) or a full /audio/speech URL including ?api-version=... — exactly the endpoint you'd use as SillyTavern's Provider Endpoint.",
         "azureBaseUrlLabel": "Speech Endpoint",
@@ -818,7 +847,7 @@
   },
   "accessibility": {
     "permissionsRequired": "Accessibility Permissions Required",
-    "permissionsDescription": "Handy needs accessibility permissions to type transcribed text.",
+    "permissionsDescription": "SpeakoFlow needs accessibility permissions to type transcribed text.",
     "openSettings": "Open System Settings",
     "dismiss": "Dismiss"
   },
@@ -841,9 +870,10 @@
   },
   "appLanguage": {
     "title": "Application Language",
-    "description": "Change the language of the Handy interface"
+    "description": "Change the language of the SpeakoFlow interface"
   },
   "overlay": {
+    "preparing": "Getting mic ready…",
     "transcribing": "Transcribing...",
     "processing": "Processing...",
     "locked": "Recording — press hotkey to stop"

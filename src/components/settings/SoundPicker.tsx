@@ -24,6 +24,7 @@ export const SoundPicker: React.FC<SoundPickerProps> = ({
   const options: DropdownOption[] = [
     { value: "marimba", label: "Marimba" },
     { value: "pop", label: "Pop" },
+    { value: "click", label: "Click" },
   ];
 
   // Only add Custom option if both custom sound files exist
@@ -47,7 +48,10 @@ export const SoundPicker: React.FC<SoundPickerProps> = ({
         <Dropdown
           selectedValue={selectedTheme}
           onSelect={(value) =>
-            updateSetting("sound_theme", value as "marimba" | "pop" | "custom")
+            updateSetting(
+              "sound_theme",
+              value as "marimba" | "pop" | "click" | "custom",
+            )
           }
           options={options}
         />

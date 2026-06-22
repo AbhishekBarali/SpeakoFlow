@@ -280,6 +280,47 @@ async updateCustomWords(words: string[]) : Promise<Result<null, string>> {
     else return { status: "error", error: e  as any };
 }
 },
+async changeReplacementsEnabledSetting(enabled: boolean) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("change_replacements_enabled_setting", { enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async updateTextReplacements(replacements: Replacement[]) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("update_text_replacements", { replacements }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Writes the given contents to a user-chosen path. The path comes from the
+ * frontend's native "save" dialog; file I/O is done here (rather than via the
+ * JS fs plugin) so the user can export anywhere, not just inside `$APPDATA`.
+ */
+async exportTextReplacements(path: string, contents: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("export_text_replacements", { path, contents }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Reads a user-chosen file (selected via the native "open" dialog) and returns
+ * its contents as a string for the frontend to parse.
+ */
+async importTextReplacements(path: string) : Promise<Result<string, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("import_text_replacements", { path }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 /**
  * Temporarily unregister a binding while the user is editing it in the UI.
  * This avoids firing the action while keys are being recorded.
@@ -1316,7 +1357,15 @@ historyUpdatePayload: "history-update-payload"
 
 /** user-defined types **/
 
-export type AppSettings = { bindings: Partial<{ [key in string]: ShortcutBinding }>; push_to_talk: boolean; audio_feedback: boolean; audio_feedback_volume?: number; sound_theme?: SoundTheme; start_hidden?: boolean; autostart_enabled?: boolean; update_checks_enabled?: boolean; selected_model?: string; always_on_microphone?: boolean; selected_microphone?: string | null; clamshell_microphone?: string | null; selected_output_device?: string | null; translate_to_english?: boolean; selected_language?: string; overlay_position?: OverlayPosition; debug_mode?: boolean; log_level?: LogLevel; custom_words?: string[]; model_unload_timeout?: ModelUnloadTimeout; 
+export type AppSettings = { bindings: Partial<{ [key in string]: ShortcutBinding }>; push_to_talk: boolean; audio_feedback: boolean; audio_feedback_volume?: number; sound_theme?: SoundTheme; start_hidden?: boolean; autostart_enabled?: boolean; update_checks_enabled?: boolean; selected_model?: string; always_on_microphone?: boolean; selected_microphone?: string | null; clamshell_microphone?: string | null; selected_output_device?: string | null; translate_to_english?: boolean; selected_language?: string; overlay_position?: OverlayPosition; debug_mode?: boolean; log_level?: LogLevel; custom_words?: string[]; 
+/**
+ * Master switch for the deterministic text-replacements pass.
+ */
+replacements_enabled?: boolean; 
+/**
+ * Ordered list of find/replace rules applied after LLM post-processing.
+ */
+text_replacements?: Replacement[]; model_unload_timeout?: ModelUnloadTimeout; 
 /**
  * Idle timeout after which the built-in local LLM engine (llama.cpp
  * sidecar) is unloaded to free RAM/VRAM. Mirrors `model_unload_timeout`
@@ -1410,6 +1459,26 @@ locale: string;
  */
 gender: string }
 export type BindingResponse = { success: boolean; binding: ShortcutBinding | null; error: string | null }
+/**
+ * Case transform applied to the output of a text replacement rule.
+ */
+export type Capitalization = 
+/**
+ * Leave the replacement text as written.
+ */
+"none" | 
+/**
+ * UPPERCASE the whole replacement.
+ */
+"uppercase" | 
+/**
+ * lowercase the whole replacement.
+ */
+"lowercase" | 
+/**
+ * Capitalize the first character of the replacement.
+ */
+"capitalize"
 export type ChatMessage = { role: string; content: string }
 export type ClipboardHandling = "dont_modify" | "copy_to_clipboard"
 export type CustomSounds = { start: boolean; stop: boolean }
@@ -1521,13 +1590,51 @@ export type PermissionAccess = "allowed" | "denied" | "unknown"
 export type PostProcessProvider = { id: string; label: string; base_url: string; allow_base_url_edit?: boolean; models_endpoint?: string | null; supports_structured_output?: boolean }
 export type RecordingRetentionPeriod = "never" | "preserve_limit" | "days_3" | "weeks_2" | "months_3"
 /**
+ * A single deterministic find/replace rule applied to the transcript.
+ * 
+ * Rules run as a fast, offline, deterministic pass that complements (does not
+ * duplicate) the optional LLM post-processing. `search` is matched literally
+ * by default; set `is_regex` to treat it as a regular expression. `replace`
+ * may contain magic commands such as `[date]`, `[time]`, `[uppercase]`,
+ * `[lowercase]`, `[capitalize]`, and `[nospace]`.
+ */
+export type Replacement = { 
+/**
+ * Text (or regex pattern when `is_regex` is set) to search for.
+ */
+search: string; 
+/**
+ * Replacement text. Supports the magic commands described on the struct.
+ */
+replace: string; 
+/**
+ * Treat `search` as a regular expression instead of a literal string.
+ */
+is_regex?: boolean; 
+/**
+ * Whether this rule is applied. Disabled rules are kept but skipped.
+ */
+enabled?: boolean; 
+/**
+ * Remove whitespace immediately before each match.
+ */
+trim_before?: boolean; 
+/**
+ * Remove whitespace immediately after each match.
+ */
+trim_after?: boolean; 
+/**
+ * Case transform applied to this rule's output.
+ */
+capitalization?: Capitalization }
+/**
  * A single web result, trimmed to the essentials the model needs.
  */
 export type SearchResult = { title: string; url: string; snippet: string }
 export type SecretMap = Partial<{ [key in string]: string }>
 export type SecretString = string
 export type ShortcutBinding = { id: string; name: string; description: string; default_binding: string; current_binding: string }
-export type SoundTheme = "marimba" | "pop" | "custom"
+export type SoundTheme = "marimba" | "pop" | "click" | "custom"
 /**
  * UI appearance preference. `System` follows the OS; `Light` / `Dark` pin the
  * theme regardless of the OS setting. Serialized lowercase ("light", "dark",

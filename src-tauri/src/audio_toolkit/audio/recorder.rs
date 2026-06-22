@@ -2,7 +2,7 @@ use std::{
     io::Error,
     sync::{
         atomic::{AtomicBool, Ordering},
-        mpsc, Arc, Mutex,
+        mpsc, Arc, Condvar, Mutex,
     },
     time::Duration,
 };
@@ -36,6 +36,11 @@ pub struct AudioRecorder {
     worker_handle: Option<std::thread::JoinHandle<()>>,
     vad: Option<Arc<Mutex<Box<dyn vad::VoiceActivityDetector>>>>,
     level_cb: Option<Arc<dyn Fn(Vec<f32>) + Send + Sync + 'static>>,
+    /// Becomes `true` once the microphone has delivered its first audio frame
+    /// after [`AudioRecorder::start`]. Lets callers align the "start speaking"
+    /// cue with a stream that is genuinely live, instead of guessing a fixed
+    /// warm-up delay (which clips the first words on slow-to-wake devices).
+    capture_ready: Arc<(Mutex<bool>, Condvar)>,
 }
 
 impl AudioRecorder {
@@ -46,6 +51,7 @@ impl AudioRecorder {
             worker_handle: None,
             vad: None,
             level_cb: None,
+            capture_ready: Arc::new((Mutex::new(false), Condvar::new())),
         })
     }
 
@@ -83,6 +89,7 @@ impl AudioRecorder {
         let vad = self.vad.clone();
         // Move the optional level callback into the worker thread
         let level_cb = self.level_cb.clone();
+        let capture_ready = self.capture_ready.clone();
 
         let worker = std::thread::spawn(move || {
             let stop_flag = Arc::new(AtomicBool::new(false));
@@ -159,7 +166,15 @@ impl AudioRecorder {
                 Ok((stream, sample_rate)) => {
                     let _ = init_tx.send(Ok(()));
                     // Keep the stream alive while we process samples.
-                    run_consumer(sample_rate, vad, sample_rx, cmd_rx, level_cb, stop_flag);
+                    run_consumer(
+                        sample_rate,
+                        vad,
+                        sample_rx,
+                        cmd_rx,
+                        level_cb,
+                        stop_flag,
+                        capture_ready,
+                    );
                     drop(stream);
                 }
                 Err(error_message) => {
@@ -196,10 +211,24 @@ impl AudioRecorder {
     }
 
     pub fn start(&self) -> Result<(), Box<dyn std::error::Error>> {
+        // Reset capture-readiness before signalling Start so a stale `true`
+        // from a previous recording can't satisfy a waiter before the mic is
+        // actually delivering samples for this session.
+        {
+            let (lock, _) = &*self.capture_ready;
+            *lock.lock().unwrap() = false;
+        }
         if let Some(tx) = &self.cmd_tx {
             tx.send(Cmd::Start)?;
         }
         Ok(())
+    }
+
+    /// Shared handle that flips to `true` once the microphone delivers its
+    /// first audio frame after [`AudioRecorder::start`]. Callers can wait on
+    /// the [`Condvar`] to time the "start speaking" cue to a live stream.
+    pub fn capture_ready_handle(&self) -> Arc<(Mutex<bool>, Condvar)> {
+        self.capture_ready.clone()
     }
 
     pub fn stop(&self) -> Result<Vec<f32>, Box<dyn std::error::Error>> {
@@ -399,6 +428,7 @@ fn run_consumer(
     cmd_rx: mpsc::Receiver<Cmd>,
     level_cb: Option<Arc<dyn Fn(Vec<f32>) + Send + Sync + 'static>>,
     stop_flag: Arc<AtomicBool>,
+    capture_ready: Arc<(Mutex<bool>, Condvar)>,
 ) {
     let mut frame_resampler = FrameResampler::new(
         in_sample_rate as usize,
@@ -408,6 +438,8 @@ fn run_consumer(
 
     let mut processed_samples = Vec::<f32>::new();
     let mut recording = false;
+    // Set on Cmd::Start; cleared once we signal readiness for the session.
+    let mut awaiting_first_frame = false;
 
     // ---------- spectrum visualisation setup ---------------------------- //
     const BUCKETS: usize = 16;
@@ -462,6 +494,16 @@ fn run_consumer(
             AudioChunk::EndOfStream => continue,
         };
 
+        // First real audio frame after a Start means the device is genuinely
+        // delivering audio for this session. Signal readiness so the UI/cue can
+        // tell the user it's safe to speak (instead of guessing a fixed delay).
+        if recording && awaiting_first_frame {
+            let (lock, cvar) = &*capture_ready;
+            *lock.lock().unwrap() = true;
+            cvar.notify_all();
+            awaiting_first_frame = false;
+        }
+
         // ---------- spectrum processing ---------------------------------- //
         if let Some(buckets) = visualizer.feed(&raw) {
             if let Some(cb) = &level_cb {
@@ -481,6 +523,7 @@ fn run_consumer(
                     stop_flag.store(false, Ordering::Relaxed);
                     processed_samples.clear();
                     recording = true;
+                    awaiting_first_frame = true;
                     visualizer.reset();
                     if let Some(v) = &vad {
                         v.lock().unwrap().reset();

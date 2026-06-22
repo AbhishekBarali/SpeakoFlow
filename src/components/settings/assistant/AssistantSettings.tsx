@@ -65,7 +65,7 @@ const FONT_SIZES: Record<string, string> = {
  *  These are intentionally not translated — they're meme sample lines. */
 const TEST_PHRASES = [
   "Wagwan brother.",
-  "Hi! This is a test of Handy's voice output.",
+  "Hi! This is a test of SpeakoFlow's voice output.",
   "Ayo, is this thing on?",
   "Greetings, human. Your voice assistant has entered the chat.",
   "Testing, testing, one two... yeah we good.",

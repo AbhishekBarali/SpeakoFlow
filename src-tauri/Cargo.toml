@@ -1,7 +1,7 @@
 [package]
 name = "handy"
 version = "0.8.3"
-description = "Handy"
+description = "SpeakoFlow"
 authors = ["cjpais"]
 edition = "2021"
 license = "MIT"
@@ -93,6 +93,9 @@ tauri-plugin-updater = "2.10.0"
 
 [target.'cfg(windows)'.dependencies]
 transcribe-rs = { version = "0.3.3", features = ["whisper-vulkan", "ort-directml"] }
+# Secure API-key storage via the Windows Credential Manager. `windows-native`
+# uses windows-sys (no extra C/system build dependency).
+keyring = { version = "3", features = ["windows-native"] }
 windows = { version = "0.61.3", features = [
   "Win32_Media_Audio_Endpoints",
   "Win32_System_Com_StructuredStorage",
@@ -105,11 +108,26 @@ winreg = "0.55"
 [target.'cfg(target_os = "macos")'.dependencies]
 tauri-nspanel = { git = "https://github.com/ahkohd/tauri-nspanel", branch = "v2.1" }
 transcribe-rs = { version = "0.3.3", features = ["whisper-metal"] }
+# Secure API-key storage via the macOS Keychain. `apple-native` uses the
+# system Security framework (no extra C/system build dependency).
+keyring = { version = "3", features = ["apple-native"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 gtk-layer-shell = { version = "0.8", features = ["v0_6"] }
 gtk = "0.18"
 transcribe-rs = { version = "0.3.3", features = ["whisper-vulkan"] }
+# Secure API-key storage via the Secret Service (GNOME Keyring / KWallet).
+# `async-secret-service` + `crypto-rust` use the pure-Rust zbus + RustCrypto
+# stack, so the Linux build needs NO libdbus/OpenSSL system headers (keeps the
+# export/CI build self-contained). keyring access is funnelled onto a worker
+# thread in secret_store.rs because this backend can deadlock if called on the
+# main/runtime thread. Absent Secret Service (headless) is handled at runtime
+# by falling back to the settings file.
+keyring = { version = "3", features = [
+  "async-secret-service",
+  "tokio",
+  "crypto-rust",
+] }
 
 [patch.crates-io]
 tauri-runtime = { git = "https://github.com/cjpais/tauri.git", branch = "handy-2.10.2" }

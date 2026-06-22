@@ -414,6 +414,41 @@ impl AudioRecordingManager {
         }
     }
 
+    /// Block until the microphone has started delivering audio for the current
+    /// recording, or `timeout` elapses. Returns `true` if the stream went live
+    /// in time. Used to delay the "start speaking" cue until capture is real,
+    /// so the first words aren't lost during a cold-start/wake-up on slower
+    /// devices. The recorder lock is released before waiting so this never
+    /// blocks other recorder operations.
+    pub fn wait_for_capture_ready(&self, timeout: Duration) -> bool {
+        let handle = {
+            let guard = self.recorder.lock().unwrap();
+            match guard.as_ref() {
+                Some(rec) => rec.capture_ready_handle(),
+                None => return false,
+            }
+        };
+
+        let (lock, cvar) = &*handle;
+        let mut ready = lock.lock().unwrap();
+        if *ready {
+            return true;
+        }
+        let deadline = Instant::now() + timeout;
+        while !*ready {
+            let remaining = match deadline.checked_duration_since(Instant::now()) {
+                Some(r) => r,
+                None => break,
+            };
+            let (guard, res) = cvar.wait_timeout(ready, remaining).unwrap();
+            ready = guard;
+            if res.timed_out() {
+                break;
+            }
+        }
+        *ready
+    }
+
     pub fn update_selected_device(&self) -> Result<(), anyhow::Error> {
         // If currently open, restart the microphone stream to use the new device
         if *self.is_open.lock().unwrap() {

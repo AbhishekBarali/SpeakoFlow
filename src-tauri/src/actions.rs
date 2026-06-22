@@ -424,6 +424,21 @@ pub(crate) async fn process_transcription_output(
         post_processed_text = Some(final_text.clone());
     }
 
+    // === Deterministic text replacements =================================
+    // Rule-based find/replace + magic commands. This runs AFTER LLM
+    // post-processing by default so hand-written, deterministic fix-ups always
+    // win over the model's output. To run replacements BEFORE the LLM instead,
+    // move this single block above the `if post_process` block above.
+    if settings.replacements_enabled && !settings.text_replacements.is_empty() {
+        let replaced =
+            crate::audio_toolkit::apply_replacements(&final_text, &settings.text_replacements);
+        if replaced != final_text {
+            final_text = replaced;
+            // Keep history's "post-processed" view aligned with what we paste.
+            post_processed_text = Some(final_text.clone());
+        }
+    }
+
     ProcessedTranscription {
         final_text,
         post_processed_text,
@@ -500,12 +515,22 @@ impl ShortcutAction for TranscribeAction {
             match rm.try_start_recording(&binding_id) {
                 Ok(()) => {
                     debug!("Recording started in {:?}", recording_start_time.elapsed());
-                    // Small delay to ensure microphone stream is active
+                    // Wait until the microphone is actually delivering audio
+                    // before cueing the user to speak. On a warm stream this
+                    // fires almost immediately; on a cold device (laptop
+                    // power-saving, USB/Bluetooth wake-up) it waits out the
+                    // warm-up so the first words aren't clipped. A short timeout
+                    // fallback guarantees a misbehaving device can never hang
+                    // the cue.
                     let app_clone = app.clone();
                     let rm_clone = Arc::clone(&rm);
                     std::thread::spawn(move || {
-                        std::thread::sleep(std::time::Duration::from_millis(100));
-                        debug!("Handling delayed audio feedback/mute sequence");
+                        let ready =
+                            rm_clone.wait_for_capture_ready(std::time::Duration::from_millis(400));
+                        debug!(
+                            "Capture ready: {} — handling audio feedback/mute sequence",
+                            ready
+                        );
                         // Helper handles disabled audio feedback by returning early, so we reuse it
                         // to keep mute sequencing consistent in every mode.
                         play_feedback_sound_blocking(&app_clone, SoundType::Start);
@@ -597,7 +622,7 @@ impl ShortcutAction for TranscribeAction {
                 } else {
                     // Save WAV concurrently with transcription
                     let sample_count = samples.len();
-                    let file_name = format!("handy-{}.wav", chrono::Utc::now().timestamp());
+                    let file_name = format!("speakoflow-{}.wav", chrono::Utc::now().timestamp());
                     let wav_path = hm.recordings_dir().join(&file_name);
                     let wav_path_for_verify = wav_path.clone();
                     let samples_for_wav = samples.clone();

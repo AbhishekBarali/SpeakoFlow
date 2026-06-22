@@ -93,6 +93,51 @@ pub struct LLMPrompt {
     pub prompt: String,
 }
 
+/// Case transform applied to the output of a text replacement rule.
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum Capitalization {
+    /// Leave the replacement text as written.
+    #[default]
+    None,
+    /// UPPERCASE the whole replacement.
+    Uppercase,
+    /// lowercase the whole replacement.
+    Lowercase,
+    /// Capitalize the first character of the replacement.
+    Capitalize,
+}
+
+/// A single deterministic find/replace rule applied to the transcript.
+///
+/// Rules run as a fast, offline, deterministic pass that complements (does not
+/// duplicate) the optional LLM post-processing. `search` is matched literally
+/// by default; set `is_regex` to treat it as a regular expression. `replace`
+/// may contain magic commands such as `[date]`, `[time]`, `[uppercase]`,
+/// `[lowercase]`, `[capitalize]`, and `[nospace]`.
+#[derive(Serialize, Deserialize, Debug, Clone, Type)]
+pub struct Replacement {
+    /// Text (or regex pattern when `is_regex` is set) to search for.
+    pub search: String,
+    /// Replacement text. Supports the magic commands described on the struct.
+    pub replace: String,
+    /// Treat `search` as a regular expression instead of a literal string.
+    #[serde(default)]
+    pub is_regex: bool,
+    /// Whether this rule is applied. Disabled rules are kept but skipped.
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    /// Remove whitespace immediately before each match.
+    #[serde(default)]
+    pub trim_before: bool,
+    /// Remove whitespace immediately after each match.
+    #[serde(default)]
+    pub trim_after: bool,
+    /// Case transform applied to this rule's output.
+    #[serde(default)]
+    pub capitalization: Capitalization,
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, Type)]
 pub struct PostProcessProvider {
     pub id: String,
@@ -268,6 +313,7 @@ impl ModelUnloadTimeout {
 pub enum SoundTheme {
     Marimba,
     Pop,
+    Click,
     Custom,
 }
 
@@ -276,6 +322,7 @@ impl SoundTheme {
         match self {
             SoundTheme::Marimba => "marimba",
             SoundTheme::Pop => "pop",
+            SoundTheme::Click => "click",
             SoundTheme::Custom => "custom",
         }
     }
@@ -434,6 +481,12 @@ pub struct AppSettings {
     pub log_level: LogLevel,
     #[serde(default)]
     pub custom_words: Vec<String>,
+    /// Master switch for the deterministic text-replacements pass.
+    #[serde(default)]
+    pub replacements_enabled: bool,
+    /// Ordered list of find/replace rules applied after LLM post-processing.
+    #[serde(default = "default_text_replacements")]
+    pub text_replacements: Vec<Replacement>,
     #[serde(default)]
     pub model_unload_timeout: ModelUnloadTimeout,
     /// Idle timeout after which the built-in local LLM engine (llama.cpp
@@ -635,7 +688,7 @@ fn default_audio_feedback_volume() -> f32 {
 }
 
 fn default_sound_theme() -> SoundTheme {
-    SoundTheme::Marimba
+    SoundTheme::Click
 }
 
 fn default_post_process_enabled() -> bool {
@@ -793,6 +846,16 @@ fn default_post_process_models() -> HashMap<String, String> {
         );
     }
     map
+}
+
+/// Default value helper for `#[serde(default = "default_true")]` fields.
+fn default_true() -> bool {
+    true
+}
+
+/// Default text-replacement rules. Empty by default — users add their own.
+fn default_text_replacements() -> Vec<crate::settings::Replacement> {
+    Vec::new()
 }
 
 fn default_post_process_prompts() -> Vec<LLMPrompt> {
@@ -1199,6 +1262,8 @@ pub fn get_default_settings() -> AppSettings {
         debug_mode: false,
         log_level: default_log_level(),
         custom_words: Vec::new(),
+        replacements_enabled: false,
+        text_replacements: default_text_replacements(),
         model_unload_timeout: ModelUnloadTimeout::default(),
         local_llm_unload_timeout: default_local_llm_unload_timeout(),
         word_correction_threshold: default_word_correction_threshold(),
@@ -1293,6 +1358,147 @@ impl AppSettings {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Secret handling (OS keychain)
+//
+// API keys live in the OS keychain (see `crate::secret_store`), not in
+// `settings_store.json`. The flow:
+//   * `write_settings` mirrors the in-memory secrets into the keychain, then
+//     blanks them before the struct is written to disk.
+//   * `get_settings` re-fills the in-memory secrets from the keychain so every
+//     existing read site keeps working unchanged.
+//   * `load_or_create_app_settings` performs a one-time migration of any
+//     pre-existing plaintext keys out of the store and into the keychain.
+// When the keychain is unavailable (e.g. headless Linux), secrets simply stay
+// in the store and the app behaves exactly as before (a warning is logged once
+// by `secret_store`).
+// ---------------------------------------------------------------------------
+
+/// Persist the in-memory secrets into the OS keychain and blank each one in the
+/// struct **only after** the keychain confirms it holds the value. A failed
+/// keychain write therefore leaves the key in the on-disk store as a fallback
+/// rather than losing it. An empty value removes any stored credential, so
+/// clearing a key in the UI actually clears it (and it won't be re-hydrated).
+///
+/// Input must be hydrated (the live values), which is always the case for
+/// `write_settings` since every caller goes through `get_settings` first.
+fn persist_hydrated_secrets(settings: &mut AppSettings) {
+    let provider_ids: Vec<String> = settings.post_process_api_keys.keys().cloned().collect();
+    for id in provider_ids {
+        let value = settings
+            .post_process_api_keys
+            .get(&id)
+            .cloned()
+            .unwrap_or_default();
+        if crate::secret_store::sync(&crate::secret_store::account_post_process(&id), &value) {
+            if let Some(slot) = settings.post_process_api_keys.get_mut(&id) {
+                slot.clear();
+            }
+        }
+    }
+    let provider_ids: Vec<String> = settings.web_search_api_keys.keys().cloned().collect();
+    for id in provider_ids {
+        let value = settings
+            .web_search_api_keys
+            .get(&id)
+            .cloned()
+            .unwrap_or_default();
+        if crate::secret_store::sync(&crate::secret_store::account_web_search(&id), &value) {
+            if let Some(slot) = settings.web_search_api_keys.get_mut(&id) {
+                slot.clear();
+            }
+        }
+    }
+    if crate::secret_store::sync(
+        crate::secret_store::ACCOUNT_ASSISTANT_TTS,
+        &settings.assistant_tts_api_key.0,
+    ) {
+        settings.assistant_tts_api_key = SecretString::default();
+    }
+}
+
+/// One-time migration of legacy plaintext keys from the store into the keychain.
+///
+/// Only touches NON-EMPTY values and only blanks a value once the keychain
+/// confirms it was stored. This is deliberately different from
+/// `persist_hydrated_secrets`: its input comes straight from disk (not yet
+/// hydrated), so an empty slot means "already migrated / never set", NOT "the
+/// user cleared this key". It must therefore never delete a keychain entry based
+/// on an empty on-disk value — otherwise a restart would wipe the keychain.
+/// Returns true if anything was moved (so the caller can persist the stripped
+/// store).
+fn migrate_plaintext_secrets(settings: &mut AppSettings) -> bool {
+    let mut changed = false;
+    let provider_ids: Vec<String> = settings.post_process_api_keys.keys().cloned().collect();
+    for id in provider_ids {
+        let value = settings
+            .post_process_api_keys
+            .get(&id)
+            .cloned()
+            .unwrap_or_default();
+        if !value.is_empty()
+            && crate::secret_store::set(&crate::secret_store::account_post_process(&id), &value)
+        {
+            if let Some(slot) = settings.post_process_api_keys.get_mut(&id) {
+                slot.clear();
+            }
+            changed = true;
+        }
+    }
+    let provider_ids: Vec<String> = settings.web_search_api_keys.keys().cloned().collect();
+    for id in provider_ids {
+        let value = settings
+            .web_search_api_keys
+            .get(&id)
+            .cloned()
+            .unwrap_or_default();
+        if !value.is_empty()
+            && crate::secret_store::set(&crate::secret_store::account_web_search(&id), &value)
+        {
+            if let Some(slot) = settings.web_search_api_keys.get_mut(&id) {
+                slot.clear();
+            }
+            changed = true;
+        }
+    }
+    if !settings.assistant_tts_api_key.0.is_empty()
+        && crate::secret_store::set(
+            crate::secret_store::ACCOUNT_ASSISTANT_TTS,
+            &settings.assistant_tts_api_key.0,
+        )
+    {
+        settings.assistant_tts_api_key = SecretString::default();
+        changed = true;
+    }
+    changed
+}
+
+/// Re-fill the in-memory secret fields from the OS keychain. No-op when the
+/// keychain is unavailable, which leaves any plaintext fallback values from the
+/// store in place.
+fn hydrate_secrets(settings: &mut AppSettings) {
+    if !crate::secret_store::is_available() {
+        return;
+    }
+    for (provider_id, value) in settings.post_process_api_keys.iter_mut() {
+        if let Some(secret) =
+            crate::secret_store::get(&crate::secret_store::account_post_process(provider_id))
+        {
+            *value = secret;
+        }
+    }
+    for (provider_id, value) in settings.web_search_api_keys.iter_mut() {
+        if let Some(secret) =
+            crate::secret_store::get(&crate::secret_store::account_web_search(provider_id))
+        {
+            *value = secret;
+        }
+    }
+    if let Some(secret) = crate::secret_store::get(crate::secret_store::ACCOUNT_ASSISTANT_TTS) {
+        settings.assistant_tts_api_key = SecretString(secret);
+    }
+}
+
 pub fn load_or_create_app_settings(app: &AppHandle) -> AppSettings {
     // Initialize store
     let store = app
@@ -1341,6 +1547,18 @@ pub fn load_or_create_app_settings(app: &AppHandle) -> AppSettings {
         store.set("settings", serde_json::to_value(&settings).unwrap());
     }
 
+    // One-time migration: move any plaintext keys that pre-date keychain storage
+    // into the OS keychain. Only keys the keychain confirms it stored are
+    // stripped from the JSON; the rest stay on disk (fallback). This never
+    // deletes a keychain entry based on an already-stripped value, so restarts
+    // are safe. Persist only if something actually moved.
+    if crate::secret_store::is_available() && migrate_plaintext_secrets(&mut settings) {
+        store.set("settings", serde_json::to_value(&settings).unwrap());
+    }
+
+    // Fill the in-memory secrets from the keychain so callers see real keys.
+    hydrate_secrets(&mut settings);
+
     settings
 }
 
@@ -1365,13 +1583,27 @@ pub fn get_settings(app: &AppHandle) -> AppSettings {
         store.set("settings", serde_json::to_value(&settings).unwrap());
     }
 
+    // Fill the in-memory secrets from the keychain (served from cache after the
+    // first read, so this stays cheap on the hot path). No-op — leaving any
+    // plaintext fallback in place — when the keychain is unavailable.
+    hydrate_secrets(&mut settings);
+
     settings
 }
 
-pub fn write_settings(app: &AppHandle, settings: AppSettings) {
+pub fn write_settings(app: &AppHandle, mut settings: AppSettings) {
     let store = app
         .store(crate::portable::store_path(SETTINGS_STORE_PATH))
         .expect("Failed to initialize store");
+
+    // Keep API keys in the OS keychain, never in the on-disk store. Each key is
+    // blanked from the serialized copy only after the keychain confirms it holds
+    // it; a failed keychain write leaves the key on disk (fallback) rather than
+    // losing it. When the keychain is unavailable, secrets stay on disk as
+    // before.
+    if crate::secret_store::is_available() {
+        persist_hydrated_secrets(&mut settings);
+    }
 
     store.set("settings", serde_json::to_value(&settings).unwrap());
 }

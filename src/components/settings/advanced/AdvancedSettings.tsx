@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { ShowOverlay } from "../ShowOverlay";
 import { ModelUnloadTimeoutSetting } from "../ModelUnloadTimeout";
 import { CustomWords } from "../CustomWords";
+import { TextReplacements } from "../TextReplacements";
 import { SettingsGroup } from "../../ui/SettingsGroup";
 import { MoreOptions } from "../../ui/MoreOptions";
 import { StartHidden } from "../StartHidden";
@@ -54,6 +55,10 @@ export const AdvancedSettings: React.FC = () => {
         <MoreOptions>
           <AppendTrailingSpace descriptionMode="tooltip" grouped={true} />
         </MoreOptions>
+      </SettingsGroup>
+
+      <SettingsGroup title={t("settings.advanced.groups.textReplacements")}>
+        <TextReplacements descriptionMode="tooltip" grouped />
       </SettingsGroup>
 
       <SettingsGroup title={t("settings.advanced.groups.history")}>
