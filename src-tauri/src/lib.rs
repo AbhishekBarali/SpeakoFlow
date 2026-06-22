@@ -517,6 +517,7 @@ pub fn run(cli_args: CliArgs) {
             commands::assistant::set_assistant_web_search_enabled,
             commands::assistant::set_assistant_web_search_provider,
             commands::assistant::set_assistant_web_search_max_results,
+            commands::assistant::set_assistant_web_search_fetch_content,
             commands::assistant::set_assistant_web_search_api_key,
             commands::assistant::assistant_test_web_search,
             helpers::clamshell::is_laptop,

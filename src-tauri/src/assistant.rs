@@ -481,6 +481,39 @@ fn current_datetime_line() -> String {
         .to_string()
 }
 
+/// Build a short transcript of the most recent conversation turns to give the
+/// search planner context, so follow-up questions ("what about its price?")
+/// can be resolved into self-contained queries. Excludes the just-recorded
+/// current message and the screenshot marker, and bounds each line so the
+/// planner prompt stays small.
+fn recent_context_for_planner(app: &AppHandle) -> String {
+    let conversation = app.state::<AssistantConversation>();
+    let history = conversation.messages.lock().unwrap();
+    let mut lines: Vec<String> = Vec::new();
+    // Skip the latest user message (just pushed above); take the few before it.
+    for message in history.iter().rev().skip(1).take(4) {
+        let role = if message.role == "assistant" {
+            "Assistant"
+        } else {
+            "User"
+        };
+        // Collapse whitespace and strip the screenshot marker, then bound length.
+        let text: String = message
+            .content
+            .replace(SCREENSHOT_MARKER, "")
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ");
+        if text.is_empty() {
+            continue;
+        }
+        let text: String = text.chars().take(300).collect();
+        lines.push(format!("{}: {}", role, text));
+    }
+    lines.reverse();
+    lines.join("\n")
+}
+
 /// Run one assistant turn: record the user message, stream the LLM answer to
 /// the panel via events, and append the reply to the conversation history.
 ///
@@ -569,37 +602,76 @@ pub async fn run_assistant_turn(app: AppHandle, user_text: String, screenshot: O
     // the model (or the search) errors out before replying.
     persist_assistant_session(&app);
 
-    // Optional web search. Runs only when enabled, when this isn't a screenshot
-    // turn (those are about the screen, not the web), and when a fast local
-    // heuristic judges the question worth searching. Any failure or timeout
-    // degrades gracefully — we simply answer without web context rather than
-    // breaking the turn.
+    // Optional web search. Runs only when enabled and this isn't a screenshot
+    // turn (those are about the screen, not the web). A capable model plans the
+    // search — deciding whether one is actually needed and rewriting the (often
+    // messy, transcribed) request into clean queries — and then we fetch real
+    // page content to ground the answer. Any failure or timeout degrades
+    // gracefully: we answer without web context rather than breaking the turn.
+    // The cheap `should_search` pre-gate skips obvious non-search turns so we
+    // don't spend a planner round-trip on chit-chat, code, or math.
     let web_context: Option<String> = if settings.assistant_web_search_enabled
         && screenshot.is_none()
         && web_search::should_search(&user_text)
     {
         emit_state(&app, "searching");
-        // Race the search against a Stop press: a slow/rate-limited search must
-        // never trap the user in the "searching" state with no way out.
+        // Race every search stage against a Stop press: a slow search must never
+        // trap the user in the "searching" state with no way out.
         let cancel = app.state::<AssistantConversation>().cancel.clone();
-        let search_result = tokio::select! {
-            r = web_search::search(&settings, &user_text) => Some(r),
-            _ = cancel.notified() => None,
+
+        // Stage 1 — plan. The built-in local model skips planning (it's small and
+        // its engine may be cold) and searches the raw question; cloud/"reasonable"
+        // models do the full decide-and-rewrite step. `None` here means "skip the
+        // search": either cancelled, or the model judged a search unnecessary.
+        let plan_opt: Option<web_search::SearchPlan> = if provider.id == "builtin" {
+            Some(web_search::SearchPlan::raw(&user_text))
+        } else {
+            let recent = recent_context_for_planner(&app);
+            let planned = tokio::select! {
+                r = web_search::plan_search(
+                    &provider,
+                    api_key.clone(),
+                    &model,
+                    provider.supports_structured_output,
+                    &recent,
+                    &user_text,
+                ) => Some(r),
+                _ = cancel.notified() => None,
+            };
+            match planned {
+                Some(Ok(plan)) => Some(plan),
+                Some(Err(e)) => {
+                    warn!("Search planner failed ({}); searching the raw question", e);
+                    Some(web_search::SearchPlan::raw(&user_text))
+                }
+                None => None, // cancelled during planning
+            }
         };
-        match search_result {
-            Some(Ok(results)) if !results.is_empty() => {
-                debug!("Web search returned {} results", results.len());
-                Some(web_search::format_results_for_prompt(&user_text, &results))
+
+        // Stage 2 — retrieve, when the plan calls for it.
+        match plan_opt {
+            Some(plan) if plan.needs_search && !plan.queries.is_empty() => {
+                let search_result = tokio::select! {
+                    r = web_search::search_with_plan(&settings, &plan) => Some(r),
+                    _ = cancel.notified() => None,
+                };
+                match search_result {
+                    Some(results) if !results.is_empty() => {
+                        debug!(
+                            "Web search returned {} results across {} queries",
+                            results.len(),
+                            plan.queries.len()
+                        );
+                        Some(web_search::format_results_for_prompt(&results))
+                    }
+                    Some(_) => {
+                        debug!("Web search returned no results; answering without web context");
+                        None
+                    }
+                    None => None, // cancelled during search
+                }
             }
-            Some(Ok(_)) => {
-                debug!("Web search returned no results; answering without web context");
-                None
-            }
-            Some(Err(e)) => {
-                warn!("Web search failed ({}); answering without web context", e);
-                None
-            }
-            None => None, // cancelled during search; handled just below
+            _ => None,
         }
     } else {
         None

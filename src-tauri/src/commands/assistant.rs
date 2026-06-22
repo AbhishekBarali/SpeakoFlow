@@ -458,12 +458,25 @@ pub fn set_assistant_web_search_provider(app: AppHandle, provider: String) -> Re
     Ok(())
 }
 
-/// How many results to feed the model (clamped to 1–8 to stay fast and cheap).
+/// How many results to feed the model (clamped to 1–10).
 #[tauri::command]
 #[specta::specta]
 pub fn set_assistant_web_search_max_results(app: AppHandle, count: u32) -> Result<(), String> {
     let mut settings = get_settings(&app);
-    settings.assistant_web_search_max_results = count.clamp(1, 8);
+    settings.assistant_web_search_max_results = count.clamp(1, 10);
+    write_settings(&app, settings);
+    emit_settings_changed(&app);
+    Ok(())
+}
+
+/// Toggle fetching full page content for the top results (Firecrawl only).
+/// Full content makes answers far more accurate; turning it off relies on short
+/// snippets and saves Firecrawl credits.
+#[tauri::command]
+#[specta::specta]
+pub fn set_assistant_web_search_fetch_content(app: AppHandle, enabled: bool) -> Result<(), String> {
+    let mut settings = get_settings(&app);
+    settings.assistant_web_search_fetch_content = enabled;
     write_settings(&app, settings);
     emit_settings_changed(&app);
     Ok(())

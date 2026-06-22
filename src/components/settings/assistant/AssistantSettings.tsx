@@ -362,7 +362,7 @@ export const AssistantSettings: React.FC = () => {
 
   useEffect(() => {
     setWebSearchMaxResults(
-      String(settings?.assistant_web_search_max_results ?? 4),
+      String(settings?.assistant_web_search_max_results ?? 5),
     );
   }, [settings?.assistant_web_search_max_results]);
 
@@ -374,7 +374,7 @@ export const AssistantSettings: React.FC = () => {
   const handleWebSearchMaxResultsBlur = async () => {
     const parsed = Math.max(
       1,
-      Math.min(8, parseInt(webSearchMaxResults, 10) || 4),
+      Math.min(10, parseInt(webSearchMaxResults, 10) || 5),
     );
     setWebSearchMaxResults(String(parsed));
     await commands.setAssistantWebSearchMaxResults(parsed);
@@ -628,6 +628,17 @@ export const AssistantSettings: React.FC = () => {
           </SettingContainer>
         )}
 
+        <ToggleSwitch
+          checked={settings?.assistant_web_search_fetch_content ?? true}
+          onChange={(checked) =>
+            setAndRefresh(commands.setAssistantWebSearchFetchContent(checked))
+          }
+          label={t("settings.assistant.webSearch.fetchContentLabel")}
+          description={t("settings.assistant.webSearch.fetchContentDescription")}
+          grouped={true}
+          disabled={!webSearchEnabled}
+        />
+
         <SettingContainer
           title={t("settings.assistant.webSearch.maxResultsLabel")}
           description={t("settings.assistant.webSearch.maxResultsDescription")}
@@ -638,7 +649,7 @@ export const AssistantSettings: React.FC = () => {
           <Input
             type="number"
             min={1}
-            max={8}
+            max={10}
             value={webSearchMaxResults}
             onChange={(e) => setWebSearchMaxResults(e.target.value)}
             onBlur={handleWebSearchMaxResultsBlur}

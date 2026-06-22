@@ -1294,11 +1294,24 @@ async setAssistantWebSearchProvider(provider: string) : Promise<Result<null, str
 }
 },
 /**
- * How many results to feed the model (clamped to 1–8 to stay fast and cheap).
+ * How many results to feed the model (clamped to 1–10).
  */
 async setAssistantWebSearchMaxResults(count: number) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("set_assistant_web_search_max_results", { count }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Toggle fetching full page content for the top results (Firecrawl only).
+ * Full content makes answers far more accurate; turning it off relies on short
+ * snippets and saves Firecrawl credits.
+ */
+async setAssistantWebSearchFetchContent(enabled: boolean) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_assistant_web_search_fetch_content", { enabled }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -1398,10 +1411,17 @@ assistant_web_search_enabled?: boolean;
  */
 assistant_web_search_provider?: string; 
 /**
- * How many results to feed the model. Kept small to stay fast and cheap on
- * tokens; clamped to 1–8 at search time.
+ * How many results to feed the model. Kept modest to bound prompt size;
+ * clamped to 1–10 at search time.
  */
 assistant_web_search_max_results?: number; 
+/**
+ * Whether to fetch the full page content of the top results (Firecrawl
+ * only) instead of relying on short snippets. Full content makes answers
+ * far more accurate and complete; turn it off to save Firecrawl credits or
+ * favor speed. No effect on the snippet-only providers.
+ */
+assistant_web_search_fetch_content?: boolean; 
 /**
  * API keys for the keyed search providers, keyed by provider id
  * ("firecrawl", "brave"). DuckDuckGo needs none.
@@ -1628,9 +1648,15 @@ trim_after?: boolean;
  */
 capitalization?: Capitalization }
 /**
- * A single web result, trimmed to the essentials the model needs.
+ * A single web result. `content` holds the scraped page text (markdown) when a
+ * content-fetching provider was used; `snippet` is the short description that's
+ * always available. The model prefers `content` and falls back to `snippet`.
  */
-export type SearchResult = { title: string; url: string; snippet: string }
+export type SearchResult = { title: string; url: string; snippet: string; 
+/**
+ * Full page content (markdown) when available; empty otherwise.
+ */
+content?: string }
 export type SecretMap = Partial<{ [key in string]: string }>
 export type SecretString = string
 export type ShortcutBinding = { id: string; name: string; description: string; default_binding: string; current_binding: string }

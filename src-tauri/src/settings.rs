@@ -608,10 +608,16 @@ pub struct AppSettings {
     /// or "brave".
     #[serde(default = "default_assistant_web_search_provider")]
     pub assistant_web_search_provider: String,
-    /// How many results to feed the model. Kept small to stay fast and cheap on
-    /// tokens; clamped to 1–8 at search time.
+    /// How many results to feed the model. Kept modest to bound prompt size;
+    /// clamped to 1–10 at search time.
     #[serde(default = "default_assistant_web_search_max_results")]
     pub assistant_web_search_max_results: u32,
+    /// Whether to fetch the full page content of the top results (Firecrawl
+    /// only) instead of relying on short snippets. Full content makes answers
+    /// far more accurate and complete; turn it off to save Firecrawl credits or
+    /// favor speed. No effect on the snippet-only providers.
+    #[serde(default = "default_assistant_web_search_fetch_content")]
+    pub assistant_web_search_fetch_content: bool,
     /// API keys for the keyed search providers, keyed by provider id
     /// ("firecrawl", "brave"). DuckDuckGo needs none.
     #[serde(default = "default_web_search_api_keys")]
@@ -960,8 +966,14 @@ fn default_assistant_web_search_provider() -> String {
 }
 
 fn default_assistant_web_search_max_results() -> u32 {
-    // Few results keep the prompt small and the round-trip fast.
-    4
+    // A handful of full-content sources gives the model enough to synthesize a
+    // solid answer without flooding the prompt.
+    5
+}
+
+fn default_assistant_web_search_fetch_content() -> bool {
+    // Quality-first: fetch real page content (Firecrawl) by default.
+    true
 }
 
 fn default_web_search_api_keys() -> SecretMap {
@@ -1052,7 +1064,7 @@ fn ensure_assistant_defaults(settings: &mut AppSettings) -> bool {
         changed = true;
     }
     if settings.assistant_web_search_max_results == 0
-        || settings.assistant_web_search_max_results > 8
+        || settings.assistant_web_search_max_results > 10
     {
         settings.assistant_web_search_max_results = default_assistant_web_search_max_results();
         changed = true;
@@ -1324,6 +1336,7 @@ pub fn get_default_settings() -> AppSettings {
         assistant_web_search_enabled: false,
         assistant_web_search_provider: default_assistant_web_search_provider(),
         assistant_web_search_max_results: default_assistant_web_search_max_results(),
+        assistant_web_search_fetch_content: default_assistant_web_search_fetch_content(),
         web_search_api_keys: default_web_search_api_keys(),
         theme: Theme::System,
     }
