@@ -913,10 +913,6 @@
     "screenAttached": "Screen",
     "attachScreen": "Attach a screenshot of your screen",
     "detachScreen": "Don't attach screenshot",
-    "theme": {
-      "toLight": "Switch panel to light",
-      "toDark": "Switch panel to dark"
-    },
     "webSearch": {
       "enable": "Enable web search",
       "disable": "Disable web search"
