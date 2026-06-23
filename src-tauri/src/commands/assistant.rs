@@ -319,6 +319,19 @@ pub fn set_assistant_panel_size(app: AppHandle, size: String) -> Result<(), Stri
 
 #[tauri::command]
 #[specta::specta]
+pub fn set_assistant_panel_theme(app: AppHandle, theme: String) -> Result<(), String> {
+    if !matches!(theme.as_str(), "auto" | "light" | "dark") {
+        return Err(format!("Unknown panel theme: {}", theme));
+    }
+    let mut settings = get_settings(&app);
+    settings.assistant_panel_theme = theme;
+    write_settings(&app, settings);
+    emit_settings_changed(&app);
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
 pub fn set_assistant_panel_collapsed(app: AppHandle, collapsed: bool) -> Result<(), String> {
     assistant::set_panel_collapsed(&app, collapsed);
     Ok(())

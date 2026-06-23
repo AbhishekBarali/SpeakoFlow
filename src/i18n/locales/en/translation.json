@@ -25,6 +25,16 @@
     "debug": "Debug",
     "about": "About"
   },
+  "sectionSubtitles": {
+    "general": "Shortcuts, dictation, and audio — the essentials for everyday use.",
+    "models": "Choose the transcription, language, and voice models that run on your machine.",
+    "advanced": "Startup, output, text replacements, and how long history is kept.",
+    "history": "Your recent transcriptions and assistant conversations, stored on this device.",
+    "postProcessing": "Clean up and reshape transcripts with a language model.",
+    "assistant": "Connect a model, then tune voice, screen vision, web search, and the panel.",
+    "debug": "Diagnostics and developer tools.",
+    "about": "Version, data locations, and credits."
+  },
   "onboarding": {
     "subtitle": "To get started, choose a transcription model",
     "recommended": "Recommended",
@@ -422,6 +432,7 @@
         "description": "Apply rule-based find and replace to the transcript. Runs instantly and offline after any AI post-processing. Use literal text or regular expressions, and magic commands in the replacement.",
         "empty": "No replacements yet. Add a rule to get started.",
         "addRule": "Add replacement",
+        "manageRules": "Edit replacement rules ({{count}})",
         "searchPlaceholder": "Find",
         "replacePlaceholder": "Replace with",
         "advanced": "Advanced options",
@@ -774,9 +785,16 @@
       "appearance": {
         "title": "Panel Appearance",
         "previewLabel": "Preview",
-        "previewDescription": "Live preview of your accent, text size, and opacity choices.",
+        "previewDescription": "Live preview of your theme, accent, text size, and opacity choices.",
         "previewUser": "Hey, what can you do?",
         "previewAssistant": "Lots! Ask me anything — I can even look at your screen.",
+        "themeLabel": "Panel theme",
+        "themeDescription": "Appearance of the floating panel. Auto follows the app theme; Light or Dark overrides it for the panel only.",
+        "themes": {
+          "auto": "Auto (match app)",
+          "light": "Light",
+          "dark": "Dark"
+        },
         "sizeLabel": "Panel size",
         "sizeDescription": "Size of the floating panel window. You can also collapse it to a tiny pill from the panel header.",
         "sizes": {
@@ -876,9 +894,11 @@
   },
   "overlay": {
     "preparing": "Getting mic ready…",
+    "recording": "Recording",
     "transcribing": "Transcribing...",
     "processing": "Processing...",
-    "locked": "Recording — press hotkey to stop"
+    "locked": "Recording — press hotkey to stop",
+    "cancel": "Cancel"
   },
   "assistant": {
     "title": "Assistant",
@@ -893,6 +913,10 @@
     "screenAttached": "Screen",
     "attachScreen": "Attach a screenshot of your screen",
     "detachScreen": "Don't attach screenshot",
+    "theme": {
+      "toLight": "Switch panel to light",
+      "toDark": "Switch panel to dark"
+    },
     "webSearch": {
       "enable": "Enable web search",
       "disable": "Disable web search"

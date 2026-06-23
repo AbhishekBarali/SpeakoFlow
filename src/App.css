@@ -81,6 +81,12 @@
   /* Atmospheric orb opacity — subtle on light, glowier on dark (see .orb) */
   --orb-opacity: 0.2;
 
+  /* Canvas orbs (App.tsx) — indirection so each theme picks harmonious hues.
+   * Light keeps the warm editorial pastels; dark retunes to a cohesive cool
+   * glow (see dark blocks) so the two orbs never blend into a muddy brown. */
+  --color-canvas-orb-1: var(--color-orb-lavender); /* top-right */
+  --color-canvas-orb-2: var(--color-orb-peach); /* top-left */
+
   /* Typography baseline */
   font-family: var(--font-sans);
   font-size: 15px;
@@ -110,6 +116,8 @@
   font-family: var(--font-display);
   font-weight: 400;
   letter-spacing: -0.01em;
+  font-optical-sizing: auto;
+  text-wrap: balance;
 }
 
 /* === Dark inversion — warm near-black surfaces, off-white ink. ===
@@ -118,7 +126,9 @@
  * the stored preference (so a system-dark user never flashes light). */
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --orb-opacity: 0.42;
+  --orb-opacity: 0.18;
+  --color-canvas-orb-1: #7f76c9; /* muted violet — premium cool glow */
+  --color-canvas-orb-2: #5f78c2; /* muted indigo — harmonizes, no muddy brown */
   --color-canvas: #0c0a09;
   --color-canvas-soft: #161311;
   --color-surface: #1c1917;
@@ -153,7 +163,9 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
     color-scheme: dark;
-    --orb-opacity: 0.42;
+    --orb-opacity: 0.18;
+    --color-canvas-orb-1: #7f76c9; /* muted violet — premium cool glow */
+    --color-canvas-orb-2: #5f78c2; /* muted indigo — harmonizes, no muddy brown */
     --color-canvas: #0c0a09;
     --color-canvas-soft: #161311;
     --color-surface: #1c1917;

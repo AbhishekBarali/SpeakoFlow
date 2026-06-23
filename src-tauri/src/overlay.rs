@@ -31,8 +31,13 @@ tauri_panel! {
     })
 }
 
-const OVERLAY_WIDTH: f64 = 172.0;
-const OVERLAY_HEIGHT: f64 = 36.0;
+// The window is intentionally a little larger than the visible pill: the pill
+// hugs its content (auto width) and floats centered inside this transparent
+// frame, so these are the *maximum* bounds across all states rather than the
+// chip's actual size. Keeping them tight makes the overlay read as a small,
+// unobtrusive lozenge.
+const OVERLAY_WIDTH: f64 = 128.0;
+const OVERLAY_HEIGHT: f64 = 40.0;
 
 #[cfg(target_os = "macos")]
 const OVERLAY_TOP_OFFSET: f64 = 46.0;

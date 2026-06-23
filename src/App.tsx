@@ -261,6 +261,16 @@ function App() {
     return <Onboarding onModelSelected={handleModelSelected} />;
   }
 
+  // Page header: the section title plus a one-line subtitle that gives each
+  // screen a clear primary→secondary hierarchy. Subtitle key mirrors the
+  // sidebar label key (sidebar.* → sectionSubtitles.*); missing locales fall
+  // back to English, and an absent key renders nothing.
+  const sectionLabelKey = SECTIONS_CONFIG[currentSection].labelKey;
+  const sectionSubtitle = t(
+    sectionLabelKey.replace("sidebar.", "sectionSubtitles."),
+    { defaultValue: "" },
+  );
+
   return (
     <div
       dir={direction}
@@ -296,7 +306,7 @@ function App() {
                 top: "-170px",
                 insetInlineEnd: "-90px",
                 background:
-                  "radial-gradient(circle at 30% 30%, var(--color-orb-lavender), transparent 70%)",
+                  "radial-gradient(circle at 30% 30%, var(--color-canvas-orb-1), transparent 70%)",
               }}
             />
             <div
@@ -307,15 +317,20 @@ function App() {
                 top: "-130px",
                 insetInlineStart: "-120px",
                 background:
-                  "radial-gradient(circle at 70% 40%, var(--color-orb-peach), transparent 72%)",
+                  "radial-gradient(circle at 70% 40%, var(--color-canvas-orb-2), transparent 72%)",
               }}
             />
             <div className="relative z-10 flex flex-col items-center px-6 py-8 gap-6">
               <AccessibilityPermissions />
               <header className="max-w-3xl w-full mx-auto">
-                <h1 className="font-display text-[2rem] leading-tight text-ink">
+                <h1 className="font-display text-[2.25rem] leading-[1.08] tracking-[-0.02em] text-balance text-ink">
                   {t(SECTIONS_CONFIG[currentSection].labelKey)}
                 </h1>
+                {sectionSubtitle && (
+                  <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted">
+                    {sectionSubtitle}
+                  </p>
+                )}
               </header>
               {renderSettingsContent(currentSection)}
             </div>

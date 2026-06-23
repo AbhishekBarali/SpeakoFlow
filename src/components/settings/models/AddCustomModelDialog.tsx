@@ -278,7 +278,7 @@ export const AddCustomModelDialog: React.FC<AddCustomModelDialogProps> = ({
                       </label>
                     )}
 
-                    <p className="text-[11px] font-semibold text-muted uppercase tracking-[0.14em] pt-1">
+                    <p className="text-[11px] font-semibold text-muted uppercase tracking-[0.1em] pt-1">
                       {t("settings.models.customModel.selectQuant")}
                     </p>
 

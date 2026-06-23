@@ -804,8 +804,10 @@ impl ShortcutAction for AssistantAction {
         // re-evaluated at stop, but the dedicated vision binding always does.
         let _ = app.emit("assistant-vision-active", binding_id == "assistant_vision");
 
+        // The assistant panel renders its own listening/transcribing state, so
+        // we intentionally do NOT show the STT recording lozenge here — that
+        // would put two status surfaces on screen for one voice turn.
         change_tray_icon(app, TrayIconState::Recording);
-        show_recording_overlay(app);
 
         let binding_id = binding_id.to_string();
         let mut recording_error: Option<String> = None;
@@ -828,7 +830,6 @@ impl ShortcutAction for AssistantAction {
         if recording_error.is_none() {
             shortcut::register_cancel_shortcut(app);
         } else {
-            utils::hide_recording_overlay(app);
             change_tray_icon(app, TrayIconState::Idle);
             crate::assistant::emit_state(app, "idle");
             if let Some(err) = recording_error {
@@ -859,7 +860,6 @@ impl ShortcutAction for AssistantAction {
         let tm = Arc::clone(&app.state::<Arc<TranscriptionManager>>());
 
         change_tray_icon(app, TrayIconState::Transcribing);
-        show_transcribing_overlay(app);
         crate::assistant::emit_state(app, "transcribing");
 
         rm.remove_mute();
@@ -873,7 +873,6 @@ impl ShortcutAction for AssistantAction {
                 Some(samples) if !samples.is_empty() => samples,
                 _ => {
                     debug!("Assistant recording produced no audio samples");
-                    utils::hide_recording_overlay(&ah);
                     change_tray_icon(&ah, TrayIconState::Idle);
                     crate::assistant::emit_state(&ah, "idle");
                     return;
@@ -887,7 +886,6 @@ impl ShortcutAction for AssistantAction {
             // unchanged in those ~150ms.
             match tm.transcribe(samples) {
                 Ok(transcription) => {
-                    utils::hide_recording_overlay(&ah);
                     change_tray_icon(&ah, TrayIconState::Idle);
 
                     let settings = crate::settings::get_settings(&ah);
@@ -937,7 +935,6 @@ impl ShortcutAction for AssistantAction {
                 }
                 Err(err) => {
                     error!("Assistant transcription error: {}", err);
-                    utils::hide_recording_overlay(&ah);
                     change_tray_icon(&ah, TrayIconState::Idle);
                     let _ = ah.emit("assistant-error", format!("Transcription failed: {}", err));
                     crate::assistant::emit_state(&ah, "idle");

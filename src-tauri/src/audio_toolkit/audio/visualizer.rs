@@ -1,10 +1,18 @@
 use rustfft::{num_complex::Complex32, Fft, FftPlanner};
 use std::sync::Arc;
 
-const DB_MIN: f32 = -55.0;
-const DB_MAX: f32 = -8.0;
-const GAIN: f32 = 1.3;
-const CURVE_POWER: f32 = 0.7;
+// The bars track how far the signal rises *above the room*, not its absolute
+// level — that is what lets quiet speech move them on a low-gain mic while
+// steady ambient hiss stays at rest. Each bucket maps the band level from its
+// adaptive noise floor (plus a small margin) across DYN_RANGE dB onto 0..1.
+const DYN_RANGE: f32 = 36.0; // dB above the floor that spans the full bar height
+const FLOOR_MARGIN: f32 = 5.0; // dB above the floor before a bar starts to lift
+const FLOOR_TRACK_BAND: f32 = 10.0; // creep the floor up to ambient within this band; above it = speech
+const FLOOR_MIN: f32 = -70.0; // hard limit so the floor never chases digital silence
+const FLOOR_FALL: f32 = 0.15; // fast downward tracking toward quieter ambient (<1s)
+const FLOOR_RISE: f32 = 0.02; // slow upward creep while only room tone is present
+const GAIN: f32 = 1.2; // gentle lift of the mid-range
+const CURVE_POWER: f32 = 0.6; // sub-1 curve raises soft speech without clipping loud
 
 pub struct AudioVisualiser {
     fft: Arc<dyn Fft<f32>>,
@@ -70,7 +78,7 @@ impl AudioVisualiser {
             window,
             bucket_ranges,
             fft_input: vec![Complex32::new(0.0, 0.0); window_size],
-            noise_floor: vec![-40.0; buckets], // Initialize to reasonable noise floor
+            noise_floor: vec![-45.0; buckets], // start just above typical ambient; fast-fall converges in <1s
             buffer: Vec::with_capacity(window_size * 2),
             window_size,
             buckets,
@@ -122,18 +130,29 @@ impl AudioVisualiser {
             let db = if avg_power > 1e-12 {
                 20.0 * (avg_power.sqrt() / self.window_size as f32).log10()
             } else {
-                -80.0 // Very low floor for zero power
+                -90.0 // effectively silent
             };
 
-            // Only update noise floor when signal is quiet (below current floor + 10dB)
-            if db < self.noise_floor[bucket_idx] + 10.0 {
-                const NOISE_ALPHA: f32 = 0.001; // Very slow adaptation
-                self.noise_floor[bucket_idx] =
-                    NOISE_ALPHA * db + (1.0 - NOISE_ALPHA) * self.noise_floor[bucket_idx];
-            }
+            // Adaptive per-bucket noise floor (a minimum-follower): fall quickly
+            // toward quieter ambient, creep up only slowly while no speech is
+            // present, and never descend past FLOOR_MIN. Anchoring to this floor
+            // — instead of a fixed DB_MIN — is what makes quiet speech register:
+            // we react to how far the band rises above the room, so a soft voice
+            // on a low-gain mic still lifts the bars while steady hiss does not.
+            let nf = self.noise_floor[bucket_idx];
+            self.noise_floor[bucket_idx] = if db < nf {
+                (FLOOR_FALL * db + (1.0 - FLOOR_FALL) * nf).max(FLOOR_MIN)
+            } else if db < nf + FLOOR_TRACK_BAND {
+                FLOOR_RISE * db + (1.0 - FLOOR_RISE) * nf
+            } else {
+                nf // clearly speech/transient — hold the floor steady
+            };
 
-            // Map configurable dB range to 0-1 with gain and curve shaping
-            let normalized = ((db - DB_MIN) / (DB_MAX - DB_MIN)).clamp(0.0, 1.0);
+            // Map [floor+margin .. floor+margin+DYN_RANGE] dB onto 0..1 so the
+            // gesture reads consistently regardless of mic gain, then lift the
+            // low end with gain + a sub-1 curve so soft speech stays visible.
+            let floor = self.noise_floor[bucket_idx] + FLOOR_MARGIN;
+            let normalized = ((db - floor) / DYN_RANGE).clamp(0.0, 1.0);
             buckets[bucket_idx] = (normalized * GAIN).powf(CURVE_POWER).clamp(0.0, 1.0);
         }
 
@@ -151,6 +170,6 @@ impl AudioVisualiser {
     pub fn reset(&mut self) {
         self.buffer.clear();
         // Reset noise floor to initial values
-        self.noise_floor.fill(-40.0);
+        self.noise_floor.fill(-45.0);
     }
 }

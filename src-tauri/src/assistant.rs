@@ -158,7 +158,7 @@ struct AssistantStatePayload {
 }
 
 /// Emit a pipeline state update to the panel:
-/// "listening" | "transcribing" | "thinking" | "idle"
+/// "listening" | "transcribing" | "searching" | "thinking" | "speaking" | "idle"
 pub fn emit_state(app: &AppHandle, state: &str) {
     let _ = app.emit(
         "assistant-state",
@@ -833,6 +833,10 @@ pub async fn run_assistant_turn(app: AppHandle, user_text: String, screenshot: O
         _ = cancel.notified() => None,
     };
 
+    // Whether a spoken reply is starting. When it is, the turn ends in a
+    // "speaking" UI state rather than idle, so the panel/pill doesn't flash its
+    // idle "Assistant" affordance in the gap before audio begins.
+    let mut speaking = false;
     match outcome {
         None => {
             // User pressed Stop. Silence any spoken summary already playing and
@@ -872,6 +876,7 @@ pub async fn run_assistant_turn(app: AppHandle, user_text: String, screenshot: O
                 crate::tts::stop_remote();
             } else if settings.assistant_tts_enabled {
                 spawn_tts_speak(&app, &settings, full_text);
+                speaking = true;
             }
         }
         Some(Err(e)) => {
@@ -892,7 +897,11 @@ pub async fn run_assistant_turn(app: AppHandle, user_text: String, screenshot: O
         }
     }
 
-    emit_state(&app, "idle");
+    // When a spoken reply is starting, hand the UI a dedicated "speaking" state
+    // instead of dropping straight to idle — otherwise the panel/pill flashes
+    // its idle "Assistant" affordance in the gap before audio begins. The panel
+    // flips itself back to idle once playback ends (it owns the local engine).
+    emit_state(&app, if speaking { "speaking" } else { "idle" });
 }
 
 /// Speak the assistant's reply aloud via the configured TTS engine.

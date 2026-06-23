@@ -54,3 +54,4 @@ graphify-out/*
 # Editor / agent tooling
 .kiro/
 .agents/
+.impeccable/

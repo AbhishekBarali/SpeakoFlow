@@ -227,6 +227,11 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
 
   const progressPercent = getProgressPercent();
 
+  // Before metadata loads (e.g. lazy-loaded history audio that hasn't been
+  // played yet) the duration is unknown. Show a calm placeholder instead of a
+  // misleading "0:00" that reads as broken.
+  const durationLabel = duration > 0 ? formatTime(duration) : "--:--";
+
   return (
     <div className={`flex items-center gap-3 ${className}`}>
       <audio ref={audioRef} src={src ?? undefined} preload="metadata" />
@@ -258,14 +263,14 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
           onChange={handleSeek}
           onMouseDown={handleSliderMouseDown}
           onTouchStart={handleSliderTouchStart}
-          className={`flex-1 h-1 rounded-full appearance-none cursor-pointer focus:outline-none focus:ring-1 focus:ring-ink/20 ${progressPercent >= 99.5 ? "[&::-webkit-slider-thumb]:translate-x-0.5 [&::-moz-range-thumb]:translate-x-0.5" : ""}`}
+          className={`flex-1 h-1 rounded-full appearance-none cursor-pointer bg-transparent focus:outline-none focus:ring-1 focus:ring-ink/20 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-0 [&::-webkit-slider-thumb]:bg-[var(--color-background-ui)] [&::-webkit-slider-thumb]:shadow-sm [&::-moz-range-thumb]:h-3 [&::-moz-range-thumb]:w-3 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-[var(--color-background-ui)] ${progressPercent >= 99.5 ? "[&::-webkit-slider-thumb]:translate-x-0.5 [&::-moz-range-thumb]:translate-x-0.5" : ""}`}
           style={{
             background: `linear-gradient(to right, var(--color-background-ui) 0%, var(--color-background-ui) ${progressPercent}%, var(--color-hairline) ${progressPercent}%, var(--color-hairline) 100%)`,
           }}
         />
 
         <span className="text-xs text-text/60 min-w-[30px] tabular-nums">
-          {formatTime(duration)}
+          {durationLabel}
         </span>
       </div>
     </div>

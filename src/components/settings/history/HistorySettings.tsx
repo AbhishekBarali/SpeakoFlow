@@ -486,11 +486,11 @@ export const HistorySettings: React.FC = () => {
   }
 
   return (
-    <div className="max-w-3xl w-full mx-auto space-y-6">
+    <div className="max-w-3xl w-full mx-auto space-y-8">
       <div className="space-y-2">
         <div className="px-1 flex items-center justify-between">
           <div>
-            <h2 className="text-[11px] font-semibold text-muted uppercase tracking-[0.14em]">
+            <h2 className="text-[11px] font-semibold text-muted uppercase tracking-[0.1em]">
               {t("settings.history.title")}
             </h2>
           </div>

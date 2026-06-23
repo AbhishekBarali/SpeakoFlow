@@ -57,6 +57,36 @@ interface ModelCardProps {
   showRecommended?: boolean;
 }
 
+/** Accuracy / speed as a slim aligned bar. Label sits in its own fixed
+ *  column (so "ACCURACY" never crams against the track), both rows line up,
+ *  and the track is visible enough to read the fill against. */
+const ScoreMeter: React.FC<{ label: string; score: number }> = ({
+  label,
+  score,
+}) => {
+  const pct = Math.max(0, Math.min(100, Math.round(score * 100)));
+  return (
+    <div className="flex items-center gap-3">
+      <span className="w-[4.75rem] shrink-0 text-end text-[10px] font-medium uppercase tracking-[0.06em] text-text/55">
+        {label}
+      </span>
+      <div
+        className="h-1.5 w-20 shrink-0 overflow-hidden rounded-full bg-ink/15"
+        role="meter"
+        aria-label={label}
+        aria-valuenow={pct}
+        aria-valuemin={0}
+        aria-valuemax={100}
+      >
+        <div
+          className="h-full rounded-full bg-logo-primary"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+    </div>
+  );
+};
+
 const ModelCard: React.FC<ModelCardProps> = ({
   model,
   variant = "default",
@@ -84,11 +114,14 @@ const ModelCard: React.FC<ModelCardProps> = ({
   const formattedModelSize = formatModelSize(Number(model.size_mb));
 
   const baseClasses =
-    "flex flex-col rounded-xl px-4 py-3 gap-2 text-left transition-all duration-200";
+    "flex flex-col rounded-2xl px-4 py-3.5 gap-2.5 text-left transition-all duration-200";
 
   const getVariantClasses = () => {
     if (status === "active") {
-      return "border-2 border-ink bg-surface-strong";
+      // Selected state: a calm ink ring + faint lift, not a hard 2px slab.
+      // The solid "Active" badge carries the status; the card only needs to
+      // read as gently elevated and current.
+      return "border border-ink/25 bg-surface-strong ring-1 ring-ink/10 shadow-[0_1px_2px_rgba(12,10,9,0.05)]";
     }
     if (isFeatured) {
       return "border border-ink/30 bg-surface shadow-[0_1px_2px_rgba(12,10,9,0.04)]";
@@ -99,7 +132,7 @@ const ModelCard: React.FC<ModelCardProps> = ({
   const getInteractiveClasses = () => {
     if (!isClickable) return "";
     if (disabled) return "opacity-50 cursor-not-allowed";
-    return "cursor-pointer hover:border-ink/40 hover:shadow-md hover:scale-[1.01] active:scale-[0.99] group";
+    return "cursor-pointer hover:border-ink/40 hover:shadow-md group";
   };
 
   const handleClick = () => {
@@ -143,10 +176,10 @@ const ModelCard: React.FC<ModelCardProps> = ({
               {displayName}
             </h3>
             {showRecommended && model.is_recommended && (
-              <Badge variant="primary">{t("onboarding.recommended")}</Badge>
+              <Badge variant="outline">{t("onboarding.recommended")}</Badge>
             )}
             {status === "active" && (
-              <Badge variant="primary">
+              <Badge variant="active">
                 <Check className="w-3 h-3 mr-1" />
                 {t("modelSelector.active")}
               </Badge>
@@ -163,36 +196,20 @@ const ModelCard: React.FC<ModelCardProps> = ({
           </p>
         </div>
         {(model.accuracy_score > 0 || model.speed_score > 0) && (
-          <div className="hidden sm:flex items-center ms-4">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <p className="text-xs text-text/60 w-24 text-end">
-                  {t("onboarding.modelCard.accuracy")}
-                </p>
-                <div className="w-16 h-1.5 bg-mid-gray/20 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-logo-primary rounded-full"
-                    style={{ width: `${model.accuracy_score * 100}%` }}
-                  />
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <p className="text-xs text-text/60 w-24 text-end">
-                  {t("onboarding.modelCard.speed")}
-                </p>
-                <div className="w-16 h-1.5 bg-mid-gray/20 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-logo-primary rounded-full"
-                    style={{ width: `${model.speed_score * 100}%` }}
-                  />
-                </div>
-              </div>
-            </div>
+          <div className="hidden sm:flex flex-col gap-1.5 ms-4 shrink-0">
+            <ScoreMeter
+              label={t("onboarding.modelCard.accuracy")}
+              score={model.accuracy_score}
+            />
+            <ScoreMeter
+              label={t("onboarding.modelCard.speed")}
+              score={model.speed_score}
+            />
           </div>
         )}
       </div>
 
-      <hr className="w-full border-mid-gray/20" />
+      <hr className="w-full border-hairline" />
 
       {/* Bottom row: tags + action buttons (full width) */}
       <div className="flex items-center gap-3 w-full -mb-0.5 mt-0.5 h-5">

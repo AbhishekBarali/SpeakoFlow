@@ -1,7 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import AssistantPanel from "./AssistantPanel";
-import { applyCachedTheme } from "@/lib/theme";
+import { applyCachedAssistantTheme } from "@/lib/theme";
 import "@/i18n";
 
 // Fonts — Inter for UI/body, EB Garamond for the editorial display title.
@@ -13,9 +13,9 @@ import "@fontsource/inter/600.css";
 import "@fontsource/eb-garamond/400.css";
 import "@fontsource/eb-garamond/500.css";
 
-// Apply the cached appearance preference before render to avoid a theme flash.
-// AssistantPanel re-applies the real setting once it loads.
-applyCachedTheme();
+// Apply the cached assistant-panel theme before render to avoid a theme flash.
+// AssistantPanel re-applies the real setting (override or app-follow) on load.
+applyCachedAssistantTheme();
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>

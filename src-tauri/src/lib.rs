@@ -506,6 +506,7 @@ pub fn run(cli_args: CliArgs) {
             commands::assistant::set_assistant_tts_kokoro_dtype,
             commands::assistant::set_assistant_tts_speed,
             commands::assistant::set_assistant_panel_size,
+            commands::assistant::set_assistant_panel_theme,
             commands::assistant::set_assistant_panel_collapsed,
             commands::assistant::set_assistant_screen_armed,
             commands::assistant::assistant_toggle_voice,

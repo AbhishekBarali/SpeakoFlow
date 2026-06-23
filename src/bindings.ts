@@ -1176,6 +1176,14 @@ async setAssistantPanelSize(size: string) : Promise<Result<null, string>> {
     else return { status: "error", error: e  as any };
 }
 },
+async setAssistantPanelTheme(theme: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_assistant_panel_theme", { theme }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async setAssistantPanelCollapsed(collapsed: boolean) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("set_assistant_panel_collapsed", { collapsed }) };
@@ -1398,6 +1406,12 @@ assistant_tts_speed?: number; assistant_max_history_messages?: number;
  * (Ollama / LM Studio / cloud), which manage their own context.
  */
 local_llm_context_size?: number; assistant_response_length?: AssistantResponseLength; assistant_panel_opacity?: number; assistant_font_size?: string; assistant_accent?: string; assistant_panel_size?: string; 
+/**
+ * Appearance of the floating assistant panel: "auto" (follow the app
+ * theme), "light", or "dark". A light/dark choice overrides the app-wide
+ * theme for the panel only.
+ */
+assistant_panel_theme?: string; 
 /**
  * Whether the assistant may search the web. When on, an automatic
  * heuristic decides per-question whether a search is actually worthwhile

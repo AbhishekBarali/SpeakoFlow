@@ -1,7 +1,7 @@
 import { listen } from "@tauri-apps/api/event";
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Mic, AudioLines, Sparkles, X } from "lucide-react";
+import { Lock, Loader2, X } from "lucide-react";
 import { AudioWaveform } from "../components/shared";
 import "./RecordingOverlay.css";
 import { commands } from "@/bindings";
@@ -77,67 +77,83 @@ const RecordingOverlay: React.FC = () => {
 
   const isRecording = state === "recording";
 
-  // Clean Lucide glyphs, matching the icon language of the rest of the app.
-  const renderIcon = () => {
-    if (isRecording) {
-      return <Mic size={17} strokeWidth={2} color={ICON_COLOR} />;
-    }
-    if (state === "processing") {
-      return <Sparkles size={16} strokeWidth={2} color={ICON_COLOR} />;
-    }
-    return <AudioLines size={17} strokeWidth={2} color={ICON_COLOR} />;
-  };
+  // Accessible label for the current state — the visible chip is intentionally
+  // terse (an icon or just the waveform), so the full phrasing lives here.
+  const ariaLabel = isRecording
+    ? locked
+      ? t("overlay.locked")
+      : micLive
+        ? t("overlay.recording", "Recording")
+        : t("overlay.preparing")
+    : state === "transcribing"
+      ? t("overlay.transcribing")
+      : t("overlay.processing");
 
   return (
     <div
       dir={direction}
-      className={`recording-overlay ${state} ${isVisible ? "fade-in" : ""}`}
+      className={`overlay-root ${isVisible ? "fade-in" : ""}`}
     >
-      <div className="overlay-left">
-        <span
-          className={`overlay-icon ${state}${
-            isRecording && !micLive ? " preparing" : ""
-          }`}
-        >
-          {renderIcon()}
-        </span>
-      </div>
-
-      <div className="overlay-middle">
-        {isRecording && locked && (
-          <div className="overlay-text">{t("overlay.locked")}</div>
-        )}
-        {isRecording && !locked && !micLive && (
-          <div className="overlay-text preparing">{t("overlay.preparing")}</div>
-        )}
-        {isRecording && !locked && micLive && (
-          <AudioWaveform
-            levels={levels}
-            size="sm"
-            barCount={17}
-            active={isVisible}
-          />
-        )}
-        {state === "transcribing" && (
-          <div className="overlay-text shimmer">
-            {t("overlay.transcribing")}
+      <div
+        className={`overlay-pill ${state}`}
+        role="status"
+        aria-label={ariaLabel}
+      >
+        {/* Live recording — the waveform carries the whole state. Before the
+            first audio frame lands it simply rests as a calm row of dots, so
+            the chip eases straight into motion the moment you speak instead of
+            flashing a microphone glyph. A small lock badge appears for
+            hands-free so the chip stays compact. */}
+        {isRecording && (
+          <div className="pill-wave">
+            {locked && (
+              <Lock
+                className="lock-badge"
+                size={12}
+                strokeWidth={2.25}
+                color={ICON_COLOR}
+              />
+            )}
+            <div className="wave-box">
+              <AudioWaveform
+                levels={micLive ? levels : []}
+                size="sm"
+                barCount={14}
+                active={micLive}
+              />
+            </div>
           </div>
         )}
-        {state === "processing" && (
-          <div className="overlay-text shimmer">{t("overlay.processing")}</div>
-        )}
-      </div>
 
-      <div className="overlay-right">
+        {/* Working (transcribing / post-processing) — keep the audio identity
+            but settle the bars and tuck a quiet spinner alongside, instead of a
+            word. The waveform freezing + spinner reads as "done capturing, now
+            thinking". */}
+        {(state === "transcribing" || state === "processing") && (
+          <div className="pill-wave">
+            <Loader2
+              className="load-spinner"
+              size={13}
+              strokeWidth={2.5}
+              color={ICON_COLOR}
+            />
+            <div className="wave-box">
+              <AudioWaveform levels={[]} size="sm" barCount={14} active={false} />
+            </div>
+          </div>
+        )}
+
+        {/* Cancel stays out of the way until you reach for it. */}
         {isRecording && (
           <button
             type="button"
-            className="cancel-button"
+            className="pill-cancel"
+            aria-label={t("overlay.cancel", "Cancel")}
             onClick={() => {
               commands.cancelOperation();
             }}
           >
-            <X size={16} strokeWidth={2.5} color={ICON_COLOR} />
+            <X size={13} strokeWidth={2.5} color={ICON_COLOR} />
           </button>
         )}
       </div>

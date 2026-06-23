@@ -258,7 +258,7 @@ export const ModelsSettings: React.FC = () => {
   }
 
   return (
-    <div className="max-w-3xl w-full mx-auto space-y-4">
+    <div className="max-w-3xl w-full mx-auto space-y-6">
       {/* Category switcher: Transcription / Language Model / Speech */}
       <div className="flex items-center gap-1 p-1 bg-surface-strong rounded-full w-fit">
         {CATEGORY_TABS.map((cat) => (
@@ -294,7 +294,7 @@ export const ModelsSettings: React.FC = () => {
           {/* Downloaded Models Section — header always visible so filter stays accessible */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <h2 className="text-[11px] font-semibold text-muted uppercase tracking-[0.14em]">
+              <h2 className="text-[11px] font-semibold text-muted uppercase tracking-[0.1em]">
                 {t("settings.models.yourModels")}
               </h2>
               {/* Language filter dropdown (transcription models only) */}
@@ -417,7 +417,7 @@ export const ModelsSettings: React.FC = () => {
                 onCancel={handleModelCancel}
                 downloadProgress={getDownloadProgress(model.id)}
                 downloadSpeed={getDownloadSpeed(model.id)}
-                showRecommended={false}
+                showRecommended={true}
               />
             ))}
           </div>
@@ -425,7 +425,7 @@ export const ModelsSettings: React.FC = () => {
           {/* Available Models Section */}
           {availableModels.length > 0 && (
             <div className="space-y-3">
-              <h2 className="text-[11px] font-semibold text-muted uppercase tracking-[0.14em]">
+              <h2 className="text-[11px] font-semibold text-muted uppercase tracking-[0.1em]">
                 {t("settings.models.availableModels")}
               </h2>
               {availableModels.map((model: ModelInfo) => (
@@ -441,7 +441,7 @@ export const ModelsSettings: React.FC = () => {
                   onCancel={handleModelCancel}
                   downloadProgress={getDownloadProgress(model.id)}
                   downloadSpeed={getDownloadSpeed(model.id)}
-                  showRecommended={false}
+                  showRecommended={true}
                 />
               ))}
             </div>

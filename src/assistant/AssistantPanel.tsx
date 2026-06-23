@@ -21,8 +21,8 @@ import {
 import { commands, type AppSettings } from "@/bindings";
 import { syncLanguageFromSettings } from "@/i18n";
 import {
-  applyThemePreference,
-  watchSystemTheme,
+  applyAssistantTheme,
+  type AssistantThemePref,
   type ThemePreference,
 } from "@/lib/theme";
 import { AudioWaveform } from "@/components/shared";
@@ -34,7 +34,8 @@ type AssistantState =
   | "listening"
   | "transcribing"
   | "searching"
-  | "thinking";
+  | "thinking"
+  | "speaking";
 
 interface DisplayMessage {
   role: "user" | "assistant";
@@ -110,6 +111,9 @@ const AssistantPanel: React.FC = () => {
   const [visionActive, setVisionActive] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
   const sendingRef = useRef(false);
+  // Tracks whether audio actually began during the current "speaking" phase,
+  // so we can detect when playback *ends* and hand the UI back to idle.
+  const spokeRef = useRef(false);
   // Set when the user presses Stop; blocks a TTS event that was emitted just
   // before the Stop from slipping through (events can arrive slightly out of
   // order). Cleared as soon as any new turn becomes active, so it never blocks
@@ -153,13 +157,25 @@ const AssistantPanel: React.FC = () => {
       "--msg-font-size",
       FONT_SIZES[settings.assistant_font_size ?? "medium"] ?? FONT_SIZES.medium,
     );
-    // Apply the appearance preference so the panel recolors with the toggle.
-    applyThemePreference((settings.theme ?? "system") as ThemePreference);
+    // The panel follows the app-wide theme by default; a light/dark choice in
+    // settings (or the header toggle) overrides it for the panel only.
+    applyAssistantTheme(
+      (settings.assistant_panel_theme ?? "auto") as AssistantThemePref,
+      (settings.theme ?? "system") as ThemePreference,
+    );
   }, [settings]);
 
-  // Follow OS theme changes while the preference is "system".
-  const themePreference = (settings?.theme ?? "system") as ThemePreference;
-  useEffect(() => watchSystemTheme(() => themePreference), [themePreference]);
+  // Re-resolve on OS scheme changes (covers app "system" + panel "auto").
+  const appThemePref = (settings?.theme ?? "system") as ThemePreference;
+  const panelThemePref = (settings?.assistant_panel_theme ??
+    "auto") as AssistantThemePref;
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const handler = () => applyAssistantTheme(panelThemePref, appThemePref);
+    media.addEventListener("change", handler);
+    return () => media.removeEventListener("change", handler);
+  }, [panelThemePref, appThemePref]);
 
   // Auto-scroll to bottom on new content
   useEffect(() => {
@@ -279,6 +295,8 @@ const AssistantPanel: React.FC = () => {
         await listen("assistant-tts-stop", () => {
           suppressTtsRef.current = true;
           tts.stop();
+          // Stopping during the spoken-reply phase ends the turn.
+          setState((s) => (s === "speaking" ? "idle" : s));
         }),
       );
 
@@ -313,6 +331,36 @@ const AssistantPanel: React.FC = () => {
   const ttsActive =
     ttsPlaying || tts.status === "speaking" || tts.status === "loading";
   const showStop = busy || ttsActive;
+
+  // Effective light/dark the panel is currently showing — drives the header
+  // toggle icon. "auto" follows the app theme; an explicit choice overrides.
+  const panelResolved = resolveAssistantTheme(
+    (settings?.assistant_panel_theme ?? "auto") as AssistantThemePref,
+    (settings?.theme ?? "system") as ThemePreference,
+  );
+
+  // The backend parks the turn in "speaking" when a spoken reply is starting,
+  // so the pill/panel never flashes its idle "Assistant" affordance in the gap
+  // before audio begins. We own the end of that phase: once playback has
+  // started and then stopped (ttsActive falls after having risen), return to
+  // idle. A safety timeout avoids a stuck "speaking" pill if audio never plays
+  // (e.g. a TTS error), and works for both the local Kokoro and remote engines.
+  useEffect(() => {
+    if (state !== "speaking") {
+      spokeRef.current = false;
+      return;
+    }
+    if (ttsActive) {
+      spokeRef.current = true;
+      return;
+    }
+    if (spokeRef.current) {
+      setState("idle");
+      return;
+    }
+    const timer = window.setTimeout(() => setState("idle"), 10000);
+    return () => window.clearTimeout(timer);
+  }, [state, ttsActive]);
 
   const sendText = useCallback(async () => {
     const text = input.trim();
@@ -367,6 +415,19 @@ const AssistantPanel: React.FC = () => {
     await commands.setAssistantTtsEnabled(!ttsEnabled);
     await refreshSettings();
   }, [ttsEnabled, tts, refreshSettings]);
+
+  const toggleTheme = useCallback(async () => {
+    // Quick per-panel override from the header: flip to the opposite of what's
+    // currently showing. Use Settings -> Assistant to return to "Auto".
+    const resolved = resolveAssistantTheme(
+      (settings?.assistant_panel_theme ?? "auto") as AssistantThemePref,
+      (settings?.theme ?? "system") as ThemePreference,
+    );
+    await commands.setAssistantPanelTheme(
+      resolved === "dark" ? "light" : "dark",
+    );
+    await refreshSettings();
+  }, [settings, refreshSettings]);
 
   const toggleVoice = useCallback(async () => {
     await commands.assistantToggleVoice();
@@ -483,6 +544,17 @@ const AssistantPanel: React.FC = () => {
           )}
         </div>
         <div className="assistant-header-actions">
+          <button
+            className="assistant-icon-button"
+            onClick={toggleTheme}
+            title={
+              panelResolved === "dark"
+                ? t("assistant.theme.toLight")
+                : t("assistant.theme.toDark")
+            }
+          >
+            {panelResolved === "dark" ? <Sun size={14} /> : <Moon size={14} />}
+          </button>
           <button
             className={`assistant-icon-button${ttsEnabled ? " active" : ""}${
               tts.status === "loading" ? " pulsing" : ""

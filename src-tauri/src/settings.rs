@@ -598,6 +598,11 @@ pub struct AppSettings {
     pub assistant_accent: String,
     #[serde(default = "default_assistant_panel_size")]
     pub assistant_panel_size: String,
+    /// Appearance of the floating assistant panel: "auto" (follow the app
+    /// theme), "light", or "dark". A light/dark choice overrides the app-wide
+    /// theme for the panel only.
+    #[serde(default = "default_assistant_panel_theme")]
+    pub assistant_panel_theme: String,
     /// Whether the assistant may search the web. When on, an automatic
     /// heuristic decides per-question whether a search is actually worthwhile
     /// (factual/time-sensitive questions yes; chit-chat, code, math no), so
@@ -948,6 +953,11 @@ fn default_assistant_panel_size() -> String {
     "standard".to_string()
 }
 
+fn default_assistant_panel_theme() -> String {
+    // Follow the app-wide theme by default; the user can override per-panel.
+    "auto".to_string()
+}
+
 fn default_assistant_panel_opacity() -> f64 {
     1.0
 }
@@ -1037,6 +1047,13 @@ fn ensure_assistant_defaults(settings: &mut AppSettings) -> bool {
         "compact" | "standard" | "large"
     ) {
         settings.assistant_panel_size = default_assistant_panel_size();
+        changed = true;
+    }
+    if !matches!(
+        settings.assistant_panel_theme.as_str(),
+        "auto" | "light" | "dark"
+    ) {
+        settings.assistant_panel_theme = default_assistant_panel_theme();
         changed = true;
     }
     if !(0.5..=1.0).contains(&settings.assistant_panel_opacity) {
@@ -1333,6 +1350,7 @@ pub fn get_default_settings() -> AppSettings {
         assistant_font_size: default_assistant_font_size(),
         assistant_accent: default_assistant_accent(),
         assistant_panel_size: default_assistant_panel_size(),
+        assistant_panel_theme: default_assistant_panel_theme(),
         assistant_web_search_enabled: false,
         assistant_web_search_provider: default_assistant_web_search_provider(),
         assistant_web_search_max_results: default_assistant_web_search_max_results(),
