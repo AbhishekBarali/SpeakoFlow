@@ -332,13 +332,6 @@ const AssistantPanel: React.FC = () => {
     ttsPlaying || tts.status === "speaking" || tts.status === "loading";
   const showStop = busy || ttsActive;
 
-  // Effective light/dark the panel is currently showing — drives the header
-  // toggle icon. "auto" follows the app theme; an explicit choice overrides.
-  const panelResolved = resolveAssistantTheme(
-    (settings?.assistant_panel_theme ?? "auto") as AssistantThemePref,
-    (settings?.theme ?? "system") as ThemePreference,
-  );
-
   // The backend parks the turn in "speaking" when a spoken reply is starting,
   // so the pill/panel never flashes its idle "Assistant" affordance in the gap
   // before audio begins. We own the end of that phase: once playback has
@@ -415,19 +408,6 @@ const AssistantPanel: React.FC = () => {
     await commands.setAssistantTtsEnabled(!ttsEnabled);
     await refreshSettings();
   }, [ttsEnabled, tts, refreshSettings]);
-
-  const toggleTheme = useCallback(async () => {
-    // Quick per-panel override from the header: flip to the opposite of what's
-    // currently showing. Use Settings -> Assistant to return to "Auto".
-    const resolved = resolveAssistantTheme(
-      (settings?.assistant_panel_theme ?? "auto") as AssistantThemePref,
-      (settings?.theme ?? "system") as ThemePreference,
-    );
-    await commands.setAssistantPanelTheme(
-      resolved === "dark" ? "light" : "dark",
-    );
-    await refreshSettings();
-  }, [settings, refreshSettings]);
 
   const toggleVoice = useCallback(async () => {
     await commands.assistantToggleVoice();
@@ -544,17 +524,6 @@ const AssistantPanel: React.FC = () => {
           )}
         </div>
         <div className="assistant-header-actions">
-          <button
-            className="assistant-icon-button"
-            onClick={toggleTheme}
-            title={
-              panelResolved === "dark"
-                ? t("assistant.theme.toLight")
-                : t("assistant.theme.toDark")
-            }
-          >
-            {panelResolved === "dark" ? <Sun size={14} /> : <Moon size={14} />}
-          </button>
           <button
             className={`assistant-icon-button${ttsEnabled ? " active" : ""}${
               tts.status === "loading" ? " pulsing" : ""
