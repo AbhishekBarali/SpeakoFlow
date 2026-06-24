@@ -230,6 +230,24 @@ impl AssistantResponseLength {
     }
 }
 
+/// How thorough a web search should be. This is the single dial that replaces
+/// the old raw "max results" number: it controls how many queries run, how many
+/// pages get scraped, and how much source text the model receives. All three
+/// tiers are tuned to stay fast (one retrieval pass, heavy parallelism, tight
+/// timeouts) — this is "answer-with-search like ChatGPT/Gemini do in seconds",
+/// not minutes-long deep research.
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum AssistantSearchDepth {
+    /// Fastest. One query, snippets + a couple of scraped pages. Quick facts.
+    Low,
+    /// Balanced default. A few queries, rerank, scrape the top handful.
+    #[default]
+    Medium,
+    /// Broadest single pass. More queries/sources, scrape more winners.
+    High,
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Type)]
 #[serde(rename_all = "snake_case")]
 pub enum RecordingRetentionPeriod {
@@ -623,6 +641,16 @@ pub struct AppSettings {
     /// favor speed. No effect on the snippet-only providers.
     #[serde(default = "default_assistant_web_search_fetch_content")]
     pub assistant_web_search_fetch_content: bool,
+    /// How thorough web search is (Low/Medium/High). Replaces the old raw
+    /// "max results" number as the primary control; tuned to stay fast.
+    #[serde(default)]
+    pub assistant_search_depth: AssistantSearchDepth,
+    /// Safety rail: the most Firecrawl credits web search may spend per local
+    /// calendar day before it stops searching (and the assistant answers from
+    /// its own knowledge instead). `0` means unlimited. A rolling per-minute
+    /// request cap also guards against runaway loops regardless of this value.
+    #[serde(default = "default_assistant_web_search_daily_credit_budget")]
+    pub assistant_web_search_daily_credit_budget: u32,
     /// API keys for the keyed search providers, keyed by provider id
     /// ("firecrawl", "brave"). DuckDuckGo needs none.
     #[serde(default = "default_web_search_api_keys")]
@@ -986,6 +1014,13 @@ fn default_assistant_web_search_fetch_content() -> bool {
     true
 }
 
+fn default_assistant_web_search_daily_credit_budget() -> u32 {
+    // Conservative spend ceiling so a misbehaving session can't silently drain
+    // a Firecrawl plan. A Medium turn costs roughly 8–12 credits, so this
+    // covers a few hundred searches/day; 0 disables the budget.
+    2000
+}
+
 fn default_web_search_api_keys() -> SecretMap {
     let mut map = HashMap::new();
     map.insert("firecrawl".to_string(), String::new());
@@ -1331,6 +1366,9 @@ pub fn get_default_settings() -> AppSettings {
         assistant_web_search_provider: default_assistant_web_search_provider(),
         assistant_web_search_max_results: default_assistant_web_search_max_results(),
         assistant_web_search_fetch_content: default_assistant_web_search_fetch_content(),
+        assistant_search_depth: AssistantSearchDepth::default(),
+        assistant_web_search_daily_credit_budget: default_assistant_web_search_daily_credit_budget(
+        ),
         web_search_api_keys: default_web_search_api_keys(),
         theme: Theme::System,
     }

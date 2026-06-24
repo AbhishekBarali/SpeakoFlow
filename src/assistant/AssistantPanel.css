@@ -519,6 +519,11 @@
   flex-shrink: 0;
 }
 
+.listening-lock {
+  color: var(--accent-from);
+  flex-shrink: 0;
+}
+
 /* ---------- Typing dots ---------- */
 
 .assistant-message.typing {
@@ -744,9 +749,17 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 7px;
   /* The pill is tiny and rounded; clip so the waveform never touches the
    * buttons or the rounded edge. */
   overflow: hidden;
+}
+
+/* Lock glyph shown in the collapsed pill while hands-free (tap-to-lock), so the
+ * locked state reads differently from a plain hold-to-talk recording. */
+.pill-lock-hint {
+  flex-shrink: 0;
+  color: var(--accent-from);
 }
 
 .pill-status {

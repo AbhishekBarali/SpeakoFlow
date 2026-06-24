@@ -730,6 +730,15 @@
         "fetchContentDescription": "With Firecrawl, download and read the full content of each top result instead of just a short snippet. This is the single biggest quality boost — the model answers from the actual source text. It's slower and uses more Firecrawl credits. No effect on Brave or DuckDuckGo.",
         "maxResultsLabel": "Sources to use",
         "maxResultsDescription": "How many search results to read and send the model (1–10). More sources give broader, better-grounded answers; fewer is faster and uses fewer tokens and credits.",
+        "depthLabel": "Search depth",
+        "depthDescription": "How thorough each search is — the main quality dial. Quick is fastest (one query, a couple of pages) for simple facts. Standard (recommended) runs a few queries, reranks, and reads the top sources. Deep casts a wider net for harder, multi-part questions. All three stay fast (a few seconds) — this is fast answer-with-search, not minutes-long deep research.",
+        "depthOptions": {
+          "low": "Quick",
+          "medium": "Standard",
+          "high": "Deep"
+        },
+        "creditBudgetLabel": "Daily Firecrawl credit limit",
+        "creditBudgetDescription": "Safety cap on how many Firecrawl credits web search may spend per day before it pauses and the assistant answers from its own knowledge. A typical Standard search costs ~8–12 credits. Set 0 for no limit. (A separate per-minute request cap always guards against runaway loops.)",
         "testLabel": "Test search",
         "testDescription": "Run a sample search with the current provider and key to confirm it works.",
         "testButton": "Test search",

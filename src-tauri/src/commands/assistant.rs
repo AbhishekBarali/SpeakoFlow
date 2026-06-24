@@ -496,6 +496,38 @@ pub fn set_assistant_web_search_max_results(app: AppHandle, count: u32) -> Resul
     Ok(())
 }
 
+/// Set how thorough web search is: "low" (fastest), "medium" (default), or
+/// "high" (broadest single pass). This is the primary depth control.
+#[tauri::command]
+#[specta::specta]
+pub fn set_assistant_search_depth(
+    app: AppHandle,
+    depth: crate::settings::AssistantSearchDepth,
+) -> Result<(), String> {
+    let mut settings = get_settings(&app);
+    settings.assistant_search_depth = depth;
+    write_settings(&app, settings);
+    emit_settings_changed(&app);
+    Ok(())
+}
+
+/// Set the daily Firecrawl credit budget for web search (0 = unlimited). A
+/// safety rail so a session can't silently drain the user's Firecrawl plan; a
+/// rolling per-minute request cap guards against runaway loops regardless.
+#[tauri::command]
+#[specta::specta]
+pub fn set_assistant_web_search_daily_credit_budget(
+    app: AppHandle,
+    budget: u32,
+) -> Result<(), String> {
+    let mut settings = get_settings(&app);
+    // Clamp to a sane ceiling; 0 stays 0 (unlimited).
+    settings.assistant_web_search_daily_credit_budget = budget.min(1_000_000);
+    write_settings(&app, settings);
+    emit_settings_changed(&app);
+    Ok(())
+}
+
 /// Toggle fetching full page content for the top results (Firecrawl only).
 /// Full content makes answers far more accurate; turning it off relies on short
 /// snippets and saves Firecrawl credits.

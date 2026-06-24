@@ -1331,6 +1331,31 @@ async setAssistantWebSearchMaxResults(count: number) : Promise<Result<null, stri
 }
 },
 /**
+ * Set how thorough web search is: "low" (fastest), "medium" (default), or
+ * "high" (broadest single pass). This is the primary depth control.
+ */
+async setAssistantSearchDepth(depth: AssistantSearchDepth) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_assistant_search_depth", { depth }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Set the daily Firecrawl credit budget for web search (0 = unlimited). A
+ * safety rail so a session can't silently drain the user's Firecrawl plan; a
+ * rolling per-minute request cap guards against runaway loops regardless.
+ */
+async setAssistantWebSearchDailyCreditBudget(budget: number) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_assistant_web_search_daily_credit_budget", { budget }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * Toggle fetching full page content for the top results (Firecrawl only).
  * Full content makes answers far more accurate; turning it off relies on short
  * snippets and saves Firecrawl credits.
@@ -1455,6 +1480,18 @@ assistant_web_search_max_results?: number;
  */
 assistant_web_search_fetch_content?: boolean; 
 /**
+ * How thorough web search is (Low/Medium/High). Replaces the old raw
+ * "max results" number as the primary control; tuned to stay fast.
+ */
+assistant_search_depth?: AssistantSearchDepth; 
+/**
+ * Safety rail: the most Firecrawl credits web search may spend per local
+ * calendar day before it stops searching (and the assistant answers from
+ * its own knowledge instead). `0` means unlimited. A rolling per-minute
+ * request cap also guards against runaway loops regardless of this value.
+ */
+assistant_web_search_daily_credit_budget?: number; 
+/**
  * API keys for the keyed search providers, keyed by provider id
  * ("firecrawl", "brave"). DuckDuckGo needs none.
  */
@@ -1487,6 +1524,27 @@ export type AssistantResponseLength =
  * No length directive — use the system prompt as-is.
  */
 "default" | "short" | "medium" | "long"
+/**
+ * How thorough a web search should be. This is the single dial that replaces
+ * the old raw "max results" number: it controls how many queries run, how many
+ * pages get scraped, and how much source text the model receives. All three
+ * tiers are tuned to stay fast (one retrieval pass, heavy parallelism, tight
+ * timeouts) — this is "answer-with-search like ChatGPT/Gemini do in seconds",
+ * not minutes-long deep research.
+ */
+export type AssistantSearchDepth = 
+/**
+ * Fastest. One query, snippets + a couple of scraped pages. Quick facts.
+ */
+"low" | 
+/**
+ * Balanced default. A few queries, rerank, scrape the top handful.
+ */
+"medium" | 
+/**
+ * Broadest single pass. More queries/sources, scrape more winners.
+ */
+"high"
 export type AudioDevice = { index: string; name: string; is_default: boolean }
 export type AutoSubmitKey = "enter" | "ctrl_enter" | "cmd_enter"
 export type AvailableAccelerators = { whisper: string[]; ort: string[]; gpu_devices: GpuDeviceOption[] }
@@ -1680,9 +1738,9 @@ trim_after?: boolean;
  */
 capitalization?: Capitalization }
 /**
- * A single web result. `content` holds the scraped page text (markdown) when a
- * content-fetching provider was used; `snippet` is the short description that's
- * always available. The model prefers `content` and falls back to `snippet`.
+ * A single web result handed to the model. `content` holds scraped page text
+ * (markdown) when available; `snippet` is the short description that's always
+ * present. The model prefers `content` and falls back to `snippet`.
  */
 export type SearchResult = { title: string; url: string; snippet: string; 
 /**

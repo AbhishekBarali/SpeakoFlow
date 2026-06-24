@@ -30,48 +30,12 @@ use crate::tray;
 
 // Note: Commands are accessed via shortcut::handy_keys:: in lib.rs
 
-/// Recording bindings that gain an automatic Shift "lock" (hands-free) variant.
-const LOCK_VARIANT_BINDINGS: [&str; 2] = ["transcribe", "assistant"];
-
-/// Build the auto-derived Shift "lock" variant for a recording binding, or
-/// `None` if it has no variant (not a recording binding, empty, or it already
-/// includes Shift). The variant id carries [`LOCK_SUFFIX`] so the shortcut
-/// handler can recognise it and select the hands-free recording mode. This lets
-/// "add Shift" toggle a shortcut between push-to-talk and hands-free without the
-/// user configuring a second hotkey.
-pub fn lock_variant_binding(binding: &ShortcutBinding) -> Option<ShortcutBinding> {
-    use crate::transcription_coordinator::LOCK_SUFFIX;
-    if !LOCK_VARIANT_BINDINGS.contains(&binding.id.as_str()) {
-        return None;
-    }
-    let current = add_shift(&binding.current_binding)?;
-    let default = add_shift(&binding.default_binding).unwrap_or_else(|| current.clone());
-    Some(ShortcutBinding {
-        id: format!("{}{}", binding.id, LOCK_SUFFIX),
-        name: binding.name.clone(),
-        description: binding.description.clone(),
-        default_binding: default,
-        current_binding: current,
-    })
-}
-
-/// Insert the Shift modifier into a hotkey string, just before the main key
-/// ("ctrl+space" → "ctrl+shift+space"). Returns `None` if the hotkey is empty
-/// or already contains Shift.
-fn add_shift(hotkey: &str) -> Option<String> {
-    let hotkey = hotkey.trim();
-    if hotkey.is_empty() {
-        return None;
-    }
-    let mut parts: Vec<&str> = hotkey.split('+').map(str::trim).collect();
-    if parts.iter().any(|p| p.eq_ignore_ascii_case("shift")) {
-        return None;
-    }
-    let key = parts.pop()?;
-    parts.push("shift");
-    parts.push(key);
-    Some(parts.join("+"))
-}
+// Hands-free recording is now reached at runtime via *tap-to-lock*: while a
+// push-to-talk recording is held, a quick Shift tap converts it to hands-free
+// (see `crate::lock_watch` and the transcription coordinator). There is no
+// longer a statically-registered Shift "lock" variant of each recording
+// shortcut — which also frees the Shift combinations (e.g. Ctrl+Shift+Space) so
+// they no longer collide with bindings like "Transcribe with Post-Processing".
 
 /// Initialize shortcuts using the configured implementation
 pub fn init_shortcuts(app: &AppHandle) {

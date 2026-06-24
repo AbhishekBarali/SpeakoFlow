@@ -679,7 +679,9 @@ pub async fn run_assistant_turn(app: AppHandle, user_text: String, screenshot: O
                             results.len(),
                             plan.queries.len()
                         );
-                        Some(web_search::format_results_for_prompt(&results))
+                        let budget =
+                            web_search::context_budget_for(settings.assistant_search_depth);
+                        Some(web_search::format_results_for_prompt(&results, budget))
                     }
                     Some(_) => {
                         debug!("Web search returned no results; answering without web context");
@@ -730,6 +732,14 @@ pub async fn run_assistant_turn(app: AppHandle, user_text: String, screenshot: O
             content.push_str("\n\n");
         }
         content.push_str(TIME_AWARENESS_NOTE);
+        // When web search is enabled, tell the model it HAS that capability on
+        // every turn — even ones where the app didn't auto-search — so it never
+        // denies having internet access and can offer to look things up. Stable
+        // text → cache-safe.
+        if settings.assistant_web_search_enabled {
+            content.push_str("\n\n");
+            content.push_str(web_search::WEB_SEARCH_CAPABILITY_NOTE);
+        }
         // Append the user's response-length preference (if any) so a single
         // system prompt covers both display and spoken output.
         if let Some(directive) = settings.assistant_response_length.directive() {

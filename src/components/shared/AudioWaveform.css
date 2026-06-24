@@ -56,25 +56,30 @@
   min-height: 2px;
   border-radius: 999px;
   background: var(--wave-bar);
-  /* Smooth, springy rise/fall as the live signal moves the bars. */
-  transition: height 110ms cubic-bezier(0.22, 0.61, 0.36, 1);
-  will-change: height;
+  /* Smooth, springy rise/fall as the live signal moves the bars; transform is
+   * eased too so the idle breathe and the live bars hand off cleanly. */
+  transition:
+    height 110ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    transform 220ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  will-change: height, transform;
 }
 
-/* Idle — bars rest as a calm row of dots while a soft sweep of light travels
- * across them. Opacity only: nothing grows or shrinks. */
+/* Idle — the bars rest as a calm row of soft dots that breathe together. Every
+ * dot shares one slow, synchronised pulse (no per-bar delay), so the resting
+ * state reads as a steady breath instead of a light scanning left-to-right. */
 .audio-waveform.is-idle .wave-bar {
-  animation: wave-idle-sweep 2.6s ease-in-out infinite;
-  animation-delay: calc(var(--i) * 55ms);
+  animation: wave-idle-breathe 2.8s ease-in-out infinite;
 }
 
-@keyframes wave-idle-sweep {
+@keyframes wave-idle-breathe {
   0%,
   100% {
-    opacity: 0.32;
+    opacity: 0.3;
+    transform: scaleY(0.82);
   }
   50% {
     opacity: 0.72;
+    transform: scaleY(1.5);
   }
 }
 

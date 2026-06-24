@@ -69,23 +69,9 @@ pub fn validate_shortcut(raw: &str) -> Result<(), String> {
     }
 }
 
-/// Register a shortcut using Tauri's global-shortcut plugin. Recording bindings
-/// also get their auto-derived Shift "lock" (hands-free) variant registered.
+/// Register a shortcut using Tauri's global-shortcut plugin.
 pub fn register_shortcut(app: &AppHandle, binding: ShortcutBinding) -> Result<(), String> {
-    register_one(app, &binding.id, &binding.current_binding)?;
-
-    if let Some(variant) = super::lock_variant_binding(&binding) {
-        if let Err(e) = register_one(app, &variant.id, &variant.current_binding) {
-            // Non-fatal: the hands-free variant may collide with another
-            // shortcut (e.g. the post-processing hotkey). The base still works.
-            warn!(
-                "Lock variant '{}' ({}) not registered: {}",
-                variant.id, variant.current_binding, e
-            );
-        }
-    }
-
-    Ok(())
+    register_one(app, &binding.id, &binding.current_binding)
 }
 
 /// Register a single (id, hotkey) pair with Tauri's global-shortcut plugin.
@@ -140,14 +126,9 @@ fn register_one(app: &AppHandle, binding_id: &str, hotkey: &str) -> Result<(), S
     Ok(())
 }
 
-/// Unregister a shortcut from Tauri's global-shortcut plugin (and its Shift
-/// "lock" variant, if any).
+/// Unregister a shortcut from Tauri's global-shortcut plugin.
 pub fn unregister_shortcut(app: &AppHandle, binding: ShortcutBinding) -> Result<(), String> {
-    let result = unregister_one(app, &binding.current_binding);
-    if let Some(variant) = super::lock_variant_binding(&binding) {
-        let _ = unregister_one(app, &variant.current_binding);
-    }
-    result
+    unregister_one(app, &binding.current_binding)
 }
 
 /// Unregister a single hotkey from Tauri's global-shortcut plugin.

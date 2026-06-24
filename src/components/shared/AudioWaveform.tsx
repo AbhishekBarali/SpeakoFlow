@@ -113,7 +113,6 @@ const AudioWaveform: React.FC<AudioWaveformProps> = ({
               style={
                 {
                   height: `${pct}%`,
-                  "--i": i,
                 } as React.CSSProperties
               }
             />

@@ -71,18 +71,13 @@
   width: 66px;
   display: flex;
   align-items: center;
+  /* Eases the chip's resize as it switches between hold and hands-free. */
+  transition: width 220ms cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
-/* Hands-free lock: a quiet badge rather than a full sentence, so the chip
- * stays the same compact size whether locked or not. */
-.lock-badge {
-  flex-shrink: 0;
-  opacity: 0.85;
-  filter: drop-shadow(0 0 4px rgba(244, 197, 168, 0.35));
-}
-
-/* The "working" spinner sits where the lock badge would, so transcribing reads
- * as the same compact audio chip with a quiet loading cue rather than a word. */
+/* The "working" spinner tucks alongside the settled waveform, so transcribing
+ * reads as the same compact audio chip with a quiet loading cue rather than a
+ * word. */
 .load-spinner {
   flex-shrink: 0;
   opacity: 0.9;
@@ -202,6 +197,24 @@
   width: 54px;
 }
 
+/* Ease the hands-free controls in, so the hold → lock switch reads as one
+ * smooth motion (tick growing in beside the waveform) rather than a jump. */
+.overlay-pill.locked .pill-cancel,
+.overlay-pill.locked .pill-confirm {
+  animation: control-in 220ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+@keyframes control-in {
+  from {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 /* Mirror the control order for right-to-left layouts. */
 [dir="rtl"] .overlay-pill.locked .pill-cancel {
   order: 2;
@@ -216,6 +229,12 @@
   .pill-cancel,
   .pill-confirm {
     transition: none;
+  }
+  .wave-box,
+  .overlay-pill.locked .pill-cancel,
+  .overlay-pill.locked .pill-confirm {
+    transition: none;
+    animation: none;
   }
   .load-spinner {
     animation: none;

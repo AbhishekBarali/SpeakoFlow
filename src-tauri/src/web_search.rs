@@ -1,76 +1,100 @@
 //! Web search for the assistant.
 //!
-//! Design priority: **answer quality**. An enabled web search should let the
-//! assistant answer current/factual questions as well as a human with a browser
-//! would — so we favor real page content and well-formed queries over raw speed.
+//! Goal: **fast but genuinely good** — the kind of answer-with-search that
+//! ChatGPT / Gemini give in a few seconds while you talk to them, *not* the
+//! minutes-long "deep research" mode. The whole pipeline is one retrieval pass
+//! with heavy parallelism and tight timeouts.
 //!
-//! Two stages make that work:
-//! 1. **Planner** (`plan_search`): a capable LLM decides *whether* a live search
-//!    is actually needed and rewrites the user's request — often a rough voice
-//!    transcription — into one to three clean, keyword-rich search queries
-//!    (fixing misheard names, dropping filler, splitting compound questions, and
-//!    picking a freshness window). This replaces the old keyword heuristic, which
-//!    couldn't understand intent, other languages, or reformulate a messy query.
-//! 2. **Retrieval** (`search_with_plan`): runs those queries and, with Firecrawl,
-//!    pulls the **full page content** of the top results (not just a one-line
-//!    snippet) so the model answers from the actual source text. Results are
-//!    merged, de-duplicated, and bounded to a token budget.
+//! Pipeline:
+//! 1. **Planner** (`plan_search`): a capable LLM decides whether a live search
+//!    is needed and rewrites the user's (often transcribed) request into 1–4
+//!    clean queries, picks a freshness window, and flags whether this is a
+//!    current-events/news topic.
+//! 2. **Snippet search** (`snippet_search`): run each query in parallel and get
+//!    back fast title+snippet results only — no scraping yet. For Firecrawl we
+//!    pull both `web` and `news` sources (news is what makes "what's happening
+//!    with X" questions work) and sort the web results by date when the topic
+//!    is time-sensitive.
+//! 3. **Local rerank** (`rerank`): score the merged snippets by lexical overlap
+//!    with the query plus a recency boost — purely local, no extra network or
+//!    LLM call, so it costs ~nothing.
+//! 4. **Scrape the winners only** (`firecrawl_scrape`): fetch full page content
+//!    for just the top few reranked results, in parallel, each with a tight
+//!    deadline. A slow page is dropped (we keep its snippet) rather than
+//!    stalling the spoken answer. Cached pages (`maxAge`) come back fast.
 //!
-//! Providers: **Firecrawl** (`/v2/search` with `scrapeOptions` → full markdown,
-//! the recommended high-quality path), **Brave**, and **DuckDuckGo** (keyless,
-//! snippet-only fallback). Any failure or timeout degrades gracefully — the turn
-//! answers without web context rather than breaking.
+//! A **credit guard** wraps every Firecrawl call: a rolling per-minute request
+//! cap stops runaway loops, and a per-day credit budget stops a session from
+//! quietly draining the user's plan. When either trips, search degrades
+//! gracefully (the assistant answers without web context).
+//!
+//! Providers: **Firecrawl** (search + scrape, the high-quality path), **Brave**
+//! and **DuckDuckGo** (keyless) are snippet-only fallbacks that still benefit
+//! from the rerank.
 
 use crate::llm_client;
-use crate::settings::{AppSettings, PostProcessProvider};
+use crate::settings::{AppSettings, AssistantSearchDepth, PostProcessProvider};
 use log::{debug, warn};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use specta::Type;
-use std::collections::HashSet;
-use std::time::Duration;
+use std::collections::{HashSet, VecDeque};
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
 
-/// Timeout for the lightweight snippet providers (Brave, DuckDuckGo). Generous
-/// compared to the old 6 s ceiling — we prioritize getting an answer over speed.
-const REQUEST_TIMEOUT: Duration = Duration::from_secs(20);
+/// Timeout for the snippet search call (Firecrawl `/v2/search` without scraping,
+/// or Brave/DuckDuckGo). Normally ~1–2 s; this is just the ceiling.
+const SNIPPET_SEARCH_TIMEOUT: Duration = Duration::from_secs(8);
 
-/// Timeout for Firecrawl, which also scrapes result pages and so legitimately
-/// takes longer than a bare search. Quality over speed: we wait.
-const FIRECRAWL_TIMEOUT: Duration = Duration::from_secs(45);
+/// Per-page scrape timeout. Deliberately tight: a real-time voice assistant
+/// would rather answer from a snippet than wait on one slow page.
+const SCRAPE_TIMEOUT: Duration = Duration::from_secs(7);
 
-/// Per-snippet character cap (the short description shown when full content is
-/// unavailable). Larger than before so snippet-only providers still give the
-/// model something to work with.
-const SNIPPET_MAX_CHARS: usize = 400;
+/// Timeout for the bare snippet providers (Brave, DuckDuckGo).
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(8);
 
-/// Per-result full-content cap. Firecrawl returns whole pages as markdown; we
-/// keep a meaty excerpt per source while staying within the prompt budget.
-const CONTENT_MAX_CHARS: usize = 2_000;
-
-/// Total cap on the web-context block fed to the model, across all sources.
-/// Bounds prompt size regardless of how much content the pages contain.
-const TOTAL_CONTEXT_MAX_CHARS: usize = 8_000;
+/// Per-snippet character cap.
+const SNIPPET_MAX_CHARS: usize = 500;
 
 /// Title character cap (defensive against pathological titles).
 const TITLE_MAX_CHARS: usize = 160;
 
-/// Hard cap on how many distinct queries the planner may run for one turn.
-const MAX_QUERIES: usize = 3;
+/// Absolute per-result content cap (a tier may ask for less).
+const CONTENT_HARD_CAP: usize = 4_000;
 
-/// Upper bound on results per provider call / merged total.
+/// Hard cap on how many distinct queries the planner may run for one turn.
+const MAX_QUERIES: usize = 4;
+
+/// Upper bound on results per provider call.
 const MAX_RESULTS_HARD: usize = 10;
 
+// --- Credit guard rails -----------------------------------------------------
+
+/// Rolling window for the request-rate limiter.
+const RATE_WINDOW: Duration = Duration::from_secs(60);
+
+/// Max Firecrawl HTTP calls allowed within `RATE_WINDOW`. Far above normal use
+/// (a High turn is ~9 calls) but low enough that a runaway loop trips quickly.
+const MAX_CALLS_PER_WINDOW: usize = 40;
+
+/// Hard ceiling on estimated credits a single turn may reserve. The tiers stay
+/// well under this; it's defense-in-depth against a logic bug.
+const MAX_CREDITS_PER_TURN: u32 = 60;
+
+/// Serve cached Firecrawl scrapes younger than this (ms). Big speed/credit win
+/// for popular or repeated pages; 1 h is fresh enough for an assistant.
+const SCRAPE_MAX_AGE_MS: u64 = 3_600_000;
+
 /// A browser-like User-Agent. The DuckDuckGo HTML endpoint returns an empty
-/// page to obviously-automated clients; a normal UA gets normal results. This
-/// is the same approach the popular `duckduckgo-search` library uses.
+/// page to obviously-automated clients; a normal UA gets normal results.
 const BROWSER_UA: &str =
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
 
-/// A single web result. `content` holds the scraped page text (markdown) when a
-/// content-fetching provider was used; `snippet` is the short description that's
-/// always available. The model prefers `content` and falls back to `snippet`.
+/// A single web result handed to the model. `content` holds scraped page text
+/// (markdown) when available; `snippet` is the short description that's always
+/// present. The model prefers `content` and falls back to `snippet`.
 #[derive(Debug, Clone, Serialize, Type)]
 pub struct SearchResult {
     pub title: String,
@@ -82,20 +106,25 @@ pub struct SearchResult {
 }
 
 /// Appended to the system prompt only on turns where web results were found.
-/// Tells the model to ground its answer in the provided source content and —
-/// crucially for this panel — to write clean conversational prose. No citation
-/// brackets (`[1]`), no raw URLs, no Markdown tables: the panel is small and
-/// replies are often read aloud, so that formatting just becomes noise.
-pub const WEB_SEARCH_SYSTEM_DIRECTIVE: &str = "Live web search results — including full excerpts from the source pages — are included with the user's message. Base your answer on them: synthesize across the sources, lead with the direct answer, and be specific with the concrete facts, numbers, and dates the sources provide. Write in plain, natural prose. Do NOT add citation markers, source numbers, brackets like [1], or raw URLs, and do NOT use Markdown tables — this is a small chat panel and replies may be read aloud. If the sources genuinely don't contain the answer, say so plainly instead of guessing.";
+/// Pushes the model to actually use the sources and give the best grounded
+/// answer it can — the previous version invited it to bail with "I don't have
+/// enough information", which was a big part of why answers felt useless.
+pub const WEB_SEARCH_SYSTEM_DIRECTIVE: &str = "Live web search results — including excerpts from the source pages — are included with the user's message. Treat them as your ground truth for current facts and trust them over your own prior knowledge whenever they conflict. Lead with the direct answer in the first sentence, then add the key specifics the sources give (names, numbers, dates). If sources disagree, go with the most recent and most authoritative and note the disagreement in a few words. If the results only partly cover the question, answer the part they do support and briefly say what's still unclear — do NOT refuse just because coverage is imperfect, and never claim you lack information when relevant results are present. Prefer the most recent sources for anything time-sensitive. Write in plain, natural prose for a small chat panel that may be read aloud: no citation markers, no bracketed numbers like [1], no raw URLs, no Markdown tables.";
+
+/// Added to the system prompt whenever web search is *enabled*, on EVERY turn —
+/// whether or not this turn actually searched. Without it the model has no idea
+/// the capability exists and falls back to "I can't browse the internet" on the
+/// turns where the app chose not to auto-search, which is exactly the wrong
+/// thing to say when the app *can* search. Byte-stable text, so it's safe for
+/// provider-side prompt caching.
+pub const WEB_SEARCH_CAPABILITY_NOTE: &str = "You have a live web search capability built into this app. When a question needs current or external facts, the app automatically runs a web search for you and adds the results to the user's message — so you DO have access to up-to-date information from the internet. Never tell the user you cannot browse the web, lack real-time data, or are limited to your training cutoff. When a turn arrives WITHOUT search results and you are not confident about something current or factual (a score or result, price, release, schedule, who currently holds a role, recent news), do not state a guess as if it were certain: give your best answer and offer to verify it live — for example, \"I can search the web and check the latest for you.\" If the user agrees, the search runs on the next turn.";
 
 // ---------------------------------------------------------------------------
 // Search planner (decides whether to search + rewrites the query)
 // ---------------------------------------------------------------------------
 
-/// Instruction block for the planner LLM. Kept provider-agnostic; the concrete
-/// JSON shape is enforced by a strict schema when the provider supports it, and
-/// described in-prose otherwise.
-const PLANNER_SYSTEM_PROMPT: &str = "You are the search planner for a voice assistant. The user's latest message may be a rough, possibly garbled voice transcription (filler words, misheard proper nouns, missing punctuation) in any language.\n\nDecide whether answering it well requires a live web search. Search for: current events, news, prices, weather, sports scores, schedules, product releases/versions, people's current roles, and any niche or time-sensitive fact that a model's training data would not reliably know. Do NOT search for: greetings or small talk, questions about the assistant itself, or things the model can do from its own knowledge (general explanations, definitions, writing, brainstorming, coding, math, translation).\n\nWhen a search is warranted, rewrite the request into 1 to 3 focused, keyword-rich web search queries: correct likely transcription errors and proper names, strip filler, expand only where it clearly helps recall, and split a multi-part question into separate queries. Use the conversation context to make follow-up questions self-contained (resolve pronouns like \"it\"/\"they\" to the actual subject). Keep each query concise, as a person would type it into a search box.\n\nPick a freshness window: \"day\", \"week\", \"month\", or \"year\" for time-sensitive topics (more recent = tighter), or \"none\" when recency doesn't matter.";
+/// Instruction block for the planner LLM.
+const PLANNER_SYSTEM_PROMPT: &str = "You are the search planner for a voice assistant. The user's latest message may be a rough, possibly garbled voice transcription (filler words, misheard proper nouns, missing punctuation) in any language.\n\nDecide whether answering it well requires a live web search. Search for: current events, news, prices, weather, sports scores and fixtures, schedules, product releases/versions, people's current roles, and any niche or time-sensitive fact that a model's training data would not reliably know. Do NOT search for: greetings or small talk, questions about the assistant itself, or things you can answer from your own knowledge (general explanations, definitions, writing, brainstorming, coding, math, translation).\n\nWhen a search is warranted, rewrite the request into 1 to 4 focused, keyword-rich web search queries: correct likely transcription errors and proper names, strip filler, and split a multi-part question into separate queries. Use the conversation context to make follow-up questions self-contained (resolve pronouns like \"it\"/\"they\" to the actual subject). Use today's date to disambiguate which instance of a recurring thing the user means (e.g. which year's tournament, the latest model version). Keep each query concise, as a person would type it into a search box.\n\nSet \"freshness\" to the tightest window that fits: \"day\" or \"week\" for breaking news and live events, \"month\" or \"year\" for recent-but-not-breaking topics, or \"none\" when recency doesn't matter. Set \"news\" to true when the question is about current events, breaking news, sports, or anything where fresh news coverage is the best source — this pulls in news articles, not just static web pages.";
 
 /// The planner's structured decision.
 #[derive(Debug, Clone, Deserialize)]
@@ -103,12 +132,15 @@ pub struct SearchPlan {
     /// Whether a live web search should run for this turn.
     #[serde(default)]
     pub needs_search: bool,
-    /// Cleaned, search-ready queries (1–3 after sanitizing).
+    /// Cleaned, search-ready queries (1–4 after sanitizing).
     #[serde(default)]
     pub queries: Vec<String>,
     /// Freshness window: "none" | "day" | "week" | "month" | "year".
     #[serde(default = "default_freshness")]
     pub freshness: String,
+    /// Whether to include news-source results (current events / breaking news).
+    #[serde(default)]
+    pub news: bool,
 }
 
 fn default_freshness() -> String {
@@ -117,8 +149,7 @@ fn default_freshness() -> String {
 
 impl SearchPlan {
     /// A trivial plan that searches the raw user text verbatim. Used as the
-    /// fallback when the planner is unavailable (built-in model) or errors, so
-    /// the feature degrades to "search the question as typed" rather than off.
+    /// fallback when the planner is unavailable (built-in model) or errors.
     pub fn raw(user_text: &str) -> Self {
         let q = user_text.trim();
         SearchPlan {
@@ -129,6 +160,7 @@ impl SearchPlan {
                 vec![truncate_chars(q, 480)]
             },
             freshness: "none".to_string(),
+            news: false,
         }
     }
 
@@ -171,9 +203,7 @@ impl SearchPlan {
     }
 }
 
-/// Ask the assistant's own (capable) model to plan the search: decide whether
-/// it's needed and produce clean queries + a freshness window. Returns an error
-/// on any LLM/parse failure so the caller can fall back to the raw query.
+/// Ask the assistant's own (capable) model to plan the search.
 pub async fn plan_search(
     provider: &PostProcessProvider,
     api_key: String,
@@ -206,13 +236,14 @@ pub async fn plan_search(
             "properties": {
                 "needs_search": { "type": "boolean" },
                 "queries": { "type": "array", "items": { "type": "string" } },
-                "freshness": { "type": "string", "enum": ["none", "day", "week", "month", "year"] }
+                "freshness": { "type": "string", "enum": ["none", "day", "week", "month", "year"] },
+                "news": { "type": "boolean" }
             },
-            "required": ["needs_search", "queries", "freshness"],
+            "required": ["needs_search", "queries", "freshness", "news"],
             "additionalProperties": false
         }))
     } else {
-        system.push_str("\n\nReply with ONLY a JSON object of this exact shape, no prose and no code fences: {\"needs_search\": true|false, \"queries\": [\"...\"], \"freshness\": \"none|day|week|month|year\"}.");
+        system.push_str("\n\nReply with ONLY a JSON object of this exact shape, no prose and no code fences: {\"needs_search\": true|false, \"queries\": [\"...\"], \"freshness\": \"none|day|week|month|year\", \"news\": true|false}.");
         None
     };
 
@@ -239,8 +270,8 @@ pub async fn plan_search(
     })?;
     plan.sanitize(user_text);
     debug!(
-        "Search plan: needs_search={}, freshness={}, queries={:?}",
-        plan.needs_search, plan.freshness, plan.queries
+        "Search plan: needs_search={}, freshness={}, news={}, queries={:?}",
+        plan.needs_search, plan.freshness, plan.news, plan.queries
     );
     Ok(plan)
 }
@@ -265,73 +296,228 @@ fn parse_plan(raw: &str) -> Option<SearchPlan> {
 }
 
 // ---------------------------------------------------------------------------
+// Search depth tiers
+// ---------------------------------------------------------------------------
+
+/// Concrete retrieval knobs for a depth tier. All tiers are one pass; they
+/// differ only in breadth and how much text reaches the model.
+#[derive(Clone, Copy, Debug)]
+struct TierParams {
+    /// Max queries to actually run from the plan.
+    max_queries: usize,
+    /// Results requested per source per query in the snippet phase.
+    snippet_limit: usize,
+    /// How many reranked winners to scrape for full content.
+    scrape_top: usize,
+    /// Total sources handed to the model (scraped + snippet-only extras).
+    sources_out: usize,
+    /// Per-result content cap (chars).
+    per_result_chars: usize,
+    /// Total web-context cap across all sources (chars).
+    total_budget_chars: usize,
+}
+
+fn tier_params(depth: AssistantSearchDepth) -> TierParams {
+    match depth {
+        AssistantSearchDepth::Low => TierParams {
+            max_queries: 1,
+            snippet_limit: 6,
+            scrape_top: 2,
+            sources_out: 3,
+            per_result_chars: 1_800,
+            total_budget_chars: 7_000,
+        },
+        AssistantSearchDepth::Medium => TierParams {
+            max_queries: 3,
+            snippet_limit: 6,
+            scrape_top: 3,
+            sources_out: 5,
+            per_result_chars: 3_000,
+            total_budget_chars: 14_000,
+        },
+        AssistantSearchDepth::High => TierParams {
+            max_queries: 4,
+            snippet_limit: 8,
+            scrape_top: 5,
+            sources_out: 7,
+            per_result_chars: 3_500,
+            total_budget_chars: 24_000,
+        },
+    }
+}
+
+/// The total web-context character budget for a tier — used by the caller when
+/// formatting results for the prompt.
+pub fn context_budget_for(depth: AssistantSearchDepth) -> usize {
+    tier_params(depth).total_budget_chars
+}
+
+// ---------------------------------------------------------------------------
+// Credit guard (protects the user's Firecrawl credits)
+// ---------------------------------------------------------------------------
+
+struct CreditGuard {
+    /// Timestamps of recent Firecrawl calls (for the rolling-window rate limit).
+    calls: VecDeque<Instant>,
+    /// Day key (YYYYDDD) the budget counter belongs to; resets when it changes.
+    day: i64,
+    /// Estimated credits spent so far today.
+    spent_today: u32,
+}
+
+static CREDIT_GUARD: Lazy<Mutex<CreditGuard>> = Lazy::new(|| {
+    Mutex::new(CreditGuard {
+        calls: VecDeque::new(),
+        day: current_day_key(),
+        spent_today: 0,
+    })
+});
+
+/// Local calendar-day key (year * 1000 + day-of-year). Only equality matters.
+fn current_day_key() -> i64 {
+    chrono::Local::now()
+        .format("%Y%j")
+        .to_string()
+        .parse()
+        .unwrap_or(0)
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum GuardDenied {
+    RateLimited,
+    Budget { spent: u32, budget: u32 },
+}
+
+impl std::fmt::Display for GuardDenied {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            GuardDenied::RateLimited => write!(
+                f,
+                "web search paused: too many requests in a short time (runaway-loop guard)"
+            ),
+            GuardDenied::Budget { spent, budget } => write!(
+                f,
+                "web search paused: daily Firecrawl credit budget reached ({}/{} today)",
+                spent, budget
+            ),
+        }
+    }
+}
+
+/// Pure, testable core of the guard. Prunes the rolling window, resets the daily
+/// counter on a new day, then either reserves `estimated` credits or denies.
+fn try_reserve(
+    guard: &mut CreditGuard,
+    now: Instant,
+    today: i64,
+    estimated: u32,
+    daily_budget: u32,
+) -> Result<(), GuardDenied> {
+    if today != guard.day {
+        guard.day = today;
+        guard.spent_today = 0;
+    }
+    while let Some(&front) = guard.calls.front() {
+        if now.duration_since(front) > RATE_WINDOW {
+            guard.calls.pop_front();
+        } else {
+            break;
+        }
+    }
+    if guard.calls.len() >= MAX_CALLS_PER_WINDOW {
+        return Err(GuardDenied::RateLimited);
+    }
+    if daily_budget > 0 && guard.spent_today.saturating_add(estimated) > daily_budget {
+        return Err(GuardDenied::Budget {
+            spent: guard.spent_today,
+            budget: daily_budget,
+        });
+    }
+    guard.calls.push_back(now);
+    guard.spent_today = guard.spent_today.saturating_add(estimated);
+    Ok(())
+}
+
+/// Reserve `estimated` credits against the global guard, or return an error
+/// describing why the call must be skipped.
+fn reserve_credits(estimated: u32, daily_budget: u32) -> Result<(), GuardDenied> {
+    let mut guard = CREDIT_GUARD.lock().unwrap();
+    try_reserve(
+        &mut guard,
+        Instant::now(),
+        current_day_key(),
+        estimated,
+        daily_budget,
+    )
+}
+
+// ---------------------------------------------------------------------------
 // Retrieval
 // ---------------------------------------------------------------------------
 
-/// Run a single web search using the provider configured in settings. This is
-/// the one-off entry used by the settings "Test search" button; it surfaces
-/// provider errors (missing key, rate limit) to the caller.
+/// A pre-scrape candidate from the snippet phase.
+#[derive(Debug, Clone)]
+struct Candidate {
+    title: String,
+    url: String,
+    snippet: String,
+    /// True when this came from a news source — used for the recency boost.
+    from_news: bool,
+}
+
+/// Run a single web search using the configured provider and return snippet
+/// results. Used by the settings "Test search" button; surfaces provider errors
+/// (missing key, rate limit, budget) to the caller.
 pub async fn search(settings: &AppSettings, query: &str) -> Result<Vec<SearchResult>, String> {
     let query = query.trim();
     if query.is_empty() {
         return Ok(Vec::new());
     }
-    let max_results =
-        (settings.assistant_web_search_max_results as usize).clamp(1, MAX_RESULTS_HARD);
-    run_provider_search(
-        settings,
-        query,
-        "none",
-        settings.assistant_web_search_fetch_content,
-        max_results,
-    )
-    .await
+    let cands = snippet_search(settings, query, 5, None, false).await?;
+    Ok(cands.into_iter().take(5).map(candidate_to_result).collect())
 }
 
-/// Execute a full search plan: run each query (in parallel), then merge and
-/// de-duplicate the results, interleaving across queries for source diversity
-/// and capping the total. Per-query errors are swallowed (logged) so one bad
-/// query never sinks the whole turn.
+/// Execute a full search plan: snippet-search every query in parallel, merge +
+/// rerank locally, then scrape only the top winners for full content. Per-query
+/// errors are swallowed (logged) so one bad query never sinks the whole turn.
 pub async fn search_with_plan(settings: &AppSettings, plan: &SearchPlan) -> Vec<SearchResult> {
+    let tp = tier_params(settings.assistant_search_depth);
+    let daily_budget = settings.assistant_web_search_daily_credit_budget;
+
     let queries: Vec<&String> = plan
         .queries
         .iter()
         .filter(|q| !q.trim().is_empty())
-        .take(MAX_QUERIES)
+        .take(tp.max_queries)
         .collect();
     if queries.is_empty() {
         return Vec::new();
     }
 
-    let max_results =
-        (settings.assistant_web_search_max_results as usize).clamp(1, MAX_RESULTS_HARD);
-    let fetch_content = settings.assistant_web_search_fetch_content;
-    let n = queries.len();
-    // Spread the result budget across queries (at least 2 each), then cap the
-    // merged total so multi-query turns don't flood the prompt.
-    let per_query = if n <= 1 {
-        max_results
-    } else {
-        max_results.div_ceil(n).max(2)
-    };
-    let total_cap = if n <= 1 {
-        max_results
-    } else {
-        (max_results + 2).min(MAX_RESULTS_HARD)
-    };
+    // Keep the whole turn under the per-turn credit ceiling (defense-in-depth;
+    // the tiers are already well within it).
+    let scrape_budget = MAX_CREDITS_PER_TURN.saturating_sub(queries.len() as u32 * 2) as usize;
+    let scrape_top = tp.scrape_top.min(scrape_budget);
 
-    let futures = queries.iter().map(|q| {
-        run_provider_search(
+    // Recency-sensitive topics get news + date-sorted web results.
+    let recency_sensitive = plan.news || matches!(plan.freshness.as_str(), "day" | "week");
+    let include_news = plan.news || matches!(plan.freshness.as_str(), "day" | "week" | "month");
+    let tbs = build_tbs(&plan.freshness, recency_sensitive);
+    let tbs_ref = tbs.as_deref();
+
+    // Stage 1 — snippet search, every query in parallel.
+    let snippet_futs = queries.iter().map(|q| {
+        snippet_search(
             settings,
             q.as_str(),
-            &plan.freshness,
-            fetch_content,
-            per_query,
+            tp.snippet_limit,
+            tbs_ref,
+            include_news,
         )
     });
-    let per_query_results = futures_util::future::join_all(futures).await;
+    let per_query = futures_util::future::join_all(snippet_futs).await;
 
-    let lists: Vec<Vec<SearchResult>> = per_query_results
+    let lists: Vec<Vec<Candidate>> = per_query
         .into_iter()
         .enumerate()
         .map(|(i, r)| match r {
@@ -343,20 +529,74 @@ pub async fn search_with_plan(settings: &AppSettings, plan: &SearchPlan) -> Vec<
         })
         .collect();
 
-    // Round-robin merge so each query contributes near the top, de-duping by URL
-    // (or title when a result has no URL).
+    let mut merged = round_robin_merge(lists);
+    if merged.is_empty() {
+        return Vec::new();
+    }
+
+    // Stage 2 — local rerank (lexical + recency). No network, no LLM.
+    let primary = queries.first().map(|q| q.as_str()).unwrap_or("");
+    rerank(primary, &mut merged, recency_sensitive);
+
+    // Stage 3 — scrape only the top winners for full content (Firecrawl only).
+    let scrape = settings.assistant_web_search_provider == "firecrawl"
+        && settings.assistant_web_search_fetch_content
+        && scrape_top > 0;
+
+    let mut results: Vec<SearchResult> = Vec::new();
+    if scrape {
+        let key = settings
+            .web_search_api_keys
+            .get("firecrawl")
+            .cloned()
+            .unwrap_or_default();
+        let winners: Vec<Candidate> = merged.iter().take(scrape_top).cloned().collect();
+        let scrape_futs = winners
+            .iter()
+            .map(|c| firecrawl_scrape(&key, &c.url, daily_budget));
+        let scraped = futures_util::future::join_all(scrape_futs).await;
+        for (c, sc) in winners.into_iter().zip(scraped) {
+            let content = match sc {
+                Ok(md) => cap_content(&md, tp.per_result_chars),
+                Err(e) => {
+                    debug!("Scrape of {:?} failed ({}); keeping snippet", c.url, e);
+                    String::new()
+                }
+            };
+            results.push(SearchResult {
+                title: truncate_chars(c.title.trim(), TITLE_MAX_CHARS),
+                url: c.url,
+                snippet: truncate_chars(c.snippet.trim(), SNIPPET_MAX_CHARS),
+                content,
+            });
+        }
+        // Add a few snippet-only extras for breadth, up to the tier's total.
+        let extra = tp.sources_out.saturating_sub(results.len());
+        for c in merged.into_iter().skip(scrape_top).take(extra) {
+            results.push(candidate_to_result(c));
+        }
+    } else {
+        // Snippet-only path (Brave/DuckDuckGo, or Firecrawl with scraping off).
+        for c in merged.into_iter().take(tp.sources_out) {
+            results.push(candidate_to_result(c));
+        }
+    }
+
+    results
+}
+
+/// Round-robin merge across per-query candidate lists, de-duping by URL (or
+/// title when a result has no URL) so each query contributes near the top.
+fn round_robin_merge(lists: Vec<Vec<Candidate>>) -> Vec<Candidate> {
     let mut seen: HashSet<String> = HashSet::new();
-    let mut merged: Vec<SearchResult> = Vec::new();
+    let mut merged: Vec<Candidate> = Vec::new();
     let max_len = lists.iter().map(|v| v.len()).max().unwrap_or(0);
-    'outer: for i in 0..max_len {
+    for i in 0..max_len {
         for list in &lists {
-            if let Some(r) = list.get(i) {
-                let key = dedupe_key(r);
+            if let Some(c) = list.get(i) {
+                let key = dedupe_key(c);
                 if key.is_empty() || seen.insert(key) {
-                    merged.push(r.clone());
-                    if merged.len() >= total_cap {
-                        break 'outer;
-                    }
+                    merged.push(c.clone());
                 }
             }
         }
@@ -365,31 +605,109 @@ pub async fn search_with_plan(settings: &AppSettings, plan: &SearchPlan) -> Vec<
 }
 
 /// De-duplication key: normalized URL, falling back to the lowercased title.
-fn dedupe_key(r: &SearchResult) -> String {
-    let url = r.url.trim().trim_end_matches('/').to_lowercase();
+fn dedupe_key(c: &Candidate) -> String {
+    let url = c.url.trim().trim_end_matches('/').to_lowercase();
     if !url.is_empty() {
         url
     } else {
-        r.title.trim().to_lowercase()
+        c.title.trim().to_lowercase()
     }
 }
 
-/// Dispatch one query to the configured provider.
-async fn run_provider_search(
+/// Local relevance rerank: lexical overlap of query terms with title (weighted)
+/// and snippet, plus a recency boost for news results when the topic is
+/// time-sensitive. Stable order is preserved for ties.
+fn rerank(query: &str, candidates: &mut Vec<Candidate>, recency_sensitive: bool) {
+    let terms = query_terms(query);
+    let mut scored: Vec<(f32, usize, Candidate)> = candidates
+        .drain(..)
+        .enumerate()
+        .map(|(i, c)| {
+            let s = candidate_score(&c, &terms, recency_sensitive);
+            (s, i, c)
+        })
+        .collect();
+    // Higher score first; original position breaks ties (stable).
+    scored.sort_by(|a, b| {
+        b.0.partial_cmp(&a.0)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then(a.1.cmp(&b.1))
+    });
+    *candidates = scored.into_iter().map(|(_, _, c)| c).collect();
+}
+
+/// Tokenize a query into meaningful lowercase terms (drop short words / stopwords).
+fn query_terms(query: &str) -> Vec<String> {
+    const STOP: [&str; 22] = [
+        "the", "a", "an", "of", "to", "in", "is", "are", "was", "were", "what", "who", "when",
+        "how", "and", "for", "on", "with", "about", "whats", "does", "did",
+    ];
+    query
+        .to_lowercase()
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|w| w.len() > 2 && !STOP.contains(w))
+        .map(|w| w.to_string())
+        .collect()
+}
+
+/// Score one candidate against the query terms (+ optional recency boost).
+fn candidate_score(c: &Candidate, terms: &[String], recency_sensitive: bool) -> f32 {
+    let title = c.title.to_lowercase();
+    let snippet = c.snippet.to_lowercase();
+    let mut hits = 0.0f32;
+    for t in terms {
+        if title.contains(t) {
+            hits += 2.0;
+        }
+        if snippet.contains(t) {
+            hits += 1.0;
+        }
+    }
+    let denom = (terms.len() as f32).max(1.0);
+    let mut score = hits / denom;
+    if c.from_news {
+        score += if recency_sensitive { 1.5 } else { 0.3 };
+    }
+    score
+}
+
+/// Map a freshness window (+ recency sensitivity) to a Firecrawl `tbs` value.
+/// `sbd:1` sorts web results newest-first; `qdr:*` restricts the window. `tbs`
+/// only affects the `web` source — news is fresh by nature.
+fn build_tbs(freshness: &str, recency_sensitive: bool) -> Option<String> {
+    let qdr = match freshness {
+        "day" => Some("qdr:d"),
+        "week" => Some("qdr:w"),
+        "month" => Some("qdr:m"),
+        "year" => Some("qdr:y"),
+        _ => None,
+    };
+    match (recency_sensitive, qdr) {
+        (true, Some(q)) => Some(format!("sbd:1,{}", q)),
+        (true, None) => Some("sbd:1".to_string()),
+        (false, Some(q)) => Some(q.to_string()),
+        (false, None) => None,
+    }
+}
+
+/// Dispatch one query to the configured provider, returning snippet candidates.
+async fn snippet_search(
     settings: &AppSettings,
     query: &str,
-    freshness: &str,
-    fetch_content: bool,
-    max_results: usize,
-) -> Result<Vec<SearchResult>, String> {
+    limit: usize,
+    tbs: Option<&str>,
+    include_news: bool,
+) -> Result<Vec<Candidate>, String> {
     let query = query.trim();
     if query.is_empty() {
         return Ok(Vec::new());
     }
+    let limit = limit.clamp(1, MAX_RESULTS_HARD);
+    let daily_budget = settings.assistant_web_search_daily_credit_budget;
     let provider = settings.assistant_web_search_provider.as_str();
     debug!(
-        "Web search via '{}' for {:?} (max {}, freshness {}, content {})",
-        provider, query, max_results, freshness, fetch_content
+        "Snippet search via '{}' for {:?} (limit {}, news {}, tbs {:?})",
+        provider, query, limit, include_news, tbs
     );
 
     match provider {
@@ -399,14 +717,7 @@ async fn run_provider_search(
                 .get("firecrawl")
                 .cloned()
                 .unwrap_or_default();
-            search_firecrawl(
-                &key,
-                query,
-                max_results,
-                freshness_to_tbs(freshness),
-                fetch_content,
-            )
-            .await
+            firecrawl_search_snippets(&key, query, limit, tbs, include_news, daily_budget).await
         }
         "brave" => {
             let key = settings
@@ -414,62 +725,24 @@ async fn run_provider_search(
                 .get("brave")
                 .cloned()
                 .unwrap_or_default();
-            search_brave(&key, query, max_results, freshness).await
+            let results = search_brave(&key, query, limit, tbs).await?;
+            Ok(results.into_iter().map(result_to_candidate).collect())
         }
         // "duckduckgo" and any unknown value fall back to the free engine.
-        _ => search_duckduckgo(query, max_results, freshness).await,
+        _ => {
+            let results = search_duckduckgo(query, limit, tbs).await?;
+            Ok(results.into_iter().map(result_to_candidate).collect())
+        }
     }
 }
 
-/// Map a freshness window to a Firecrawl `tbs` value (Google-style time filter).
-fn freshness_to_tbs(freshness: &str) -> Option<&'static str> {
-    match freshness {
-        "day" => Some("qdr:d"),
-        "week" => Some("qdr:w"),
-        "month" => Some("qdr:m"),
-        "year" => Some("qdr:y"),
-        _ => None,
-    }
-}
-
-/// Map a freshness window to a Brave `freshness` value.
-fn freshness_to_brave(freshness: &str) -> Option<&'static str> {
-    match freshness {
-        "day" => Some("pd"),
-        "week" => Some("pw"),
-        "month" => Some("pm"),
-        "year" => Some("py"),
-        _ => None,
-    }
-}
-
-/// Map a freshness window to a DuckDuckGo `df` value (year unsupported there).
-fn freshness_to_ddg(freshness: &str) -> Option<&'static str> {
-    match freshness {
-        "day" => Some("d"),
-        "week" => Some("w"),
-        "month" => Some("m"),
-        _ => None,
-    }
-}
-
-/// Format results as a context block to include with the user's message. Each
-/// source gets its title and, within a shared character budget, its full
-/// content (or snippet). Deliberately no numbered citations or URLs, so the
-/// model has nothing to echo back as `[1]`-style markers and stays in clean
-/// prose:
-///
-/// ```text
-/// Live web search results:
-///
-/// ---
-/// Source: Title
-/// <page content excerpt>
-/// ```
-pub fn format_results_for_prompt(results: &[SearchResult]) -> String {
+/// Format results as a context block to include with the user's message, within
+/// `total_budget` characters across all sources. No numbered citations or URLs,
+/// so the model has nothing to echo back and stays in clean prose.
+pub fn format_results_for_prompt(results: &[SearchResult], total_budget: usize) -> String {
     let mut out = String::with_capacity(1024);
     out.push_str("Live web search results:\n");
-    let mut budget = TOTAL_CONTEXT_MAX_CHARS;
+    let mut budget = total_budget;
     for r in results {
         out.push_str("\n---\nSource: ");
         out.push_str(&r.title);
@@ -492,15 +765,13 @@ pub fn format_results_for_prompt(results: &[SearchResult]) -> String {
 /// Fast, allocation-light heuristic used as a cheap *pre-gate* before the LLM
 /// planner: it skips clear non-search work (chit-chat, questions about the
 /// assistant, text-generation/coding tasks, pure arithmetic, "explain/define"
-/// requests) so we don't spend a planner round-trip on them. Everything else
-/// proceeds to the planner, which makes the real decision and crafts queries.
+/// requests). Everything else proceeds to the planner.
 pub fn should_search(query: &str) -> bool {
     let q = query.trim().to_lowercase();
     if q.is_empty() {
         return false;
     }
 
-    // Very short greetings / acknowledgements — never worth a search.
     const SMALL_TALK: [&str; 16] = [
         "hi",
         "hey",
@@ -523,7 +794,6 @@ pub fn should_search(query: &str) -> bool {
         return false;
     }
 
-    // Questions about the assistant itself don't need the web.
     const SELF_REFERENTIAL: [&str; 8] = [
         "who are you",
         "what are you",
@@ -538,8 +808,6 @@ pub fn should_search(query: &str) -> bool {
         return false;
     }
 
-    // Clear non-search tasks: generation, transformation, or coding. These are
-    // about producing/altering text the user supplies, not looking things up.
     const TASK_PREFIXES: [&str; 18] = [
         "write ",
         "compose ",
@@ -564,19 +832,14 @@ pub fn should_search(query: &str) -> bool {
         return false;
     }
 
-    // Code is a strong non-search signal.
     if q.contains("```") || q.contains("def ") || q.contains("function ") {
         return false;
     }
 
-    // Pure arithmetic like "12 * (3 + 4)" — the model can do this directly.
     if is_simple_math(&q) {
         return false;
     }
 
-    // Conceptual "teach me" requests are best answered from the model's own
-    // knowledge rather than the live web. Kept deliberately narrow (only the
-    // clearest openers) so genuine lookups still reach the planner.
     const CONCEPTUAL_PREFIXES: [&str; 5] = [
         "explain ",
         "define ",
@@ -588,12 +851,10 @@ pub fn should_search(query: &str) -> bool {
         return false;
     }
 
-    // Anything that survives the filters proceeds to the planner.
     true
 }
 
-/// Rough detector for "this is just arithmetic": only digits, whitespace and
-/// math operators, and at least one operator present.
+/// Rough detector for "this is just arithmetic".
 fn is_simple_math(q: &str) -> bool {
     let mut has_op = false;
     for c in q.chars() {
@@ -619,50 +880,40 @@ fn http_client(timeout: Duration) -> Result<reqwest::Client, String> {
         .map_err(|e| format!("Failed to build HTTP client: {}", e))
 }
 
-/// Firecrawl `/v2/search`. With `scrapeOptions.formats = ["markdown"]` it returns
-/// the full page content of each result as markdown — the key to grounded,
-/// complete answers (snippets alone are too thin). `tbs` applies a freshness
-/// window; `parsers: []` and `proxy: "auto"` keep credit cost in check.
-async fn search_firecrawl(
+/// Firecrawl `/v2/search`, snippet-only (no `scrapeOptions`) — fast and cheap
+/// (2 credits / 10 results). Pulls `web` plus, when relevant, `news`. `tbs`
+/// applies a date sort/window to the web source.
+async fn firecrawl_search_snippets(
     api_key: &str,
     query: &str,
-    max_results: usize,
+    limit: usize,
     tbs: Option<&str>,
-    fetch_content: bool,
-) -> Result<Vec<SearchResult>, String> {
+    include_news: bool,
+    daily_budget: u32,
+) -> Result<Vec<Candidate>, String> {
     if api_key.trim().is_empty() {
         return Err(
             "Firecrawl API key is not set. Add it in Settings → Assistant → Web Search."
                 .to_string(),
         );
     }
+    reserve_credits(2, daily_budget).map_err(|d| d.to_string())?;
 
-    let timeout = if fetch_content {
-        FIRECRAWL_TIMEOUT
+    let client = http_client(SNIPPET_SEARCH_TIMEOUT)?;
+    let sources = if include_news {
+        json!(["web", "news"])
     } else {
-        REQUEST_TIMEOUT
+        json!(["web"])
     };
-    let client = http_client(timeout)?;
-
     let mut body = json!({
         "query": query,
-        "limit": max_results,
-        "sources": ["web"],
+        "limit": limit,
+        "sources": sources,
         // Server-side timeout, kept under our client timeout.
-        "timeout": 40000,
+        "timeout": 7000,
     });
     if let Some(tbs) = tbs {
         body["tbs"] = json!(tbs);
-    }
-    if fetch_content {
-        // Pull the main page content as markdown for each result. `onlyMainContent`
-        // strips nav/boilerplate; `parsers: []` avoids paid PDF parsing.
-        body["scrapeOptions"] = json!({
-            "formats": ["markdown"],
-            "onlyMainContent": true,
-            "parsers": [],
-            "proxy": "auto",
-        });
     }
 
     let resp = client
@@ -688,42 +939,100 @@ async fn search_firecrawl(
         .await
         .map_err(|e| format!("Failed to parse Firecrawl response: {}", e))?;
 
-    let mut results = Vec::new();
-    if let Some(items) = value
-        .get("data")
-        .and_then(|d| d.get("web"))
-        .and_then(|w| w.as_array())
-    {
-        for item in items {
-            let title = item.get("title").and_then(|v| v.as_str()).unwrap_or("");
-            let url = item.get("url").and_then(|v| v.as_str()).unwrap_or("");
-            let snippet = item
-                .get("description")
-                .and_then(|v| v.as_str())
-                .unwrap_or("");
-            // Prefer scraped markdown; fall back to a "summary" field if present.
-            let content = item
-                .get("markdown")
-                .and_then(|v| v.as_str())
-                .or_else(|| item.get("summary").and_then(|v| v.as_str()))
-                .unwrap_or("");
-            push_result(&mut results, title, url, snippet, content);
-            if results.len() >= max_results {
-                break;
+    let mut candidates = Vec::new();
+    if let Some(data) = value.get("data") {
+        if let Some(items) = data.get("web").and_then(|w| w.as_array()) {
+            for item in items {
+                let title = item.get("title").and_then(|v| v.as_str()).unwrap_or("");
+                let url = item.get("url").and_then(|v| v.as_str()).unwrap_or("");
+                let snippet = item
+                    .get("description")
+                    .and_then(|v| v.as_str())
+                    .or_else(|| item.get("snippet").and_then(|v| v.as_str()))
+                    .unwrap_or("");
+                push_candidate(&mut candidates, title, url, snippet, false);
+            }
+        }
+        if let Some(items) = data.get("news").and_then(|w| w.as_array()) {
+            for item in items {
+                let title = item.get("title").and_then(|v| v.as_str()).unwrap_or("");
+                let url = item.get("url").and_then(|v| v.as_str()).unwrap_or("");
+                let snippet = item
+                    .get("snippet")
+                    .and_then(|v| v.as_str())
+                    .or_else(|| item.get("description").and_then(|v| v.as_str()))
+                    .unwrap_or("");
+                push_candidate(&mut candidates, title, url, snippet, true);
             }
         }
     }
-    Ok(results)
+    Ok(candidates)
 }
 
-/// Brave Web Search API. JSON results live at `web.results[]`; descriptions can
-/// contain `<strong>` highlight tags, which we strip. Snippet-only (Brave does
-/// not return page bodies).
+/// Firecrawl `/v2/scrape` for a single URL → main content as markdown. Uses a
+/// cache window (`maxAge`) for speed and `parsers: []` / `proxy: "auto"` to keep
+/// credit cost down (1 credit/page).
+async fn firecrawl_scrape(api_key: &str, url: &str, daily_budget: u32) -> Result<String, String> {
+    if api_key.trim().is_empty() {
+        return Err("Firecrawl API key is not set".to_string());
+    }
+    if url.trim().is_empty() {
+        return Err("empty url".to_string());
+    }
+    reserve_credits(1, daily_budget).map_err(|d| d.to_string())?;
+
+    let client = http_client(SCRAPE_TIMEOUT)?;
+    let body = json!({
+        "url": url,
+        "formats": ["markdown"],
+        "onlyMainContent": true,
+        "parsers": [],
+        "proxy": "auto",
+        "maxAge": SCRAPE_MAX_AGE_MS,
+        "timeout": 6000,
+    });
+
+    let resp = client
+        .post("https://api.firecrawl.dev/v2/scrape")
+        .bearer_auth(api_key)
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| format!("Firecrawl scrape failed: {}", e))?;
+
+    let status = resp.status();
+    if !status.is_success() {
+        let text = resp.text().await.unwrap_or_default();
+        return Err(format!(
+            "Firecrawl scrape failed ({}): {}",
+            status,
+            truncate_chars(&text, 160)
+        ));
+    }
+
+    let value: serde_json::Value = resp
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse Firecrawl scrape response: {}", e))?;
+
+    let markdown = value
+        .get("data")
+        .and_then(|d| d.get("markdown"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    if markdown.trim().is_empty() {
+        return Err("scrape returned no content".to_string());
+    }
+    Ok(markdown.to_string())
+}
+
+/// Brave Web Search API (snippet-only). `tbs` is ignored (Brave uses its own
+/// `freshness` param, applied via the dedicated freshness mapping).
 async fn search_brave(
     api_key: &str,
     query: &str,
     max_results: usize,
-    freshness: &str,
+    tbs: Option<&str>,
 ) -> Result<Vec<SearchResult>, String> {
     if api_key.trim().is_empty() {
         return Err(
@@ -733,11 +1042,10 @@ async fn search_brave(
     }
 
     let client = http_client(REQUEST_TIMEOUT)?;
-    // Brave caps `count` at 20.
     let count = max_results.clamp(1, 20).to_string();
 
     let mut query_params: Vec<(&str, String)> = vec![("q", query.to_string()), ("count", count)];
-    if let Some(f) = freshness_to_brave(freshness) {
+    if let Some(f) = brave_freshness_from_tbs(tbs) {
         query_params.push(("freshness", f.to_string()));
     }
 
@@ -788,18 +1096,17 @@ async fn search_brave(
     Ok(results)
 }
 
-/// DuckDuckGo via the keyless HTML endpoint. We POST the query and parse the
-/// returned HTML for result links + snippets. Free, no account, no API key, but
-/// snippet-only and occasionally rate-limited.
+/// DuckDuckGo via the keyless HTML endpoint (snippet-only).
 async fn search_duckduckgo(
     query: &str,
     max_results: usize,
-    freshness: &str,
+    tbs: Option<&str>,
 ) -> Result<Vec<SearchResult>, String> {
     let client = http_client(REQUEST_TIMEOUT)?;
 
+    let df = ddg_df_from_tbs(tbs);
     let mut form: Vec<(&str, &str)> = vec![("q", query)];
-    if let Some(df) = freshness_to_ddg(freshness) {
+    if let Some(df) = df {
         form.push(("df", df));
     }
 
@@ -826,10 +1133,39 @@ async fn search_duckduckgo(
 
     let results = parse_duckduckgo_html(&html, max_results);
     if results.is_empty() {
-        // Either a genuine no-results page or a rate-limit/challenge response.
         warn!("DuckDuckGo returned no parseable results (possible rate limit)");
     }
     Ok(results)
+}
+
+/// Extract a Brave `freshness` value from our `tbs` (which encodes the qdr window).
+fn brave_freshness_from_tbs(tbs: Option<&str>) -> Option<&'static str> {
+    let tbs = tbs?;
+    if tbs.contains("qdr:d") {
+        Some("pd")
+    } else if tbs.contains("qdr:w") {
+        Some("pw")
+    } else if tbs.contains("qdr:m") {
+        Some("pm")
+    } else if tbs.contains("qdr:y") {
+        Some("py")
+    } else {
+        None
+    }
+}
+
+/// Extract a DuckDuckGo `df` value from our `tbs` (year unsupported there).
+fn ddg_df_from_tbs(tbs: Option<&str>) -> Option<&'static str> {
+    let tbs = tbs?;
+    if tbs.contains("qdr:d") {
+        Some("d")
+    } else if tbs.contains("qdr:w") {
+        Some("w")
+    } else if tbs.contains("qdr:m") {
+        Some("m")
+    } else {
+        None
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -837,24 +1173,18 @@ async fn search_duckduckgo(
 // ---------------------------------------------------------------------------
 
 static DDG_TITLE_RE: Lazy<Regex> = Lazy::new(|| {
-    // The result title anchor: `<a ... class="result__a" ... href="URL">TITLE</a>`.
-    // `(?s)` lets `.` span newlines inside the title.
     Regex::new(r#"(?s)<a[^>]*class="[^"]*result__a[^"]*"[^>]*href="([^"]*)"[^>]*>(.*?)</a>"#)
         .expect("valid DDG title regex")
 });
 
 static DDG_SNIPPET_RE: Lazy<Regex> = Lazy::new(|| {
-    // The snippet anchor: `<a ... class="result__snippet" ...>SNIPPET</a>`.
     Regex::new(r#"(?s)<a[^>]*class="[^"]*result__snippet[^"]*"[^>]*>(.*?)</a>"#)
         .expect("valid DDG snippet regex")
 });
 
-/// Parse the DuckDuckGo HTML results page. Pairs each title link with the
-/// snippet that follows it (by document position, so missing snippets and
-/// interleaved ads don't misalign the pairs), decodes DDG's redirect URLs, and
-/// drops sponsored results.
+/// Parse the DuckDuckGo HTML results page, pairing each title with the snippet
+/// that follows it, decoding redirect URLs, and dropping sponsored results.
 fn parse_duckduckgo_html(html: &str, max_results: usize) -> Vec<SearchResult> {
-    // Collect (position, url, title) for every result link.
     let titles: Vec<(usize, String, String)> = DDG_TITLE_RE
         .captures_iter(html)
         .filter_map(|c| {
@@ -865,7 +1195,6 @@ fn parse_duckduckgo_html(html: &str, max_results: usize) -> Vec<SearchResult> {
         })
         .collect();
 
-    // Collect (position, snippet) for every snippet.
     let snippets: Vec<(usize, String)> = DDG_SNIPPET_RE
         .captures_iter(html)
         .filter_map(|c| {
@@ -877,7 +1206,6 @@ fn parse_duckduckgo_html(html: &str, max_results: usize) -> Vec<SearchResult> {
 
     let mut results = Vec::new();
     for (i, (t_pos, url, title)) in titles.iter().enumerate() {
-        // Skip sponsored results (DuckDuckGo routes ad clicks through y.js).
         if url.contains("duckduckgo.com/y.js") || url.is_empty() {
             continue;
         }
@@ -885,8 +1213,6 @@ fn parse_duckduckgo_html(html: &str, max_results: usize) -> Vec<SearchResult> {
             continue;
         }
 
-        // The matching snippet is the first one positioned after this title and
-        // before the next title.
         let next_pos = titles.get(i + 1).map(|(p, _, _)| *p).unwrap_or(usize::MAX);
         let snippet = snippets
             .iter()
@@ -902,9 +1228,7 @@ fn parse_duckduckgo_html(html: &str, max_results: usize) -> Vec<SearchResult> {
     results
 }
 
-/// DuckDuckGo wraps result links in a redirect: `//duckduckgo.com/l/?uddg=<percent-encoded-url>&...`.
-/// Extract and decode the real destination. Handles bare `//host` and direct
-/// `http(s)://` hrefs too.
+/// DuckDuckGo wraps result links in a redirect: `//duckduckgo.com/l/?uddg=<enc>`.
 fn decode_ddg_url(href: &str) -> String {
     if let Some(idx) = href.find("uddg=") {
         let rest = &href[idx + 5..];
@@ -917,8 +1241,7 @@ fn decode_ddg_url(href: &str) -> String {
     href.to_string()
 }
 
-/// Minimal `%XX` percent-decoder (UTF-8 aware). Avoids pulling in the `url`
-/// crate just for this one path.
+/// Minimal `%XX` percent-decoder (UTF-8 aware).
 fn percent_decode(input: &str) -> String {
     let bytes = input.as_bytes();
     let mut out: Vec<u8> = Vec::with_capacity(bytes.len());
@@ -966,19 +1289,17 @@ fn clean_html_text(input: &str) -> String {
         .replace("&#39;", "'")
         .replace("&#x2F;", "/")
         .replace("&nbsp;", " ");
-    // Collapse runs of whitespace into single spaces.
     unescaped.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
-/// Clean scraped page content: trim, collapse excessive blank lines, and cap to
-/// the per-result content budget. Markdown structure is otherwise preserved.
-fn sanitize_content(input: &str) -> String {
+/// Clean scraped page content: trim, collapse excessive blank lines, cap length.
+fn cap_content(input: &str, max: usize) -> String {
     let trimmed = input.trim();
     if trimmed.is_empty() {
         return String::new();
     }
     let collapsed = MULTI_NEWLINE_RE.replace_all(trimmed, "\n\n");
-    truncate_chars(collapsed.trim(), CONTENT_MAX_CHARS)
+    truncate_chars(collapsed.trim(), max)
 }
 
 /// Truncate to at most `max` characters on a char boundary, adding an ellipsis
@@ -992,6 +1313,28 @@ fn truncate_chars(s: &str, max: usize) -> String {
     out
 }
 
+/// Push a cleaned, bounded candidate, skipping entries with neither title nor URL.
+fn push_candidate(
+    candidates: &mut Vec<Candidate>,
+    title: &str,
+    url: &str,
+    snippet: &str,
+    from_news: bool,
+) {
+    let title = truncate_chars(title.trim(), TITLE_MAX_CHARS);
+    let url = url.trim().to_string();
+    let snippet = truncate_chars(&clean_html_text(snippet), SNIPPET_MAX_CHARS);
+    if title.is_empty() && url.is_empty() {
+        return;
+    }
+    candidates.push(Candidate {
+        title,
+        url,
+        snippet,
+        from_news,
+    });
+}
+
 /// Push a cleaned, bounded result, skipping entries with neither title nor URL.
 fn push_result(
     results: &mut Vec<SearchResult>,
@@ -1003,7 +1346,7 @@ fn push_result(
     let title = truncate_chars(title.trim(), TITLE_MAX_CHARS);
     let url = url.trim().to_string();
     let snippet = truncate_chars(snippet.trim(), SNIPPET_MAX_CHARS);
-    let content = sanitize_content(content);
+    let content = cap_content(content, CONTENT_HARD_CAP);
     if title.is_empty() && url.is_empty() {
         return;
     }
@@ -1013,6 +1356,26 @@ fn push_result(
         snippet,
         content,
     });
+}
+
+/// Convert a snippet-only candidate into a result (no scraped content).
+fn candidate_to_result(c: Candidate) -> SearchResult {
+    SearchResult {
+        title: truncate_chars(c.title.trim(), TITLE_MAX_CHARS),
+        url: c.url,
+        snippet: truncate_chars(c.snippet.trim(), SNIPPET_MAX_CHARS),
+        content: String::new(),
+    }
+}
+
+/// Convert a provider `SearchResult` (Brave/DDG) into a candidate.
+fn result_to_candidate(r: SearchResult) -> Candidate {
+    Candidate {
+        title: r.title,
+        url: r.url,
+        snippet: r.snippet,
+        from_news: false,
+    }
 }
 
 #[cfg(test)]
@@ -1027,7 +1390,6 @@ mod tests {
         assert!(!should_search("translate this to French"));
         assert!(!should_search("who are you"));
         assert!(!should_search("12 * (3 + 4)"));
-        // Conceptual "teach me" requests answer from the model's own knowledge.
         assert!(!should_search("explain how recursion works"));
         assert!(!should_search("define entropy"));
     }
@@ -1037,32 +1399,43 @@ mod tests {
         assert!(should_search("who is the prime minister of canada"));
         assert!(should_search("what's the weather in Paris"));
         assert!(should_search("latest iphone price"));
-        assert!(should_search("prime minister of canada"));
-        assert!(should_search("tesla q3 earnings"));
+        assert!(should_search("what's going on with the world cup"));
     }
 
     #[test]
-    fn freshness_maps_to_provider_params() {
-        assert_eq!(freshness_to_tbs("day"), Some("qdr:d"));
-        assert_eq!(freshness_to_tbs("year"), Some("qdr:y"));
-        assert_eq!(freshness_to_tbs("none"), None);
-        assert_eq!(freshness_to_brave("week"), Some("pw"));
-        assert_eq!(freshness_to_ddg("month"), Some("m"));
-        assert_eq!(freshness_to_ddg("year"), None); // DDG has no year filter
+    fn build_tbs_combines_sort_and_window() {
+        assert_eq!(build_tbs("day", true), Some("sbd:1,qdr:d".to_string()));
+        assert_eq!(build_tbs("week", false), Some("qdr:w".to_string()));
+        assert_eq!(build_tbs("none", true), Some("sbd:1".to_string()));
+        assert_eq!(build_tbs("none", false), None);
+        assert_eq!(build_tbs("year", false), Some("qdr:y".to_string()));
+    }
+
+    #[test]
+    fn provider_freshness_mappings() {
+        assert_eq!(brave_freshness_from_tbs(Some("sbd:1,qdr:w")), Some("pw"));
+        assert_eq!(brave_freshness_from_tbs(Some("qdr:y")), Some("py"));
+        assert_eq!(brave_freshness_from_tbs(None), None);
+        assert_eq!(ddg_df_from_tbs(Some("sbd:1,qdr:m")), Some("m"));
+        assert_eq!(ddg_df_from_tbs(Some("qdr:y")), None); // DDG has no year filter
     }
 
     #[test]
     fn parse_plan_handles_plain_and_fenced_json() {
-        let plain = r#"{"needs_search": true, "queries": ["a", "b"], "freshness": "week"}"#;
+        let plain =
+            r#"{"needs_search": true, "queries": ["a", "b"], "freshness": "week", "news": true}"#;
         let p = parse_plan(plain).expect("plain json");
         assert!(p.needs_search);
         assert_eq!(p.queries.len(), 2);
         assert_eq!(p.freshness, "week");
+        assert!(p.news);
 
+        // News omitted → defaults to false, still parses.
         let fenced = "Sure!\n```json\n{\"needs_search\": false, \"queries\": [], \"freshness\": \"none\"}\n```";
         let p = parse_plan(fenced).expect("fenced json");
         assert!(!p.needs_search);
         assert!(p.queries.is_empty());
+        assert!(!p.news);
     }
 
     #[test]
@@ -1074,9 +1447,10 @@ mod tests {
                 "tesla earnings".to_string(), // dup (case/space)
                 "tesla stock".to_string(),
                 "tesla news".to_string(),
-                "tesla revenue".to_string(), // beyond MAX_QUERIES
+                "tesla revenue".to_string(),
             ],
             freshness: "HOUR".to_string(),
+            news: false,
         };
         plan.sanitize("tesla earnings");
         assert_eq!(plan.queries.len(), MAX_QUERIES);
@@ -1085,28 +1459,149 @@ mod tests {
     }
 
     #[test]
-    fn sanitize_falls_back_to_raw_when_no_queries() {
-        let mut plan = SearchPlan {
-            needs_search: true,
-            queries: vec![],
-            freshness: "bogus".to_string(),
-        };
-        plan.sanitize("who won the game last night");
-        assert_eq!(
-            plan.queries,
-            vec!["who won the game last night".to_string()]
-        );
-        assert_eq!(plan.freshness, "none"); // unknown normalized to "none"
-    }
-
-    #[test]
     fn raw_plan_searches_the_question() {
         let p = SearchPlan::raw("  population of japan  ");
         assert!(p.needs_search);
         assert_eq!(p.queries, vec!["population of japan".to_string()]);
+        assert!(!p.news);
         let empty = SearchPlan::raw("   ");
         assert!(!empty.needs_search);
         assert!(empty.queries.is_empty());
+    }
+
+    #[test]
+    fn rerank_prefers_query_overlap_and_recency() {
+        let mut cands = vec![
+            Candidate {
+                title: "Unrelated cooking blog".to_string(),
+                url: "https://a.com".to_string(),
+                snippet: "recipes and food".to_string(),
+                from_news: false,
+            },
+            Candidate {
+                title: "World Cup final result".to_string(),
+                url: "https://b.com".to_string(),
+                snippet: "the world cup final ended".to_string(),
+                from_news: true,
+            },
+        ];
+        rerank("world cup final", &mut cands, true);
+        assert_eq!(cands[0].url, "https://b.com"); // relevant + news wins
+    }
+
+    #[test]
+    fn rerank_news_boost_only_when_recency_sensitive() {
+        let news = Candidate {
+            title: "x".to_string(),
+            url: "n".to_string(),
+            snippet: "y".to_string(),
+            from_news: true,
+        };
+        let web = Candidate {
+            title: "x".to_string(),
+            url: "w".to_string(),
+            snippet: "y".to_string(),
+            from_news: false,
+        };
+        let terms = query_terms("z");
+        assert!(candidate_score(&news, &terms, true) > candidate_score(&web, &terms, true));
+    }
+
+    #[test]
+    fn credit_guard_enforces_budget_and_rate() {
+        let mut g = CreditGuard {
+            calls: VecDeque::new(),
+            day: 100,
+            spent_today: 0,
+        };
+        let now = Instant::now();
+        // Budget of 5: a 2-credit reserve twice is fine (4), third (6) denied.
+        assert!(try_reserve(&mut g, now, 100, 2, 5).is_ok());
+        assert!(try_reserve(&mut g, now, 100, 2, 5).is_ok());
+        assert_eq!(
+            try_reserve(&mut g, now, 100, 2, 5),
+            Err(GuardDenied::Budget {
+                spent: 4,
+                budget: 5
+            })
+        );
+        // budget 0 = unlimited (budget-wise).
+        assert!(try_reserve(&mut g, now, 100, 1000, 0).is_ok());
+    }
+
+    #[test]
+    fn credit_guard_resets_on_new_day() {
+        let mut g = CreditGuard {
+            calls: VecDeque::new(),
+            day: 100,
+            spent_today: 9999,
+        };
+        let now = Instant::now();
+        // New day resets the counter, so the reserve succeeds under budget.
+        assert!(try_reserve(&mut g, now, 101, 5, 50).is_ok());
+        assert_eq!(g.spent_today, 5);
+        assert_eq!(g.day, 101);
+    }
+
+    #[test]
+    fn credit_guard_rate_limits_runaway_calls() {
+        let mut g = CreditGuard {
+            calls: VecDeque::new(),
+            day: 100,
+            spent_today: 0,
+        };
+        let now = Instant::now();
+        // Fill the window to the cap (budget unlimited so only rate matters).
+        for _ in 0..MAX_CALLS_PER_WINDOW {
+            assert!(try_reserve(&mut g, now, 100, 1, 0).is_ok());
+        }
+        assert_eq!(
+            try_reserve(&mut g, now, 100, 1, 0),
+            Err(GuardDenied::RateLimited)
+        );
+        // After the window elapses, calls are allowed again.
+        let later = now + RATE_WINDOW + Duration::from_secs(1);
+        assert!(try_reserve(&mut g, later, 100, 1, 0).is_ok());
+    }
+
+    #[test]
+    fn format_results_use_content_within_budget() {
+        let results = vec![
+            SearchResult {
+                title: "Alpha".to_string(),
+                url: "https://a.com".to_string(),
+                snippet: "snip a".to_string(),
+                content: "Full page content about Alpha.".to_string(),
+            },
+            SearchResult {
+                title: "Beta".to_string(),
+                url: "https://b.com".to_string(),
+                snippet: "snippet for beta".to_string(),
+                content: String::new(),
+            },
+        ];
+        let block = format_results_for_prompt(&results, 8_000);
+        assert!(block.starts_with("Live web search results:"));
+        assert!(block.contains("Source: Alpha"));
+        assert!(block.contains("Full page content about Alpha."));
+        assert!(block.contains("Source: Beta"));
+        assert!(block.contains("snippet for beta"));
+        assert!(!block.contains("[1]"));
+        assert!(!block.contains("https://"));
+    }
+
+    #[test]
+    fn format_results_respects_tiny_budget() {
+        let results = vec![SearchResult {
+            title: "T".to_string(),
+            url: "u".to_string(),
+            snippet: "s".to_string(),
+            content: "abcdefghij".to_string(),
+        }];
+        let block = format_results_for_prompt(&results, 3);
+        // Only 3 chars of the body should appear.
+        assert!(block.contains("abc"));
+        assert!(!block.contains("abcd"));
     }
 
     #[test]
@@ -1139,34 +1634,6 @@ mod tests {
         assert_eq!(results[0].title, "Prime Minister of Canada");
         assert_eq!(results[0].url, "https://en.wikipedia.org/wiki/Canada");
         assert!(results[0].snippet.contains("current prime minister"));
-        assert!(results[0].snippet.contains("&")); // entity unescaped
-    }
-
-    #[test]
-    fn format_results_use_content_without_numbers_or_urls() {
-        let results = vec![
-            SearchResult {
-                title: "Alpha".to_string(),
-                url: "https://a.com".to_string(),
-                snippet: "snip a".to_string(),
-                content: "Full page content about Alpha.".to_string(),
-            },
-            SearchResult {
-                title: "Beta".to_string(),
-                url: "https://b.com".to_string(),
-                snippet: "snippet for beta".to_string(),
-                content: String::new(),
-            },
-        ];
-        let block = format_results_for_prompt(&results);
-        assert!(block.starts_with("Live web search results:"));
-        assert!(block.contains("Source: Alpha"));
-        assert!(block.contains("Full page content about Alpha."));
-        // Falls back to snippet when content is empty.
-        assert!(block.contains("Source: Beta"));
-        assert!(block.contains("snippet for beta"));
-        // No citation numbers and no URLs to tempt the model into echoing them.
-        assert!(!block.contains("[1]"));
-        assert!(!block.contains("https://"));
+        assert!(results[0].snippet.contains("&"));
     }
 }

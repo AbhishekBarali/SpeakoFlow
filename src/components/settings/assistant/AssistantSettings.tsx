@@ -6,6 +6,7 @@ import {
   type AzureVoice,
   type LocalLlmStatus,
   type AssistantResponseLength,
+  type AssistantSearchDepth,
 } from "@/bindings";
 import {
   Dropdown,
@@ -248,7 +249,7 @@ export const AssistantSettings: React.FC = () => {
 
   // Web search section state.
   const [webSearchApiKey, setWebSearchApiKey] = useState("");
-  const [webSearchMaxResults, setWebSearchMaxResults] = useState("4");
+  const [webSearchCreditBudget, setWebSearchCreditBudget] = useState("2000");
   const [webSearchTest, setWebSearchTest] = useState<
     "idle" | "testing" | "ok" | "error"
   >("idle");
@@ -434,10 +435,10 @@ export const AssistantSettings: React.FC = () => {
   }, [settings, webSearchProvider]);
 
   useEffect(() => {
-    setWebSearchMaxResults(
-      String(settings?.assistant_web_search_max_results ?? 5),
+    setWebSearchCreditBudget(
+      String(settings?.assistant_web_search_daily_credit_budget ?? 2000),
     );
-  }, [settings?.assistant_web_search_max_results]);
+  }, [settings?.assistant_web_search_daily_credit_budget]);
 
   const handleWebSearchApiKeyBlur = async () => {
     await commands.setAssistantWebSearchApiKey(
@@ -447,13 +448,13 @@ export const AssistantSettings: React.FC = () => {
     await refreshSettings();
   };
 
-  const handleWebSearchMaxResultsBlur = async () => {
-    const parsed = Math.max(
-      1,
-      Math.min(10, parseInt(webSearchMaxResults, 10) || 5),
-    );
-    setWebSearchMaxResults(String(parsed));
-    await commands.setAssistantWebSearchMaxResults(parsed);
+  const handleWebSearchCreditBudgetBlur = async () => {
+    const raw = parseInt(webSearchCreditBudget, 10);
+    const parsed = Number.isFinite(raw)
+      ? Math.max(0, Math.min(1000000, raw))
+      : 2000;
+    setWebSearchCreditBudget(String(parsed));
+    await commands.setAssistantWebSearchDailyCreditBudget(parsed);
     await refreshSettings();
   };
 
@@ -735,25 +736,63 @@ export const AssistantSettings: React.FC = () => {
             />
 
             <SettingContainer
-              title={t("settings.assistant.webSearch.maxResultsLabel")}
-              description={t(
-                "settings.assistant.webSearch.maxResultsDescription",
-              )}
+              title={t("settings.assistant.webSearch.depthLabel")}
+              description={t("settings.assistant.webSearch.depthDescription")}
               descriptionMode="tooltip"
               layout="horizontal"
               grouped={true}
             >
-              <Input
-                type="number"
-                min={1}
-                max={10}
-                value={webSearchMaxResults}
-                onChange={(e) => setWebSearchMaxResults(e.target.value)}
-                onBlur={handleWebSearchMaxResultsBlur}
-                className="w-[120px]"
+              <Dropdown
+                options={[
+                  {
+                    value: "low",
+                    label: t("settings.assistant.webSearch.depthOptions.low"),
+                  },
+                  {
+                    value: "medium",
+                    label: t(
+                      "settings.assistant.webSearch.depthOptions.medium",
+                    ),
+                  },
+                  {
+                    value: "high",
+                    label: t("settings.assistant.webSearch.depthOptions.high"),
+                  },
+                ]}
+                selectedValue={settings?.assistant_search_depth ?? "medium"}
+                onSelect={(depth) =>
+                  setAndRefresh(
+                    commands.setAssistantSearchDepth(
+                      depth as AssistantSearchDepth,
+                    ),
+                  )
+                }
                 disabled={!webSearchEnabled}
               />
             </SettingContainer>
+
+            {webSearchProvider === "firecrawl" && (
+              <SettingContainer
+                title={t("settings.assistant.webSearch.creditBudgetLabel")}
+                description={t(
+                  "settings.assistant.webSearch.creditBudgetDescription",
+                )}
+                descriptionMode="tooltip"
+                layout="horizontal"
+                grouped={true}
+              >
+                <Input
+                  type="number"
+                  min={0}
+                  step={100}
+                  value={webSearchCreditBudget}
+                  onChange={(e) => setWebSearchCreditBudget(e.target.value)}
+                  onBlur={handleWebSearchCreditBudgetBlur}
+                  className="w-[120px]"
+                  disabled={!webSearchEnabled}
+                />
+              </SettingContainer>
+            )}
 
             <SettingContainer
               title={t("settings.assistant.webSearch.testLabel")}

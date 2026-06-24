@@ -1,7 +1,7 @@
 import { listen } from "@tauri-apps/api/event";
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Lock, Loader2, X, Check } from "lucide-react";
+import { Loader2, X, Check } from "lucide-react";
 import { AudioWaveform } from "../components/shared";
 import "./RecordingOverlay.css";
 import { commands } from "@/bindings";
@@ -102,18 +102,11 @@ const RecordingOverlay: React.FC = () => {
         {/* Live recording — the waveform carries the whole state. Before the
             first audio frame lands it simply rests as a calm row of dots, so
             the chip eases straight into motion the moment you speak instead of
-            flashing a microphone glyph. A small lock badge appears for
-            hands-free so the chip stays compact. */}
+            flashing a microphone glyph. Hands-free (locked) mode is signalled
+            by the "done" tick easing in (see below), so the chip needs no extra
+            badge and stays compact. */}
         {isRecording && (
           <div className="pill-wave">
-            {locked && (
-              <Lock
-                className="lock-badge"
-                size={12}
-                strokeWidth={2.25}
-                color={ICON_COLOR}
-              />
-            )}
             <div className="wave-box">
               <AudioWaveform
                 levels={micLive ? levels : []}

@@ -1,4 +1,5 @@
 use crate::actions::ACTION_MAP;
+use crate::lock_watch::LockWatch;
 use crate::managers::audio::AudioRecordingManager;
 use log::{debug, error, warn};
 use std::sync::mpsc::{self, Sender};
@@ -52,6 +53,10 @@ enum Command {
     /// Finish the active recording and transcribe it (overlay "done" tick /
     /// assistant panel finish button). No-op unless something is recording.
     Commit,
+    /// Convert the active push-to-talk (hold) recording to hands-free (lock)
+    /// mode without stopping it — the runtime "tap Shift to lock" gesture. No-op
+    /// unless a hold recording is active.
+    Lock,
     Cancel {
         recording_was_active: bool,
     },
@@ -108,15 +113,24 @@ impl TranscriptionCoordinator {
                                 match &stage {
                                     Stage::Idle => {
                                         start(&app, &mut stage, &binding_id, &hotkey_string, mode);
-                                        // Hands-free recording shows the "press
-                                        // again or click done to stop" controls;
-                                        // a push-to-talk hold stops on release so
-                                        // it needs none of that.
-                                        if mode == RecordingMode::Lock
-                                            && matches!(stage, Stage::Recording { .. })
-                                        {
-                                            use tauri::Emitter;
-                                            let _ = app.emit("recording-locked", true);
+                                        if matches!(stage, Stage::Recording { .. }) {
+                                            match mode {
+                                                // Hands-free from the start shows
+                                                // the "press again / click done"
+                                                // controls right away.
+                                                RecordingMode::Lock => {
+                                                    use tauri::Emitter;
+                                                    let _ = app.emit("recording-locked", true);
+                                                }
+                                                // Push-to-talk: arm tap-to-lock so a
+                                                // Shift tap can convert this hold to
+                                                // hands-free mid-recording.
+                                                RecordingMode::Hold => {
+                                                    if let Some(lw) = app.try_state::<LockWatch>() {
+                                                        lw.arm();
+                                                    }
+                                                }
+                                            }
                                         }
                                     }
                                     // A second press only stops a hands-free
@@ -156,9 +170,27 @@ impl TranscriptionCoordinator {
                                 stop(&app, &mut stage, &id, "commit");
                             }
                         }
+                        Command::Lock => {
+                            // Tap-to-lock: flip an active push-to-talk hold to
+                            // hands-free so the user can release the keys and keep
+                            // talking. Ignored unless a hold recording is active.
+                            if let Stage::Recording { mode, .. } = &mut stage {
+                                if *mode == RecordingMode::Hold {
+                                    *mode = RecordingMode::Lock;
+                                    if let Some(lw) = app.try_state::<LockWatch>() {
+                                        lw.disarm();
+                                    }
+                                    use tauri::Emitter;
+                                    let _ = app.emit("recording-locked", true);
+                                }
+                            }
+                        }
                         Command::Cancel {
                             recording_was_active,
                         } => {
+                            if let Some(lw) = app.try_state::<LockWatch>() {
+                                lw.disarm();
+                            }
                             // Don't reset during processing — wait for the pipeline to finish.
                             if !matches!(stage, Stage::Processing)
                                 && (recording_was_active
@@ -227,6 +259,14 @@ impl TranscriptionCoordinator {
         }
     }
 
+    /// Convert the active push-to-talk hold recording to hands-free, if any.
+    /// Driven by the tap-to-lock watcher when the user taps Shift mid-recording.
+    pub fn notify_lock(&self) {
+        if self.tx.send(Command::Lock).is_err() {
+            warn!("Transcription coordinator channel closed");
+        }
+    }
+
     pub fn notify_processing_finished(&self) {
         if self.tx.send(Command::ProcessingFinished).is_err() {
             warn!("Transcription coordinator channel closed");
@@ -260,6 +300,10 @@ fn start(
 }
 
 fn stop(app: &AppHandle, stage: &mut Stage, binding_id: &str, hotkey_string: &str) {
+    // Recording is ending — make sure tap-to-lock isn't left armed.
+    if let Some(lw) = app.try_state::<LockWatch>() {
+        lw.disarm();
+    }
     let Some(action) = ACTION_MAP.get(binding_id) else {
         warn!("No action in ACTION_MAP for '{binding_id}'");
         return;

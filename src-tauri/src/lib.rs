@@ -11,6 +11,7 @@ mod helpers;
 mod huggingface;
 mod input;
 mod llm_client;
+mod lock_watch;
 mod managers;
 mod overlay;
 pub mod portable;
@@ -520,6 +521,8 @@ pub fn run(cli_args: CliArgs) {
             commands::assistant::set_assistant_web_search_enabled,
             commands::assistant::set_assistant_web_search_provider,
             commands::assistant::set_assistant_web_search_max_results,
+            commands::assistant::set_assistant_search_depth,
+            commands::assistant::set_assistant_web_search_daily_credit_budget,
             commands::assistant::set_assistant_web_search_fetch_content,
             commands::assistant::set_assistant_web_search_api_key,
             commands::assistant::assistant_test_web_search,
@@ -652,6 +655,9 @@ pub fn run(cli_args: CliArgs) {
             FILE_LOG_LEVEL.store(file_log_level.to_level_filter() as u8, Ordering::Relaxed);
             let app_handle = app.handle().clone();
             app.manage(TranscriptionCoordinator::new(app_handle.clone()));
+            // Tap-to-lock: watches for a Shift tap to flip a hold recording to
+            // hands-free. Spawns its own global keyboard listener thread.
+            app.manage(lock_watch::LockWatch::new(app_handle.clone()));
             app.manage(assistant::AssistantConversation::new());
 
             initialize_core_logic(&app_handle);

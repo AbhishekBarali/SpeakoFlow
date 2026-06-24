@@ -10,6 +10,7 @@ import {
   Copy,
   Eraser,
   Globe,
+  Lock,
   Maximize2,
   Mic,
   Minimize2,
@@ -481,14 +482,22 @@ const AssistantPanel: React.FC = () => {
             }
             title={
               isListening
-                ? t("assistant.finish")
+                ? locked
+                  ? t("assistant.finish")
+                  : t("assistant.status.listening")
                 : pillStop
                   ? t("assistant.stop")
                   : t("assistant.pill.talk")
             }
           >
             {isListening ? (
-              <Check size={16} strokeWidth={2.75} />
+              // Hold-to-talk shows a live mic (release the hotkey to send);
+              // hands-free shows the tap-to-finish tick.
+              locked ? (
+                <Check size={16} strokeWidth={2.75} />
+              ) : (
+                <Mic size={17} strokeWidth={2} />
+              )
             ) : pillStop ? (
               <Square size={15} strokeWidth={2.5} />
             ) : (
@@ -506,10 +515,20 @@ const AssistantPanel: React.FC = () => {
         </div>
         {isListening ? (
           <div className="pill-wave" data-tauri-drag-region>
+            {/* Hands-free (locked) gets a lock glyph so it reads differently
+                from a plain hold-to-talk recording. */}
+            {locked && (
+              <Lock
+                className="pill-lock-hint"
+                size={13}
+                strokeWidth={2.5}
+                aria-label={t("assistant.status.locked")}
+              />
+            )}
             <AudioWaveform
               levels={micLevels}
               size="md"
-              barCount={21}
+              barCount={locked ? 17 : 21}
               active={true}
             />
           </div>
@@ -629,6 +648,9 @@ const AssistantPanel: React.FC = () => {
             <span className="listening-label">
               {screenActive && (
                 <Camera size={13} strokeWidth={2} className="listening-cam" />
+              )}
+              {state === "listening" && locked && (
+                <Lock size={13} strokeWidth={2} className="listening-lock" />
               )}
               {state === "listening" && locked
                 ? t("assistant.status.locked")
