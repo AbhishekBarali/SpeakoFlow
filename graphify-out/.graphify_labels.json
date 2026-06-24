@@ -28,7 +28,6 @@
   "26": "Register Shortcut",
   "27": "Models",
   "28": "Github Workflows",
-  "29": "Overlay",
   "30": "Audio Toolkit",
   "31": "Transcription Mock",
   "32": "AppHandle",
@@ -45,7 +44,6 @@
   "43": "Huggingface",
   "44": "Tray",
   "45": "Src-Tauri Swift",
-  "46": "TextReplacements",
   "47": "ClamshellMicrophoneSelector",
   "48": "CONTRIBUTING",
   "49": "Assistant",
@@ -107,7 +105,6 @@
   "105": "Docs",
   "106": "Docs",
   "107": "README",
-  "108": "Fc Diag",
   "109": "Replacement",
   "110": "macOS",
   "111": "Src-Tauri Icons",
@@ -126,7 +123,6 @@
   "124": "Src-Tauri Gen Schemas",
   "125": "Windows",
   "126": "Updater",
-  "127": "Community 127",
   "128": "Audio Toolkit",
   "129": "github ISSUE TEMPLATE",
   "130": "Src-Tauri Resources",
@@ -156,9 +152,5 @@
   "154": "Tailwind Config",
   "155": "Tests",
   "156": "Vite Config",
-  "157": "Community 157",
-  "158": "Community 158",
-  "159": "Community 159",
-  "160": "Community 160",
-  "161": "Community 161"
+  "159": "Community 159"
 }
