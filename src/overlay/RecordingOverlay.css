@@ -139,9 +139,82 @@
   transform: translateY(-50%) scale(0.9);
 }
 
+/* ---- Done / confirm: finishes a hands-free recording (shown when locked) -- */
+
+.pill-confirm {
+  position: absolute;
+  right: 3px;
+  top: 50%;
+  transform: translateY(-50%) scale(0.85);
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(40, 36, 33, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition:
+    background-color 140ms ease-out,
+    transform 120ms ease-out;
+}
+
+.pill-confirm:hover {
+  background: rgba(34, 160, 94, 0.4);
+}
+
+.pill-confirm:active {
+  transform: translateY(-50%) scale(0.9);
+}
+
+/* Hands-free (locked) mode: lay Cancel · waveform · Done out inline as
+ * persistent controls, rather than the hover-only cancel used during a
+ * push-to-talk hold (where you finish by releasing the key). */
+.overlay-pill.locked {
+  gap: 4px;
+}
+
+.overlay-pill.locked .pill-cancel,
+.overlay-pill.locked .pill-confirm {
+  position: static;
+  transform: none;
+  opacity: 1;
+  pointer-events: auto;
+  width: 18px;
+  height: 18px;
+}
+
+.overlay-pill.locked .pill-cancel {
+  order: 0;
+}
+
+.overlay-pill.locked .pill-wave {
+  order: 1;
+}
+
+.overlay-pill.locked .pill-confirm {
+  order: 2;
+}
+
+.overlay-pill.locked .wave-box {
+  width: 54px;
+}
+
+/* Mirror the control order for right-to-left layouts. */
+[dir="rtl"] .overlay-pill.locked .pill-cancel {
+  order: 2;
+}
+
+[dir="rtl"] .overlay-pill.locked .pill-confirm {
+  order: 0;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .overlay-pill,
-  .pill-cancel {
+  .pill-cancel,
+  .pill-confirm {
     transition: none;
   }
   .load-spinner {

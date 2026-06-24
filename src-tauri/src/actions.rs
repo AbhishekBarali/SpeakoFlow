@@ -890,7 +890,6 @@ impl ShortcutAction for AssistantAction {
 
                     let settings = crate::settings::get_settings(&ah);
                     let wants_screen = crate::assistant::take_screen_armed(&ah)
-                        || binding_id == "assistant_vision"
                         || crate::assistant::wants_screen_context(&transcription);
                     let screenshot = if wants_screen && settings.assistant_screenshot_enabled {
                         // Tiny body only for Azure; loopback (built-in/local
@@ -990,12 +989,6 @@ pub static ACTION_MAP: Lazy<HashMap<String, Arc<dyn ShortcutAction>>> = Lazy::ne
         }) as Arc<dyn ShortcutAction>,
     );
     map.insert(
-        "transcribe_toggle".to_string(),
-        Arc::new(TranscribeAction {
-            post_process: false,
-        }) as Arc<dyn ShortcutAction>,
-    );
-    map.insert(
         "transcribe_with_post_process".to_string(),
         Arc::new(TranscribeAction { post_process: true }) as Arc<dyn ShortcutAction>,
     );
@@ -1005,10 +998,6 @@ pub static ACTION_MAP: Lazy<HashMap<String, Arc<dyn ShortcutAction>>> = Lazy::ne
     );
     map.insert(
         "assistant".to_string(),
-        Arc::new(AssistantAction) as Arc<dyn ShortcutAction>,
-    );
-    map.insert(
-        "assistant_vision".to_string(),
         Arc::new(AssistantAction) as Arc<dyn ShortcutAction>,
     );
     map.insert(

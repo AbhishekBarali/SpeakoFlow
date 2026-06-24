@@ -203,6 +203,16 @@ const AssistantPanel: React.FC = () => {
       await syncLanguageFromSettings();
       await refreshSettings();
 
+      // Sync the pill/expanded state from the backend so a freshly (re)loaded
+      // panel renders the right layout. Without this the webview defaults to
+      // "expanded" and can show the full panel header inside the pill window.
+      try {
+        const isCollapsed = await commands.getAssistantPanelCollapsed();
+        if (!cancelled) setCollapsed(isCollapsed);
+      } catch {
+        // bindings not ready yet; keep current state
+      }
+
       // Restore conversation (panel window can be recreated mid-conversation)
       try {
         const result = await commands.assistantGetConversation();
@@ -328,6 +338,7 @@ const AssistantPanel: React.FC = () => {
   }, [refreshSettings]);
 
   const busy = state !== "idle";
+  const isListening = state === "listening";
   const ttsActive =
     ttsPlaying || tts.status === "speaking" || tts.status === "loading";
   const showStop = busy || ttsActive;
@@ -413,6 +424,13 @@ const AssistantPanel: React.FC = () => {
     await commands.assistantToggleVoice();
   }, []);
 
+  // Finish a hands-free (tap-to-lock or toggle) voice capture and send it —
+  // the keyboard-free equivalent of pressing the hotkey again. Stops the
+  // recording and runs the assistant turn on it.
+  const finishVoice = useCallback(async () => {
+    await commands.commitRecording();
+  }, []);
+
   const toggleWebSearch = useCallback(async () => {
     await commands.setAssistantWebSearchEnabled(!webSearchEnabled);
     await refreshSettings();
@@ -438,10 +456,9 @@ const AssistantPanel: React.FC = () => {
         : t("assistant.tts.enable");
 
   if (collapsed) {
-    const isListening = state === "listening";
     // Anything the main panel lets you stop — a generating/transcribing turn
     // or a (possibly long) TTS readout — should be stoppable from the pill too,
-    // without expanding it. Listening is excluded: there the square means
+    // without expanding it. Listening is excluded: there the tick means
     // "finish and send", not "cancel".
     const pillStop = showStop && !isListening;
     const pillStatus =
@@ -459,16 +476,20 @@ const AssistantPanel: React.FC = () => {
             className={`pill-mic${isListening ? " recording" : ""}${
               pillStop ? " stopping" : ""
             }`}
-            onClick={pillStop ? stopTurn : toggleVoice}
+            onClick={
+              isListening ? finishVoice : pillStop ? stopTurn : toggleVoice
+            }
             title={
               isListening
-                ? t("assistant.pill.stop")
+                ? t("assistant.finish")
                 : pillStop
                   ? t("assistant.stop")
                   : t("assistant.pill.talk")
             }
           >
-            {isListening || pillStop ? (
+            {isListening ? (
+              <Check size={16} strokeWidth={2.75} />
+            ) : pillStop ? (
               <Square size={15} strokeWidth={2.5} />
             ) : (
               <Mic size={17} strokeWidth={2} />
@@ -678,11 +699,19 @@ const AssistantPanel: React.FC = () => {
         />
         <button
           className="assistant-send-button"
-          onClick={showStop ? stopTurn : sendText}
-          disabled={!showStop && !input.trim()}
-          title={showStop ? t("assistant.stop") : t("assistant.send")}
+          onClick={isListening ? finishVoice : showStop ? stopTurn : sendText}
+          disabled={!isListening && !showStop && !input.trim()}
+          title={
+            isListening
+              ? t("assistant.finish")
+              : showStop
+                ? t("assistant.stop")
+                : t("assistant.send")
+          }
         >
-          {showStop ? (
+          {isListening ? (
+            <Check size={16} strokeWidth={2.75} />
+          ) : showStop ? (
             <Square size={15} strokeWidth={2.5} />
           ) : (
             <ArrowUp size={16} strokeWidth={2.5} />

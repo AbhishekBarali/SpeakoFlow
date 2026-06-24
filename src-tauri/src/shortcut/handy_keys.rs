@@ -450,6 +450,16 @@ pub fn init_shortcuts(app: &AppHandle) -> Result<(), String> {
                 id, e
             );
         }
+
+        // Also register the auto-derived Shift "lock" (hands-free) variant.
+        if let Some(variant) = super::lock_variant_binding(&binding) {
+            if let Err(e) = state.register(&variant) {
+                error!(
+                    "Failed to register handy-keys lock variant {} during init: {}",
+                    variant.id, e
+                );
+            }
+        }
     }
 
     app.manage(state);
@@ -502,20 +512,35 @@ pub fn unregister_cancel_shortcut(app: &AppHandle) {
     }
 }
 
-/// Register a shortcut
+/// Register a shortcut (and its auto-derived Shift "lock" variant, if any)
 pub fn register_shortcut(app: &AppHandle, binding: ShortcutBinding) -> Result<(), String> {
     let state = app
         .try_state::<HandyKeysState>()
         .ok_or("HandyKeysState not initialized")?;
-    state.register(&binding)
+    state.register(&binding)?;
+    if let Some(variant) = super::lock_variant_binding(&binding) {
+        if let Err(e) = state.register(&variant) {
+            // Non-fatal: the hands-free variant may collide with another
+            // shortcut. The base binding still works.
+            error!(
+                "Lock variant '{}' ({}) not registered: {}",
+                variant.id, variant.current_binding, e
+            );
+        }
+    }
+    Ok(())
 }
 
-/// Unregister a shortcut
+/// Unregister a shortcut (and its Shift "lock" variant, if any)
 pub fn unregister_shortcut(app: &AppHandle, binding: ShortcutBinding) -> Result<(), String> {
     let state = app
         .try_state::<HandyKeysState>()
         .ok_or("HandyKeysState not initialized")?;
-    state.unregister(&binding)
+    let result = state.unregister(&binding);
+    if let Some(variant) = super::lock_variant_binding(&binding) {
+        let _ = state.unregister(&variant);
+    }
+    result
 }
 
 /// Start key recording mode

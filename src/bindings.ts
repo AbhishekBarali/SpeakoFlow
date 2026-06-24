@@ -488,6 +488,16 @@ async showMainWindowCommand() : Promise<Result<null, string>> {
 async cancelOperation() : Promise<void> {
     await TAURI_INVOKE("cancel_operation");
 },
+/**
+ * Finish the current recording right now and run the normal transcribe /
+ * assistant pipeline on it. This is the "done" tick on the recording overlay
+ * and the finish button on the assistant panel — the keyboard-free way to end
+ * a hands-free (tap-to-lock or toggle) recording. Unlike `cancel_operation`,
+ * the captured audio is kept and transcribed. No-op when nothing is recording.
+ */
+async commitRecording() : Promise<void> {
+    await TAURI_INVOKE("commit_recording");
+},
 async isPortable() : Promise<boolean> {
     return await TAURI_INVOKE("is_portable");
 },
@@ -1193,6 +1203,14 @@ async setAssistantPanelCollapsed(collapsed: boolean) : Promise<Result<null, stri
 }
 },
 /**
+ * Current pill/expanded state of the assistant panel. The webview queries this
+ * on mount so a fresh or reloaded panel renders the right layout instead of
+ * showing the full panel header inside the collapsed pill window.
+ */
+async getAssistantPanelCollapsed() : Promise<boolean> {
+    return await TAURI_INVOKE("get_assistant_panel_collapsed");
+},
+/**
  * Arm (or disarm) a screenshot for the NEXT assistant turn — typed or
  * voice. One-shot: consumed by the next turn.
  */
@@ -1206,7 +1224,7 @@ async setAssistantScreenArmed(armed: boolean) : Promise<Result<null, string>> {
 },
 /**
  * Start/stop assistant voice recording programmatically (pill mic button).
- * Uses the coordinator's toggle semantics: first call starts, second stops.
+ * Hands-free toggle: first call starts, second stops (a click can't "hold").
  */
 async assistantToggleVoice() : Promise<Result<null, string>> {
     try {

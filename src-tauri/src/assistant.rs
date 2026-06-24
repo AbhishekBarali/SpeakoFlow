@@ -361,11 +361,28 @@ pub fn create_assistant_panel(app: &AppHandle) {
 
 pub fn show_assistant_panel(app: &AppHandle) {
     if let Some(window) = app.get_webview_window(PANEL_LABEL) {
+        // Keep the webview's layout in sync with the actual window before
+        // showing. A reloaded webview resets its React state to "expanded", so
+        // without this it can render the full panel inside the pill-sized
+        // window (showing only the header bar). Re-assert the pill size when
+        // collapsed, and always tell the webview which mode to render.
+        let collapsed = PILL_MODE.load(Ordering::SeqCst);
+        if collapsed {
+            let _ = window.set_size(tauri::LogicalSize::new(PILL_WIDTH, PILL_HEIGHT));
+        }
+        let _ = app.emit("assistant-collapsed", collapsed);
+
         let _ = window.show();
         #[cfg(target_os = "windows")]
         force_panel_topmost(&window);
         let _ = app.emit("assistant-panel-shown", ());
     }
+}
+
+/// Whether the assistant panel is currently collapsed to the pill. Lets the
+/// webview initialise its layout correctly after a (re)load.
+pub fn is_panel_collapsed() -> bool {
+    PILL_MODE.load(Ordering::SeqCst)
 }
 
 pub fn hide_assistant_panel(app: &AppHandle) {

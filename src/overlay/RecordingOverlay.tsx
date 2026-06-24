@@ -1,7 +1,7 @@
 import { listen } from "@tauri-apps/api/event";
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Lock, Loader2, X } from "lucide-react";
+import { Lock, Loader2, X, Check } from "lucide-react";
 import { AudioWaveform } from "../components/shared";
 import "./RecordingOverlay.css";
 import { commands } from "@/bindings";
@@ -95,7 +95,7 @@ const RecordingOverlay: React.FC = () => {
       className={`overlay-root ${isVisible ? "fade-in" : ""}`}
     >
       <div
-        className={`overlay-pill ${state}`}
+        className={`overlay-pill ${state}${locked ? " locked" : ""}`}
         role="status"
         aria-label={ariaLabel}
       >
@@ -138,7 +138,12 @@ const RecordingOverlay: React.FC = () => {
               color={ICON_COLOR}
             />
             <div className="wave-box">
-              <AudioWaveform levels={[]} size="sm" barCount={14} active={false} />
+              <AudioWaveform
+                levels={[]}
+                size="sm"
+                barCount={14}
+                active={false}
+              />
             </div>
           </div>
         )}
@@ -154,6 +159,22 @@ const RecordingOverlay: React.FC = () => {
             }}
           >
             <X size={13} strokeWidth={2.5} color={ICON_COLOR} />
+          </button>
+        )}
+
+        {/* Hands-free (locked) recording isn't ended by releasing a key, so it
+            gets a persistent "done" tick to finish and transcribe — alongside
+            re-pressing the hotkey. Hidden during a push-to-talk hold. */}
+        {isRecording && locked && (
+          <button
+            type="button"
+            className="pill-confirm"
+            aria-label={t("overlay.done", "Done")}
+            onClick={() => {
+              commands.commitRecording();
+            }}
+          >
+            <Check size={13} strokeWidth={2.5} color={ICON_COLOR} />
           </button>
         )}
       </div>

@@ -337,6 +337,15 @@ pub fn set_assistant_panel_collapsed(app: AppHandle, collapsed: bool) -> Result<
     Ok(())
 }
 
+/// Current pill/expanded state of the assistant panel. The webview queries this
+/// on mount so a fresh or reloaded panel renders the right layout instead of
+/// showing the full panel header inside the collapsed pill window.
+#[tauri::command]
+#[specta::specta]
+pub fn get_assistant_panel_collapsed() -> bool {
+    assistant::is_panel_collapsed()
+}
+
 /// Arm (or disarm) a screenshot for the NEXT assistant turn — typed or
 /// voice. One-shot: consumed by the next turn.
 #[tauri::command]
@@ -347,14 +356,19 @@ pub fn set_assistant_screen_armed(app: AppHandle, armed: bool) -> Result<(), Str
 }
 
 /// Start/stop assistant voice recording programmatically (pill mic button).
-/// Uses the coordinator's toggle semantics: first call starts, second stops.
+/// Hands-free toggle: first call starts, second stops (a click can't "hold").
 #[tauri::command]
 #[specta::specta]
 pub fn assistant_toggle_voice(app: AppHandle) -> Result<(), String> {
     let coordinator = app
         .try_state::<crate::TranscriptionCoordinator>()
         .ok_or_else(|| "Coordinator not initialized".to_string())?;
-    coordinator.send_input("assistant", "pill", true, false);
+    coordinator.send_input(
+        "assistant",
+        "pill",
+        true,
+        crate::transcription_coordinator::RecordingMode::Lock,
+    );
     Ok(())
 }
 

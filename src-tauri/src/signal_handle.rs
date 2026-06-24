@@ -15,7 +15,13 @@ use std::thread;
 /// Used by signal handlers, CLI flags, and any other external trigger.
 pub fn send_transcription_input(app: &AppHandle, binding_id: &str, source: &str) {
     if let Some(c) = app.try_state::<TranscriptionCoordinator>() {
-        c.send_input(binding_id, source, true, false);
+        // External triggers can't "hold", so they always run hands-free (lock).
+        c.send_input(
+            binding_id,
+            source,
+            true,
+            crate::transcription_coordinator::RecordingMode::Lock,
+        );
     } else {
         warn!("TranscriptionCoordinator not initialized");
     }

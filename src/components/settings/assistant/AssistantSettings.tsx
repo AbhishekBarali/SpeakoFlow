@@ -486,7 +486,6 @@ export const AssistantSettings: React.FC = () => {
     <div className="max-w-3xl w-full mx-auto space-y-8">
       <SettingsGroup title={t("settings.assistant.shortcuts.title")}>
         <ShortcutInput shortcutId="assistant" grouped={true} />
-        <ShortcutInput shortcutId="assistant_vision" grouped={true} />
         <ShortcutInput shortcutId="assistant_panel_toggle" grouped={true} />
       </SettingsGroup>
 

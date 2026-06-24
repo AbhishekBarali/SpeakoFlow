@@ -9,14 +9,49 @@ use tauri::{AppHandle, Manager};
 
 const DEBOUNCE: Duration = Duration::from_millis(30);
 
+/// Suffix marking the auto-derived "Shift" variant of a recording binding — the
+/// hands-free counterpart of a hold shortcut (e.g. `transcribe` → `transcribe.lock`).
+pub const LOCK_SUFFIX: &str = ".lock";
+
+/// How a recording is driven.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum RecordingMode {
+    /// Push-to-talk: hold the shortcut to record, release to stop & transcribe.
+    Hold,
+    /// Hands-free: press to start, press again (or commit/cancel) to stop.
+    /// Releases are ignored.
+    Lock,
+}
+
+/// Resolve the recording mode for a shortcut event. The base shortcut uses the
+/// user's default mode; its Shift variant uses the opposite. With push-to-talk
+/// on (default) the base shortcut holds and Shift locks hands-free; with it off
+/// the base shortcut locks and Shift holds.
+pub fn recording_mode(push_to_talk_default: bool, is_lock_variant: bool) -> RecordingMode {
+    let base_holds = push_to_talk_default;
+    let holds = if is_lock_variant {
+        !base_holds
+    } else {
+        base_holds
+    };
+    if holds {
+        RecordingMode::Hold
+    } else {
+        RecordingMode::Lock
+    }
+}
+
 /// Commands processed sequentially by the coordinator thread.
 enum Command {
     Input {
         binding_id: String,
         hotkey_string: String,
         is_pressed: bool,
-        push_to_talk: bool,
+        mode: RecordingMode,
     },
+    /// Finish the active recording and transcribe it (overlay "done" tick /
+    /// assistant panel finish button). No-op unless something is recording.
+    Commit,
     Cancel {
         recording_was_active: bool,
     },
@@ -26,7 +61,10 @@ enum Command {
 /// Pipeline lifecycle, owned exclusively by the coordinator thread.
 enum Stage {
     Idle,
-    Recording(String), // binding_id
+    Recording {
+        binding_id: String,
+        mode: RecordingMode,
+    },
     Processing,
 }
 
@@ -38,11 +76,7 @@ pub struct TranscriptionCoordinator {
 }
 
 pub fn is_transcribe_binding(id: &str) -> bool {
-    id == "transcribe"
-        || id == "transcribe_toggle"
-        || id == "transcribe_with_post_process"
-        || id == "assistant"
-        || id == "assistant_vision"
+    id == "transcribe" || id == "transcribe_with_post_process" || id == "assistant"
 }
 
 impl TranscriptionCoordinator {
@@ -60,47 +94,66 @@ impl TranscriptionCoordinator {
                             binding_id,
                             hotkey_string,
                             is_pressed,
-                            push_to_talk,
+                            mode,
                         } => {
-                            // Debounce rapid-fire press events (key repeat / double-tap).
-                            // Releases always pass through for push-to-talk.
                             if is_pressed {
+                                // Debounce rapid-fire / auto-repeat press events.
                                 let now = Instant::now();
                                 if last_press.map_or(false, |t| now.duration_since(t) < DEBOUNCE) {
                                     debug!("Debounced press for '{binding_id}'");
                                     continue;
                                 }
                                 last_press = Some(now);
-                            }
 
-                            if push_to_talk {
-                                // Hold to record, release to stop. Simple.
-                                if is_pressed && matches!(stage, Stage::Idle) {
-                                    start(&app, &mut stage, &binding_id, &hotkey_string);
-                                } else if !is_pressed
-                                    && matches!(&stage, Stage::Recording(id) if id == &binding_id)
-                                {
-                                    stop(&app, &mut stage, &binding_id, &hotkey_string);
-                                }
-                            } else if is_pressed {
-                                // Toggle: press starts, pressing again stops.
                                 match &stage {
                                     Stage::Idle => {
-                                        start(&app, &mut stage, &binding_id, &hotkey_string);
-                                        // Hands-free recording engaged — let
-                                        // overlays show "press again to stop".
-                                        if matches!(stage, Stage::Recording(_)) {
+                                        start(&app, &mut stage, &binding_id, &hotkey_string, mode);
+                                        // Hands-free recording shows the "press
+                                        // again or click done to stop" controls;
+                                        // a push-to-talk hold stops on release so
+                                        // it needs none of that.
+                                        if mode == RecordingMode::Lock
+                                            && matches!(stage, Stage::Recording { .. })
+                                        {
                                             use tauri::Emitter;
                                             let _ = app.emit("recording-locked", true);
                                         }
                                     }
-                                    Stage::Recording(id) if id == &binding_id => {
+                                    // A second press only stops a hands-free
+                                    // (locked) recording. A held one stops on
+                                    // release, so ignore extra presses (incl.
+                                    // key auto-repeat) while holding.
+                                    Stage::Recording {
+                                        binding_id: id,
+                                        mode: RecordingMode::Lock,
+                                    } if id == &binding_id => {
                                         stop(&app, &mut stage, &binding_id, &hotkey_string);
                                     }
                                     _ => {
-                                        debug!("Ignoring press for '{binding_id}': pipeline busy")
+                                        debug!("Ignoring press for '{binding_id}': held or busy")
                                     }
                                 }
+                            } else {
+                                // Release only stops a push-to-talk (hold)
+                                // recording. Hands-free ignores releases, which
+                                // are unreliable for global shortcuts anyway.
+                                let should_stop = matches!(
+                                    &stage,
+                                    Stage::Recording { binding_id: id, mode: RecordingMode::Hold }
+                                        if id == &binding_id
+                                );
+                                if should_stop {
+                                    stop(&app, &mut stage, &binding_id, &hotkey_string);
+                                }
+                            }
+                        }
+                        Command::Commit => {
+                            // Finish + transcribe whatever is recording. Used by
+                            // the overlay tick and the assistant finish button so
+                            // a hands-free recording can end without the keyboard.
+                            if let Stage::Recording { binding_id, .. } = &stage {
+                                let id = binding_id.clone();
+                                stop(&app, &mut stage, &id, "commit");
                             }
                         }
                         Command::Cancel {
@@ -108,7 +161,8 @@ impl TranscriptionCoordinator {
                         } => {
                             // Don't reset during processing — wait for the pipeline to finish.
                             if !matches!(stage, Stage::Processing)
-                                && (recording_was_active || matches!(stage, Stage::Recording(_)))
+                                && (recording_was_active
+                                    || matches!(stage, Stage::Recording { .. }))
                             {
                                 stage = Stage::Idle;
                             }
@@ -128,14 +182,15 @@ impl TranscriptionCoordinator {
         Self { tx }
     }
 
-    /// Send a keyboard/signal input event for a transcribe binding.
-    /// For signal-based toggles, use `is_pressed: true` and `push_to_talk: false`.
+    /// Send a keyboard/signal input event for a transcribe binding. `mode`
+    /// selects push-to-talk (hold) vs hands-free (lock). Programmatic triggers
+    /// (pill mic, signals/CLI) pass `is_pressed: true` with `RecordingMode::Lock`.
     pub fn send_input(
         &self,
         binding_id: &str,
         hotkey_string: &str,
         is_pressed: bool,
-        push_to_talk: bool,
+        mode: RecordingMode,
     ) {
         if self
             .tx
@@ -143,7 +198,7 @@ impl TranscriptionCoordinator {
                 binding_id: binding_id.to_string(),
                 hotkey_string: hotkey_string.to_string(),
                 is_pressed,
-                push_to_talk,
+                mode,
             })
             .is_err()
         {
@@ -163,6 +218,15 @@ impl TranscriptionCoordinator {
         }
     }
 
+    /// Finish + transcribe the active recording, if any. Drives the overlay's
+    /// "done" tick and the assistant panel's finish button so a hands-free
+    /// recording can be ended without touching the keyboard.
+    pub fn notify_commit(&self) {
+        if self.tx.send(Command::Commit).is_err() {
+            warn!("Transcription coordinator channel closed");
+        }
+    }
+
     pub fn notify_processing_finished(&self) {
         if self.tx.send(Command::ProcessingFinished).is_err() {
             warn!("Transcription coordinator channel closed");
@@ -170,7 +234,13 @@ impl TranscriptionCoordinator {
     }
 }
 
-fn start(app: &AppHandle, stage: &mut Stage, binding_id: &str, hotkey_string: &str) {
+fn start(
+    app: &AppHandle,
+    stage: &mut Stage,
+    binding_id: &str,
+    hotkey_string: &str,
+    mode: RecordingMode,
+) {
     let Some(action) = ACTION_MAP.get(binding_id) else {
         warn!("No action in ACTION_MAP for '{binding_id}'");
         return;
@@ -180,7 +250,10 @@ fn start(app: &AppHandle, stage: &mut Stage, binding_id: &str, hotkey_string: &s
         .try_state::<Arc<AudioRecordingManager>>()
         .map_or(false, |a| a.is_recording())
     {
-        *stage = Stage::Recording(binding_id.to_string());
+        *stage = Stage::Recording {
+            binding_id: binding_id.to_string(),
+            mode,
+        };
     } else {
         debug!("Start for '{binding_id}' did not begin recording; staying idle");
     }

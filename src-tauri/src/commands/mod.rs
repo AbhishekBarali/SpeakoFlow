@@ -16,6 +16,19 @@ pub fn cancel_operation(app: AppHandle) {
     cancel_current_operation(&app);
 }
 
+/// Finish the current recording right now and run the normal transcribe /
+/// assistant pipeline on it. This is the "done" tick on the recording overlay
+/// and the finish button on the assistant panel — the keyboard-free way to end
+/// a hands-free (tap-to-lock or toggle) recording. Unlike `cancel_operation`,
+/// the captured audio is kept and transcribed. No-op when nothing is recording.
+#[tauri::command]
+#[specta::specta]
+pub fn commit_recording(app: AppHandle) {
+    if let Some(coordinator) = app.try_state::<crate::TranscriptionCoordinator>() {
+        coordinator.notify_commit();
+    }
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn is_portable() -> bool {

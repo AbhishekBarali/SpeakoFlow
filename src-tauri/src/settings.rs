@@ -1171,21 +1171,10 @@ pub fn get_default_settings() -> AppSettings {
         ShortcutBinding {
             id: "transcribe".to_string(),
             name: "Transcribe".to_string(),
-            description: "Converts your speech into text.".to_string(),
+            description: "Press to start recording, press again to stop and type it out."
+                .to_string(),
             default_binding: default_shortcut.to_string(),
             current_binding: default_shortcut.to_string(),
-        },
-    );
-    bindings.insert(
-        "transcribe_toggle".to_string(),
-        ShortcutBinding {
-            id: "transcribe_toggle".to_string(),
-            name: "Hands-free Dictation".to_string(),
-            description:
-                "Press once to start recording, press again to stop and transcribe. No need to hold anything."
-                    .to_string(),
-            default_binding: "f9".to_string(),
-            current_binding: "f9".to_string(),
         },
     );
     #[cfg(target_os = "windows")]
@@ -1237,23 +1226,10 @@ pub fn get_default_settings() -> AppSettings {
         },
     );
 
-    #[cfg(target_os = "macos")]
-    let default_assistant_vision_shortcut = "option+ctrl+shift+space";
-    #[cfg(not(target_os = "macos"))]
-    let default_assistant_vision_shortcut = "ctrl+alt+shift+space";
-
-    bindings.insert(
-        "assistant_vision".to_string(),
-        ShortcutBinding {
-            id: "assistant_vision".to_string(),
-            name: "Assistant + Screen".to_string(),
-            description:
-                "Ask the assistant by voice and attach a screenshot of your screen so it can see what you see."
-                    .to_string(),
-            default_binding: default_assistant_vision_shortcut.to_string(),
-            current_binding: default_assistant_vision_shortcut.to_string(),
-        },
-    );
+    // Note: there's intentionally no dedicated "Assistant + Screen" shortcut.
+    // Ctrl/Cmd+Alt+Shift+Space is reserved as the assistant's hands-free (lock)
+    // variant. Attach a screenshot from the assistant panel's camera button
+    // instead; a dedicated screen shortcut may return later on a free combo.
 
     #[cfg(target_os = "macos")]
     let default_panel_toggle_shortcut = "option+ctrl+a";
@@ -1549,6 +1525,20 @@ pub fn load_or_create_app_settings(app: &AppHandle) -> AppSettings {
                     if !settings.bindings.contains_key(&key) {
                         debug!("Adding missing binding: {}", key);
                         settings.bindings.insert(key, value);
+                        updated = true;
+                    }
+                }
+
+                // Drop obsolete bindings from older settings files so they stop
+                // being registered:
+                //  - transcribe_toggle: the main shortcuts now lock hands-free
+                //    via their Shift variant, so the standalone toggle is gone.
+                //  - assistant_vision: Ctrl/Cmd+Alt+Shift+Space is now the
+                //    assistant's hands-free variant; screenshots come from the
+                //    panel's camera button instead.
+                for obsolete in ["transcribe_toggle", "assistant_vision"] {
+                    if settings.bindings.remove(obsolete).is_some() {
+                        debug!("Removing obsolete '{}' binding", obsolete);
                         updated = true;
                     }
                 }

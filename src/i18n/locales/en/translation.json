@@ -187,7 +187,7 @@
         "bindings": {
           "transcribe": {
             "name": "Transcribe Shortcut",
-            "description": "The keyboard shortcut to record and transcribe your voice."
+            "description": "Press to start recording, press again to stop and type it out. You can also click the check on the recording pill to finish, or the cross (or Escape) to cancel."
           },
           "transcribe_toggle": {
             "name": "Hands-free Dictation",
@@ -203,7 +203,7 @@
           },
           "assistant": {
             "name": "Assistant Shortcut",
-            "description": "Ask the AI assistant by voice. The answer streams into the floating assistant panel."
+            "description": "Ask the AI assistant by voice. Press to start, press again to stop; the answer streams into the floating assistant panel."
           },
           "assistant_vision": {
             "name": "Assistant + Screen Shortcut",
@@ -230,7 +230,7 @@
       },
       "pushToTalk": {
         "label": "Push To Talk",
-        "description": "Hold to record, release to stop"
+        "description": "Hold to record, release to stop. Quick-tap instead to lock hands-free recording — it keeps going until you press the hotkey again or tap done."
       }
     },
     "models": {
@@ -897,8 +897,9 @@
     "recording": "Recording",
     "transcribing": "Transcribing...",
     "processing": "Processing...",
-    "locked": "Recording — press hotkey to stop",
-    "cancel": "Cancel"
+    "locked": "Recording hands-free — press the hotkey again or done to stop",
+    "cancel": "Cancel",
+    "done": "Done"
   },
   "assistant": {
     "title": "Assistant",
@@ -907,6 +908,7 @@
     "inputPlaceholderScreen": "Ask about your screen...",
     "send": "Send",
     "stop": "Stop",
+    "finish": "Finish & send",
     "clear": "Clear conversation",
     "hide": "Hide panel",
     "copy": "Copy",
@@ -932,7 +934,7 @@
     },
     "status": {
       "listening": "Listening...",
-      "locked": "Listening — press hotkey to stop",
+      "locked": "Listening hands-free — press the hotkey or tick to stop",
       "transcribing": "Transcribing...",
       "searching": "Searching the web...",
       "thinking": "Thinking...",
