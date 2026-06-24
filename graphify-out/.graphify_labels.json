@@ -117,6 +117,7 @@
   "115": "Build",
   "116": "AccessibilityPermissions",
   "117": "CRUSH",
+  "118": "Community 118",
   "119": "Src-Tauri Gen Schemas",
   "120": "Src-Tauri Gen Schemas",
   "121": "Src-Tauri Gen Schemas",
@@ -125,6 +126,7 @@
   "124": "Src-Tauri Gen Schemas",
   "125": "Windows",
   "126": "Updater",
+  "127": "Community 127",
   "128": "Audio Toolkit",
   "129": "github ISSUE TEMPLATE",
   "130": "Src-Tauri Resources",
@@ -153,5 +155,10 @@
   "153": "Src-Tauri Swift",
   "154": "Tailwind Config",
   "155": "Tests",
-  "156": "Vite Config"
+  "156": "Vite Config",
+  "157": "Community 157",
+  "158": "Community 158",
+  "159": "Community 159",
+  "160": "Community 160",
+  "161": "Community 161"
 }
