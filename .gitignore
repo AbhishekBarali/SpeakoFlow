@@ -55,3 +55,6 @@ graphify-out/*
 .kiro/
 .agents/
 .impeccable/
+
+# Firecrawl MCP diagnostic scratch files (may contain API keys)
+.fc_*
