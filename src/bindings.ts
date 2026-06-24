@@ -1356,6 +1356,18 @@ async setAssistantWebSearchDailyCreditBudget(budget: number) : Promise<Result<nu
 }
 },
 /**
+ * Built-in local model only: toggle smart (LLM-planned) search decisions vs the
+ * fast keyword heuristic. No effect on cloud/custom providers.
+ */
+async setAssistantLocalSearchSmart(enabled: boolean) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_assistant_local_search_smart", { enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * Toggle fetching full page content for the top results (Firecrawl only).
  * Full content makes answers far more accurate; turning it off relies on short
  * snippets and saves Firecrawl credits.
@@ -1491,6 +1503,14 @@ assistant_search_depth?: AssistantSearchDepth;
  * request cap also guards against runaway loops regardless of this value.
  */
 assistant_web_search_daily_credit_budget?: number; 
+/**
+ * Built-in local model ONLY: when true, decide whether to search with the
+ * same LLM planner the cloud providers use (smarter, but an extra
+ * generation pass — slower, especially on weak hardware). When false
+ * (default), use the instant keyword heuristic. No effect on cloud/custom
+ * providers, which always use the planner.
+ */
+assistant_local_search_smart?: boolean; 
 /**
  * API keys for the keyed search providers, keyed by provider id
  * ("firecrawl", "brave"). DuckDuckGo needs none.

@@ -104,7 +104,7 @@ const AssistantPanel: React.FC = () => {
   const [state, setState] = useState<AssistantState>("idle");
   const [input, setInput] = useState("");
   const [attachScreen, setAttachScreen] = useState(false);
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
   const [locked, setLocked] = useState(false);
   const [ttsPlaying, setTtsPlaying] = useState(false);
   const [settings, setSettings] = useState<AppSettings | null>(null);
@@ -470,8 +470,33 @@ const AssistantPanel: React.FC = () => {
           : ttsActive
             ? t("assistant.status.speaking")
             : t("assistant.pill.idle");
+
+    // Waveform-led status: one living waveform whose motion conveys the phase,
+    // plus a small side glyph for the phases worth calling out. Only true rest
+    // shows the "Assistant" label; precise wording lives in aria-label below
+    // (and in the expanded panel's state chip).
+    const isSpeakingPhase =
+      state === "speaking" || ttsPlaying || tts.status === "speaking";
+    const isSearchingPhase = state === "searching";
+    const showPillWave = isListening || pillStop;
+    const waveMode: "reactive" | "shimmer" | "flow" = isListening
+      ? "reactive"
+      : isSpeakingPhase
+        ? "flow"
+        : "shimmer";
+    const phaseIcon = isSearchingPhase ? (
+      <Globe size={14} strokeWidth={2} />
+    ) : isSpeakingPhase ? (
+      <Volume2 size={14} strokeWidth={2} />
+    ) : null;
+
     return (
-      <div className="assistant-pill" data-tauri-drag-region>
+      <div
+        className="assistant-pill"
+        data-tauri-drag-region
+        role="status"
+        aria-label={pillStatus}
+      >
         <div className="pill-mic-wrap">
           <button
             className={`pill-mic${isListening ? " recording" : ""}${
@@ -513,11 +538,11 @@ const AssistantPanel: React.FC = () => {
             </span>
           )}
         </div>
-        {isListening ? (
+        {showPillWave ? (
           <div className="pill-wave" data-tauri-drag-region>
-            {/* Hands-free (locked) gets a lock glyph so it reads differently
-                from a plain hold-to-talk recording. */}
-            {locked && (
+            {/* Hands-free (locked) listening gets a lock glyph so it reads
+                differently from a plain hold-to-talk recording. */}
+            {isListening && locked && (
               <Lock
                 className="pill-lock-hint"
                 size={13}
@@ -526,15 +551,24 @@ const AssistantPanel: React.FC = () => {
               />
             )}
             <AudioWaveform
-              levels={micLevels}
+              levels={isListening ? micLevels : []}
               size="md"
-              barCount={locked ? 17 : 21}
-              active={true}
+              barCount={isListening && locked ? 13 : 16}
+              mode={waveMode}
             />
           </div>
         ) : (
           <span className="pill-status" data-tauri-drag-region>
             {pillStatus}
+          </span>
+        )}
+        {phaseIcon && (
+          <span
+            className="pill-phase-icon"
+            data-tauri-drag-region
+            aria-hidden="true"
+          >
+            {phaseIcon}
           </span>
         )}
         <button
@@ -642,7 +676,7 @@ const AssistantPanel: React.FC = () => {
             <AudioWaveform
               levels={micLevels}
               size="md"
-              barCount={29}
+              barCount={22}
               active={state === "listening"}
             />
             <span className="listening-label">

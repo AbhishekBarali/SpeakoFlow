@@ -528,6 +528,18 @@ pub fn set_assistant_web_search_daily_credit_budget(
     Ok(())
 }
 
+/// Built-in local model only: toggle smart (LLM-planned) search decisions vs the
+/// fast keyword heuristic. No effect on cloud/custom providers.
+#[tauri::command]
+#[specta::specta]
+pub fn set_assistant_local_search_smart(app: AppHandle, enabled: bool) -> Result<(), String> {
+    let mut settings = get_settings(&app);
+    settings.assistant_local_search_smart = enabled;
+    write_settings(&app, settings);
+    emit_settings_changed(&app);
+    Ok(())
+}
+
 /// Toggle fetching full page content for the top results (Firecrawl only).
 /// Full content makes answers far more accurate; turning it off relies on short
 /// snippets and saves Firecrawl credits.

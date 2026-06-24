@@ -651,6 +651,13 @@ pub struct AppSettings {
     /// request cap also guards against runaway loops regardless of this value.
     #[serde(default = "default_assistant_web_search_daily_credit_budget")]
     pub assistant_web_search_daily_credit_budget: u32,
+    /// Built-in local model ONLY: when true, decide whether to search with the
+    /// same LLM planner the cloud providers use (smarter, but an extra
+    /// generation pass — slower, especially on weak hardware). When false
+    /// (default), use the instant keyword heuristic. No effect on cloud/custom
+    /// providers, which always use the planner.
+    #[serde(default)]
+    pub assistant_local_search_smart: bool,
     /// API keys for the keyed search providers, keyed by provider id
     /// ("firecrawl", "brave"). DuckDuckGo needs none.
     #[serde(default = "default_web_search_api_keys")]
@@ -1369,6 +1376,7 @@ pub fn get_default_settings() -> AppSettings {
         assistant_search_depth: AssistantSearchDepth::default(),
         assistant_web_search_daily_credit_budget: default_assistant_web_search_daily_credit_budget(
         ),
+        assistant_local_search_smart: false,
         web_search_api_keys: default_web_search_api_keys(),
         theme: Theme::System,
     }

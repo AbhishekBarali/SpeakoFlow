@@ -764,10 +764,24 @@
 }
 
 /* Lock glyph shown in the collapsed pill while hands-free (tap-to-lock), so the
- * locked state reads differently from a plain hold-to-talk recording. */
+ * locked state reads differently from a plain hold-to-talk recording. Kept a
+ * neutral ink tone (inherits the pill text colour) so it doesn't clash with the
+ * recording button's warm accent. */
 .pill-lock-hint {
   flex-shrink: 0;
-  color: var(--accent-from);
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+/* Phase glyph on the pill's trailing edge — a globe while searching the web, a
+ * speaker while reading the answer aloud. Quiet, neutral tone so it informs
+ * without competing with the waveform. */
+.pill-phase-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  color: var(--muted);
+  pointer-events: none;
 }
 
 .pill-status {

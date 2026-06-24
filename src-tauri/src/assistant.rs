@@ -34,8 +34,10 @@ pub fn panel_size_for(preset: &str) -> (f64, f64) {
     }
 }
 
-/// Whether the panel is currently collapsed to the pill.
-static PILL_MODE: AtomicBool = AtomicBool::new(false);
+/// Whether the panel is currently collapsed to the pill. Starts collapsed so
+/// the assistant first appears as the small pill rather than the full panel;
+/// expanding (or collapsing) updates it for the rest of the session.
+static PILL_MODE: AtomicBool = AtomicBool::new(true);
 
 /// One-shot "attach a screenshot to the next turn" flag, set by the panel's
 /// camera button. Applies to BOTH typed and voice turns.
@@ -319,6 +321,13 @@ pub fn create_assistant_panel(app: &AppHandle) {
     let (x, y) = saved_position(app).unwrap_or_else(|| default_position(app));
     let settings = get_settings(app);
     let (panel_w, panel_h) = panel_size_for(&settings.assistant_panel_size);
+    // Build at whichever size matches the current mode (pill by default) so the
+    // first show doesn't briefly flash the large panel before collapsing.
+    let (init_w, init_h) = if PILL_MODE.load(Ordering::SeqCst) {
+        (PILL_WIDTH, PILL_HEIGHT)
+    } else {
+        (panel_w, panel_h)
+    };
 
     let mut builder = WebviewWindowBuilder::new(
         app,
@@ -326,7 +335,7 @@ pub fn create_assistant_panel(app: &AppHandle) {
         tauri::WebviewUrl::App("src/assistant/index.html".into()),
     )
     .title("Assistant")
-    .inner_size(panel_w, panel_h)
+    .inner_size(init_w, init_h)
     .min_inner_size(PILL_WIDTH, PILL_HEIGHT)
     .position(x, y)
     .resizable(true)
@@ -631,18 +640,38 @@ pub async fn run_assistant_turn(app: AppHandle, user_text: String, screenshot: O
         && screenshot.is_none()
         && web_search::should_search(&user_text)
     {
-        emit_state(&app, "searching");
         // Race every search stage against a Stop press: a slow search must never
         // trap the user in the "searching" state with no way out.
         let cancel = app.state::<AssistantConversation>().cancel.clone();
 
-        // Stage 1 — plan. The built-in local model skips planning (it's small and
-        // its engine may be cold) and searches the raw question; cloud/"reasonable"
-        // models do the full decide-and-rewrite step. `None` here means "skip the
-        // search": either cancelled, or the model judged a search unnecessary.
-        let plan_opt: Option<web_search::SearchPlan> = if provider.id == "builtin" {
-            Some(web_search::SearchPlan::raw(&user_text))
+        // Stage 1 — decide whether to search and craft queries. Cloud/custom
+        // models always use the LLM planner (the smart decider). The built-in
+        // local model uses the fast keyword heuristic by default, or the same
+        // planner when the user enabled "smart" local search — in which case we
+        // load its engine first so the planning call isn't cold. `None` means
+        // skip (cancelled).
+        let use_planner = if provider.id == "builtin" {
+            settings.assistant_local_search_smart && {
+                let manager = app.state::<Arc<crate::managers::local_llm::LocalLlmManager>>();
+                match manager.ensure_running(&model).await {
+                    Ok(_) => true,
+                    Err(e) => {
+                        warn!(
+                            "Built-in engine couldn't start for planning ({}); using heuristic",
+                            e
+                        );
+                        false
+                    }
+                }
+            }
         } else {
+            true
+        };
+
+        let mut plan_opt: Option<web_search::SearchPlan> = if use_planner {
+            // The planner is a quick LLM call; show "thinking" while it decides
+            // (we only switch to "searching" once a search actually runs).
+            emit_state(&app, "thinking");
             let recent = recent_context_for_planner(&app);
             let planned = tokio::select! {
                 r = web_search::plan_search(
@@ -658,16 +687,36 @@ pub async fn run_assistant_turn(app: AppHandle, user_text: String, screenshot: O
             match planned {
                 Some(Ok(plan)) => Some(plan),
                 Some(Err(e)) => {
-                    warn!("Search planner failed ({}); searching the raw question", e);
-                    Some(web_search::SearchPlan::raw(&user_text))
+                    warn!(
+                        "Search planner failed ({}); falling back to a signal heuristic",
+                        e
+                    );
+                    Some(web_search::SearchPlan::heuristic(&user_text))
                 }
                 None => None, // cancelled during planning
             }
+        } else {
+            Some(web_search::SearchPlan::heuristic(&user_text))
         };
 
-        // Stage 2 — retrieve, when the plan calls for it.
+        // An explicit "search the web for ..." request always searches, even if
+        // the planner/heuristic judged otherwise — the user asked directly.
+        if let Some(plan) = plan_opt.as_mut() {
+            if !plan.needs_search && web_search::is_explicit_search_request(&user_text) {
+                plan.needs_search = true;
+                if plan.queries.is_empty() {
+                    plan.queries
+                        .push(user_text.trim().chars().take(480).collect());
+                }
+            }
+        }
+
+        // Stage 2 — retrieve, only when the decision calls for it. The
+        // "searching" state is emitted here (not earlier) so the panel never
+        // shows "Searching the web…" on a turn that decides NOT to search.
         match plan_opt {
             Some(plan) if plan.needs_search && !plan.queries.is_empty() => {
+                emit_state(&app, "searching");
                 let search_result = tokio::select! {
                     r = web_search::search_with_plan(&settings, &plan) => Some(r),
                     _ = cancel.notified() => None,

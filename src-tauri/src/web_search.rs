@@ -117,7 +117,7 @@ pub const WEB_SEARCH_SYSTEM_DIRECTIVE: &str = "Live web search results — inclu
 /// turns where the app chose not to auto-search, which is exactly the wrong
 /// thing to say when the app *can* search. Byte-stable text, so it's safe for
 /// provider-side prompt caching.
-pub const WEB_SEARCH_CAPABILITY_NOTE: &str = "You have a live web search capability built into this app. When a question needs current or external facts, the app automatically runs a web search for you and adds the results to the user's message — so you DO have access to up-to-date information from the internet. Never tell the user you cannot browse the web, lack real-time data, or are limited to your training cutoff. When a turn arrives WITHOUT search results and you are not confident about something current or factual (a score or result, price, release, schedule, who currently holds a role, recent news), do not state a guess as if it were certain: give your best answer and offer to verify it live — for example, \"I can search the web and check the latest for you.\" If the user agrees, the search runs on the next turn.";
+pub const WEB_SEARCH_CAPABILITY_NOTE: &str = "You have a live web search tool available in this app, and the user's current local date is provided with each message. Your training data has a cutoff and may be out of date, but you are NOT stuck in your training year: trust the provided current date, and rely on web search for anything time-sensitive (recent events, news, sports results, prices, releases, schedules, who currently holds a role) rather than answering from stale memory or assuming an old year. Use the tool ONLY when a question genuinely needs current or external facts. For greetings, small talk, opinions, advice, explanations, definitions, writing, coding, math, or anything you already know well, just answer directly — do NOT search. When a search is warranted the app runs it automatically and adds the results to the user's message; on a turn that arrives without results, never claim you cannot access the internet — if you're unsure about something current, give your best answer and offer to look it up.";
 
 // ---------------------------------------------------------------------------
 // Search planner (decides whether to search + rewrites the query)
@@ -148,19 +148,53 @@ fn default_freshness() -> String {
 }
 
 impl SearchPlan {
-    /// A trivial plan that searches the raw user text verbatim. Used as the
-    /// fallback when the planner is unavailable (built-in model) or errors.
-    pub fn raw(user_text: &str) -> Self {
+    /// A plan derived purely from cheap local signals — no LLM call. It searches
+    /// **only when the query actually looks time-sensitive**, so casual
+    /// conversation never triggers a search. Used for the built-in local model
+    /// (whose small, possibly-cold engine isn't worth a planning round-trip) and
+    /// as the planner-failure fallback.
+    pub fn heuristic(user_text: &str) -> Self {
         let q = user_text.trim();
+        if q.is_empty() || (!is_explicit_search_request(q) && !looks_time_sensitive(q)) {
+            return SearchPlan {
+                needs_search: false,
+                queries: Vec::new(),
+                freshness: "none".to_string(),
+                news: false,
+            };
+        }
+        let ql = q.to_lowercase();
+        let news = [
+            "news",
+            "score",
+            "result",
+            "won",
+            "winner",
+            "breaking",
+            "election",
+            "match",
+            "game",
+            "standings",
+            "fixture",
+            "headline",
+        ]
+        .iter()
+        .any(|s| ql.contains(s));
+        let freshness = if ["today", "tonight", "right now", "breaking", "live"]
+            .iter()
+            .any(|s| ql.contains(s))
+        {
+            "day"
+        } else if news {
+            "week"
+        } else {
+            "month"
+        };
         SearchPlan {
-            needs_search: !q.is_empty(),
-            queries: if q.is_empty() {
-                Vec::new()
-            } else {
-                vec![truncate_chars(q, 480)]
-            },
-            freshness: "none".to_string(),
-            news: false,
+            needs_search: true,
+            queries: vec![truncate_chars(q, 480)],
+            freshness: freshness.to_string(),
+            news,
         }
     }
 
@@ -772,25 +806,9 @@ pub fn should_search(query: &str) -> bool {
         return false;
     }
 
-    const SMALL_TALK: [&str; 16] = [
-        "hi",
-        "hey",
-        "hello",
-        "yo",
-        "sup",
-        "thanks",
-        "thank you",
-        "ty",
-        "ok",
-        "okay",
-        "cool",
-        "nice",
-        "lol",
-        "bye",
-        "good morning",
-        "good night",
-    ];
-    if SMALL_TALK.contains(&q.as_str()) {
+    // Conversational small talk / greetings — including ones with leading
+    // greetings or trailing address terms like "Hey, what's up, bro?".
+    if is_small_talk(&q) {
         return false;
     }
 
@@ -865,6 +883,211 @@ fn is_simple_math(q: &str) -> bool {
         }
     }
     has_op
+}
+
+/// Detect conversational small talk / greetings, robust to leading greetings and
+/// trailing address terms (e.g. "Hey, what's up, bro?" → small talk). Normalizes
+/// the text (drop apostrophes, punctuation → spaces), strips a leading greeting
+/// word and trailing address words, then matches the remainder against a set of
+/// known chit-chat phrases. Deliberately exact-match on the remainder so real
+/// questions that merely start the same way ("what's up with the World Cup")
+/// are NOT treated as small talk.
+fn is_small_talk(q: &str) -> bool {
+    let mut normalized = String::with_capacity(q.len());
+    for c in q.chars() {
+        if c.is_alphanumeric() {
+            normalized.extend(c.to_lowercase());
+        } else if matches!(c, '\'' | '\u{2019}' | '`') {
+            // drop apostrophes so "what's" -> "whats"
+        } else {
+            normalized.push(' ');
+        }
+    }
+    let mut words: Vec<&str> = normalized.split_whitespace().collect();
+
+    const TRAILING: [&str; 11] = [
+        "bro", "man", "dude", "buddy", "bruh", "mate", "pal", "sir", "friend", "ya", "there",
+    ];
+    while let Some(last) = words.last() {
+        if TRAILING.contains(last) {
+            words.pop();
+        } else {
+            break;
+        }
+    }
+
+    const LEADING: [&str; 8] = ["hey", "hi", "hello", "yo", "hiya", "heya", "sup", "wassup"];
+    while let Some(first) = words.first() {
+        if LEADING.contains(first) {
+            words.remove(0);
+        } else {
+            break;
+        }
+    }
+
+    let phrase = words.join(" ");
+    const SMALL_TALK: [&str; 27] = [
+        "", // bare greeting like "hey bro"
+        "thanks",
+        "thank you",
+        "ty",
+        "ok",
+        "okay",
+        "cool",
+        "nice",
+        "lol",
+        "bye",
+        "good morning",
+        "good night",
+        "good evening",
+        "good afternoon",
+        "whats up",
+        "whats good",
+        "whats new",
+        "wassup",
+        "hows it going",
+        "how is it going",
+        "how are you",
+        "how are you doing",
+        "how have you been",
+        "hows your day",
+        "hows life",
+        "how is life",
+        "nice to meet you",
+    ];
+    SMALL_TALK.contains(&phrase.as_str())
+}
+
+/// Cheap positive signal that a query likely needs *current / external* info.
+/// Used by the built-in model path and the planner-failure fallback so those
+/// search only when it actually looks necessary — never on greetings or
+/// chit-chat. Single-word signals are matched on whole words (so "now" doesn't
+/// fire on "know"); phrases and recent-year tokens are matched on the substring.
+pub fn looks_time_sensitive(query: &str) -> bool {
+    let q = query.to_lowercase();
+    let words: HashSet<&str> = q
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|w| !w.is_empty())
+        .collect();
+
+    const WORD_SIGNALS: [&str; 44] = [
+        "latest",
+        "current",
+        "currently",
+        "today",
+        "tonight",
+        "tomorrow",
+        "yesterday",
+        "recent",
+        "recently",
+        "breaking",
+        "news",
+        "headline",
+        "headlines",
+        "score",
+        "scores",
+        "result",
+        "results",
+        "won",
+        "winner",
+        "standings",
+        "fixture",
+        "fixtures",
+        "schedule",
+        "upcoming",
+        "price",
+        "prices",
+        "cost",
+        "stock",
+        "stocks",
+        "weather",
+        "forecast",
+        "temperature",
+        "released",
+        "launched",
+        "announced",
+        "update",
+        "updates",
+        "president",
+        "champion",
+        "election",
+        "trending",
+        "happening",
+        "nowadays",
+        "today's",
+    ];
+    if WORD_SIGNALS.iter().any(|s| words.contains(s)) {
+        return true;
+    }
+
+    const PHRASE_SIGNALS: [&str; 10] = [
+        "right now",
+        "this week",
+        "this month",
+        "this year",
+        "how much is",
+        "who is the",
+        "who's the",
+        "prime minister",
+        "exchange rate",
+        "going on",
+    ];
+    if PHRASE_SIGNALS.iter().any(|p| q.contains(p)) {
+        return true;
+    }
+
+    contains_recent_year(&q)
+}
+
+/// Detects an explicit instruction to search the web ("search online for X",
+/// "look it up", "google that"). When present we search regardless of model or
+/// mode — the user asked directly, so no judgement call is needed.
+pub fn is_explicit_search_request(query: &str) -> bool {
+    let q = query.to_lowercase();
+    const PHRASES: [&str; 18] = [
+        "search online",
+        "search the web",
+        "search the internet",
+        "search for",
+        "search up",
+        "web search",
+        "look it up",
+        "look that up",
+        "look this up",
+        "google it",
+        "google that",
+        "check online",
+        "check the web",
+        "do a web search",
+        "do a search",
+        "can you search",
+        "please search",
+        "search and tell",
+    ];
+    PHRASES.iter().any(|p| q.contains(p))
+}
+
+/// Detects a standalone 4-digit year token in 2000–2099 (a strong "specific /
+/// current event" signal, e.g. "world cup 2026").
+fn contains_recent_year(q: &str) -> bool {
+    let bytes = q.as_bytes();
+    let n = bytes.len();
+    let mut i = 0;
+    while i + 4 <= n {
+        if bytes[i] == b'2'
+            && bytes[i + 1] == b'0'
+            && bytes[i + 2].is_ascii_digit()
+            && bytes[i + 3].is_ascii_digit()
+        {
+            let prev_digit = i > 0 && bytes[i - 1].is_ascii_digit();
+            let next_digit = i + 4 < n && bytes[i + 4].is_ascii_digit();
+            if !prev_digit && !next_digit {
+                return true;
+            }
+        }
+        i += 1;
+    }
+    false
 }
 
 // ---------------------------------------------------------------------------
@@ -1392,6 +1615,12 @@ mod tests {
         assert!(!should_search("12 * (3 + 4)"));
         assert!(!should_search("explain how recursion works"));
         assert!(!should_search("define entropy"));
+        // Conversational greetings with leading/trailing filler (the screenshot bug).
+        assert!(!should_search("Hey, what's up, bro?"));
+        assert!(!should_search("how are you doing"));
+        assert!(!should_search("sup man"));
+        assert!(!should_search("yo dude"));
+        assert!(!should_search("how's it going"));
     }
 
     #[test]
@@ -1400,6 +1629,53 @@ mod tests {
         assert!(should_search("what's the weather in Paris"));
         assert!(should_search("latest iphone price"));
         assert!(should_search("what's going on with the world cup"));
+        // "what's up WITH X" is a real question, not the "what's up" greeting.
+        assert!(should_search("what's up with the world cup"));
+    }
+
+    #[test]
+    fn looks_time_sensitive_detects_signals_and_years() {
+        assert!(looks_time_sensitive("world cup 2026 result"));
+        assert!(looks_time_sensitive("latest iphone price"));
+        assert!(looks_time_sensitive("weather in paris today"));
+        assert!(looks_time_sensitive("who is the prime minister of canada"));
+        assert!(looks_time_sensitive("what is going on with the election"));
+        // Not time-sensitive: chit-chat and evergreen/conceptual questions.
+        assert!(!looks_time_sensitive("hey whats up bro"));
+        assert!(!looks_time_sensitive("tell me a joke"));
+        assert!(!looks_time_sensitive("how do llms work"));
+        // "now" must not fire on words like "know".
+        assert!(!looks_time_sensitive("how do you know that"));
+    }
+
+    #[test]
+    fn heuristic_plan_searches_only_when_warranted() {
+        let chat = SearchPlan::heuristic("hey what's up bro");
+        assert!(!chat.needs_search);
+        assert!(chat.queries.is_empty());
+
+        let wc = SearchPlan::heuristic("world cup 2026 result");
+        assert!(wc.needs_search);
+        assert!(wc.news); // "result" → news
+        assert_eq!(wc.queries.len(), 1);
+
+        let breaking = SearchPlan::heuristic("breaking news on the election today");
+        assert!(breaking.needs_search);
+        assert_eq!(breaking.freshness, "day");
+    }
+
+    #[test]
+    fn explicit_request_forces_search_even_without_signals() {
+        assert!(is_explicit_search_request(
+            "search online for the best ramen"
+        ));
+        assert!(is_explicit_search_request("can you look it up"));
+        assert!(is_explicit_search_request("google that for me"));
+        assert!(!is_explicit_search_request("what is the capital of france"));
+        // A query with no time signal still searches when explicitly requested.
+        let p = SearchPlan::heuristic("search the web for the best ramen recipe");
+        assert!(p.needs_search);
+        assert_eq!(p.queries.len(), 1);
     }
 
     #[test]
@@ -1456,17 +1732,6 @@ mod tests {
         assert_eq!(plan.queries.len(), MAX_QUERIES);
         assert_eq!(plan.queries[0], "Tesla earnings");
         assert_eq!(plan.freshness, "day"); // "hour" normalized to "day"
-    }
-
-    #[test]
-    fn raw_plan_searches_the_question() {
-        let p = SearchPlan::raw("  population of japan  ");
-        assert!(p.needs_search);
-        assert_eq!(p.queries, vec!["population of japan".to_string()]);
-        assert!(!p.news);
-        let empty = SearchPlan::raw("   ");
-        assert!(!empty.needs_search);
-        assert!(empty.queries.is_empty());
     }
 
     #[test]

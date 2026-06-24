@@ -737,6 +737,8 @@
           "medium": "Standard",
           "high": "Deep"
         },
+        "localSmartLabel": "Smart search decisions (local model)",
+        "localSmartDescription": "Only shown when using the Built-in (Local) model. ON: the local model decides when to search using the same planner the cloud providers use — smarter, but it adds a short extra step before answering (noticeable on slower machines). OFF (default): a fast keyword check decides — instant, but it only catches obvious current-info questions (years, news, prices, scores, weather…). Either way, explicitly saying \"search the web for…\" always triggers a search.",
         "creditBudgetLabel": "Daily Firecrawl credit limit",
         "creditBudgetDescription": "Safety cap on how many Firecrawl credits web search may spend per day before it pauses and the assistant answers from its own knowledge. A typical Standard search costs ~8–12 credits. Set 0 for no limit. (A separate per-minute request cap always guards against runaway loops.)",
         "testLabel": "Test search",

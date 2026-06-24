@@ -771,6 +771,23 @@ export const AssistantSettings: React.FC = () => {
               />
             </SettingContainer>
 
+            {settings?.assistant_provider_id === "builtin" && (
+              <ToggleSwitch
+                checked={settings?.assistant_local_search_smart ?? false}
+                onChange={(checked) =>
+                  setAndRefresh(
+                    commands.setAssistantLocalSearchSmart(checked),
+                  )
+                }
+                label={t("settings.assistant.webSearch.localSmartLabel")}
+                description={t(
+                  "settings.assistant.webSearch.localSmartDescription",
+                )}
+                grouped={true}
+                disabled={!webSearchEnabled}
+              />
+            )}
+
             {webSearchProvider === "firecrawl" && (
               <SettingContainer
                 title={t("settings.assistant.webSearch.creditBudgetLabel")}

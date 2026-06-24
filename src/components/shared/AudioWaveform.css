@@ -15,6 +15,7 @@
 
 .audio-waveform {
   --wave-bar: linear-gradient(to top, #cdbfa8, #fafaf9 75%);
+  --wave-stroke: #e9ddc9;
 
   position: relative;
   display: flex;
@@ -22,6 +23,9 @@
   justify-content: center;
   width: 100%;
   line-height: 0;
+  /* Purely decorative — never intercept clicks/drags, so the pill stays
+   * draggable while the waveform is showing (speaking / processing). */
+  pointer-events: none;
 }
 
 .audio-waveform.sm {
@@ -38,6 +42,7 @@
  * overlay (which never sets that attribute) keeps its off-white bars. */
 :root[data-theme="light"] .audio-waveform {
   --wave-bar: linear-gradient(to top, #9c8c75, #c4b59d 72%);
+  --wave-stroke: #9c8c75;
 }
 
 .wave-bars {
@@ -83,6 +88,88 @@
   }
 }
 
+/* Working / thinking — a calm "shimmer": the centre-weighted silhouette gently
+ * pulses, phased by distance from the centre so it blooms symmetrically from
+ * the middle outward (never a left-to-right scan). */
+/* Smooth continuous wave (working / speaking) — two sine "ribbons" that drift
+ * at different speeds for an organic, premium flow instead of discrete bars.
+ * Each line lives in a 200%-wide layer and translates by -50% (an integer
+ * number of cycles) so the loop is seamless. */
+.wave-flow-field {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.wave-line {
+  position: absolute;
+  inset: 0;
+  width: 200%;
+  height: 100%;
+  will-change: transform;
+}
+
+.wave-line .wline {
+  fill: none;
+  stroke: var(--wave-stroke, #e9ddc9);
+  stroke-width: 2.25;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+/* Soft ribbon body under the front crest — a vertical fade to transparent. */
+.wave-line .wfill {
+  stroke: none;
+}
+
+.wfill-top {
+  stop-color: var(--wave-stroke, #e9ddc9);
+  stop-opacity: 0.24;
+}
+
+.wfill-bottom {
+  stop-color: var(--wave-stroke, #e9ddc9);
+  stop-opacity: 0;
+}
+
+.wave-line.back {
+  opacity: 0.4;
+}
+
+.wave-line.back .wline {
+  stroke-width: 1.75;
+}
+
+/* Speaking — a gentle, visible flow. */
+.audio-waveform.flow .wave-line.front {
+  animation: wave-travel 3.4s linear infinite;
+}
+.audio-waveform.flow .wave-line.back {
+  animation: wave-travel 5.2s linear infinite;
+}
+
+/* Working / thinking — calmer: a shorter ribbon drifting more slowly. */
+.audio-waveform.shimmer .wave-flow-field {
+  transform: scaleY(0.62);
+}
+.audio-waveform.shimmer .wave-line.front {
+  animation: wave-travel 5.6s linear infinite;
+}
+.audio-waveform.shimmer .wave-line.back {
+  animation: wave-travel 8s linear infinite;
+}
+
+@keyframes wave-travel {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .audio-waveform.is-idle .wave-bar {
     animation: none;
@@ -90,5 +177,8 @@
   }
   .wave-bar {
     transition: none;
+  }
+  .wave-line {
+    animation: none;
   }
 }
