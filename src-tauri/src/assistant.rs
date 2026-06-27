@@ -699,10 +699,19 @@ pub async fn run_assistant_turn(app: AppHandle, user_text: String, screenshot: O
             Some(web_search::SearchPlan::heuristic(&user_text))
         };
 
-        // An explicit "search the web for ..." request always searches, even if
-        // the planner/heuristic judged otherwise — the user asked directly.
+        // Force a search even when the planner judged one unnecessary, in two
+        // cases: (1) the user explicitly asked ("search the web for …"), or
+        // (2) the question clearly needs current/external facts — a role holder,
+        // price, score, weather, a recent year, etc. Capable models are often
+        // over-confident and answer "who is the current …" questions straight
+        // from stale training data instead of searching; this deterministic
+        // guard is the fail-safe for that (the `should_search` pre-gate has
+        // already screened out chit-chat, code and math before we get here).
         if let Some(plan) = plan_opt.as_mut() {
-            if !plan.needs_search && web_search::is_explicit_search_request(&user_text) {
+            if !plan.needs_search
+                && (web_search::is_explicit_search_request(&user_text)
+                    || web_search::looks_time_sensitive(&user_text))
+            {
                 plan.needs_search = true;
                 if plan.queries.is_empty() {
                     plan.queries
@@ -797,13 +806,18 @@ pub async fn run_assistant_turn(app: AppHandle, user_text: String, screenshot: O
             }
             content.push_str(directive);
         }
-        // On web-search turns, tell the model to ground its answer in (and
-        // cite) the results that are prepended to the user's message below.
+        // On web-search turns, tell the model to ground its answer in the
+        // results that are prepended to the user's message below — and, crucially,
+        // to treat them as its OWN findings (never "the results you sent"). The
+        // directive adapts to TTS: speech-friendly prose when the reply is spoken,
+        // richer Markdown (tables/bullets) when it's only read on screen.
         if web_context.is_some() {
             if !content.trim().is_empty() {
                 content.push_str("\n\n");
             }
-            content.push_str(web_search::WEB_SEARCH_SYSTEM_DIRECTIVE);
+            content.push_str(&web_search::web_search_system_directive(
+                settings.assistant_tts_enabled,
+            ));
         }
         content
     };

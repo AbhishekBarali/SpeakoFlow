@@ -1,8 +1,10 @@
 /* AudioWaveform — a mirrored "voice spindle": rounded-cap bars that arch up
  * from a centre line, tall in the middle and settling to small dots at the
- * rim. Self-contained; colours come from CSS variables with editorial
- * defaults (warm off-white bars) so it reads the same inside the recording
- * overlay and the assistant pill / panel.
+ * rim. One visual language for every state: live mic levels (reactive), a calm
+ * self-animated pulse (shimmer), and a livelier one (flow). Self-contained;
+ * colours come from CSS variables with editorial defaults (warm off-white
+ * bars) so it reads the same inside the recording overlay and the assistant
+ * pill / panel.
  *
  * Heights are a share of the container height and bars flex to fill the
  * available width, so the parent's box decides the scale.
@@ -15,7 +17,6 @@
 
 .audio-waveform {
   --wave-bar: linear-gradient(to top, #cdbfa8, #fafaf9 75%);
-  --wave-stroke: #e9ddc9;
 
   position: relative;
   display: flex;
@@ -42,7 +43,6 @@
  * overlay (which never sets that attribute) keeps its off-white bars. */
 :root[data-theme="light"] .audio-waveform {
   --wave-bar: linear-gradient(to top, #9c8c75, #c4b59d 72%);
-  --wave-stroke: #9c8c75;
 }
 
 .wave-bars {
@@ -61,6 +61,7 @@
   min-height: 2px;
   border-radius: 999px;
   background: var(--wave-bar);
+  transform-origin: center center;
   /* Smooth, springy rise/fall as the live signal moves the bars; transform is
    * eased too so the idle breathe and the live bars hand off cleanly. */
   transition:
@@ -69,9 +70,9 @@
   will-change: height, transform;
 }
 
-/* Idle — the bars rest as a calm row of soft dots that breathe together. Every
- * dot shares one slow, synchronised pulse (no per-bar delay), so the resting
- * state reads as a steady breath instead of a light scanning left-to-right. */
+/* Idle (reactive, no signal) — the bars rest as a calm row of soft dots that
+ * breathe together. Every dot shares one slow, synchronised pulse (no per-bar
+ * delay), so the resting state reads as a steady breath rather than a scan. */
 .audio-waveform.is-idle .wave-bar {
   animation: wave-idle-breathe 2.8s ease-in-out infinite;
 }
@@ -88,97 +89,54 @@
   }
 }
 
-/* Working / thinking — a calm "shimmer": the centre-weighted silhouette gently
- * pulses, phased by distance from the centre so it blooms symmetrically from
- * the middle outward (never a left-to-right scan). */
-/* Smooth continuous wave (working / speaking) — two sine "ribbons" that drift
- * at different speeds for an organic, premium flow instead of discrete bars.
- * Each line lives in a 200%-wide layer and translates by -50% (an integer
- * number of cycles) so the loop is seamless. */
-.wave-flow-field {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-}
-
-.wave-line {
-  position: absolute;
-  inset: 0;
-  width: 200%;
-  height: 100%;
+/* ---- Self-animated states: same bars, centre-out ripple ------------------ *
+ * `shimmer` (thinking) and `flow` (speaking) hold a static spindle silhouette
+ * (set inline as each bar's height) and pulse it with scaleY. The per-bar
+ * `--dist` (0 at the centre, 1 at the rim) phases the animation so the motion
+ * blooms symmetrically from the middle outward — never a left-to-right scan —
+ * and reads unmistakably as "voice", not a decorative squiggle. */
+.audio-waveform.shimmer .wave-bar,
+.audio-waveform.flow .wave-bar {
+  animation-name: wave-pulse;
+  animation-iteration-count: infinite;
+  animation-timing-function: cubic-bezier(0.37, 0, 0.63, 1);
   will-change: transform;
 }
 
-.wave-line .wline {
-  fill: none;
-  stroke: var(--wave-stroke, #e9ddc9);
-  stroke-width: 2.25;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  vector-effect: non-scaling-stroke;
+/* Thinking — slow and shallow: a quiet, premium breath. */
+.audio-waveform.shimmer .wave-bar {
+  --pulse-lo: 0.78;
+  animation-duration: 2.4s;
+  animation-delay: calc(var(--dist, 0) * -0.62s);
 }
 
-/* Soft ribbon body under the front crest — a vertical fade to transparent. */
-.wave-line .wfill {
-  stroke: none;
+/* Speaking — quicker and deeper, so it feels like a live voice. */
+.audio-waveform.flow .wave-bar {
+  --pulse-lo: 0.42;
+  animation-duration: 1.15s;
+  animation-delay: calc(var(--dist, 0) * -0.46s);
 }
 
-.wfill-top {
-  stop-color: var(--wave-stroke, #e9ddc9);
-  stop-opacity: 0.24;
-}
-
-.wfill-bottom {
-  stop-color: var(--wave-stroke, #e9ddc9);
-  stop-opacity: 0;
-}
-
-.wave-line.back {
-  opacity: 0.4;
-}
-
-.wave-line.back .wline {
-  stroke-width: 1.75;
-}
-
-/* Speaking — a gentle, visible flow. */
-.audio-waveform.flow .wave-line.front {
-  animation: wave-travel 3.4s linear infinite;
-}
-.audio-waveform.flow .wave-line.back {
-  animation: wave-travel 5.2s linear infinite;
-}
-
-/* Working / thinking — calmer: a shorter ribbon drifting more slowly. */
-.audio-waveform.shimmer .wave-flow-field {
-  transform: scaleY(0.62);
-}
-.audio-waveform.shimmer .wave-line.front {
-  animation: wave-travel 5.6s linear infinite;
-}
-.audio-waveform.shimmer .wave-line.back {
-  animation: wave-travel 8s linear infinite;
-}
-
-@keyframes wave-travel {
-  from {
-    transform: translateX(0);
+@keyframes wave-pulse {
+  0%,
+  100% {
+    transform: scaleY(var(--pulse-lo, 0.6));
   }
-  to {
-    transform: translateX(-50%);
+  50% {
+    transform: scaleY(1);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .audio-waveform.is-idle .wave-bar {
+  .audio-waveform.is-idle .wave-bar,
+  .audio-waveform.shimmer .wave-bar,
+  .audio-waveform.flow .wave-bar {
     animation: none;
+  }
+  .audio-waveform.is-idle .wave-bar {
     opacity: 0.5;
   }
   .wave-bar {
     transition: none;
-  }
-  .wave-line {
-    animation: none;
   }
 }

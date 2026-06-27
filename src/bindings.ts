@@ -1308,8 +1308,8 @@ async setAssistantWebSearchEnabled(enabled: boolean) : Promise<Result<null, stri
 }
 },
 /**
- * Choose the search backend: "duckduckgo" (free, no key), "firecrawl", or
- * "brave".
+ * Choose the search backend: "serper" (default), "brave", "tavily", "exa", or
+ * "serpapi". All are snippet-only and use a single API key.
  */
 async setAssistantWebSearchProvider(provider: string) : Promise<Result<null, string>> {
     try {
@@ -1343,9 +1343,9 @@ async setAssistantSearchDepth(depth: AssistantSearchDepth) : Promise<Result<null
 }
 },
 /**
- * Set the daily Firecrawl credit budget for web search (0 = unlimited). A
- * safety rail so a session can't silently drain the user's Firecrawl plan; a
- * rolling per-minute request cap guards against runaway loops regardless.
+ * DEPRECATED / no-op since web search became snippet-only (the Firecrawl
+ * credit guard was removed). Still registered so existing bindings/settings
+ * stay valid; it only writes the now-unused setting field.
  */
 async setAssistantWebSearchDailyCreditBudget(budget: number) : Promise<Result<null, string>> {
     try {
@@ -1368,9 +1368,9 @@ async setAssistantLocalSearchSmart(enabled: boolean) : Promise<Result<null, stri
 }
 },
 /**
- * Toggle fetching full page content for the top results (Firecrawl only).
- * Full content makes answers far more accurate; turning it off relies on short
- * snippets and saves Firecrawl credits.
+ * DEPRECATED / no-op since web search became snippet-only (page fetching was
+ * removed). Still registered so existing bindings/settings stay valid; it only
+ * writes the now-unused setting field.
  */
 async setAssistantWebSearchFetchContent(enabled: boolean) : Promise<Result<null, string>> {
     try {
@@ -1381,7 +1381,8 @@ async setAssistantWebSearchFetchContent(enabled: boolean) : Promise<Result<null,
 }
 },
 /**
- * Store the API key for a keyed search provider ("firecrawl" or "brave").
+ * Store the API key for a search provider ("serper", "brave", "tavily", "exa",
+ * or "serpapi").
  */
 async setAssistantWebSearchApiKey(provider: string, apiKey: string) : Promise<Result<null, string>> {
     try {
@@ -1475,8 +1476,8 @@ assistant_panel_theme?: string;
  */
 assistant_web_search_enabled?: boolean; 
 /**
- * Which search backend to use: "duckduckgo" (free, no key), "firecrawl",
- * or "brave".
+ * Which search backend to use: "serper" (default), "brave", "tavily",
+ * "exa", or "serpapi". All are snippet-only and use a single API key.
  */
 assistant_web_search_provider?: string; 
 /**
@@ -1485,10 +1486,9 @@ assistant_web_search_provider?: string;
  */
 assistant_web_search_max_results?: number; 
 /**
- * Whether to fetch the full page content of the top results (Firecrawl
- * only) instead of relying on short snippets. Full content makes answers
- * far more accurate and complete; turn it off to save Firecrawl credits or
- * favor speed. No effect on the snippet-only providers.
+ * DEPRECATED / unused since web search became snippet-only (Firecrawl and
+ * its page-scrape stage were removed). Kept so existing settings files and
+ * generated bindings stay stable; no current provider reads it.
  */
 assistant_web_search_fetch_content?: boolean; 
 /**
@@ -1497,10 +1497,9 @@ assistant_web_search_fetch_content?: boolean;
  */
 assistant_search_depth?: AssistantSearchDepth; 
 /**
- * Safety rail: the most Firecrawl credits web search may spend per local
- * calendar day before it stops searching (and the assistant answers from
- * its own knowledge instead). `0` means unlimited. A rolling per-minute
- * request cap also guards against runaway loops regardless of this value.
+ * DEPRECATED / unused since the Firecrawl credit guard was removed (search
+ * is now snippet-only over per-request SERP APIs). Kept so existing
+ * settings files and generated bindings stay stable.
  */
 assistant_web_search_daily_credit_budget?: number; 
 /**
@@ -1513,7 +1512,7 @@ assistant_web_search_daily_credit_budget?: number;
 assistant_local_search_smart?: boolean; 
 /**
  * API keys for the keyed search providers, keyed by provider id
- * ("firecrawl", "brave"). DuckDuckGo needs none.
+ * ("serper", "brave", "tavily", "exa", "serpapi").
  */
 web_search_api_keys?: SecretMap; theme?: Theme }
 /**

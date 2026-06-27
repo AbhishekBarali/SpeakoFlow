@@ -470,12 +470,15 @@ pub fn set_assistant_web_search_enabled(app: AppHandle, enabled: bool) -> Result
     Ok(())
 }
 
-/// Choose the search backend: "duckduckgo" (free, no key), "firecrawl", or
-/// "brave".
+/// Choose the search backend: "serper" (default), "brave", "tavily", "exa", or
+/// "serpapi". All are snippet-only and use a single API key.
 #[tauri::command]
 #[specta::specta]
 pub fn set_assistant_web_search_provider(app: AppHandle, provider: String) -> Result<(), String> {
-    if !matches!(provider.as_str(), "duckduckgo" | "firecrawl" | "brave") {
+    if !matches!(
+        provider.as_str(),
+        "serper" | "brave" | "tavily" | "exa" | "serpapi"
+    ) {
         return Err(format!("Unknown web search provider: {}", provider));
     }
     let mut settings = get_settings(&app);
@@ -511,9 +514,9 @@ pub fn set_assistant_search_depth(
     Ok(())
 }
 
-/// Set the daily Firecrawl credit budget for web search (0 = unlimited). A
-/// safety rail so a session can't silently drain the user's Firecrawl plan; a
-/// rolling per-minute request cap guards against runaway loops regardless.
+/// DEPRECATED / no-op since web search became snippet-only (the Firecrawl
+/// credit guard was removed). Still registered so existing bindings/settings
+/// stay valid; it only writes the now-unused setting field.
 #[tauri::command]
 #[specta::specta]
 pub fn set_assistant_web_search_daily_credit_budget(
@@ -540,9 +543,9 @@ pub fn set_assistant_local_search_smart(app: AppHandle, enabled: bool) -> Result
     Ok(())
 }
 
-/// Toggle fetching full page content for the top results (Firecrawl only).
-/// Full content makes answers far more accurate; turning it off relies on short
-/// snippets and saves Firecrawl credits.
+/// DEPRECATED / no-op since web search became snippet-only (page fetching was
+/// removed). Still registered so existing bindings/settings stay valid; it only
+/// writes the now-unused setting field.
 #[tauri::command]
 #[specta::specta]
 pub fn set_assistant_web_search_fetch_content(app: AppHandle, enabled: bool) -> Result<(), String> {
@@ -553,7 +556,8 @@ pub fn set_assistant_web_search_fetch_content(app: AppHandle, enabled: bool) -> 
     Ok(())
 }
 
-/// Store the API key for a keyed search provider ("firecrawl" or "brave").
+/// Store the API key for a search provider ("serper", "brave", "tavily", "exa",
+/// or "serpapi").
 #[tauri::command]
 #[specta::specta]
 pub fn set_assistant_web_search_api_key(
@@ -561,7 +565,10 @@ pub fn set_assistant_web_search_api_key(
     provider: String,
     api_key: String,
 ) -> Result<(), String> {
-    if !matches!(provider.as_str(), "firecrawl" | "brave") {
+    if !matches!(
+        provider.as_str(),
+        "serper" | "brave" | "tavily" | "exa" | "serpapi"
+    ) {
         return Err(format!(
             "Provider '{}' does not use an API key for web search",
             provider

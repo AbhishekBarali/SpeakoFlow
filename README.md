@@ -30,9 +30,12 @@ SpeakoFlow started as a fork of the excellent [Handy](https://github.com/cjpais/
 
 - Flip on web search and the assistant can answer current, factual questions — prices, weather, news, "who is the prime minister of…" — instead of guessing from stale training data
 - A globe toggle lives right in the panel's input row, so you can turn it on or off per question
-- Three backends:
-  - **DuckDuckGo** — free, no API key, on by default
-  - **Firecrawl** and **Brave** — bring your own key if you prefer them
+- Five backends, all snippet-first and each with its own free tier (bring your own API key):
+  - **Serper** — fast, cheap Google results with a generous free tier (default)
+  - **SerpAPI** — Google results via an alternative SERP API
+  - **Brave** — Brave's own independent index
+  - **Tavily** — search tuned for AI assistants, returns a short synthesized answer too
+  - **Exa** — neural/semantic search
 - Built for speed and small prompts: only short snippets come back (never full pages), a quick local heuristic skips searches for chit-chat or coding, and a slow search degrades gracefully instead of stalling the answer
 
 ### 🔊 Spoken answers (TTS)
@@ -59,7 +62,7 @@ SpeakoFlow started as a fork of the excellent [Handy](https://github.com/cjpais/
 | Local dictation                          | ✅    | ✅ (unchanged core)                                    |
 | AI assistant chat panel                  | —     | ✅ floating glass panel, streaming                     |
 | Screen vision (screenshots to the model) | —     | ✅ hotkey, voice intent, or camera button              |
-| Web search                               | —     | ✅ DuckDuckGo (keyless) / Firecrawl / Brave            |
+| Web search                               | —     | ✅ Serper / SerpAPI / Brave / Tavily / Exa (bring your own key) |
 | Spoken answers (TTS)                      | —     | ✅ Kokoro local / OpenAI-compatible / ElevenLabs / Azure |
 | Hands-free dictation toggle              | —     | ✅ dedicated F9 binding                                |
 | Built-in offline LLM (llama.cpp)         | —     | ✅ runs a downloaded model, no server                  |
@@ -90,7 +93,7 @@ On macOS the modifier defaults to `Option` in place of `Ctrl`/`Alt` (e.g. `Optio
    - **Custom** for Azure OpenAI — base URL `https://{your-resource}.openai.azure.com/openai/v1` (or your `cognitiveservices.azure.com` domain), model = your deployment name
    - **Local** for an Ollama / LM Studio server, or any of the hosted presets (OpenAI, Anthropic, Groq, OpenRouter, Z.AI, Cerebras, AWS Bedrock) with an API key
    - For screen vision, the model must support images (`gpt-4o-mini`, `gpt-4.1-mini`, `gemini-flash`, …)
-3. Optionally enable **Web search** in the same settings page (DuckDuckGo works with no key)
+3. Optionally enable **Web search** in the same settings page (add a free Serper API key)
 4. Press `Ctrl + Alt + Space` and ask something
 
 ### Building from source
@@ -107,7 +110,7 @@ See [BUILD.md](BUILD.md) for platform prerequisites (Rust, CMake, Vulkan SDK on 
 
 - **Voice → text**: always local, never leaves your machine
 - **Assistant questions + optional screenshots**: sent only to the LLM provider _you_ configure — which can be the built-in local model or your own Ollama / LM Studio server
-- **Web search** (off by default): when on, only your search query goes to the provider you pick (DuckDuckGo needs no key), and just short snippets come back — your conversation is never sent
+- **Web search** (off by default): when on, only your search query goes to the provider you pick (Serper by default), and just short snippets come back — your conversation is never sent
 - **TTS**: local by default (Kokoro); remote only if you choose a remote engine
 - **Fully offline option**: pair the Built-in (Local) LLM with Kokoro TTS and web search off, and nothing leaves your machine at all
 - No telemetry, no accounts, no cloud middleman

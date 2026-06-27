@@ -627,28 +627,26 @@ pub struct AppSettings {
     /// casual messages stay instant.
     #[serde(default)]
     pub assistant_web_search_enabled: bool,
-    /// Which search backend to use: "duckduckgo" (free, no key), "firecrawl",
-    /// or "brave".
+    /// Which search backend to use: "serper" (default), "brave", "tavily",
+    /// "exa", or "serpapi". All are snippet-only and use a single API key.
     #[serde(default = "default_assistant_web_search_provider")]
     pub assistant_web_search_provider: String,
     /// How many results to feed the model. Kept modest to bound prompt size;
     /// clamped to 1–10 at search time.
     #[serde(default = "default_assistant_web_search_max_results")]
     pub assistant_web_search_max_results: u32,
-    /// Whether to fetch the full page content of the top results (Firecrawl
-    /// only) instead of relying on short snippets. Full content makes answers
-    /// far more accurate and complete; turn it off to save Firecrawl credits or
-    /// favor speed. No effect on the snippet-only providers.
+    /// DEPRECATED / unused since web search became snippet-only (Firecrawl and
+    /// its page-scrape stage were removed). Kept so existing settings files and
+    /// generated bindings stay stable; no current provider reads it.
     #[serde(default = "default_assistant_web_search_fetch_content")]
     pub assistant_web_search_fetch_content: bool,
     /// How thorough web search is (Low/Medium/High). Replaces the old raw
     /// "max results" number as the primary control; tuned to stay fast.
     #[serde(default)]
     pub assistant_search_depth: AssistantSearchDepth,
-    /// Safety rail: the most Firecrawl credits web search may spend per local
-    /// calendar day before it stops searching (and the assistant answers from
-    /// its own knowledge instead). `0` means unlimited. A rolling per-minute
-    /// request cap also guards against runaway loops regardless of this value.
+    /// DEPRECATED / unused since the Firecrawl credit guard was removed (search
+    /// is now snippet-only over per-request SERP APIs). Kept so existing
+    /// settings files and generated bindings stay stable.
     #[serde(default = "default_assistant_web_search_daily_credit_budget")]
     pub assistant_web_search_daily_credit_budget: u32,
     /// Built-in local model ONLY: when true, decide whether to search with the
@@ -659,7 +657,7 @@ pub struct AppSettings {
     #[serde(default)]
     pub assistant_local_search_smart: bool,
     /// API keys for the keyed search providers, keyed by provider id
-    /// ("firecrawl", "brave"). DuckDuckGo needs none.
+    /// ("serper", "brave", "tavily", "exa", "serpapi").
     #[serde(default = "default_web_search_api_keys")]
     pub web_search_api_keys: SecretMap,
     #[serde(default)]
@@ -1006,8 +1004,9 @@ fn default_assistant_accent() -> String {
 }
 
 fn default_assistant_web_search_provider() -> String {
-    // Free and keyless by default so web search works out of the box.
-    "duckduckgo".to_string()
+    // Serper is the default snippet backend: fast (~1–2 s) Google SERP results,
+    // a generous free tier, and cheap at scale. Requires a (free) API key.
+    "serper".to_string()
 }
 
 fn default_assistant_web_search_max_results() -> u32 {
@@ -1017,21 +1016,24 @@ fn default_assistant_web_search_max_results() -> u32 {
 }
 
 fn default_assistant_web_search_fetch_content() -> bool {
-    // Quality-first: fetch real page content (Firecrawl) by default.
+    // DEPRECATED / unused (web search is snippet-only). Default kept for
+    // back-compat with existing settings files.
     true
 }
 
 fn default_assistant_web_search_daily_credit_budget() -> u32 {
-    // Conservative spend ceiling so a misbehaving session can't silently drain
-    // a Firecrawl plan. A Medium turn costs roughly 8–12 credits, so this
-    // covers a few hundred searches/day; 0 disables the budget.
+    // DEPRECATED / unused (the Firecrawl credit guard was removed; search is
+    // snippet-only). Default kept for back-compat with existing settings files.
     2000
 }
 
 fn default_web_search_api_keys() -> SecretMap {
     let mut map = HashMap::new();
-    map.insert("firecrawl".to_string(), String::new());
+    map.insert("serper".to_string(), String::new());
     map.insert("brave".to_string(), String::new());
+    map.insert("tavily".to_string(), String::new());
+    map.insert("exa".to_string(), String::new());
+    map.insert("serpapi".to_string(), String::new());
     SecretMap(map)
 }
 
@@ -1114,10 +1116,12 @@ fn ensure_assistant_defaults(settings: &mut AppSettings) -> bool {
         changed = true;
     }
     // Web search: validate provider and backfill API-key slots for keyed
-    // providers so the settings UI always has entries to bind to.
+    // providers so the settings UI always has entries to bind to. Legacy values
+    // (e.g. the removed "firecrawl"/"duckduckgo") fail this match and migrate to
+    // the default (Serper).
     if !matches!(
         settings.assistant_web_search_provider.as_str(),
-        "duckduckgo" | "firecrawl" | "brave"
+        "serper" | "brave" | "tavily" | "exa" | "serpapi"
     ) {
         settings.assistant_web_search_provider = default_assistant_web_search_provider();
         changed = true;
@@ -1128,7 +1132,7 @@ fn ensure_assistant_defaults(settings: &mut AppSettings) -> bool {
         settings.assistant_web_search_max_results = default_assistant_web_search_max_results();
         changed = true;
     }
-    for provider_id in ["firecrawl", "brave"] {
+    for provider_id in ["serper", "brave", "tavily", "exa", "serpapi"] {
         if !settings.web_search_api_keys.contains_key(provider_id) {
             settings
                 .web_search_api_keys

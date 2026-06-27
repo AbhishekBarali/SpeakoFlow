@@ -670,8 +670,8 @@
   height: 100%;
   display: flex;
   align-items: center;
-  gap: 11px;
-  padding: 0 12px 0 9px;
+  gap: 10px;
+  padding: 0 10px 0 7px;
   font-family: var(--font-ui);
   color: var(--ink);
   background: var(--panel-surface);
@@ -686,27 +686,35 @@
   box-shadow:
     0 0 0 1px var(--hairline),
     0 1px 2px rgba(0, 0, 0, 0.2),
-    0 3px 6px rgba(0, 0, 0, 0.16);
+    0 3px 8px rgba(0, 0, 0, 0.18);
   overflow: hidden;
   user-select: none;
   cursor: grab;
 }
 
+/* Mic / stop button — quiet by default: a subtle ink-tinted disc with a hairline
+ * ring and a crisp glyph, so the resting pill stays calm and modern instead of
+ * leading with a bright solid circle. Colour is earned only by the active
+ * recording state below (the pill's single colour moment). The tint is mixed
+ * from --ink, so it adapts correctly to both the light and dark panel themes. */
 .pill-mic {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   flex-shrink: 0;
-  border: none;
+  border: 1px solid color-mix(in srgb, var(--ink) 14%, transparent);
   border-radius: 50%;
-  background: var(--ink-pill-bg);
-  color: var(--ink-pill-fg);
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+  color: var(--ink);
   cursor: pointer;
   transition:
-    box-shadow 0.15s ease,
-    background 0.15s ease;
+    background 0.16s ease,
+    border-color 0.16s ease,
+    color 0.16s ease,
+    transform 0.12s ease,
+    box-shadow 0.22s ease;
 }
 
 .pill-mic-wrap {
@@ -733,21 +741,36 @@
 }
 
 .pill-mic:hover {
-  filter: brightness(1.08);
+  background: color-mix(in srgb, var(--ink) 13%, transparent);
+  border-color: color-mix(in srgb, var(--ink) 24%, transparent);
 }
 
+.pill-mic:active {
+  transform: scale(0.94);
+}
+
+/* Recording — the pill's single colour moment. A clean solid red (the
+ * universal "recording" convention, so it conveys state rather than decorating)
+ * with a soft halo that reads as "live". */
 .pill-mic.recording {
-  background: linear-gradient(135deg, #ef4444, #f97316);
+  background: #e5484d;
+  border-color: transparent;
   color: #fff;
+  box-shadow: 0 0 0 4px color-mix(in srgb, #e5484d 18%, transparent);
+}
+
+.pill-mic.recording:hover {
+  background: #ec5f63;
+  border-color: transparent;
 }
 
 /* Stop affordance (a turn is generating, or TTS is reading out a long reply).
- * Keeps the dark "ink" button — same language as the main panel's stop — so
- * it reads as "stop the current activity" and stays distinct from the red
- * recording state. */
+ * Stays the quiet neutral disc — the animated waveform already signals that
+ * something is happening, so the button just needs to read as "stop", distinct
+ * from the red recording state. */
 .pill-mic.stopping {
-  background: var(--ink-pill-bg);
-  color: var(--ink-pill-fg);
+  background: color-mix(in srgb, var(--ink) 9%, transparent);
+  color: var(--ink);
 }
 
 .pill-wave {

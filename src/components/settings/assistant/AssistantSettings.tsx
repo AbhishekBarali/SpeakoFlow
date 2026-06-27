@@ -249,7 +249,6 @@ export const AssistantSettings: React.FC = () => {
 
   // Web search section state.
   const [webSearchApiKey, setWebSearchApiKey] = useState("");
-  const [webSearchCreditBudget, setWebSearchCreditBudget] = useState("2000");
   const [webSearchTest, setWebSearchTest] = useState<
     "idle" | "testing" | "ok" | "error"
   >("idle");
@@ -422,10 +421,14 @@ export const AssistantSettings: React.FC = () => {
 
   // --- Web search ---------------------------------------------------------
   const webSearchProvider =
-    settings?.assistant_web_search_provider ?? "duckduckgo";
+    settings?.assistant_web_search_provider ?? "serper";
   const webSearchEnabled = settings?.assistant_web_search_enabled ?? false;
   const webSearchNeedsKey =
-    webSearchProvider === "firecrawl" || webSearchProvider === "brave";
+    webSearchProvider === "serper" ||
+    webSearchProvider === "brave" ||
+    webSearchProvider === "tavily" ||
+    webSearchProvider === "exa" ||
+    webSearchProvider === "serpapi";
 
   // Sync the API-key field to the selected provider's stored key.
   useEffect(() => {
@@ -434,27 +437,11 @@ export const AssistantSettings: React.FC = () => {
     );
   }, [settings, webSearchProvider]);
 
-  useEffect(() => {
-    setWebSearchCreditBudget(
-      String(settings?.assistant_web_search_daily_credit_budget ?? 2000),
-    );
-  }, [settings?.assistant_web_search_daily_credit_budget]);
-
   const handleWebSearchApiKeyBlur = async () => {
     await commands.setAssistantWebSearchApiKey(
       webSearchProvider,
       webSearchApiKey,
     );
-    await refreshSettings();
-  };
-
-  const handleWebSearchCreditBudgetBlur = async () => {
-    const raw = parseInt(webSearchCreditBudget, 10);
-    const parsed = Number.isFinite(raw)
-      ? Math.max(0, Math.min(1000000, raw))
-      : 2000;
-    setWebSearchCreditBudget(String(parsed));
-    await commands.setAssistantWebSearchDailyCreditBudget(parsed);
     await refreshSettings();
   };
 
@@ -670,20 +657,24 @@ export const AssistantSettings: React.FC = () => {
               <Dropdown
                 options={[
                   {
-                    value: "duckduckgo",
-                    label: t(
-                      "settings.assistant.webSearch.providers.duckduckgo",
-                    ),
-                  },
-                  {
-                    value: "firecrawl",
-                    label: t(
-                      "settings.assistant.webSearch.providers.firecrawl",
-                    ),
+                    value: "serper",
+                    label: t("settings.assistant.webSearch.providers.serper"),
                   },
                   {
                     value: "brave",
                     label: t("settings.assistant.webSearch.providers.brave"),
+                  },
+                  {
+                    value: "tavily",
+                    label: t("settings.assistant.webSearch.providers.tavily"),
+                  },
+                  {
+                    value: "exa",
+                    label: t("settings.assistant.webSearch.providers.exa"),
+                  },
+                  {
+                    value: "serpapi",
+                    label: t("settings.assistant.webSearch.providers.serpapi"),
                   },
                 ]}
                 selectedValue={webSearchProvider}
@@ -719,21 +710,6 @@ export const AssistantSettings: React.FC = () => {
                 />
               </SettingContainer>
             )}
-
-            <ToggleSwitch
-              checked={settings?.assistant_web_search_fetch_content ?? true}
-              onChange={(checked) =>
-                setAndRefresh(
-                  commands.setAssistantWebSearchFetchContent(checked),
-                )
-              }
-              label={t("settings.assistant.webSearch.fetchContentLabel")}
-              description={t(
-                "settings.assistant.webSearch.fetchContentDescription",
-              )}
-              grouped={true}
-              disabled={!webSearchEnabled}
-            />
 
             <SettingContainer
               title={t("settings.assistant.webSearch.depthLabel")}
@@ -786,29 +762,6 @@ export const AssistantSettings: React.FC = () => {
                 grouped={true}
                 disabled={!webSearchEnabled}
               />
-            )}
-
-            {webSearchProvider === "firecrawl" && (
-              <SettingContainer
-                title={t("settings.assistant.webSearch.creditBudgetLabel")}
-                description={t(
-                  "settings.assistant.webSearch.creditBudgetDescription",
-                )}
-                descriptionMode="tooltip"
-                layout="horizontal"
-                grouped={true}
-              >
-                <Input
-                  type="number"
-                  min={0}
-                  step={100}
-                  value={webSearchCreditBudget}
-                  onChange={(e) => setWebSearchCreditBudget(e.target.value)}
-                  onBlur={handleWebSearchCreditBudgetBlur}
-                  className="w-[120px]"
-                  disabled={!webSearchEnabled}
-                />
-              </SettingContainer>
             )}
 
             <SettingContainer

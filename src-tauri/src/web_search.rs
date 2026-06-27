@@ -10,27 +10,25 @@
 //!    is needed and rewrites the user's (often transcribed) request into 1–4
 //!    clean queries, picks a freshness window, and flags whether this is a
 //!    current-events/news topic.
-//! 2. **Snippet search** (`snippet_search`): run each query in parallel and get
-//!    back fast title+snippet results only — no scraping yet. For Firecrawl we
-//!    pull both `web` and `news` sources (news is what makes "what's happening
-//!    with X" questions work) and sort the web results by date when the topic
-//!    is time-sensitive.
+//! 2. **Snippet search** (`snippet_search`): run each query in parallel against
+//!    the configured provider and get back fast title+snippet results. News
+//!    sources are pulled in when the planner flags a current-events topic, and
+//!    a freshness window is applied when the topic is time-sensitive.
 //! 3. **Local rerank** (`rerank`): score the merged snippets by lexical overlap
 //!    with the query plus a recency boost — purely local, no extra network or
-//!    LLM call, so it costs ~nothing.
-//! 4. **Scrape the winners only** (`firecrawl_scrape`): fetch full page content
-//!    for just the top few reranked results, in parallel, each with a tight
-//!    deadline. A slow page is dropped (we keep its snippet) rather than
-//!    stalling the spoken answer. Cached pages (`maxAge`) come back fast.
+//!    LLM call, so it costs ~nothing. The top sources are handed to the model.
 //!
-//! A **credit guard** wraps every Firecrawl call: a rolling per-minute request
-//! cap stops runaway loops, and a per-day credit budget stops a session from
-//! quietly draining the user's plan. When either trips, search degrades
-//! gracefully (the assistant answers without web context).
+//! Snippet-first by design: result pages are never fetched/scraped, so a search
+//! is a single fast HTTP round-trip per query and the model only ever sees
+//! short titles + snippets (plus answer boxes / knowledge panels when the
+//! provider returns them). A failed/slow search degrades gracefully — the turn
+//! answers without web context rather than stalling.
 //!
-//! Providers: **Firecrawl** (search + scrape, the high-quality path), **Brave**
-//! and **DuckDuckGo** (keyless) are snippet-only fallbacks that still benefit
-//! from the rerank.
+//! Providers (all snippet-first, all benefit from the local rerank, all use a
+//! single API key): **Serper** (fast, cheap Google SERP — the default),
+//! **Brave** (independent index), **Tavily** (LLM-optimized search + answer),
+//! **Exa** (neural/semantic search), and **SerpAPI** (Google SERP). Any unknown
+//! or legacy provider value routes to Serper.
 
 use crate::llm_client;
 use crate::settings::{AppSettings, AssistantSearchDepth, PostProcessProvider};
@@ -40,19 +38,11 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use specta::Type;
-use std::collections::{HashSet, VecDeque};
-use std::sync::Mutex;
-use std::time::{Duration, Instant};
+use std::collections::HashSet;
+use std::time::Duration;
 
-/// Timeout for the snippet search call (Firecrawl `/v2/search` without scraping,
-/// or Brave/DuckDuckGo). Normally ~1–2 s; this is just the ceiling.
-const SNIPPET_SEARCH_TIMEOUT: Duration = Duration::from_secs(8);
-
-/// Per-page scrape timeout. Deliberately tight: a real-time voice assistant
-/// would rather answer from a snippet than wait on one slow page.
-const SCRAPE_TIMEOUT: Duration = Duration::from_secs(7);
-
-/// Timeout for the bare snippet providers (Brave, DuckDuckGo).
+/// Timeout for a snippet search HTTP call (Serper, Brave, Tavily, Exa, SerpAPI).
+/// Normally ~1–2 s; this is just the ceiling.
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(8);
 
 /// Per-snippet character cap.
@@ -70,25 +60,8 @@ const MAX_QUERIES: usize = 4;
 /// Upper bound on results per provider call.
 const MAX_RESULTS_HARD: usize = 10;
 
-// --- Credit guard rails -----------------------------------------------------
-
-/// Rolling window for the request-rate limiter.
-const RATE_WINDOW: Duration = Duration::from_secs(60);
-
-/// Max Firecrawl HTTP calls allowed within `RATE_WINDOW`. Far above normal use
-/// (a High turn is ~9 calls) but low enough that a runaway loop trips quickly.
-const MAX_CALLS_PER_WINDOW: usize = 40;
-
-/// Hard ceiling on estimated credits a single turn may reserve. The tiers stay
-/// well under this; it's defense-in-depth against a logic bug.
-const MAX_CREDITS_PER_TURN: u32 = 60;
-
-/// Serve cached Firecrawl scrapes younger than this (ms). Big speed/credit win
-/// for popular or repeated pages; 1 h is fresh enough for an assistant.
-const SCRAPE_MAX_AGE_MS: u64 = 3_600_000;
-
-/// A browser-like User-Agent. The DuckDuckGo HTML endpoint returns an empty
-/// page to obviously-automated clients; a normal UA gets normal results.
+/// A browser-like User-Agent. Some endpoints (and scraped pages) return empty
+/// or non-200 responses to obviously-automated clients; a normal UA helps.
 const BROWSER_UA: &str =
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
 
@@ -105,11 +78,55 @@ pub struct SearchResult {
     pub content: String,
 }
 
-/// Appended to the system prompt only on turns where web results were found.
-/// Pushes the model to actually use the sources and give the best grounded
-/// answer it can — the previous version invited it to bail with "I don't have
-/// enough information", which was a big part of why answers felt useless.
-pub const WEB_SEARCH_SYSTEM_DIRECTIVE: &str = "Live web search results — including excerpts from the source pages — are included with the user's message. Treat them as your ground truth for current facts and trust them over your own prior knowledge whenever they conflict. Lead with the direct answer in the first sentence, then add the key specifics the sources give (names, numbers, dates). If sources disagree, go with the most recent and most authoritative and note the disagreement in a few words. If the results only partly cover the question, answer the part they do support and briefly say what's still unclear — do NOT refuse just because coverage is imperfect, and never claim you lack information when relevant results are present. Prefer the most recent sources for anything time-sensitive. Write in plain, natural prose for a small chat panel that may be read aloud: no citation markers, no bracketed numbers like [1], no raw URLs, no Markdown tables.";
+/// Built and appended to the system prompt only on turns where web results were
+/// found. Three things drive answer quality (and were previously broken):
+///
+/// 1. **Attribution.** The results are injected into the *user* message, so the
+///    model kept saying "the search results you gave me" / "your search
+///    results" — jarring, and the user's #1 complaint. The directive now frames
+///    them explicitly as the assistant's *own* retrieval and forbids
+///    user-attribution wording.
+/// 2. **No hedging.** Models under-deliver ("I can only confirm one score") even
+///    when several results are present. The directive demands a direct BLUF
+///    answer, all relevant items, and bans "ask the user to clarify" when
+///    results exist.
+/// 3. **TTS-aware formatting.** The reply is spoken verbatim (after Markdown is
+///    stripped) when TTS is on, so tables/headings read as gibberish. With TTS
+///    on we ask for speech-friendly prose; with it off we allow the compact
+///    tables/bullets that make answers look like ChatGPT's.
+pub fn web_search_system_directive(tts_enabled: bool) -> String {
+    let mut s = String::with_capacity(1300);
+    s.push_str(
+        "The user's message includes live web search results that YOU just retrieved with your \
+         built-in web tool for this turn. Treat them as your own current findings and as ground \
+         truth, trusting them over your prior knowledge when they conflict. Never describe them as \
+         something the user gave, sent, pasted, or provided, and never use phrases like \"your \
+         search results\" or \"the results you sent\" — to the user it must read as if you simply \
+         know the current answer. Open with the direct answer in the very first sentence (the name, \
+         number, score, or date asked for), then add the key supporting specifics. When the results \
+         contain several relevant items (scores, prices, options), give them all rather than \
+         undercounting or claiming only one is available. If coverage is only partial, answer what \
+         the results do support and add at most one short line on what's missing — never refuse, \
+         stall, or ask the user to clarify when relevant results are present. Prefer the most recent \
+         and most authoritative sources for time-sensitive facts and note any real disagreement in a \
+         few words. Do not output citation markers like [1], footnotes, or raw URLs; you may name a \
+         source in plain words when it helps.",
+    );
+    if tts_enabled {
+        s.push_str(
+            " Your reply is read aloud, so write natural spoken prose: short, clear sentences. A \
+             simple bullet list is fine when listing several items, but do not use tables, headings, \
+             or code blocks.",
+        );
+    } else {
+        s.push_str(
+            " The panel renders Markdown, so after the opening answer you may use light formatting \
+             where it genuinely helps: bold labels, short bullet lists, or a compact table for \
+             scores, comparisons, or multi-item results. Keep it tight and skip large headings.",
+        );
+    }
+    s
+}
 
 /// Added to the system prompt whenever web search is *enabled*, on EVERY turn —
 /// whether or not this turn actually searched. Without it the model has no idea
@@ -207,7 +224,7 @@ impl SearchPlan {
             if q.is_empty() {
                 continue;
             }
-            // Firecrawl caps queries at 500 chars; keep a little headroom.
+            // Keep queries reasonably short for the SERP APIs.
             let q = truncate_chars(q, 480);
             if seen.insert(q.to_lowercase()) {
                 cleaned.push(q);
@@ -333,20 +350,16 @@ fn parse_plan(raw: &str) -> Option<SearchPlan> {
 // Search depth tiers
 // ---------------------------------------------------------------------------
 
-/// Concrete retrieval knobs for a depth tier. All tiers are one pass; they
-/// differ only in breadth and how much text reaches the model.
+/// Concrete retrieval knobs for a depth tier. All tiers are one snippet-only
+/// pass; they differ only in breadth and how much text reaches the model.
 #[derive(Clone, Copy, Debug)]
 struct TierParams {
     /// Max queries to actually run from the plan.
     max_queries: usize,
     /// Results requested per source per query in the snippet phase.
     snippet_limit: usize,
-    /// How many reranked winners to scrape for full content.
-    scrape_top: usize,
-    /// Total sources handed to the model (scraped + snippet-only extras).
+    /// Total sources handed to the model.
     sources_out: usize,
-    /// Per-result content cap (chars).
-    per_result_chars: usize,
     /// Total web-context cap across all sources (chars).
     total_budget_chars: usize,
 }
@@ -355,26 +368,20 @@ fn tier_params(depth: AssistantSearchDepth) -> TierParams {
     match depth {
         AssistantSearchDepth::Low => TierParams {
             max_queries: 1,
-            snippet_limit: 6,
-            scrape_top: 2,
-            sources_out: 3,
-            per_result_chars: 1_800,
+            snippet_limit: 8,
+            sources_out: 5,
             total_budget_chars: 7_000,
         },
         AssistantSearchDepth::Medium => TierParams {
             max_queries: 3,
-            snippet_limit: 6,
-            scrape_top: 3,
-            sources_out: 5,
-            per_result_chars: 3_000,
+            snippet_limit: 10,
+            sources_out: 8,
             total_budget_chars: 14_000,
         },
         AssistantSearchDepth::High => TierParams {
             max_queries: 4,
-            snippet_limit: 8,
-            scrape_top: 5,
-            sources_out: 7,
-            per_result_chars: 3_500,
+            snippet_limit: 10,
+            sources_out: 10,
             total_budget_chars: 24_000,
         },
     }
@@ -387,109 +394,10 @@ pub fn context_budget_for(depth: AssistantSearchDepth) -> usize {
 }
 
 // ---------------------------------------------------------------------------
-// Credit guard (protects the user's Firecrawl credits)
-// ---------------------------------------------------------------------------
-
-struct CreditGuard {
-    /// Timestamps of recent Firecrawl calls (for the rolling-window rate limit).
-    calls: VecDeque<Instant>,
-    /// Day key (YYYYDDD) the budget counter belongs to; resets when it changes.
-    day: i64,
-    /// Estimated credits spent so far today.
-    spent_today: u32,
-}
-
-static CREDIT_GUARD: Lazy<Mutex<CreditGuard>> = Lazy::new(|| {
-    Mutex::new(CreditGuard {
-        calls: VecDeque::new(),
-        day: current_day_key(),
-        spent_today: 0,
-    })
-});
-
-/// Local calendar-day key (year * 1000 + day-of-year). Only equality matters.
-fn current_day_key() -> i64 {
-    chrono::Local::now()
-        .format("%Y%j")
-        .to_string()
-        .parse()
-        .unwrap_or(0)
-}
-
-#[derive(Debug, PartialEq, Eq)]
-enum GuardDenied {
-    RateLimited,
-    Budget { spent: u32, budget: u32 },
-}
-
-impl std::fmt::Display for GuardDenied {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            GuardDenied::RateLimited => write!(
-                f,
-                "web search paused: too many requests in a short time (runaway-loop guard)"
-            ),
-            GuardDenied::Budget { spent, budget } => write!(
-                f,
-                "web search paused: daily Firecrawl credit budget reached ({}/{} today)",
-                spent, budget
-            ),
-        }
-    }
-}
-
-/// Pure, testable core of the guard. Prunes the rolling window, resets the daily
-/// counter on a new day, then either reserves `estimated` credits or denies.
-fn try_reserve(
-    guard: &mut CreditGuard,
-    now: Instant,
-    today: i64,
-    estimated: u32,
-    daily_budget: u32,
-) -> Result<(), GuardDenied> {
-    if today != guard.day {
-        guard.day = today;
-        guard.spent_today = 0;
-    }
-    while let Some(&front) = guard.calls.front() {
-        if now.duration_since(front) > RATE_WINDOW {
-            guard.calls.pop_front();
-        } else {
-            break;
-        }
-    }
-    if guard.calls.len() >= MAX_CALLS_PER_WINDOW {
-        return Err(GuardDenied::RateLimited);
-    }
-    if daily_budget > 0 && guard.spent_today.saturating_add(estimated) > daily_budget {
-        return Err(GuardDenied::Budget {
-            spent: guard.spent_today,
-            budget: daily_budget,
-        });
-    }
-    guard.calls.push_back(now);
-    guard.spent_today = guard.spent_today.saturating_add(estimated);
-    Ok(())
-}
-
-/// Reserve `estimated` credits against the global guard, or return an error
-/// describing why the call must be skipped.
-fn reserve_credits(estimated: u32, daily_budget: u32) -> Result<(), GuardDenied> {
-    let mut guard = CREDIT_GUARD.lock().unwrap();
-    try_reserve(
-        &mut guard,
-        Instant::now(),
-        current_day_key(),
-        estimated,
-        daily_budget,
-    )
-}
-
-// ---------------------------------------------------------------------------
 // Retrieval
 // ---------------------------------------------------------------------------
 
-/// A pre-scrape candidate from the snippet phase.
+/// A candidate from the snippet phase.
 #[derive(Debug, Clone)]
 struct Candidate {
     title: String,
@@ -511,12 +419,11 @@ pub async fn search(settings: &AppSettings, query: &str) -> Result<Vec<SearchRes
     Ok(cands.into_iter().take(5).map(candidate_to_result).collect())
 }
 
-/// Execute a full search plan: snippet-search every query in parallel, merge +
-/// rerank locally, then scrape only the top winners for full content. Per-query
+/// Execute a full search plan: snippet-search every query in parallel, then
+/// merge + rerank locally and hand the top sources to the model. Per-query
 /// errors are swallowed (logged) so one bad query never sinks the whole turn.
 pub async fn search_with_plan(settings: &AppSettings, plan: &SearchPlan) -> Vec<SearchResult> {
     let tp = tier_params(settings.assistant_search_depth);
-    let daily_budget = settings.assistant_web_search_daily_credit_budget;
 
     let queries: Vec<&String> = plan
         .queries
@@ -528,27 +435,16 @@ pub async fn search_with_plan(settings: &AppSettings, plan: &SearchPlan) -> Vec<
         return Vec::new();
     }
 
-    // Keep the whole turn under the per-turn credit ceiling (defense-in-depth;
-    // the tiers are already well within it).
-    let scrape_budget = MAX_CREDITS_PER_TURN.saturating_sub(queries.len() as u32 * 2) as usize;
-    let scrape_top = tp.scrape_top.min(scrape_budget);
-
-    // Recency-sensitive topics get news + date-sorted web results.
+    // Recency-sensitive topics get news + a date-restricted window.
     let recency_sensitive = plan.news || matches!(plan.freshness.as_str(), "day" | "week");
     let include_news = plan.news || matches!(plan.freshness.as_str(), "day" | "week" | "month");
     let tbs = build_tbs(&plan.freshness, recency_sensitive);
     let tbs_ref = tbs.as_deref();
 
     // Stage 1 — snippet search, every query in parallel.
-    let snippet_futs = queries.iter().map(|q| {
-        snippet_search(
-            settings,
-            q.as_str(),
-            tp.snippet_limit,
-            tbs_ref,
-            include_news,
-        )
-    });
+    let snippet_futs = queries
+        .iter()
+        .map(|q| snippet_search(settings, q.as_str(), tp.snippet_limit, tbs_ref, include_news));
     let per_query = futures_util::future::join_all(snippet_futs).await;
 
     let lists: Vec<Vec<Candidate>> = per_query
@@ -572,51 +468,12 @@ pub async fn search_with_plan(settings: &AppSettings, plan: &SearchPlan) -> Vec<
     let primary = queries.first().map(|q| q.as_str()).unwrap_or("");
     rerank(primary, &mut merged, recency_sensitive);
 
-    // Stage 3 — scrape only the top winners for full content (Firecrawl only).
-    let scrape = settings.assistant_web_search_provider == "firecrawl"
-        && settings.assistant_web_search_fetch_content
-        && scrape_top > 0;
-
-    let mut results: Vec<SearchResult> = Vec::new();
-    if scrape {
-        let key = settings
-            .web_search_api_keys
-            .get("firecrawl")
-            .cloned()
-            .unwrap_or_default();
-        let winners: Vec<Candidate> = merged.iter().take(scrape_top).cloned().collect();
-        let scrape_futs = winners
-            .iter()
-            .map(|c| firecrawl_scrape(&key, &c.url, daily_budget));
-        let scraped = futures_util::future::join_all(scrape_futs).await;
-        for (c, sc) in winners.into_iter().zip(scraped) {
-            let content = match sc {
-                Ok(md) => cap_content(&md, tp.per_result_chars),
-                Err(e) => {
-                    debug!("Scrape of {:?} failed ({}); keeping snippet", c.url, e);
-                    String::new()
-                }
-            };
-            results.push(SearchResult {
-                title: truncate_chars(c.title.trim(), TITLE_MAX_CHARS),
-                url: c.url,
-                snippet: truncate_chars(c.snippet.trim(), SNIPPET_MAX_CHARS),
-                content,
-            });
-        }
-        // Add a few snippet-only extras for breadth, up to the tier's total.
-        let extra = tp.sources_out.saturating_sub(results.len());
-        for c in merged.into_iter().skip(scrape_top).take(extra) {
-            results.push(candidate_to_result(c));
-        }
-    } else {
-        // Snippet-only path (Brave/DuckDuckGo, or Firecrawl with scraping off).
-        for c in merged.into_iter().take(tp.sources_out) {
-            results.push(candidate_to_result(c));
-        }
-    }
-
-    results
+    // Stage 3 — hand the top reranked snippets to the model.
+    merged
+        .into_iter()
+        .take(tp.sources_out)
+        .map(candidate_to_result)
+        .collect()
 }
 
 /// Round-robin merge across per-query candidate lists, de-duping by URL (or
@@ -705,9 +562,10 @@ fn candidate_score(c: &Candidate, terms: &[String], recency_sensitive: bool) -> 
     score
 }
 
-/// Map a freshness window (+ recency sensitivity) to a Firecrawl `tbs` value.
-/// `sbd:1` sorts web results newest-first; `qdr:*` restricts the window. `tbs`
-/// only affects the `web` source — news is fresh by nature.
+/// Map a freshness window (+ recency sensitivity) to a Google-style `tbs` value.
+/// `sbd:1` sorts results newest-first; `qdr:*` restricts the window. Used
+/// directly by Serper/SerpAPI; Brave/Tavily/Exa map it to their own freshness
+/// params via the helpers below.
 fn build_tbs(freshness: &str, recency_sensitive: bool) -> Option<String> {
     let qdr = match freshness {
         "day" => Some("qdr:d"),
@@ -737,36 +595,31 @@ async fn snippet_search(
         return Ok(Vec::new());
     }
     let limit = limit.clamp(1, MAX_RESULTS_HARD);
-    let daily_budget = settings.assistant_web_search_daily_credit_budget;
     let provider = settings.assistant_web_search_provider.as_str();
+    let key = |id: &str| {
+        settings
+            .web_search_api_keys
+            .get(id)
+            .cloned()
+            .unwrap_or_default()
+    };
     debug!(
         "Snippet search via '{}' for {:?} (limit {}, news {}, tbs {:?})",
         provider, query, limit, include_news, tbs
     );
 
     match provider {
-        "firecrawl" => {
-            let key = settings
-                .web_search_api_keys
-                .get("firecrawl")
-                .cloned()
-                .unwrap_or_default();
-            firecrawl_search_snippets(&key, query, limit, tbs, include_news, daily_budget).await
-        }
         "brave" => {
-            let key = settings
-                .web_search_api_keys
-                .get("brave")
-                .cloned()
-                .unwrap_or_default();
-            let results = search_brave(&key, query, limit, tbs).await?;
+            let results = search_brave(&key("brave"), query, limit, tbs).await?;
             Ok(results.into_iter().map(result_to_candidate).collect())
         }
-        // "duckduckgo" and any unknown value fall back to the free engine.
-        _ => {
-            let results = search_duckduckgo(query, limit, tbs).await?;
-            Ok(results.into_iter().map(result_to_candidate).collect())
-        }
+        "tavily" => search_tavily(&key("tavily"), query, limit, tbs, include_news).await,
+        "exa" => search_exa(&key("exa"), query, limit, tbs).await,
+        "serpapi" => search_serpapi(&key("serpapi"), query, limit, tbs, include_news).await,
+        // "serper" is the default. Any unknown or legacy value (including the
+        // removed "firecrawl"/"duckduckgo") also routes here so old settings
+        // keep working.
+        _ => search_serper(&key("serper"), query, limit, tbs, include_news).await,
     }
 }
 
@@ -775,7 +628,9 @@ async fn snippet_search(
 /// so the model has nothing to echo back and stays in clean prose.
 pub fn format_results_for_prompt(results: &[SearchResult], total_budget: usize) -> String {
     let mut out = String::with_capacity(1024);
-    out.push_str("Live web search results:\n");
+    out.push_str(
+        "[Web search results you retrieved for this turn — your own findings, NOT provided by the user]\n",
+    );
     let mut budget = total_budget;
     for r in results {
         out.push_str("\n---\nSource: ");
@@ -1103,55 +958,49 @@ fn http_client(timeout: Duration) -> Result<reqwest::Client, String> {
         .map_err(|e| format!("Failed to build HTTP client: {}", e))
 }
 
-/// Firecrawl `/v2/search`, snippet-only (no `scrapeOptions`) — fast and cheap
-/// (2 credits / 10 results). Pulls `web` plus, when relevant, `news`. `tbs`
-/// applies a date sort/window to the web source.
-async fn firecrawl_search_snippets(
+/// Tavily Search (`POST /search`) — an LLM-optimized search API returning clean
+/// per-result snippets (`content`) plus an optional synthesized `answer`. Auth
+/// is a Bearer token. Freshness maps to Tavily's `time_range`; a news topic
+/// switches `topic` to "news".
+async fn search_tavily(
     api_key: &str,
     query: &str,
-    limit: usize,
+    max_results: usize,
     tbs: Option<&str>,
     include_news: bool,
-    daily_budget: u32,
 ) -> Result<Vec<Candidate>, String> {
     if api_key.trim().is_empty() {
         return Err(
-            "Firecrawl API key is not set. Add it in Settings → Assistant → Web Search."
-                .to_string(),
+            "Tavily API key is not set. Add it in Settings → Assistant → Web Search.".to_string(),
         );
     }
-    reserve_credits(2, daily_budget).map_err(|d| d.to_string())?;
 
-    let client = http_client(SNIPPET_SEARCH_TIMEOUT)?;
-    let sources = if include_news {
-        json!(["web", "news"])
-    } else {
-        json!(["web"])
-    };
+    let client = http_client(REQUEST_TIMEOUT)?;
+    let max = max_results.clamp(1, 20);
     let mut body = json!({
         "query": query,
-        "limit": limit,
-        "sources": sources,
-        // Server-side timeout, kept under our client timeout.
-        "timeout": 7000,
+        "max_results": max,
+        "search_depth": "basic",
+        "topic": if include_news { "news" } else { "general" },
+        "include_answer": true,
     });
-    if let Some(tbs) = tbs {
-        body["tbs"] = json!(tbs);
+    if let Some(tr) = tavily_time_range_from_tbs(tbs) {
+        body["time_range"] = json!(tr);
     }
 
     let resp = client
-        .post("https://api.firecrawl.dev/v2/search")
+        .post("https://api.tavily.com/search")
         .bearer_auth(api_key)
         .json(&body)
         .send()
         .await
-        .map_err(|e| format!("Firecrawl request failed: {}", e))?;
+        .map_err(|e| format!("Tavily request failed: {}", e))?;
 
     let status = resp.status();
     if !status.is_success() {
         let text = resp.text().await.unwrap_or_default();
         return Err(format!(
-            "Firecrawl search failed ({}): {}",
+            "Tavily search failed ({}): {}",
             status,
             truncate_chars(&text, 200)
         ));
@@ -1160,93 +1009,227 @@ async fn firecrawl_search_snippets(
     let value: serde_json::Value = resp
         .json()
         .await
-        .map_err(|e| format!("Failed to parse Firecrawl response: {}", e))?;
+        .map_err(|e| format!("Failed to parse Tavily response: {}", e))?;
 
     let mut candidates = Vec::new();
-    if let Some(data) = value.get("data") {
-        if let Some(items) = data.get("web").and_then(|w| w.as_array()) {
-            for item in items {
-                let title = item.get("title").and_then(|v| v.as_str()).unwrap_or("");
-                let url = item.get("url").and_then(|v| v.as_str()).unwrap_or("");
-                let snippet = item
-                    .get("description")
-                    .and_then(|v| v.as_str())
-                    .or_else(|| item.get("snippet").and_then(|v| v.as_str()))
-                    .unwrap_or("");
-                push_candidate(&mut candidates, title, url, snippet, false);
-            }
+    // Tavily's synthesized answer — highest value for quick facts; added first.
+    if let Some(answer) = value.get("answer").and_then(|v| v.as_str()) {
+        if !answer.trim().is_empty() {
+            push_candidate(&mut candidates, "Answer", "", answer, false);
         }
-        if let Some(items) = data.get("news").and_then(|w| w.as_array()) {
-            for item in items {
-                let title = item.get("title").and_then(|v| v.as_str()).unwrap_or("");
-                let url = item.get("url").and_then(|v| v.as_str()).unwrap_or("");
-                let snippet = item
-                    .get("snippet")
-                    .and_then(|v| v.as_str())
-                    .or_else(|| item.get("description").and_then(|v| v.as_str()))
-                    .unwrap_or("");
-                push_candidate(&mut candidates, title, url, snippet, true);
-            }
+    }
+    if let Some(items) = value.get("results").and_then(|v| v.as_array()) {
+        for item in items {
+            let title = item.get("title").and_then(|v| v.as_str()).unwrap_or("");
+            let url = item.get("url").and_then(|v| v.as_str()).unwrap_or("");
+            let snippet = item.get("content").and_then(|v| v.as_str()).unwrap_or("");
+            push_candidate(&mut candidates, title, url, snippet, include_news);
         }
     }
     Ok(candidates)
 }
 
-/// Firecrawl `/v2/scrape` for a single URL → main content as markdown. Uses a
-/// cache window (`maxAge`) for speed and `parsers: []` / `proxy: "auto"` to keep
-/// credit cost down (1 credit/page).
-async fn firecrawl_scrape(api_key: &str, url: &str, daily_budget: u32) -> Result<String, String> {
+/// Exa Search (`POST /search`) — neural/semantic search. Auth is the `x-api-key`
+/// header. We request `highlights` (with a short `text` fallback) as the snippet
+/// and use the `fast` search type for low latency. Freshness maps to a
+/// `startPublishedDate` lower bound.
+async fn search_exa(
+    api_key: &str,
+    query: &str,
+    max_results: usize,
+    tbs: Option<&str>,
+) -> Result<Vec<Candidate>, String> {
     if api_key.trim().is_empty() {
-        return Err("Firecrawl API key is not set".to_string());
+        return Err(
+            "Exa API key is not set. Add it in Settings → Assistant → Web Search.".to_string(),
+        );
     }
-    if url.trim().is_empty() {
-        return Err("empty url".to_string());
-    }
-    reserve_credits(1, daily_budget).map_err(|d| d.to_string())?;
 
-    let client = http_client(SCRAPE_TIMEOUT)?;
-    let body = json!({
-        "url": url,
-        "formats": ["markdown"],
-        "onlyMainContent": true,
-        "parsers": [],
-        "proxy": "auto",
-        "maxAge": SCRAPE_MAX_AGE_MS,
-        "timeout": 6000,
+    let client = http_client(REQUEST_TIMEOUT)?;
+    let num = max_results.clamp(1, 20);
+    let mut body = json!({
+        "query": query,
+        "numResults": num,
+        "type": "fast",
+        "contents": {
+            "highlights": true,
+            "text": { "maxCharacters": 800 }
+        }
     });
+    if let Some(start) = exa_start_date_from_tbs(tbs) {
+        body["startPublishedDate"] = json!(start);
+    }
 
     let resp = client
-        .post("https://api.firecrawl.dev/v2/scrape")
-        .bearer_auth(api_key)
+        .post("https://api.exa.ai/search")
+        .header("x-api-key", api_key)
+        .header(reqwest::header::CONTENT_TYPE, "application/json")
         .json(&body)
         .send()
         .await
-        .map_err(|e| format!("Firecrawl scrape failed: {}", e))?;
+        .map_err(|e| format!("Exa request failed: {}", e))?;
 
     let status = resp.status();
     if !status.is_success() {
         let text = resp.text().await.unwrap_or_default();
         return Err(format!(
-            "Firecrawl scrape failed ({}): {}",
+            "Exa search failed ({}): {}",
             status,
-            truncate_chars(&text, 160)
+            truncate_chars(&text, 200)
         ));
     }
 
     let value: serde_json::Value = resp
         .json()
         .await
-        .map_err(|e| format!("Failed to parse Firecrawl scrape response: {}", e))?;
+        .map_err(|e| format!("Failed to parse Exa response: {}", e))?;
 
-    let markdown = value
-        .get("data")
-        .and_then(|d| d.get("markdown"))
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
-    if markdown.trim().is_empty() {
-        return Err("scrape returned no content".to_string());
+    let mut candidates = Vec::new();
+    if let Some(items) = value.get("results").and_then(|v| v.as_array()) {
+        for item in items {
+            let title = item.get("title").and_then(|v| v.as_str()).unwrap_or("");
+            let url = item.get("url").and_then(|v| v.as_str()).unwrap_or("");
+            // Prefer the highlighted passages; fall back to summary, then text.
+            let snippet = item
+                .get("highlights")
+                .and_then(|v| v.as_array())
+                .map(|hs| {
+                    hs.iter()
+                        .filter_map(|h| h.as_str())
+                        .collect::<Vec<_>>()
+                        .join(" ")
+                })
+                .filter(|s| !s.trim().is_empty())
+                .or_else(|| {
+                    item.get("summary")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string())
+                })
+                .or_else(|| {
+                    item.get("text")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string())
+                })
+                .unwrap_or_default();
+            push_candidate(&mut candidates, title, url, &snippet, false);
+        }
     }
-    Ok(markdown.to_string())
+    Ok(candidates)
+}
+
+/// SerpAPI Google Search (`GET /search.json`) — Google SERP JSON. Auth is the
+/// `api_key` query param. Parses the answer box, knowledge graph, organic
+/// results, and (when news-y) `news_results`. `tbs` is Google's own time filter,
+/// passed straight through.
+async fn search_serpapi(
+    api_key: &str,
+    query: &str,
+    max_results: usize,
+    tbs: Option<&str>,
+    include_news: bool,
+) -> Result<Vec<Candidate>, String> {
+    if api_key.trim().is_empty() {
+        return Err(
+            "SerpAPI key is not set. Add it in Settings → Assistant → Web Search.".to_string(),
+        );
+    }
+
+    let client = http_client(REQUEST_TIMEOUT)?;
+    let num = max_results.clamp(1, 20).to_string();
+    let mut params: Vec<(&str, String)> = vec![
+        ("engine", "google".to_string()),
+        ("q", query.to_string()),
+        ("num", num),
+        ("api_key", api_key.to_string()),
+    ];
+    if let Some(tbs) = tbs {
+        params.push(("tbs", tbs.to_string()));
+    }
+
+    let resp = client
+        .get("https://serpapi.com/search.json")
+        .query(&params)
+        .send()
+        .await
+        .map_err(|e| format!("SerpAPI request failed: {}", e))?;
+
+    let status = resp.status();
+    if !status.is_success() {
+        let text = resp.text().await.unwrap_or_default();
+        return Err(format!(
+            "SerpAPI search failed ({}): {}",
+            status,
+            truncate_chars(&text, 200)
+        ));
+    }
+
+    let value: serde_json::Value = resp
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse SerpAPI response: {}", e))?;
+
+    let mut candidates = Vec::new();
+
+    // Answer box: Google's direct answer.
+    if let Some(ab) = value.get("answer_box") {
+        let title = ab.get("title").and_then(|v| v.as_str()).unwrap_or("Answer");
+        let url = ab.get("link").and_then(|v| v.as_str()).unwrap_or("");
+        let snippet = ab
+            .get("answer")
+            .and_then(|v| v.as_str())
+            .or_else(|| ab.get("snippet").and_then(|v| v.as_str()))
+            .unwrap_or("");
+        if !snippet.is_empty() {
+            push_candidate(&mut candidates, title, url, snippet, false);
+        }
+    }
+
+    // Knowledge graph: structured entity facts.
+    if let Some(kg) = value.get("knowledge_graph") {
+        let title = kg.get("title").and_then(|v| v.as_str()).unwrap_or("");
+        let url = kg.get("website").and_then(|v| v.as_str()).unwrap_or("");
+        let snippet = kg
+            .get("description")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        if !snippet.is_empty() {
+            push_candidate(&mut candidates, title, url, snippet, false);
+        }
+    }
+
+    // Fresh news coverage, only when the planner flagged the turn as news-y.
+    if include_news {
+        if let Some(items) = value.get("news_results").and_then(|v| v.as_array()) {
+            for item in items {
+                let title = item.get("title").and_then(|v| v.as_str()).unwrap_or("");
+                let url = item.get("link").and_then(|v| v.as_str()).unwrap_or("");
+                let base = item.get("snippet").and_then(|v| v.as_str()).unwrap_or("");
+                let date = item.get("date").and_then(|v| v.as_str()).unwrap_or("");
+                let snippet = match (date.is_empty(), base.is_empty()) {
+                    (false, false) => format!("{} — {}", date, base),
+                    (false, true) => date.to_string(),
+                    _ => base.to_string(),
+                };
+                push_candidate(&mut candidates, title, url, &snippet, true);
+            }
+        }
+    }
+
+    // Organic web results.
+    if let Some(items) = value.get("organic_results").and_then(|v| v.as_array()) {
+        for item in items {
+            let title = item.get("title").and_then(|v| v.as_str()).unwrap_or("");
+            let url = item.get("link").and_then(|v| v.as_str()).unwrap_or("");
+            let base = item.get("snippet").and_then(|v| v.as_str()).unwrap_or("");
+            let snippet = match item.get("date").and_then(|v| v.as_str()) {
+                Some(date) if !date.is_empty() => format!("{} — {}", date, base),
+                _ => base.to_string(),
+            };
+            push_candidate(&mut candidates, title, url, &snippet, false);
+        }
+    }
+
+    Ok(candidates)
 }
 
 /// Brave Web Search API (snippet-only). `tbs` is ignored (Brave uses its own
@@ -1319,46 +1302,166 @@ async fn search_brave(
     Ok(results)
 }
 
-/// DuckDuckGo via the keyless HTML endpoint (snippet-only).
-async fn search_duckduckgo(
+/// Serper.dev Google Search API (snippet-only). Fast (~1–2 s) and cheap
+/// (1 credit per 10 results, generous free tier). Parses Google's answer box and
+/// knowledge graph when present (great for quick facts), the organic results,
+/// and — when the turn is news-y — `topStories`. `tbs` is Google's own time
+/// filter and is passed straight through (e.g. `qdr:d`, `sbd:1,qdr:w`).
+async fn search_serper(
+    api_key: &str,
     query: &str,
     max_results: usize,
     tbs: Option<&str>,
-) -> Result<Vec<SearchResult>, String> {
-    let client = http_client(REQUEST_TIMEOUT)?;
+    include_news: bool,
+) -> Result<Vec<Candidate>, String> {
+    if api_key.trim().is_empty() {
+        return Err(
+            "Serper API key is not set. Add it in Settings → Assistant → Web Search.".to_string(),
+        );
+    }
 
-    let df = ddg_df_from_tbs(tbs);
-    let mut form: Vec<(&str, &str)> = vec![("q", query)];
-    if let Some(df) = df {
-        form.push(("df", df));
+    let client = http_client(REQUEST_TIMEOUT)?;
+    let num = max_results.clamp(1, 20);
+
+    let mut candidates = serper_query(&client, api_key, query, num, tbs, include_news).await?;
+
+    // Serper proxies live Google, and a 200 response intermittently comes back
+    // with an *empty* result set — most often on the first, uncached hit for a
+    // query, or when a tight `tbs` time window filters everything out. Verified
+    // against the live API: the very next identical request returns the full
+    // result set. Without a retry the turn silently degrades to "no web
+    // context" and the model answers from stale memory — which reads to the
+    // user as "web search doesn't work". Retry once, dropping the time filter
+    // so a too-narrow `tbs` can't keep returning nothing.
+    if candidates.is_empty() {
+        debug!(
+            "Serper returned no results for {:?} (tbs={:?}); retrying once without the time filter",
+            query, tbs
+        );
+        candidates = serper_query(&client, api_key, query, num, None, include_news).await?;
+    }
+
+    debug!(
+        "Serper returned {} candidate(s) for {:?}",
+        candidates.len(),
+        query
+    );
+    Ok(candidates)
+}
+
+/// Issue a single Serper request and parse it into candidates. Parses Google's
+/// answer box and knowledge graph (when present), `topStories` (when the turn is
+/// news-y), and the organic results. Split out from `search_serper` so the
+/// caller can cheaply retry on an empty result set.
+async fn serper_query(
+    client: &reqwest::Client,
+    api_key: &str,
+    query: &str,
+    num: usize,
+    tbs: Option<&str>,
+    include_news: bool,
+) -> Result<Vec<Candidate>, String> {
+    let mut body = json!({
+        "q": query,
+        "num": num,
+    });
+    if let Some(tbs) = tbs {
+        body["tbs"] = json!(tbs);
     }
 
     let resp = client
-        .post("https://html.duckduckgo.com/html/")
-        .header(
-            reqwest::header::CONTENT_TYPE,
-            "application/x-www-form-urlencoded",
-        )
-        .form(&form)
+        .post("https://google.serper.dev/search")
+        .header("X-API-KEY", api_key)
+        .header(reqwest::header::CONTENT_TYPE, "application/json")
+        .json(&body)
         .send()
         .await
-        .map_err(|e| format!("DuckDuckGo request failed: {}", e))?;
+        .map_err(|e| format!("Serper request failed: {}", e))?;
 
     let status = resp.status();
     if !status.is_success() {
-        return Err(format!("DuckDuckGo search failed ({})", status));
+        let text = resp.text().await.unwrap_or_default();
+        return Err(format!(
+            "Serper search failed ({}): {}",
+            status,
+            truncate_chars(&text, 200)
+        ));
     }
 
-    let html = resp
-        .text()
+    let value: serde_json::Value = resp
+        .json()
         .await
-        .map_err(|e| format!("Failed to read DuckDuckGo response: {}", e))?;
+        .map_err(|e| format!("Failed to parse Serper response: {}", e))?;
 
-    let results = parse_duckduckgo_html(&html, max_results);
-    if results.is_empty() {
-        warn!("DuckDuckGo returned no parseable results (possible rate limit)");
+    let mut candidates = Vec::new();
+
+    // Answer box: Google's direct answer — highest value for quick facts. Added
+    // first; the local rerank still scores it on its own merits.
+    if let Some(ab) = value.get("answerBox") {
+        let title = ab.get("title").and_then(|v| v.as_str()).unwrap_or("Answer");
+        let url = ab.get("link").and_then(|v| v.as_str()).unwrap_or("");
+        let snippet = ab
+            .get("answer")
+            .and_then(|v| v.as_str())
+            .or_else(|| ab.get("snippet").and_then(|v| v.as_str()))
+            .unwrap_or("");
+        if !snippet.is_empty() {
+            push_candidate(&mut candidates, title, url, snippet, false);
+        }
     }
-    Ok(results)
+
+    // Knowledge graph: structured entity facts (people, places, orgs).
+    if let Some(kg) = value.get("knowledgeGraph") {
+        let title = kg.get("title").and_then(|v| v.as_str()).unwrap_or("");
+        let url = kg
+            .get("website")
+            .and_then(|v| v.as_str())
+            .or_else(|| kg.get("descriptionLink").and_then(|v| v.as_str()))
+            .unwrap_or("");
+        let snippet = kg.get("description").and_then(|v| v.as_str()).unwrap_or("");
+        if !snippet.is_empty() {
+            push_candidate(&mut candidates, title, url, snippet, false);
+        }
+    }
+
+    // Fresh news coverage, only when the planner flagged the turn as news-y.
+    if include_news {
+        if let Some(items) = value.get("topStories").and_then(|v| v.as_array()) {
+            for item in items {
+                let title = item.get("title").and_then(|v| v.as_str()).unwrap_or("");
+                let url = item.get("link").and_then(|v| v.as_str()).unwrap_or("");
+                let source = item.get("source").and_then(|v| v.as_str()).unwrap_or("");
+                let date = item.get("date").and_then(|v| v.as_str()).unwrap_or("");
+                // topStories carry no snippet; fold source + date in so there's
+                // something for the rerank and the model to read.
+                let snippet = [source, date]
+                    .iter()
+                    .filter(|s| !s.is_empty())
+                    .copied()
+                    .collect::<Vec<_>>()
+                    .join(" · ");
+                push_candidate(&mut candidates, title, url, &snippet, true);
+            }
+        }
+    }
+
+    // Organic web results.
+    if let Some(items) = value.get("organic").and_then(|v| v.as_array()) {
+        for item in items {
+            let title = item.get("title").and_then(|v| v.as_str()).unwrap_or("");
+            let url = item.get("link").and_then(|v| v.as_str()).unwrap_or("");
+            let base = item.get("snippet").and_then(|v| v.as_str()).unwrap_or("");
+            // Some organic results carry a date; prepend it so recency is visible
+            // to the rerank.
+            let snippet = match item.get("date").and_then(|v| v.as_str()) {
+                Some(date) if !date.is_empty() => format!("{} — {}", date, base),
+                _ => base.to_string(),
+            };
+            push_candidate(&mut candidates, title, url, &snippet, false);
+        }
+    }
+
+    Ok(candidates)
 }
 
 /// Extract a Brave `freshness` value from our `tbs` (which encodes the qdr window).
@@ -1377,119 +1480,39 @@ fn brave_freshness_from_tbs(tbs: Option<&str>) -> Option<&'static str> {
     }
 }
 
-/// Extract a DuckDuckGo `df` value from our `tbs` (year unsupported there).
-fn ddg_df_from_tbs(tbs: Option<&str>) -> Option<&'static str> {
+/// Map our `tbs` (which encodes the qdr window) to Tavily's `time_range`.
+fn tavily_time_range_from_tbs(tbs: Option<&str>) -> Option<&'static str> {
     let tbs = tbs?;
     if tbs.contains("qdr:d") {
-        Some("d")
+        Some("day")
     } else if tbs.contains("qdr:w") {
-        Some("w")
+        Some("week")
     } else if tbs.contains("qdr:m") {
-        Some("m")
+        Some("month")
+    } else if tbs.contains("qdr:y") {
+        Some("year")
     } else {
         None
     }
 }
 
-// ---------------------------------------------------------------------------
-// DuckDuckGo HTML parsing
-// ---------------------------------------------------------------------------
-
-static DDG_TITLE_RE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r#"(?s)<a[^>]*class="[^"]*result__a[^"]*"[^>]*href="([^"]*)"[^>]*>(.*?)</a>"#)
-        .expect("valid DDG title regex")
-});
-
-static DDG_SNIPPET_RE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r#"(?s)<a[^>]*class="[^"]*result__snippet[^"]*"[^>]*>(.*?)</a>"#)
-        .expect("valid DDG snippet regex")
-});
-
-/// Parse the DuckDuckGo HTML results page, pairing each title with the snippet
-/// that follows it, decoding redirect URLs, and dropping sponsored results.
-fn parse_duckduckgo_html(html: &str, max_results: usize) -> Vec<SearchResult> {
-    let titles: Vec<(usize, String, String)> = DDG_TITLE_RE
-        .captures_iter(html)
-        .filter_map(|c| {
-            let pos = c.get(0)?.start();
-            let href = c.get(1)?.as_str();
-            let title = clean_html_text(c.get(2)?.as_str());
-            Some((pos, decode_ddg_url(href), title))
-        })
-        .collect();
-
-    let snippets: Vec<(usize, String)> = DDG_SNIPPET_RE
-        .captures_iter(html)
-        .filter_map(|c| {
-            let pos = c.get(0)?.start();
-            let text = clean_html_text(c.get(1)?.as_str());
-            Some((pos, text))
-        })
-        .collect();
-
-    let mut results = Vec::new();
-    for (i, (t_pos, url, title)) in titles.iter().enumerate() {
-        if url.contains("duckduckgo.com/y.js") || url.is_empty() {
-            continue;
-        }
-        if title.is_empty() {
-            continue;
-        }
-
-        let next_pos = titles.get(i + 1).map(|(p, _, _)| *p).unwrap_or(usize::MAX);
-        let snippet = snippets
-            .iter()
-            .find(|(s_pos, _)| *s_pos > *t_pos && *s_pos < next_pos)
-            .map(|(_, s)| s.clone())
-            .unwrap_or_default();
-
-        push_result(&mut results, title, url, &snippet, "");
-        if results.len() >= max_results {
-            break;
-        }
-    }
-    results
-}
-
-/// DuckDuckGo wraps result links in a redirect: `//duckduckgo.com/l/?uddg=<enc>`.
-fn decode_ddg_url(href: &str) -> String {
-    if let Some(idx) = href.find("uddg=") {
-        let rest = &href[idx + 5..];
-        let encoded = rest.split('&').next().unwrap_or(rest);
-        return percent_decode(encoded);
-    }
-    if let Some(stripped) = href.strip_prefix("//") {
-        return format!("https://{}", stripped);
-    }
-    href.to_string()
-}
-
-/// Minimal `%XX` percent-decoder (UTF-8 aware).
-fn percent_decode(input: &str) -> String {
-    let bytes = input.as_bytes();
-    let mut out: Vec<u8> = Vec::with_capacity(bytes.len());
-    let mut i = 0;
-    while i < bytes.len() {
-        if bytes[i] == b'%' && i + 2 < bytes.len() {
-            if let (Some(h), Some(l)) = (hex_val(bytes[i + 1]), hex_val(bytes[i + 2])) {
-                out.push((h << 4) | l);
-                i += 3;
-                continue;
-            }
-        }
-        out.push(bytes[i]);
-        i += 1;
-    }
-    String::from_utf8_lossy(&out).into_owned()
-}
-
-fn hex_val(b: u8) -> Option<u8> {
-    match b {
-        b'0'..=b'9' => Some(b - b'0'),
-        b'a'..=b'f' => Some(b - b'a' + 10),
-        b'A'..=b'F' => Some(b - b'A' + 10),
-        _ => None,
-    }
+/// Map our `tbs` (qdr window) to an Exa `startPublishedDate` lower bound (ISO
+/// 8601), computed as "now minus the window".
+fn exa_start_date_from_tbs(tbs: Option<&str>) -> Option<String> {
+    let tbs = tbs?;
+    let days = if tbs.contains("qdr:d") {
+        1
+    } else if tbs.contains("qdr:w") {
+        7
+    } else if tbs.contains("qdr:m") {
+        30
+    } else if tbs.contains("qdr:y") {
+        365
+    } else {
+        return None;
+    };
+    let start = chrono::Utc::now() - chrono::Duration::days(days);
+    Some(start.format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string())
 }
 
 // ---------------------------------------------------------------------------
@@ -1591,7 +1614,7 @@ fn candidate_to_result(c: Candidate) -> SearchResult {
     }
 }
 
-/// Convert a provider `SearchResult` (Brave/DDG) into a candidate.
+/// Convert a provider `SearchResult` (Brave) into a candidate.
 fn result_to_candidate(r: SearchResult) -> Candidate {
     Candidate {
         title: r.title,
@@ -1692,8 +1715,12 @@ mod tests {
         assert_eq!(brave_freshness_from_tbs(Some("sbd:1,qdr:w")), Some("pw"));
         assert_eq!(brave_freshness_from_tbs(Some("qdr:y")), Some("py"));
         assert_eq!(brave_freshness_from_tbs(None), None);
-        assert_eq!(ddg_df_from_tbs(Some("sbd:1,qdr:m")), Some("m"));
-        assert_eq!(ddg_df_from_tbs(Some("qdr:y")), None); // DDG has no year filter
+        assert_eq!(tavily_time_range_from_tbs(Some("sbd:1,qdr:d")), Some("day"));
+        assert_eq!(tavily_time_range_from_tbs(Some("qdr:m")), Some("month"));
+        assert_eq!(tavily_time_range_from_tbs(None), None);
+        // Exa maps the window to an ISO start date (or None when unbounded).
+        assert!(exa_start_date_from_tbs(Some("qdr:w")).is_some());
+        assert_eq!(exa_start_date_from_tbs(None), None);
     }
 
     #[test]
@@ -1773,63 +1800,6 @@ mod tests {
     }
 
     #[test]
-    fn credit_guard_enforces_budget_and_rate() {
-        let mut g = CreditGuard {
-            calls: VecDeque::new(),
-            day: 100,
-            spent_today: 0,
-        };
-        let now = Instant::now();
-        // Budget of 5: a 2-credit reserve twice is fine (4), third (6) denied.
-        assert!(try_reserve(&mut g, now, 100, 2, 5).is_ok());
-        assert!(try_reserve(&mut g, now, 100, 2, 5).is_ok());
-        assert_eq!(
-            try_reserve(&mut g, now, 100, 2, 5),
-            Err(GuardDenied::Budget {
-                spent: 4,
-                budget: 5
-            })
-        );
-        // budget 0 = unlimited (budget-wise).
-        assert!(try_reserve(&mut g, now, 100, 1000, 0).is_ok());
-    }
-
-    #[test]
-    fn credit_guard_resets_on_new_day() {
-        let mut g = CreditGuard {
-            calls: VecDeque::new(),
-            day: 100,
-            spent_today: 9999,
-        };
-        let now = Instant::now();
-        // New day resets the counter, so the reserve succeeds under budget.
-        assert!(try_reserve(&mut g, now, 101, 5, 50).is_ok());
-        assert_eq!(g.spent_today, 5);
-        assert_eq!(g.day, 101);
-    }
-
-    #[test]
-    fn credit_guard_rate_limits_runaway_calls() {
-        let mut g = CreditGuard {
-            calls: VecDeque::new(),
-            day: 100,
-            spent_today: 0,
-        };
-        let now = Instant::now();
-        // Fill the window to the cap (budget unlimited so only rate matters).
-        for _ in 0..MAX_CALLS_PER_WINDOW {
-            assert!(try_reserve(&mut g, now, 100, 1, 0).is_ok());
-        }
-        assert_eq!(
-            try_reserve(&mut g, now, 100, 1, 0),
-            Err(GuardDenied::RateLimited)
-        );
-        // After the window elapses, calls are allowed again.
-        let later = now + RATE_WINDOW + Duration::from_secs(1);
-        assert!(try_reserve(&mut g, later, 100, 1, 0).is_ok());
-    }
-
-    #[test]
     fn format_results_use_content_within_budget() {
         let results = vec![
             SearchResult {
@@ -1846,7 +1816,7 @@ mod tests {
             },
         ];
         let block = format_results_for_prompt(&results, 8_000);
-        assert!(block.starts_with("Live web search results:"));
+        assert!(block.starts_with("[Web search results you retrieved"));
         assert!(block.contains("Source: Alpha"));
         assert!(block.contains("Full page content about Alpha."));
         assert!(block.contains("Source: Beta"));
@@ -1867,38 +1837,5 @@ mod tests {
         // Only 3 chars of the body should appear.
         assert!(block.contains("abc"));
         assert!(!block.contains("abcd"));
-    }
-
-    #[test]
-    fn decode_ddg_url_handles_redirect_and_plain() {
-        assert_eq!(
-            decode_ddg_url("//duckduckgo.com/l/?uddg=https%3A%2F%2Fexample.com%2Fa%3Fb%3Dc&rut=x"),
-            "https://example.com/a?b=c"
-        );
-        assert_eq!(
-            decode_ddg_url("//example.com/path"),
-            "https://example.com/path"
-        );
-        assert_eq!(decode_ddg_url("https://example.com"), "https://example.com");
-    }
-
-    #[test]
-    fn parse_duckduckgo_html_extracts_pairs() {
-        let html = r#"
-            <div class="result results_links">
-              <a rel="nofollow" class="result__a" href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fen.wikipedia.org%2Fwiki%2FCanada&rut=z">Prime Minister of <b>Canada</b></a>
-              <a class="result__snippet" href="x">The current prime minister is someone &amp; notable.</a>
-            </div>
-            <div class="result results_links result--ad">
-              <a class="result__a" href="//duckduckgo.com/y.js?ad=1">Sponsored</a>
-              <a class="result__snippet" href="x">an ad</a>
-            </div>
-        "#;
-        let results = parse_duckduckgo_html(html, 5);
-        assert_eq!(results.len(), 1);
-        assert_eq!(results[0].title, "Prime Minister of Canada");
-        assert_eq!(results[0].url, "https://en.wikipedia.org/wiki/Canada");
-        assert!(results[0].snippet.contains("current prime minister"));
-        assert!(results[0].snippet.contains("&"));
     }
 }

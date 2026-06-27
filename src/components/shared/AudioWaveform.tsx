@@ -1,4 +1,4 @@
-import React, { useId, useRef } from "react";
+import React, { useRef } from "react";
 import "./AudioWaveform.css";
 
 export type WaveMode = "reactive" | "shimmer" | "flow";
@@ -6,14 +6,14 @@ export type WaveMode = "reactive" | "shimmer" | "flow";
 export interface AudioWaveformProps {
   /** Raw vocal-spectrum levels (roughly 0..1), any length. */
   levels: number[];
-  /** Number of bars to render (reactive mode only). */
+  /** Number of bars to render. */
   barCount?: number;
   /** Whether audio is actively flowing. When false the bars rest as dots.
    *  Only consulted in `reactive` mode. */
   active?: boolean;
-  /** Motion style. `reactive` follows `levels` (live mic, rendered as bars);
-   *  `shimmer` is a calm flowing ribbon for "working"/"thinking"; `flow` is a
-   *  livelier flowing ribbon for "speaking". Defaults to `reactive`. */
+  /** Motion style. `reactive` follows `levels` (live mic); `shimmer` is a calm
+   *  self-animated pulse for "working"/"thinking"; `flow` is a livelier
+   *  self-animated pulse for "speaking". Defaults to `reactive`. */
   mode?: WaveMode;
   /** Visual scale — `sm` for the compact overlay, `md` for the pill / panel. */
   size?: "sm" | "md";
@@ -25,35 +25,23 @@ const SIZES = {
   md: { barW: 3.5, gap: 3, bars: 20 },
 } as const;
 
-// Resting dot vs. tallest bar, as a share of the container height (reactive).
+// Resting dot vs. tallest bar, as a share of the container height.
 const MIN_PCT = 9;
 const MAX_PCT = 96;
 
-// --- Smooth continuous wave (shimmer / flow) -------------------------------
-// The self-animated states render a flowing sine "ribbon" rather than discrete
-// bars: two layered sine lines drift at different speeds for an organic feel.
-// Geometry is built once at module load; CSS translates the lines and loops
-// seamlessly — each <svg> is 200% wide and shifts by -50% (an integer number
-// of cycles), so the wrap is invisible.
-const WAVE_W = 200;
-const WAVE_H = 40;
+// Resting silhouette height for the self-animated states, as a share of the
+// reactive range — `flow` (speaking) stands taller and livelier than the calm
+// `shimmer` (thinking). CSS then pulses each bar around this baseline.
+const SELF_SILHOUETTE: Record<Exclude<WaveMode, "reactive">, number> = {
+  shimmer: 0.5,
+  flow: 0.82,
+};
 
-/** Build a smooth sine path across the full wave viewBox. `period` must divide
- *  100 so the -50% travel loops seamlessly. */
-function sinePath(period: number, amp: number, phase: number): string {
-  const mid = WAVE_H / 2;
-  let d = "";
-  for (let x = 0; x <= WAVE_W; x += 2) {
-    const y = mid + amp * Math.sin((2 * Math.PI * x) / period + phase);
-    d += `${x === 0 ? "M" : "L"}${x} ${y.toFixed(2)} `;
-  }
-  return d.trim();
+/** Centre-weighted bell envelope: 1 at the centre line, easing to 0 at the rim
+ *  so the bars always read as a voice "spindle" rather than a flat row. */
+function bell(dist: number): number {
+  return Math.pow(0.5 + 0.5 * Math.cos(Math.PI * Math.min(1, dist)), 1.4);
 }
-
-const FRONT_PATH = sinePath(50, 12, 0);
-// Same curve, closed down to the baseline — a soft "ribbon" body under the crest.
-const FRONT_FILL = `${FRONT_PATH} L ${WAVE_W} ${WAVE_H} L 0 ${WAVE_H} Z`;
-const BACK_PATH = sinePath(100, 8, 1.1);
 
 /** Resample an arbitrary-length level array to exactly `n` points with linear
  *  interpolation, so the shape is stable regardless of how many bands the
@@ -75,13 +63,15 @@ function resample(src: number[], n: number): number[] {
 }
 
 /**
- * Voice waveform with two looks:
+ * Voice waveform rendered as a single, consistent visual language: a mirrored
+ * "voice spindle" of rounded-cap bars that arch up from a centre line.
  *
- * - **reactive** (listening): a mirrored "voice spindle" of bars driven by the
- *   live 16-band vocal spectrum, smoothed frame-to-frame.
- * - **shimmer / flow** (working / speaking): a smooth, continuously flowing
- *   sine ribbon — two sine lines drifting at different speeds — for a calm,
- *   premium motion that doesn't react to audio.
+ * - **reactive** (listening): bar heights are driven by the live 16-band vocal
+ *   spectrum, smoothed frame-to-frame.
+ * - **shimmer / flow** (working / speaking): the bars hold a calm spindle
+ *   silhouette and pulse with a centre-out ripple driven entirely in CSS — no
+ *   live audio, but the same crisp bars, so motion always reads as "voice"
+ *   rather than a decorative line.
  *
  * Heights / sizes are container-relative, so the same component fills the short
  * recording overlay and the taller assistant pill alike.
@@ -96,6 +86,8 @@ const AudioWaveform: React.FC<AudioWaveformProps> = ({
 }) => {
   const { barW, gap, bars: defaultBars } = SIZES[size];
   const count = barCount ?? defaultBars;
+  const center = (count - 1) / 2;
+  const isReactive = mode === "reactive";
 
   // Unique bands from the centre (low freq, loud) out to one edge.
   const half = Math.max(2, Math.ceil(count / 2));
@@ -103,56 +95,28 @@ const AudioWaveform: React.FC<AudioWaveformProps> = ({
   if (smoothedRef.current.length !== half) {
     smoothedRef.current = new Array(half).fill(0);
   }
-  // Stable, collision-free id for the ribbon's fill gradient.
-  const fillId = `wfill-${useId().replace(/:/g, "")}`;
 
-  // Self-animated states draw a smooth, flowing sine ribbon (no live audio).
-  if (mode !== "reactive") {
-    return (
-      <div
-        className={`audio-waveform ${size} ${mode} ${className}`}
-        aria-hidden="true"
-      >
-        <div className="wave-flow-field">
-          <svg
-            className="wave-line back"
-            viewBox={`0 0 ${WAVE_W} ${WAVE_H}`}
-            preserveAspectRatio="none"
-          >
-            <path className="wline" d={BACK_PATH} />
-          </svg>
-          <svg
-            className="wave-line front"
-            viewBox={`0 0 ${WAVE_W} ${WAVE_H}`}
-            preserveAspectRatio="none"
-          >
-            <defs>
-              <linearGradient id={fillId} x1="0" y1="0" x2="0" y2="1">
-                <stop className="wfill-top" offset="0" />
-                <stop className="wfill-bottom" offset="1" />
-              </linearGradient>
-            </defs>
-            <path className="wfill" d={FRONT_FILL} fill={`url(#${fillId})`} />
-            <path className="wline" d={FRONT_PATH} />
-          </svg>
-        </div>
-      </div>
+  // Reactive mode smooths the incoming spectrum frame-to-frame; the
+  // self-animated modes ignore `levels` entirely (motion comes from CSS).
+  let display: number[] = smoothedRef.current;
+  let idle = false;
+  if (isReactive) {
+    const profile = resample(levels, half);
+    display = smoothedRef.current.map(
+      (prev, i) => prev * 0.6 + (profile[i] ?? 0) * 0.4,
     );
+    smoothedRef.current = display;
+    const energy = display.reduce((m, v) => Math.max(m, v), 0);
+    idle = !active || energy < 0.05;
   }
 
-  const profile = resample(levels, half);
-  const display = smoothedRef.current.map(
-    (prev, i) => prev * 0.6 + (profile[i] ?? 0) * 0.4,
-  );
-  smoothedRef.current = display;
-
-  const energy = display.reduce((m, v) => Math.max(m, v), 0);
-  const idle = !active || energy < 0.05;
-  const center = (count - 1) / 2;
+  const silhouette = isReactive ? 0 : SELF_SILHOUETTE[mode];
 
   return (
     <div
-      className={`audio-waveform ${size} ${mode} ${idle ? "is-idle" : ""} ${className}`}
+      className={`audio-waveform ${size} ${mode} ${
+        isReactive && idle ? "is-idle" : ""
+      } ${className}`}
       style={
         {
           "--bar-gap": `${gap}px`,
@@ -166,19 +130,36 @@ const AudioWaveform: React.FC<AudioWaveformProps> = ({
           // 0 at the centre line, 1 at the outer edge.
           const dist = center === 0 ? 0 : Math.abs(i - center) / center;
           // Bell envelope: the centre carries the signal, the rim eases to dots.
-          const env = Math.pow(
-            0.5 + 0.5 * Math.cos(Math.PI * Math.min(1, dist)),
-            1.4,
-          );
-          const band = display[Math.round(dist * (half - 1))] ?? 0;
-          const shaped = Math.pow(Math.min(1, Math.max(0, band)), 0.6);
-          const amp = idle ? 0 : shaped * env;
-          const pct = MIN_PCT + amp * (MAX_PCT - MIN_PCT);
+          const env = bell(dist);
+
+          if (isReactive) {
+            const band = display[Math.round(dist * (half - 1))] ?? 0;
+            const shaped = Math.pow(Math.min(1, Math.max(0, band)), 0.6);
+            const amp = idle ? 0 : shaped * env;
+            const pct = MIN_PCT + amp * (MAX_PCT - MIN_PCT);
+            return (
+              <span
+                key={i}
+                className="wave-bar"
+                style={{ height: `${pct}%` } as React.CSSProperties}
+              />
+            );
+          }
+
+          // Self-animated: a static spindle silhouette that CSS pulses around.
+          // `--dist` phases the centre-out ripple; the height is the resting
+          // shape, scaled by the per-mode silhouette weight.
+          const pct = MIN_PCT + env * silhouette * (MAX_PCT - MIN_PCT);
           return (
             <span
               key={i}
               className="wave-bar"
-              style={{ height: `${pct}%` } as React.CSSProperties}
+              style={
+                {
+                  height: `${pct}%`,
+                  "--dist": dist.toFixed(3),
+                } as React.CSSProperties
+              }
             />
           );
         })}
