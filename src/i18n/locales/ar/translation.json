@@ -1,6 +1,6 @@
 {
   "tray": {
-    "settings": "...الإعدادات",
+    "home": "الرئيسية",
     "checkUpdates": "...التحقق من وجود تحديثات",
     "copyLastTranscript": "نسخ آخر نص تم تفريغه",
     "unloadModel": "تفريغ النموذج",

@@ -261,15 +261,8 @@ function App() {
     return <Onboarding onModelSelected={handleModelSelected} />;
   }
 
-  // Page header: the section title plus a one-line subtitle that gives each
-  // screen a clear primary→secondary hierarchy. Subtitle key mirrors the
-  // sidebar label key (sidebar.* → sectionSubtitles.*); missing locales fall
-  // back to English, and an absent key renders nothing.
-  const sectionLabelKey = SECTIONS_CONFIG[currentSection].labelKey;
-  const sectionSubtitle = t(
-    sectionLabelKey.replace("sidebar.", "sectionSubtitles."),
-    { defaultValue: "" },
-  );
+  // Page header: just the section title. Each screen's name is self-explanatory
+  // (General, Models, Advanced…), so no explanatory subtitle is needed.
 
   return (
     <div
@@ -326,11 +319,6 @@ function App() {
                 <h1 className="font-display text-[2.25rem] leading-[1.08] tracking-[-0.02em] text-balance text-ink">
                   {t(SECTIONS_CONFIG[currentSection].labelKey)}
                 </h1>
-                {sectionSubtitle && (
-                  <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted">
-                    {sectionSubtitle}
-                  </p>
-                )}
               </header>
               {renderSettingsContent(currentSection)}
             </div>

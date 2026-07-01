@@ -1,6 +1,6 @@
 {
   "tray": {
-    "settings": "設定...",
+    "home": "ホーム",
     "checkUpdates": "アップデートを確認...",
     "copyLastTranscript": "最新の文字起こしをコピー",
     "unloadModel": "モデルをアンロード",

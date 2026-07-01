@@ -71,6 +71,14 @@ fn build_headers(provider: &PostProcessProvider, api_key: &str) -> Result<Header
 
     // Common headers
     headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+    // OpenRouter reads `HTTP-Referer` (not the standard `Referer`) plus `X-Title`
+    // for app attribution / leaderboard ranking; other gateways ignore both.
+    // We send `HTTP-Referer` (the name OpenRouter documents) and keep the plain
+    // `Referer` too — harmless everywhere, and some proxies still look at it.
+    headers.insert(
+        "HTTP-Referer",
+        HeaderValue::from_static("https://github.com/AbhishekBarali/SpeakoFlow"),
+    );
     headers.insert(
         REFERER,
         HeaderValue::from_static("https://github.com/AbhishekBarali/SpeakoFlow"),
@@ -84,6 +92,9 @@ fn build_headers(provider: &PostProcessProvider, api_key: &str) -> Result<Header
     // Provider-specific auth headers
     if !api_key.is_empty() {
         if provider.id == "anthropic" {
+            // Anthropic's OpenAI-compatible layer (api.anthropic.com/v1) accepts
+            // either the native `x-api-key` header or `Authorization: Bearer`.
+            // We send the native pair, which also works on the classic API.
             headers.insert(
                 "x-api-key",
                 HeaderValue::from_str(api_key)
@@ -96,6 +107,17 @@ fn build_headers(provider: &PostProcessProvider, api_key: &str) -> Result<Header
                 HeaderValue::from_str(&format!("Bearer {}", api_key))
                     .map_err(|e| format!("Invalid authorization header value: {}", e))?,
             );
+            // Azure OpenAI's v1 endpoint (`{res}.openai.azure.com/openai/v1`)
+            // accepts key auth via the `api-key` header as well as `Bearer`.
+            // Send both for Azure hosts so a key works regardless of which auth
+            // style the gateway honors; non-Azure hosts ignore the extra header.
+            if provider.base_url.contains("azure.com") {
+                headers.insert(
+                    "api-key",
+                    HeaderValue::from_str(api_key)
+                        .map_err(|e| format!("Invalid api-key header value: {}", e))?,
+                );
+            }
         }
     }
 
@@ -113,6 +135,44 @@ fn create_client(provider: &PostProcessProvider, api_key: &str) -> Result<reqwes
         .http1_only()
         .build()
         .map_err(|e| format!("Failed to build HTTP client: {}", e))
+}
+
+/// If `raw` points at an Azure OpenAI–style host, return just the host. Covers
+/// the Azure OpenAI resource domain, the AI Foundry domain, the classic
+/// Cognitive Services domain, and the US-gov domain.
+fn azure_openai_host(raw: &str) -> Option<String> {
+    let without_scheme = raw
+        .strip_prefix("https://")
+        .or_else(|| raw.strip_prefix("http://"))
+        .unwrap_or(raw);
+    let host = without_scheme.split('/').next().unwrap_or("").to_lowercase();
+    if host.ends_with(".openai.azure.com")
+        || host.ends_with(".services.ai.azure.com")
+        || host.ends_with(".cognitiveservices.azure.com")
+        || host.ends_with(".openai.azure.us")
+    {
+        Some(host)
+    } else {
+        None
+    }
+}
+
+/// Resolve the effective OpenAI-compatible base URL for a provider.
+///
+/// Most providers are used verbatim (trailing slash trimmed). Azure endpoints
+/// are normalized to the v1 API surface: whatever the user pastes from the
+/// portal — `https://{res}.openai.azure.com/`, the AI Foundry project endpoint
+/// `https://{res}.services.ai.azure.com/api/projects/{proj}`, or a
+/// `cognitiveservices.azure.com` domain — is rewritten to
+/// `https://{host}/openai/v1`, which is where the app appends
+/// `/chat/completions` and `/models`. This makes "paste the endpoint from the
+/// Azure portal" just work instead of 404ing on a missing `/openai/v1` path.
+fn effective_base_url(provider: &PostProcessProvider) -> String {
+    let raw = provider.base_url.trim().trim_end_matches('/');
+    if let Some(host) = azure_openai_host(raw) {
+        return format!("https://{}/openai/v1", host);
+    }
+    raw.to_string()
 }
 
 /// Send a chat completion request to an OpenAI-compatible API
@@ -154,7 +214,7 @@ pub async fn send_chat_completion_with_schema(
     reasoning_effort: Option<String>,
     reasoning: Option<ReasoningConfig>,
 ) -> Result<Option<String>, String> {
-    let base_url = provider.base_url.trim_end_matches('/');
+    let base_url = effective_base_url(provider);
     let url = format!("{}/chat/completions", base_url);
 
     debug!("Sending chat completion request to: {}", url);
@@ -248,7 +308,7 @@ pub async fn send_chat_stream(
     messages: Vec<Value>,
     mut on_token: impl FnMut(&str),
 ) -> Result<String, String> {
-    let base_url = provider.base_url.trim_end_matches('/');
+    let base_url = effective_base_url(provider);
     let url = format!("{}/chat/completions", base_url);
 
     debug!("Sending streaming chat completion request to: {}", url);
@@ -335,7 +395,7 @@ pub async fn fetch_models(
     provider: &PostProcessProvider,
     api_key: String,
 ) -> Result<Vec<String>, String> {
-    let base_url = provider.base_url.trim_end_matches('/');
+    let base_url = effective_base_url(provider);
     let url = format!("{}/models", base_url);
 
     debug!("Fetching models from: {}", url);
@@ -387,4 +447,78 @@ pub async fn fetch_models(
     }
 
     Ok(models)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::settings::PostProcessProvider;
+
+    fn provider(id: &str, base: &str) -> PostProcessProvider {
+        PostProcessProvider {
+            id: id.to_string(),
+            label: id.to_string(),
+            base_url: base.to_string(),
+            allow_base_url_edit: true,
+            models_endpoint: Some("/models".to_string()),
+            supports_structured_output: true,
+        }
+    }
+
+    #[test]
+    fn azure_openai_endpoints_normalize_to_v1() {
+        // Bare resource endpoint from the Azure portal.
+        assert_eq!(
+            effective_base_url(&provider("azure_openai", "https://res.openai.azure.com/")),
+            "https://res.openai.azure.com/openai/v1"
+        );
+        // AI Foundry project endpoint (path is stripped).
+        assert_eq!(
+            effective_base_url(&provider(
+                "azure_openai",
+                "https://res.services.ai.azure.com/api/projects/proj"
+            )),
+            "https://res.services.ai.azure.com/openai/v1"
+        );
+        // Classic Cognitive Services custom domain.
+        assert_eq!(
+            effective_base_url(&provider(
+                "azure_openai",
+                "https://res.cognitiveservices.azure.com"
+            )),
+            "https://res.cognitiveservices.azure.com/openai/v1"
+        );
+        // Already-correct v1 endpoint is left equivalent.
+        assert_eq!(
+            effective_base_url(&provider(
+                "azure_openai",
+                "https://res.openai.azure.com/openai/v1"
+            )),
+            "https://res.openai.azure.com/openai/v1"
+        );
+    }
+
+    #[test]
+    fn non_azure_base_urls_are_untouched() {
+        assert_eq!(
+            effective_base_url(&provider("openai", "https://api.openai.com/v1/")),
+            "https://api.openai.com/v1"
+        );
+        assert_eq!(
+            effective_base_url(&provider("groq", "https://api.groq.com/openai/v1")),
+            "https://api.groq.com/openai/v1"
+        );
+        assert_eq!(
+            effective_base_url(&provider("local", "http://localhost:11434/v1")),
+            "http://localhost:11434/v1"
+        );
+    }
+
+    #[test]
+    fn azure_host_detection() {
+        assert!(azure_openai_host("https://res.openai.azure.com/openai/v1").is_some());
+        assert!(azure_openai_host("https://res.services.ai.azure.com/api/projects/p").is_some());
+        assert!(azure_openai_host("https://api.openai.com/v1").is_none());
+        assert!(azure_openai_host("http://localhost:11434/v1").is_none());
+    }
 }

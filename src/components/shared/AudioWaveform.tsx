@@ -29,6 +29,36 @@ const SIZES = {
 const MIN_PCT = 9;
 const MAX_PCT = 96;
 
+// Reactive-mode shaping (live mic). The vocal spectrum coming from the backend
+// tends to sit low, so instead of mapping it straight onto 0..1 we lift it and
+// hold it inside a pleasing visual band:
+//   - REACTIVE_GAIN lifts the generally-low incoming signal so ordinary speech
+//     actually fills the wave (fixes "too low").
+//   - REACTIVE_CEIL caps the amplitude so loud peaks can't slam the bars to
+//     full height and read as a jagged, bizarre spike (the upper limit).
+//   - ACTIVE_FLOOR keeps a baseline height while the mic is live so the wave
+//     always reads as a continuous flow instead of collapsing to flat dots
+//     between syllables (the lower limit).
+const REACTIVE_GAIN = 1.7;
+const REACTIVE_CEIL = 0.9;
+const ACTIVE_FLOOR = 0.34;
+
+// Frame-to-frame easing for the live wave, applied per spectrum update
+// (~20-30/sec). Lower = smoother and slower. The release (falling) rate is
+// deliberately much slower than the attack (rising) rate so the bars climb
+// gently toward louder audio and then ease back down like a slow tide — they
+// never snap up or drop out from under the eye between syllables. This is what
+// turns a twitchy, distracting meter into a soothing flow.
+const WAVE_ATTACK = 0.28;
+const WAVE_RELEASE = 0.1;
+
+// Envelope floor shared by every mode. Rather than a tall "spindle" that tapers
+// to empty dots at the rim, the bars follow a gentle arch whose sides keep this
+// share of the centre's height — so the wave (live mic, thinking, or speaking)
+// reads as an even flow across the whole chip instead of a spike in the middle
+// with hollow sides.
+const ENV_FLOOR = 0.68;
+
 // Resting silhouette height for the self-animated states, as a share of the
 // reactive range — `flow` (speaking) stands taller and livelier than the calm
 // `shimmer` (thinking). CSS then pulses each bar around this baseline.
@@ -37,10 +67,12 @@ const SELF_SILHOUETTE: Record<Exclude<WaveMode, "reactive">, number> = {
   flow: 0.82,
 };
 
-/** Centre-weighted bell envelope: 1 at the centre line, easing to 0 at the rim
- *  so the bars always read as a voice "spindle" rather than a flat row. */
-function bell(dist: number): number {
-  return Math.pow(0.5 + 0.5 * Math.cos(Math.PI * Math.min(1, dist)), 1.4);
+/** Envelope across the bars: 1 at the centre line, easing to ENV_FLOOR at the
+ *  rim (a raised cosine). A gentle arch that keeps the sides full so the wave
+ *  reads as an even flow rather than a spike in the middle with empty dots. */
+function envelope(dist: number): number {
+  const arch = 0.5 + 0.5 * Math.cos(Math.PI * Math.min(1, dist));
+  return ENV_FLOOR + (1 - ENV_FLOOR) * arch;
 }
 
 /** Resample an arbitrary-length level array to exactly `n` points with linear
@@ -64,11 +96,12 @@ function resample(src: number[], n: number): number[] {
 
 /**
  * Voice waveform rendered as a single, consistent visual language: a mirrored
- * "voice spindle" of rounded-cap bars that arch up from a centre line.
+ * arch of rounded-cap bars that rise from a centre line, with the sides kept
+ * full (see `envelope`) so it reads as an even flow rather than a spike.
  *
  * - **reactive** (listening): bar heights are driven by the live 16-band vocal
  *   spectrum, smoothed frame-to-frame.
- * - **shimmer / flow** (working / speaking): the bars hold a calm spindle
+ * - **shimmer / flow** (working / speaking): the bars hold a calm arch
  *   silhouette and pulse with a centre-out ripple driven entirely in CSS — no
  *   live audio, but the same crisp bars, so motion always reads as "voice"
  *   rather than a decorative line.
@@ -102,12 +135,20 @@ const AudioWaveform: React.FC<AudioWaveformProps> = ({
   let idle = false;
   if (isReactive) {
     const profile = resample(levels, half);
-    display = smoothedRef.current.map(
-      (prev, i) => prev * 0.6 + (profile[i] ?? 0) * 0.4,
-    );
+    // Asymmetric attack/release easing: move toward a louder target at
+    // WAVE_ATTACK, but fall back at the slower WAVE_RELEASE, so the wave settles
+    // gently instead of tracking every jump. Both rates are gentle enough that
+    // the motion reads as a flowing tide rather than a reactive meter.
+    display = smoothedRef.current.map((prev, i) => {
+      const target = profile[i] ?? 0;
+      const k = target > prev ? WAVE_ATTACK : WAVE_RELEASE;
+      return prev + (target - prev) * k;
+    });
     smoothedRef.current = display;
     const energy = display.reduce((m, v) => Math.max(m, v), 0);
-    idle = !active || energy < 0.05;
+    // A low trip point so brief gaps between words don't drop the wave into the
+    // idle "breathe" state; the active floor keeps it flowing while speaking.
+    idle = !active || energy < 0.03;
   }
 
   const silhouette = isReactive ? 0 : SELF_SILHOUETTE[mode];
@@ -129,13 +170,21 @@ const AudioWaveform: React.FC<AudioWaveformProps> = ({
         {Array.from({ length: count }, (_, i) => {
           // 0 at the centre line, 1 at the outer edge.
           const dist = center === 0 ? 0 : Math.abs(i - center) / center;
-          // Bell envelope: the centre carries the signal, the rim eases to dots.
-          const env = bell(dist);
+          // Flatter, floored arch (see `envelope`): the centre leads slightly
+          // but the sides stay full, so every mode flows evenly across the chip
+          // rather than spiking in the middle with empty sides.
+          const env = envelope(dist);
 
           if (isReactive) {
             const band = display[Math.round(dist * (half - 1))] ?? 0;
+            // Lift the low-sitting signal with the sub-1 curve + gain, then cap
+            // it so loud peaks stay smooth rather than spiking to the rim.
             const shaped = Math.pow(Math.min(1, Math.max(0, band)), 0.6);
-            const amp = idle ? 0 : shaped * env;
+            const signal = Math.min(REACTIVE_CEIL, shaped * REACTIVE_GAIN);
+            // While the mic is live, blend in a baseline so the wave keeps
+            // flowing between syllables.
+            const base = idle ? 0 : ACTIVE_FLOOR + (1 - ACTIVE_FLOOR) * signal;
+            const amp = base * env;
             const pct = MIN_PCT + amp * (MAX_PCT - MIN_PCT);
             return (
               <span
@@ -146,9 +195,9 @@ const AudioWaveform: React.FC<AudioWaveformProps> = ({
             );
           }
 
-          // Self-animated: a static spindle silhouette that CSS pulses around.
+          // Self-animated: a static arch silhouette that CSS pulses around.
           // `--dist` phases the centre-out ripple; the height is the resting
-          // shape, scaled by the per-mode silhouette weight.
+          // shape (flattened envelope) scaled by the per-mode silhouette weight.
           const pct = MIN_PCT + env * silhouette * (MAX_PCT - MIN_PCT);
           return (
             <span

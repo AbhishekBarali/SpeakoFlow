@@ -92,7 +92,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ onModelSelected }) => {
     <div className="h-screen w-screen flex flex-col p-6 gap-4 inset-0">
       <div className="flex flex-col items-center gap-2 shrink-0">
         <Wordmark className="text-4xl" />
-        <p className="font-display text-xl text-body max-w-md mx-auto">
+        <p className="text-xl text-body max-w-md mx-auto">
           {t("onboarding.subtitle")}
         </p>
       </div>

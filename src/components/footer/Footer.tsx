@@ -15,7 +15,7 @@ const Footer: React.FC = () => {
         setVersion(appVersion);
       } catch (error) {
         console.error("Failed to get app version:", error);
-        setVersion("0.1.2");
+        setVersion("");
       }
     };
 
@@ -35,7 +35,7 @@ const Footer: React.FC = () => {
           <UpdateChecker />
           <span className="text-muted-soft">•</span>
           {/* eslint-disable-next-line i18next/no-literal-string */}
-          <span>v{version}</span>
+          {version && <span>v{version}</span>}
         </div>
       </div>
     </div>

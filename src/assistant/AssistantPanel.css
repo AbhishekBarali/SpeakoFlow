@@ -1,6 +1,6 @@
 /* Assistant panel — a floating editorial card that speaks the same language
  * as the main SpeakoFlow window: warm near-black surfaces, off-white ink,
- * hairline rules, EB Garamond for the title, and the accent used only as an
+ * hairline rules, the brand sans (Plus Jakarta Sans) for the title, and the accent used only as an
  * atmospheric moment (orb glow, send action, status, focus) rather than as
  * saturated chrome everywhere.
  *
@@ -17,9 +17,10 @@
   --msg-font-size: 13.5px;
 
   --font-ui:
-    "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text",
-    "Segoe UI", Roboto, sans-serif;
-  --font-display: "EB Garamond", "Iowan Old Style", "Times New Roman", serif;
+    "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont,
+    "Segoe UI Variable Text", "Segoe UI", Roboto, sans-serif;
+  --font-display:
+    "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
 
   --panel-radius: 18px;
 

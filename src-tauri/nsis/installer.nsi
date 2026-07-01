@@ -1,4 +1,4 @@
-; Custom NSIS template for Handy with portable mode support.
+; Custom NSIS template for SpeakoFlow with portable mode support.
 ; Based on tauri-apps/tauri@tauri-v2.9.1 crates/tauri-bundler/src/bundle/windows/nsis/installer.nsi
 ; Portable changes are marked with "; --- PORTABLE MODE ---" comments.
 ;
@@ -587,17 +587,21 @@ Function .onInit
 
 
   ; --- PORTABLE MODE --- Auto-detect portable mode during updates.
-  ; Preserve portable installs that use either the current magic-string marker
-  ; or the legacy empty marker created by older Handy releases. Require Data/
-  ; for the legacy empty-marker case so stale scoop side-effect files do not
-  ; accidentally opt an updater run into portable mode.
+  ; Preserve portable installs that use the current magic-string marker, the
+  ; legacy "Handy Portable Mode" marker written by installs created before
+  ; the SpeakoFlow rebrand, or the legacy empty marker created by even older
+  ; Handy releases. Require Data/ for the legacy empty-marker case so stale
+  ; scoop side-effect files do not accidentally opt an updater run into
+  ; portable mode.
   ${If} $PortableMode <> 1
   ${AndIf} $UpdateMode = 1
   ${AndIf} ${FileExists} "$INSTDIR\portable"
     FileOpen $1 "$INSTDIR\portable" r
     FileRead $1 $2
     FileClose $1
-    ${If} $2 == "Handy Portable Mode"
+    ${If} $2 == "SpeakoFlow Portable Mode"
+      StrCpy $PortableMode 1
+    ${OrIf} $2 == "Handy Portable Mode"
       StrCpy $PortableMode 1
     ${OrIf} $2 == ""
     ${AndIf} ${FileExists} "$INSTDIR\Data"
@@ -768,7 +772,7 @@ Section Install
   ; --- PORTABLE MODE --- Create portable marker and Data directory
   ${If} $PortableMode = 1
     FileOpen $0 "$INSTDIR\portable" w
-    FileWrite $0 "Handy Portable Mode"
+    FileWrite $0 "SpeakoFlow Portable Mode"
     FileClose $0
     CreateDirectory "$INSTDIR\Data"
     DetailPrint "Portable mode: created marker file and Data directory."

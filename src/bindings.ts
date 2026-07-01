@@ -1272,6 +1272,33 @@ async assistantListAzureVoices() : Promise<Result<AzureVoice[], string>> {
 }
 },
 /**
+ * List selectable voices for the currently-configured remote TTS engine
+ * (OpenAI-compatible, ElevenLabs, or Azure), so the settings UI can offer a
+ * searchable voice picker instead of a raw text field. Returns an error string
+ * for inline display when the lookup fails (bad key, unreachable endpoint).
+ */
+async assistantListTtsVoices() : Promise<Result<TtsVoice[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("assistant_list_tts_voices") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * List selectable models for the currently-configured remote TTS engine
+ * (OpenAI-compatible `/models`, or ElevenLabs text-to-speech models). Azure and
+ * Kokoro don't expose a model list and return an error the UI shows inline.
+ */
+async assistantListTtsModels() : Promise<Result<string[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("assistant_list_tts_models") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * Stop the current assistant turn: cancels in-flight generation and silences
  * any spoken summary that is playing or about to play.
  */
@@ -1776,6 +1803,20 @@ export type SoundTheme = "marimba" | "pop" | "click" | "custom"
  * "system") to match the `data-theme` attribute the frontend sets on <html>.
  */
 export type Theme = "light" | "dark" | "system"
+/**
+ * A voice option handed to the settings UI for any remote TTS engine, so the
+ * user can pick from a loaded list instead of typing an opaque id.
+ */
+export type TtsVoice = { 
+/**
+ * Value written to settings (OpenAI voice name / ElevenLabs voice_id /
+ * Azure short name).
+ */
+id: string; 
+/**
+ * Friendly label for the picker.
+ */
+label: string }
 export type TypingTool = "auto" | "wtype" | "kwtype" | "dotool" | "ydotool" | "xdotool"
 export type WhisperAcceleratorSetting = "auto" | "cpu" | "gpu"
 export type WindowsMicrophonePermissionStatus = { supported: boolean; overall_access: PermissionAccess; device_access: PermissionAccess; app_access: PermissionAccess; desktop_app_access: PermissionAccess }

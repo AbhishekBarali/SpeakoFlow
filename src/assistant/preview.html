@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="utf-8" />
+    <title>Pill preview</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        min-height: 100%;
+      }
+      body {
+        /* A neutral desktop-ish backdrop so the floating pill's shadow reads. */
+        background:
+          radial-gradient(1200px 600px at 20% -10%, #3a3a3c, transparent 60%),
+          linear-gradient(160deg, #2b2b2e, #18181b 70%);
+        font-family: system-ui, sans-serif;
+        padding: 40px;
+      }
+      body[data-bg="light"] {
+        background:
+          radial-gradient(1200px 600px at 20% -10%, #fbfaf8, transparent 60%),
+          linear-gradient(160deg, #e9e6df, #d8d4cb 70%);
+      }
+      .grid {
+        display: flex;
+        flex-direction: column;
+        gap: 26px;
+        max-width: 720px;
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 22px;
+      }
+      .label {
+        width: 150px;
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+        color: #9b9ba1;
+      }
+      body[data-bg="light"] .label {
+        color: #6b675e;
+      }
+      /* Mimic the transparent pill window (232x64) + the #root 10px gutter. */
+      .win {
+        width: 232px;
+        height: 64px;
+        padding: 10px;
+        box-sizing: border-box;
+      }
+      .win > * {
+        width: 100%;
+        height: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/assistant/preview.tsx"></script>
+  </body>
+</html>

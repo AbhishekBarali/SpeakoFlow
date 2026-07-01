@@ -230,6 +230,19 @@ pub fn set_assistant_tts_engine(app: AppHandle, engine: String) -> Result<(), St
     // Switching engine mid-playback should stop the current clip.
     crate::tts::stop_remote();
     let mut settings = get_settings(&app);
+    if settings.assistant_tts_engine != engine {
+        // Switching engines: reset the endpoint / model / remote voice to this
+        // engine's defaults so a stale value from the previous engine (most
+        // importantly the OpenAI base URL leaking into Azure and 404ing on Load
+        // voices / Test voice) never carries over. The API key is preserved on
+        // purpose so a hard-to-retype secret isn't lost on a toggle. Kokoro uses
+        // a separate voice field and none of these, so it's unaffected.
+        settings.assistant_tts_base_url =
+            crate::settings::default_tts_base_url_for_engine(&engine);
+        settings.assistant_tts_model = crate::settings::default_tts_model_for_engine(&engine);
+        settings.assistant_tts_remote_voice =
+            crate::settings::default_tts_remote_voice_for_engine(&engine);
+    }
     settings.assistant_tts_engine = engine;
     write_settings(&app, settings);
     emit_settings_changed(&app);
@@ -425,6 +438,29 @@ pub async fn assistant_list_azure_voices(
 ) -> Result<Vec<crate::tts::AzureVoice>, String> {
     let settings = get_settings(&app);
     crate::tts::list_azure_voices(&settings).await
+}
+
+/// List selectable voices for the currently-configured remote TTS engine
+/// (OpenAI-compatible, ElevenLabs, or Azure), so the settings UI can offer a
+/// searchable voice picker instead of a raw text field. Returns an error string
+/// for inline display when the lookup fails (bad key, unreachable endpoint).
+#[tauri::command]
+#[specta::specta]
+pub async fn assistant_list_tts_voices(
+    app: AppHandle,
+) -> Result<Vec<crate::tts::TtsVoice>, String> {
+    let settings = get_settings(&app);
+    crate::tts::list_tts_voices(&settings).await
+}
+
+/// List selectable models for the currently-configured remote TTS engine
+/// (OpenAI-compatible `/models`, or ElevenLabs text-to-speech models). Azure and
+/// Kokoro don't expose a model list and return an error the UI shows inline.
+#[tauri::command]
+#[specta::specta]
+pub async fn assistant_list_tts_models(app: AppHandle) -> Result<Vec<String>, String> {
+    let settings = get_settings(&app);
+    crate::tts::list_tts_models(&settings).await
 }
 
 /// Stop the current assistant turn: cancels in-flight generation and silences

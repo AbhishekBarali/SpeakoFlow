@@ -11,8 +11,10 @@
  * The default (light) theme is a warm, creamy "paper" palette — never plain
  * white — with warm near-black ink, hairline rules and soft pastel gradient
  * orbs as the only color moments. The dark inversion lives under
- * :root[data-theme="dark"] further below. Display runs EB Garamond (light,
- * editorial); body/UI runs Inter. Inspired by the ElevenLabs design language.
+ * :root[data-theme="dark"] further below. Both display headings and body/UI
+ * now run Plus Jakarta Sans (the brand/logo face) — one geometric sans across
+ * the whole app, with weight carrying the hierarchy. Inspired by the Wispr Flow
+ * design language: bold headings, clean sans, no editorial serif.
  */
 @theme {
   /* === Surfaces (soft warm white — premium, airy, not beige) === */
@@ -65,10 +67,16 @@
   /* warm gray: solid it reads as a muted label, at low opacity ≈ a hairline */
   --color-mid-gray: #968c7b;
 
-  /* === Type families === */
+  /* === Type families ===
+   * One family across the app: Plus Jakarta Sans (the logo face). Headings and
+   * body share it; weight + size carry the hierarchy (see .font-display). */
   --font-sans:
-    "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-display: "EB Garamond", "Iowan Old Style", "Times New Roman", serif;
+    "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    sans-serif;
+  --font-display:
+    "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-brand:
+    "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
 }
 
 /* Explicit light selection — hint native controls/scrollbars to light. The
@@ -111,13 +119,26 @@
   background-color: var(--color-background);
 }
 
-/* Display face — editorial serif, used with restraint on headings only. */
+/* Heading face — the brand sans (Plus Jakarta Sans) set bold. Carries section
+ * titles and other display headings. Weight + tight tracking give the Wispr-
+ * Flow-style bold heading; secondary uses override the weight locally. */
 .font-display {
   font-family: var(--font-display);
-  font-weight: 400;
-  letter-spacing: -0.01em;
+  font-weight: 700;
+  letter-spacing: -0.02em;
   font-optical-sizing: auto;
   text-wrap: balance;
+}
+
+/* Brand face — geometric sans (Plus Jakarta Sans ExtraBold) for the logo
+ * lockup. Pair with a text color utility (e.g. `text-ink`) so the wordmark
+ * inherits the theme ink and adapts to light/dark automatically. Tracking
+ * mirrors the reference lockup (-2px @ 64px ≈ -0.03em). */
+.font-brand {
+  font-family: var(--font-brand);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  font-optical-sizing: auto;
 }
 
 /* === Dark inversion — warm near-black surfaces, off-white ink. ===

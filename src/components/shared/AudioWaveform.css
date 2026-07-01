@@ -62,11 +62,14 @@
   border-radius: 999px;
   background: var(--wave-bar);
   transform-origin: center center;
-  /* Smooth, springy rise/fall as the live signal moves the bars; transform is
-   * eased too so the idle breathe and the live bars hand off cleanly. */
+  /* Eased rise/fall as the live signal moves the bars. The durations are long
+   * enough to visually bridge the gaps between spectrum frames, so the bars
+   * glide between heights (a soothing flow) instead of stepping to each update;
+   * transform is eased in the same spirit so the idle breathe and the live bars
+   * hand off cleanly. */
   transition:
-    height 110ms cubic-bezier(0.22, 0.61, 0.36, 1),
-    transform 220ms cubic-bezier(0.22, 0.61, 0.36, 1);
+    height 240ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    transform 260ms cubic-bezier(0.22, 0.61, 0.36, 1);
   will-change: height, transform;
 }
 
@@ -90,7 +93,7 @@
 }
 
 /* ---- Self-animated states: same bars, centre-out ripple ------------------ *
- * `shimmer` (thinking) and `flow` (speaking) hold a static spindle silhouette
+ * `shimmer` (thinking) and `flow` (speaking) hold a static arch silhouette
  * (set inline as each bar's height) and pulse it with scaleY. The per-bar
  * `--dist` (0 at the centre, 1 at the rim) phases the animation so the motion
  * blooms symmetrically from the middle outward — never a left-to-right scan —
@@ -110,11 +113,13 @@
   animation-delay: calc(var(--dist, 0) * -0.62s);
 }
 
-/* Speaking — quicker and deeper, so it feels like a live voice. */
+/* Speaking — a calm, slow swell. It stays a touch livelier than the thinking
+ * shimmer, but the long period + gentle depth keep it soothing rather than a
+ * fast, headache-inducing flicker. */
 .audio-waveform.flow .wave-bar {
-  --pulse-lo: 0.42;
-  animation-duration: 1.15s;
-  animation-delay: calc(var(--dist, 0) * -0.46s);
+  --pulse-lo: 0.58;
+  animation-duration: 2.3s;
+  animation-delay: calc(var(--dist, 0) * -0.8s);
 }
 
 @keyframes wave-pulse {

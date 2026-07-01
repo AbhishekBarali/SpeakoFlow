@@ -1,6 +1,6 @@
 {
   "tray": {
-    "settings": "Ustawienia...",
+    "home": "Ekran główny",
     "checkUpdates": "Sprawdź aktualizacje...",
     "copyLastTranscript": "Kopiuj ostatnią transkrypcję",
     "unloadModel": "Zwolnij model",

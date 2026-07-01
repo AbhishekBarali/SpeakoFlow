@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   SlidersHorizontal,
@@ -9,8 +9,11 @@ import {
   Info,
   Sparkles,
   MessageCircle,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
-import Wordmark from "./Wordmark";
+import Logo from "./Logo";
+import LogoLockup from "./LogoLockup";
 import { useSettings } from "../hooks/useSettings";
 import {
   GeneralSettings,
@@ -102,14 +105,35 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const { t } = useTranslation();
   const { settings } = useSettings();
+  // The sidebar always opens expanded; the toggle only affects the current
+  // session (no persistence), so the full rail is the default on every launch.
+  const [collapsed, setCollapsed] = useState(false);
 
   const availableSections = Object.entries(SECTIONS_CONFIG)
     .filter(([_, config]) => config.enabled(settings))
     .map(([id, config]) => ({ id: id as SidebarSection, ...config }));
 
+  const toggleLabel = collapsed ? t("sidebar.expand") : t("sidebar.collapse");
+
   return (
-    <div className="flex flex-col w-44 h-full border-e border-hairline bg-canvas-soft px-3 py-4">
-      <Wordmark className="text-2xl mx-2 mb-5 mt-1" />
+    <div
+      className={`flex flex-col h-full border-e border-hairline bg-canvas-soft py-4 overflow-hidden transition-[width] duration-200 ease-out motion-reduce:transition-none ${
+        collapsed ? "w-16 items-center px-2" : "w-44 px-3"
+      }`}
+    >
+      {/* Brand mark — full lockup when expanded, icon-only when collapsed. */}
+      <div
+        className={`flex mb-6 mt-1 ${
+          collapsed ? "justify-center" : "items-center ms-1"
+        }`}
+      >
+        {collapsed ? (
+          <Logo className="text-ink h-6 w-auto shrink-0" />
+        ) : (
+          <LogoLockup iconClassName="h-6 w-auto" />
+        )}
+      </div>
+
       <nav className="flex flex-col w-full gap-0.5">
         {availableSections.map((section) => {
           const Icon = section.icon;
@@ -120,21 +144,44 @@ export const Sidebar: React.FC<SidebarProps> = ({
               key={section.id}
               type="button"
               aria-current={isActive ? "page" : undefined}
-              className={`flex gap-2.5 items-center px-3 py-2 w-full rounded-xl cursor-pointer transition-colors text-start ${
+              title={t(section.labelKey)}
+              className={`flex gap-2.5 items-center py-2 w-full rounded-xl cursor-pointer transition-colors text-start ${
+                collapsed ? "justify-center px-0" : "px-3"
+              } ${
                 isActive
-                  ? "bg-surface text-ink font-medium border border-hairline shadow-[0_1px_2px_rgba(12,10,9,0.04)]"
-                  : "text-muted hover:text-ink hover:bg-surface-strong border border-transparent"
+                  ? "bg-surface text-ink font-semibold border border-hairline shadow-[0_1px_2px_rgba(12,10,9,0.04)]"
+                  : "text-muted font-medium hover:text-ink hover:bg-surface-strong border border-transparent"
               }`}
               onClick={() => onSectionChange(section.id)}
             >
               <Icon width={18} height={18} className="shrink-0" />
-              <span className="text-sm truncate" title={t(section.labelKey)}>
-                {t(section.labelKey)}
-              </span>
+              {!collapsed && (
+                <span className="text-sm truncate">{t(section.labelKey)}</span>
+              )}
             </button>
           );
         })}
       </nav>
+
+      {/* Collapse control — a plain chevron pinned to the bottom, kept clear of
+          the logo and nav. Points inward (left) to collapse, outward (right) to
+          expand. */}
+      <button
+        type="button"
+        onClick={() => setCollapsed((value) => !value)}
+        aria-label={toggleLabel}
+        aria-expanded={!collapsed}
+        title={toggleLabel}
+        className={`mt-auto flex items-center h-8 w-full rounded-lg cursor-pointer text-muted transition-colors hover:text-ink hover:bg-surface-strong ${
+          collapsed ? "justify-center" : "justify-start px-3"
+        }`}
+      >
+        {collapsed ? (
+          <ChevronRight width={18} height={18} />
+        ) : (
+          <ChevronLeft width={18} height={18} />
+        )}
+      </button>
     </div>
   );
 };

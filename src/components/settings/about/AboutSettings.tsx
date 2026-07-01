@@ -27,7 +27,7 @@ export const AboutSettings: React.FC = () => {
         setVersion(appVersion);
       } catch (error) {
         console.error("Failed to get app version:", error);
-        setVersion("0.1.2");
+        setVersion("");
       }
     };
 
@@ -44,7 +44,7 @@ export const AboutSettings: React.FC = () => {
           grouped={true}
         >
           {/* eslint-disable-next-line i18next/no-literal-string */}
-          <span className="text-sm font-mono">v{version}</span>
+          {version && <span className="text-sm font-mono">v{version}</span>}
         </SettingContainer>
 
         <SettingContainer
@@ -60,6 +60,24 @@ export const AboutSettings: React.FC = () => {
             }
           >
             {t("settings.about.sourceCode.button")}
+          </Button>
+        </SettingContainer>
+
+        <SettingContainer
+          title={t("settings.about.license.title")}
+          description={t("settings.about.license.description")}
+          grouped={true}
+        >
+          <Button
+            variant="secondary"
+            size="md"
+            onClick={() =>
+              openUrl(
+                "https://github.com/AbhishekBarali/SpeakoFlow/blob/main/LICENSE",
+              )
+            }
+          >
+            {t("settings.about.license.button")}
           </Button>
         </SettingContainer>
 

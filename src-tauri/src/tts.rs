@@ -40,6 +40,27 @@ pub struct AzureVoice {
     pub gender: String,
 }
 
+/// A voice option handed to the settings UI for any remote TTS engine, so the
+/// user can pick from a loaded list instead of typing an opaque id.
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+pub struct TtsVoice {
+    /// Value written to settings (OpenAI voice name / ElevenLabs voice_id /
+    /// Azure short name).
+    pub id: String,
+    /// Friendly label for the picker.
+    pub label: String,
+}
+
+/// Built-in OpenAI TTS voices (current Audio API set). Used as the fallback
+/// voice list for the "openai" engine when the configured endpoint has no
+/// `/audio/voices` listing (e.g. api.openai.com itself, which serves a fixed
+/// set). Local OpenAI-compatible servers (Kokoro-FastAPI, openai-edge-tts) that
+/// do expose `/audio/voices` return their own list instead.
+const OPENAI_TTS_VOICES: &[&str] = &[
+    "alloy", "ash", "ballad", "coral", "echo", "fable", "onyx", "nova", "sage", "shimmer", "verse",
+    "marin", "cedar",
+];
+
 /// Monotonic playback epoch. Incremented whenever in-flight TTS should be
 /// cancelled (e.g. the user disables voice summaries). A request or playback
 /// tagged with an older epoch aborts instead of starting/continuing.
@@ -306,6 +327,26 @@ fn azure_tts_host(raw: &str) -> String {
     format!("https://{}", host)
 }
 
+/// True when the resolved Azure host is a regional Speech host
+/// (`{region}.tts.speech.microsoft.com` / `.azure.us`). Regional hosts use the
+/// un-prefixed `/cognitiveservices/...` paths; custom-domain resources
+/// (`{res}.cognitiveservices.azure.com`, AI Foundry `services.ai.azure.com`)
+/// use the `/tts/`-prefixed voices path instead.
+fn azure_is_regional_host(host_url: &str) -> bool {
+    host_url.ends_with(".tts.speech.microsoft.com") || host_url.ends_with(".tts.speech.azure.us")
+}
+
+/// Build the Azure `voices/list` URL for a configured endpoint, choosing the
+/// right path prefix for the resolved host type.
+fn azure_voices_url(raw: &str) -> String {
+    let host = azure_tts_host(raw);
+    if azure_is_regional_host(&host) {
+        format!("{}/cognitiveservices/voices/list", host)
+    } else {
+        format!("{}/tts/cognitiveservices/voices/list", host)
+    }
+}
+
 /// GET {host}/cognitiveservices/voices/list — all neural voices available to
 /// the configured Azure Speech resource. Errors are returned for display.
 pub async fn list_azure_voices(settings: &AppSettings) -> Result<Vec<AzureVoice>, String> {
@@ -320,10 +361,7 @@ pub async fn list_azure_voices(settings: &AppSettings) -> Result<Vec<AzureVoice>
     if api_key.is_empty() {
         return Err("No Azure Speech API key configured".to_string());
     }
-    let url = format!(
-        "{}/cognitiveservices/voices/list",
-        azure_tts_host(&settings.assistant_tts_base_url)
-    );
+    let url = azure_voices_url(&settings.assistant_tts_base_url);
 
     let client = reqwest::Client::new();
     let response = client
@@ -383,6 +421,283 @@ pub async fn list_azure_voices(settings: &AppSettings) -> Result<Vec<AzureVoice>
         return Err("The endpoint returned no voices".to_string());
     }
     Ok(voices)
+}
+
+// ---------------------------------------------------------------------------
+// Remote TTS voice / model discovery (settings pickers)
+// ---------------------------------------------------------------------------
+
+/// List available voices for the configured remote TTS engine, for the settings
+/// voice picker. Errors are returned for inline display.
+pub async fn list_tts_voices(settings: &AppSettings) -> Result<Vec<TtsVoice>, String> {
+    match settings.assistant_tts_engine.as_str() {
+        "openai" => list_openai_tts_voices(settings).await,
+        "elevenlabs" => list_elevenlabs_voices(settings).await,
+        "azure" => {
+            let voices = list_azure_voices(settings).await?;
+            Ok(voices
+                .into_iter()
+                .map(|v| TtsVoice {
+                    label: format!("{} · {} {}", v.short_name, v.locale, v.gender)
+                        .trim()
+                        .to_string(),
+                    id: v.short_name,
+                })
+                .collect())
+        }
+        other => Err(format!("Voice listing isn't supported for engine: {}", other)),
+    }
+}
+
+/// OpenAI-compatible voices. Local servers (Kokoro-FastAPI, openai-edge-tts)
+/// expose `GET {base}/audio/voices`; OpenAI proper does not, so we fall back to
+/// the known built-in voice set. Never errors — a failed lookup degrades to the
+/// built-in list so the picker is always usable.
+async fn list_openai_tts_voices(settings: &AppSettings) -> Result<Vec<TtsVoice>, String> {
+    let builtin = || -> Vec<TtsVoice> {
+        OPENAI_TTS_VOICES
+            .iter()
+            .map(|v| TtsVoice {
+                id: v.to_string(),
+                label: v.to_string(),
+            })
+            .collect()
+    };
+
+    let raw = settings.assistant_tts_base_url.trim();
+    if raw.is_empty() || raw.contains("api.openai.com") {
+        return Ok(builtin());
+    }
+
+    // Derive an `/audio/voices` URL from the configured base (which may already
+    // point straight at `/audio/speech`, possibly with a query string).
+    let base = raw.trim_end_matches('/');
+    let voices_url = match base.split_once("/audio/speech") {
+        Some((prefix, _)) => format!("{}/audio/voices", prefix.trim_end_matches('/')),
+        None => format!("{}/audio/voices", base),
+    };
+
+    let client = tts_client()?;
+    let mut req = client.get(&voices_url);
+    let api_key = settings.assistant_tts_api_key.0.trim();
+    if !api_key.is_empty() {
+        req = req.bearer_auth(api_key).header("api-key", api_key);
+    }
+
+    let resp = match req.send().await {
+        Ok(r) if r.status().is_success() => r,
+        _ => return Ok(builtin()),
+    };
+    let value: serde_json::Value = match resp.json().await {
+        Ok(v) => v,
+        Err(_) => return Ok(builtin()),
+    };
+
+    // Accept several shapes: {voices:[...]} / {data:[...]} / top-level array,
+    // where each item is a bare string or an object with an id/name.
+    let arr = value
+        .get("voices")
+        .and_then(|v| v.as_array())
+        .or_else(|| value.get("data").and_then(|v| v.as_array()))
+        .or_else(|| value.as_array());
+
+    let mut voices = Vec::new();
+    if let Some(items) = arr {
+        for item in items {
+            if let Some(s) = item.as_str() {
+                voices.push(TtsVoice {
+                    id: s.to_string(),
+                    label: s.to_string(),
+                });
+            } else if let Some(id) = item
+                .get("id")
+                .and_then(|v| v.as_str())
+                .or_else(|| item.get("voice_id").and_then(|v| v.as_str()))
+                .or_else(|| item.get("name").and_then(|v| v.as_str()))
+            {
+                let label = item
+                    .get("name")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or(id)
+                    .to_string();
+                voices.push(TtsVoice {
+                    id: id.to_string(),
+                    label,
+                });
+            }
+        }
+    }
+
+    if voices.is_empty() {
+        return Ok(builtin());
+    }
+    Ok(voices)
+}
+
+/// ElevenLabs voices via `GET /v2/voices` (auth `xi-api-key`).
+async fn list_elevenlabs_voices(settings: &AppSettings) -> Result<Vec<TtsVoice>, String> {
+    let api_key = settings.assistant_tts_api_key.0.trim();
+    if api_key.is_empty() {
+        return Err("No ElevenLabs API key configured".to_string());
+    }
+    let client = tts_client()?;
+    let resp = client
+        .get("https://api.elevenlabs.io/v2/voices?page_size=100")
+        .header("xi-api-key", api_key)
+        .send()
+        .await
+        .map_err(|e| format!("HTTP request failed: {}", e))?;
+
+    let status = resp.status();
+    if !status.is_success() {
+        let body = resp.text().await.unwrap_or_default();
+        return Err(format!("{}: {}", status, truncate(&body, 300)));
+    }
+
+    let value: serde_json::Value = resp
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse voices list: {}", e))?;
+
+    let mut voices = Vec::new();
+    if let Some(items) = value.get("voices").and_then(|v| v.as_array()) {
+        for item in items {
+            let Some(id) = item.get("voice_id").and_then(|v| v.as_str()) else {
+                continue;
+            };
+            if id.is_empty() {
+                continue;
+            }
+            let name = item.get("name").and_then(|v| v.as_str()).unwrap_or(id);
+            let category = item.get("category").and_then(|v| v.as_str()).unwrap_or("");
+            let label = if category.is_empty() {
+                name.to_string()
+            } else {
+                format!("{} · {}", name, category)
+            };
+            voices.push(TtsVoice {
+                id: id.to_string(),
+                label,
+            });
+        }
+    }
+
+    if voices.is_empty() {
+        return Err("The endpoint returned no voices".to_string());
+    }
+    Ok(voices)
+}
+
+/// List available models for the configured remote TTS engine, for the settings
+/// model picker. Only the OpenAI-compatible and ElevenLabs engines expose a
+/// model list; Azure/Kokoro return an error the UI surfaces as "not supported".
+pub async fn list_tts_models(settings: &AppSettings) -> Result<Vec<String>, String> {
+    match settings.assistant_tts_engine.as_str() {
+        "openai" => list_openai_tts_models(settings).await,
+        "elevenlabs" => list_elevenlabs_models(settings).await,
+        other => Err(format!("Model listing isn't supported for engine: {}", other)),
+    }
+}
+
+/// OpenAI-compatible models via `GET {base}/models`.
+async fn list_openai_tts_models(settings: &AppSettings) -> Result<Vec<String>, String> {
+    let raw = settings.assistant_tts_base_url.trim();
+    let base = if raw.is_empty() {
+        "https://api.openai.com/v1".to_string()
+    } else {
+        let b = raw.trim_end_matches('/');
+        match b.split_once("/audio/speech") {
+            Some((prefix, _)) => prefix.trim_end_matches('/').to_string(),
+            None => b.to_string(),
+        }
+    };
+    let url = format!("{}/models", base);
+
+    let client = tts_client()?;
+    let mut req = client.get(&url);
+    let api_key = settings.assistant_tts_api_key.0.trim();
+    if !api_key.is_empty() {
+        req = req.bearer_auth(api_key).header("api-key", api_key);
+    }
+
+    let resp = req
+        .send()
+        .await
+        .map_err(|e| format!("HTTP request failed: {}", e))?;
+    let status = resp.status();
+    if !status.is_success() {
+        let body = resp.text().await.unwrap_or_default();
+        return Err(format!("{}: {}", status, truncate(&body, 300)));
+    }
+
+    let value: serde_json::Value = resp
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse models list: {}", e))?;
+
+    let mut models = Vec::new();
+    if let Some(items) = value.get("data").and_then(|v| v.as_array()) {
+        for item in items {
+            if let Some(id) = item.get("id").and_then(|v| v.as_str()) {
+                models.push(id.to_string());
+            }
+        }
+    } else if let Some(items) = value.as_array() {
+        for item in items {
+            if let Some(id) = item.as_str() {
+                models.push(id.to_string());
+            }
+        }
+    }
+    Ok(models)
+}
+
+/// ElevenLabs TTS models via `GET /v1/models`, filtered to those that can do
+/// text-to-speech.
+async fn list_elevenlabs_models(settings: &AppSettings) -> Result<Vec<String>, String> {
+    let api_key = settings.assistant_tts_api_key.0.trim();
+    if api_key.is_empty() {
+        return Err("No ElevenLabs API key configured".to_string());
+    }
+    let client = tts_client()?;
+    let resp = client
+        .get("https://api.elevenlabs.io/v1/models")
+        .header("xi-api-key", api_key)
+        .send()
+        .await
+        .map_err(|e| format!("HTTP request failed: {}", e))?;
+
+    let status = resp.status();
+    if !status.is_success() {
+        let body = resp.text().await.unwrap_or_default();
+        return Err(format!("{}: {}", status, truncate(&body, 300)));
+    }
+
+    let value: serde_json::Value = resp
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse models list: {}", e))?;
+
+    let mut models = Vec::new();
+    if let Some(items) = value.as_array() {
+        for item in items {
+            let can_tts = item
+                .get("can_do_text_to_speech")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(true);
+            if !can_tts {
+                continue;
+            }
+            if let Some(id) = item.get("model_id").and_then(|v| v.as_str()) {
+                models.push(id.to_string());
+            }
+        }
+    }
+
+    if models.is_empty() {
+        return Err("The endpoint returned no text-to-speech models".to_string());
+    }
+    Ok(models)
 }
 
 /// POST {base}/cognitiveservices/v1 — Azure AI Speech (Neural TTS) SSML API.
@@ -712,5 +1027,25 @@ mod tests {
     fn symbols_only_returns_empty() {
         assert_eq!(sanitize_for_speech("***"), "");
         assert_eq!(sanitize_for_speech("```\n```"), "");
+    }
+
+    #[test]
+    fn azure_voices_url_regional_vs_custom_domain() {
+        use super::azure_voices_url;
+        // Regional Speech host: un-prefixed path.
+        assert_eq!(
+            azure_voices_url("https://eastus2.tts.speech.microsoft.com"),
+            "https://eastus2.tts.speech.microsoft.com/cognitiveservices/voices/list"
+        );
+        // Portal "endpoint" form is converted to the regional tts host.
+        assert_eq!(
+            azure_voices_url("https://eastus.api.cognitive.microsoft.com/"),
+            "https://eastus.tts.speech.microsoft.com/cognitiveservices/voices/list"
+        );
+        // Custom-domain / AI Foundry resource: /tts/-prefixed path.
+        assert_eq!(
+            azure_voices_url("https://myres.cognitiveservices.azure.com/"),
+            "https://myres.cognitiveservices.azure.com/tts/cognitiveservices/voices/list"
+        );
     }
 }

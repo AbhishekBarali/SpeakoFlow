@@ -6,9 +6,9 @@ interface WordmarkProps {
 }
 
 /**
- * SpeakoFlow brand wordmark. Set in the editorial display serif so it speaks
- * the same type language as the section headers, rather than a mismatched
- * hand-drawn logo.
+ * SpeakoFlow brand wordmark. Set in the brand sans (Plus Jakarta Sans via
+ * `.font-display`) so it speaks the same type language as the logo and the
+ * section headers.
  */
 export const Wordmark: React.FC<WordmarkProps> = ({ className = "" }) => (
   <span

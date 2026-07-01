@@ -22,12 +22,18 @@ const UpdateChecker: React.FC<UpdateCheckerProps> = ({ className = "" }) => {
   const [showUpToDate, setShowUpToDate] = useState(false);
   const [showPortableUpdateDialog, setShowPortableUpdateDialog] =
     useState(false);
+  // Tracks a surfaced failure so the user gets an honest, visible message
+  // instead of the status silently reverting to "Check for updates".
+  const [errorState, setErrorState] = useState<null | "check" | "install">(
+    null,
+  );
 
   const { settings, isLoading } = useSettings();
   const settingsLoaded = !isLoading && settings !== null;
   const updateChecksEnabled = settings?.update_checks_enabled ?? false;
 
   const upToDateTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const errorTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
   const isManualCheckRef = useRef(false);
   const downloadedBytesRef = useRef(0);
   const contentLengthRef = useRef(0);
@@ -40,9 +46,13 @@ const UpdateChecker: React.FC<UpdateCheckerProps> = ({ className = "" }) => {
       if (upToDateTimeoutRef.current) {
         clearTimeout(upToDateTimeoutRef.current);
       }
+      if (errorTimeoutRef.current) {
+        clearTimeout(errorTimeoutRef.current);
+      }
       setIsChecking(false);
       setUpdateAvailable(false);
       setShowUpToDate(false);
+      setErrorState(null);
       return;
     }
 
@@ -57,6 +67,9 @@ const UpdateChecker: React.FC<UpdateCheckerProps> = ({ className = "" }) => {
       if (upToDateTimeoutRef.current) {
         clearTimeout(upToDateTimeoutRef.current);
       }
+      if (errorTimeoutRef.current) {
+        clearTimeout(errorTimeoutRef.current);
+      }
       updateUnlisten.then((fn) => fn());
     };
   }, [settingsLoaded, updateChecksEnabled]);
@@ -67,6 +80,7 @@ const UpdateChecker: React.FC<UpdateCheckerProps> = ({ className = "" }) => {
 
     try {
       setIsChecking(true);
+      setErrorState(null);
       const update = await check();
 
       if (update) {
@@ -87,6 +101,20 @@ const UpdateChecker: React.FC<UpdateCheckerProps> = ({ className = "" }) => {
       }
     } catch (error) {
       console.error("Failed to check for updates:", error);
+      setUpdateAvailable(false);
+      setShowUpToDate(false);
+      // Only surface failures the user explicitly triggered. Silent background
+      // checks stay quiet (network blips shouldn't nag), but a manual check
+      // must never look like a no-op.
+      if (isManualCheckRef.current) {
+        setErrorState("check");
+        if (errorTimeoutRef.current) {
+          clearTimeout(errorTimeoutRef.current);
+        }
+        errorTimeoutRef.current = setTimeout(() => {
+          setErrorState(null);
+        }, 6000);
+      }
     } finally {
       setIsChecking(false);
       isManualCheckRef.current = false;
@@ -110,6 +138,7 @@ const UpdateChecker: React.FC<UpdateCheckerProps> = ({ className = "" }) => {
 
     try {
       setIsInstalling(true);
+      setErrorState(null);
       setDownloadProgress(0);
       downloadedBytesRef.current = 0;
       contentLengthRef.current = 0;
@@ -142,6 +171,14 @@ const UpdateChecker: React.FC<UpdateCheckerProps> = ({ className = "" }) => {
       await relaunch();
     } catch (error) {
       console.error("Failed to install update:", error);
+      // Keep updateAvailable true so the user can retry the install.
+      setErrorState("install");
+      if (errorTimeoutRef.current) {
+        clearTimeout(errorTimeoutRef.current);
+      }
+      errorTimeoutRef.current = setTimeout(() => {
+        setErrorState(null);
+      }, 6000);
     } finally {
       setIsInstalling(false);
       setDownloadProgress(0);
@@ -165,22 +202,28 @@ const UpdateChecker: React.FC<UpdateCheckerProps> = ({ className = "" }) => {
           : t("footer.preparing");
     }
     if (isChecking) return t("footer.checkingUpdates");
+    if (errorState === "install") return t("footer.updateFailed");
+    if (errorState === "check") return t("footer.checkFailed");
     if (showUpToDate) return t("footer.upToDate");
     if (updateAvailable) return t("footer.updateAvailableShort");
     return t("footer.checkForUpdates");
   };
 
   const getUpdateStatusAction = () => {
-    if (!updateChecksEnabled) return undefined;
-    if (updateAvailable && !isInstalling) return installUpdate;
-    if (!isChecking && !isInstalling && !updateAvailable)
-      return handleManualUpdateCheck;
+    if (!updateChecksEnabled || isChecking || isInstalling) return undefined;
+    // A surfaced failure is always retryable.
+    if (errorState === "install") return installUpdate;
+    if (errorState === "check") return handleManualUpdateCheck;
+    if (updateAvailable) return installUpdate;
+    if (!showUpToDate) return handleManualUpdateCheck;
     return undefined;
   };
 
+  const hasError = errorState !== null;
   const isUpdateDisabled = !updateChecksEnabled || isChecking || isInstalling;
   const isUpdateClickable =
-    !isUpdateDisabled && (updateAvailable || (!isChecking && !showUpToDate));
+    !isUpdateDisabled &&
+    (updateAvailable || hasError || !showUpToDate);
 
   return (
     <>
@@ -218,16 +261,23 @@ const UpdateChecker: React.FC<UpdateCheckerProps> = ({ className = "" }) => {
           <button
             onClick={getUpdateStatusAction()}
             disabled={isUpdateDisabled}
+            title={hasError ? t("footer.clickToRetry") : undefined}
             className={`transition-colors disabled:opacity-50 tabular-nums ${
-              updateAvailable
-                ? "text-logo-primary hover:text-logo-primary/80 font-medium"
-                : "text-text/60 hover:text-text/80"
+              hasError
+                ? "text-red-500 hover:text-red-400 font-medium"
+                : updateAvailable
+                  ? "text-logo-primary hover:text-logo-primary/80 font-medium"
+                  : "text-text/60 hover:text-text/80"
             }`}
           >
             {getUpdateStatusText()}
           </button>
         ) : (
-          <span className="text-text/60 tabular-nums">
+          <span
+            className={`tabular-nums ${
+              hasError ? "text-red-500 font-medium" : "text-text/60"
+            }`}
+          >
             {getUpdateStatusText()}
           </span>
         )}

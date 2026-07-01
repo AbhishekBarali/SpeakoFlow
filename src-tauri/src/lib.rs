@@ -223,7 +223,7 @@ fn initialize_core_logic(app_handle: &AppHandle) {
         .show_menu_on_left_click(true)
         .icon_as_template(true)
         .on_menu_event(|app, event| match event.id.as_ref() {
-            "settings" => {
+            "home" => {
                 show_main_window(app);
             }
             "check_updates" => {
@@ -516,6 +516,8 @@ pub fn run(cli_args: CliArgs) {
             commands::assistant::assistant_speak,
             commands::assistant::assistant_test_tts,
             commands::assistant::assistant_list_azure_voices,
+            commands::assistant::assistant_list_tts_voices,
+            commands::assistant::assistant_list_tts_models,
             commands::assistant::assistant_stop,
             commands::assistant::set_assistant_max_history_messages,
             commands::assistant::set_assistant_web_search_enabled,
@@ -561,11 +563,11 @@ pub fn run(cli_args: CliArgs) {
                     Target::new(if let Some(data_dir) = portable::data_dir() {
                         TargetKind::Folder {
                             path: data_dir.join("logs"),
-                            file_name: Some("handy".into()),
+                            file_name: Some("speakoflow".into()),
                         }
                     } else {
                         TargetKind::LogDir {
-                            file_name: Some("handy".into()),
+                            file_name: Some("speakoflow".into()),
                         }
                     })
                     .filter(|metadata| {
@@ -616,7 +618,10 @@ pub fn run(cli_args: CliArgs) {
             // for portable mode (redirects WebView2 cache to portable Data dir)
             let mut win_builder =
                 tauri::WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::App("/".into()))
-                    .title("SpeakoFlow")
+                    // Empty title + a blanked caption icon (see
+                    // tray::update_window_icon) keep the top of the window clear
+                    // — no "SpeakoFlow" text and no logo in the title bar.
+                    .title("")
                     // Open a bit wider/taller so content (max-w-3xl) breathes
                     // next to the sidebar instead of feeling cramped. Min stays
                     // smaller so users can still shrink the window.
@@ -643,6 +648,12 @@ pub fn run(cli_args: CliArgs) {
                 settings::Theme::System => None,
             };
             let _ = main_webview.set_theme(window_theme);
+
+            // Paint the taskbar / alt-tab icon with a transparent, theme-matched
+            // mark (light mark on dark, dark mark on light) so there is no white
+            // box and the logo stays visible. On Windows this also blanks the
+            // title bar caption icon so the top of the window shows nothing.
+            tray::update_window_icon(app.handle());
 
             // CLI --debug flag overrides debug_mode and log level (runtime-only, not persisted)
             if cli_args.debug {
@@ -723,6 +734,8 @@ pub fn run(cli_args: CliArgs) {
                 log::info!("Theme changed to: {:?}", theme);
                 // Update tray icon to match new theme, maintaining idle state
                 utils::change_tray_icon(&window.app_handle(), utils::TrayIconState::Idle);
+                // Re-tint the title bar / taskbar mark for the new theme.
+                tray::update_window_icon(&window.app_handle());
             }
             _ => {}
         })

@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { RefreshCw, Volume2, ArrowUp, Globe } from "lucide-react";
 import {
   commands,
-  type AzureVoice,
+  type TtsVoice,
   type LocalLlmStatus,
   type AssistantResponseLength,
   type AssistantSearchDepth,
@@ -78,6 +78,98 @@ const TEST_PHRASES = [
 /** Pick a random sample line for the voice test. */
 const randomTestPhrase = (): string =>
   TEST_PHRASES[Math.floor(Math.random() * TEST_PHRASES.length)];
+
+/** An editable text field with type-to-search suggestions (native `<datalist>`)
+ *  paired with a "Load" (refresh) button and an inline error line. Used for the
+ *  remote-TTS voice/model pickers and the assistant model picker.
+ *
+ *  A plain editable input (not a react-select value chip) is deliberate: the
+ *  value stays fully editable — cursor at the end, edit any character — which
+ *  is what you want for tweaking a model name like `gpt-5.1-mini`, while the
+ *  datalist still filters suggestions as you type. Module-scope so it isn't
+ *  recreated on every parent render. */
+const LoadableSelect: React.FC<{
+  value: string;
+  options: { value: string; label: string }[];
+  onCommit: (value: string) => void;
+  onLoad: () => void;
+  loading: boolean;
+  error: string | null;
+  placeholder: string;
+  loadLabel: string;
+  disabled?: boolean;
+  /** Unused; kept for call-site compatibility. */
+  formatCreateLabel?: (input: string) => string;
+}> = ({
+  value,
+  options,
+  onCommit,
+  onLoad,
+  loading,
+  error,
+  placeholder,
+  loadLabel,
+  disabled,
+}) => {
+  const listId = React.useId();
+  const [local, setLocal] = React.useState(value);
+  React.useEffect(() => setLocal(value), [value]);
+
+  const commit = (next: string) => {
+    const trimmed = next.trim();
+    if (trimmed && trimmed !== value.trim()) onCommit(trimmed);
+  };
+
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <div className="flex items-center gap-2">
+        <Input
+          type="text"
+          list={listId}
+          value={local}
+          onChange={(e) => {
+            const next = e.target.value;
+            setLocal(next);
+            // Picking a suggestion from the datalist matches an option exactly —
+            // commit immediately so a click doesn't require an extra blur.
+            if (options.some((o) => o.value === next)) commit(next);
+          }}
+          onBlur={() => commit(local)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") commit(local);
+          }}
+          placeholder={placeholder}
+          disabled={disabled}
+          className="min-w-[300px]"
+        />
+        <datalist id={listId}>
+          {options.map((o) => (
+            <option
+              key={o.value}
+              value={o.value}
+              label={o.label !== o.value ? o.label : undefined}
+            />
+          ))}
+        </datalist>
+        <button
+          type="button"
+          onClick={onLoad}
+          disabled={loading || disabled}
+          aria-label={loadLabel}
+          title={loadLabel}
+          className="flex h-10 w-10 items-center justify-center rounded-lg border border-mid-gray/30 hover:bg-mid-gray/10 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
+        </button>
+      </div>
+      {error && (
+        <span className="text-xs text-red-500 max-w-[360px] text-right break-words">
+          {error}
+        </span>
+      )}
+    </div>
+  );
+};
 
 /** Explicit dark/light palettes for the live preview — mirror the real panel
  *  tokens in AssistantPanel.css so the preview is truthful for both themes
@@ -157,7 +249,7 @@ const PanelPreview: React.FC<{
           style={{ background: accentGradient }}
         />
         <span
-          className="font-display text-[15px] leading-none"
+          className="font-display font-medium text-[15px] leading-none"
           style={{ color: c.ink }}
         >
           {t("assistant.title")}
@@ -260,27 +352,94 @@ export const AssistantSettings: React.FC = () => {
   >("idle");
   const [testError, setTestError] = useState<string | null>(null);
 
-  // Azure voice list state (loaded on demand from the endpoint + key).
-  const [azureVoices, setAzureVoices] = useState<AzureVoice[]>([]);
-  const [voicesLoading, setVoicesLoading] = useState(false);
-  const [voicesError, setVoicesError] = useState<string | null>(null);
+  // Assistant model list, fetched per-provider from its /models endpoint via
+  // the same command post-processing uses (providers + keys are shared). Kept
+  // local to this component so it doesn't couple to the post-processing tab.
+  const [loadedModels, setLoadedModels] = useState<Record<string, string[]>>(
+    {},
+  );
+  const [modelsLoading, setModelsLoading] = useState(false);
+  const [modelsError, setModelsError] = useState<string | null>(null);
 
-  const loadAzureVoices = async () => {
-    setVoicesLoading(true);
-    setVoicesError(null);
+  // Remote TTS voice / model lists, loaded on demand for the OpenAI-compatible,
+  // ElevenLabs, and Azure engines (searchable pickers instead of raw text
+  // fields).
+  const [ttsVoiceList, setTtsVoiceList] = useState<TtsVoice[]>([]);
+  const [ttsVoicesLoading, setTtsVoicesLoading] = useState(false);
+  const [ttsVoicesError, setTtsVoicesError] = useState<string | null>(null);
+  const [ttsModelList, setTtsModelList] = useState<string[]>([]);
+  const [ttsModelsLoading, setTtsModelsLoading] = useState(false);
+  const [ttsModelsError, setTtsModelsError] = useState<string | null>(null);
+
+  // Fetch the model list for the selected assistant provider from its /models
+  // endpoint (shares the post-processing command since providers + keys are
+  // shared). Errors surface inline; the field stays a free-text search so a
+  // provider without a model list is never a dead end.
+  const handleLoadAssistantModels = async () => {
+    setModelsLoading(true);
+    setModelsError(null);
     try {
-      const res = await commands.assistantListAzureVoices();
+      const res = await commands.fetchPostProcessModels(selectedProviderId);
       if (res.status === "error") {
-        setVoicesError(res.error);
-        setAzureVoices([]);
+        setModelsError(res.error);
         return;
       }
-      setAzureVoices(res.data);
+      setLoadedModels((prev) => ({ ...prev, [selectedProviderId]: res.data }));
+      if (res.data.length === 0) {
+        setModelsError(t("settings.assistant.provider.noModelsFound"));
+      }
     } catch (e) {
-      setVoicesError(String(e));
-      setAzureVoices([]);
+      setModelsError(String(e));
     } finally {
-      setVoicesLoading(false);
+      setModelsLoading(false);
+    }
+  };
+
+  const handleAssistantModelChange = async (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    setModel(trimmed);
+    await commands.changeAssistantModelSetting(selectedProviderId, trimmed);
+    await refreshSettings();
+  };
+
+  // Load selectable voices / models for the current remote TTS engine
+  // (OpenAI-compatible or ElevenLabs; Azure has its own loader above).
+  const handleLoadTtsVoices = async () => {
+    setTtsVoicesLoading(true);
+    setTtsVoicesError(null);
+    try {
+      const res = await commands.assistantListTtsVoices();
+      if (res.status === "error") {
+        setTtsVoicesError(res.error);
+        setTtsVoiceList([]);
+        return;
+      }
+      setTtsVoiceList(res.data);
+    } catch (e) {
+      setTtsVoicesError(String(e));
+      setTtsVoiceList([]);
+    } finally {
+      setTtsVoicesLoading(false);
+    }
+  };
+
+  const handleLoadTtsModels = async () => {
+    setTtsModelsLoading(true);
+    setTtsModelsError(null);
+    try {
+      const res = await commands.assistantListTtsModels();
+      if (res.status === "error") {
+        setTtsModelsError(res.error);
+        setTtsModelList([]);
+        return;
+      }
+      setTtsModelList(res.data);
+    } catch (e) {
+      setTtsModelsError(String(e));
+      setTtsModelList([]);
+    } finally {
+      setTtsModelsLoading(false);
     }
   };
 
@@ -367,17 +526,71 @@ export const AssistantSettings: React.FC = () => {
     settings?.assistant_tts_speed,
   ]);
 
+  // Clear any loaded voice/model lists when the TTS engine changes so a stale
+  // list (e.g. OpenAI voices) never shows under a different engine.
+  useEffect(() => {
+    setTtsVoiceList([]);
+    setTtsVoicesError(null);
+    setTtsModelList([]);
+    setTtsModelsError(null);
+  }, [settings?.assistant_tts_engine]);
+
   const providerOptions = providers
     .filter((p) => p.id !== "apple_intelligence")
-    .map((p) => ({ value: p.id, label: p.label }));
+    .map((p) => ({ value: p.id, label: p.label }))
+    // Keep the built-in local model pinned to the top — it's the zero-setup,
+    // no-API-key option most users should reach for first.
+    .sort((a, b) =>
+      a.value === "builtin" ? -1 : b.value === "builtin" ? 1 : 0,
+    );
+
+  // Options for the searchable assistant-model picker: loaded models for the
+  // current provider plus the currently-set model (so a hand-typed value still
+  // shows as selected). The Select is creatable, so users can type any model.
+  const assistantModelOptions = useMemo(() => {
+    const seen = new Set<string>();
+    const opts: { value: string; label: string }[] = [];
+    const add = (v?: string | null) => {
+      const trimmed = v?.trim();
+      if (!trimmed || seen.has(trimmed)) return;
+      seen.add(trimmed);
+      opts.push({ value: trimmed, label: trimmed });
+    };
+    for (const m of loadedModels[selectedProviderId] || []) add(m);
+    add(model);
+    return opts;
+  }, [loadedModels, selectedProviderId, model]);
+
+  const ttsVoiceOptions = useMemo(() => {
+    const seen = new Set<string>();
+    const opts: { value: string; label: string }[] = [];
+    const add = (value: string, label: string) => {
+      const v = value.trim();
+      if (!v || seen.has(v)) return;
+      seen.add(v);
+      opts.push({ value: v, label: label || v });
+    };
+    for (const v of ttsVoiceList) add(v.id, v.label);
+    if (ttsRemoteVoice.trim()) add(ttsRemoteVoice, ttsRemoteVoice);
+    return opts;
+  }, [ttsVoiceList, ttsRemoteVoice]);
+
+  const ttsModelOptions = useMemo(() => {
+    const seen = new Set<string>();
+    const opts: { value: string; label: string }[] = [];
+    const add = (v?: string | null) => {
+      const trimmed = v?.trim();
+      if (!trimmed || seen.has(trimmed)) return;
+      seen.add(trimmed);
+      opts.push({ value: trimmed, label: trimmed });
+    };
+    for (const m of ttsModelList) add(m);
+    if (ttsModel.trim()) add(ttsModel);
+    return opts;
+  }, [ttsModelList, ttsModel]);
 
   const handleProviderSelect = async (providerId: string) => {
     await commands.setAssistantProvider(providerId);
-    await refreshSettings();
-  };
-
-  const handleModelBlur = async () => {
-    await commands.changeAssistantModelSetting(selectedProviderId, model);
     await refreshSettings();
   };
 
@@ -586,14 +799,20 @@ export const AssistantSettings: React.FC = () => {
             layout="horizontal"
             grouped={true}
           >
-            <Input
-              type="text"
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
-              onBlur={handleModelBlur}
-              placeholder={t("settings.assistant.provider.modelPlaceholder")}
-              className="min-w-[320px]"
-            />
+            <div className="flex flex-col items-end gap-1">
+              <LoadableSelect
+                value={model}
+                options={assistantModelOptions}
+                onCommit={(v) => void handleAssistantModelChange(v)}
+                onLoad={handleLoadAssistantModels}
+                loading={modelsLoading}
+                error={modelsError}
+                placeholder={t(
+                  "settings.assistant.provider.modelSearchPlaceholder",
+                )}
+                loadLabel={t("settings.assistant.provider.loadModels")}
+              />
+            </div>
           </SettingContainer>
         )}
 
@@ -843,6 +1062,7 @@ export const AssistantSettings: React.FC = () => {
                   setAndRefresh(commands.setAssistantTtsEngine(engine))
                 }
                 disabled={!settings?.assistant_tts_enabled}
+                className="min-w-[260px]"
               />
             </SettingContainer>
 
@@ -929,15 +1149,21 @@ export const AssistantSettings: React.FC = () => {
                   layout="horizontal"
                   grouped={true}
                 >
-                  <Input
-                    type="text"
+                  <LoadableSelect
                     value={ttsModel}
-                    onChange={(e) => setTtsModel(e.target.value)}
-                    onBlur={() =>
-                      setAndRefresh(commands.setAssistantTtsModel(ttsModel))
-                    }
+                    options={ttsModelOptions}
+                    onCommit={(v) => {
+                      setTtsModel(v);
+                      void setAndRefresh(commands.setAssistantTtsModel(v));
+                    }}
+                    onLoad={handleLoadTtsModels}
+                    loading={ttsModelsLoading}
+                    error={ttsModelsError}
                     placeholder="gpt-4o-mini-tts"
-                    className="min-w-[240px]"
+                    loadLabel={t("settings.assistant.tts.loadModels")}
+                    formatCreateLabel={(input) =>
+                      t("settings.assistant.tts.modelsUse", { model: input })
+                    }
                   />
                 </SettingContainer>
                 <SettingContainer
@@ -949,17 +1175,23 @@ export const AssistantSettings: React.FC = () => {
                   layout="horizontal"
                   grouped={true}
                 >
-                  <Input
-                    type="text"
+                  <LoadableSelect
                     value={ttsRemoteVoice}
-                    onChange={(e) => setTtsRemoteVoice(e.target.value)}
-                    onBlur={() =>
-                      setAndRefresh(
-                        commands.setAssistantTtsRemoteVoice(ttsRemoteVoice),
-                      )
-                    }
+                    options={ttsVoiceOptions}
+                    onCommit={(v) => {
+                      setTtsRemoteVoice(v);
+                      void setAndRefresh(
+                        commands.setAssistantTtsRemoteVoice(v),
+                      );
+                    }}
+                    onLoad={handleLoadTtsVoices}
+                    loading={ttsVoicesLoading}
+                    error={ttsVoicesError}
                     placeholder="alloy"
-                    className="min-w-[240px]"
+                    loadLabel={t("settings.assistant.tts.loadVoices")}
+                    formatCreateLabel={(input) =>
+                      t("settings.assistant.tts.voicesUse", { voice: input })
+                    }
                   />
                 </SettingContainer>
               </>
@@ -993,17 +1225,23 @@ export const AssistantSettings: React.FC = () => {
                   layout="horizontal"
                   grouped={true}
                 >
-                  <Input
-                    type="text"
+                  <LoadableSelect
                     value={ttsRemoteVoice}
-                    onChange={(e) => setTtsRemoteVoice(e.target.value)}
-                    onBlur={() =>
-                      setAndRefresh(
-                        commands.setAssistantTtsRemoteVoice(ttsRemoteVoice),
-                      )
-                    }
+                    options={ttsVoiceOptions}
+                    onCommit={(v) => {
+                      setTtsRemoteVoice(v);
+                      void setAndRefresh(
+                        commands.setAssistantTtsRemoteVoice(v),
+                      );
+                    }}
+                    onLoad={handleLoadTtsVoices}
+                    loading={ttsVoicesLoading}
+                    error={ttsVoicesError}
                     placeholder="JBFqnCBsd6RMkjVDRZzb"
-                    className="min-w-[300px]"
+                    loadLabel={t("settings.assistant.tts.loadVoices")}
+                    formatCreateLabel={(input) =>
+                      t("settings.assistant.tts.voicesUse", { voice: input })
+                    }
                   />
                 </SettingContainer>
                 <SettingContainer
@@ -1013,15 +1251,21 @@ export const AssistantSettings: React.FC = () => {
                   layout="horizontal"
                   grouped={true}
                 >
-                  <Input
-                    type="text"
+                  <LoadableSelect
                     value={ttsModel}
-                    onChange={(e) => setTtsModel(e.target.value)}
-                    onBlur={() =>
-                      setAndRefresh(commands.setAssistantTtsModel(ttsModel))
-                    }
+                    options={ttsModelOptions}
+                    onCommit={(v) => {
+                      setTtsModel(v);
+                      void setAndRefresh(commands.setAssistantTtsModel(v));
+                    }}
+                    onLoad={handleLoadTtsModels}
+                    loading={ttsModelsLoading}
+                    error={ttsModelsError}
                     placeholder="eleven_flash_v2_5"
-                    className="min-w-[240px]"
+                    loadLabel={t("settings.assistant.tts.loadModels")}
+                    formatCreateLabel={(input) =>
+                      t("settings.assistant.tts.modelsUse", { model: input })
+                    }
                   />
                 </SettingContainer>
               </>
@@ -1075,58 +1319,24 @@ export const AssistantSettings: React.FC = () => {
                   layout="horizontal"
                   grouped={true}
                 >
-                  <div className="flex flex-col items-end gap-2">
-                    <div className="flex items-center gap-2">
-                      <Input
-                        type="text"
-                        value={ttsRemoteVoice}
-                        onChange={(e) => setTtsRemoteVoice(e.target.value)}
-                        onBlur={() =>
-                          setAndRefresh(
-                            commands.setAssistantTtsRemoteVoice(ttsRemoteVoice),
-                          )
-                        }
-                        placeholder="en-US-JennyNeural"
-                        className="min-w-[220px]"
-                      />
-                      <button
-                        type="button"
-                        onClick={loadAzureVoices}
-                        disabled={voicesLoading}
-                        className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-mid-gray/30 hover:bg-mid-gray/10 disabled:opacity-50 disabled:cursor-not-allowed text-sm whitespace-nowrap"
-                      >
-                        <RefreshCw
-                          size={14}
-                          className={voicesLoading ? "animate-spin" : ""}
-                        />
-                        {voicesLoading
-                          ? t("settings.assistant.tts.voicesLoading")
-                          : t("settings.assistant.tts.loadVoices")}
-                      </button>
-                    </div>
-                    {azureVoices.length > 0 && (
-                      <Dropdown
-                        options={azureVoices.map((v) => ({
-                          value: v.short_name,
-                          label: `${v.short_name} · ${v.locale} ${v.gender}`,
-                        }))}
-                        selectedValue={ttsRemoteVoice}
-                        onSelect={(v) => {
-                          setTtsRemoteVoice(v);
-                          setAndRefresh(commands.setAssistantTtsRemoteVoice(v));
-                        }}
-                        placeholder={t("settings.assistant.tts.voicesPick", {
-                          count: azureVoices.length,
-                        })}
-                        className="min-w-[300px]"
-                      />
-                    )}
-                    {voicesError && (
-                      <span className="text-xs text-red-500 max-w-[360px] text-right break-words">
-                        {voicesError}
-                      </span>
-                    )}
-                  </div>
+                  <LoadableSelect
+                    value={ttsRemoteVoice}
+                    options={ttsVoiceOptions}
+                    onCommit={(v) => {
+                      setTtsRemoteVoice(v);
+                      void setAndRefresh(
+                        commands.setAssistantTtsRemoteVoice(v),
+                      );
+                    }}
+                    onLoad={handleLoadTtsVoices}
+                    loading={ttsVoicesLoading}
+                    error={ttsVoicesError}
+                    placeholder="en-US-JennyNeural"
+                    loadLabel={t("settings.assistant.tts.loadVoices")}
+                    formatCreateLabel={(input) =>
+                      t("settings.assistant.tts.voicesUse", { voice: input })
+                    }
+                  />
                 </SettingContainer>
               </>
             )}

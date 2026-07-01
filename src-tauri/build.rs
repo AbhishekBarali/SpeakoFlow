@@ -1,4 +1,12 @@
 fn main() {
+    // Re-embed the Windows exe icon whenever it changes. `tauri_build::build()`
+    // embeds icons/icon.ico into the binary, but without this rerun hint a
+    // regenerated icon is NOT picked up — the stale embedded icon keeps showing
+    // in the title bar / taskbar. Watching the .ico (and config) forces a
+    // re-embed on change.
+    println!("cargo:rerun-if-changed=icons/icon.ico");
+    println!("cargo:rerun-if-changed=tauri.conf.json");
+
     #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
     build_apple_intelligence_bridge();
 

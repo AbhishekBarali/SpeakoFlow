@@ -30,8 +30,17 @@ pub fn get_current_theme(app: &AppHandle) -> AppTheme {
     if cfg!(target_os = "linux") {
         // On Linux, always use the colored theme
         AppTheme::Colored
+    } else if cfg!(target_os = "windows") {
+        // The Windows taskbar and system tray (incl. the "show hidden icons"
+        // flyout) are dark by default on Win11 and do NOT follow the app's
+        // light/dark appearance. Pin the tray + window icons to the WHITE mark
+        // (AppTheme::Dark selects the light/white assets) so the logo stays
+        // visible and never flips to an invisible dark glyph when the in-app
+        // appearance changes.
+        AppTheme::Dark
     } else {
-        // On other platforms, map system theme to our app theme
+        // macOS: the menu-bar tray uses template mode (auto-inverts), and the
+        // title bar follows the window theme — map the window theme through.
         if let Some(main_window) = app.get_webview_window("main") {
             match main_window.theme().unwrap_or(Theme::Dark) {
                 Theme::Light => AppTheme::Light,
@@ -56,9 +65,113 @@ pub fn get_icon_path(theme: AppTheme, state: TrayIconState) -> &'static str {
         (AppTheme::Light, TrayIconState::Recording) => "resources/tray_recording_dark.png",
         (AppTheme::Light, TrayIconState::Transcribing) => "resources/tray_transcribing_dark.png",
         // Colored theme uses pink icons (for Linux)
-        (AppTheme::Colored, TrayIconState::Idle) => "resources/handy.png",
+        (AppTheme::Colored, TrayIconState::Idle) => "resources/speakoflow.png",
         (AppTheme::Colored, TrayIconState::Recording) => "resources/recording.png",
         (AppTheme::Colored, TrayIconState::Transcribing) => "resources/transcribing.png",
+    }
+}
+
+/// Window/taskbar icon for the given theme.
+///
+/// Unlike the tray (a monochrome template), the window icon is the full mark on
+/// a transparent background, so it must be a LIGHT mark on dark title bars and a
+/// DARK mark on light ones — that keeps the logo visible with no box on either
+/// theme. Linux (Colored) falls back to the dark mark.
+pub fn window_icon_path(theme: AppTheme) -> &'static str {
+    match theme {
+        AppTheme::Dark => "resources/window_icon_light.png",
+        AppTheme::Light => "resources/window_icon_dark.png",
+        AppTheme::Colored => "resources/window_icon_dark.png",
+    }
+}
+
+/// Set the main window's taskbar / alt-tab icon to a transparent, theme-matched
+/// mark. On Windows the title bar (caption) icon is then blanked separately (see
+/// `blank_caption_icon_keep_taskbar`) so the top of the window stays empty while
+/// the taskbar keeps the mark. Safe to call before/after theme changes; no-ops
+/// if the window is gone.
+pub fn update_window_icon(app: &AppHandle) {
+    let Some(window) = app.get_webview_window("main") else {
+        return;
+    };
+    let path = window_icon_path(get_current_theme(app));
+    match app
+        .path()
+        .resolve(path, tauri::path::BaseDirectory::Resource)
+    {
+        Ok(resolved) => match Image::from_path(&resolved) {
+            Ok(img) => {
+                if let Err(e) = window.set_icon(img) {
+                    warn!("Failed to set window icon: {}", e);
+                }
+            }
+            Err(e) => warn!("Failed to load window icon {:?}: {}", resolved, e),
+        },
+        Err(e) => warn!("Failed to resolve window icon {}: {}", path, e),
+    }
+
+    // Windows: keep the mark in the taskbar but blank the title bar caption icon.
+    // Runs after every set_icon (including on theme changes) because set_icon
+    // re-sets the small (caption) icon each time.
+    #[cfg(target_os = "windows")]
+    blank_caption_icon_keep_taskbar(&window);
+}
+
+/// Windows only: show the mark in the taskbar / alt-tab while leaving the title
+/// bar (caption) icon blank.
+///
+/// The underlying window layer (tao) only sets `ICON_SMALL` in `set_icon`, and
+/// with no `ICON_BIG` set the taskbar falls back to that same small icon. So we
+/// (1) promote the mark tao just set onto `ICON_BIG` so the taskbar keeps a
+/// visible icon, then (2) overwrite `ICON_SMALL` with a fully transparent icon
+/// so the caption shows nothing. A transparent icon is used instead of a NULL
+/// handle on purpose: a NULL small icon makes Windows fall back to the big icon,
+/// so the mark would reappear in the caption.
+#[cfg(target_os = "windows")]
+fn blank_caption_icon_keep_taskbar(window: &tauri::webview::WebviewWindow) {
+    use windows::Win32::Foundation::{LPARAM, WPARAM};
+    use windows::Win32::UI::WindowsAndMessaging::{CreateIcon, SendMessageW};
+
+    // Defined locally so this does not depend on the constants being re-exported
+    // by the `windows` crate. ICON_SMALL = caption, ICON_BIG = taskbar/alt-tab.
+    const WM_GETICON: u32 = 0x007F;
+    const WM_SETICON: u32 = 0x0080;
+    const ICON_SMALL: usize = 0;
+    const ICON_BIG: usize = 1;
+
+    let hwnd = match window.hwnd() {
+        Ok(hwnd) => hwnd,
+        Err(e) => {
+            warn!("Failed to get main window handle for window icons: {}", e);
+            return;
+        }
+    };
+
+    unsafe {
+        // 1) Promote the icon tao set (ICON_SMALL) onto ICON_BIG so the taskbar
+        //    and alt-tab keep a visible mark of their own.
+        let mark = SendMessageW(hwnd, WM_GETICON, Some(WPARAM(ICON_SMALL)), Some(LPARAM(0)));
+        if mark.0 != 0 {
+            let _ = SendMessageW(hwnd, WM_SETICON, Some(WPARAM(ICON_BIG)), Some(LPARAM(mark.0)));
+        }
+
+        // 2) Blank the caption icon with a 16x16 fully transparent icon. For a
+        //    monochrome icon, AND=1 + XOR=0 means "leave the background
+        //    untouched" → transparent. A 16px row is 2 bytes (WORD aligned), so
+        //    each mask is 16 rows * 2 bytes = 32 bytes.
+        let and_mask = [0xFFu8; 32];
+        let xor_mask = [0x00u8; 32];
+        match CreateIcon(None, 16, 16, 1, 1, and_mask.as_ptr(), xor_mask.as_ptr()) {
+            Ok(transparent) => {
+                let _ = SendMessageW(
+                    hwnd,
+                    WM_SETICON,
+                    Some(WPARAM(ICON_SMALL)),
+                    Some(LPARAM(transparent.0 as isize)),
+                );
+            }
+            Err(e) => warn!("Failed to create transparent caption icon: {}", e),
+        }
     }
 }
 
@@ -99,24 +212,22 @@ pub fn update_tray_menu(app: &AppHandle, state: &TrayIconState, locale: Option<&
     let locale = locale.unwrap_or(&settings.app_language);
     let strings = get_tray_translations(Some(locale.to_string()));
 
-    // Platform-specific accelerators
+    // Platform-specific accelerators. Cmd/Ctrl+, keeps the familiar
+    // "open preferences" shortcut for the main window (now labeled Home).
     #[cfg(target_os = "macos")]
-    let (settings_accelerator, quit_accelerator) = (Some("Cmd+,"), Some("Cmd+Q"));
+    let (home_accelerator, quit_accelerator) = (Some("Cmd+,"), Some("Cmd+Q"));
     #[cfg(not(target_os = "macos"))]
-    let (settings_accelerator, quit_accelerator) = (Some("Ctrl+,"), Some("Ctrl+Q"));
+    let (home_accelerator, quit_accelerator) = (Some("Ctrl+,"), Some("Ctrl+Q"));
 
     // Create common menu items
     let version_label = version_label();
     let version_i = MenuItem::with_id(app, "version", &version_label, false, None::<&str>)
         .expect("failed to create version item");
-    let settings_i = MenuItem::with_id(
-        app,
-        "settings",
-        &strings.settings,
-        true,
-        settings_accelerator,
-    )
-    .expect("failed to create settings item");
+    // "Home" opens/focuses the main window. It replaces the old "Settings"
+    // item — both pointed at the same window, so a single, clearer entry
+    // avoids two tray items doing the exact same thing.
+    let home_i = MenuItem::with_id(app, "home", &strings.home, true, home_accelerator)
+        .expect("failed to create home item");
     let check_updates_i = MenuItem::with_id(
         app,
         "check_updates",
@@ -190,7 +301,7 @@ pub fn update_tray_menu(app: &AppHandle, state: &TrayIconState, locale: Option<&
                     &separator(),
                     &copy_last_transcript_i,
                     &separator(),
-                    &settings_i,
+                    &home_i,
                     &check_updates_i,
                     &separator(),
                     &quit_i,
@@ -208,7 +319,7 @@ pub fn update_tray_menu(app: &AppHandle, state: &TrayIconState, locale: Option<&
                 &model_submenu,
                 &unload_model_i,
                 &separator(),
-                &settings_i,
+                &home_i,
                 &check_updates_i,
                 &separator(),
                 &quit_i,

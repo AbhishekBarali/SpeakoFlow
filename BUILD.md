@@ -1,6 +1,6 @@
 # Build Instructions
 
-This guide covers how to set up the development environment and build Handy from source across different platforms.
+This guide covers how to set up the development environment and build SpeakoFlow from source across different platforms.
 
 ## Prerequisites
 
@@ -67,8 +67,8 @@ ORT_LIB_LOCATION=$(brew --prefix onnxruntime)/lib ORT_PREFER_DYNAMIC_LINK=1 bun 
 ### 1. Clone the Repository
 
 ```bash
-git clone git@github.com:cjpais/Handy.git
-cd Handy
+git clone git@github.com:AbhishekBarali/SpeakoFlow.git
+cd SpeakoFlow
 ```
 
 ### 2. Install Dependencies
@@ -93,24 +93,24 @@ This compiles a release binary and generates platform-specific bundles (deb, rpm
 
 ## Linux Install (from source)
 
-The raw binary (`src-tauri/target/release/handy`) cannot run standalone — it needs Tauri resource files (tray icons, sounds, VAD model) to be co-located at the expected path.
+The raw binary (`src-tauri/target/release/speakoflow`) cannot run standalone — it needs Tauri resource files (tray icons, sounds, VAD model) to be co-located at the expected path.
 
 **Install from the deb bundle** (works on any Linux distro):
 
 ```bash
 cd /tmp
-ar x /path/to/Handy/src-tauri/target/release/bundle/deb/Handy_*_amd64.deb data.tar.gz
+ar x /path/to/SpeakoFlow/src-tauri/target/release/bundle/deb/SpeakoFlow_*_amd64.deb data.tar.gz
 tar xzf data.tar.gz
-sudo cp usr/bin/handy /usr/bin/
-sudo cp -r usr/lib/Handy /usr/lib/
+sudo cp usr/bin/speakoflow /usr/bin/
+sudo cp -r usr/lib/SpeakoFlow /usr/lib/
 sudo cp -r usr/share/icons/hicolor/* /usr/share/icons/hicolor/
-sudo cp usr/share/applications/Handy.desktop /usr/share/applications/
+sudo cp usr/share/applications/SpeakoFlow.desktop /usr/share/applications/
 ```
 
 After subsequent rebuilds, only the binary needs re-copying:
 
 ```bash
-sudo cp src-tauri/target/release/handy /usr/bin/
+sudo cp src-tauri/target/release/speakoflow /usr/bin/
 ```
 
 Resources only need re-copying if they change upstream (new icons, sounds, etc.).
@@ -124,7 +124,7 @@ Resources only need re-copying if they change upstream (new icons, sounds, etc.)
 The error from Tauri:
 
 ```
-Bundling Handy_*_amd64.AppImage
+Bundling SpeakoFlow_*_amd64.AppImage
 failed to bundle project `failed to run linuxdeploy`
 ```
 
@@ -133,7 +133,7 @@ Tauri swallows the real linuxdeploy error. To see it, run linuxdeploy manually:
 ```bash
 cd src-tauri/target/release/bundle/appimage
 ~/.cache/tauri/linuxdeploy-x86_64.AppImage --appimage-extract-and-run \
-  --appdir Handy.AppDir --plugin gtk --output appimage
+  --appdir SpeakoFlow.AppDir --plugin gtk --output appimage
 ```
 
 **Workaround:** The binary, deb, and rpm bundles all build fine — only the AppImage step fails. To skip it:

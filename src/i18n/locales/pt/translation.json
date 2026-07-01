@@ -1,6 +1,6 @@
 {
   "tray": {
-    "settings": "Configurações...",
+    "home": "Início",
     "checkUpdates": "Verificar Atualizações...",
     "copyLastTranscript": "Copiar última transcrição",
     "unloadModel": "Descarregar modelo",

@@ -803,6 +803,85 @@ fn default_post_process_providers() -> Vec<PostProcessProvider> {
             models_endpoint: Some("/models".to_string()),
             supports_structured_output: true,
         },
+        // Google Gemini via its OpenAI-compatible surface. Base URL has NO
+        // trailing `/v1` — the app appends `/chat/completions` and `/models`.
+        PostProcessProvider {
+            id: "gemini".to_string(),
+            label: "Google Gemini".to_string(),
+            base_url: "https://generativelanguage.googleapis.com/v1beta/openai".to_string(),
+            allow_base_url_edit: false,
+            models_endpoint: Some("/models".to_string()),
+            supports_structured_output: true,
+        },
+        PostProcessProvider {
+            id: "xai".to_string(),
+            label: "xAI (Grok)".to_string(),
+            base_url: "https://api.x.ai/v1".to_string(),
+            allow_base_url_edit: false,
+            models_endpoint: Some("/models".to_string()),
+            supports_structured_output: true,
+        },
+        PostProcessProvider {
+            id: "deepseek".to_string(),
+            label: "DeepSeek".to_string(),
+            base_url: "https://api.deepseek.com/v1".to_string(),
+            allow_base_url_edit: false,
+            models_endpoint: Some("/models".to_string()),
+            supports_structured_output: false,
+        },
+        PostProcessProvider {
+            id: "mistral".to_string(),
+            label: "Mistral".to_string(),
+            base_url: "https://api.mistral.ai/v1".to_string(),
+            allow_base_url_edit: false,
+            models_endpoint: Some("/models".to_string()),
+            supports_structured_output: true,
+        },
+        PostProcessProvider {
+            id: "moonshot".to_string(),
+            label: "Moonshot (Kimi)".to_string(),
+            base_url: "https://api.moonshot.ai/v1".to_string(),
+            allow_base_url_edit: false,
+            models_endpoint: Some("/models".to_string()),
+            supports_structured_output: false,
+        },
+        PostProcessProvider {
+            id: "together".to_string(),
+            label: "Together AI".to_string(),
+            base_url: "https://api.together.xyz/v1".to_string(),
+            allow_base_url_edit: false,
+            models_endpoint: Some("/models".to_string()),
+            supports_structured_output: false,
+        },
+        PostProcessProvider {
+            id: "fireworks".to_string(),
+            label: "Fireworks AI".to_string(),
+            base_url: "https://api.fireworks.ai/inference/v1".to_string(),
+            allow_base_url_edit: false,
+            models_endpoint: Some("/models".to_string()),
+            supports_structured_output: false,
+        },
+        PostProcessProvider {
+            id: "perplexity".to_string(),
+            label: "Perplexity".to_string(),
+            base_url: "https://api.perplexity.ai".to_string(),
+            allow_base_url_edit: false,
+            models_endpoint: None,
+            supports_structured_output: false,
+        },
+        // Azure OpenAI via the v1 API surface. Users must edit the base URL to
+        // their resource, e.g. https://my-res.openai.azure.com/openai/v1
+        // (classic dated `?api-version=` deployment endpoints are not supported;
+        // the model name is the deployment name). Key auth is sent as both
+        // `Authorization: Bearer` and the `api-key` header.
+        PostProcessProvider {
+            id: "azure_openai".to_string(),
+            label: "Azure OpenAI".to_string(),
+            base_url: "https://YOUR-RESOURCE.openai.azure.com/openai/v1".to_string(),
+            allow_base_url_edit: true,
+            models_endpoint: Some("/models".to_string()),
+            supports_structured_output: true,
+        },
     ];
 
     // Note: We always include Apple Intelligence on macOS ARM64 without checking availability
@@ -942,6 +1021,38 @@ fn default_assistant_tts_engine() -> String {
 
 fn default_assistant_tts_base_url() -> String {
     "https://api.openai.com/v1".to_string()
+}
+
+/// Sensible default TTS base URL for a given engine. Used when the engine is
+/// switched so a stale value (e.g. the OpenAI URL lingering under the Azure
+/// engine and 404ing on Load voices) never leaks across engines.
+pub fn default_tts_base_url_for_engine(engine: &str) -> String {
+    match engine {
+        "openai" => "https://api.openai.com/v1".to_string(),
+        // Azure Speech / ElevenLabs / Kokoro don't reuse the OpenAI base URL; an
+        // empty value shows the field's placeholder so the user enters the right
+        // endpoint (or needs none, for ElevenLabs/Kokoro).
+        _ => String::new(),
+    }
+}
+
+/// Sensible default TTS model for a given engine.
+pub fn default_tts_model_for_engine(engine: &str) -> String {
+    match engine {
+        "openai" => "gpt-4o-mini-tts".to_string(),
+        "elevenlabs" => "eleven_flash_v2_5".to_string(),
+        _ => String::new(),
+    }
+}
+
+/// Sensible default remote voice for a given engine.
+pub fn default_tts_remote_voice_for_engine(engine: &str) -> String {
+    match engine {
+        "openai" => "alloy".to_string(),
+        // Azure falls back to en-US-JennyNeural when empty; ElevenLabs needs a
+        // user-provided voice id.
+        _ => String::new(),
+    }
 }
 
 fn default_assistant_tts_model() -> String {

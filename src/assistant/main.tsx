@@ -4,14 +4,13 @@ import AssistantPanel from "./AssistantPanel";
 import { applyCachedAssistantTheme } from "@/lib/theme";
 import "@/i18n";
 
-// Fonts — Inter for UI/body, EB Garamond for the editorial display title.
-// The panel is its own window, so it must load fonts independently of the
-// main app entry point.
-import "@fontsource/inter/400.css";
-import "@fontsource/inter/500.css";
-import "@fontsource/inter/600.css";
-import "@fontsource/eb-garamond/400.css";
-import "@fontsource/eb-garamond/500.css";
+// Fonts — the panel is its own window, so it must load fonts independently of
+// the main app entry point. Plus Jakarta Sans (the brand face) carries it: body
+// at 400, title/labels at 500, table headers at 600, markdown bold at 700.
+import "@fontsource/plus-jakarta-sans/400.css";
+import "@fontsource/plus-jakarta-sans/500.css";
+import "@fontsource/plus-jakarta-sans/600.css";
+import "@fontsource/plus-jakarta-sans/700.css";
 
 // Apply the cached assistant-panel theme before render to avoid a theme flash.
 // AssistantPanel re-applies the real setting (override or app-follow) on load.

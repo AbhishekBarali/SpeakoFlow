@@ -1,6 +1,6 @@
 {
   "tray": {
-    "settings": "設定...",
+    "home": "首頁",
     "checkUpdates": "檢查更新...",
     "copyLastTranscript": "複製最新轉錄",
     "unloadModel": "卸載模型",

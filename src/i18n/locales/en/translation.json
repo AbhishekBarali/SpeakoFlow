@@ -7,7 +7,7 @@
     "dark": "Dark"
   },
   "tray": {
-    "settings": "Settings...",
+    "home": "Home",
     "checkUpdates": "Check for Updates...",
     "copyLastTranscript": "Copy Last Transcript",
     "unloadModel": "Unload Model",
@@ -23,7 +23,9 @@
     "assistant": "Assistant",
     "history": "History",
     "debug": "Debug",
-    "about": "About"
+    "about": "About",
+    "collapse": "Collapse sidebar",
+    "expand": "Expand sidebar"
   },
   "sectionSubtitles": {
     "general": "Shortcuts, dictation, and audio — the essentials for everyday use.",
@@ -633,6 +635,11 @@
         "description": "View source code and contribute",
         "button": "View on GitHub"
       },
+      "license": {
+        "title": "License",
+        "description": "SpeakoFlow is open source under the MIT License, building on Handy (also MIT) by CJ Pais.",
+        "button": "View License"
+      },
       "supportDevelopment": {
         "title": "Support Development",
         "description": "Help us continue building SpeakoFlow",
@@ -673,13 +680,18 @@
         "providerLabel": "Provider",
         "providerDescription": "The LLM provider that answers your assistant questions. API keys and base URLs are shared with post-processing providers.",
         "baseUrlLabel": "Base URL",
-        "baseUrlDescription": "OpenAI-compatible endpoint base URL. For Azure OpenAI use https://{resource}.openai.azure.com/openai/v1",
+        "baseUrlDescription": "OpenAI-compatible endpoint base URL. For Azure OpenAI you can paste the endpoint straight from the Azure portal (e.g. https://your-resource.openai.azure.com/ or the AI Foundry endpoint) — it's normalized to the /openai/v1 API automatically. The model name is your deployment name.",
         "apiKeyLabel": "API Key",
         "apiKeyDescription": "API key for the selected provider (shared with post-processing).",
         "apiKeyPlaceholder": "Enter API key...",
         "modelLabel": "Model",
         "modelDescription": "Model or deployment name to use for assistant answers.",
         "modelPlaceholder": "e.g. gpt-4o-mini",
+        "modelSearchPlaceholder": "Search or type a model…",
+        "modelUse": "Use \"{{model}}\"",
+        "loadModels": "Load models",
+        "loadingModels": "Loading…",
+        "noModelsFound": "No models returned. Type the model name instead.",
         "builtinModelDescription": "Pick a downloaded local model. It runs on your device with no API key.",
         "builtinModelPlaceholder": "Select a downloaded model",
         "builtinNoModels": "No local models yet. Download one from the Models tab under \"Language Model\".",
@@ -757,9 +769,9 @@
         "engineDescription": "Kokoro runs locally and free (uses your GPU via WebGPU). The OpenAI-compatible engine works with OpenAI, Azure OpenAI, Groq, or any local server exposing /audio/speech. ElevenLabs uses your ElevenLabs API key. Azure AI Speech uses a regional Neural TTS endpoint with SSML voices.",
         "engines": {
           "kokoro": "Kokoro (local, free)",
-          "openai": "OpenAI-compatible (OpenAI / Azure / custom)",
+          "openai": "OpenAI-compatible",
           "elevenlabs": "ElevenLabs",
-          "azure": "Azure AI Speech (Neural TTS)"
+          "azure": "Azure AI Speech"
         },
         "voiceLabel": "Voice",
         "voiceDescription": "Kokoro voice used for the spoken summary.",
@@ -778,7 +790,7 @@
         "baseUrlLabel": "TTS Base URL",
         "baseUrlDescription": "OpenAI-compatible endpoint. You can paste either a base (e.g. https://{resource}.openai.azure.com/openai/v1) or a full /audio/speech URL including ?api-version=... — exactly the endpoint you'd use as SillyTavern's Provider Endpoint.",
         "azureBaseUrlLabel": "Speech Endpoint",
-        "azureBaseUrlDescription": "Your Azure AI Speech regional Text to Speech (Neural) endpoint, e.g. https://eastus2.tts.speech.microsoft.com — found under Key and endpoints in the Azure portal.",
+        "azureBaseUrlDescription": "Your Azure AI Speech endpoint. The regional form always works, e.g. https://eastus2.tts.speech.microsoft.com. A custom-domain / AI Foundry Speech resource also works: https://your-resource.cognitiveservices.azure.com. Find it under Keys and Endpoint in the Azure portal, then click Load voices.",
         "apiKeyLabel": "TTS API Key",
         "apiKeyDescription": "API key for the TTS endpoint (separate from the assistant LLM key).",
         "modelLabel": "TTS Model",
@@ -790,6 +802,11 @@
         "loadVoices": "Load voices",
         "voicesLoading": "Loading…",
         "voicesPick": "Pick from {{count}} voices…",
+        "loadModels": "Load models",
+        "modelsLoading": "Loading…",
+        "modelsPick": "Pick from {{count}} models…",
+        "modelsUse": "Use \"{{model}}\"",
+        "voicesUse": "Use \"{{voice}}\"",
         "elevenVoiceLabel": "Voice ID",
         "elevenVoiceDescription": "ElevenLabs voice ID (from the Voices tab in their dashboard).",
         "promptLabel": "Summary Prompt",
@@ -850,6 +867,9 @@
     "installing": "Installing...",
     "preparing": "Preparing...",
     "checkForUpdates": "Check for updates",
+    "checkFailed": "Update check failed",
+    "updateFailed": "Update failed",
+    "clickToRetry": "Click to try again",
     "portableUpdateTitle": "Manual update required",
     "portableUpdateMessage": "Portable installs cannot be updated automatically. To update: download the latest NSIS installer from GitHub Releases, install it to the same folder, then copy your Data/ folder (settings, models, recordings) from the old version to the new one.",
     "portableUpdateButton": "Open GitHub Releases"

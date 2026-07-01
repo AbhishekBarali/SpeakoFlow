@@ -1,4 +1,4 @@
-# NixOS module for Handy speech-to-text
+# NixOS module for SpeakoFlow voice assistant
 #
 # Handles system-level configuration that the package wrapper cannot:
 #   - udev rule for /dev/uinput (rdev grab() needs it for virtual input)
@@ -7,12 +7,12 @@
 #
 # Usage in your flake:
 #
-#   inputs.handy.url = "github:cjpais/Handy";
+#   inputs.speakoflow.url = "github:AbhishekBarali/SpeakoFlow";
 #
 #   nixosConfigurations.myhost = nixpkgs.lib.nixosSystem {
 #     modules = [
-#       handy.nixosModules.default
-#       { programs.handy.enable = true; }
+#       speakoflow.nixosModules.default
+#       { programs.speakoflow.enable = true; }
 #     ];
 #   };
 {
@@ -22,16 +22,16 @@
   ...
 }:
 let
-  cfg = config.programs.handy;
+  cfg = config.programs.speakoflow;
 in
 {
-  options.programs.handy = {
-    enable = lib.mkEnableOption "Handy offline speech-to-text";
+  options.programs.speakoflow = {
+    enable = lib.mkEnableOption "SpeakoFlow offline voice assistant";
 
     package = lib.mkOption {
       type = lib.types.package;
-      defaultText = lib.literalExpression "handy.packages.\${system}.handy";
-      description = "The Handy package to use.";
+      defaultText = lib.literalExpression "speakoflow.packages.\${system}.speakoflow";
+      description = "The SpeakoFlow package to use.";
     };
   };
 

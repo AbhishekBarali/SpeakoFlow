@@ -1,6 +1,6 @@
 {
   "tray": {
-    "settings": "Inställningar...",
+    "home": "Hem",
     "checkUpdates": "Sök efter uppdateringar...",
     "copyLastTranscript": "Kopiera senaste transkriptionen",
     "unloadModel": "Avlasta modell",
