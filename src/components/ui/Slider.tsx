@@ -10,10 +10,17 @@ interface SliderProps {
   disabled?: boolean;
   label: string;
   description?: string;
+  /** Optional deep-dive help shown behind a small (i) icon, matching the
+   *  dropdown rows (e.g. Panel size) so slider rows can carry the same hint. */
+  info?: string;
   descriptionMode?: "inline" | "tooltip";
   grouped?: boolean;
   showValue?: boolean;
   formatValue?: (value: number) => string;
+  /** Tailwind width class for the control column. Defaults to full width. The
+   *  assistant opacity row passes a fixed width so the slider lines up with the
+   *  dropdown rows above it instead of running wider and starting further left. */
+  controlClassName?: string;
 }
 
 export const Slider: React.FC<SliderProps> = ({
@@ -25,10 +32,12 @@ export const Slider: React.FC<SliderProps> = ({
   disabled = false,
   label,
   description,
+  info,
   descriptionMode = "tooltip",
   grouped = false,
   showValue = true,
   formatValue = (v) => v.toFixed(2),
+  controlClassName = "w-full",
 }) => {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     onChange(parseFloat(e.target.value));
@@ -38,12 +47,13 @@ export const Slider: React.FC<SliderProps> = ({
     <SettingContainer
       title={label}
       description={description}
+      info={info}
       descriptionMode={descriptionMode}
       grouped={grouped}
       layout="horizontal"
       disabled={disabled}
     >
-      <div className="w-full">
+      <div className={controlClassName}>
         <div className="flex items-center space-x-1 h-6">
           <input
             type="range"

@@ -143,50 +143,6 @@
   transform: translateY(-50%) scale(0.9);
 }
 
-/* ---- Ask Assistant: reroute this dictation to the assistant ------------- */
-
-.pill-assist {
-  position: absolute;
-  left: 3px;
-  top: 50%;
-  transform: translateY(-50%) scale(0.85);
-  width: 20px;
-  height: 20px;
-  padding: 0;
-  border: none;
-  border-radius: 50%;
-  background: rgba(40, 36, 33, 0.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  opacity: 0;
-  pointer-events: none;
-  transition:
-    opacity 140ms ease-out,
-    background-color 140ms ease-out,
-    transform 120ms ease-out;
-}
-
-[dir="rtl"] .pill-assist {
-  left: auto;
-  right: 3px;
-}
-
-.overlay-pill:hover .pill-assist {
-  opacity: 1;
-  pointer-events: auto;
-  transform: translateY(-50%) scale(1);
-}
-
-.pill-assist:hover {
-  background: rgba(255, 255, 255, 0.18);
-}
-
-.pill-assist:active {
-  transform: translateY(-50%) scale(0.9);
-}
-
 /* ---- Done / confirm: finishes a hands-free recording (shown when locked) -- */
 
 .pill-confirm {

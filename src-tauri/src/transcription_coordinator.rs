@@ -124,15 +124,25 @@ impl TranscriptionCoordinator {
                                                     let _ = app.emit("recording-locked", true);
                                                 }
                                                 // Push-to-talk: arm tap-to-lock so a
-                                                // Shift tap can convert this hold to
-                                                // hands-free mid-recording — unless the
-                                                // user turned tap-to-lock off in settings.
+                                                // tap of the lock shortcut can convert
+                                                // this hold to hands-free mid-recording.
+                                                // Both dictation and the assistant
+                                                // support this, each with its own
+                                                // configured shortcut (the assistant's
+                                                // defaults to Space) so they can differ.
+                                                // An empty shortcut means off.
                                                 RecordingMode::Hold => {
-                                                    if get_settings(&app).tap_to_lock {
+                                                    let settings = get_settings(&app);
+                                                    let shortcut = if binding_id == "assistant" {
+                                                        settings.assistant_tap_to_lock_key.trim()
+                                                    } else {
+                                                        settings.tap_to_lock_key.trim()
+                                                    };
+                                                    if !shortcut.is_empty() {
                                                         if let Some(lw) =
                                                             app.try_state::<LockWatch>()
                                                         {
-                                                            lw.arm();
+                                                            lw.arm(shortcut);
                                                         }
                                                     }
                                                 }
@@ -180,6 +190,8 @@ impl TranscriptionCoordinator {
                             // Tap-to-lock: flip an active push-to-talk hold to
                             // hands-free so the user can release the keys and keep
                             // talking. Ignored unless a hold recording is active.
+                            // Works for both dictation and the assistant (each has
+                            // its own configured lock shortcut).
                             if let Stage::Recording { mode, .. } = &mut stage {
                                 if *mode == RecordingMode::Hold {
                                     *mode = RecordingMode::Lock;

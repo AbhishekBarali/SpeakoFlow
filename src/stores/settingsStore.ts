@@ -93,6 +93,10 @@ const settingUpdaters: {
     commands.changeUpdateChecksSetting(value as boolean),
   push_to_talk: (value) => commands.changePttSetting(value as boolean),
   tap_to_lock: (value) => commands.changeTapToLockSetting(value as boolean),
+  tap_to_lock_key: (value) =>
+    commands.changeTapToLockKeySetting(value as string),
+  assistant_tap_to_lock_key: (value) =>
+    commands.changeAssistantTapToLockKeySetting(value as string),
   selected_microphone: (value) =>
     commands.setSelectedMicrophone(
       (value as string) === "Default" || value === null

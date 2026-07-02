@@ -9,7 +9,7 @@ import {
   Info,
   Sparkles,
   MessageCircle,
-  Drama,
+  Users,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
@@ -84,7 +84,7 @@ export const SECTIONS_CONFIG = {
   },
   characters: {
     labelKey: "sidebar.characters",
-    icon: Drama,
+    icon: Users,
     component: CharactersSettings,
     enabled: () => true,
   },

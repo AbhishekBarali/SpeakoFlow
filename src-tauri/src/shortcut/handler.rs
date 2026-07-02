@@ -42,8 +42,8 @@ pub fn handle_shortcut_event(
     };
 
     // Transcribe/assistant bindings are handled by the coordinator. The base
-    // shortcut uses the default mode (push-to-talk by default); the Shift
-    // variant uses the opposite (hands-free lock).
+    // shortcut uses the default mode (push-to-talk hold by default); tapping the
+    // lock key on top converts a hold to hands-free mid-recording.
     if is_transcribe_binding(base_id) {
         if let Some(coordinator) = app.try_state::<TranscriptionCoordinator>() {
             let mode = recording_mode(get_settings(app).push_to_talk, is_lock_variant);

@@ -30,13 +30,42 @@ async changePttSetting(enabled: boolean) : Promise<Result<null, string>> {
 }
 },
 /**
- * Toggle the "tap Shift to lock a hold recording hands-free" gesture. When
- * off, holding the hotkey never arms the Shift watcher, so a stray Shift tap
- * can't convert an in-progress recording to hands-free.
+ * Toggle the "tap to lock a hold recording hands-free" gesture. When off,
+ * holding the hotkey never arms the lock-key watcher, so a stray tap can't
+ * convert an in-progress recording to hands-free.
  */
 async changeTapToLockSetting(enabled: boolean) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("change_tap_to_lock_setting", { enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Set the key that a tap converts a hold recording to hands-free (the "Tap to
+ * Lock" gesture). Accepts a modifier ("shift", "ctrl", "alt", "super"/"cmd")
+ * or a plain key name ("tab", "f8", …). Persisted; takes effect on the next
+ * recording (the watcher reads it fresh each time it arms).
+ */
+async changeTapToLockKeySetting(key: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("change_tap_to_lock_key_setting", { key }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Set the key that a tap converts a hold **assistant** recording to hands-free.
+ * Separate from the dictation lock key so the assistant can use a different
+ * combo (defaults to Space). Accepts a modifier or a plain key name; empty
+ * disables it. Persisted; takes effect on the next assistant recording (the
+ * watcher reads it fresh each time it arms).
+ */
+async changeAssistantTapToLockKeySetting(key: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("change_assistant_tap_to_lock_key_setting", { key }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -518,6 +547,22 @@ async cancelOperation() : Promise<void> {
  */
 async commitRecording() : Promise<void> {
     await TAURI_INVOKE("commit_recording");
+},
+/**
+ * Start/stop a plain dictation recording programmatically, for in-app
+ * "dictate into this field" mic buttons (e.g. the Create-with-AI character
+ * description box). Hands-free toggle like the assistant pill mic: the first
+ * call starts recording, the second stops it — the transcript is then pasted
+ * into whatever field currently has keyboard focus, exactly like the global
+ * dictation shortcut. No-op if the coordinator isn't ready yet.
+ */
+async toggleDictation() : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("toggle_dictation") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 },
 async isPortable() : Promise<boolean> {
     return await TAURI_INVOKE("is_portable");
@@ -1675,12 +1720,29 @@ historyUpdatePayload: "history-update-payload"
 
 export type AppSettings = { bindings: Partial<{ [key in string]: ShortcutBinding }>; push_to_talk: boolean; 
 /**
- * While a push-to-talk (hold) recording is active, a quick tap of Shift
- * converts it to hands-free (locked) mode so you can let go of the hotkey
- * and keep talking. On by default; turn off if a stray Shift tap keeps
- * locking your recordings. Only relevant while push-to-talk is on.
+ * While a push-to-talk (hold) recording is active, a quick tap of the
+ * configured lock key (see `tap_to_lock_key`) converts it to hands-free
+ * (locked) mode so you can let go of the hotkey and keep talking. On by
+ * default; turn off if a stray tap keeps locking your recordings. Only
+ * relevant while push-to-talk is on.
  */
-tap_to_lock?: boolean; audio_feedback: boolean; audio_feedback_volume?: number; sound_theme?: SoundTheme; start_hidden?: boolean; autostart_enabled?: boolean; update_checks_enabled?: boolean; selected_model?: string; always_on_microphone?: boolean; selected_microphone?: string | null; clamshell_microphone?: string | null; selected_output_device?: string | null; translate_to_english?: boolean; selected_language?: string; overlay_position?: OverlayPosition; debug_mode?: boolean; log_level?: LogLevel; custom_words?: string[]; 
+tap_to_lock?: boolean; 
+/**
+ * The key you tap (while holding a push-to-talk recording) to lock it
+ * hands-free. Defaults to Shift. Pick a key that isn't part of your record
+ * shortcut and that you won't press by accident. Accepts a modifier
+ * ("shift", "ctrl", "alt", "super"/"cmd") or a plain key name ("tab", "f8",
+ * …). Only relevant while push-to-talk and Tap to Lock are on.
+ */
+tap_to_lock_key?: string; 
+/**
+ * The key you tap while holding a push-to-talk **assistant** recording to
+ * lock it hands-free, so you can release the hotkey and keep talking to the
+ * assistant. Separate from the dictation `tap_to_lock_key` so it can be a
+ * different combo (defaults to Space). Accepts a modifier ("shift", "ctrl",
+ * …) or a plain key name ("space", "tab", …). Clear it (empty) to disable.
+ */
+assistant_tap_to_lock_key?: string; audio_feedback: boolean; audio_feedback_volume?: number; sound_theme?: SoundTheme; start_hidden?: boolean; autostart_enabled?: boolean; update_checks_enabled?: boolean; selected_model?: string; always_on_microphone?: boolean; selected_microphone?: string | null; clamshell_microphone?: string | null; selected_output_device?: string | null; translate_to_english?: boolean; selected_language?: string; overlay_position?: OverlayPosition; debug_mode?: boolean; log_level?: LogLevel; custom_words?: string[]; 
 /**
  * Master switch for the deterministic text-replacements pass.
  */

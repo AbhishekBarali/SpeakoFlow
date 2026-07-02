@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import {
@@ -6,10 +6,12 @@ import {
   Download,
   ImagePlus,
   Loader2,
+  Mic,
   Plus,
-  Sparkles,
+  Square,
   Trash2,
   Upload,
+  Wand2,
   X,
 } from "lucide-react";
 import { commands, type AssistantCharacter } from "@/bindings";
@@ -99,6 +101,11 @@ export const CharactersSettings: React.FC = () => {
   const [aiDesc, setAiDesc] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
+  // In-app dictation for the "Describe your character" box. The dictation
+  // pipeline pastes the transcript into whatever field has keyboard focus, so
+  // we keep the textarea focused while recording.
+  const aiBoxRef = useRef<HTMLDivElement>(null);
+  const [dictating, setDictating] = useState(false);
 
   // Reseed the editable drafts whenever the selected character changes.
   useEffect(() => {
@@ -266,6 +273,7 @@ export const CharactersSettings: React.FC = () => {
         await activate(id);
         setShowAi(false);
         setAiDesc("");
+        setDictating(false);
       }
     } catch (err) {
       setAiError(String(err));
@@ -273,6 +281,30 @@ export const CharactersSettings: React.FC = () => {
       setAiLoading(false);
     }
   }, [aiDesc, characters, saveCharacters, activate]);
+
+  // Toggle in-app dictation for the description box. First tap starts a
+  // hands-free recording, second tap stops it; the transcript is pasted into
+  // the focused textarea by the normal dictation pipeline.
+  const toggleDictation = useCallback(async () => {
+    // Keep (or restore) focus on the textarea so the paste lands there.
+    aiBoxRef.current?.querySelector("textarea")?.focus();
+    setDictating((d) => !d);
+    try {
+      await commands.toggleDictation();
+    } catch {
+      setDictating(false);
+    }
+  }, []);
+
+  // Close the "Create with AI" box, cancelling any in-progress dictation so we
+  // never leave a recording running for a hidden field.
+  const closeAi = useCallback(() => {
+    if (dictating) {
+      setDictating(false);
+      void commands.cancelOperation().catch(() => {});
+    }
+    setShowAi(false);
+  }, [dictating]);
 
   if (!settings) return null;
 
@@ -341,9 +373,9 @@ export const CharactersSettings: React.FC = () => {
           <Button
             variant="secondary"
             size="sm"
-            onClick={() => setShowAi((v) => !v)}
+            onClick={() => (showAi ? closeAi() : setShowAi(true))}
           >
-            <Sparkles size={14} />
+            <Wand2 size={14} />
             {t("settings.assistant.characters.createAi")}
           </Button>
           <Button variant="secondary" size="sm" onClick={importCharacter}>
@@ -356,27 +388,54 @@ export const CharactersSettings: React.FC = () => {
           <div className="rounded-xl border border-hairline bg-surface p-4 space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Sparkles size={15} className="text-accent" />
+                <Wand2 size={15} className="text-accent" />
                 <span className="text-[13px] font-medium text-ink">
                   {t("settings.assistant.characters.aiTitle")}
                 </span>
               </div>
               <button
                 type="button"
-                onClick={() => setShowAi(false)}
+                onClick={closeAi}
                 title={t("settings.assistant.characters.aiClose")}
                 className="text-muted hover:text-ink transition-colors cursor-pointer"
               >
                 <X size={15} />
               </button>
             </div>
-            <Textarea
-              value={aiDesc}
-              onChange={(e) => setAiDesc(e.target.value)}
-              placeholder={t("settings.assistant.characters.aiPlaceholder")}
-              rows={3}
-              className="w-full"
-            />
+            <div className="relative" ref={aiBoxRef}>
+              <Textarea
+                value={aiDesc}
+                onChange={(e) => setAiDesc(e.target.value)}
+                placeholder={t("settings.assistant.characters.aiPlaceholder")}
+                rows={3}
+                className="w-full pr-11"
+              />
+              <button
+                type="button"
+                // Don't steal focus from the textarea on click, so the dictated
+                // text pastes into the box rather than the button.
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={toggleDictation}
+                title={t(
+                  dictating
+                    ? "settings.assistant.characters.aiDictateStop"
+                    : "settings.assistant.characters.aiDictate",
+                )}
+                aria-label={t(
+                  dictating
+                    ? "settings.assistant.characters.aiDictateStop"
+                    : "settings.assistant.characters.aiDictate",
+                )}
+                aria-pressed={dictating}
+                className={`absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-lg border transition-colors cursor-pointer ${
+                  dictating
+                    ? "border-transparent bg-accent text-white animate-pulse"
+                    : "border-hairline-strong bg-surface text-muted hover:text-ink hover:border-ink/40"
+                }`}
+              >
+                {dictating ? <Square size={13} /> : <Mic size={14} />}
+              </button>
+            </div>
             <div className="flex items-center gap-3">
               <Button
                 variant="primary"
@@ -387,7 +446,7 @@ export const CharactersSettings: React.FC = () => {
                 {aiLoading ? (
                   <Loader2 size={14} className="animate-spin" />
                 ) : (
-                  <Sparkles size={14} />
+                  <Wand2 size={14} />
                 )}
                 {t("settings.assistant.characters.generate")}
               </Button>

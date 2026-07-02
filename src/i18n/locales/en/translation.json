@@ -241,8 +241,10 @@
         "description": "Hold to record, release to stop. Quick-tap to lock hands-free recording."
       },
       "tapToLock": {
-        "label": "Tap Shift to Lock",
-        "description": "While holding your record shortcut, a quick tap of Shift locks hands-free recording so you can let go and keep talking. Turn off if a stray Shift tap keeps locking your recordings."
+        "label": "Tap to Lock",
+        "info": "While holding your record shortcut, tap this to lock hands-free recording so you can let go and keep talking. Pick any key that isn't part of your record shortcut, or clear it to turn this off.",
+        "off": "Off",
+        "clear": "Clear"
       }
     },
     "models": {
@@ -686,6 +688,12 @@
       "shortcuts": {
         "title": "Assistant Shortcuts"
       },
+      "tapToLock": {
+        "label": "Tap to Lock",
+        "info": "While holding the assistant shortcut, tap this to lock hands-free so you can let go and keep talking. Defaults to Space; pick any key that isn't part of your assistant shortcut, or clear it to turn this off.",
+        "off": "Off",
+        "clear": "Clear"
+      },
       "provider": {
         "title": "Assistant Provider",
         "providerLabel": "Provider",
@@ -736,6 +744,8 @@
         "aiTitle": "Describe your character",
         "aiClose": "Close",
         "aiPlaceholder": "e.g. a patient chess coach who explains every move, or a cheerful barista who loves puns",
+        "aiDictate": "Dictate the description",
+        "aiDictateStop": "Stop dictation",
         "generate": "Generate",
         "avatarUpload": "Upload image",
         "avatarRemove": "Remove",
@@ -1020,9 +1030,9 @@
       "disarmScreen": "Screen vision is on — click to turn it off"
     },
     "status": {
-      "listening": "Listening...",
-      "locked": "Listening hands-free — press the hotkey or tick to stop",
-      "transcribing": "Transcribing...",
+      "listening": "Listening…",
+      "locked": "Listening hands-free",
+      "transcribing": "Transcribing…",
       "searching": "Searching the web...",
       "thinking": "Thinking...",
       "speaking": "Speaking..."

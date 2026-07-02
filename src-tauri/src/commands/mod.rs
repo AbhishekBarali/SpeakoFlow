@@ -29,6 +29,27 @@ pub fn commit_recording(app: AppHandle) {
     }
 }
 
+/// Start/stop a plain dictation recording programmatically, for in-app
+/// "dictate into this field" mic buttons (e.g. the Create-with-AI character
+/// description box). Hands-free toggle like the assistant pill mic: the first
+/// call starts recording, the second stops it — the transcript is then pasted
+/// into whatever field currently has keyboard focus, exactly like the global
+/// dictation shortcut. No-op if the coordinator isn't ready yet.
+#[tauri::command]
+#[specta::specta]
+pub fn toggle_dictation(app: AppHandle) -> Result<(), String> {
+    let coordinator = app
+        .try_state::<crate::TranscriptionCoordinator>()
+        .ok_or_else(|| "Coordinator not initialized".to_string())?;
+    coordinator.send_input(
+        "transcribe",
+        "in-app",
+        true,
+        crate::transcription_coordinator::RecordingMode::Lock,
+    );
+    Ok(())
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn is_portable() -> bool {

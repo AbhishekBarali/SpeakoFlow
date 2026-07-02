@@ -537,12 +537,27 @@ impl fmt::Debug for SecretString {
 pub struct AppSettings {
     pub bindings: HashMap<String, ShortcutBinding>,
     pub push_to_talk: bool,
-    /// While a push-to-talk (hold) recording is active, a quick tap of Shift
-    /// converts it to hands-free (locked) mode so you can let go of the hotkey
-    /// and keep talking. On by default; turn off if a stray Shift tap keeps
-    /// locking your recordings. Only relevant while push-to-talk is on.
+    /// While a push-to-talk (hold) recording is active, a quick tap of the
+    /// configured lock key (see `tap_to_lock_key`) converts it to hands-free
+    /// (locked) mode so you can let go of the hotkey and keep talking. On by
+    /// default; turn off if a stray tap keeps locking your recordings. Only
+    /// relevant while push-to-talk is on.
     #[serde(default = "default_tap_to_lock")]
     pub tap_to_lock: bool,
+    /// The key you tap (while holding a push-to-talk recording) to lock it
+    /// hands-free. Defaults to Shift. Pick a key that isn't part of your record
+    /// shortcut and that you won't press by accident. Accepts a modifier
+    /// ("shift", "ctrl", "alt", "super"/"cmd") or a plain key name ("tab", "f8",
+    /// …). Only relevant while push-to-talk and Tap to Lock are on.
+    #[serde(default = "default_tap_to_lock_key")]
+    pub tap_to_lock_key: String,
+    /// The key you tap while holding a push-to-talk **assistant** recording to
+    /// lock it hands-free, so you can release the hotkey and keep talking to the
+    /// assistant. Separate from the dictation `tap_to_lock_key` so it can be a
+    /// different combo (defaults to Space). Accepts a modifier ("shift", "ctrl",
+    /// …) or a plain key name ("space", "tab", …). Clear it (empty) to disable.
+    #[serde(default = "default_assistant_tap_to_lock_key")]
+    pub assistant_tap_to_lock_key: String,
     pub audio_feedback: bool,
     #[serde(default = "default_audio_feedback_volume")]
     pub audio_feedback_volume: f32,
@@ -1286,6 +1301,14 @@ fn default_tap_to_lock() -> bool {
     true
 }
 
+fn default_tap_to_lock_key() -> String {
+    "shift".to_string()
+}
+
+fn default_assistant_tap_to_lock_key() -> String {
+    "space".to_string()
+}
+
 fn default_assistant_font_size() -> String {
     "medium".to_string()
 }
@@ -1637,6 +1660,8 @@ pub fn get_default_settings() -> AppSettings {
         bindings,
         push_to_talk: true,
         tap_to_lock: default_tap_to_lock(),
+        tap_to_lock_key: default_tap_to_lock_key(),
+        assistant_tap_to_lock_key: default_assistant_tap_to_lock_key(),
         audio_feedback: false,
         audio_feedback_volume: default_audio_feedback_volume(),
         sound_theme: default_sound_theme(),

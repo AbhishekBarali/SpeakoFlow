@@ -1,7 +1,7 @@
 import { listen } from "@tauri-apps/api/event";
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Loader2, Sparkles, X, Check } from "lucide-react";
+import { Loader2, X, Check } from "lucide-react";
 import { AudioWaveform } from "../components/shared";
 import "./RecordingOverlay.css";
 import { commands } from "@/bindings";
@@ -152,26 +152,6 @@ const RecordingOverlay: React.FC = () => {
             }}
           >
             <X size={13} strokeWidth={2.5} color={ICON_COLOR} />
-          </button>
-        )}
-
-        {/* Send this dictation to the assistant instead of typing it — the
-            one entry point for both flows: dictate first, opt into a question.
-            Hover-revealed during a push-to-talk hold, inline when locked. */}
-        {isRecording && (
-          <button
-            type="button"
-            className="pill-assist"
-            aria-label={t("overlay.askAssistant")}
-            title={t("overlay.askAssistant")}
-            onClick={() => {
-              void (async () => {
-                await commands.redirectTranscriptionToAssistant();
-                await commands.commitRecording();
-              })();
-            }}
-          >
-            <Sparkles size={12} strokeWidth={2.25} color={ICON_COLOR} />
           </button>
         )}
 

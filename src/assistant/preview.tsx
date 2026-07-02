@@ -9,6 +9,7 @@ import {
   Loader2,
   Maximize2,
   Mic,
+  Sparkles,
   Volume2,
   X,
 } from "lucide-react";
@@ -114,6 +115,11 @@ const Pill: React.FC<{ demo: Demo }> = ({ demo }) => {
         </>
       ) : busy ? (
         <>
+          {demo !== "searching" && demo !== "speaking" && (
+            <span className="apill-glyph identity" aria-hidden="true">
+              <Sparkles size={13} strokeWidth={2} />
+            </span>
+          )}
           {demo === "searching" && (
             <span className="apill-glyph">
               <Globe size={13} strokeWidth={2} />

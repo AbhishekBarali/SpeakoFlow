@@ -487,14 +487,44 @@ pub fn change_ptt_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
     Ok(())
 }
 
-/// Toggle the "tap Shift to lock a hold recording hands-free" gesture. When
-/// off, holding the hotkey never arms the Shift watcher, so a stray Shift tap
-/// can't convert an in-progress recording to hands-free.
+/// Toggle the "tap to lock a hold recording hands-free" gesture. When off,
+/// holding the hotkey never arms the lock-key watcher, so a stray tap can't
+/// convert an in-progress recording to hands-free.
 #[tauri::command]
 #[specta::specta]
 pub fn change_tap_to_lock_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
     let mut settings = settings::get_settings(&app);
     settings.tap_to_lock = enabled;
+    settings::write_settings(&app, settings);
+    Ok(())
+}
+
+/// Set the key that a tap converts a hold recording to hands-free (the "Tap to
+/// Lock" gesture). Accepts a modifier ("shift", "ctrl", "alt", "super"/"cmd")
+/// or a plain key name ("tab", "f8", …). Persisted; takes effect on the next
+/// recording (the watcher reads it fresh each time it arms).
+#[tauri::command]
+#[specta::specta]
+pub fn change_tap_to_lock_key_setting(app: AppHandle, key: String) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    settings.tap_to_lock_key = key;
+    settings::write_settings(&app, settings);
+    Ok(())
+}
+
+/// Set the key that a tap converts a hold **assistant** recording to hands-free.
+/// Separate from the dictation lock key so the assistant can use a different
+/// combo (defaults to Space). Accepts a modifier or a plain key name; empty
+/// disables it. Persisted; takes effect on the next assistant recording (the
+/// watcher reads it fresh each time it arms).
+#[tauri::command]
+#[specta::specta]
+pub fn change_assistant_tap_to_lock_key_setting(
+    app: AppHandle,
+    key: String,
+) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    settings.assistant_tap_to_lock_key = key;
     settings::write_settings(&app, settings);
     Ok(())
 }

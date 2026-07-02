@@ -26,6 +26,7 @@ import {
   Paperclip,
   RotateCcw,
   Scissors,
+  Sparkles,
   Square,
   Volume2,
   VolumeX,
@@ -130,6 +131,11 @@ async function downscaleToDataUrl(blob: Blob): Promise<string> {
 
 /** How long transient errors/notices linger on the pill before self-clearing. */
 const TRANSIENT_MS = 8000;
+
+/** How long the collapsed pill sits idle (at rest, no hover) before it dims to
+ *  a quiet, thin sliver so it stays out of the user's way. Any activity or a
+ *  hover brings it straight back. */
+const PILL_IDLE_DIM_MS = 6000;
 
 function toDisplay(raw: { role: string; content: string }): DisplayMessage {
   const role = raw.role === "assistant" ? "assistant" : "user";
@@ -281,6 +287,10 @@ const AssistantPanel: React.FC = () => {
   const [attachScreen, setAttachScreen] = useState(false);
   const [collapsed, setCollapsed] = useState(true);
   const [locked, setLocked] = useState(false);
+  // The collapsed pill dims to a thin, translucent sliver after a spell of
+  // inactivity so it doesn't sit in the user's way; hovering it (CSS) or any
+  // activity restores it.
+  const [dimmed, setDimmed] = useState(false);
   const [ttsPlaying, setTtsPlaying] = useState(false);
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [micLevels, setMicLevels] = useState<number[]>([]);
@@ -749,6 +759,24 @@ const AssistantPanel: React.FC = () => {
     return () => window.clearTimeout(timer);
   }, [state, ttsAudible, tts.status]);
 
+  // Idle-dim the collapsed pill: after a spell at rest (idle, no error/notice,
+  // no voice playing) fade and thin it to a quiet sliver so it stays out of the
+  // way. Any activity flips it back here; a hover restores it via CSS. Only the
+  // pill dims — the expanded panel never does.
+  useEffect(() => {
+    if (!collapsed) {
+      setDimmed(false);
+      return;
+    }
+    const atRest = state === "idle" && !error && !notice && !ttsActive;
+    if (!atRest) {
+      setDimmed(false);
+      return;
+    }
+    const timer = window.setTimeout(() => setDimmed(true), PILL_IDLE_DIM_MS);
+    return () => window.clearTimeout(timer);
+  }, [collapsed, state, error, notice, ttsActive]);
+
   const sendText = useCallback(async () => {
     const text = input.trim();
     if (!text || sendingRef.current || busy) return;
@@ -940,7 +968,7 @@ const AssistantPanel: React.FC = () => {
         <div
           className={`apill${isListening ? " listening" : ""}${
             showError ? " error" : ""
-          }`}
+          }${dimmed ? " dimmed" : ""}`}
           data-tauri-drag-region
           role="status"
           aria-label={pillStatus}
@@ -996,6 +1024,22 @@ const AssistantPanel: React.FC = () => {
             // phases worth calling out. Hovering reveals expand + cancel — the
             // user is never locked out of the full panel while it works.
             <>
+              {/* Assistant identity anchor: a sparkle leads the pill whenever a
+                  phase-specific glyph (search / speaking) isn't showing, so the
+                  listening / thinking states never collapse to "just a
+                  waveform" — which is what made this chip indistinguishable
+                  from the STT recording overlay. The accent tint lives here
+                  (see .apill-glyph.identity) rather than being smeared across
+                  the whole chip. */}
+              {!isSearchingPhase && !ttsAudible && (
+                <span
+                  className="apill-glyph identity"
+                  data-tauri-drag-region
+                  aria-hidden="true"
+                >
+                  <Sparkles size={13} strokeWidth={2} />
+                </span>
+              )}
               {isSearchingPhase && (
                 <span className="apill-glyph" data-tauri-drag-region>
                   <Globe size={13} strokeWidth={2} />
@@ -1276,7 +1320,7 @@ const AssistantPanel: React.FC = () => {
               <AudioWaveform
                 levels={micLevels}
                 size="md"
-                barCount={22}
+                barCount={16}
                 active={state === "listening"}
               />
               <span className="listening-label">
