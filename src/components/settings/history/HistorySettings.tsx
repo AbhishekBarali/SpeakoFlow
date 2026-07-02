@@ -10,7 +10,6 @@ import { listen } from "@tauri-apps/api/event";
 import { readFile } from "@tauri-apps/plugin-fs";
 import {
   Check,
-  ChevronDown,
   ChevronRight,
   Copy,
   FolderOpen,
@@ -116,8 +115,8 @@ const IconButton: React.FC<{
   <button
     onClick={onClick}
     disabled={disabled}
-    className={`p-1.5 rounded-lg flex items-center justify-center transition-colors cursor-pointer disabled:cursor-not-allowed disabled:text-muted-soft/50 ${
-      active ? "text-ink hover:text-ink/80" : "text-muted hover:text-ink"
+    className={`p-1.5 rounded-md flex items-center justify-center transition-colors cursor-pointer hover:bg-ink/6 disabled:cursor-not-allowed disabled:text-muted-soft/50 disabled:hover:bg-transparent ${
+      active ? "text-ink" : "text-muted hover:text-ink"
     }`}
     title={title}
   >
@@ -409,15 +408,12 @@ export const HistorySettings: React.FC = () => {
   );
 
   /** Load a past conversation back into the assistant panel and open it. */
-  const resumeAssistantSession = useCallback(
-    async (id: number) => {
-      const result = await commands.assistantResumeSession(id);
-      if (result.status !== "ok") {
-        toast.error(String(result.error));
-      }
-    },
-    [],
-  );
+  const resumeAssistantSession = useCallback(async (id: number) => {
+    const result = await commands.assistantResumeSession(id);
+    if (result.status !== "ok") {
+      toast.error(String(result.error));
+    }
+  }, []);
 
   const openRecordingsFolder = async () => {
     try {
@@ -465,7 +461,7 @@ export const HistorySettings: React.FC = () => {
   } else {
     content = (
       <>
-        <div className="divide-y divide-mid-gray/20">
+        <div className="divide-y divide-hairline">
           {feed.map((item) =>
             item.kind === "transcription" ? (
               <HistoryEntryComponent
@@ -499,7 +495,7 @@ export const HistorySettings: React.FC = () => {
   }
 
   return (
-    <div className="max-w-3xl w-full mx-auto space-y-8">
+    <div className="max-w-2xl w-full mx-auto space-y-8">
       <div className="space-y-2">
         <div className="flex items-center justify-end">
           <OpenRecordingsButton
@@ -507,7 +503,7 @@ export const HistorySettings: React.FC = () => {
             label={t("settings.history.openFolder")}
           />
         </div>
-        <div className="bg-surface border border-hairline rounded-2xl overflow-visible shadow-[0_1px_2px_rgba(12,10,9,0.04)]">
+        <div className="bg-surface border border-hairline rounded-xl overflow-visible">
           {content}
         </div>
       </div>
@@ -577,69 +573,15 @@ const HistoryEntryComponent: React.FC<HistoryEntryProps> = ({
   const formattedDate = formatDateTime(String(entry.timestamp), i18n.language);
 
   return (
-    <div className="px-4 py-2 pb-5 flex flex-col gap-3">
-      <div className="flex justify-between items-center">
-        <p className="text-sm font-medium">{formattedDate}</p>
-        <div className="flex items-center">
-          <IconButton
-            onClick={handleCopyText}
-            disabled={!hasTranscription || retrying}
-            title={t("settings.history.copyToClipboard")}
-          >
-            {showCopied ? (
-              <Check width={16} height={16} />
-            ) : (
-              <Copy width={16} height={16} />
-            )}
-          </IconButton>
-          <IconButton
-            onClick={onToggleSaved}
-            disabled={retrying}
-            active={entry.saved}
-            title={
-              entry.saved
-                ? t("settings.history.unsave")
-                : t("settings.history.save")
-            }
-          >
-            <Star
-              width={16}
-              height={16}
-              fill={entry.saved ? "currentColor" : "none"}
-            />
-          </IconButton>
-          <IconButton
-            onClick={handleRetranscribe}
-            disabled={retrying}
-            title={t("settings.history.retranscribe")}
-          >
-            <RotateCcw
-              width={16}
-              height={16}
-              style={
-                retrying
-                  ? { animation: "spin 1s linear infinite reverse" }
-                  : undefined
-              }
-            />
-          </IconButton>
-          <IconButton
-            onClick={handleDeleteEntry}
-            disabled={retrying}
-            title={t("settings.history.delete")}
-          >
-            <Trash2 width={16} height={16} />
-          </IconButton>
-        </div>
-      </div>
-
+    <div className="group px-4 py-3.5 flex flex-col gap-1.5">
+      {/* Transcript first — the content is the entry. */}
       <p
-        className={`italic text-sm pb-2 ${
+        className={`text-[13px] leading-relaxed ${
           retrying
             ? ""
             : hasTranscription
-              ? "text-text/90 select-text cursor-text whitespace-pre-wrap break-words"
-              : "text-text/40"
+              ? "text-ink select-text cursor-text whitespace-pre-wrap break-words"
+              : "text-muted-soft"
         }`}
         style={
           retrying
@@ -661,6 +603,62 @@ const HistoryEntryComponent: React.FC<HistoryEntryProps> = ({
             ? entry.transcription_text
             : t("settings.history.transcriptionFailed")}
       </p>
+
+      {/* Meta row — quiet caption on the left, actions surface on hover. */}
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-xs text-muted shrink-0">{formattedDate}</span>
+        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-150">
+          <IconButton
+            onClick={handleCopyText}
+            disabled={!hasTranscription || retrying}
+            title={t("settings.history.copyToClipboard")}
+          >
+            {showCopied ? (
+              <Check width={14} height={14} />
+            ) : (
+              <Copy width={14} height={14} />
+            )}
+          </IconButton>
+          <IconButton
+            onClick={onToggleSaved}
+            disabled={retrying}
+            active={entry.saved}
+            title={
+              entry.saved
+                ? t("settings.history.unsave")
+                : t("settings.history.save")
+            }
+          >
+            <Star
+              width={14}
+              height={14}
+              fill={entry.saved ? "currentColor" : "none"}
+            />
+          </IconButton>
+          <IconButton
+            onClick={handleRetranscribe}
+            disabled={retrying}
+            title={t("settings.history.retranscribe")}
+          >
+            <RotateCcw
+              width={14}
+              height={14}
+              style={
+                retrying
+                  ? { animation: "spin 1s linear infinite reverse" }
+                  : undefined
+              }
+            />
+          </IconButton>
+          <IconButton
+            onClick={handleDeleteEntry}
+            disabled={retrying}
+            title={t("settings.history.delete")}
+          >
+            <Trash2 width={14} height={14} />
+          </IconButton>
+        </div>
+      </div>
 
       <AudioPlayer onLoadRequest={handleLoadAudio} className="w-full" />
     </div>
@@ -714,72 +712,75 @@ const AssistantHistoryEntryComponent: React.FC<AssistantHistoryEntryProps> = ({
   };
 
   return (
-    <div className="px-4 py-2 pb-5 flex flex-col gap-3">
-      <div className="flex justify-between items-center gap-2">
-        <button
-          onClick={onToggleExpand}
-          className="flex items-center gap-2 min-w-0 text-left cursor-pointer text-muted hover:text-ink transition-colors"
-          title={
-            expanded
-              ? t("settings.history.hideConversation")
-              : t("settings.history.showConversation")
-          }
+    <div className="group px-4 py-3.5 flex flex-col gap-1.5">
+      {/* Title first — the conversation is the content. */}
+      <button
+        onClick={onToggleExpand}
+        className="text-left cursor-pointer flex items-start gap-1.5 min-w-0"
+        title={
+          expanded
+            ? t("settings.history.hideConversation")
+            : t("settings.history.showConversation")
+        }
+      >
+        <span
+          className={`mt-[3px] shrink-0 text-muted-soft transition-transform duration-150 ${
+            expanded ? "rotate-90" : ""
+          }`}
         >
-          {expanded ? (
-            <ChevronDown width={15} height={15} className="shrink-0" />
-          ) : (
-            <ChevronRight width={15} height={15} className="shrink-0" />
-          )}
-          <span className="text-sm font-medium text-ink">{formattedDate}</span>
-          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium uppercase tracking-wide bg-mid-gray/15 text-muted shrink-0">
-            <MessageCircle width={10} height={10} />
-            {t("settings.history.assistantLabel")}
+          <ChevronRight width={13} height={13} />
+        </span>
+        <span
+          className={`text-[13px] leading-relaxed text-ink break-words ${
+            expanded ? "" : "line-clamp-2"
+          }`}
+        >
+          {session.title}
+        </span>
+      </button>
+
+      {/* Meta row — quiet caption on the left, actions surface on hover. */}
+      <div className="flex items-center justify-between gap-3 ps-[19px]">
+        <span className="text-xs text-muted shrink-0 inline-flex items-center gap-1.5">
+          {formattedDate}
+          <span aria-hidden="true" className="text-muted-soft">
+            ·
           </span>
-        </button>
-        <div className="flex items-center shrink-0">
+          <span className="inline-flex items-center gap-1">
+            <MessageCircle width={11} height={11} />
+            {t("settings.history.messageCount", {
+              count: session.messages.length,
+            })}
+          </span>
+        </span>
+        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-150">
           <IconButton
             onClick={onResume}
             title={t("settings.history.resumeConversation")}
           >
-            <MessageSquarePlus width={16} height={16} />
+            <MessageSquarePlus width={14} height={14} />
           </IconButton>
           <IconButton
             onClick={handleCopy}
             title={t("settings.history.copyConversation")}
           >
             {showCopied ? (
-              <Check width={16} height={16} />
+              <Check width={14} height={14} />
             ) : (
-              <Copy width={16} height={16} />
+              <Copy width={14} height={14} />
             )}
           </IconButton>
           <IconButton
             onClick={handleDelete}
             title={t("settings.history.delete")}
           >
-            <Trash2 width={16} height={16} />
+            <Trash2 width={14} height={14} />
           </IconButton>
         </div>
       </div>
 
-      {!expanded && (
-        <button
-          onClick={onToggleExpand}
-          className="text-left cursor-pointer flex flex-col gap-1"
-        >
-          <p className="text-sm text-text/90 line-clamp-2 break-words">
-            {session.title}
-          </p>
-          <span className="text-xs text-muted">
-            {t("settings.history.messageCount", {
-              count: session.messages.length,
-            })}
-          </span>
-        </button>
-      )}
-
       {expanded && (
-        <div className="flex flex-col gap-2 pt-0.5">
+        <div className="flex flex-col gap-2 pt-1.5 ps-[19px]">
           {session.messages.map((message, index) => {
             const { text, screenshot } = cleanMessageContent(message.content);
             const isUser = message.role === "user";
@@ -791,8 +792,8 @@ const AssistantHistoryEntryComponent: React.FC<AssistantHistoryEntryProps> = ({
                 <div
                   className={
                     isUser
-                      ? "max-w-[85%] rounded-2xl rounded-br-md bg-ink-soft px-3 py-2 text-sm leading-relaxed text-on-primary select-text whitespace-pre-wrap break-words"
-                      : "max-w-[85%] rounded-2xl rounded-bl-md border border-hairline-strong bg-surface-strong px-3 py-2 text-sm leading-relaxed text-ink select-text break-words shadow-[0_1px_2px_rgba(12,10,9,0.05)]"
+                      ? "max-w-[85%] rounded-xl rounded-br-sm bg-accent px-3 py-2 text-[13px] leading-relaxed text-on-primary select-text whitespace-pre-wrap break-words"
+                      : "max-w-[85%] rounded-xl rounded-bl-sm bg-surface-strong px-3 py-2 text-[13px] leading-relaxed text-ink select-text break-words"
                   }
                 >
                   {isUser ? (
@@ -806,7 +807,7 @@ const AssistantHistoryEntryComponent: React.FC<AssistantHistoryEntryProps> = ({
                     <span
                       className={`mt-1.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${
                         isUser
-                          ? "bg-on-primary/15 text-on-primary/80"
+                          ? "bg-on-primary/20 text-on-primary/90"
                           : "bg-mid-gray/15 text-muted"
                       }`}
                     >

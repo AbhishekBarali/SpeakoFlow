@@ -61,6 +61,14 @@ async changeThemeSetting(theme: string) : Promise<Result<null, string>> {
     else return { status: "error", error: e  as any };
 }
 },
+async changeUiTextSizeSetting(size: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("change_ui_text_size_setting", { size }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async changeStartHiddenSetting(enabled: boolean) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("change_start_hidden_setting", { enabled }) };
@@ -1654,7 +1662,7 @@ assistant_local_search_smart?: boolean;
  * API keys for the keyed search providers, keyed by provider id
  * ("serper", "brave", "tavily", "exa", "serpapi").
  */
-web_search_api_keys?: SecretMap; theme?: Theme }
+web_search_api_keys?: SecretMap; theme?: Theme; ui_text_size?: UiTextSize }
 /**
  * A persisted assistant conversation. One row per session; `messages` is the
  * ordered turn-by-turn transcript (the same `{role, content}` shape the
@@ -1940,6 +1948,12 @@ id: string;
  */
 label: string }
 export type TypingTool = "auto" | "wtype" | "kwtype" | "dotool" | "ydotool" | "xdotool"
+/**
+ * UI text size for the main window. Applied as a webview zoom factor so the
+ * whole interface scales together. Serialized snake_case ("default",
+ * "large", "extra_large") to match the values the settings dropdown uses.
+ */
+export type UiTextSize = "default" | "large" | "extra_large"
 export type WhisperAcceleratorSetting = "auto" | "cpu" | "gpu"
 export type WindowsMicrophonePermissionStatus = { supported: boolean; overall_access: PermissionAccess; device_access: PermissionAccess; app_access: PermissionAccess; desktop_app_access: PermissionAccess }
 

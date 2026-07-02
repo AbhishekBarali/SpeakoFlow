@@ -122,7 +122,7 @@ const Snip: React.FC = () => {
             border: "1px solid rgba(255, 255, 255, 0.1)",
             color: "#f5f5f4",
             fontFamily:
-              '"Plus Jakarta Sans", -apple-system, "Segoe UI", sans-serif',
+              '"Inter Variable", -apple-system, "Segoe UI", sans-serif',
             fontSize: 12.5,
             pointerEvents: "none",
           }}

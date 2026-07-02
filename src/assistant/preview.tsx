@@ -17,9 +17,7 @@ import AudioWaveform, {
 } from "@/components/shared/AudioWaveform";
 import "./AssistantPanel.css";
 
-import "@fontsource/plus-jakarta-sans/400.css";
-import "@fontsource/plus-jakarta-sans/500.css";
-import "@fontsource/plus-jakarta-sans/600.css";
+import "@fontsource-variable/inter";
 
 // THROWAWAY visual-verification harness for the collapsed assistant pill.
 // Not shipped — for eyeballing every pill state in a plain browser (no

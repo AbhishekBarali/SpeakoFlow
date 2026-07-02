@@ -114,17 +114,16 @@ const ModelCard: React.FC<ModelCardProps> = ({
   const formattedModelSize = formatModelSize(Number(model.size_mb));
 
   const baseClasses =
-    "flex flex-col rounded-2xl px-4 py-3.5 gap-2.5 text-left transition-all duration-200";
+    "flex flex-col rounded-xl px-4 py-3.5 gap-2.5 text-left transition-all duration-200";
 
   const getVariantClasses = () => {
     if (status === "active") {
-      // Selected state: a calm ink ring + faint lift, not a hard 2px slab.
-      // The solid "Active" badge carries the status; the card only needs to
-      // read as gently elevated and current.
-      return "border border-ink/25 bg-surface-strong ring-1 ring-ink/10 shadow-[0_1px_2px_rgba(12,10,9,0.05)]";
+      // Selected state: a quiet accent ring. The tinted "Active" badge
+      // carries the status; the card only needs to read as current.
+      return "border border-accent/50 bg-surface ring-1 ring-accent/25";
     }
     if (isFeatured) {
-      return "border border-ink/30 bg-surface shadow-[0_1px_2px_rgba(12,10,9,0.04)]";
+      return "border border-hairline-strong bg-surface";
     }
     return "border border-hairline bg-surface";
   };
@@ -132,7 +131,7 @@ const ModelCard: React.FC<ModelCardProps> = ({
   const getInteractiveClasses = () => {
     if (!isClickable) return "";
     if (disabled) return "opacity-50 cursor-not-allowed";
-    return "cursor-pointer hover:border-ink/40 hover:shadow-md group";
+    return "cursor-pointer hover:border-hairline-strong hover:shadow-[0_2px_8px_rgba(0,0,0,0.06)] group";
   };
 
   const handleClick = () => {
@@ -171,7 +170,7 @@ const ModelCard: React.FC<ModelCardProps> = ({
         <div className="flex flex-col items-start flex-1 min-w-0">
           <div className="flex items-center gap-3 flex-wrap">
             <h3
-              className={`text-base font-semibold text-text ${isClickable ? "group-hover:text-logo-primary" : ""} transition-colors`}
+              className={`text-sm font-semibold text-text ${isClickable ? "group-hover:text-accent" : ""} transition-colors`}
             >
               {displayName}
             </h3>
@@ -191,7 +190,7 @@ const ModelCard: React.FC<ModelCardProps> = ({
               </Badge>
             )}
           </div>
-          <p className="text-text/60 text-sm leading-relaxed">
+          <p className="text-text/60 text-[13px] leading-relaxed">
             {displayDescription}
           </p>
         </div>
@@ -251,7 +250,7 @@ const ModelCard: React.FC<ModelCardProps> = ({
             size="sm"
             onClick={handleDelete}
             title={t("modelSelector.deleteModel", { modelName: displayName })}
-            className="flex items-center gap-1.5 text-logo-primary/85 hover:text-logo-primary hover:bg-logo-primary/10"
+            className="flex items-center gap-1.5 text-muted hover:text-error hover:bg-error/10"
           >
             <Trash2 className="w-3.5 h-3.5" />
             <span>{t("common.delete")}</span>

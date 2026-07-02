@@ -20,7 +20,7 @@
     "postinstall": "bun scripts/check-nix-deps.ts"
   },
   "dependencies": {
-    "@fontsource/plus-jakarta-sans": "^5.2.8",
+    "@fontsource-variable/inter": "^5.2.8",
     "@tailwindcss/vite": "^4.1.16",
     "@tauri-apps/api": "^2.10.0",
     "@tauri-apps/plugin-autostart": "~2.5.1",

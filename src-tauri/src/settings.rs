@@ -371,6 +371,34 @@ impl Default for Theme {
     }
 }
 
+/// UI text size for the main window. Applied as a webview zoom factor so the
+/// whole interface scales together. Serialized snake_case ("default",
+/// "large", "extra_large") to match the values the settings dropdown uses.
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum UiTextSize {
+    Default,
+    Large,
+    ExtraLarge,
+}
+
+impl Default for UiTextSize {
+    fn default() -> Self {
+        UiTextSize::Default
+    }
+}
+
+impl UiTextSize {
+    /// Webview zoom factor for this size step.
+    pub fn zoom_factor(&self) -> f64 {
+        match self {
+            UiTextSize::Default => 1.0,
+            UiTextSize::Large => 1.1,
+            UiTextSize::ExtraLarge => 1.2,
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Type)]
 #[serde(rename_all = "snake_case")]
 pub enum TypingTool {
@@ -666,6 +694,8 @@ pub struct AppSettings {
     pub web_search_api_keys: SecretMap,
     #[serde(default)]
     pub theme: Theme,
+    #[serde(default)]
+    pub ui_text_size: UiTextSize,
 }
 
 fn default_model() -> String {
@@ -1465,6 +1495,7 @@ pub fn get_default_settings() -> AppSettings {
         assistant_local_search_smart: false,
         web_search_api_keys: default_web_search_api_keys(),
         theme: Theme::System,
+        ui_text_size: UiTextSize::default(),
     }
 }
 

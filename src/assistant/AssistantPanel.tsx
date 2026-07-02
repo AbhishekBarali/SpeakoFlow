@@ -32,11 +32,7 @@ import {
 import { commands, type AppSettings } from "@/bindings";
 import { syncLanguageFromSettings } from "@/i18n";
 import { AudioWaveform } from "@/components/shared";
-import {
-  FONT_SIZES,
-  errorKind,
-  type AssistantError,
-} from "./appearance";
+import { FONT_SIZES, errorKind, type AssistantError } from "./appearance";
 import { useKokoroTts } from "./useKokoroTts";
 import "./AssistantPanel.css";
 
@@ -673,7 +669,14 @@ const AssistantPanel: React.FC = () => {
     } finally {
       sendingRef.current = false;
     }
-  }, [input, busy, attachScreen, screenshotEnabled, pendingImages, pendingFiles]);
+  }, [
+    input,
+    busy,
+    attachScreen,
+    screenshotEnabled,
+    pendingImages,
+    pendingFiles,
+  ]);
 
   const clearConversation = useCallback(async () => {
     tts.stop();

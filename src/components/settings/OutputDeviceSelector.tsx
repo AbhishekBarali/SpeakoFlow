@@ -47,7 +47,6 @@ export const OutputDeviceSelector: React.FC<OutputDeviceSelectorProps> =
       return (
         <SettingContainer
           title={t("settings.sound.outputDevice.title")}
-          description={t("settings.sound.outputDevice.description")}
           descriptionMode={descriptionMode}
           grouped={grouped}
           disabled={disabled}

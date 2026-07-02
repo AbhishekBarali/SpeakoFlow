@@ -14,13 +14,13 @@ build signed updater artifacts and publish `latest.json`.
 SpeakoFlow uses the official [Tauri v2 updater plugin](https://v2.tauri.app/plugin/updater/).
 The moving parts, all wired up in this repo:
 
-| Piece | Where | Current value |
-|-------|-------|---------------|
-| Updater enabled | `src-tauri/tauri.conf.json` → `bundle.createUpdaterArtifacts` | `true` |
-| Public key | `tauri.conf.json` → `plugins.updater.pubkey` | a minisign public key (base64) |
-| Update feed URL | `tauri.conf.json` → `plugins.updater.endpoints` | `https://github.com/AbhishekBarali/SpeakoFlow/releases/latest/download/latest.json` |
-| Frontend UI | `src/components/update-checker/UpdateChecker.tsx` | "Check for updates" in the footer + tray |
-| Tray entry | `src-tauri/src/tray.rs` + `lib.rs` (`check_updates`) | emits `check-for-updates` |
+| Piece           | Where                                                         | Current value                                                                       |
+| --------------- | ------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| Updater enabled | `src-tauri/tauri.conf.json` → `bundle.createUpdaterArtifacts` | `true`                                                                              |
+| Public key      | `tauri.conf.json` → `plugins.updater.pubkey`                  | a minisign public key (base64)                                                      |
+| Update feed URL | `tauri.conf.json` → `plugins.updater.endpoints`               | `https://github.com/AbhishekBarali/SpeakoFlow/releases/latest/download/latest.json` |
+| Frontend UI     | `src/components/update-checker/UpdateChecker.tsx`             | "Check for updates" in the footer + tray                                            |
+| Tray entry      | `src-tauri/src/tray.rs` + `lib.rs` (`check_updates`)          | emits `check-for-updates`                                                           |
 
 **The runtime flow:**
 
@@ -114,11 +114,11 @@ Tauri produces the normal installers **plus** updater artifacts and a `.sig` fil
 for each (because `createUpdaterArtifacts: true`). Per platform, the updater cares
 about:
 
-| Platform | Updater artifact | Signature file |
-|----------|------------------|----------------|
+| Platform | Updater artifact         | Signature file        |
+| -------- | ------------------------ | --------------------- |
 | Windows  | `*_x64-setup.exe` (NSIS) | `*_x64-setup.exe.sig` |
-| macOS    | `*.app.tar.gz` | `*.app.tar.gz.sig` |
-| Linux    | `*.AppImage` | `*.AppImage.sig` |
+| macOS    | `*.app.tar.gz`           | `*.app.tar.gz.sig`    |
+| Linux    | `*.AppImage`             | `*.AppImage.sig`      |
 
 Artifacts land under `src-tauri/target/release/bundle/…`. Build on each OS you
 intend to ship (cross-compiling desktop installers is not practical).
@@ -155,6 +155,7 @@ intend to ship (cross-compiling desktop installers is not practical).
 ```
 
 Notes:
+
 - Only include the platforms you actually built and uploaded.
 - Every `url` must point at the uploaded release asset for that exact version.
 - `version` must be greater than the shipped version for clients to update.

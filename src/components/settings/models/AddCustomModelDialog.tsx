@@ -178,7 +178,7 @@ export const AddCustomModelDialog: React.FC<AddCustomModelDialogProps> = ({
       role="presentation"
     >
       <div
-        className="bg-surface border border-hairline rounded-2xl shadow-xl w-full max-w-xl max-h-[80vh] flex flex-col overflow-hidden"
+        className="bg-surface border border-hairline rounded-xl shadow-xl w-full max-w-xl max-h-[80vh] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
@@ -265,7 +265,7 @@ export const AddCustomModelDialog: React.FC<AddCustomModelDialogProps> = ({
                           type="checkbox"
                           checked={enableVision}
                           onChange={(e) => setEnableVision(e.target.checked)}
-                          className="mt-0.5 accent-ink"
+                          className="mt-0.5 accent-accent"
                         />
                         <span className="flex flex-col">
                           <span className="text-sm text-ink">
@@ -278,7 +278,7 @@ export const AddCustomModelDialog: React.FC<AddCustomModelDialogProps> = ({
                       </label>
                     )}
 
-                    <p className="text-[11px] font-semibold text-muted uppercase tracking-[0.1em] pt-1">
+                    <p className="text-[13px] font-semibold text-ink pt-1">
                       {t("settings.models.customModel.selectQuant")}
                     </p>
 

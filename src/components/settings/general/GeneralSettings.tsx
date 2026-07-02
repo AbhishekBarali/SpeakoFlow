@@ -8,6 +8,7 @@ import { MoreOptions } from "../../ui/MoreOptions";
 import { OutputDeviceSelector } from "../OutputDeviceSelector";
 import { AudioFeedback } from "../AudioFeedback";
 import { AppearanceSelector } from "../AppearanceSelector";
+import { TextSizeSelector } from "../TextSizeSelector";
 import { useSettings } from "../../../hooks/useSettings";
 import { VolumeSlider } from "../VolumeSlider";
 import { MuteWhileRecording } from "../MuteWhileRecording";
@@ -18,12 +19,15 @@ export const GeneralSettings: React.FC = () => {
   const { audioFeedbackEnabled } = useSettings();
   const isLinux = type() === "linux";
   return (
-    <div className="max-w-3xl w-full mx-auto space-y-8">
-      <SettingsGroup>
+    <div className="max-w-2xl w-full mx-auto space-y-8">
+      <SettingsGroup title={t("settings.general.shortcut.title")}>
         <ShortcutInput shortcutId="transcribe" grouped={true} />
         {/* Cancel shortcut is hidden on Linux (dynamic shortcut instability). */}
         {!isLinux && <ShortcutInput shortcutId="cancel" grouped={true} />}
+      </SettingsGroup>
+      <SettingsGroup title={t("appearance.title")}>
         <AppearanceSelector descriptionMode="tooltip" grouped={true} />
+        <TextSizeSelector grouped={true} />
       </SettingsGroup>
       <ModelSettingsCard />
       <SettingsGroup title={t("settings.sound.title")}>

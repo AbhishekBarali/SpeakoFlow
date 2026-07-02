@@ -23,7 +23,7 @@ use tauri_plugin_autostart::ManagerExt;
 use crate::settings::APPLE_INTELLIGENCE_DEFAULT_MODEL_ID;
 use crate::settings::{
     self, get_settings, AutoSubmitKey, ClipboardHandling, KeyboardImplementation, LLMPrompt,
-    OverlayPosition, PasteMethod, ShortcutBinding, SoundTheme, Theme, TypingTool,
+    OverlayPosition, PasteMethod, ShortcutBinding, SoundTheme, Theme, TypingTool, UiTextSize,
     APPLE_INTELLIGENCE_PROVIDER_ID,
 };
 use crate::tray;
@@ -555,6 +555,32 @@ pub fn change_theme_setting(app: AppHandle, theme: String) -> Result<(), String>
     // Without it, toggling light/dark in settings leaves the panel stuck on
     // whatever theme it loaded with.
     let _ = app.emit("assistant-settings-changed", ());
+
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn change_ui_text_size_setting(app: AppHandle, size: String) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    let parsed = match size.as_str() {
+        "default" => UiTextSize::Default,
+        "large" => UiTextSize::Large,
+        "extra_large" => UiTextSize::ExtraLarge,
+        other => {
+            warn!("Invalid UI text size '{}', defaulting to default", other);
+            UiTextSize::Default
+        }
+    };
+    settings.ui_text_size = parsed;
+    settings::write_settings(&app, settings);
+
+    // Apply immediately (webview zoom) so the change is visible without a
+    // restart. Only the main settings window scales — the overlay and the
+    // assistant panel have their own, purpose-built sizing.
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.set_zoom(parsed.zoom_factor());
+    }
 
     Ok(())
 }

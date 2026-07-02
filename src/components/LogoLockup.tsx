@@ -18,7 +18,7 @@ interface LogoLockupProps {
  * The whole lockup sits on a transparent background: the mark fills via
  * `currentColor` and the wordmark inherits the same color, so pairing the
  * wrapper with `text-ink` makes both adapt to light/dark automatically. The
- * wordmark is set in Plus Jakarta Sans ExtraBold (`.font-brand`) to match the
+ * wordmark is set in Inter semibold (`.font-brand`) to match the
  * geometric sans of the reference art.
  */
 export const LogoLockup: React.FC<LogoLockupProps> = ({

@@ -5,7 +5,7 @@
     "": {
       "name": "handy-app",
       "dependencies": {
-        "@fontsource/plus-jakarta-sans": "^5.2.8",
+        "@fontsource-variable/inter": "^5.2.8",
         "@tailwindcss/vite": "^4.1.16",
         "@tauri-apps/api": "^2.10.0",
         "@tauri-apps/plugin-autostart": "~2.5.1",
@@ -194,7 +194,7 @@
 
     "@floating-ui/utils": ["@floating-ui/utils@0.2.10", "", {}, "sha512-aGTxbpbg8/b5JfU1HXSrbH3wXZuLPJcNEcZQFMxLs3oSzgtVu6nFPkbbGGUvBcUjKV2YyB9Wxxabo+HEH9tcRQ=="],
 
-    "@fontsource/plus-jakarta-sans": ["@fontsource/plus-jakarta-sans@5.2.8", "", {}, "sha512-P5qE49fqdeD+7DXH1KBxmMPlB17LTz1zvBhFH0tFzfnYTKVJVyb0pR6plh0ZGXxcB+Oayb54FZZw3V42/DawTw=="],
+    "@fontsource-variable/inter": ["@fontsource-variable/inter@5.2.8", "", {}, "sha512-kOfP2D+ykbcX/P3IFnokOhVRNoTozo5/JxhAIVYLpea/UBmCQ/YWPBfWIDuBImXX/15KH+eKh4xpEUyS2sQQGQ=="],
 
     "@huggingface/jinja": ["@huggingface/jinja@0.5.9", "", {}, "sha512-uWTG+l3VJRsl7EXxYizuL3P+cCPoc3cRqbWWRcQN0FhejRfbdq0RNhCmbY/YDtnTcz9icdLYuLDjsnz4d8JMuw=="],
 

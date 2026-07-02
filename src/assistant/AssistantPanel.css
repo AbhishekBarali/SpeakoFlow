@@ -42,7 +42,7 @@
 
   --as-msg-font: 13.5px;
   --as-font:
-    "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont,
+    "Inter Variable", -apple-system, BlinkMacSystemFont,
     "Segoe UI Variable Text", "Segoe UI", Roboto, sans-serif;
 
   color: var(--as-ink);
@@ -230,7 +230,9 @@
   border: none;
   border-radius: 50%;
   background: var(--as-chip-surface);
-  box-shadow: 0 0 0 1px var(--as-hairline), 0 0 6px 5px var(--as-chip-surface);
+  box-shadow:
+    0 0 0 1px var(--as-hairline),
+    0 0 6px 5px var(--as-chip-surface);
   color: var(--as-muted);
   display: flex;
   align-items: center;
@@ -288,7 +290,9 @@
   color: var(--as-chip-surface);
   box-shadow: 0 0 0 2px var(--as-chip-surface);
   cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
 }
 
 .apill-screen .apill-screen-off {

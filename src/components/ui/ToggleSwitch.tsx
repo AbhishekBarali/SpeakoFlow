@@ -7,7 +7,9 @@ interface ToggleSwitchProps {
   disabled?: boolean;
   isUpdating?: boolean;
   label: string;
-  description: string;
+  description?: string;
+  /** Deep-dive help behind the (i) hint. */
+  info?: string;
   descriptionMode?: "inline" | "tooltip";
   grouped?: boolean;
   tooltipPosition?: "top" | "bottom";
@@ -20,6 +22,7 @@ export const ToggleSwitch: React.FC<ToggleSwitchProps> = ({
   isUpdating = false,
   label,
   description,
+  info,
   descriptionMode = "tooltip",
   grouped = false,
   tooltipPosition = "top",
@@ -28,6 +31,7 @@ export const ToggleSwitch: React.FC<ToggleSwitchProps> = ({
     <SettingContainer
       title={label}
       description={description}
+      info={info}
       descriptionMode={descriptionMode}
       grouped={grouped}
       disabled={disabled}
@@ -44,7 +48,7 @@ export const ToggleSwitch: React.FC<ToggleSwitchProps> = ({
           disabled={disabled || isUpdating}
           onChange={(e) => onChange(e.target.checked)}
         />
-        <div className="relative w-11 h-6 bg-hairline-strong peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-ink/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:shadow-sm after:transition-all peer-checked:bg-toggle-track-on peer-checked:after:bg-toggle-knob-on peer-disabled:opacity-50"></div>
+        <div className="relative w-[42px] h-[26px] bg-hairline-strong peer-focus-visible:outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-accent/40 rounded-full peer peer-checked:after:translate-x-4 rtl:peer-checked:after:-translate-x-4 after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:rounded-full after:h-[22px] after:w-[22px] after:shadow-[0_1px_2px_rgba(0,0,0,0.2)] after:transition-transform after:duration-200 after:ease-out transition-colors duration-200 peer-checked:bg-toggle-track-on peer-checked:after:bg-toggle-knob-on peer-disabled:opacity-50"></div>
       </label>
       {isUpdating && (
         <div className="absolute inset-0 flex items-center justify-center">

@@ -68,7 +68,9 @@ smaller, quieter option. It should stay a **simple assistant**.
 ## 2. Ground truth (facts you can rely on — so you don't re-derive or guess)
 
 ### The STT overlay = the design target
+
 `src/overlay/RecordingOverlay.css`:
+
 - Surface `rgba(24,22,20,0.94)`; border `1px solid rgba(255,255,255,0.08)`.
 - Depth comes from inner highlights, **not** a drop shadow (the window is
   transparent): `inset 0 1px 0 rgba(255,255,255,0.07), inset 0 0 0 0.5px rgba(0,0,0,0.4)`.
@@ -81,10 +83,12 @@ smaller, quieter option. It should stay a **simple assistant**.
   `Cancel · waveform · Done(✓)`.
 
 ### Shared waveform component (reuse it — don't rebuild)
+
 `<AudioWaveform levels={number[]} size="sm"|"md" barCount={n} active={bool} mode="reactive"|"shimmer"|"flow" />`
 from `@/components/shared`.
 
 ### Current assistant window (what you're replacing)
+
 - Frontend: `src/assistant/AssistantPanel.tsx`, `AssistantPanel.css`, `main.tsx`,
   `useKokoroTts.ts` (+ a preview harness — ignore/remove `shoot.mjs`).
 - Rust: `src-tauri/src/assistant.rs` (window + pipeline),
@@ -102,12 +106,14 @@ from `@/components/shared`.
 - Non-vision-provider detection exists (`is_vision_unsupported_error`) — reuse it.
 
 ### The opacity bug
+
 In `AssistantPanel.css`:
 `--panel-surface: rgb(253 252 250 / calc(0.97 * var(--panel-alpha)))`. The `0.97`
 cap means the surface is **never fully opaque**, so even at "100%" the transparent
 window shows through. Max opacity must be **fully opaque**.
 
 ### Customization to REMOVE (product decision)
+
 The 6 accent colors (`violet/blue/emerald/rose/amber/mono`), the accent "orb"
 glow, the **opacity slider**, and the **size presets**. Keep only **light/dark**
 (assistant-window scoped) and, if trivial, text size. Remove the matching
@@ -120,6 +126,7 @@ panel so they can't drift.
 ## 3. Design decisions (product requirements)
 
 ### 3.1 The small pill — a voice HUD (collapsed = default state)
+
 - **Voice only.** No text input or search on the pill; typing lives in the
   expanded panel.
 - **As small and calm as the STT overlay** (match its tokens in dark; a warm
@@ -142,6 +149,7 @@ panel so they can't drift.
 - Drag to move; position persists (already implemented — keep it).
 
 ### 3.2 The expanded panel — minimal but complete
+
 - **One fixed, comfortable size** (no presets); draggable; position persists.
   **Nothing may clip** at that size in either theme.
 - **Opacity bug fixed** (fully opaque at max).
@@ -155,6 +163,7 @@ panel so they can't drift.
   dark. No accent orb, no saturated chrome.
 
 ### 3.3 Motion & accessibility
+
 - Subtle animation; honor `prefers-reduced-motion` (both windows already do).
 - Preserve `role="status"` / `aria-label` on the pill and accessible names on
   all icon buttons (via i18n).
@@ -169,6 +178,7 @@ went wrong** and, where useful, what to do next. Never a silent no-op, a spinner
 that never resolves, or a raw stack/error dump.
 
 Cover at least:
+
 - **Microphone** unavailable, in use, or permission denied.
 - **No assistant model** configured or loaded (and it's needed).
 - **LLM / provider** errors: auth/API-key, rate limit, network/timeout, and
@@ -178,6 +188,7 @@ Cover at least:
 - **Screenshot / region capture** failure.
 
 Rules:
+
 - Show errors **where the user is looking**: the pill for the compact state, the
   panel for the expanded state (a compact pill error should be readable without
   forcing an expand).
@@ -195,6 +206,7 @@ and let the human eyeball it in `bun run tauri dev` before continuing. Phase 6
 may be a **separate session**.
 
 ### Phase 0 — Orientation (no code)
+
 **Goal:** understand the current assistant window, the STT overlay, the window
 sizing + pipeline in `assistant.rs`, the `assistant_*` settings, the screen-vision
 path, and how `bindings.ts` regenerates — enough to confirm this brief against
@@ -203,6 +215,7 @@ reality.
 here that conflicts with the code, and the human agrees before you edit.
 
 ### Phase 1 — Shared foundation, decluttered, opacity fixed
+
 **Goal:** the assistant window shares one visual language with the STT overlay
 (dark near-black glass + a light variant), with accents / orb / opacity-slider /
 size-presets removed and the opacity bug fixed. The Panel Appearance settings and
@@ -212,6 +225,7 @@ opacity is truly opaque; only light/dark (+ optional text size) remain;
 pre-existing stored settings still load without error.
 
 ### Phase 2 — The small voice pill
+
 **Goal:** deliver §3.1 — a voice-only pill as small and calm as the STT overlay,
 state carried by the waveform, hover-to-cancel, idle-hover to expand/close,
 hands-free lock with cancel+done, and a sticky screen-vision badge you can
@@ -221,6 +235,7 @@ themes; you can cancel an in-flight turn and close the pill **without** expandin
 drag + position persistence still work; nothing clips.
 
 ### Phase 3 — The expanded panel
+
 **Goal:** deliver §3.2 — one fixed, comfortable, non-clipping chat window in the
 same language, all features present and quiet, opacity fixed, both themes, theme
 control only in settings.
@@ -228,7 +243,9 @@ control only in settings.
 with the pill; position persists; nothing clips in either theme.
 
 ### Phase 4 — See things: images, files, and focused screen vision
+
 **Goal:** make the expanded panel able to chat about visual/document context:
+
 - **Attach images** (button, paste, and drag-drop) and **text/pdf/code files** as
   context.
 - **Region screenshot:** the screen-vision capture should let the user **draw a
@@ -237,21 +254,23 @@ with the pill; position persists; nothing clips in either theme.
   control, no new hotkey. (Builds on the existing screenshot pipeline —
   `screenshot.rs` + the image assembly in `assistant.rs`.)
 - Screen vision is **sticky** and clearly indicated (per §3.1).
-Reuse the existing image pipeline and respect its size budget; handle non-vision
-providers per §4.
-**Done when:** you can attach/paste/drag an image or file and get a grounded
-answer; you can snip a region and ask about it; sticky vision persists across
-turns and is visible; oversized inputs and unsupported providers produce clear
-errors (per §4).
+  Reuse the existing image pipeline and respect its size budget; handle non-vision
+  providers per §4.
+  **Done when:** you can attach/paste/drag an image or file and get a grounded
+  answer; you can snip a region and ask about it; sticky vision persists across
+  turns and is visible; oversized inputs and unsupported providers produce clear
+  errors (per §4).
 
 ### Phase 5 — Conversation quality-of-life
+
 **Goal:** **Regenerate** and **Continue** on the last answer; a **/summarize**
 action that keeps long chats coherent (the only slash-command — don't build a
 broader system); **per-code-block copy** (keep copy-whole-answer too).
 **Done when:** regenerate/continue work on the latest turn, summarize keeps a
 long conversation usable, and code blocks are individually copyable.
 
-### Phase 6 — Resume past conversations from History  *(may be a separate session)*
+### Phase 6 — Resume past conversations from History _(may be a separate session)_
+
 **Goal:** close the gap where assistant history exists but you can't reopen it —
 select a past conversation in History and resume it in the panel. (Relevant code:
 `managers/history.rs`, the conversation state in `assistant.rs`,

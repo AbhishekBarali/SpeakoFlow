@@ -1,4 +1,5 @@
 export { Dropdown } from "./Dropdown";
+export { MoreOptions } from "./MoreOptions";
 export { Slider } from "./Slider";
 export { ToggleSwitch } from "./ToggleSwitch";
 export { SettingContainer } from "./SettingContainer";

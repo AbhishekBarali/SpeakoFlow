@@ -1,0 +1,17 @@
+{
+  "name": "speakoflow-logo-tools",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Tooling to generate SpeakoFlow logo assets at standard sizes",
+  "scripts": {
+    "bbox": "node compute-bbox.mjs",
+    "build": "node build-logos.mjs"
+  },
+  "dependencies": {
+    "opentype.js": "^2.0.0",
+    "png-to-ico": "^3.0.1",
+    "sharp": "^0.35.3",
+    "svg-path-bounds": "^1.0.2"
+  }
+}

@@ -11,11 +11,11 @@ actual code, and (3) give a **recommended order of attack** at the end.
 
 ## The three features
 
-| # | Feature | Upstream PR | Effort | Build independently? |
-|---|---------|-------------|--------|----------------------|
-| 1 | Deterministic text replacements (find/replace + magic commands) | #455 / #1533 | Medium | ✅ Yes — isolated hook |
-| 2 | Secure API-key storage in OS keychain | #814 | Low-Medium | ✅ Yes — orthogonal to the pipeline |
-| 3 | Eager / streaming transcription (transcribe while recording) | #1515 | High | ❌ No — rewrites the shared core |
+| #   | Feature                                                         | Upstream PR  | Effort     | Build independently?                |
+| --- | --------------------------------------------------------------- | ------------ | ---------- | ----------------------------------- |
+| 1   | Deterministic text replacements (find/replace + magic commands) | #455 / #1533 | Medium     | ✅ Yes — isolated hook              |
+| 2   | Secure API-key storage in OS keychain                           | #814         | Low-Medium | ✅ Yes — orthogonal to the pipeline |
+| 3   | Eager / streaming transcription (transcribe while recording)    | #1515        | High       | ❌ No — rewrites the shared core    |
 
 **Bottom line:** #1 and #2 can each be built on their own branch, in parallel, merged in
 any order (zero file overlap). #3 rewrites the recording→transcription core, so it must
@@ -69,6 +69,7 @@ Instant, offline, deterministic — complements (does not duplicate) the existin
 post-processing. Today `custom_words` is only a single-word dictionary, so this is a real gap.
 
 ### What needs to be done
+
 - **Settings (`settings.rs`)**
   - Add `replacements_enabled: bool` and `text_replacements: Vec<Replacement>`.
   - `Replacement { search, replace, is_regex, enabled, trim_*, capitalization }` with
@@ -93,6 +94,7 @@ post-processing. Today `custom_words` is only a single-word dictionary, so this 
     without confirmation.
 
 ### Independence
+
 **Fully independent.** Touches `actions.rs` (one function), `settings.rs`, a new transform
 module, and new UI. Does **not** touch the recording pipeline, the transcribe API, or API
 keys. Safe to build in parallel with everything else.
@@ -107,6 +109,7 @@ We now hold many keys (OpenAI, Anthropic, Groq, OpenRouter, Z.AI, Cerebras, Bedr
 ElevenLabs, Brave, Firecrawl), so this matters — but it can be kept simple.
 
 ### Can it be done independently? — YES, and kept simple
+
 It is **orthogonal to the transcription pipeline** and to #1/#3. It only touches
 `settings.rs` plus the small, already-enumerated set of read/write sites. Recommended
 minimal-blast-radius design that **keeps all 4 read sites unchanged**:
@@ -125,16 +128,18 @@ minimal-blast-radius design that **keeps all 4 read sites unchanged**:
    into the keychain and strip them from the JSON.
 
 ### Keep it simple (scope guardrails)
+
 - ✅ Use the OS keychain primitive directly via `keyring`. That's the whole feature.
 - ⚠️ **Hot-path caveat:** `get_settings()` runs on every action. Do **not** hit the keychain
   on every call — hydrate once into an in-memory cache (`OnceCell`/`Mutex`) and update the
-  cache on write. This is the one correctness detail that keeps it both simple *and* fast.
+  cache on write. This is the one correctness detail that keeps it both simple _and_ fast.
 - ❌ Don't over-build: no custom encryption envelopes, no master-password vault, no rotation
   system. The OS keychain is the trust boundary.
 - 🔻 Linux fallback: Secret Service may be absent on headless/minimal setups — fall back to
   the current store with a logged warning so the app still runs.
 
 ### Independence
+
 **Fully independent.** No overlap with the pipeline or #1. Build it whenever; it pairs
 naturally alongside #1.
 
@@ -146,6 +151,7 @@ Transcribe segments **while** recording so text appears almost immediately. Bigg
 perceived-latency win, but it restructures the core.
 
 ### What needs to be done
+
 - **Audio recorder (`audio_toolkit/audio/recorder.rs`)** — emit rolling audio chunks during
   capture (not just one buffer at stop).
 - **Transcription manager (`managers/transcription.rs`)** — add incremental/segment
@@ -159,9 +165,11 @@ perceived-latency win, but it restructures the core.
   partials. Keep the replacement pass in `process_transcription_output` (the finalize path).
 
 ### Independence
+
 **Not independent.** It rewrites the recorder + transcription manager + coordinator + actions
-+ overlay — the shared core. High risk. Must be done **last and alone**, after #1/#2 are
-merged and stable.
+
+- overlay — the shared core. High risk. Must be done **last and alone**, after #1/#2 are
+  merged and stable.
 
 ---
 
@@ -187,6 +195,7 @@ Build in small, independently mergeable branches. Each phase ships on its own an
 verifiable (build + targeted test) before the next.
 
 **Phase A — quick, independent wins (parallel-safe)**
+
 1. **#2 Secure API-key storage** first. It's contained, low-risk, high-trust, and gets the
    security upgrade in before more secrets accumulate. Land the in-memory cache + migration.
 2. **#1 Text replacements** alongside it. Different files, zero conflict. Ship literal +
@@ -194,12 +203,12 @@ verifiable (build + targeted test) before the next.
 
 > A is a clean first PR pair: one security branch, one feature branch, no shared files.
 
-**Phase B — the core rewrite (last, alone)**
-3. **#3 Streaming transcription.** Only after Phase A is merged and stable. Expect to touch
-   the recorder, transcription manager, coordinator, actions, and overlay. Confirm #1's
-   replacement pass still runs on the finalized text.
+**Phase B — the core rewrite (last, alone)** 3. **#3 Streaming transcription.** Only after Phase A is merged and stable. Expect to touch
+the recorder, transcription manager, coordinator, actions, and overlay. Confirm #1's
+replacement pass still runs on the finalized text.
 
 **Per-phase checklist**
+
 - New `settings.rs` fields get `#[serde(default)]` + a default fn (back-compat with existing stores).
 - Regenerate `bindings.ts` (tauri-specta) and add `settingsStore.ts` updaters for any new setting.
 - All user-facing strings go through i18n (ESLint enforces it).

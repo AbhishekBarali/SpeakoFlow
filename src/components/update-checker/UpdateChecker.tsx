@@ -222,8 +222,7 @@ const UpdateChecker: React.FC<UpdateCheckerProps> = ({ className = "" }) => {
   const hasError = errorState !== null;
   const isUpdateDisabled = !updateChecksEnabled || isChecking || isInstalling;
   const isUpdateClickable =
-    !isUpdateDisabled &&
-    (updateAvailable || hasError || !showUpToDate);
+    !isUpdateDisabled && (updateAvailable || hasError || !showUpToDate);
 
   return (
     <>
@@ -244,9 +243,11 @@ const UpdateChecker: React.FC<UpdateCheckerProps> = ({ className = "" }) => {
                 {t("common.close")}
               </button>
               <button
-                className="px-3 py-1.5 text-sm rounded bg-logo-primary text-white hover:bg-logo-primary/80 transition-colors"
+                className="px-3 py-1.5 text-sm rounded-lg bg-accent text-on-primary hover:bg-accent-strong transition-colors"
                 onClick={() => {
-                  openUrl("https://github.com/AbhishekBarali/SpeakoFlow/releases/latest");
+                  openUrl(
+                    "https://github.com/AbhishekBarali/SpeakoFlow/releases/latest",
+                  );
                   setShowPortableUpdateDialog(false);
                 }}
               >

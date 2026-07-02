@@ -10,6 +10,7 @@ import {
 } from "@/bindings";
 import {
   Dropdown,
+  MoreOptions,
   SettingContainer,
   SettingsGroup,
   Slider,
@@ -203,7 +204,14 @@ const PanelPreview: React.FC<{
           </div>
         </div>
         <div className="assistant-input-row">
-          <div className="assistant-input" style={{ display: "flex", alignItems: "center", color: "var(--as-faint)" }}>
+          <div
+            className="assistant-input"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              color: "var(--as-faint)",
+            }}
+          >
             {t("assistant.inputPlaceholder")}
           </div>
           <span className="assistant-send-button">
@@ -553,8 +561,7 @@ export const AssistantSettings: React.FC = () => {
   };
 
   // --- Web search ---------------------------------------------------------
-  const webSearchProvider =
-    settings?.assistant_web_search_provider ?? "serper";
+  const webSearchProvider = settings?.assistant_web_search_provider ?? "serper";
   const webSearchEnabled = settings?.assistant_web_search_enabled ?? false;
   const webSearchNeedsKey =
     webSearchProvider === "serper" ||
@@ -604,7 +611,7 @@ export const AssistantSettings: React.FC = () => {
   };
 
   return (
-    <div className="max-w-3xl w-full mx-auto space-y-8">
+    <div className="max-w-2xl w-full mx-auto space-y-8">
       <SettingsGroup title={t("settings.assistant.shortcuts.title")}>
         <ShortcutInput shortcutId="assistant" grouped={true} />
         <ShortcutInput shortcutId="assistant_panel_toggle" grouped={true} />
@@ -613,8 +620,6 @@ export const AssistantSettings: React.FC = () => {
       <SettingsGroup title={t("settings.assistant.provider.title")}>
         <SettingContainer
           title={t("settings.assistant.provider.providerLabel")}
-          description={t("settings.assistant.provider.providerDescription")}
-          descriptionMode="tooltip"
           layout="horizontal"
           grouped={true}
         >
@@ -628,8 +633,7 @@ export const AssistantSettings: React.FC = () => {
         {selectedProvider?.allow_base_url_edit && (
           <SettingContainer
             title={t("settings.assistant.provider.baseUrlLabel")}
-            description={t("settings.assistant.provider.baseUrlDescription")}
-            descriptionMode="tooltip"
+            info={t("settings.assistant.provider.baseUrlDescription")}
             layout="horizontal"
             grouped={true}
           >
@@ -647,8 +651,7 @@ export const AssistantSettings: React.FC = () => {
         {!isBuiltin && (
           <SettingContainer
             title={t("settings.assistant.provider.apiKeyLabel")}
-            description={t("settings.assistant.provider.apiKeyDescription")}
-            descriptionMode="tooltip"
+            info={t("settings.assistant.provider.apiKeyDescription")}
             layout="horizontal"
             grouped={true}
           >
@@ -666,10 +669,6 @@ export const AssistantSettings: React.FC = () => {
         {isBuiltin ? (
           <SettingContainer
             title={t("settings.assistant.provider.modelLabel")}
-            description={t(
-              "settings.assistant.provider.builtinModelDescription",
-            )}
-            descriptionMode="tooltip"
             layout="horizontal"
             grouped={true}
           >
@@ -714,8 +713,6 @@ export const AssistantSettings: React.FC = () => {
         ) : (
           <SettingContainer
             title={t("settings.assistant.provider.modelLabel")}
-            description={t("settings.assistant.provider.modelDescription")}
-            descriptionMode="tooltip"
             layout="horizontal"
             grouped={true}
           >
@@ -739,10 +736,7 @@ export const AssistantSettings: React.FC = () => {
         {isBuiltin && (
           <SettingContainer
             title={t("settings.assistant.provider.contextSizeLabel")}
-            description={t(
-              "settings.assistant.provider.contextSizeDescription",
-            )}
-            descriptionMode="tooltip"
+            info={t("settings.assistant.provider.contextSizeDescription")}
             layout="horizontal"
             grouped={true}
           >
@@ -767,7 +761,7 @@ export const AssistantSettings: React.FC = () => {
             setAndRefresh(commands.setAssistantScreenshotEnabled(checked))
           }
           label={t("settings.assistant.vision.enableLabel")}
-          description={t("settings.assistant.vision.enableDescription")}
+          info={t("settings.assistant.vision.enableDescription")}
           grouped={true}
         />
       </SettingsGroup>
@@ -779,17 +773,13 @@ export const AssistantSettings: React.FC = () => {
             setAndRefresh(commands.setAssistantWebSearchEnabled(checked))
           }
           label={t("settings.assistant.webSearch.enableLabel")}
-          description={t("settings.assistant.webSearch.enableDescription")}
           grouped={true}
         />
         {webSearchEnabled && (
           <>
             <SettingContainer
               title={t("settings.assistant.webSearch.providerLabel")}
-              description={t(
-                "settings.assistant.webSearch.providerDescription",
-              )}
-              descriptionMode="tooltip"
+              info={t("settings.assistant.webSearch.providerDescription")}
               layout="horizontal"
               grouped={true}
             >
@@ -829,10 +819,6 @@ export const AssistantSettings: React.FC = () => {
             {webSearchNeedsKey && (
               <SettingContainer
                 title={t("settings.assistant.webSearch.apiKeyLabel")}
-                description={t(
-                  "settings.assistant.webSearch.apiKeyDescription",
-                )}
-                descriptionMode="tooltip"
                 layout="horizontal"
                 grouped={true}
               >
@@ -851,62 +837,7 @@ export const AssistantSettings: React.FC = () => {
             )}
 
             <SettingContainer
-              title={t("settings.assistant.webSearch.depthLabel")}
-              description={t("settings.assistant.webSearch.depthDescription")}
-              descriptionMode="tooltip"
-              layout="horizontal"
-              grouped={true}
-            >
-              <Dropdown
-                options={[
-                  {
-                    value: "low",
-                    label: t("settings.assistant.webSearch.depthOptions.low"),
-                  },
-                  {
-                    value: "medium",
-                    label: t(
-                      "settings.assistant.webSearch.depthOptions.medium",
-                    ),
-                  },
-                  {
-                    value: "high",
-                    label: t("settings.assistant.webSearch.depthOptions.high"),
-                  },
-                ]}
-                selectedValue={settings?.assistant_search_depth ?? "medium"}
-                onSelect={(depth) =>
-                  setAndRefresh(
-                    commands.setAssistantSearchDepth(
-                      depth as AssistantSearchDepth,
-                    ),
-                  )
-                }
-                disabled={!webSearchEnabled}
-              />
-            </SettingContainer>
-
-            {settings?.assistant_provider_id === "builtin" && (
-              <ToggleSwitch
-                checked={settings?.assistant_local_search_smart ?? false}
-                onChange={(checked) =>
-                  setAndRefresh(
-                    commands.setAssistantLocalSearchSmart(checked),
-                  )
-                }
-                label={t("settings.assistant.webSearch.localSmartLabel")}
-                description={t(
-                  "settings.assistant.webSearch.localSmartDescription",
-                )}
-                grouped={true}
-                disabled={!webSearchEnabled}
-              />
-            )}
-
-            <SettingContainer
               title={t("settings.assistant.webSearch.testLabel")}
-              description={t("settings.assistant.webSearch.testDescription")}
-              descriptionMode="tooltip"
               layout="horizontal"
               grouped={true}
             >
@@ -915,7 +846,7 @@ export const AssistantSettings: React.FC = () => {
                   type="button"
                   onClick={handleTestWebSearch}
                   disabled={!webSearchEnabled || webSearchTest === "testing"}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-mid-gray/30 hover:bg-mid-gray/10 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-hairline-strong bg-surface hover:bg-surface-strong disabled:opacity-50 disabled:cursor-not-allowed text-[13px] font-medium cursor-pointer transition-colors"
                 >
                   <Globe size={14} />
                   {webSearchTest === "testing"
@@ -926,7 +857,7 @@ export const AssistantSettings: React.FC = () => {
                   <span
                     className={`text-xs max-w-[360px] text-right break-words ${
                       webSearchTest === "error"
-                        ? "text-red-500"
+                        ? "text-error"
                         : "text-muted-soft"
                     }`}
                   >
@@ -935,6 +866,60 @@ export const AssistantSettings: React.FC = () => {
                 )}
               </div>
             </SettingContainer>
+
+            <MoreOptions>
+              <SettingContainer
+                title={t("settings.assistant.webSearch.depthLabel")}
+                info={t("settings.assistant.webSearch.depthDescription")}
+                layout="horizontal"
+                grouped={true}
+              >
+                <Dropdown
+                  options={[
+                    {
+                      value: "low",
+                      label: t("settings.assistant.webSearch.depthOptions.low"),
+                    },
+                    {
+                      value: "medium",
+                      label: t(
+                        "settings.assistant.webSearch.depthOptions.medium",
+                      ),
+                    },
+                    {
+                      value: "high",
+                      label: t(
+                        "settings.assistant.webSearch.depthOptions.high",
+                      ),
+                    },
+                  ]}
+                  selectedValue={settings?.assistant_search_depth ?? "medium"}
+                  onSelect={(depth) =>
+                    setAndRefresh(
+                      commands.setAssistantSearchDepth(
+                        depth as AssistantSearchDepth,
+                      ),
+                    )
+                  }
+                  disabled={!webSearchEnabled}
+                />
+              </SettingContainer>
+
+              {settings?.assistant_provider_id === "builtin" && (
+                <ToggleSwitch
+                  checked={settings?.assistant_local_search_smart ?? false}
+                  onChange={(checked) =>
+                    setAndRefresh(
+                      commands.setAssistantLocalSearchSmart(checked),
+                    )
+                  }
+                  label={t("settings.assistant.webSearch.localSmartLabel")}
+                  info={t("settings.assistant.webSearch.localSmartDescription")}
+                  grouped={true}
+                  disabled={!webSearchEnabled}
+                />
+              )}
+            </MoreOptions>
           </>
         )}
       </SettingsGroup>
@@ -946,26 +931,13 @@ export const AssistantSettings: React.FC = () => {
             setAndRefresh(commands.setAssistantTtsEnabled(checked))
           }
           label={t("settings.assistant.tts.enableLabel")}
-          description={t("settings.assistant.tts.enableDescription")}
           grouped={true}
         />
         {settings?.assistant_tts_enabled && (
           <>
-            <ToggleSwitch
-              checked={settings?.assistant_tts_stop_on_dictation ?? false}
-              onChange={(checked) =>
-                setAndRefresh(
-                  commands.setAssistantTtsStopOnDictation(checked),
-                )
-              }
-              label={t("settings.assistant.tts.stopOnDictationLabel")}
-              description={t("settings.assistant.tts.stopOnDictationDescription")}
-              grouped={true}
-            />
             <SettingContainer
               title={t("settings.assistant.tts.engineLabel")}
-              description={t("settings.assistant.tts.engineDescription")}
-              descriptionMode="tooltip"
+              info={t("settings.assistant.tts.engineDescription")}
               layout="horizontal"
               grouped={true}
             >
@@ -998,50 +970,27 @@ export const AssistantSettings: React.FC = () => {
             </SettingContainer>
 
             {(settings?.assistant_tts_engine ?? "kokoro") === "kokoro" && (
-              <>
-                <SettingContainer
-                  title={t("settings.assistant.tts.voiceLabel")}
-                  description={t("settings.assistant.tts.voiceDescription")}
-                  descriptionMode="tooltip"
-                  layout="horizontal"
-                  grouped={true}
-                >
-                  <Dropdown
-                    options={KOKORO_VOICES}
-                    selectedValue={settings?.assistant_tts_voice ?? "af_heart"}
-                    onSelect={(voice) =>
-                      setAndRefresh(commands.setAssistantTtsVoice(voice))
-                    }
-                    disabled={!settings?.assistant_tts_enabled}
-                  />
-                </SettingContainer>
-                <SettingContainer
-                  title={t("settings.assistant.tts.dtypeLabel")}
-                  description={t("settings.assistant.tts.dtypeDescription")}
-                  descriptionMode="tooltip"
-                  layout="horizontal"
-                  grouped={true}
-                >
-                  <Dropdown
-                    options={KOKORO_DTYPES}
-                    selectedValue={
-                      settings?.assistant_tts_kokoro_dtype ?? "fp32"
-                    }
-                    onSelect={(dtype) =>
-                      setAndRefresh(commands.setAssistantTtsKokoroDtype(dtype))
-                    }
-                    disabled={!settings?.assistant_tts_enabled}
-                  />
-                </SettingContainer>
-              </>
+              <SettingContainer
+                title={t("settings.assistant.tts.voiceLabel")}
+                layout="horizontal"
+                grouped={true}
+              >
+                <Dropdown
+                  options={KOKORO_VOICES}
+                  selectedValue={settings?.assistant_tts_voice ?? "af_heart"}
+                  onSelect={(voice) =>
+                    setAndRefresh(commands.setAssistantTtsVoice(voice))
+                  }
+                  disabled={!settings?.assistant_tts_enabled}
+                />
+              </SettingContainer>
             )}
 
             {settings?.assistant_tts_engine === "openai" && (
               <>
                 <SettingContainer
                   title={t("settings.assistant.tts.baseUrlLabel")}
-                  description={t("settings.assistant.tts.baseUrlDescription")}
-                  descriptionMode="tooltip"
+                  info={t("settings.assistant.tts.baseUrlDescription")}
                   layout="horizontal"
                   grouped={true}
                 >
@@ -1058,8 +1007,7 @@ export const AssistantSettings: React.FC = () => {
                 </SettingContainer>
                 <SettingContainer
                   title={t("settings.assistant.tts.apiKeyLabel")}
-                  description={t("settings.assistant.tts.apiKeyDescription")}
-                  descriptionMode="tooltip"
+                  info={t("settings.assistant.tts.apiKeyDescription")}
                   layout="horizontal"
                   grouped={true}
                 >
@@ -1075,8 +1023,6 @@ export const AssistantSettings: React.FC = () => {
                 </SettingContainer>
                 <SettingContainer
                   title={t("settings.assistant.tts.modelLabel")}
-                  description={t("settings.assistant.tts.modelDescription")}
-                  descriptionMode="tooltip"
                   layout="horizontal"
                   grouped={true}
                 >
@@ -1099,10 +1045,7 @@ export const AssistantSettings: React.FC = () => {
                 </SettingContainer>
                 <SettingContainer
                   title={t("settings.assistant.tts.remoteVoiceLabel")}
-                  description={t(
-                    "settings.assistant.tts.remoteVoiceDescription",
-                  )}
-                  descriptionMode="tooltip"
+                  info={t("settings.assistant.tts.remoteVoiceDescription")}
                   layout="horizontal"
                   grouped={true}
                 >
@@ -1132,8 +1075,7 @@ export const AssistantSettings: React.FC = () => {
               <>
                 <SettingContainer
                   title={t("settings.assistant.tts.apiKeyLabel")}
-                  description={t("settings.assistant.tts.apiKeyDescription")}
-                  descriptionMode="tooltip"
+                  info={t("settings.assistant.tts.apiKeyDescription")}
                   layout="horizontal"
                   grouped={true}
                 >
@@ -1149,10 +1091,7 @@ export const AssistantSettings: React.FC = () => {
                 </SettingContainer>
                 <SettingContainer
                   title={t("settings.assistant.tts.elevenVoiceLabel")}
-                  description={t(
-                    "settings.assistant.tts.elevenVoiceDescription",
-                  )}
-                  descriptionMode="tooltip"
+                  info={t("settings.assistant.tts.elevenVoiceDescription")}
                   layout="horizontal"
                   grouped={true}
                 >
@@ -1206,10 +1145,7 @@ export const AssistantSettings: React.FC = () => {
               <>
                 <SettingContainer
                   title={t("settings.assistant.tts.azureBaseUrlLabel")}
-                  description={t(
-                    "settings.assistant.tts.azureBaseUrlDescription",
-                  )}
-                  descriptionMode="tooltip"
+                  info={t("settings.assistant.tts.azureBaseUrlDescription")}
                   layout="horizontal"
                   grouped={true}
                 >
@@ -1226,8 +1162,7 @@ export const AssistantSettings: React.FC = () => {
                 </SettingContainer>
                 <SettingContainer
                   title={t("settings.assistant.tts.apiKeyLabel")}
-                  description={t("settings.assistant.tts.apiKeyDescription")}
-                  descriptionMode="tooltip"
+                  info={t("settings.assistant.tts.apiKeyDescription")}
                   layout="horizontal"
                   grouped={true}
                 >
@@ -1243,10 +1178,7 @@ export const AssistantSettings: React.FC = () => {
                 </SettingContainer>
                 <SettingContainer
                   title={t("settings.assistant.tts.azureVoiceLabel")}
-                  description={t(
-                    "settings.assistant.tts.azureVoiceDescription",
-                  )}
-                  descriptionMode="tooltip"
+                  info={t("settings.assistant.tts.azureVoiceDescription")}
                   layout="horizontal"
                   grouped={true}
                 >
@@ -1274,8 +1206,7 @@ export const AssistantSettings: React.FC = () => {
 
             <SettingContainer
               title={t("settings.assistant.tts.speedLabel")}
-              description={t("settings.assistant.tts.speedDescription")}
-              descriptionMode="tooltip"
+              info={t("settings.assistant.tts.speedDescription")}
               layout="horizontal"
               grouped={true}
             >
@@ -1288,9 +1219,9 @@ export const AssistantSettings: React.FC = () => {
                       type="button"
                       onClick={() => commitTtsSpeed(preset)}
                       disabled={!settings?.assistant_tts_enabled}
-                      className={`px-2.5 py-1 text-sm font-medium rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                      className={`px-2.5 py-1 text-[13px] font-medium rounded-md transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
                         active
-                          ? "bg-ink text-on-primary"
+                          ? "bg-accent/12 text-accent"
                           : "bg-surface-strong text-muted hover:text-ink"
                       }`}
                     >
@@ -1317,8 +1248,6 @@ export const AssistantSettings: React.FC = () => {
 
             <SettingContainer
               title={t("settings.assistant.tts.testLabel")}
-              description={t("settings.assistant.tts.testDescription")}
-              descriptionMode="tooltip"
               layout="horizontal"
               grouped={true}
             >
@@ -1329,7 +1258,7 @@ export const AssistantSettings: React.FC = () => {
                   disabled={
                     !settings?.assistant_tts_enabled || testState === "testing"
                   }
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-mid-gray/30 hover:bg-mid-gray/10 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-hairline-strong bg-surface hover:bg-surface-strong disabled:opacity-50 disabled:cursor-not-allowed text-[13px] font-medium cursor-pointer transition-colors"
                 >
                   <Volume2 size={14} />
                   {testState === "testing"
@@ -1339,12 +1268,44 @@ export const AssistantSettings: React.FC = () => {
                       : t("settings.assistant.tts.testButton")}
                 </button>
                 {testState === "error" && testError && (
-                  <span className="text-xs text-red-500 max-w-[360px] text-right break-words">
+                  <span className="text-xs text-error max-w-[360px] text-right break-words">
                     {testError}
                   </span>
                 )}
               </div>
             </SettingContainer>
+
+            <MoreOptions>
+              <ToggleSwitch
+                checked={settings?.assistant_tts_stop_on_dictation ?? false}
+                onChange={(checked) =>
+                  setAndRefresh(
+                    commands.setAssistantTtsStopOnDictation(checked),
+                  )
+                }
+                label={t("settings.assistant.tts.stopOnDictationLabel")}
+                grouped={true}
+              />
+              {(settings?.assistant_tts_engine ?? "kokoro") === "kokoro" && (
+                <SettingContainer
+                  title={t("settings.assistant.tts.dtypeLabel")}
+                  info={t("settings.assistant.tts.dtypeDescription")}
+                  layout="horizontal"
+                  grouped={true}
+                >
+                  <Dropdown
+                    options={KOKORO_DTYPES}
+                    selectedValue={
+                      settings?.assistant_tts_kokoro_dtype ?? "fp32"
+                    }
+                    onSelect={(dtype) =>
+                      setAndRefresh(commands.setAssistantTtsKokoroDtype(dtype))
+                    }
+                    disabled={!settings?.assistant_tts_enabled}
+                  />
+                </SettingContainer>
+              )}
+            </MoreOptions>
           </>
         )}
       </SettingsGroup>
@@ -1352,8 +1313,6 @@ export const AssistantSettings: React.FC = () => {
       <SettingsGroup title={t("settings.assistant.appearance.title")}>
         <SettingContainer
           title={t("settings.assistant.appearance.previewLabel")}
-          description={t("settings.assistant.appearance.previewDescription")}
-          descriptionMode="tooltip"
           layout="stacked"
           grouped={true}
         >
@@ -1364,8 +1323,6 @@ export const AssistantSettings: React.FC = () => {
         </SettingContainer>
         <SettingContainer
           title={t("settings.assistant.appearance.fontSizeLabel")}
-          description={t("settings.assistant.appearance.fontSizeDescription")}
-          descriptionMode="tooltip"
           layout="horizontal"
           grouped={true}
         >
@@ -1399,32 +1356,15 @@ export const AssistantSettings: React.FC = () => {
           max={1}
           step={0.05}
           label={t("settings.assistant.appearance.opacityLabel")}
-          description={t("settings.assistant.appearance.opacityDescription")}
           grouped={true}
           formatValue={(v) => `${Math.round(v * 100)}%`}
         />
       </SettingsGroup>
 
-      <SettingsGroup title={t("settings.assistant.systemPrompt.title")}>
-        <SettingContainer
-          title={t("settings.assistant.systemPrompt.label")}
-          description={t("settings.assistant.systemPrompt.description")}
-          descriptionMode="tooltip"
-          layout="stacked"
-          grouped={true}
-        >
-          <Textarea
-            value={systemPrompt}
-            onChange={(e) => setSystemPrompt(e.target.value)}
-            onBlur={handlePromptBlur}
-            className="w-full"
-            rows={5}
-          />
-        </SettingContainer>
+      <SettingsGroup title={t("settings.assistant.behavior.title")}>
         <SettingContainer
           title={t("settings.assistant.responseLength.label")}
-          description={t("settings.assistant.responseLength.description")}
-          descriptionMode="tooltip"
+          info={t("settings.assistant.responseLength.description")}
           layout="horizontal"
           grouped={true}
         >
@@ -1460,7 +1400,6 @@ export const AssistantSettings: React.FC = () => {
         <SettingContainer
           title={t("settings.assistant.memory.label")}
           description={t("settings.assistant.memory.description")}
-          descriptionMode="tooltip"
           layout="horizontal"
           grouped={true}
         >
@@ -1474,6 +1413,22 @@ export const AssistantSettings: React.FC = () => {
             className="w-[120px]"
           />
         </SettingContainer>
+        <MoreOptions>
+          <SettingContainer
+            title={t("settings.assistant.systemPrompt.label")}
+            info={t("settings.assistant.systemPrompt.description")}
+            layout="stacked"
+            grouped={true}
+          >
+            <Textarea
+              value={systemPrompt}
+              onChange={(e) => setSystemPrompt(e.target.value)}
+              onBlur={handlePromptBlur}
+              className="w-full"
+              rows={5}
+            />
+          </SettingContainer>
+        </MoreOptions>
       </SettingsGroup>
     </div>
   );

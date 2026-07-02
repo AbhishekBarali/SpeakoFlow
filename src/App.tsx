@@ -261,15 +261,9 @@ function App() {
     return <Onboarding onModelSelected={handleModelSelected} />;
   }
 
-  // Page header: section title plus a one-line subtitle. The subtitle keys live
-  // under sectionSubtitles.* and are looked up via the section's labelKey (which
-  // is already camelCase, e.g. "sidebar.postProcessing") so the lookup matches
-  // even where the SECTIONS_CONFIG key differs (e.g. "postprocessing").
+  // Page header: just the section title. Subtitles and decorative canvas orbs
+  // were removed for a quieter, native-feeling settings surface.
   const sectionLabelKey = SECTIONS_CONFIG[currentSection].labelKey;
-  const sectionSubtitleKey = sectionLabelKey.replace(
-    "sidebar.",
-    "sectionSubtitles.",
-  );
 
   return (
     <div
@@ -297,38 +291,12 @@ function App() {
         {/* Scrollable content area */}
         <div className="flex-1 flex flex-col overflow-hidden">
           <div className="flex-1 overflow-y-auto overflow-x-hidden relative">
-            {/* Atmospheric gradient orbs — the only color moment on the canvas */}
-            <div
-              className="orb"
-              style={{
-                width: "360px",
-                height: "360px",
-                top: "-170px",
-                insetInlineEnd: "-90px",
-                background:
-                  "radial-gradient(circle at 30% 30%, var(--color-canvas-orb-1), transparent 70%)",
-              }}
-            />
-            <div
-              className="orb"
-              style={{
-                width: "300px",
-                height: "300px",
-                top: "-130px",
-                insetInlineStart: "-120px",
-                background:
-                  "radial-gradient(circle at 70% 40%, var(--color-canvas-orb-2), transparent 72%)",
-              }}
-            />
-            <div className="relative z-10 flex flex-col items-center px-6 pt-6 pb-8 gap-5">
+            <div className="relative z-10 flex flex-col items-center px-8 pt-8 pb-10 gap-6">
               <AccessibilityPermissions />
-              <header className="max-w-3xl w-full mx-auto space-y-1.5">
-                <h1 className="font-display text-[1.75rem] leading-[1.15] tracking-[-0.02em] text-balance text-ink">
+              <header className="max-w-2xl w-full mx-auto">
+                <h1 className="font-display text-2xl leading-tight text-ink">
                   {t(sectionLabelKey)}
                 </h1>
-                <p className="text-sm text-muted leading-relaxed text-balance">
-                  {t(sectionSubtitleKey)}
-                </p>
               </header>
               {renderSettingsContent(currentSection)}
             </div>

@@ -57,17 +57,17 @@ SpeakoFlow started as a fork of the excellent [Handy](https://github.com/cjpais/
 
 ## What's different from Handy?
 
-|                                          | Handy | SpeakoFlow                                             |
-| ---------------------------------------- | ----- | ------------------------------------------------------ |
-| Local dictation                          | ✅    | ✅ (unchanged core)                                    |
-| AI assistant chat panel                  | —     | ✅ floating glass panel, streaming                     |
-| Screen vision (screenshots to the model) | —     | ✅ hotkey, voice intent, or camera button              |
+|                                          | Handy | SpeakoFlow                                                      |
+| ---------------------------------------- | ----- | --------------------------------------------------------------- |
+| Local dictation                          | ✅    | ✅ (unchanged core)                                             |
+| AI assistant chat panel                  | —     | ✅ floating glass panel, streaming                              |
+| Screen vision (screenshots to the model) | —     | ✅ hotkey, voice intent, or camera button                       |
 | Web search                               | —     | ✅ Serper / SerpAPI / Brave / Tavily / Exa (bring your own key) |
-| Spoken answers (TTS)                      | —     | ✅ Kokoro local / OpenAI-compatible / ElevenLabs / Azure |
-| Hands-free dictation toggle              | —     | ✅ dedicated F9 binding                                |
-| Built-in offline LLM (llama.cpp)         | —     | ✅ runs a downloaded model, no server                  |
-| Local LLM preset (Ollama / LM Studio)    | —     | ✅                                                     |
-| Panel customization + pill mode          | —     | ✅                                                     |
+| Spoken answers (TTS)                     | —     | ✅ Kokoro local / OpenAI-compatible / ElevenLabs / Azure        |
+| Hands-free dictation toggle              | —     | ✅ dedicated F9 binding                                         |
+| Built-in offline LLM (llama.cpp)         | —     | ✅ runs a downloaded model, no server                           |
+| Local LLM preset (Ollama / LM Studio)    | —     | ✅                                                              |
+| Panel customization + pill mode          | —     | ✅                                                              |
 
 Everything is wired through the same provider system, so one API key works for assistant answers, dictation post-processing, and remote TTS.
 

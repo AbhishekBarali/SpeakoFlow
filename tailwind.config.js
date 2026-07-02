@@ -4,13 +4,8 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ["Plus Jakarta Sans", "ui-sans-serif", "system-ui", "sans-serif"],
-        display: [
-          "Plus Jakarta Sans",
-          "ui-sans-serif",
-          "system-ui",
-          "sans-serif",
-        ],
+        sans: ["Inter Variable", "ui-sans-serif", "system-ui", "sans-serif"],
+        display: ["Inter Variable", "ui-sans-serif", "system-ui", "sans-serif"],
       },
       colors: {
         // New editorial palette
@@ -25,14 +20,11 @@ export default {
         "muted-soft": "var(--color-muted-soft)",
         hairline: "var(--color-hairline)",
         "hairline-strong": "var(--color-hairline-strong)",
+        accent: "var(--color-accent)",
+        "accent-strong": "var(--color-accent-strong)",
         "on-primary": "var(--color-on-primary)",
         "toggle-track-on": "var(--color-toggle-track-on)",
         "toggle-knob-on": "var(--color-toggle-knob-on)",
-        "orb-mint": "var(--color-orb-mint)",
-        "orb-peach": "var(--color-orb-peach)",
-        "orb-lavender": "var(--color-orb-lavender)",
-        "orb-sky": "var(--color-orb-sky)",
-        "orb-rose": "var(--color-orb-rose)",
         success: "var(--color-success)",
         error: "var(--color-error)",
 

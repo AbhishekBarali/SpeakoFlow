@@ -33,7 +33,6 @@ export const AppearanceSelector: React.FC<AppearanceSelectorProps> = React.memo(
     return (
       <SettingContainer
         title={t("appearance.title")}
-        description={t("appearance.description")}
         descriptionMode={descriptionMode}
         grouped={grouped}
       >

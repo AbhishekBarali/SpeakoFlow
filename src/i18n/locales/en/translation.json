@@ -4,7 +4,12 @@
     "description": "Choose a light, dark, or system-matched theme for the app and assistant panel.",
     "system": "System",
     "light": "Light",
-    "dark": "Dark"
+    "dark": "Dark",
+    "textSize": "Text size",
+    "textSizeDescription": "Scale the size of text and controls across the app.",
+    "textSizeDefault": "Default",
+    "textSizeLarge": "Large",
+    "textSizeExtraLarge": "Extra large"
   },
   "tray": {
     "home": "Home",
@@ -180,39 +185,39 @@
     "general": {
       "title": "General",
       "shortcut": {
-        "title": "SpeakoFlow Shortcuts",
-        "description": "Configure keyboard shortcuts to trigger speech-to-text recording",
+        "title": "Shortcuts",
+        "description": "Keyboard shortcuts that trigger speech-to-text recording",
         "loading": "Loading shortcuts...",
         "none": "No shortcuts configured",
         "notFound": "Shortcut not found",
         "pressKeys": "Press keys...",
         "bindings": {
           "transcribe": {
-            "name": "Transcribe Shortcut",
-            "description": "Press to start recording, press again to stop and type it out. You can also click the check on the recording pill to finish, or the cross (or Escape) to cancel."
+            "name": "Transcribe",
+            "description": "Press to start recording, press again to stop and type it out."
           },
           "transcribe_toggle": {
             "name": "Hands-free Dictation",
-            "description": "Press once to start recording, press again to stop and transcribe. No holding needed — great for long dictation."
+            "description": "Press once to start, again to stop — no holding needed."
           },
           "cancel": {
-            "name": "Cancel Shortcut",
-            "description": "The keyboard shortcut to cancel the current recording."
+            "name": "Cancel",
+            "description": "Cancels the current recording."
           },
           "transcribe_with_post_process": {
             "name": "Post-Processing Hotkey",
-            "description": "Optional: A dedicated hotkey that always applies AI post-processing to your transcription."
+            "description": "Always applies AI post-processing to the transcription."
           },
           "assistant": {
-            "name": "Assistant Shortcut",
-            "description": "Ask the AI assistant by voice. Press to start, press again to stop; the answer streams into the floating assistant panel."
+            "name": "Ask Assistant",
+            "description": "Ask the assistant by voice; the answer streams into the floating panel."
           },
           "assistant_vision": {
-            "name": "Assistant + Screen Shortcut",
-            "description": "Ask the assistant by voice and attach a screenshot of your screen so it can see what you see."
+            "name": "Ask with Screen",
+            "description": "Ask by voice with a screenshot attached so it can see your screen."
           },
           "assistant_panel_toggle": {
-            "name": "Toggle Assistant Panel",
+            "name": "Show or Hide Panel",
             "description": "Shows or hides the floating assistant panel."
           }
         },
@@ -224,20 +229,20 @@
       },
       "language": {
         "title": "Language",
-        "description": "Select the language for speech recognition. Auto will automatically determine the language, while selecting a specific language can improve accuracy for that language.",
-        "descriptionUnsupported": "Parakeet model automatically detects the language. No manual selection is needed.",
+        "description": "Language for speech recognition. A specific language can improve accuracy.",
+        "descriptionUnsupported": "This model detects the language automatically.",
         "searchPlaceholder": "Search languages...",
         "noResults": "No languages found",
         "auto": "Auto"
       },
       "pushToTalk": {
         "label": "Push To Talk",
-        "description": "Hold to record, release to stop. Quick-tap instead to lock hands-free recording — it keeps going until you press the hotkey again or tap done."
+        "description": "Hold to record, release to stop. Quick-tap to lock hands-free recording."
       }
     },
     "models": {
       "title": "Transcription Models",
-      "description": "Select a transcription model or download additional models. Different models offer varying levels of accuracy and speed.",
+      "description": "Models trade accuracy for speed — pick one that fits your machine.",
       "yourModels": "Downloaded Models",
       "availableModels": "Available to Download",
       "downloaded": "Downloaded",
@@ -251,9 +256,9 @@
         "tts": "Speech"
       },
       "categoryDescriptions": {
-        "stt": "Select a transcription model or download additional models. Different models offer varying levels of accuracy and speed.",
-        "llm": "A local language model for the built-in assistant and transcript cleanup. Runs fully on your device, no setup.",
-        "tts": "Voices for the assistant's spoken replies. Kokoro runs locally on your device."
+        "stt": "Models trade accuracy for speed — pick one that fits your machine.",
+        "llm": "A local language model for the built-in assistant and transcript cleanup.",
+        "tts": "Voices for the assistant's spoken replies. Kokoro runs locally."
       },
       "llmHint": "After downloading, select this model in the Assistant tab under the Built-in (Local) provider.",
       "ttsHint": "Speech models run locally and need no download.",
@@ -296,7 +301,7 @@
       },
       "audioFeedback": {
         "label": "Audio Feedback",
-        "description": "Play sound when recording starts and stops"
+        "description": "Play a sound when recording starts and stops"
       },
       "outputDevice": {
         "title": "Output Device",
@@ -321,24 +326,24 @@
       },
       "experimentalToggle": {
         "label": "Experimental Features",
-        "description": "Enable experimental features that are still in development."
+        "description": ""
       },
       "lazyStreamClose": {
         "label": "Keep Mic Open Between Transcriptions",
-        "description": "Keeps the microphone stream open for 30 seconds after recording stops, reducing latency for back-to-back transcriptions. May degrade Bluetooth audio quality while active."
+        "description": "Faster back-to-back dictation. May affect Bluetooth audio quality."
       },
       "acceleration": {
         "whisper": {
           "title": "Whisper Acceleration",
-          "description": "Hardware acceleration for Whisper models. Auto uses GPU if available (Metal on macOS, Vulkan on Windows/Linux)."
+          "description": "Auto uses the GPU when available."
         },
         "ort": {
           "title": "ONNX Acceleration",
-          "description": "Hardware acceleration for ONNX models (Parakeet, Canary, Moonshine, etc.). DirectML on Windows is experimental. Models may fail to transcribe."
+          "description": "For Parakeet, Canary, and Moonshine models. DirectML is experimental."
         },
         "gpuDevice": {
           "title": "GPU Device",
-          "description": "Select which GPU to use for Whisper inference. Auto picks the dedicated GPU.",
+          "description": "Auto picks the dedicated GPU.",
           "auto": "Auto"
         }
       },
@@ -348,15 +353,15 @@
       },
       "autostart": {
         "label": "Launch on Startup",
-        "description": "Automatically start SpeakoFlow when you log in to your computer."
+        "description": ""
       },
       "showTrayIcon": {
         "label": "Show Tray Icon",
-        "description": "Display the SpeakoFlow icon in the system tray."
+        "description": ""
       },
       "overlay": {
         "title": "Overlay Position",
-        "description": "Display visual feedback overlay during recording and transcription. On Linux 'None' is recommended.",
+        "description": "",
         "options": {
           "none": "None",
           "bottom": "Bottom",
@@ -365,7 +370,7 @@
       },
       "pasteMethod": {
         "title": "Paste Method",
-        "description": "Choose how text is inserted. Direct: simulates typing via system input. None: skips paste, only updates history/clipboard.",
+        "description": "How transcribed text is inserted into the active app.",
         "options": {
           "clipboard": "Clipboard ({{modifier}}+V)",
           "clipboardCtrlShiftV": "Clipboard (Ctrl+Shift+V)",
@@ -378,14 +383,14 @@
       },
       "typingTool": {
         "title": "Typing Tool",
-        "description": "Choose which Linux typing tool to use for Direct paste method. Auto will automatically detect and use the best available tool for your system.",
+        "description": "Linux tool used for the Direct paste method.",
         "options": {
           "auto": "Auto (Recommended)"
         }
       },
       "clipboardHandling": {
         "title": "Clipboard Handling",
-        "description": "Don't Modify Clipboard preserves your current clipboard contents after transcription. Copy to Clipboard leaves the transcription result in your clipboard after pasting.",
+        "description": "Whether the transcription stays in your clipboard after pasting.",
         "options": {
           "dontModify": "Don't Modify Clipboard",
           "copyToClipboard": "Copy to Clipboard"
@@ -393,7 +398,7 @@
       },
       "autoSubmit": {
         "title": "Auto Submit",
-        "description": "Automatically send the selected key combination after text insertion. Cmd+Enter applies on macOS, while Windows/Linux use Super+Enter.",
+        "description": "Send a key combination automatically after the text is inserted.",
         "options": {
           "off": "Off",
           "enter": "Enter",
@@ -404,12 +409,12 @@
       },
       "translateToEnglish": {
         "label": "Translate to English",
-        "description": "Automatically translate speech from other languages to English during transcription.",
+        "description": "Translate speech from other languages to English.",
         "descriptionUnsupported": "Translation is not supported by the {{model}} model."
       },
       "modelUnload": {
         "title": "Unload Model",
-        "description": "Automatically free GPU/CPU memory when the model hasn't been used for the specified time",
+        "description": "Free memory when the model has been idle for this long.",
         "options": {
           "never": "Never",
           "immediately": "Immediately",
@@ -423,7 +428,7 @@
       },
       "customWords": {
         "title": "Custom Words",
-        "description": "Add words that are often misheard or misspelled during transcription. The system will automatically correct similar-sounding words to match your list.",
+        "description": "Words that are often misheard. Similar-sounding words are corrected to match.",
         "placeholder": "Add a word",
         "add": "Add",
         "remove": "Remove {{word}}",
@@ -431,7 +436,7 @@
       },
       "textReplacements": {
         "title": "Text Replacements",
-        "description": "Apply rule-based find and replace to the transcript. Runs instantly and offline after any AI post-processing. Use literal text or regular expressions, and magic commands in the replacement.",
+        "description": "Find-and-replace rules applied to every transcript. Supports regex.",
         "empty": "No replacements yet. Add a rule to get started.",
         "addRule": "Add replacement",
         "manageRules": "Edit replacement rules ({{count}})",
@@ -549,19 +554,19 @@
       "title": "Debug",
       "logDirectory": {
         "title": "Log Directory",
-        "description": "Location where log files are stored"
+        "description": ""
       },
       "logLevel": {
         "title": "Log Level",
-        "description": "Set the verbosity of logging"
+        "description": ""
       },
       "updateChecks": {
         "label": "Check for Updates",
-        "description": "Automatically check for new versions of SpeakoFlow"
+        "description": ""
       },
       "soundTheme": {
         "label": "Sound Theme",
-        "description": "Choose a sound theme for recording start and stop feedback"
+        "description": ""
       },
       "wordCorrectionThreshold": {
         "title": "Word Correction Threshold",
@@ -569,12 +574,12 @@
       },
       "historyLimit": {
         "title": "History Limit",
-        "description": "Maximum number of history entries to keep",
+        "description": "",
         "entries": "entries"
       },
       "recordingRetention": {
         "title": "Auto-Delete Recordings",
-        "description": "Automatically delete old recordings to save space",
+        "description": "",
         "never": "Never",
         "preserveLimit": "Keep latest {{count}}",
         "days3": "After 3 days",
@@ -584,7 +589,7 @@
       },
       "alwaysOnMicrophone": {
         "label": "Always-On Microphone",
-        "description": "Keep the microphone warm so capture is instant and the first words are never clipped. Best on desktops or while plugged in; uses a little more battery since the mic stays active."
+        "description": "Keep the mic warm so the first words are never clipped. Uses a little more battery."
       },
       "clamshellMicrophone": {
         "title": "Clamshell Microphone",
@@ -600,7 +605,7 @@
       },
       "appendTrailingSpace": {
         "label": "Append Trailing Space",
-        "description": "Add a space after pasted transcription"
+        "description": ""
       },
       "keyboardImplementation": {
         "title": "Keyboard Implementation",
@@ -614,26 +619,26 @@
       },
       "pasteDelay": {
         "title": "Paste Delay",
-        "description": "Delay before sending paste keystroke (in milliseconds). Increase if wrong text is being pasted."
+        "description": "Milliseconds to wait before pasting. Increase if the wrong text is pasted."
       },
       "recordingBuffer": {
         "title": "Extra Recording Buffer",
-        "description": "Extra time (in milliseconds) to keep recording after you release the key, to capture trailing audio. 0 = no extra buffer."
+        "description": "Milliseconds to keep recording after you release the key."
       }
     },
     "about": {
       "title": "About",
       "version": {
         "title": "Version",
-        "description": "Current version of SpeakoFlow"
+        "description": ""
       },
       "appDataDirectory": {
         "title": "App Data Directory",
-        "description": "Location where SpeakoFlow stores its data"
+        "description": ""
       },
       "sourceCode": {
         "title": "Source Code",
-        "description": "View source code and contribute",
+        "description": "",
         "button": "View on GitHub"
       },
       "license": {
@@ -679,11 +684,11 @@
       "provider": {
         "title": "Assistant Provider",
         "providerLabel": "Provider",
-        "providerDescription": "The LLM provider that answers your assistant questions. API keys and base URLs are shared with post-processing providers.",
+        "providerDescription": "The provider that answers assistant questions.",
         "baseUrlLabel": "Base URL",
-        "baseUrlDescription": "OpenAI-compatible endpoint base URL. For Azure OpenAI you can paste the endpoint straight from the Azure portal (e.g. https://your-resource.openai.azure.com/ or the AI Foundry endpoint) — it's normalized to the /openai/v1 API automatically. The model name is your deployment name.",
+        "baseUrlDescription": "OpenAI-compatible base URL. Azure endpoints are normalized automatically.",
         "apiKeyLabel": "API Key",
-        "apiKeyDescription": "API key for the selected provider (shared with post-processing).",
+        "apiKeyDescription": "Shared with post-processing.",
         "apiKeyPlaceholder": "Enter API key...",
         "modelLabel": "Model",
         "modelDescription": "Model or deployment name to use for assistant answers.",
@@ -699,20 +704,23 @@
         "builtinReady": "Runs fully on your device. No API key, no setup.",
         "builtinEngineMissing": "First use downloads a small local engine automatically (one time), then runs fully offline. No setup needed.",
         "contextSizeLabel": "Context window",
-        "contextSizeDescription": "How many tokens the built-in local model keeps in context (prompt + reply). Larger remembers more but uses more memory and runs slower — especially on CPU-only machines; smaller is faster and lighter. Applies on the next request. Default 4096."
+        "contextSizeDescription": "Tokens the local model keeps in context. Larger remembers more but uses more memory. Default 4096."
       },
       "systemPrompt": {
         "title": "System Prompt",
         "label": "Assistant System Prompt",
-        "description": "Sets the assistant's behavior. Keep it stable — changing it invalidates the provider-side prompt cache."
+        "description": "Sets the assistant's behavior."
+      },
+      "behavior": {
+        "title": "Behavior"
       },
       "memory": {
         "label": "Conversation memory",
-        "description": "How many recent messages (your messages + the assistant's replies) are sent back as context on each turn. Higher remembers more of the conversation but costs more tokens and can slow responses. 0 means each question is answered with no memory of prior turns. Screenshot turns are capped lower automatically."
+        "description": "How many recent messages are sent as context each turn. 0 disables memory."
       },
       "responseLength": {
         "label": "Response length",
-        "description": "Controls how long replies are. The model still matches your intent — a quick \"hi\" gets a short reply even on Long. \"No effect\" leaves your system prompt untouched.",
+        "description": "Preferred reply length. \"No effect\" leaves your prompt untouched.",
         "options": {
           "default": "No effect",
           "short": "Short",
@@ -723,14 +731,14 @@
       "vision": {
         "title": "Screen Vision",
         "enableLabel": "Allow screenshots",
-        "enableDescription": "The Assistant + Screen shortcut and the panel's camera button capture your screen and send it with your question. Saying things like \"what's on my screen\" or \"look at this error\" also auto-attaches a capture. Requires a vision-capable model (e.g. gpt-4o-mini, gemini-flash). Disable to guarantee nothing is ever captured."
+        "enableDescription": "Let the assistant capture your screen when you ask about it. Requires a vision-capable model."
       },
       "webSearch": {
         "title": "Web Search",
         "enableLabel": "Allow web search",
-        "enableDescription": "When on, the assistant can look things up on the web for current or factual questions (news, prices, weather, who/what/when). A capable model decides when a search is actually needed and rewrites your question into focused queries, so casual chat stays instant while real questions get well-grounded answers.",
+        "enableDescription": "Let the assistant search the web when a question needs current information.",
         "providerLabel": "Search provider",
-        "providerDescription": "All providers return fast, snippet-first results and use a single API key (each has a free tier). Serper (default) and SerpAPI return Google results; Brave uses its own independent index; Tavily is tuned for AI assistants and adds a short synthesized answer; Exa does neural/semantic search. Serper is a good default — pick whichever you have a key for.",
+        "providerDescription": "Serper is a good default. Every provider has a free tier.",
         "providers": {
           "serper": "Serper (Google, fast)",
           "brave": "Brave Search",
@@ -739,25 +747,25 @@
           "serpapi": "SerpAPI (Google)"
         },
         "apiKeyLabel": "API Key",
-        "apiKeyDescription": "API key for the selected provider. Each one (Serper, Brave, Tavily, Exa, SerpAPI) has its own free tier — create a key on the provider's site and paste it here.",
+        "apiKeyDescription": "Key for the selected search provider.",
         "apiKeyPlaceholder": "Enter API key...",
         "fetchContentLabel": "Read full pages (best quality)",
-        "fetchContentDescription": "With Firecrawl, download and read the full content of each top result instead of just a short snippet. This is the single biggest quality boost — the model answers from the actual source text. It's slower and uses more Firecrawl credits. No effect on Serper or Brave.",
+        "fetchContentDescription": "Read the full text of each result instead of snippets. Better answers, but slower.",
         "maxResultsLabel": "Sources to use",
-        "maxResultsDescription": "How many search results to read and send the model (1–10). More sources give broader, better-grounded answers; fewer is faster and uses fewer tokens and credits.",
+        "maxResultsDescription": "How many results to read (1–10).",
         "depthLabel": "Search depth",
-        "depthDescription": "How thorough each search is — the main quality dial. Quick is fastest (one query, a couple of pages) for simple facts. Standard (recommended) runs a few queries, reranks, and reads the top sources. Deep casts a wider net for harder, multi-part questions. All three stay fast (a few seconds) — this is fast answer-with-search, not minutes-long deep research.",
+        "depthDescription": "Quick for simple facts, Standard for most questions, Deep for hard ones.",
         "depthOptions": {
           "low": "Quick",
           "medium": "Standard",
           "high": "Deep"
         },
         "localSmartLabel": "Smart search decisions (local model)",
-        "localSmartDescription": "Only shown when using the Built-in (Local) model. ON: the local model decides when to search using the same planner the cloud providers use — smarter, but it adds a short extra step before answering (noticeable on slower machines). OFF (default): a fast keyword check decides — instant, but it only catches obvious current-info questions (years, news, prices, scores, weather…). Either way, explicitly saying \"search the web for…\" always triggers a search.",
+        "localSmartDescription": "Let the local model decide when to search. Off uses a fast keyword check instead.",
         "creditBudgetLabel": "Daily Firecrawl credit limit",
-        "creditBudgetDescription": "Safety cap on how many Firecrawl credits web search may spend per day before it pauses and the assistant answers from its own knowledge. A typical Standard search costs ~8–12 credits. Set 0 for no limit. (A separate per-minute request cap always guards against runaway loops.)",
+        "creditBudgetDescription": "Daily cap on Firecrawl credits before search pauses. 0 = no limit.",
         "testLabel": "Test search",
-        "testDescription": "Run a sample search with the current provider and key to confirm it works.",
+        "testDescription": "Run a sample search with the current provider and key.",
         "testButton": "Test search",
         "testing": "Searching...",
         "testResult": "Got {{count}} results."
@@ -765,11 +773,11 @@
       "tts": {
         "title": "Voice Output (TTS)",
         "enableLabel": "Speak responses aloud",
-        "enableDescription": "Reads the assistant's reply out loud. Use the Response length option (under System Prompt) to keep spoken replies short.",
+        "enableDescription": "Read the assistant's replies out loud.",
         "stopOnDictationLabel": "Stop speech when dictation starts",
-        "stopOnDictationDescription": "Silence a reply that's still being read aloud when you start a new dictation. Leave off to keep listening (handy with earphones). Asking the assistant a new question always interrupts the old answer.",
+        "stopOnDictationDescription": "Stop any reply that's still playing when you start dictating.",
         "engineLabel": "TTS engine",
-        "engineDescription": "Kokoro runs locally and free (uses your GPU via WebGPU). The OpenAI-compatible engine works with OpenAI, Azure OpenAI, Groq, or any local server exposing /audio/speech. ElevenLabs uses your ElevenLabs API key. Azure AI Speech uses a regional Neural TTS endpoint with SSML voices.",
+        "engineDescription": "Kokoro runs locally for free. The other engines use your API key.",
         "engines": {
           "kokoro": "Kokoro (local, free)",
           "openai": "OpenAI-compatible",
@@ -777,31 +785,31 @@
           "azure": "Azure AI Speech"
         },
         "voiceLabel": "Voice",
-        "voiceDescription": "Kokoro voice used for the spoken summary.",
+        "voiceDescription": "Kokoro voice for spoken replies.",
         "dtypeLabel": "Kokoro precision",
-        "dtypeDescription": "Model precision/quantization for the local Kokoro engine. fp32 is highest quality and recommended for WebGPU. If synthesis is slow (e.g. WebGPU isn't available and it runs on CPU), pick a quantized option: q8 is a good balance, q4/q4f16 are fastest. Changing this reloads the model.",
+        "dtypeDescription": "fp32 is highest quality; q8 is faster on CPU. Changing this reloads the model.",
         "speedLabel": "Playback speed",
-        "speedDescription": "How fast the assistant speaks. 1× is normal; lower is slower, higher is faster. Pick a preset or type a value between 0.25 and 4. Kokoro, OpenAI and Azure keep a natural pitch at any speed; ElevenLabs only supports 0.7×–1.2×.",
+        "speedDescription": "1× is normal. ElevenLabs supports 0.7×–1.2× only.",
         "speedValue": "{{value}}×",
         "speedCustomLabel": "Custom playback speed",
         "testLabel": "Test voice",
-        "testDescription": "Play a short sample with the current TTS settings to confirm playback works.",
+        "testDescription": "Play a short sample with the current settings.",
         "testButton": "Test voice",
         "testing": "Testing…",
         "testOk": "Played ✓",
         "testPhrase": "Hi! This is a test of SpeakoFlow's voice output.",
         "baseUrlLabel": "TTS Base URL",
-        "baseUrlDescription": "OpenAI-compatible endpoint. You can paste either a base (e.g. https://{resource}.openai.azure.com/openai/v1) or a full /audio/speech URL including ?api-version=... — exactly the endpoint you'd use as SillyTavern's Provider Endpoint.",
+        "baseUrlDescription": "OpenAI-compatible TTS endpoint. A base URL or a full /audio/speech URL both work.",
         "azureBaseUrlLabel": "Speech Endpoint",
-        "azureBaseUrlDescription": "Your Azure AI Speech endpoint. The regional form always works, e.g. https://eastus2.tts.speech.microsoft.com. A custom-domain / AI Foundry Speech resource also works: https://your-resource.cognitiveservices.azure.com. Find it under Keys and Endpoint in the Azure portal, then click Load voices.",
+        "azureBaseUrlDescription": "Your Azure Speech endpoint from the portal, e.g. https://eastus2.tts.speech.microsoft.com.",
         "apiKeyLabel": "TTS API Key",
-        "apiKeyDescription": "API key for the TTS endpoint (separate from the assistant LLM key).",
+        "apiKeyDescription": "Separate from the assistant LLM key.",
         "modelLabel": "TTS Model",
         "modelDescription": "Model or deployment name, e.g. gpt-4o-mini-tts (OpenAI/Azure) or eleven_flash_v2_5 (ElevenLabs).",
         "remoteVoiceLabel": "Voice name",
         "remoteVoiceDescription": "Voice for OpenAI-compatible TTS, e.g. alloy, echo, nova, shimmer.",
         "azureVoiceLabel": "Voice name",
-        "azureVoiceDescription": "Azure neural voice name, e.g. en-US-JennyNeural, en-US-AvaMultilingualNeural. The locale prefix sets the spoken language. Use Load voices to fetch the full list from your endpoint.",
+        "azureVoiceDescription": "Azure voice name, e.g. en-US-JennyNeural. Click Load voices to browse.",
         "loadVoices": "Load voices",
         "voicesLoading": "Loading…",
         "voicesPick": "Pick from {{count}} voices…",
@@ -874,7 +882,7 @@
     "yes": "Yes",
     "no": "No",
     "noOptionsFound": "No options found",
-    "showAdvanced": "Show advanced options",
+    "showAdvanced": "More options",
     "showLess": "Show less"
   },
   "accessibility": {

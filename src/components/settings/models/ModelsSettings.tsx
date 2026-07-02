@@ -249,7 +249,7 @@ export const ModelsSettings: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="max-w-3xl w-full mx-auto">
+      <div className="max-w-2xl w-full mx-auto">
         <div className="flex items-center justify-center py-16">
           <div className="w-8 h-8 border-2 border-hairline-strong border-t-ink rounded-full animate-spin" />
         </div>
@@ -258,17 +258,17 @@ export const ModelsSettings: React.FC = () => {
   }
 
   return (
-    <div className="max-w-3xl w-full mx-auto space-y-6">
+    <div className="max-w-2xl w-full mx-auto space-y-6">
       {/* Category switcher: Transcription / Language Model / Speech */}
-      <div className="flex items-center gap-1 p-1 bg-surface-strong rounded-full w-fit">
+      <div className="flex items-center gap-0.5 p-0.5 bg-surface-strong rounded-lg w-fit">
         {CATEGORY_TABS.map((cat) => (
           <button
             key={cat}
             type="button"
             onClick={() => setCategoryFilter(cat)}
-            className={`px-4 py-1.5 text-sm font-medium rounded-full transition-colors ${
+            className={`px-3.5 py-1.5 text-[13px] font-medium rounded-[7px] transition-all duration-150 cursor-pointer ${
               categoryFilter === cat
-                ? "bg-ink text-on-primary"
+                ? "bg-surface text-ink shadow-[0_1px_3px_rgba(0,0,0,0.12)]"
                 : "text-muted hover:text-ink"
             }`}
           >
@@ -276,7 +276,7 @@ export const ModelsSettings: React.FC = () => {
           </button>
         ))}
       </div>
-      <p className="text-sm text-muted">
+      <p className="text-[13px] text-muted">
         {t(`settings.models.categoryDescriptions.${categoryFilter}`)}
       </p>
       {categoryFilter === "llm" && (
@@ -294,7 +294,7 @@ export const ModelsSettings: React.FC = () => {
           {/* Downloaded Models Section — header always visible so filter stays accessible */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <h2 className="text-[11px] font-semibold text-muted uppercase tracking-[0.1em]">
+              <h2 className="text-[13px] font-semibold text-ink">
                 {t("settings.models.yourModels")}
               </h2>
               {/* Language filter dropdown (transcription models only) */}
@@ -305,9 +305,9 @@ export const ModelsSettings: React.FC = () => {
                     onClick={() =>
                       setLanguageDropdownOpen(!languageDropdownOpen)
                     }
-                    className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-full transition-colors ${
+                    className={`flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-medium rounded-lg transition-colors cursor-pointer ${
                       languageFilter !== "all"
-                        ? "bg-ink text-on-primary"
+                        ? "bg-accent/10 text-accent"
                         : "bg-surface-strong text-muted hover:text-ink"
                     }`}
                   >
@@ -425,7 +425,7 @@ export const ModelsSettings: React.FC = () => {
           {/* Available Models Section */}
           {availableModels.length > 0 && (
             <div className="space-y-3">
-              <h2 className="text-[11px] font-semibold text-muted uppercase tracking-[0.1em]">
+              <h2 className="text-[13px] font-semibold text-ink">
                 {t("settings.models.availableModels")}
               </h2>
               {availableModels.map((model: ModelInfo) => (

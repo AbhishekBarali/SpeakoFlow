@@ -374,6 +374,7 @@ pub fn run(cli_args: CliArgs) {
             shortcut::change_audio_feedback_volume_setting,
             shortcut::change_sound_theme_setting,
             shortcut::change_theme_setting,
+            shortcut::change_ui_text_size_setting,
             shortcut::change_start_hidden_setting,
             shortcut::change_autostart_setting,
             shortcut::change_translate_to_english_setting,
@@ -655,6 +656,10 @@ pub fn run(cli_args: CliArgs) {
                 settings::Theme::System => None,
             };
             let _ = main_webview.set_theme(window_theme);
+
+            // Scale the UI to the saved text-size preference (webview zoom, so
+            // px and rem sizes scale together) before the window is shown.
+            let _ = main_webview.set_zoom(settings.ui_text_size.zoom_factor());
 
             // Paint the taskbar / alt-tab icon with a transparent, theme-matched
             // mark (light mark on dark, dark mark on light) so there is no white

@@ -54,7 +54,7 @@ Two things hurt the most:
   navigation, infoboxes, and boilerplate — not the sentence that answers the
   question. The correct answer is very often already in the one-line **snippet**.
 - **Too much context.** Feeding a small local model a big, noisy blob is slower
-  (more to read before it can start) and *less* accurate (the key sentence gets
+  (more to read before it can start) and _less_ accurate (the key sentence gets
   lost), and it costs more tokens.
 
 On top of that, the **default provider was DuckDuckGo**, a keyless HTML endpoint
@@ -74,7 +74,7 @@ public write-ups (content rephrased for licensing compliance; sources linked):
   [SearchGPT/Bing overlap study](https://www.seerinteractive.com/insights/87-percent-of-searchgpt-citations-match-bings-top-results))
 - **Perplexity** runs a multi-stage RAG pipeline over its **own index**: hybrid
   retrieval (keyword + semantic), a multi-layer **reranker**, and citations wired
-  into the prompt *before* the model writes. Its fast model (Sonar) runs on
+  into the prompt _before_ the model writes. Its fast model (Sonar) runs on
   Cerebras hardware at roughly 1,200 tokens/second.
   ([pipeline breakdown](https://ziptie.dev/blog/how-perplexity-ai-answers-work/),
   [Sonar + Cerebras](https://www.perplexity.ai/hub/blog/meet-new-sonar))
@@ -105,11 +105,11 @@ Serper is the practical equivalent.
 
 ### Cost reality (correcting the earlier worry)
 
-| Concern | Reality |
-| --- | --- |
+| Concern                         | Reality                                                                                                          |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
 | "One search uses 10–20 credits" | That was the old **Firecrawl** path (search = 2 credits + 1/scraped page). On Serper, **10 results = 1 credit**. |
-| "$1 / 1,000 is expensive" | You run ~1,000 searches to spend ~$1; it drops toward $0.30/1k at volume. |
-| "Free tier won't last" | ~2,500 free credits/month; a personal voice assistant rarely exceeds it. |
+| "$1 / 1,000 is expensive"       | You run ~1,000 searches to spend ~$1; it drops toward $0.30/1k at volume.                                        |
+| "Free tier won't last"          | ~2,500 free credits/month; a personal voice assistant rarely exceeds it.                                         |
 
 ---
 
@@ -155,7 +155,7 @@ See the integration doc for the exact file-by-file map and verification steps.
 ## Future plan / roadmap
 
 Ordered roughly by impact-to-effort. Serper is step 0; the rest turn "fast
-snippets" into "fast *and* well-grounded".
+snippets" into "fast _and_ well-grounded".
 
 1. **Snippet-first by default.** Keep full-page scraping (Firecrawl) as an
    opt-in for hard questions, not the default path. Answer from snippets +
@@ -181,13 +181,13 @@ snippets" into "fast *and* well-grounded".
 
 ### Provider landscape (for future choices)
 
-| Provider | Type | Notes |
-| --- | --- | --- |
-| **Serper** (current default) | Google SERP | Fast, cheap, snippet-first, generous free tier |
-| **Firecrawl** | Search + full-page scrape | Best when the snippet truly isn't enough; costs more |
-| **Brave** | Independent index | Privacy-first; `$5/1k`, no standalone free tier as of 2026 |
-| **SearXNG** (planned) | Self-hosted metasearch | Free, no key; you run it; can be rate-limited by upstreams |
-| **Tavily / Exa** | RAG-native search | AI-optimized snippets / neural search; future options |
+| Provider                     | Type                      | Notes                                                      |
+| ---------------------------- | ------------------------- | ---------------------------------------------------------- |
+| **Serper** (current default) | Google SERP               | Fast, cheap, snippet-first, generous free tier             |
+| **Firecrawl**                | Search + full-page scrape | Best when the snippet truly isn't enough; costs more       |
+| **Brave**                    | Independent index         | Privacy-first; `$5/1k`, no standalone free tier as of 2026 |
+| **SearXNG** (planned)        | Self-hosted metasearch    | Free, no key; you run it; can be rate-limited by upstreams |
+| **Tavily / Exa**             | RAG-native search         | AI-optimized snippets / neural search; future options      |
 
 ---
 

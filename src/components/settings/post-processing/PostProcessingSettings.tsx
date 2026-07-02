@@ -427,7 +427,7 @@ export const PostProcessingSettings: React.FC = () => {
   const { t } = useTranslation();
 
   return (
-    <div className="max-w-3xl w-full mx-auto space-y-6">
+    <div className="max-w-2xl w-full mx-auto space-y-6">
       <SettingsGroup title={t("settings.postProcessing.hotkey.title")}>
         <ShortcutInput
           shortcutId="transcribe_with_post_process"

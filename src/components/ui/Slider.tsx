@@ -9,7 +9,7 @@ interface SliderProps {
   step?: number;
   disabled?: boolean;
   label: string;
-  description: string;
+  description?: string;
   descriptionMode?: "inline" | "tooltip";
   grouped?: boolean;
   showValue?: boolean;

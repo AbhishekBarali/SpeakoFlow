@@ -42,21 +42,23 @@ export type SelectProps = BaseProps & (CreatableProps | NonCreatableProps);
 const surfaceBg = "var(--color-surface)";
 const hoverBg = "var(--color-surface-strong)";
 const neutralBorder = "var(--color-hairline-strong)";
-const inkBorder = "color-mix(in srgb, var(--color-ink) 40%, transparent)";
+const accentBorder = "var(--color-accent)";
 
 const selectStyles: StylesConfig<SelectOption, false> = {
   control: (base, state) => ({
     ...base,
-    minHeight: 40,
+    minHeight: 36,
     borderRadius: 8,
-    borderColor: state.isFocused ? "var(--color-ink)" : neutralBorder,
-    boxShadow: state.isFocused ? "0 0 0 1px var(--color-ink)" : "none",
+    borderColor: state.isFocused ? accentBorder : neutralBorder,
+    boxShadow: state.isFocused
+      ? "0 0 0 3px color-mix(in srgb, var(--color-accent) 20%, transparent)"
+      : "none",
     backgroundColor: surfaceBg,
     fontSize: "0.875rem",
     color: "var(--color-text)",
     transition: "border-color 150ms ease, box-shadow 150ms ease",
     ":hover": {
-      borderColor: state.isFocused ? "var(--color-ink)" : inkBorder,
+      borderColor: state.isFocused ? accentBorder : neutralBorder,
     },
   }),
   valueContainer: (base) => ({
@@ -94,7 +96,7 @@ const selectStyles: StylesConfig<SelectOption, false> = {
     backgroundColor: surfaceBg,
     color: "var(--color-text)",
     border: "1px solid var(--color-hairline)",
-    boxShadow: "0 10px 30px rgba(12, 10, 9, 0.12)",
+    boxShadow: "0 10px 30px rgba(0, 0, 0, 0.12)",
   }),
   option: (base, state) => ({
     ...base,

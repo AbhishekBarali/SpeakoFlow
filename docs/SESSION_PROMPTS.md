@@ -15,12 +15,12 @@ what's actually done.
 Run one prompt per window. Prompts in the **same wave** touch different files, so
 they're safe to run at the same time. Finish a wave before starting the next.
 
-| Wave | Run these together | Why they don't collide |
-|------|--------------------|------------------------|
-| 1 | **P1** rebrand · **P2** logo · **P5** history fix · **P6** provider audit | config vs assets vs backend — disjoint |
-| 2 | **P3** update/tray/about · **P7** model metadata · **P10** panel · (P6 cont.) | different windows + backend areas |
-| 3 | **P8** models page · **P9** settings layout · **P11** assistant settings · **P13** optimization | disjoint frontend areas + backend |
-| 4 | **P12** visual polish · **P14** security + QA sweep | polish after layout is final |
+| Wave | Run these together                                                                              | Why they don't collide                 |
+| ---- | ----------------------------------------------------------------------------------------------- | -------------------------------------- |
+| 1    | **P1** rebrand · **P2** logo · **P5** history fix · **P6** provider audit                       | config vs assets vs backend — disjoint |
+| 2    | **P3** update/tray/about · **P7** model metadata · **P10** panel · (P6 cont.)                   | different windows + backend areas      |
+| 3    | **P8** models page · **P9** settings layout · **P11** assistant settings · **P13** optimization | disjoint frontend areas + backend      |
+| 4    | **P12** visual polish · **P14** security + QA sweep                                             | polish after layout is final           |
 
 **The one rule:** never run two windows editing the same file. If unsure, run fewer.
 
@@ -79,7 +79,7 @@ You are working on SpeakoFlow, a Tauri 2 voice app (Rust + React/TS) forked from
 
 Research first (trace the whole path, don't assume):
 - Update system: read the updater config in tauri.conf.json (endpoints, pubkey), the frontend update-checker component (src/components/update-checker), the tray "check for updates" item, and how the footer shows the version. Understand exactly how a release becomes an update: who signs artifacts, what latest.json is, and where it's published. Identify what's missing or misleading for THIS repo (it was forked, so verify the endpoint points at the correct GitHub repo and that the signing pubkey has a matching private key story).
-- Tray menu: read tray.rs and the tray menu event handler in lib.rs (the on_menu_event match). 
+- Tray menu: read tray.rs and the tray menu event handler in lib.rs (the on_menu_event match).
 - About page: read src/components/settings/about/AboutSettings.tsx.
 
 Implement:
@@ -105,7 +105,7 @@ Research first: trace the entire path. The setting fields live in settings.rs (h
 
 Fix the root cause — don't paper over it. Make sure both dimensions work: (a) count limit prunes oldest entries beyond N, (b) retention deletes recordings older than the period, and (c) both delete the associated audio files, not just rows. Apply on insert AND on app start.
 
-Add a focused test (Rust) proving pruning by count and by age. 
+Add a focused test (Rust) proving pruning by count and by age.
 
 Done when: setting limit=5 with 10 entries prunes to 5 (and removes their WAVs); setting a short retention removes old recordings; a test covers both; cargo test + bun run tauri dev pass. Explain the actual bug you found.
 

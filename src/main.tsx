@@ -4,13 +4,9 @@ import { platform } from "@tauri-apps/plugin-os";
 import App from "./App";
 import { applyCachedTheme } from "./lib/theme";
 
-// Fonts — Plus Jakarta Sans (the brand/logo face) carries the whole UI: body
-// and labels at 400/500, emphasis/active at 600, headings at 700, logo at 800.
-import "@fontsource/plus-jakarta-sans/400.css";
-import "@fontsource/plus-jakarta-sans/500.css";
-import "@fontsource/plus-jakarta-sans/600.css";
-import "@fontsource/plus-jakarta-sans/700.css";
-import "@fontsource/plus-jakarta-sans/800.css";
+// Fonts — Inter (variable) carries the whole UI: body and labels at 400/500,
+// emphasis/active at 500/600, headings at 600.
+import "@fontsource-variable/inter";
 
 // Set platform before render so CSS can scope per-platform (e.g. scrollbar styles)
 document.documentElement.dataset.platform = platform();

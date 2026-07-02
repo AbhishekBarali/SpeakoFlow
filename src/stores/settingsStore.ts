@@ -85,6 +85,7 @@ const settingUpdaters: {
     commands.changeAudioFeedbackVolumeSetting(value as number),
   sound_theme: (value) => commands.changeSoundThemeSetting(value as string),
   theme: (value) => commands.changeThemeSetting(value as string),
+  ui_text_size: (value) => commands.changeUiTextSizeSetting(value as string),
   start_hidden: (value) => commands.changeStartHiddenSetting(value as boolean),
   autostart_enabled: (value) =>
     commands.changeAutostartSetting(value as boolean),

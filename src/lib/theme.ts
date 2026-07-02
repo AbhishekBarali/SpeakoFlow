@@ -89,4 +89,3 @@ export const watchSystemTheme = (
 
 // (The assistant panel is dark-only, styled like the STT recording overlay —
 // it no longer participates in theme resolution.)
-

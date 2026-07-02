@@ -13,7 +13,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import Logo from "./Logo";
-import LogoLockup from "./LogoLockup";
+import Wordmark from "./Wordmark";
 import { useSettings } from "../hooks/useSettings";
 import {
   GeneralSettings,
@@ -117,24 +117,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <div
-      className={`flex flex-col h-full border-e border-hairline bg-canvas-soft py-4 overflow-hidden transition-[width] duration-200 ease-out motion-reduce:transition-none ${
-        collapsed ? "w-16 items-center px-2" : "w-44 px-3"
+      className={`flex flex-col h-full border-e border-hairline bg-canvas-soft pt-5 pb-3 overflow-hidden transition-[width] duration-200 ease-out motion-reduce:transition-none ${
+        collapsed ? "w-16 items-center px-2" : "w-52 px-3"
       }`}
     >
-      {/* Brand mark — full lockup when expanded, icon-only when collapsed. */}
+      {/* Brand — full lockup when expanded (teal mark + wordmark), mark only
+          when collapsed. Sized to lead the rail: the logo is the one piece of
+          brand color on the page, so it carries the hierarchy. */}
       <div
-        className={`flex mb-6 mt-1 ${
-          collapsed ? "justify-center" : "items-center ms-1"
+        className={`flex mb-7 ${
+          collapsed ? "justify-center" : "items-center ps-2.5"
         }`}
       >
         {collapsed ? (
-          <Logo className="text-ink h-6 w-auto shrink-0" />
+          <Logo className="text-accent h-6 w-auto shrink-0" />
         ) : (
-          <LogoLockup iconClassName="h-6 w-auto" />
+          <div className="flex items-center gap-2 min-w-0">
+            <Logo className="text-accent h-[26px] w-auto shrink-0" />
+            <Wordmark className="text-[17px] truncate" />
+          </div>
         )}
       </div>
 
-      <nav className="flex flex-col w-full gap-0.5">
+      <nav className="flex flex-col w-full gap-px">
         {availableSections.map((section) => {
           const Icon = section.icon;
           const isActive = activeSection === section.id;
@@ -145,18 +150,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
               type="button"
               aria-current={isActive ? "page" : undefined}
               title={t(section.labelKey)}
-              className={`flex gap-2.5 items-center py-2 w-full rounded-xl cursor-pointer transition-colors text-start ${
-                collapsed ? "justify-center px-0" : "px-3"
+              className={`flex gap-2.5 items-center h-[34px] w-full rounded-lg cursor-pointer transition-colors duration-150 text-start ${
+                collapsed ? "justify-center px-0" : "px-2.5"
               } ${
                 isActive
-                  ? "bg-surface text-ink font-semibold border border-hairline shadow-[0_1px_2px_rgba(12,10,9,0.04)]"
-                  : "text-muted font-medium hover:text-ink hover:bg-surface-strong border border-transparent"
+                  ? "bg-accent/10 text-accent font-medium"
+                  : "text-body font-normal hover:text-ink hover:bg-ink/4"
               }`}
               onClick={() => onSectionChange(section.id)}
             >
-              <Icon width={18} height={18} className="shrink-0" />
+              <Icon
+                width={16}
+                height={16}
+                className={`shrink-0 ${isActive ? "opacity-100" : "opacity-70"}`}
+              />
               {!collapsed && (
-                <span className="text-sm truncate">{t(section.labelKey)}</span>
+                <span className="text-[13px] truncate">
+                  {t(section.labelKey)}
+                </span>
               )}
             </button>
           );
@@ -172,14 +183,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
         aria-label={toggleLabel}
         aria-expanded={!collapsed}
         title={toggleLabel}
-        className={`mt-auto flex items-center h-8 w-full rounded-lg cursor-pointer text-muted transition-colors hover:text-ink hover:bg-surface-strong ${
-          collapsed ? "justify-center" : "justify-start px-3"
+        className={`mt-auto flex items-center h-8 w-full rounded-lg cursor-pointer text-muted-soft transition-colors hover:text-ink hover:bg-ink/4 ${
+          collapsed ? "justify-center" : "justify-start px-2.5"
         }`}
       >
         {collapsed ? (
-          <ChevronRight width={18} height={18} />
+          <ChevronRight width={16} height={16} />
         ) : (
-          <ChevronLeft width={18} height={18} />
+          <ChevronLeft width={16} height={16} />
         )}
       </button>
     </div>

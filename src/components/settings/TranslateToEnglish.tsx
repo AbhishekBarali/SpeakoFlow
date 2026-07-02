@@ -21,7 +21,6 @@ export const TranslateToEnglish: React.FC<TranslateToEnglishProps> = React.memo(
         onChange={(enabled) => updateSetting("translate_to_english", enabled)}
         isUpdating={isUpdating("translate_to_english")}
         label={t("settings.advanced.translateToEnglish.label")}
-        description={t("settings.advanced.translateToEnglish.description")}
         descriptionMode={descriptionMode}
         grouped={grouped}
       />

@@ -29,9 +29,7 @@ const LlmModelSelector: React.FC = () => {
 
   const llmModels = useMemo(
     () =>
-      models.filter(
-        (m) => getModelCategory(m) === "llm" && m.is_downloaded,
-      ),
+      models.filter((m) => getModelCategory(m) === "llm" && m.is_downloaded),
     [models],
   );
 

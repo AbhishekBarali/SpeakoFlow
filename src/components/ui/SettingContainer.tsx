@@ -1,173 +1,114 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useRef, useState } from "react";
 import { Tooltip } from "./Tooltip";
 
 interface SettingContainerProps {
   title: string;
-  description: string;
+  /** Optional one-line caption rendered under the title. Only for settings
+   * whose name alone doesn't explain the behavior — most rows need none. */
+  description?: string;
+  /** Optional deep-dive help shown behind a small (i) icon. Use for
+   * "extra-extra" detail (formats, examples, tradeoffs) that would clutter
+   * the row as a caption. */
+  info?: string;
   children: React.ReactNode;
+  /** @deprecated Descriptions always render inline now; kept so existing
+   * call sites keep compiling. */
   descriptionMode?: "inline" | "tooltip";
   grouped?: boolean;
   layout?: "horizontal" | "stacked";
   disabled?: boolean;
+  /** @deprecated Kept for call-site compatibility. */
   tooltipPosition?: "top" | "bottom";
 }
 
-const InfoIcon: React.FC = () => (
-  <svg
-    className="w-3.5 h-3.5 text-muted-soft cursor-help hover:text-ink transition-colors duration-200 select-none"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-    aria-label="More information"
-    role="button"
-    tabIndex={0}
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-    />
-  </svg>
-);
+/** Small circled-i affordance revealing a tooltip with deep-dive help. */
+const InfoHint: React.FC<{ text: string }> = ({ text }) => {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLSpanElement>(null);
+  return (
+    <span
+      ref={ref}
+      className="relative inline-flex items-center text-muted-soft hover:text-muted transition-colors"
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+    >
+      <svg
+        className="w-[13px] h-[13px]"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={1.8}
+        viewBox="0 0 24 24"
+        aria-label="More information"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+        />
+      </svg>
+      {open && (
+        <Tooltip targetRef={ref} position="top">
+          <p className="text-xs leading-relaxed text-start">{text}</p>
+        </Tooltip>
+      )}
+    </span>
+  );
+};
 
+/**
+ * A single settings row: title (plus optional muted caption) on the left,
+ * control on the right. Stacked layout puts the control full-width below.
+ * Info policy: self-evident rows get nothing; behavior notes are quiet
+ * captions; deep detail hides behind the (i) hint.
+ */
 export const SettingContainer: React.FC<SettingContainerProps> = ({
   title,
   description,
+  info,
   children,
-  descriptionMode = "tooltip",
   grouped = false,
   layout = "horizontal",
   disabled = false,
-  tooltipPosition = "top",
 }) => {
-  const [showTooltip, setShowTooltip] = useState(false);
-  const tooltipRef = useRef<HTMLDivElement>(null);
+  const titleClasses = `text-[13px] font-normal leading-snug ${disabled ? "text-muted-soft" : "text-ink"}`;
+  const descriptionClasses = `mt-0.5 text-xs leading-snug max-w-md ${disabled ? "text-muted-soft" : "text-muted"}`;
 
-  // Handle click outside to close tooltip
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        tooltipRef.current &&
-        !tooltipRef.current.contains(event.target as Node)
-      ) {
-        setShowTooltip(false);
-      }
-    };
-
-    if (showTooltip) {
-      document.addEventListener("mousedown", handleClickOutside);
-      return () =>
-        document.removeEventListener("mousedown", handleClickOutside);
-    }
-  }, [showTooltip]);
-
-  const toggleTooltip = () => {
-    setShowTooltip(!showTooltip);
-  };
-
-  const titleClasses = `text-sm font-medium ${disabled ? "text-muted-soft" : "text-ink"}`;
-
-  const containerClasses = grouped
-    ? "px-4 py-3"
-    : "px-4 py-3 rounded-2xl border border-hairline bg-surface";
+  const titleRow = (
+    <div className="flex items-center gap-1.5 min-w-0">
+      <h3 className={`${titleClasses} truncate`}>{title}</h3>
+      {info && <InfoHint text={info} />}
+    </div>
+  );
 
   if (layout === "stacked") {
-    if (descriptionMode === "tooltip") {
-      return (
-        <div className={containerClasses}>
-          <div className="flex items-center gap-2 mb-2">
-            <h3 className={titleClasses}>{title}</h3>
-            <div
-              ref={tooltipRef}
-              className="relative flex items-center"
-              onMouseEnter={() => setShowTooltip(true)}
-              onMouseLeave={() => setShowTooltip(false)}
-              onClick={toggleTooltip}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  toggleTooltip();
-                }
-              }}
-            >
-              <InfoIcon />
-              {showTooltip && (
-                <Tooltip targetRef={tooltipRef} position="top">
-                  <p className="text-sm text-center leading-relaxed">
-                    {description}
-                  </p>
-                </Tooltip>
-              )}
-            </div>
-          </div>
-          <div className="w-full">{children}</div>
-        </div>
-      );
-    }
-
     return (
-      <div className={containerClasses}>
-        <div className="mb-2">
-          <h3 className={titleClasses}>{title}</h3>
-          <p
-            className={`text-sm ${disabled ? "text-muted-soft" : "text-muted"}`}
-          >
-            {description}
-          </p>
+      <div
+        className={
+          grouped
+            ? "px-4 py-3"
+            : "px-4 py-3 rounded-xl border border-hairline bg-surface"
+        }
+      >
+        <div className="mb-2.5">
+          {titleRow}
+          {description && <p className={descriptionClasses}>{description}</p>}
         </div>
         <div className="w-full">{children}</div>
       </div>
     );
   }
 
-  // Horizontal layout (default)
-  const horizontalContainerClasses = grouped
-    ? "flex items-center justify-between gap-4 px-4 py-3"
-    : "flex items-center justify-between gap-4 px-4 py-3 rounded-2xl border border-hairline bg-surface";
-
-  if (descriptionMode === "tooltip") {
-    return (
-      <div className={horizontalContainerClasses}>
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <h3 className={titleClasses}>{title}</h3>
-            <div
-              ref={tooltipRef}
-              className="relative flex items-center"
-              onMouseEnter={() => setShowTooltip(true)}
-              onMouseLeave={() => setShowTooltip(false)}
-              onClick={toggleTooltip}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  toggleTooltip();
-                }
-              }}
-            >
-              <InfoIcon />
-              {showTooltip && (
-                <Tooltip targetRef={tooltipRef} position={tooltipPosition}>
-                  <p className="text-sm text-center leading-relaxed">
-                    {description}
-                  </p>
-                </Tooltip>
-              )}
-            </div>
-          </div>
-        </div>
-        <div className="relative shrink-0">{children}</div>
-      </div>
-    );
-  }
-
   return (
-    <div className={horizontalContainerClasses}>
+    <div
+      className={
+        grouped
+          ? "flex items-center justify-between gap-6 px-4 py-3"
+          : "flex items-center justify-between gap-6 px-4 py-3 rounded-xl border border-hairline bg-surface"
+      }
+    >
       <div className="min-w-0">
-        <h3 className={titleClasses}>{title}</h3>
-        <p className={`text-sm ${disabled ? "text-muted-soft" : "text-muted"}`}>
-          {description}
-        </p>
+        {titleRow}
+        {description && <p className={descriptionClasses}>{description}</p>}
       </div>
       <div className="relative shrink-0">{children}</div>
     </div>

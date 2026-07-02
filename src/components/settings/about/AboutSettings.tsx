@@ -35,7 +35,7 @@ export const AboutSettings: React.FC = () => {
   }, []);
 
   return (
-    <div className="max-w-3xl w-full mx-auto space-y-8">
+    <div className="max-w-2xl w-full mx-auto space-y-8">
       <SettingsGroup>
         <AppLanguageSelector descriptionMode="tooltip" grouped={true} />
         <SettingContainer

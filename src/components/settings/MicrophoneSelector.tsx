@@ -44,7 +44,6 @@ export const MicrophoneSelector: React.FC<MicrophoneSelectorProps> = React.memo(
     return (
       <SettingContainer
         title={t("settings.sound.microphone.title")}
-        description={t("settings.sound.microphone.description")}
         descriptionMode={descriptionMode}
         grouped={grouped}
       >
