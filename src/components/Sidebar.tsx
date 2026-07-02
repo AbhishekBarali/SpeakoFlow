@@ -9,6 +9,7 @@ import {
   Info,
   Sparkles,
   MessageCircle,
+  Drama,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
@@ -24,6 +25,7 @@ import {
   PostProcessingSettings,
   ModelsSettings,
   AssistantSettings,
+  CharactersSettings,
 } from "./settings";
 
 export type SidebarSection = keyof typeof SECTIONS_CONFIG;
@@ -78,6 +80,12 @@ export const SECTIONS_CONFIG = {
     labelKey: "sidebar.assistant",
     icon: MessageCircle,
     component: AssistantSettings,
+    enabled: () => true,
+  },
+  characters: {
+    labelKey: "sidebar.characters",
+    icon: Drama,
+    component: CharactersSettings,
     enabled: () => true,
   },
   debug: {

@@ -2,7 +2,7 @@
 
 use crate::assistant::{self, AssistantConversation, FileAttachment};
 use crate::llm_client::ChatMessage;
-use crate::settings::{get_settings, write_settings};
+use crate::settings::{get_settings, write_settings, AssistantCharacter};
 use tauri::{AppHandle, Manager};
 
 /// Send a typed message to the assistant (keyboard alternative to voice).
@@ -27,6 +27,8 @@ pub async fn assistant_send_composed(
     include_screen: bool,
 ) -> Result<(), String> {
     let settings = get_settings(&app);
+    // The Cat character ignores the screen entirely — skip the capture.
+    let include_screen = include_screen && !settings.active_character_is_cat();
     let screenshot = if include_screen && settings.assistant_screenshot_enabled {
         // Tiny body only for Azure's gateway; loopback (built-in/local engine)
         // gets a balanced image, cloud gets the sharp one.
@@ -112,10 +114,21 @@ pub async fn assistant_read_image(path: String) -> Result<String, String> {
 #[tauri::command]
 #[specta::specta]
 pub async fn assistant_begin_region_snip(app: AppHandle) -> Result<(), String> {
-    let frame = tauri::async_runtime::spawn_blocking(crate::screenshot::capture_screen_raw)
-        .await
-        .map_err(|e| e.to_string())??;
-    assistant::open_snip_overlay(&app, frame)
+    // Pick the monitor under the cursor from Tauri's monitor list (the same
+    // multi-monitor-safe detector the recording overlay uses), capture THAT
+    // monitor, then open the overlay over it. Capturing the chosen monitor
+    // (rather than letting the capture pick its own) guarantees the frozen
+    // frame and the selection overlay line up on multi-monitor setups.
+    let monitor = crate::overlay::get_monitor_with_cursor(&app)
+        .ok_or_else(|| "No monitor available for region snip".to_string())?;
+    let center_x = monitor.position().x + (monitor.size().width as i32) / 2;
+    let center_y = monitor.position().y + (monitor.size().height as i32) / 2;
+    let frame = tauri::async_runtime::spawn_blocking(move || {
+        crate::screenshot::capture_monitor_at(center_x, center_y)
+    })
+    .await
+    .map_err(|e| e.to_string())??;
+    assistant::open_snip_overlay(&app, frame, monitor)
 }
 
 /// Rectangle chosen in the snip overlay, in that window's logical pixels.
@@ -347,19 +360,12 @@ pub fn set_assistant_tts_engine(app: AppHandle, engine: String) -> Result<(), St
     // Switching engine mid-playback should stop the current clip.
     crate::tts::stop_remote();
     let mut settings = get_settings(&app);
-    if settings.assistant_tts_engine != engine {
-        // Switching engines: reset the endpoint / model / remote voice to this
-        // engine's defaults so a stale value from the previous engine (most
-        // importantly the OpenAI base URL leaking into Azure and 404ing on Load
-        // voices / Test voice) never carries over. The API key is preserved on
-        // purpose so a hard-to-retype secret isn't lost on a toggle. Kokoro uses
-        // a separate voice field and none of these, so it's unaffected.
-        settings.assistant_tts_base_url = crate::settings::default_tts_base_url_for_engine(&engine);
-        settings.assistant_tts_model = crate::settings::default_tts_model_for_engine(&engine);
-        settings.assistant_tts_remote_voice =
-            crate::settings::default_tts_remote_voice_for_engine(&engine);
-    }
     settings.assistant_tts_engine = engine;
+    // Load THIS engine's own saved endpoint / model / voice / key into the flat
+    // fields (from the per-engine maps, falling back to the engine's defaults).
+    // Each engine keeps its own settings, so switching no longer wipes them or
+    // carries another engine's values (e.g. an OpenAI base URL / key) across.
+    settings.sync_active_tts_fields();
     write_settings(&app, settings);
     emit_settings_changed(&app);
     Ok(())
@@ -369,6 +375,10 @@ pub fn set_assistant_tts_engine(app: AppHandle, engine: String) -> Result<(), St
 #[specta::specta]
 pub fn set_assistant_tts_base_url(app: AppHandle, base_url: String) -> Result<(), String> {
     let mut settings = get_settings(&app);
+    let engine = settings.assistant_tts_engine.clone();
+    settings
+        .assistant_tts_base_urls
+        .insert(engine, base_url.clone());
     settings.assistant_tts_base_url = base_url;
     write_settings(&app, settings);
     emit_settings_changed(&app);
@@ -379,6 +389,10 @@ pub fn set_assistant_tts_base_url(app: AppHandle, base_url: String) -> Result<()
 #[specta::specta]
 pub fn set_assistant_tts_api_key(app: AppHandle, api_key: String) -> Result<(), String> {
     let mut settings = get_settings(&app);
+    let engine = settings.assistant_tts_engine.clone();
+    settings
+        .assistant_tts_api_keys
+        .insert(engine, api_key.clone());
     settings.assistant_tts_api_key = crate::settings::SecretString(api_key);
     write_settings(&app, settings);
     emit_settings_changed(&app);
@@ -389,6 +403,8 @@ pub fn set_assistant_tts_api_key(app: AppHandle, api_key: String) -> Result<(), 
 #[specta::specta]
 pub fn set_assistant_tts_model(app: AppHandle, model: String) -> Result<(), String> {
     let mut settings = get_settings(&app);
+    let engine = settings.assistant_tts_engine.clone();
+    settings.assistant_tts_models.insert(engine, model.clone());
     settings.assistant_tts_model = model;
     write_settings(&app, settings);
     emit_settings_changed(&app);
@@ -399,6 +415,10 @@ pub fn set_assistant_tts_model(app: AppHandle, model: String) -> Result<(), Stri
 #[specta::specta]
 pub fn set_assistant_tts_remote_voice(app: AppHandle, voice: String) -> Result<(), String> {
     let mut settings = get_settings(&app);
+    let engine = settings.assistant_tts_engine.clone();
+    settings
+        .assistant_tts_remote_voices
+        .insert(engine, voice.clone());
     settings.assistant_tts_remote_voice = voice;
     write_settings(&app, settings);
     emit_settings_changed(&app);
@@ -438,6 +458,22 @@ pub fn set_assistant_panel_opacity(app: AppHandle, opacity: f64) -> Result<(), S
     let mut settings = get_settings(&app);
     settings.assistant_panel_opacity = opacity.clamp(0.5, 1.0);
     write_settings(&app, settings);
+    emit_settings_changed(&app);
+    Ok(())
+}
+
+/// Set the expanded panel size preset ("compact", "standard", or "large") and
+/// resize the live panel window to match when it's currently expanded.
+#[tauri::command]
+#[specta::specta]
+pub fn set_assistant_panel_size(app: AppHandle, size: String) -> Result<(), String> {
+    if !matches!(size.as_str(), "compact" | "standard" | "large") {
+        return Err(format!("Unknown panel size: {}", size));
+    }
+    let mut settings = get_settings(&app);
+    settings.assistant_panel_size = size.clone();
+    write_settings(&app, settings);
+    assistant::apply_panel_size(&app, &size);
     emit_settings_changed(&app);
     Ok(())
 }
@@ -759,4 +795,259 @@ pub async fn assistant_test_web_search(
 ) -> Result<Vec<crate::web_search::SearchResult>, String> {
     let settings = get_settings(&app);
     crate::web_search::search(&settings, &query).await
+}
+
+// ---------------------------------------------------------------------------
+// Characters (assistant personas)
+// ---------------------------------------------------------------------------
+
+/// Switch the active character. Errors if the id no longer exists.
+#[tauri::command]
+#[specta::specta]
+pub fn set_assistant_active_character(app: AppHandle, id: String) -> Result<(), String> {
+    let mut settings = get_settings(&app);
+    if !settings.assistant_characters.iter().any(|c| c.id == id) {
+        return Err("That character no longer exists.".to_string());
+    }
+    settings.assistant_active_character_id = id;
+    write_settings(&app, settings);
+    emit_settings_changed(&app);
+    Ok(())
+}
+
+/// Replace the whole character list. Add / edit / reorder / duplicate / delete
+/// all funnel through here (like text replacements), which keeps the UI simple.
+/// Enforces the invariants: the non-deletable `default` character must remain,
+/// the list can't be empty, ids must be unique, and the active id must still
+/// resolve. The `default` character's prompt is mirrored back into
+/// `assistant_system_prompt` for backward compatibility.
+#[tauri::command]
+#[specta::specta]
+pub fn set_assistant_characters(
+    app: AppHandle,
+    characters: Vec<AssistantCharacter>,
+) -> Result<(), String> {
+    if characters.is_empty() {
+        return Err("At least one character is required.".to_string());
+    }
+    if !characters.iter().any(|c| c.id == "default") {
+        return Err("The default assistant character can't be removed.".to_string());
+    }
+    let mut seen = std::collections::HashSet::new();
+    for c in &characters {
+        if c.id.trim().is_empty() {
+            return Err("A character is missing an id.".to_string());
+        }
+        if !seen.insert(c.id.clone()) {
+            return Err(format!("Duplicate character id: {}", c.id));
+        }
+    }
+
+    let mut settings = get_settings(&app);
+    if !characters
+        .iter()
+        .any(|c| c.id == settings.assistant_active_character_id)
+    {
+        settings.assistant_active_character_id = "default".to_string();
+    }
+    // Keep the plain system prompt in sync with the default character so any
+    // legacy reader (and the first-run migration seed) stays correct.
+    if let Some(def) = characters.iter().find(|c| c.id == "default") {
+        if !def.prompt.trim().is_empty() {
+            settings.assistant_system_prompt = def.prompt.clone();
+        }
+    }
+    settings.assistant_characters = characters;
+    write_settings(&app, settings);
+    emit_settings_changed(&app);
+    Ok(())
+}
+
+/// Load an image file as a small avatar data URL (downscaled to 256px so it
+/// stays compact inside the settings file).
+#[tauri::command]
+#[specta::specta]
+pub async fn assistant_read_avatar(path: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::screenshot::image_file_to_avatar_data_url(&path)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Import a character from a JSON file on disk (path chosen via the UI's file
+/// dialog). The imported character always gets a fresh id and is never marked
+/// built-in, so it can't clobber a built-in or the non-deletable default.
+#[tauri::command]
+#[specta::specta]
+pub fn assistant_import_character(
+    app: AppHandle,
+    path: String,
+) -> Result<AssistantCharacter, String> {
+    let bytes = std::fs::read(&path).map_err(|e| format!("Couldn't read file: {}", e))?;
+    let mut character: AssistantCharacter = serde_json::from_slice(&bytes)
+        .map_err(|e| format!("That file isn't a valid character: {}", e))?;
+    character.id = new_character_id();
+    character.builtin = false;
+    if character.name.trim().is_empty() {
+        character.name = "Imported character".to_string();
+    }
+    let mut settings = get_settings(&app);
+    settings.assistant_characters.push(character.clone());
+    write_settings(&app, settings);
+    emit_settings_changed(&app);
+    Ok(character)
+}
+
+/// Export a single character to a JSON file on disk (path chosen via the UI's
+/// save dialog).
+#[tauri::command]
+#[specta::specta]
+pub fn assistant_export_character(app: AppHandle, id: String, path: String) -> Result<(), String> {
+    let settings = get_settings(&app);
+    let character = settings
+        .assistant_characters
+        .iter()
+        .find(|c| c.id == id)
+        .ok_or_else(|| "Character not found.".to_string())?;
+    let json = serde_json::to_string_pretty(character).map_err(|e| e.to_string())?;
+    std::fs::write(&path, json).map_err(|e| format!("Couldn't write file: {}", e))?;
+    Ok(())
+}
+
+/// A persona drafted by the model from a short description. Not persisted by
+/// the backend — the UI shows it for review, then saves it via
+/// `set_assistant_characters`.
+#[derive(serde::Serialize, serde::Deserialize, specta::Type)]
+pub struct GeneratedCharacter {
+    pub name: String,
+    pub prompt: String,
+    pub greeting: String,
+}
+
+/// Draft a character from a short natural-language description using the
+/// currently-configured assistant provider/model. Returns the drafted
+/// name/prompt/greeting for the user to review and save.
+#[tauri::command]
+#[specta::specta]
+pub async fn assistant_generate_character(
+    app: AppHandle,
+    description: String,
+) -> Result<GeneratedCharacter, String> {
+    let description = description.trim().to_string();
+    if description.is_empty() {
+        return Err("Describe the character you want first.".to_string());
+    }
+
+    let settings = get_settings(&app);
+    let provider = settings
+        .active_assistant_provider()
+        .cloned()
+        .ok_or_else(|| {
+            "No assistant provider configured. Pick one in Settings → Assistant.".to_string()
+        })?;
+    let model = settings
+        .assistant_models
+        .get(&provider.id)
+        .cloned()
+        .unwrap_or_default();
+    if model.trim().is_empty() {
+        return Err(format!(
+            "No model configured for provider '{}'. Set one in Settings → Assistant.",
+            provider.label
+        ));
+    }
+    let api_key = settings
+        .post_process_api_keys
+        .get(&provider.id)
+        .cloned()
+        .unwrap_or_default();
+
+    // The built-in local engine must be running before we can call it.
+    if provider.id == "builtin" {
+        let manager = app.state::<std::sync::Arc<crate::managers::local_llm::LocalLlmManager>>();
+        manager
+            .ensure_running(&model)
+            .await
+            .map_err(|e| e.to_string())?;
+    }
+
+    let system = "You design personas for a voice assistant. Given the user's description, invent a single character and respond with ONLY a JSON object (no prose, no markdown fences) with exactly these keys: \"name\" (a short display name, 2-24 characters), \"prompt\" (the system prompt for the persona, written in the second person — define its personality, tone, speaking style, and any quirks or constraints; it must stay genuinely helpful and must never be hateful, harassing, or target real people or protected groups), and \"greeting\" (a short in-character opening line, one sentence). Keep it tasteful and PG.".to_string();
+
+    let schema = if provider.supports_structured_output {
+        Some(serde_json::json!({
+            "type": "object",
+            "properties": {
+                "name": { "type": "string" },
+                "prompt": { "type": "string" },
+                "greeting": { "type": "string" }
+            },
+            "required": ["name", "prompt", "greeting"],
+            "additionalProperties": false
+        }))
+    } else {
+        None
+    };
+
+    let raw = crate::llm_client::send_chat_completion_with_schema(
+        &provider,
+        api_key,
+        &model,
+        description,
+        Some(system),
+        schema,
+        None,
+        None,
+    )
+    .await?
+    .ok_or_else(|| "The model returned no content.".to_string())?;
+
+    parse_generated_character(&raw)
+}
+
+/// Parse the model's reply into a GeneratedCharacter, tolerating markdown
+/// fences and surrounding prose by extracting the first `{...}` block.
+fn parse_generated_character(raw: &str) -> Result<GeneratedCharacter, String> {
+    #[derive(serde::Deserialize)]
+    struct Draft {
+        name: Option<String>,
+        prompt: Option<String>,
+        greeting: Option<String>,
+    }
+
+    let trimmed = raw.trim();
+    let json_slice = match (trimmed.find('{'), trimmed.rfind('}')) {
+        (Some(start), Some(end)) if end >= start => &trimmed[start..=end],
+        _ => trimmed,
+    };
+
+    let draft: Draft = serde_json::from_str(json_slice)
+        .map_err(|e| format!("Couldn't understand the model's reply: {}", e))?;
+
+    let prompt = draft.prompt.unwrap_or_default().trim().to_string();
+    if prompt.is_empty() {
+        return Err("The model didn't return a persona prompt — try again.".to_string());
+    }
+    let name = draft.name.unwrap_or_default().trim().to_string();
+    let name: String = if name.is_empty() {
+        "New character".to_string()
+    } else {
+        name.chars().take(40).collect()
+    };
+    let greeting = draft.greeting.unwrap_or_default().trim().to_string();
+    Ok(GeneratedCharacter {
+        name,
+        prompt,
+        greeting,
+    })
+}
+
+/// A reasonably-unique id for a new/imported character (avoids a uuid dep).
+fn new_character_id() -> String {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    format!("char-{}", nanos)
 }

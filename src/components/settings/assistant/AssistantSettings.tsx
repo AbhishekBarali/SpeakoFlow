@@ -7,6 +7,7 @@ import {
   type LocalLlmStatus,
   type AssistantResponseLength,
   type AssistantSearchDepth,
+  type ModelUnloadTimeout,
 } from "@/bindings";
 import {
   Dropdown,
@@ -14,7 +15,6 @@ import {
   SettingContainer,
   SettingsGroup,
   Slider,
-  Textarea,
   ToggleSwitch,
 } from "@/components/ui";
 import { Input } from "../../ui/Input";
@@ -255,7 +255,6 @@ export const AssistantSettings: React.FC = () => {
   }, [isBuiltin]);
 
   const [model, setModel] = useState("");
-  const [systemPrompt, setSystemPrompt] = useState("");
   const [historyLimit, setHistoryLimit] = useState("12");
   const [contextSize, setContextSize] = useState("4096");
   const [apiKey, setApiKey] = useState("");
@@ -409,10 +408,6 @@ export const AssistantSettings: React.FC = () => {
   }, [settings, selectedProviderId, selectedProvider]);
 
   useEffect(() => {
-    setSystemPrompt(settings?.assistant_system_prompt ?? "");
-  }, [settings?.assistant_system_prompt]);
-
-  useEffect(() => {
     setHistoryLimit(String(settings?.assistant_max_history_messages ?? 12));
   }, [settings?.assistant_max_history_messages]);
 
@@ -439,6 +434,53 @@ export const AssistantSettings: React.FC = () => {
     await commands.setLocalLlmContextSize(parsed);
     await refreshSettings();
   };
+
+  // Idle-unload timeout for the built-in local LLM engine: after this long with
+  // no use, the model is unloaded from RAM/VRAM (it reloads on next use). Mirrors
+  // the STT model-unload control; the extra 15s option only shows in debug mode.
+  const llmUnloadOptions = useMemo(() => {
+    // NOTE: the values are the serde snake_case forms the backend actually
+    // accepts ("min2", not the "min_2" specta emits for the TS type), matching
+    // ModelUnloadTimeout.tsx — hence the casts. Sending the specta form would
+    // fail to deserialize and silently not save.
+    const base: { value: ModelUnloadTimeout; label: string }[] = [
+      {
+        value: "never" as ModelUnloadTimeout,
+        label: t("settings.advanced.modelUnload.options.never"),
+      },
+      {
+        value: "immediately" as ModelUnloadTimeout,
+        label: t("settings.advanced.modelUnload.options.immediately"),
+      },
+      {
+        value: "min2" as ModelUnloadTimeout,
+        label: t("settings.advanced.modelUnload.options.min2"),
+      },
+      {
+        value: "min5" as ModelUnloadTimeout,
+        label: t("settings.advanced.modelUnload.options.min5"),
+      },
+      {
+        value: "min10" as ModelUnloadTimeout,
+        label: t("settings.advanced.modelUnload.options.min10"),
+      },
+      {
+        value: "min15" as ModelUnloadTimeout,
+        label: t("settings.advanced.modelUnload.options.min15"),
+      },
+      {
+        value: "hour1" as ModelUnloadTimeout,
+        label: t("settings.advanced.modelUnload.options.hour1"),
+      },
+    ];
+    if (settings?.debug_mode) {
+      base.push({
+        value: "sec15" as ModelUnloadTimeout,
+        label: t("settings.advanced.modelUnload.options.sec15"),
+      });
+    }
+    return base;
+  }, [t, settings?.debug_mode]);
 
   useEffect(() => {
     setTtsBaseUrl(settings?.assistant_tts_base_url ?? "");
@@ -519,11 +561,6 @@ export const AssistantSettings: React.FC = () => {
 
   const handleProviderSelect = async (providerId: string) => {
     await commands.setAssistantProvider(providerId);
-    await refreshSettings();
-  };
-
-  const handlePromptBlur = async () => {
-    await commands.changeAssistantSystemPromptSetting(systemPrompt);
     await refreshSettings();
   };
 
@@ -749,6 +786,29 @@ export const AssistantSettings: React.FC = () => {
               onChange={(e) => setContextSize(e.target.value)}
               onBlur={handleContextSizeBlur}
               className="w-[120px]"
+            />
+          </SettingContainer>
+        )}
+
+        {isBuiltin && (
+          <SettingContainer
+            title={t("settings.assistant.provider.unloadTimeoutLabel")}
+            info={t("settings.assistant.provider.unloadTimeoutDescription")}
+            layout="horizontal"
+            grouped={true}
+          >
+            <Dropdown
+              options={llmUnloadOptions}
+              selectedValue={
+                settings?.local_llm_unload_timeout ??
+                ("min5" as ModelUnloadTimeout)
+              }
+              onSelect={(value) =>
+                setAndRefresh(
+                  commands.setLocalLlmUnloadTimeout(value as ModelUnloadTimeout),
+                )
+              }
+              className="min-w-[200px]"
             />
           </SettingContainer>
         )}
@@ -1347,6 +1407,33 @@ export const AssistantSettings: React.FC = () => {
             }
           />
         </SettingContainer>
+        <SettingContainer
+          title={t("settings.assistant.appearance.panelSizeLabel")}
+          info={t("settings.assistant.appearance.panelSizeDescription")}
+          layout="horizontal"
+          grouped={true}
+        >
+          <Dropdown
+            options={[
+              {
+                value: "compact",
+                label: t("settings.assistant.appearance.panelSizes.compact"),
+              },
+              {
+                value: "standard",
+                label: t("settings.assistant.appearance.panelSizes.standard"),
+              },
+              {
+                value: "large",
+                label: t("settings.assistant.appearance.panelSizes.large"),
+              },
+            ]}
+            selectedValue={settings?.assistant_panel_size ?? "standard"}
+            onSelect={(size) =>
+              setAndRefresh(commands.setAssistantPanelSize(size))
+            }
+          />
+        </SettingContainer>
         <Slider
           value={settings?.assistant_panel_opacity ?? 1}
           onChange={(value) =>
@@ -1413,22 +1500,6 @@ export const AssistantSettings: React.FC = () => {
             className="w-[120px]"
           />
         </SettingContainer>
-        <MoreOptions>
-          <SettingContainer
-            title={t("settings.assistant.systemPrompt.label")}
-            info={t("settings.assistant.systemPrompt.description")}
-            layout="stacked"
-            grouped={true}
-          >
-            <Textarea
-              value={systemPrompt}
-              onChange={(e) => setSystemPrompt(e.target.value)}
-              onBlur={handlePromptBlur}
-              className="w-full"
-              rows={5}
-            />
-          </SettingContainer>
-        </MoreOptions>
       </SettingsGroup>
     </div>
   );

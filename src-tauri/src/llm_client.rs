@@ -179,6 +179,80 @@ fn effective_base_url(provider: &PostProcessProvider) -> String {
     raw.to_string()
 }
 
+/// Extract the plain-text content of a chat message whose `content` may be a
+/// string or an array of OpenAI-style content parts (text / image_url). Only
+/// text parts contribute; images are ignored.
+fn message_text(message: &Value) -> String {
+    match message.get("content") {
+        Some(Value::String(s)) => s.clone(),
+        Some(Value::Array(parts)) => parts
+            .iter()
+            .filter_map(|p| p.get("text").and_then(|t| t.as_str()))
+            .collect::<Vec<_>>()
+            .join("\n"),
+        _ => String::new(),
+    }
+}
+
+/// Fold a leading `system` message into the first `user` message.
+///
+/// The bundled llama.cpp engine (the "Built-in (Local)" provider) runs with
+/// `--jinja`, so it applies each model's own chat template. Some templates —
+/// notably Gemma's — reject a `system` role outright and require messages to
+/// start with `user` and strictly alternate, returning a 400 "Conversation
+/// roles must alternate user/assistant". To keep the zero-setup built-in
+/// provider working across every local model, we merge the system prompt into
+/// the first user turn instead of sending it as its own message. External
+/// providers (Ollama / LM Studio / cloud) manage their own templating and are
+/// never passed through this.
+fn fold_system_into_first_user(messages: &mut Vec<Value>) {
+    // Only act when the first message is a system message.
+    let leads_with_system = messages
+        .first()
+        .and_then(|m| m.get("role"))
+        .and_then(|r| r.as_str())
+        == Some("system");
+    if !leads_with_system {
+        return;
+    }
+
+    let system_msg = messages.remove(0);
+    let system_text = message_text(&system_msg);
+    if system_text.trim().is_empty() {
+        return;
+    }
+
+    // Graft the system text onto the first user message.
+    if let Some(user_msg) = messages
+        .iter_mut()
+        .find(|m| m.get("role").and_then(|r| r.as_str()) == Some("user"))
+    {
+        match user_msg.get_mut("content") {
+            Some(Value::String(s)) => {
+                *s = format!("{}\n\n{}", system_text, s);
+            }
+            // Multimodal content (text + image parts): prepend a text part so
+            // the system prompt still leads the turn without disturbing images.
+            Some(Value::Array(parts)) => {
+                parts.insert(
+                    0,
+                    serde_json::json!({ "type": "text", "text": format!("{}\n\n", system_text) }),
+                );
+            }
+            _ => {
+                user_msg["content"] = Value::String(system_text);
+            }
+        }
+    } else {
+        // No user message to attach to — re-add the content as a user turn so
+        // the request isn't empty and still satisfies the alternation rule.
+        messages.insert(
+            0,
+            serde_json::json!({ "role": "user", "content": system_text }),
+        );
+    }
+}
+
 /// Send a chat completion request to an OpenAI-compatible API
 /// Returns Ok(Some(content)) on success, Ok(None) if response has no content,
 /// or Err on actual errors (HTTP, parsing, etc.)
@@ -235,6 +309,13 @@ pub async fn send_chat_completion_with_schema(
 
     // Add user message
     messages.push(serde_json::json!({"role": "user", "content": user_content}));
+
+    // The built-in engine applies the model's own Jinja chat template; fold any
+    // system message into the first user turn so templates without a system
+    // role (e.g. Gemma) don't reject the request.
+    if provider.id == "builtin" {
+        fold_system_into_first_user(&mut messages);
+    }
 
     // Build response_format if schema is provided
     let response_format = json_schema.map(|schema| ResponseFormat {
@@ -309,7 +390,7 @@ pub async fn send_chat_stream(
     provider: &PostProcessProvider,
     api_key: String,
     model: &str,
-    messages: Vec<Value>,
+    mut messages: Vec<Value>,
     mut on_token: impl FnMut(&str),
 ) -> Result<String, String> {
     let base_url = effective_base_url(provider);
@@ -318,6 +399,13 @@ pub async fn send_chat_stream(
     debug!("Sending streaming chat completion request to: {}", url);
 
     let client = create_client(provider, &api_key)?;
+
+    // The built-in engine applies the model's own Jinja chat template; fold any
+    // system message into the first user turn so templates without a system
+    // role (e.g. Gemma) don't 400 with "roles must alternate user/assistant".
+    if provider.id == "builtin" {
+        fold_system_into_first_user(&mut messages);
+    }
 
     let request_body = ChatCompletionRequest {
         model: model.to_string(),
@@ -524,5 +612,70 @@ mod tests {
         assert!(azure_openai_host("https://res.services.ai.azure.com/api/projects/p").is_some());
         assert!(azure_openai_host("https://api.openai.com/v1").is_none());
         assert!(azure_openai_host("http://localhost:11434/v1").is_none());
+    }
+
+    #[test]
+    fn fold_system_merges_into_string_user_message() {
+        let mut messages = vec![
+            serde_json::json!({"role": "system", "content": "You are helpful."}),
+            serde_json::json!({"role": "user", "content": "Hi there"}),
+        ];
+        fold_system_into_first_user(&mut messages);
+
+        // System turn is gone; conversation now starts with user.
+        assert_eq!(messages.len(), 1);
+        assert_eq!(messages[0]["role"], "user");
+        assert_eq!(messages[0]["content"], "You are helpful.\n\nHi there");
+    }
+
+    #[test]
+    fn fold_system_preserves_history_alternation() {
+        let mut messages = vec![
+            serde_json::json!({"role": "system", "content": "SYS"}),
+            serde_json::json!({"role": "user", "content": "first"}),
+            serde_json::json!({"role": "assistant", "content": "reply"}),
+            serde_json::json!({"role": "user", "content": "second"}),
+        ];
+        fold_system_into_first_user(&mut messages);
+
+        // Only the FIRST user message absorbs the system prompt; the rest keep
+        // their strict user/assistant/user alternation (what Gemma requires).
+        assert_eq!(messages.len(), 3);
+        assert_eq!(messages[0]["role"], "user");
+        assert_eq!(messages[0]["content"], "SYS\n\nfirst");
+        assert_eq!(messages[1]["role"], "assistant");
+        assert_eq!(messages[2]["role"], "user");
+        assert_eq!(messages[2]["content"], "second");
+    }
+
+    #[test]
+    fn fold_system_prepends_text_part_for_multimodal_user() {
+        let mut messages = vec![
+            serde_json::json!({"role": "system", "content": "SYS"}),
+            serde_json::json!({"role": "user", "content": [
+                {"type": "text", "text": "what is this"},
+                {"type": "image_url", "image_url": {"url": "data:image/png;base64,AAAA"}}
+            ]}),
+        ];
+        fold_system_into_first_user(&mut messages);
+
+        assert_eq!(messages.len(), 1);
+        let parts = messages[0]["content"].as_array().unwrap();
+        // A leading text part carries the system prompt; the image is untouched.
+        assert_eq!(parts[0]["type"], "text");
+        assert_eq!(parts[0]["text"], "SYS\n\n");
+        assert_eq!(parts[1]["type"], "text");
+        assert_eq!(parts[2]["type"], "image_url");
+    }
+
+    #[test]
+    fn fold_system_is_noop_without_leading_system() {
+        let mut messages = vec![
+            serde_json::json!({"role": "user", "content": "hello"}),
+            serde_json::json!({"role": "assistant", "content": "hi"}),
+        ];
+        let before = messages.clone();
+        fold_system_into_first_user(&mut messages);
+        assert_eq!(messages, before);
     }
 }

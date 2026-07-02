@@ -36,6 +36,13 @@ const PROBE_ACCOUNT: &str = "__speakoflow_keychain_probe__";
 /// Account name for the single assistant TTS API key.
 pub const ACCOUNT_ASSISTANT_TTS: &str = "assistant_tts";
 
+/// Account name for a per-engine assistant TTS key, keyed by engine id
+/// (e.g. `assistant_tts:openai`). Each remote TTS engine (openai / elevenlabs /
+/// azure) keeps its own key instead of sharing one slot.
+pub fn account_assistant_tts(engine: &str) -> String {
+    format!("assistant_tts:{engine}")
+}
+
 /// Account name for a post-processing/assistant provider key, keyed by provider
 /// id (e.g. `post_process:openai`).
 pub fn account_post_process(provider_id: &str) -> String {

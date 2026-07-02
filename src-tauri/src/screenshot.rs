@@ -137,11 +137,15 @@ pub fn capture_screen_data_url(profile: CaptureProfile) -> Result<String, String
     Ok(format!("data:image/jpeg;base64,{}", encoded))
 }
 
-/// Capture the active monitor into a raw image (no scaling/encoding), for the
-/// region-snip flow: grab the frame BEFORE the selection overlay opens, then
-/// crop the user's rectangle out of it afterwards.
-pub fn capture_screen_raw() -> Result<DynamicImage, String> {
-    let monitor = pick_monitor()?;
+/// Capture a SPECIFIC monitor — the one containing the physical point (x, y) —
+/// into a raw image (no scaling/encoding), for the region-snip flow: grab the
+/// frame BEFORE the selection overlay opens, then crop the user's rectangle out
+/// of it afterwards. Capturing the caller-chosen monitor (rather than letting
+/// the capture pick its own) keeps the frozen frame aligned with the selection
+/// overlay on multi-monitor setups. Falls back to the monitor under the cursor,
+/// then the primary.
+pub fn capture_monitor_at(x: i32, y: i32) -> Result<DynamicImage, String> {
+    let monitor = Monitor::from_point(x, y).or_else(|_| pick_monitor())?;
     let rgba = monitor
         .capture_image()
         .map_err(|e| format!("Screen capture failed: {}", e))?;
@@ -194,6 +198,20 @@ pub fn image_file_to_data_url(path: &str) -> Result<String, String> {
     }
     let img = image::open(path).map_err(|e| format!("Can't open image: {}", e))?;
     let buf = encode_jpeg(&scaled(&img, 1568), 80)?;
+    let encoded = base64::engine::general_purpose::STANDARD.encode(&buf);
+    Ok(format!("data:image/jpeg;base64,{}", encoded))
+}
+
+/// Load an image file from disk and return a SMALL square-ish data URL suitable
+/// for a character avatar. Avatars are stored inline in the settings file, so
+/// they're capped tightly (256px longest edge) to keep settings compact.
+pub fn image_file_to_avatar_data_url(path: &str) -> Result<String, String> {
+    let meta = std::fs::metadata(path).map_err(|e| format!("Can't read file: {}", e))?;
+    if meta.len() > 25 * 1024 * 1024 {
+        return Err("Image is too large (over 25 MB)".to_string());
+    }
+    let img = image::open(path).map_err(|e| format!("Can't open image: {}", e))?;
+    let buf = encode_jpeg(&scaled(&img, 256), 82)?;
     let encoded = base64::engine::general_purpose::STANDARD.encode(&buf);
     Ok(format!("data:image/jpeg;base64,{}", encoded))
 }

@@ -9,6 +9,7 @@ import { OutputDeviceSelector } from "../OutputDeviceSelector";
 import { AudioFeedback } from "../AudioFeedback";
 import { AppearanceSelector } from "../AppearanceSelector";
 import { TextSizeSelector } from "../TextSizeSelector";
+import { TapToLock } from "../TapToLock";
 import { useSettings } from "../../../hooks/useSettings";
 import { VolumeSlider } from "../VolumeSlider";
 import { MuteWhileRecording } from "../MuteWhileRecording";
@@ -24,6 +25,7 @@ export const GeneralSettings: React.FC = () => {
         <ShortcutInput shortcutId="transcribe" grouped={true} />
         {/* Cancel shortcut is hidden on Linux (dynamic shortcut instability). */}
         {!isLinux && <ShortcutInput shortcutId="cancel" grouped={true} />}
+        <TapToLock descriptionMode="tooltip" grouped={true} />
       </SettingsGroup>
       <SettingsGroup title={t("appearance.title")}>
         <AppearanceSelector descriptionMode="tooltip" grouped={true} />

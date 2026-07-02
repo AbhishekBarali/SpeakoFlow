@@ -93,6 +93,49 @@ pub struct LLMPrompt {
     pub prompt: String,
 }
 
+/// What powers a character's replies. Most characters are `Llm` (their `prompt`
+/// becomes the system prompt). `Cat` is a joke character that ignores the LLM
+/// entirely and just meows — see `assistant::run_cat_turn`.
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum AssistantCharacterKind {
+    /// Normal persona: `prompt` is used as the assistant's system prompt.
+    #[default]
+    Llm,
+    /// Novelty persona with no model call — replies are random "meow"s.
+    Cat,
+}
+
+/// A selectable assistant persona ("character"). The active character's
+/// `prompt` overrides the plain `assistant_system_prompt` for LLM turns; its
+/// `name`/`avatar` label the panel. Built-ins ship with the app; users can add,
+/// edit, duplicate, import, AI-generate, and delete their own (the `default`
+/// character can never be deleted).
+#[derive(Serialize, Deserialize, Debug, Clone, Type)]
+pub struct AssistantCharacter {
+    /// Stable identifier. `"default"` is reserved for the non-deletable base
+    /// assistant; `"cat"` for the built-in joke character.
+    pub id: String,
+    /// Display name shown in the panel header and the picker.
+    pub name: String,
+    /// System prompt / persona. Ignored for `Cat`.
+    #[serde(default)]
+    pub prompt: String,
+    /// Optional in-character opening line shown in the panel's empty state.
+    #[serde(default)]
+    pub greeting: String,
+    /// Optional avatar as a `data:image/...;base64,...` URL (empty → initial).
+    #[serde(default)]
+    pub avatar: String,
+    /// What powers this character's replies.
+    #[serde(default)]
+    pub kind: AssistantCharacterKind,
+    /// True for characters shipped with the app. Built-ins may be edited or
+    /// duplicated; only `default` is protected from deletion.
+    #[serde(default)]
+    pub builtin: bool,
+}
+
 /// Case transform applied to the output of a text replacement rule.
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default, Type)]
 #[serde(rename_all = "snake_case")]
@@ -447,7 +490,7 @@ impl Default for OrtAcceleratorSetting {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Type)]
+#[derive(Clone, Default, Serialize, Deserialize, Type)]
 #[serde(transparent)]
 pub(crate) struct SecretMap(HashMap<String, String>);
 
@@ -494,6 +537,12 @@ impl fmt::Debug for SecretString {
 pub struct AppSettings {
     pub bindings: HashMap<String, ShortcutBinding>,
     pub push_to_talk: bool,
+    /// While a push-to-talk (hold) recording is active, a quick tap of Shift
+    /// converts it to hands-free (locked) mode so you can let go of the hotkey
+    /// and keep talking. On by default; turn off if a stray Shift tap keeps
+    /// locking your recordings. Only relevant while push-to-talk is on.
+    #[serde(default = "default_tap_to_lock")]
+    pub tap_to_lock: bool,
     pub audio_feedback: bool,
     #[serde(default = "default_audio_feedback_volume")]
     pub audio_feedback_volume: f32,
@@ -619,6 +668,22 @@ pub struct AppSettings {
     pub assistant_tts_model: String,
     #[serde(default = "default_assistant_tts_remote_voice")]
     pub assistant_tts_remote_voice: String,
+    /// Per-engine remote-TTS configuration. The flat `assistant_tts_base_url`,
+    /// `assistant_tts_model`, `assistant_tts_remote_voice`, and
+    /// `assistant_tts_api_key` fields above are a denormalized MIRROR of
+    /// whichever engine is currently active (kept so `tts.rs` and the settings
+    /// UI can read a single value). These maps are the source of truth, keyed by
+    /// engine id ("openai" / "elevenlabs" / "azure"), so each engine keeps its
+    /// own endpoint, model, voice, and API key instead of sharing one slot and
+    /// getting wiped when the engine is switched.
+    #[serde(default)]
+    pub assistant_tts_base_urls: HashMap<String, String>,
+    #[serde(default)]
+    pub assistant_tts_models: HashMap<String, String>,
+    #[serde(default)]
+    pub assistant_tts_remote_voices: HashMap<String, String>,
+    #[serde(default)]
+    pub assistant_tts_api_keys: SecretMap,
     #[serde(default = "default_assistant_tts_kokoro_dtype")]
     pub assistant_tts_kokoro_dtype: String,
     /// Playback speed multiplier for spoken assistant summaries. 1.0 is normal;
@@ -636,6 +701,14 @@ pub struct AppSettings {
     pub local_llm_context_size: u32,
     #[serde(default)]
     pub assistant_response_length: AssistantResponseLength,
+    /// Selectable assistant personas. The active one's prompt overrides
+    /// `assistant_system_prompt` for LLM turns. Seeded with built-ins on first
+    /// run (see `default_assistant_characters`).
+    #[serde(default)]
+    pub assistant_characters: Vec<AssistantCharacter>,
+    /// Id of the currently active character (defaults to `"default"`).
+    #[serde(default = "default_active_character_id")]
+    pub assistant_active_character_id: String,
     #[serde(default = "default_assistant_font_size")]
     pub assistant_font_size: String,
     /// Surface opacity of the floating assistant panel (0.5–1.0). At 1.0 the
@@ -647,6 +720,12 @@ pub struct AppSettings {
     /// settings.
     #[serde(default = "default_assistant_panel_opacity")]
     pub assistant_panel_opacity: f64,
+    /// Overall size of the expanded floating assistant panel: "compact",
+    /// "standard" (default), or "large". Chosen in Panel Appearance settings and
+    /// applied as the window's logical width/height. A manual drag-resize still
+    /// overrides it for the current session.
+    #[serde(default = "default_assistant_panel_size")]
+    pub assistant_panel_size: String,
     /// Whether starting a plain dictation should silence an assistant reply
     /// that is still being read aloud. Off by default — earphone users often
     /// want to keep listening while they dictate. (Asking the assistant a NEW
@@ -1045,6 +1124,74 @@ fn default_assistant_screenshot_enabled() -> bool {
     true
 }
 
+fn default_active_character_id() -> String {
+    "default".to_string()
+}
+
+/// The base (non-deletable) assistant character, seeded from the user's current
+/// system prompt so upgrades preserve any customization.
+fn default_assistant_character(system_prompt: &str) -> AssistantCharacter {
+    let prompt = if system_prompt.trim().is_empty() {
+        default_assistant_system_prompt()
+    } else {
+        system_prompt.to_string()
+    };
+    AssistantCharacter {
+        id: "default".to_string(),
+        name: "Assistant".to_string(),
+        prompt,
+        greeting: String::new(),
+        avatar: String::new(),
+        kind: AssistantCharacterKind::Llm,
+        builtin: true,
+    }
+}
+
+/// Built-in starter characters seeded on first run. `default` is always first
+/// and can never be deleted; the rest are editable, duplicatable examples that
+/// show off what personas can do.
+pub fn default_assistant_characters(system_prompt: &str) -> Vec<AssistantCharacter> {
+    vec![
+        default_assistant_character(system_prompt),
+        AssistantCharacter {
+            id: "math_teacher".to_string(),
+            name: "Math Teacher".to_string(),
+            prompt: "You are a patient, encouraging math teacher. Explain concepts step by step in plain language, show your working, and use short worked examples instead of jargon. When it helps, check the learner's understanding with a quick question. The user is speaking to you, so expect transcription quirks and infer the intended math.".to_string(),
+            greeting: "Hi! What are we working on today?".to_string(),
+            avatar: String::new(),
+            kind: AssistantCharacterKind::Llm,
+            builtin: true,
+        },
+        AssistantCharacter {
+            id: "short_explainer".to_string(),
+            name: "Short Explainer".to_string(),
+            prompt: "You explain things as briefly and clearly as possible. Answer in one to three short sentences, in plain language, with no preamble and no filler. If a topic truly needs more, give only the single most useful extra sentence and stop.".to_string(),
+            greeting: "Ask me anything — I'll keep it short.".to_string(),
+            avatar: String::new(),
+            kind: AssistantCharacterKind::Llm,
+            builtin: true,
+        },
+        AssistantCharacter {
+            id: "karen".to_string(),
+            name: "Karen".to_string(),
+            prompt: "You are 'Karen', a comedic, over-the-top entitled-customer character. You're dramatic, you keep threatening to speak to the manager, and you're certain you're always right — but it's all in good fun: never cruel, never discriminatory, and never aimed at real people or groups. Despite the theatrics, you actually help the user with what they asked, just wrapped in melodramatic Karen flair. Keep it light and PG.".to_string(),
+            greeting: "Excuse me. I'd like to speak to the manager… but fine, I suppose you'll have to do. What do you need?".to_string(),
+            avatar: String::new(),
+            kind: AssistantCharacterKind::Llm,
+            builtin: true,
+        },
+        AssistantCharacter {
+            id: "cat".to_string(),
+            name: "Cat".to_string(),
+            prompt: String::new(),
+            greeting: "meow?".to_string(),
+            avatar: String::new(),
+            kind: AssistantCharacterKind::Cat,
+            builtin: true,
+        },
+    ]
+}
+
 fn default_assistant_tts_voice() -> String {
     "af_heart".to_string()
 }
@@ -1131,6 +1278,14 @@ fn default_assistant_panel_opacity() -> f64 {
     1.0
 }
 
+fn default_assistant_panel_size() -> String {
+    "standard".to_string()
+}
+
+fn default_tap_to_lock() -> bool {
+    true
+}
+
 fn default_assistant_font_size() -> String {
     "medium".to_string()
 }
@@ -1183,6 +1338,35 @@ fn ensure_assistant_defaults(settings: &mut AppSettings) -> bool {
         settings.assistant_system_prompt = default_assistant_system_prompt();
         changed = true;
     }
+    // Seed the built-in characters on first run, keyed off the (possibly
+    // customized) system prompt so the base "Assistant" preserves it.
+    if settings.assistant_characters.is_empty() {
+        settings.assistant_characters =
+            default_assistant_characters(&settings.assistant_system_prompt);
+        changed = true;
+    }
+    // The base "default" character must always exist — it's non-deletable and
+    // backs the plain system prompt. Re-seed it if a bad import/edit dropped it.
+    if !settings
+        .assistant_characters
+        .iter()
+        .any(|c| c.id == "default")
+    {
+        settings.assistant_characters.insert(
+            0,
+            default_assistant_character(&settings.assistant_system_prompt),
+        );
+        changed = true;
+    }
+    // Keep the active-character id pointing at a character that still exists.
+    if !settings
+        .assistant_characters
+        .iter()
+        .any(|c| c.id == settings.assistant_active_character_id)
+    {
+        settings.assistant_active_character_id = default_active_character_id();
+        changed = true;
+    }
     if settings.assistant_tts_voice.trim().is_empty() {
         settings.assistant_tts_voice = default_assistant_tts_voice();
         changed = true;
@@ -1206,6 +1390,41 @@ fn ensure_assistant_defaults(settings: &mut AppSettings) -> bool {
         settings.assistant_tts_remote_voice = default_assistant_tts_remote_voice();
         changed = true;
     }
+    // Migrate the legacy single-slot TTS config into the per-engine maps. Older
+    // builds stored one base URL / model / voice shared by every engine (and
+    // reset them on every engine switch). Seed the ACTIVE engine's slot from the
+    // flat fields so an upgrade preserves the user's current remote-TTS setup;
+    // other engines start empty and fall back to their own defaults. The flat
+    // fields stay a live mirror of the active engine (see sync_active_tts_fields).
+    // NOTE: the API key is migrated separately in hydrate_secrets, because at
+    // this point the flat key is still blanked (it lives in the keychain).
+    {
+        let engine = settings.assistant_tts_engine.clone();
+        if !settings.assistant_tts_base_url.trim().is_empty()
+            && !settings.assistant_tts_base_urls.contains_key(&engine)
+        {
+            settings
+                .assistant_tts_base_urls
+                .insert(engine.clone(), settings.assistant_tts_base_url.clone());
+            changed = true;
+        }
+        if !settings.assistant_tts_model.trim().is_empty()
+            && !settings.assistant_tts_models.contains_key(&engine)
+        {
+            settings
+                .assistant_tts_models
+                .insert(engine.clone(), settings.assistant_tts_model.clone());
+            changed = true;
+        }
+        if !settings.assistant_tts_remote_voice.trim().is_empty()
+            && !settings.assistant_tts_remote_voices.contains_key(&engine)
+        {
+            settings
+                .assistant_tts_remote_voices
+                .insert(engine.clone(), settings.assistant_tts_remote_voice.clone());
+            changed = true;
+        }
+    }
     if !matches!(
         settings.assistant_tts_kokoro_dtype.as_str(),
         "fp32" | "fp16" | "q8" | "q4" | "q4f16"
@@ -1227,6 +1446,13 @@ fn ensure_assistant_defaults(settings: &mut AppSettings) -> bool {
     }
     if !(0.5..=1.0).contains(&settings.assistant_panel_opacity) {
         settings.assistant_panel_opacity = default_assistant_panel_opacity();
+        changed = true;
+    }
+    if !matches!(
+        settings.assistant_panel_size.as_str(),
+        "compact" | "standard" | "large"
+    ) {
+        settings.assistant_panel_size = default_assistant_panel_size();
         changed = true;
     }
     // Web search: validate provider and backfill API-key slots for keyed
@@ -1410,6 +1636,7 @@ pub fn get_default_settings() -> AppSettings {
     AppSettings {
         bindings,
         push_to_talk: true,
+        tap_to_lock: default_tap_to_lock(),
         audio_feedback: false,
         audio_feedback_volume: default_audio_feedback_volume(),
         sound_theme: default_sound_theme(),
@@ -1477,13 +1704,20 @@ pub fn get_default_settings() -> AppSettings {
         assistant_tts_api_key: SecretString::default(),
         assistant_tts_model: default_assistant_tts_model(),
         assistant_tts_remote_voice: default_assistant_tts_remote_voice(),
+        assistant_tts_base_urls: HashMap::new(),
+        assistant_tts_models: HashMap::new(),
+        assistant_tts_remote_voices: HashMap::new(),
+        assistant_tts_api_keys: SecretMap::default(),
         assistant_tts_kokoro_dtype: default_assistant_tts_kokoro_dtype(),
         assistant_tts_speed: default_assistant_tts_speed(),
         assistant_max_history_messages: default_assistant_max_history_messages(),
         local_llm_context_size: default_local_llm_context_size(),
         assistant_response_length: AssistantResponseLength::default(),
+        assistant_characters: default_assistant_characters(&default_assistant_system_prompt()),
+        assistant_active_character_id: default_active_character_id(),
         assistant_font_size: default_assistant_font_size(),
         assistant_panel_opacity: default_assistant_panel_opacity(),
+        assistant_panel_size: default_assistant_panel_size(),
         assistant_tts_stop_on_dictation: false,
         assistant_web_search_enabled: false,
         assistant_web_search_provider: default_assistant_web_search_provider(),
@@ -1512,6 +1746,34 @@ impl AppSettings {
             .find(|provider| provider.id == self.assistant_provider_id)
     }
 
+    /// The currently selected character, falling back to the first available
+    /// (only `None` when the list is somehow empty).
+    pub fn active_character(&self) -> Option<&AssistantCharacter> {
+        self.assistant_characters
+            .iter()
+            .find(|c| c.id == self.assistant_active_character_id)
+            .or_else(|| self.assistant_characters.first())
+    }
+
+    /// Whether the active character is the no-LLM joke "Cat".
+    pub fn active_character_is_cat(&self) -> bool {
+        self.active_character()
+            .map(|c| c.kind == AssistantCharacterKind::Cat)
+            .unwrap_or(false)
+    }
+
+    /// The effective system prompt for an LLM turn: the active character's
+    /// prompt when it's an LLM persona with a non-empty prompt, otherwise the
+    /// plain `assistant_system_prompt`.
+    pub fn effective_system_prompt(&self) -> String {
+        if let Some(c) = self.active_character() {
+            if c.kind == AssistantCharacterKind::Llm && !c.prompt.trim().is_empty() {
+                return c.prompt.clone();
+            }
+        }
+        self.assistant_system_prompt.clone()
+    }
+
     pub fn post_process_provider(&self, provider_id: &str) -> Option<&PostProcessProvider> {
         self.post_process_providers
             .iter()
@@ -1525,6 +1787,40 @@ impl AppSettings {
         self.post_process_providers
             .iter_mut()
             .find(|provider| provider.id == provider_id)
+    }
+
+    /// Mirror the ACTIVE TTS engine's per-engine values (base URL, model, remote
+    /// voice, API key) into the flat `assistant_tts_*` fields that `tts.rs` and
+    /// the settings UI read. The per-engine maps are the source of truth; this
+    /// keeps the single "active" copy in sync so switching engines loads that
+    /// engine's own saved settings instead of sharing/wiping one slot. Falls
+    /// back to each engine's sensible default when a value hasn't been set.
+    pub fn sync_active_tts_fields(&mut self) {
+        let engine = self.assistant_tts_engine.clone();
+        self.assistant_tts_base_url = self
+            .assistant_tts_base_urls
+            .get(&engine)
+            .cloned()
+            .filter(|s| !s.trim().is_empty())
+            .unwrap_or_else(|| default_tts_base_url_for_engine(&engine));
+        self.assistant_tts_model = self
+            .assistant_tts_models
+            .get(&engine)
+            .cloned()
+            .filter(|s| !s.trim().is_empty())
+            .unwrap_or_else(|| default_tts_model_for_engine(&engine));
+        self.assistant_tts_remote_voice = self
+            .assistant_tts_remote_voices
+            .get(&engine)
+            .cloned()
+            .filter(|s| !s.trim().is_empty())
+            .unwrap_or_else(|| default_tts_remote_voice_for_engine(&engine));
+        self.assistant_tts_api_key = SecretString(
+            self.assistant_tts_api_keys
+                .get(&engine)
+                .cloned()
+                .unwrap_or_default(),
+        );
     }
 }
 
@@ -1579,12 +1875,35 @@ fn persist_hydrated_secrets(settings: &mut AppSettings) {
             }
         }
     }
-    if crate::secret_store::sync(
-        crate::secret_store::ACCOUNT_ASSISTANT_TTS,
-        &settings.assistant_tts_api_key.0,
-    ) {
-        settings.assistant_tts_api_key = SecretString::default();
+    // Per-engine assistant TTS keys → keychain, blanked on disk on success.
+    // First make sure the active engine's slot mirrors the flat key so a direct
+    // flat-field write can't be lost when we blank the flat copy below.
+    {
+        let engine = settings.assistant_tts_engine.clone();
+        if !settings.assistant_tts_api_key.0.is_empty() {
+            let entry = settings.assistant_tts_api_keys.entry(engine).or_default();
+            if entry.is_empty() {
+                *entry = settings.assistant_tts_api_key.0.clone();
+            }
+        }
     }
+    let tts_engines: Vec<String> = settings.assistant_tts_api_keys.keys().cloned().collect();
+    for engine in tts_engines {
+        let value = settings
+            .assistant_tts_api_keys
+            .get(&engine)
+            .cloned()
+            .unwrap_or_default();
+        if crate::secret_store::sync(&crate::secret_store::account_assistant_tts(&engine), &value) {
+            if let Some(slot) = settings.assistant_tts_api_keys.get_mut(&engine) {
+                slot.clear();
+            }
+        }
+    }
+    // The flat active-engine key is a derived mirror of the per-engine map; keep
+    // it out of the plaintext store (the value now lives in the keychain per
+    // engine, or in the map as the fallback when the keychain is unavailable).
+    settings.assistant_tts_api_key = SecretString::default();
 }
 
 /// One-time migration of legacy plaintext keys from the store into the keychain.
@@ -1631,6 +1950,25 @@ fn migrate_plaintext_secrets(settings: &mut AppSettings) -> bool {
             changed = true;
         }
     }
+    let tts_engines: Vec<String> = settings.assistant_tts_api_keys.keys().cloned().collect();
+    for engine in tts_engines {
+        let value = settings
+            .assistant_tts_api_keys
+            .get(&engine)
+            .cloned()
+            .unwrap_or_default();
+        if !value.is_empty()
+            && crate::secret_store::set(
+                &crate::secret_store::account_assistant_tts(&engine),
+                &value,
+            )
+        {
+            if let Some(slot) = settings.assistant_tts_api_keys.get_mut(&engine) {
+                slot.clear();
+            }
+            changed = true;
+        }
+    }
     if !settings.assistant_tts_api_key.0.is_empty()
         && crate::secret_store::set(
             crate::secret_store::ACCOUNT_ASSISTANT_TTS,
@@ -1664,8 +2002,27 @@ fn hydrate_secrets(settings: &mut AppSettings) {
             *value = secret;
         }
     }
+    // Per-engine assistant TTS keys from the keychain.
+    let tts_engines: Vec<String> = settings.assistant_tts_api_keys.keys().cloned().collect();
+    for engine in tts_engines {
+        if let Some(secret) =
+            crate::secret_store::get(&crate::secret_store::account_assistant_tts(&engine))
+        {
+            if let Some(slot) = settings.assistant_tts_api_keys.get_mut(&engine) {
+                *slot = secret;
+            }
+        }
+    }
+    // Legacy single-key migration: older builds stored one shared TTS key. Fold
+    // it into the ACTIVE engine's slot when that slot is still empty so an
+    // upgrade keeps the key. The flat `assistant_tts_api_key` mirror is then set
+    // by `sync_active_tts_fields` (called from `get_settings`).
     if let Some(secret) = crate::secret_store::get(crate::secret_store::ACCOUNT_ASSISTANT_TTS) {
-        settings.assistant_tts_api_key = SecretString(secret);
+        let engine = settings.assistant_tts_engine.clone();
+        let entry = settings.assistant_tts_api_keys.entry(engine).or_default();
+        if entry.is_empty() {
+            *entry = secret;
+        }
     }
 }
 
@@ -1771,6 +2128,12 @@ pub fn get_settings(app: &AppHandle) -> AppSettings {
     // first read, so this stays cheap on the hot path). No-op — leaving any
     // plaintext fallback in place — when the keychain is unavailable.
     hydrate_secrets(&mut settings);
+
+    // Mirror the active TTS engine's per-engine values into the flat fields
+    // `tts.rs` / the UI read. The per-engine maps are the source of truth; this
+    // must run after hydration so the active engine's API key (restored from the
+    // keychain into the map) is reflected in the flat field too.
+    settings.sync_active_tts_fields();
 
     settings
 }

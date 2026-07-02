@@ -1,6 +1,7 @@
 use crate::actions::ACTION_MAP;
 use crate::lock_watch::LockWatch;
 use crate::managers::audio::AudioRecordingManager;
+use crate::settings::get_settings;
 use log::{debug, error, warn};
 use std::sync::mpsc::{self, Sender};
 use std::sync::Arc;
@@ -124,10 +125,15 @@ impl TranscriptionCoordinator {
                                                 }
                                                 // Push-to-talk: arm tap-to-lock so a
                                                 // Shift tap can convert this hold to
-                                                // hands-free mid-recording.
+                                                // hands-free mid-recording — unless the
+                                                // user turned tap-to-lock off in settings.
                                                 RecordingMode::Hold => {
-                                                    if let Some(lw) = app.try_state::<LockWatch>() {
-                                                        lw.arm();
+                                                    if get_settings(&app).tap_to_lock {
+                                                        if let Some(lw) =
+                                                            app.try_state::<LockWatch>()
+                                                        {
+                                                            lw.arm();
+                                                        }
                                                     }
                                                 }
                                             }

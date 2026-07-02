@@ -144,7 +144,11 @@ fn force_overlay_topmost(overlay_window: &tauri::webview::WebviewWindow) {
     });
 }
 
-fn get_monitor_with_cursor(app_handle: &AppHandle) -> Option<tauri::Monitor> {
+/// Returns the `tauri::Monitor` currently under the mouse cursor (fallback:
+/// primary). Shared by the recording overlay and the assistant region-snip
+/// overlay so both place their windows with the same proven, multi-monitor-safe
+/// logic (see `calculate_overlay_position` for why logical coords matter).
+pub(crate) fn get_monitor_with_cursor(app_handle: &AppHandle) -> Option<tauri::Monitor> {
     if let Some(mouse_location) = input::get_cursor_position(app_handle) {
         if let Ok(monitors) = app_handle.available_monitors() {
             for monitor in monitors {

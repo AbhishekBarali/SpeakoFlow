@@ -1,5 +1,6 @@
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open as openFileDialog } from "@tauri-apps/plugin-dialog";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -10,6 +11,7 @@ import {
   ArrowUp,
   Camera,
   CameraOff,
+  ChevronDown,
   Check,
   Copy,
   Eraser,
@@ -29,7 +31,7 @@ import {
   VolumeX,
   X,
 } from "lucide-react";
-import { commands, type AppSettings } from "@/bindings";
+import { commands, type AppSettings, type AssistantCharacter } from "@/bindings";
 import { syncLanguageFromSettings } from "@/i18n";
 import { AudioWaveform } from "@/components/shared";
 import { FONT_SIZES, errorKind, type AssistantError } from "./appearance";
@@ -77,6 +79,38 @@ let attachmentSeq = 0;
 const nextAttachmentId = (): string => `att-${++attachmentSeq}`;
 
 const IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "gif", "webp", "bmp"];
+
+/** Small round avatar for a character: the uploaded image, a cat emoji for the
+ *  Cat, or the name's first initial. */
+const CharacterAvatar: React.FC<{
+  character: AssistantCharacter | null;
+  size: number;
+}> = ({ character, size }) => {
+  const dims = { width: size, height: size };
+  if (character?.avatar) {
+    return (
+      <img
+        className="assistant-character-avatar"
+        src={character.avatar}
+        alt=""
+        style={dims}
+      />
+    );
+  }
+  const fallback =
+    character?.kind === "cat"
+      ? "🐱"
+      : (character?.name.trim()[0] ?? "?").toUpperCase();
+  return (
+    <span
+      className="assistant-character-avatar"
+      style={{ ...dims, fontSize: Math.round(size * 0.5) }}
+      aria-hidden
+    >
+      {fallback}
+    </span>
+  );
+};
 
 /** Downscale a pasted image blob to a provider-friendly JPEG data URL (same
  *  1568px budget the backend uses for files picked from disk). */
@@ -184,6 +218,55 @@ const CodeBlock: React.FC<React.HTMLAttributes<HTMLPreElement>> = ({
 /** Shared react-markdown renderers (module scope — stable identity). */
 const MD_COMPONENTS = { pre: CodeBlock };
 
+/** Invisible edge/corner grips that drive Tauri's native window resize. The
+ *  panel window is borderless (no OS resize border — most noticeably on
+ *  Windows), so these provide reliable, easy resizing. Only rendered on the
+ *  expanded panel; the pill isn't resizable. */
+// Mirrors Tauri's (non-exported) ResizeDirection string union so we can type
+// the handles without importing an internal type.
+type ResizeDir =
+  | "North"
+  | "South"
+  | "East"
+  | "West"
+  | "NorthEast"
+  | "NorthWest"
+  | "SouthEast"
+  | "SouthWest";
+
+const RESIZE_HANDLES: { cls: string; dir: ResizeDir }[] = [
+  { cls: "n", dir: "North" },
+  { cls: "s", dir: "South" },
+  { cls: "e", dir: "East" },
+  { cls: "w", dir: "West" },
+  { cls: "ne", dir: "NorthEast" },
+  { cls: "nw", dir: "NorthWest" },
+  { cls: "se", dir: "SouthEast" },
+  { cls: "sw", dir: "SouthWest" },
+];
+
+const ResizeHandles: React.FC = () => {
+  const onDown = (e: React.MouseEvent, dir: ResizeDir) => {
+    // Primary button only; don't let the grip start a header drag or a text
+    // selection while the native resize loop runs.
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    void getCurrentWindow().startResizeDragging(dir);
+  };
+  return (
+    <>
+      {RESIZE_HANDLES.map(({ cls, dir }) => (
+        <div
+          key={cls}
+          className={`assistant-resize ${cls}`}
+          onMouseDown={(e) => onDown(e, dir)}
+        />
+      ))}
+    </>
+  );
+};
+
 const AssistantPanel: React.FC = () => {
   const { t } = useTranslation();
   // Conversation snapshots from the backend are the single source of truth;
@@ -202,6 +285,8 @@ const AssistantPanel: React.FC = () => {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [micLevels, setMicLevels] = useState<number[]>([]);
   const [visionActive, setVisionActive] = useState(false);
+  const [characterMenuOpen, setCharacterMenuOpen] = useState(false);
+  const characterMenuRef = useRef<HTMLDivElement>(null);
   const [mounted, setMounted] = useState(false);
   const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
@@ -225,6 +310,10 @@ const AssistantPanel: React.FC = () => {
   const ttsSpeed = settings?.assistant_tts_speed ?? 1;
   const screenshotEnabled = settings?.assistant_screenshot_enabled ?? true;
   const webSearchEnabled = settings?.assistant_web_search_enabled ?? false;
+  const characters = settings?.assistant_characters ?? [];
+  const activeCharacterId = settings?.assistant_active_character_id ?? "default";
+  const activeCharacter =
+    characters.find((c) => c.id === activeCharacterId) ?? characters[0] ?? null;
   const tts = useKokoroTts(ttsEnabled, ttsVoice, ttsDtype, ttsSpeed);
   const speakRef = useRef(tts.speak);
   speakRef.current = tts.speak;
@@ -241,6 +330,31 @@ const AssistantPanel: React.FC = () => {
       // bindings not ready yet
     }
   }, []);
+
+  const selectCharacter = useCallback(
+    async (id: string) => {
+      setCharacterMenuOpen(false);
+      try {
+        await commands.setAssistantActiveCharacter(id);
+        await refreshSettings();
+      } catch {
+        // best-effort — the picker just won't change on failure
+      }
+    },
+    [refreshSettings],
+  );
+
+  // Close the character switcher when clicking anywhere outside it.
+  useEffect(() => {
+    if (!characterMenuOpen) return;
+    const onDown = (e: MouseEvent) => {
+      if (!characterMenuRef.current?.contains(e.target as Node)) {
+        setCharacterMenuOpen(false);
+      }
+    };
+    window.addEventListener("mousedown", onDown);
+    return () => window.removeEventListener("mousedown", onDown);
+  }, [characterMenuOpen]);
 
   // Apply text size + surface opacity. The panel is dark-only (like the STT
   // overlay), so there is no theme resolution anymore.
@@ -986,6 +1100,7 @@ const AssistantPanel: React.FC = () => {
   return (
     <div className={shellClass}>
       <div className="assistant-panel">
+        <ResizeHandles />
         {dropActive && (
           <div className="assistant-drop-hint">
             <Paperclip size={14} />
@@ -999,7 +1114,42 @@ const AssistantPanel: React.FC = () => {
               data-tauri-drag-region
               title={busy ? t(`assistant.status.${state}`) : undefined}
             />
-            {t("assistant.title")}
+            <div className="assistant-character" ref={characterMenuRef}>
+              <button
+                type="button"
+                className="assistant-character-switch"
+                onClick={() => setCharacterMenuOpen((v) => !v)}
+                title={t("assistant.character.switch")}
+              >
+                <CharacterAvatar character={activeCharacter} size={18} />
+                <span className="assistant-character-name">
+                  {activeCharacter?.name ?? t("assistant.title")}
+                </span>
+                <ChevronDown size={12} className="as-chevron" />
+              </button>
+              {characterMenuOpen && (
+                <div className="assistant-character-menu">
+                  {characters.map((character) => (
+                    <button
+                      key={character.id}
+                      type="button"
+                      className={`assistant-character-item${
+                        character.id === activeCharacterId ? " active" : ""
+                      }`}
+                      onClick={() => selectCharacter(character.id)}
+                    >
+                      <CharacterAvatar character={character} size={18} />
+                      <span className="assistant-character-name">
+                        {character.name}
+                      </span>
+                      {character.id === activeCharacterId && (
+                        <Check size={13} className="as-check" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
           <div className="assistant-header-actions">
             <button
@@ -1038,7 +1188,11 @@ const AssistantPanel: React.FC = () => {
         <div className="assistant-messages" ref={listRef}>
           {history.length === 0 && state === "idle" && !error && (
             <div className="assistant-empty">
-              <p>{t("assistant.empty")}</p>
+              <p>
+                {activeCharacter?.greeting?.trim()
+                  ? activeCharacter.greeting
+                  : t("assistant.empty")}
+              </p>
             </div>
           )}
           {history.map((message, i) => (

@@ -26,6 +26,7 @@
     "advanced": "Advanced",
     "postProcessing": "Post Process",
     "assistant": "Assistant",
+    "characters": "Characters",
     "history": "History",
     "debug": "Debug",
     "about": "About",
@@ -238,6 +239,10 @@
       "pushToTalk": {
         "label": "Push To Talk",
         "description": "Hold to record, release to stop. Quick-tap to lock hands-free recording."
+      },
+      "tapToLock": {
+        "label": "Tap Shift to Lock",
+        "description": "While holding your record shortcut, a quick tap of Shift locks hands-free recording so you can let go and keep talking. Turn off if a stray Shift tap keeps locking your recordings."
       }
     },
     "models": {
@@ -704,12 +709,44 @@
         "builtinReady": "Runs fully on your device. No API key, no setup.",
         "builtinEngineMissing": "First use downloads a small local engine automatically (one time), then runs fully offline. No setup needed.",
         "contextSizeLabel": "Context window",
-        "contextSizeDescription": "Tokens the local model keeps in context. Larger remembers more but uses more memory. Default 4096."
+        "contextSizeDescription": "Tokens the local model keeps in context. Larger remembers more but uses more memory. Default 4096.",
+        "unloadTimeoutLabel": "Unload from memory after",
+        "unloadTimeoutDescription": "Free up RAM/VRAM by unloading the local model after it has been idle this long. It reloads automatically on next use."
       },
       "systemPrompt": {
         "title": "System Prompt",
         "label": "Assistant System Prompt",
         "description": "Sets the assistant's behavior."
+      },
+      "characters": {
+        "title": "Characters",
+        "description": "Personas you can talk to. The active character sets the assistant's name and personality, and its prompt replaces the plain system prompt. Switch anytime from the panel header.",
+        "galleryLabel": "Your characters",
+        "editSection": "Edit character",
+        "avatarLabel": "Avatar",
+        "active": "Active",
+        "meowsOnly": "Meows only",
+        "builtin": "Built-in",
+        "custom": "Custom",
+        "new": "New",
+        "newName": "New character",
+        "copyName": "{{name}} copy",
+        "createAi": "Create with AI",
+        "import": "Import",
+        "aiTitle": "Describe your character",
+        "aiClose": "Close",
+        "aiPlaceholder": "e.g. a patient chess coach who explains every move, or a cheerful barista who loves puns",
+        "generate": "Generate",
+        "avatarUpload": "Upload image",
+        "avatarRemove": "Remove",
+        "nameLabel": "Name",
+        "promptLabel": "Personality (system prompt)",
+        "greetingLabel": "Greeting",
+        "greetingPlaceholder": "Optional opening line shown in an empty chat",
+        "catNote": "The Cat ignores the AI entirely — it just meows. Nothing to configure here.",
+        "duplicate": "Duplicate",
+        "export": "Export",
+        "delete": "Delete"
       },
       "behavior": {
         "title": "Behavior"
@@ -836,6 +873,13 @@
           "medium": "Medium",
           "large": "Large"
         },
+        "panelSizeLabel": "Panel size",
+        "panelSizeDescription": "Overall size of the floating assistant panel. You can also drag its edges to resize.",
+        "panelSizes": {
+          "compact": "Compact",
+          "standard": "Standard",
+          "large": "Large"
+        },
         "opacityLabel": "Panel opacity",
         "opacityDescription": "How opaque the floating panel is. 100% is fully solid; lower values let the desktop blur through."
       }
@@ -924,6 +968,9 @@
   },
   "assistant": {
     "title": "Assistant",
+    "character": {
+      "switch": "Switch character"
+    },
     "empty": "Ask by voice with your assistant shortcut,\nor type below.",
     "inputPlaceholder": "Message…",
     "inputPlaceholderScreen": "Ask about your screen…",

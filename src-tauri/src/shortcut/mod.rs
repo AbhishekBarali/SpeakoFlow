@@ -487,6 +487,18 @@ pub fn change_ptt_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
     Ok(())
 }
 
+/// Toggle the "tap Shift to lock a hold recording hands-free" gesture. When
+/// off, holding the hotkey never arms the Shift watcher, so a stray Shift tap
+/// can't convert an in-progress recording to hands-free.
+#[tauri::command]
+#[specta::specta]
+pub fn change_tap_to_lock_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    settings.tap_to_lock = enabled;
+    settings::write_settings(&app, settings);
+    Ok(())
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn change_audio_feedback_setting(app: AppHandle, enabled: bool) -> Result<(), String> {

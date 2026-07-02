@@ -29,6 +29,19 @@ async changePttSetting(enabled: boolean) : Promise<Result<null, string>> {
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * Toggle the "tap Shift to lock a hold recording hands-free" gesture. When
+ * off, holding the hotkey never arms the Shift watcher, so a stray Shift tap
+ * can't convert an in-progress recording to hands-free.
+ */
+async changeTapToLockSetting(enabled: boolean) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("change_tap_to_lock_setting", { enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async changeAudioFeedbackSetting(enabled: boolean) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("change_audio_feedback_setting", { enabled }) };
@@ -1159,6 +1172,83 @@ async changeAssistantSystemPromptSetting(prompt: string) : Promise<Result<null, 
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * Switch the active character. Errors if the id no longer exists.
+ */
+async setAssistantActiveCharacter(id: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_assistant_active_character", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Replace the whole character list. Add / edit / reorder / duplicate / delete
+ * all funnel through here (like text replacements), which keeps the UI simple.
+ * Enforces the invariants: the non-deletable `default` character must remain,
+ * the list can't be empty, ids must be unique, and the active id must still
+ * resolve. The `default` character's prompt is mirrored back into
+ * `assistant_system_prompt` for backward compatibility.
+ */
+async setAssistantCharacters(characters: AssistantCharacter[]) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_assistant_characters", { characters }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Load an image file as a small avatar data URL (downscaled to 256px so it
+ * stays compact inside the settings file).
+ */
+async assistantReadAvatar(path: string) : Promise<Result<string, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("assistant_read_avatar", { path }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Import a character from a JSON file on disk (path chosen via the UI's file
+ * dialog). The imported character always gets a fresh id and is never marked
+ * built-in, so it can't clobber a built-in or the non-deletable default.
+ */
+async assistantImportCharacter(path: string) : Promise<Result<AssistantCharacter, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("assistant_import_character", { path }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Export a single character to a JSON file on disk (path chosen via the UI's
+ * save dialog).
+ */
+async assistantExportCharacter(id: string, path: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("assistant_export_character", { id, path }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Draft a character from a short natural-language description using the
+ * currently-configured assistant provider/model. Returns the drafted
+ * name/prompt/greeting for the user to review and save.
+ */
+async assistantGenerateCharacter(description: string) : Promise<Result<GeneratedCharacter, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("assistant_generate_character", { description }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async setAssistantScreenshotEnabled(enabled: boolean) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("set_assistant_screenshot_enabled", { enabled }) };
@@ -1264,6 +1354,18 @@ async setAssistantTtsSpeed(speed: number) : Promise<Result<null, string>> {
 async setAssistantPanelOpacity(opacity: number) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("set_assistant_panel_opacity", { opacity }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Set the expanded panel size preset ("compact", "standard", or "large") and
+ * resize the live panel window to match when it's currently expanded.
+ */
+async setAssistantPanelSize(size: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_assistant_panel_size", { size }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -1571,7 +1673,14 @@ historyUpdatePayload: "history-update-payload"
 
 /** user-defined types **/
 
-export type AppSettings = { bindings: Partial<{ [key in string]: ShortcutBinding }>; push_to_talk: boolean; audio_feedback: boolean; audio_feedback_volume?: number; sound_theme?: SoundTheme; start_hidden?: boolean; autostart_enabled?: boolean; update_checks_enabled?: boolean; selected_model?: string; always_on_microphone?: boolean; selected_microphone?: string | null; clamshell_microphone?: string | null; selected_output_device?: string | null; translate_to_english?: boolean; selected_language?: string; overlay_position?: OverlayPosition; debug_mode?: boolean; log_level?: LogLevel; custom_words?: string[]; 
+export type AppSettings = { bindings: Partial<{ [key in string]: ShortcutBinding }>; push_to_talk: boolean; 
+/**
+ * While a push-to-talk (hold) recording is active, a quick tap of Shift
+ * converts it to hands-free (locked) mode so you can let go of the hotkey
+ * and keep talking. On by default; turn off if a stray Shift tap keeps
+ * locking your recordings. Only relevant while push-to-talk is on.
+ */
+tap_to_lock?: boolean; audio_feedback: boolean; audio_feedback_volume?: number; sound_theme?: SoundTheme; start_hidden?: boolean; autostart_enabled?: boolean; update_checks_enabled?: boolean; selected_model?: string; always_on_microphone?: boolean; selected_microphone?: string | null; clamshell_microphone?: string | null; selected_output_device?: string | null; translate_to_english?: boolean; selected_language?: string; overlay_position?: OverlayPosition; debug_mode?: boolean; log_level?: LogLevel; custom_words?: string[]; 
 /**
  * Master switch for the deterministic text-replacements pass.
  */
@@ -1585,7 +1694,18 @@ text_replacements?: Replacement[]; model_unload_timeout?: ModelUnloadTimeout;
  * sidecar) is unloaded to free RAM/VRAM. Mirrors `model_unload_timeout`
  * but applies to the LLM used for post-processing and the assistant.
  */
-local_llm_unload_timeout?: ModelUnloadTimeout; word_correction_threshold?: number; history_limit?: number; recording_retention_period?: RecordingRetentionPeriod; paste_method?: PasteMethod; clipboard_handling?: ClipboardHandling; auto_submit?: boolean; auto_submit_key?: AutoSubmitKey; post_process_enabled?: boolean; post_process_provider_id?: string; post_process_providers?: PostProcessProvider[]; post_process_api_keys?: SecretMap; post_process_models?: Partial<{ [key in string]: string }>; post_process_prompts?: LLMPrompt[]; post_process_selected_prompt_id?: string | null; mute_while_recording?: boolean; append_trailing_space?: boolean; app_language?: string; experimental_enabled?: boolean; lazy_stream_close?: boolean; keyboard_implementation?: KeyboardImplementation; show_tray_icon?: boolean; paste_delay_ms?: number; typing_tool?: TypingTool; external_script_path: string | null; custom_filler_words?: string[] | null; whisper_accelerator?: WhisperAcceleratorSetting; ort_accelerator?: OrtAcceleratorSetting; whisper_gpu_device?: number; extra_recording_buffer_ms?: number; assistant_provider_id?: string; assistant_models?: Partial<{ [key in string]: string }>; assistant_system_prompt?: string; assistant_screenshot_enabled?: boolean; assistant_tts_enabled?: boolean; assistant_tts_engine?: string; assistant_tts_voice?: string; assistant_tts_base_url?: string; assistant_tts_api_key?: SecretString; assistant_tts_model?: string; assistant_tts_remote_voice?: string; assistant_tts_kokoro_dtype?: string; 
+local_llm_unload_timeout?: ModelUnloadTimeout; word_correction_threshold?: number; history_limit?: number; recording_retention_period?: RecordingRetentionPeriod; paste_method?: PasteMethod; clipboard_handling?: ClipboardHandling; auto_submit?: boolean; auto_submit_key?: AutoSubmitKey; post_process_enabled?: boolean; post_process_provider_id?: string; post_process_providers?: PostProcessProvider[]; post_process_api_keys?: SecretMap; post_process_models?: Partial<{ [key in string]: string }>; post_process_prompts?: LLMPrompt[]; post_process_selected_prompt_id?: string | null; mute_while_recording?: boolean; append_trailing_space?: boolean; app_language?: string; experimental_enabled?: boolean; lazy_stream_close?: boolean; keyboard_implementation?: KeyboardImplementation; show_tray_icon?: boolean; paste_delay_ms?: number; typing_tool?: TypingTool; external_script_path: string | null; custom_filler_words?: string[] | null; whisper_accelerator?: WhisperAcceleratorSetting; ort_accelerator?: OrtAcceleratorSetting; whisper_gpu_device?: number; extra_recording_buffer_ms?: number; assistant_provider_id?: string; assistant_models?: Partial<{ [key in string]: string }>; assistant_system_prompt?: string; assistant_screenshot_enabled?: boolean; assistant_tts_enabled?: boolean; assistant_tts_engine?: string; assistant_tts_voice?: string; assistant_tts_base_url?: string; assistant_tts_api_key?: SecretString; assistant_tts_model?: string; assistant_tts_remote_voice?: string; 
+/**
+ * Per-engine remote-TTS configuration. The flat `assistant_tts_base_url`,
+ * `assistant_tts_model`, `assistant_tts_remote_voice`, and
+ * `assistant_tts_api_key` fields above are a denormalized MIRROR of
+ * whichever engine is currently active (kept so `tts.rs` and the settings
+ * UI can read a single value). These maps are the source of truth, keyed by
+ * engine id ("openai" / "elevenlabs" / "azure"), so each engine keeps its
+ * own endpoint, model, voice, and API key instead of sharing one slot and
+ * getting wiped when the engine is switched.
+ */
+assistant_tts_base_urls?: Partial<{ [key in string]: string }>; assistant_tts_models?: Partial<{ [key in string]: string }>; assistant_tts_remote_voices?: Partial<{ [key in string]: string }>; assistant_tts_api_keys?: SecretMap; assistant_tts_kokoro_dtype?: string; 
 /**
  * Playback speed multiplier for spoken assistant summaries. 1.0 is normal;
  * 0.5 is half speed, 2.0 is double, etc. Applied locally for Kokoro (via
@@ -1598,7 +1718,17 @@ assistant_tts_speed?: number; assistant_max_history_messages?: number;
  * Applied when the engine starts; ignored by external providers
  * (Ollama / LM Studio / cloud), which manage their own context.
  */
-local_llm_context_size?: number; assistant_response_length?: AssistantResponseLength; assistant_font_size?: string; 
+local_llm_context_size?: number; assistant_response_length?: AssistantResponseLength; 
+/**
+ * Selectable assistant personas. The active one's prompt overrides
+ * `assistant_system_prompt` for LLM turns. Seeded with built-ins on first
+ * run (see `default_assistant_characters`).
+ */
+assistant_characters?: AssistantCharacter[]; 
+/**
+ * Id of the currently active character (defaults to `"default"`).
+ */
+assistant_active_character_id?: string; assistant_font_size?: string; 
 /**
  * Surface opacity of the floating assistant panel (0.5–1.0). At 1.0 the
  * panel is fully opaque; lower values let the desktop blur through.
@@ -1609,6 +1739,13 @@ local_llm_context_size?: number; assistant_response_length?: AssistantResponseLe
  * settings.
  */
 assistant_panel_opacity?: number; 
+/**
+ * Overall size of the expanded floating assistant panel: "compact",
+ * "standard" (default), or "large". Chosen in Panel Appearance settings and
+ * applied as the window's logical width/height. A manual drag-resize still
+ * overrides it for the current session.
+ */
+assistant_panel_size?: string; 
 /**
  * Whether starting a plain dictation should silence an assistant reply
  * that is still being read aloud. Off by default — earphone users often
@@ -1663,6 +1800,58 @@ assistant_local_search_smart?: boolean;
  * ("serper", "brave", "tavily", "exa", "serpapi").
  */
 web_search_api_keys?: SecretMap; theme?: Theme; ui_text_size?: UiTextSize }
+/**
+ * A selectable assistant persona ("character"). The active character's
+ * `prompt` overrides the plain `assistant_system_prompt` for LLM turns; its
+ * `name`/`avatar` label the panel. Built-ins ship with the app; users can add,
+ * edit, duplicate, import, AI-generate, and delete their own (the `default`
+ * character can never be deleted).
+ */
+export type AssistantCharacter = { 
+/**
+ * Stable identifier. `"default"` is reserved for the non-deletable base
+ * assistant; `"cat"` for the built-in joke character.
+ */
+id: string; 
+/**
+ * Display name shown in the panel header and the picker.
+ */
+name: string; 
+/**
+ * System prompt / persona. Ignored for `Cat`.
+ */
+prompt?: string; 
+/**
+ * Optional in-character opening line shown in the panel's empty state.
+ */
+greeting?: string; 
+/**
+ * Optional avatar as a `data:image/...;base64,...` URL (empty → initial).
+ */
+avatar?: string; 
+/**
+ * What powers this character's replies.
+ */
+kind?: AssistantCharacterKind; 
+/**
+ * True for characters shipped with the app. Built-ins may be edited or
+ * duplicated; only `default` is protected from deletion.
+ */
+builtin?: boolean }
+/**
+ * What powers a character's replies. Most characters are `Llm` (their `prompt`
+ * becomes the system prompt). `Cat` is a joke character that ignores the LLM
+ * entirely and just meows — see `assistant::run_cat_turn`.
+ */
+export type AssistantCharacterKind = 
+/**
+ * Normal persona: `prompt` is used as the assistant's system prompt.
+ */
+"llm" | 
+/**
+ * Novelty persona with no model call — replies are random "meow"s.
+ */
+"cat"
 /**
  * A persisted assistant conversation. One row per session; `messages` is the
  * ordered turn-by-turn transcript (the same `{role, content}` shape the
@@ -1775,6 +1964,12 @@ export type EngineType = "Whisper" | "Parakeet" | "Moonshine" | "MoonshineStream
  * webview or by `assistant_read_file`).
  */
 export type FileAttachment = { name: string; content: string }
+/**
+ * A persona drafted by the model from a short description. Not persisted by
+ * the backend — the UI shows it for review, then saves it via
+ * `set_assistant_characters`.
+ */
+export type GeneratedCharacter = { name: string; prompt: string; greeting: string }
 export type GpuDeviceOption = { id: number; name: string; total_vram_mb: number }
 /**
  * A single `.gguf` file inside a repo.

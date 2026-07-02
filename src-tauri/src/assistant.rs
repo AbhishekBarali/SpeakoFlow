@@ -30,23 +30,36 @@ const PANEL_POSITION_EXPANDED_KEY: &str = "assistant_panel_position_expanded";
 const PILL_WIDTH: f64 = 240.0;
 const PILL_HEIGHT: f64 = 44.0;
 
-/// The one expanded panel size. There are no size presets; the window stays
-/// user-resizable, and a manual resize is remembered for the session (below)
-/// so collapse → expand round-trips keep it.
+/// The default expanded panel size (the "standard" preset). The window stays
+/// user-resizable; the size preset chosen in Panel Appearance settings picks
+/// the base dimensions, and a manual resize is remembered for the session
+/// (below) so collapse → expand round-trips keep it.
 const PANEL_WIDTH: f64 = 420.0;
 const PANEL_HEIGHT: f64 = 560.0;
 
+/// Logical width/height for each panel-size preset. Unknown/legacy values fall
+/// back to the "standard" default.
+fn panel_preset_size(size: &str) -> (f64, f64) {
+    match size {
+        "compact" => (360.0, 460.0),
+        "large" => (520.0, 680.0),
+        _ => (PANEL_WIDTH, PANEL_HEIGHT),
+    }
+}
+
 /// Session memory of the last expanded size (logical px), so collapsing to the
-/// pill and expanding again restores a manual resize. 0 = never resized — use
-/// the default. Not persisted: a fresh app start uses the standard size.
+/// pill and expanding again restores a manual resize. 0 = never resized this
+/// session — fall back to the user's size preset. Not persisted: a fresh app
+/// start uses the preset from settings.
 static EXPANDED_W: AtomicU32 = AtomicU32::new(0);
 static EXPANDED_H: AtomicU32 = AtomicU32::new(0);
 
-fn expanded_size() -> (f64, f64) {
+fn expanded_size(app: &AppHandle) -> (f64, f64) {
     let w = EXPANDED_W.load(Ordering::SeqCst);
     let h = EXPANDED_H.load(Ordering::SeqCst);
     if w == 0 || h == 0 {
-        (PANEL_WIDTH, PANEL_HEIGHT)
+        // No manual resize this session — use the chosen size preset.
+        panel_preset_size(&get_settings(app).assistant_panel_size)
     } else {
         (w as f64, h as f64)
     }
@@ -464,7 +477,7 @@ pub fn create_assistant_panel(app: &AppHandle) {
     let (init_w, init_h) = if PILL_MODE.load(Ordering::SeqCst) {
         (PILL_WIDTH, PILL_HEIGHT)
     } else {
-        expanded_size()
+        expanded_size(app)
     };
 
     let mut builder = WebviewWindowBuilder::new(
@@ -583,7 +596,7 @@ pub fn set_panel_collapsed(app: &AppHandle, collapsed: bool) {
         let (new_w, new_h) = if collapsed {
             (PILL_WIDTH, PILL_HEIGHT)
         } else {
-            expanded_size()
+            expanded_size(app)
         };
         let _ = window.set_size(tauri::LogicalSize::new(new_w, new_h));
 
@@ -623,18 +636,64 @@ pub fn set_panel_collapsed(app: &AppHandle, collapsed: bool) {
     }
 }
 
+/// Apply a panel-size preset chosen in Panel Appearance settings. Remembers it
+/// as the session size (overriding an earlier manual drag-resize so the choice
+/// takes effect immediately and sticks across collapse/expand), and resizes the
+/// live window when the panel is currently expanded and on screen. The pill is
+/// unaffected.
+pub fn apply_panel_size(app: &AppHandle, size: &str) {
+    let (w, h) = panel_preset_size(size);
+    EXPANDED_W.store(w as u32, Ordering::SeqCst);
+    EXPANDED_H.store(h as u32, Ordering::SeqCst);
+
+    // Only touch the window if the expanded panel is actually visible.
+    if PILL_MODE.load(Ordering::SeqCst) {
+        return;
+    }
+    let Some(window) = app.get_webview_window(PANEL_LABEL) else {
+        return;
+    };
+    if !window.is_visible().unwrap_or(false) {
+        return;
+    }
+
+    let _ = window.set_size(tauri::LogicalSize::new(w, h));
+
+    // Keep the newly sized panel fully on its monitor (growing can push it past
+    // the right/bottom edge).
+    if let (Ok(pos), Ok(Some(monitor))) = (window.outer_position(), window.current_monitor()) {
+        let scale = monitor.scale_factor();
+        let mx = monitor.position().x as f64 / scale;
+        let my = monitor.position().y as f64 / scale;
+        let mw = monitor.size().width as f64 / scale;
+        let mh = monitor.size().height as f64 / scale;
+        let x = (pos.x as f64 / scale).clamp(mx + 8.0, (mx + mw - w - 8.0).max(mx + 8.0));
+        let y = (pos.y as f64 / scale).clamp(my + 8.0, (my + mh - h - 8.0).max(my + 8.0));
+        let _ = window.set_position(tauri::LogicalPosition::new(x, y));
+    }
+
+    save_position(app);
+}
+
 // ---------------------------------------------------------------------------
 // Region snip overlay
 // ---------------------------------------------------------------------------
 
 pub const SNIP_LABEL: &str = "snip_overlay";
-
 /// Open the region-snip overlay for a frame that was just captured: store it
-/// in PENDING_SNIP, then cover the cursor's monitor with a transparent
-/// selection window. Called from an async command (worker thread) — building
-/// a webview inline on the main thread inside a command deadlocks WebView2 on
-/// Windows, so this must NOT be dispatched to the main thread.
-pub fn open_snip_overlay(app: &AppHandle, frame: image::DynamicImage) -> Result<(), String> {
+/// in PENDING_SNIP, then cover `monitor` with a transparent selection window.
+/// Called from an async command (worker thread) — building a webview inline on
+/// the main thread inside a command deadlocks WebView2 on Windows, so this must
+/// NOT be dispatched to the main thread.
+///
+/// `monitor` is chosen by the caller (from Tauri's monitor list) and the frozen
+/// `frame` is captured from that SAME monitor, so the overlay and the crop stay
+/// aligned on multi-monitor setups.
+pub fn open_snip_overlay(
+    app: &AppHandle,
+    frame: image::DynamicImage,
+    monitor: tauri::Monitor,
+) -> Result<(), String> {
     if app.get_webview_window(SNIP_LABEL).is_some() {
         return Ok(()); // already snipping
     }
@@ -643,45 +702,48 @@ pub fn open_snip_overlay(app: &AppHandle, frame: image::DynamicImage) -> Result<
         *pending = Some(frame);
     }
 
-    // Cover the monitor the cursor is on (physical coords); primary otherwise.
-    let cursor = crate::screenshot::cursor_position();
-    let monitor = match cursor {
-        Some((x, y)) => app
-            .monitor_from_point(x as f64, y as f64)
-            .ok()
-            .flatten()
-            .or_else(|| app.primary_monitor().ok().flatten()),
-        None => app.primary_monitor().ok().flatten(),
-    }
-    .ok_or_else(|| "No monitor available for region snip".to_string())?;
+    // Cover the chosen monitor using LOGICAL coordinates set at BUILD time.
+    // Positioning/sizing AFTER build via PhysicalPosition/PhysicalSize is
+    // unreliable across monitors: tao converts physical values using the scale
+    // factor of the monitor the window is *currently* on (usually the primary),
+    // so on a mixed-DPI / mixed-orientation multi-monitor setup the snip window
+    // lands off-screen or zero-sized and "nothing happens". Building with the
+    // target monitor's logical origin/size is exactly how the recording overlay
+    // and the panel place themselves reliably (see overlay.rs).
+    let scale = monitor.scale_factor();
+    let logical_x = monitor.position().x as f64 / scale;
+    let logical_y = monitor.position().y as f64 / scale;
+    let logical_w = (monitor.size().width as f64 / scale).max(1.0);
+    let logical_h = (monitor.size().height as f64 / scale).max(1.0);
 
-    let window = WebviewWindowBuilder::new(
+    let mut builder = WebviewWindowBuilder::new(
         app,
         SNIP_LABEL,
         tauri::WebviewUrl::App("src/assistant/snip.html".into()),
     )
     .title("Snip")
+    .inner_size(logical_w, logical_h)
+    .position(logical_x, logical_y)
     .decorations(false)
     .transparent(true)
     .shadow(false)
     .always_on_top(true)
     .skip_taskbar(true)
     .resizable(false)
+    .accept_first_mouse(true)
     .focused(true)
-    .visible(true)
-    .build()
-    .map_err(|e| format!("Couldn't open the snip overlay: {}", e))?;
+    .visible(true);
 
-    // Position/size in PHYSICAL pixels so the overlay covers the monitor
-    // exactly regardless of DPI scale.
-    let _ = window.set_position(tauri::PhysicalPosition::new(
-        monitor.position().x,
-        monitor.position().y,
-    ));
-    let _ = window.set_size(tauri::PhysicalSize::new(
-        monitor.size().width,
-        monitor.size().height,
-    ));
+    // Match the other windows' WebView2 user-data dir so portable builds don't
+    // spin up a second cache (and so window creation stays consistent).
+    if let Some(data_dir) = crate::portable::data_dir() {
+        builder = builder.data_directory(data_dir.join("webview"));
+    }
+
+    let window = builder
+        .build()
+        .map_err(|e| format!("Couldn't open the snip overlay: {}", e))?;
+
     let _ = window.set_focus();
     #[cfg(target_os = "windows")]
     force_panel_topmost(&window);
@@ -742,7 +804,10 @@ pub fn finish_region_snip(app: &AppHandle, scale: f64, rect: Option<(f64, f64, f
 /// Ask-Assistant redirect.
 pub async fn run_voice_turn(app: AppHandle, transcription: String) {
     let settings = get_settings(&app);
-    let wants_screen = screen_armed() || wants_screen_context(&transcription);
+    // The Cat character never looks at the screen (it just meows), so don't
+    // capture one even if the toggle/phrasing would normally arm it.
+    let wants_screen = !settings.active_character_is_cat()
+        && (screen_armed() || wants_screen_context(&transcription));
     let screenshot = if wants_screen && settings.assistant_screenshot_enabled {
         // Tiny body only for Azure; loopback (built-in/local engine) gets a
         // balanced image, cloud gets the sharp one.
@@ -878,6 +943,101 @@ fn recent_context_for_planner(app: &AppHandle) -> String {
     lines.join("\n")
 }
 
+/// Build the stored form of a user message: the text plus one marker line per
+/// attachment (files/images/screenshot). The panel strips these markers for
+/// display and shows chips instead; on later turns they remind the model that
+/// attachments accompanied the message. Shared by the normal and Cat turns.
+fn compose_stored_user_message(
+    user_text: &str,
+    files: &[FileAttachment],
+    images: &[String],
+    has_screenshot: bool,
+) -> String {
+    let mut stored = user_text.to_string();
+    for file in files {
+        stored.push_str(&format!("\n{} {}]", FILE_MARKER_PREFIX, file.name));
+    }
+    for _ in images {
+        stored.push_str(&format!("\n{}", IMAGE_MARKER));
+    }
+    if has_screenshot {
+        stored.push_str(&format!("\n{}", SCREENSHOT_MARKER));
+    }
+    stored
+}
+
+/// A short, random string of meows for the "Cat" character — sometimes
+/// capitalized, sometimes with a trailing "!" or two. Uses a tiny time-seeded
+/// LCG so we don't pull in the `rand` crate just for a joke.
+fn random_meow() -> String {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let mut state = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_nanos() as u64)
+        .unwrap_or(0x9E37_79B9_7F4A_7C15)
+        | 1;
+    let mut next = || {
+        state = state
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
+        state >> 33
+    };
+    let count = 1 + (next() % 4) as usize; // 1..=4 meows
+    let mut parts = Vec::with_capacity(count);
+    for _ in 0..count {
+        let mut token = if next() % 2 == 0 { "meow" } else { "Meow" }.to_string();
+        for _ in 0..(next() % 3) {
+            // 0..=2 exclamation marks
+            token.push('!');
+        }
+        parts.push(token);
+    }
+    parts.join(" ")
+}
+
+/// Handle a turn for the joke "Cat" character: record the user's message, then
+/// reply with random meows — no model call, no web search, no vision. Speaks
+/// the meow aloud when TTS is on (because obviously it should).
+fn run_cat_turn(
+    app: &AppHandle,
+    settings: &crate::settings::AppSettings,
+    user_text: &str,
+    files: &[FileAttachment],
+    images: &[String],
+    has_screenshot: bool,
+) {
+    {
+        let conversation = app.state::<AssistantConversation>();
+        let mut history = conversation.messages.lock().unwrap();
+        history.push(ChatMessage {
+            role: "user".to_string(),
+            content: compose_stored_user_message(user_text, files, images, has_screenshot),
+        });
+    }
+    emit_conversation(app);
+    persist_assistant_session(app);
+
+    let reply = random_meow();
+    {
+        let conversation = app.state::<AssistantConversation>();
+        let mut history = conversation.messages.lock().unwrap();
+        history.push(ChatMessage {
+            role: "assistant".to_string(),
+            content: reply.clone(),
+        });
+    }
+    emit_conversation(app);
+    persist_assistant_session(app);
+
+    // Speak the meow when TTS is on — unless a Stop already landed in the gap.
+    let mut speaking = false;
+    if !app.state::<AssistantConversation>().is_cancelled() && settings.assistant_tts_enabled {
+        spawn_tts_speak(app, settings, reply);
+        speaking = true;
+    }
+    emit_state(app, if speaking { "speaking" } else { "idle" });
+}
+
 /// Run one assistant turn: record the user message, stream the LLM answer to
 /// the panel via events, and append the reply to the conversation history.
 ///
@@ -923,6 +1083,21 @@ pub async fn run_assistant_turn(
 
     let settings = get_settings(&app);
 
+    // The "Cat" character ignores the model entirely: no provider, no web
+    // search, no vision — it just meows. Handle it up front so it works even
+    // when no LLM provider/model is configured.
+    if settings.active_character_is_cat() {
+        run_cat_turn(
+            &app,
+            &settings,
+            &user_text,
+            &files,
+            &images,
+            screenshot.is_some(),
+        );
+        return;
+    }
+
     let Some(provider) = settings.active_assistant_provider().cloned() else {
         emit_error(
             &app,
@@ -963,19 +1138,9 @@ pub async fn run_assistant_turn(
     {
         let conversation = app.state::<AssistantConversation>();
         let mut history = conversation.messages.lock().unwrap();
-        let mut stored = user_text.clone();
-        for file in &files {
-            stored.push_str(&format!("\n{} {}]", FILE_MARKER_PREFIX, file.name));
-        }
-        for _ in &images {
-            stored.push_str(&format!("\n{}", IMAGE_MARKER));
-        }
-        if screenshot.is_some() {
-            stored.push_str(&format!("\n{}", SCREENSHOT_MARKER));
-        }
         history.push(ChatMessage {
             role: "user".to_string(),
-            content: stored,
+            content: compose_stored_user_message(&user_text, &files, &images, screenshot.is_some()),
         });
     }
     emit_conversation(&app);
@@ -1139,7 +1304,7 @@ pub async fn run_assistant_turn(
     };
     let mut messages: Vec<Value> = Vec::new();
     let system_content = {
-        let mut content = settings.assistant_system_prompt.clone();
+        let mut content = settings.effective_system_prompt();
         // Always note that a live date/time accompanies the user's message, so
         // time-relative answers are correct. Fixed text → cache-safe.
         if !content.trim().is_empty() {
