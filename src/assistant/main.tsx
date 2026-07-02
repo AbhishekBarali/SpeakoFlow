@@ -1,7 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import AssistantPanel from "./AssistantPanel";
-import { applyCachedAssistantTheme } from "@/lib/theme";
 import "@/i18n";
 
 // Fonts — the panel is its own window, so it must load fonts independently of
@@ -12,9 +11,8 @@ import "@fontsource/plus-jakarta-sans/500.css";
 import "@fontsource/plus-jakarta-sans/600.css";
 import "@fontsource/plus-jakarta-sans/700.css";
 
-// Apply the cached assistant-panel theme before render to avoid a theme flash.
-// AssistantPanel re-applies the real setting (override or app-follow) on load.
-applyCachedAssistantTheme();
+// The assistant window is dark-only (like the STT overlay) — no theme
+// resolution needed before mount.
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>

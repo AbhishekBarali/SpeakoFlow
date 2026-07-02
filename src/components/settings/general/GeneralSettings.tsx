@@ -19,7 +19,7 @@ export const GeneralSettings: React.FC = () => {
   const isLinux = type() === "linux";
   return (
     <div className="max-w-3xl w-full mx-auto space-y-8">
-      <SettingsGroup title={t("settings.general.title")}>
+      <SettingsGroup>
         <ShortcutInput shortcutId="transcribe" grouped={true} />
         {/* Cancel shortcut is hidden on Linux (dynamic shortcut instability). */}
         {!isLinux && <ShortcutInput shortcutId="cancel" grouped={true} />}

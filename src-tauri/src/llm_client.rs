@@ -145,7 +145,11 @@ fn azure_openai_host(raw: &str) -> Option<String> {
         .strip_prefix("https://")
         .or_else(|| raw.strip_prefix("http://"))
         .unwrap_or(raw);
-    let host = without_scheme.split('/').next().unwrap_or("").to_lowercase();
+    let host = without_scheme
+        .split('/')
+        .next()
+        .unwrap_or("")
+        .to_lowercase();
     if host.ends_with(".openai.azure.com")
         || host.ends_with(".services.ai.azure.com")
         || host.ends_with(".cognitiveservices.azure.com")

@@ -152,7 +152,12 @@ fn blank_caption_icon_keep_taskbar(window: &tauri::webview::WebviewWindow) {
         //    and alt-tab keep a visible mark of their own.
         let mark = SendMessageW(hwnd, WM_GETICON, Some(WPARAM(ICON_SMALL)), Some(LPARAM(0)));
         if mark.0 != 0 {
-            let _ = SendMessageW(hwnd, WM_SETICON, Some(WPARAM(ICON_BIG)), Some(LPARAM(mark.0)));
+            let _ = SendMessageW(
+                hwnd,
+                WM_SETICON,
+                Some(WPARAM(ICON_BIG)),
+                Some(LPARAM(mark.0)),
+            );
         }
 
         // 2) Blank the caption icon with a 16x16 fully transparent icon. For a

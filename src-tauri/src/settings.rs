@@ -608,19 +608,23 @@ pub struct AppSettings {
     pub local_llm_context_size: u32,
     #[serde(default)]
     pub assistant_response_length: AssistantResponseLength,
-    #[serde(default = "default_assistant_panel_opacity")]
-    pub assistant_panel_opacity: f64,
     #[serde(default = "default_assistant_font_size")]
     pub assistant_font_size: String,
-    #[serde(default = "default_assistant_accent")]
-    pub assistant_accent: String,
-    #[serde(default = "default_assistant_panel_size")]
-    pub assistant_panel_size: String,
-    /// Appearance of the floating assistant panel: "auto" (follow the app
-    /// theme), "light", or "dark". A light/dark choice overrides the app-wide
-    /// theme for the panel only.
-    #[serde(default = "default_assistant_panel_theme")]
-    pub assistant_panel_theme: String,
+    /// Surface opacity of the floating assistant panel (0.5–1.0). At 1.0 the
+    /// panel is fully opaque; lower values let the desktop blur through.
+    ///
+    /// Note: the old `assistant_accent`, `assistant_panel_size`, and
+    /// `assistant_panel_theme` customization fields were removed (the panel is
+    /// dark-only now) — serde silently ignores those keys in previously stored
+    /// settings.
+    #[serde(default = "default_assistant_panel_opacity")]
+    pub assistant_panel_opacity: f64,
+    /// Whether starting a plain dictation should silence an assistant reply
+    /// that is still being read aloud. Off by default — earphone users often
+    /// want to keep listening while they dictate. (Asking the assistant a NEW
+    /// question always interrupts the previous answer, regardless.)
+    #[serde(default)]
+    pub assistant_tts_stop_on_dictation: bool,
     /// Whether the assistant may search the web. When on, an automatic
     /// heuristic decides per-question whether a search is actually worthwhile
     /// (factual/time-sensitive questions yes; chit-chat, code, math no), so
@@ -1093,25 +1097,12 @@ fn default_local_llm_unload_timeout() -> ModelUnloadTimeout {
     ModelUnloadTimeout::Min5
 }
 
-fn default_assistant_panel_size() -> String {
-    "standard".to_string()
-}
-
-fn default_assistant_panel_theme() -> String {
-    // Follow the app-wide theme by default; the user can override per-panel.
-    "auto".to_string()
-}
-
 fn default_assistant_panel_opacity() -> f64 {
     1.0
 }
 
 fn default_assistant_font_size() -> String {
     "medium".to_string()
-}
-
-fn default_assistant_accent() -> String {
-    "violet".to_string()
 }
 
 fn default_assistant_web_search_provider() -> String {
@@ -1198,32 +1189,14 @@ fn ensure_assistant_defaults(settings: &mut AppSettings) -> bool {
         changed = true;
     }
     if !matches!(
-        settings.assistant_panel_size.as_str(),
-        "compact" | "standard" | "large"
-    ) {
-        settings.assistant_panel_size = default_assistant_panel_size();
-        changed = true;
-    }
-    if !matches!(
-        settings.assistant_panel_theme.as_str(),
-        "auto" | "light" | "dark"
-    ) {
-        settings.assistant_panel_theme = default_assistant_panel_theme();
-        changed = true;
-    }
-    if !(0.5..=1.0).contains(&settings.assistant_panel_opacity) {
-        settings.assistant_panel_opacity = default_assistant_panel_opacity();
-        changed = true;
-    }
-    if !matches!(
         settings.assistant_font_size.as_str(),
         "small" | "medium" | "large"
     ) {
         settings.assistant_font_size = default_assistant_font_size();
         changed = true;
     }
-    if settings.assistant_accent.trim().is_empty() {
-        settings.assistant_accent = default_assistant_accent();
+    if !(0.5..=1.0).contains(&settings.assistant_panel_opacity) {
+        settings.assistant_panel_opacity = default_assistant_panel_opacity();
         changed = true;
     }
     // Web search: validate provider and backfill API-key slots for keyed
@@ -1479,11 +1452,9 @@ pub fn get_default_settings() -> AppSettings {
         assistant_max_history_messages: default_assistant_max_history_messages(),
         local_llm_context_size: default_local_llm_context_size(),
         assistant_response_length: AssistantResponseLength::default(),
-        assistant_panel_opacity: default_assistant_panel_opacity(),
         assistant_font_size: default_assistant_font_size(),
-        assistant_accent: default_assistant_accent(),
-        assistant_panel_size: default_assistant_panel_size(),
-        assistant_panel_theme: default_assistant_panel_theme(),
+        assistant_panel_opacity: default_assistant_panel_opacity(),
+        assistant_tts_stop_on_dictation: false,
         assistant_web_search_enabled: false,
         assistant_web_search_provider: default_assistant_web_search_provider(),
         assistant_web_search_max_results: default_assistant_web_search_max_results(),

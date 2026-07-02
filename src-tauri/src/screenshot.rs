@@ -137,6 +137,67 @@ pub fn capture_screen_data_url(profile: CaptureProfile) -> Result<String, String
     Ok(format!("data:image/jpeg;base64,{}", encoded))
 }
 
+/// Capture the active monitor into a raw image (no scaling/encoding), for the
+/// region-snip flow: grab the frame BEFORE the selection overlay opens, then
+/// crop the user's rectangle out of it afterwards.
+pub fn capture_screen_raw() -> Result<DynamicImage, String> {
+    let monitor = pick_monitor()?;
+    let rgba = monitor
+        .capture_image()
+        .map_err(|e| format!("Screen capture failed: {}", e))?;
+    Ok(DynamicImage::ImageRgba8(rgba))
+}
+
+/// Crop a physical-pixel region out of a captured frame and encode it as a
+/// `data:image/jpeg;base64,...` URL on the ladder for the given profile.
+pub fn encode_region_data_url(
+    img: &DynamicImage,
+    profile: CaptureProfile,
+    x: u32,
+    y: u32,
+    w: u32,
+    h: u32,
+) -> Result<String, String> {
+    let (iw, ih) = (img.width(), img.height());
+    let x = x.min(iw.saturating_sub(1));
+    let y = y.min(ih.saturating_sub(1));
+    let w = w.clamp(1, iw - x);
+    let h = h.clamp(1, ih - y);
+    let crop = img.crop_imm(x, y, w, h);
+
+    let (ladder, target): (&[(u32, u8)], usize) = match profile {
+        CaptureProfile::Conservative => (&CONSERVATIVE_LADDER, CONSERVATIVE_TARGET_BYTES),
+        CaptureProfile::Local => (&LOCAL_LADDER, LOCAL_TARGET_BYTES),
+        CaptureProfile::Generous => (&GENEROUS_LADDER, GENEROUS_TARGET_BYTES),
+    };
+    let mut chosen: Option<Vec<u8>> = None;
+    for &(max_dim, quality) in ladder {
+        let buf = encode_jpeg(&scaled(&crop, max_dim), quality)?;
+        let encoded_size = buf.len().div_ceil(3) * 4;
+        chosen = Some(buf);
+        if encoded_size <= target {
+            break;
+        }
+    }
+    let buf = chosen.ok_or_else(|| "Region encoding produced no output".to_string())?;
+    let encoded = base64::engine::general_purpose::STANDARD.encode(&buf);
+    Ok(format!("data:image/jpeg;base64,{}", encoded))
+}
+
+/// Load an image file from disk, downscale it to a provider-friendly size, and
+/// return it as a `data:image/jpeg;base64,...` URL (used for image attachments
+/// picked or dropped into the assistant panel).
+pub fn image_file_to_data_url(path: &str) -> Result<String, String> {
+    let meta = std::fs::metadata(path).map_err(|e| format!("Can't read file: {}", e))?;
+    if meta.len() > 25 * 1024 * 1024 {
+        return Err("Image is too large (over 25 MB)".to_string());
+    }
+    let img = image::open(path).map_err(|e| format!("Can't open image: {}", e))?;
+    let buf = encode_jpeg(&scaled(&img, 1568), 80)?;
+    let encoded = base64::engine::general_purpose::STANDARD.encode(&buf);
+    Ok(format!("data:image/jpeg;base64,{}", encoded))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -162,7 +223,7 @@ mod tests {
 }
 
 #[cfg(target_os = "windows")]
-fn cursor_position() -> Option<(i32, i32)> {
+pub(crate) fn cursor_position() -> Option<(i32, i32)> {
     use windows::Win32::Foundation::POINT;
     use windows::Win32::UI::WindowsAndMessaging::GetCursorPos;
 
@@ -172,7 +233,7 @@ fn cursor_position() -> Option<(i32, i32)> {
 }
 
 #[cfg(not(target_os = "windows"))]
-fn cursor_position() -> Option<(i32, i32)> {
+pub(crate) fn cursor_position() -> Option<(i32, i32)> {
     None
 }
 

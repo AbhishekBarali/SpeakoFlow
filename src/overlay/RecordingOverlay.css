@@ -23,16 +23,16 @@
   align-items: center;
   justify-content: center;
   box-sizing: border-box;
-  height: 30px;
+  height: 34px;
   min-width: 46px;
   max-width: 100%;
   padding: 0 10px;
   border-radius: 999px;
   background: rgba(24, 22, 20, 0.94);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.09);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.07),
-    inset 0 0 0 0.5px rgba(0, 0, 0, 0.4);
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 0 0 0.5px rgba(0, 0, 0, 0.45);
   backdrop-filter: blur(20px) saturate(1.4);
   -webkit-backdrop-filter: blur(20px) saturate(1.4);
   /* Reveal: fade + a small settle, driven by the root .fade-in toggle. */
@@ -143,6 +143,50 @@
   transform: translateY(-50%) scale(0.9);
 }
 
+/* ---- Ask Assistant: reroute this dictation to the assistant ------------- */
+
+.pill-assist {
+  position: absolute;
+  left: 3px;
+  top: 50%;
+  transform: translateY(-50%) scale(0.85);
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(40, 36, 33, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 140ms ease-out,
+    background-color 140ms ease-out,
+    transform 120ms ease-out;
+}
+
+[dir="rtl"] .pill-assist {
+  left: auto;
+  right: 3px;
+}
+
+.overlay-pill:hover .pill-assist {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(-50%) scale(1);
+}
+
+.pill-assist:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.pill-assist:active {
+  transform: translateY(-50%) scale(0.9);
+}
+
 /* ---- Done / confirm: finishes a hands-free recording (shown when locked) -- */
 
 .pill-confirm {
@@ -173,15 +217,16 @@
   transform: translateY(-50%) scale(0.9);
 }
 
-/* Hands-free (locked) mode: lay Cancel · waveform · Done out inline as
- * persistent controls, rather than the hover-only cancel used during a
- * push-to-talk hold (where you finish by releasing the key). */
+/* Hands-free (locked) mode: lay Assistant · Cancel · waveform · Done out
+ * inline as persistent controls, rather than the hover-only buttons used
+ * during a push-to-talk hold (where you finish by releasing the key). */
 .overlay-pill.locked {
   gap: 4px;
 }
 
 .overlay-pill.locked .pill-cancel,
-.overlay-pill.locked .pill-confirm {
+.overlay-pill.locked .pill-confirm,
+.overlay-pill.locked .pill-assist {
   position: static;
   transform: none;
   opacity: 1;
@@ -190,16 +235,20 @@
   height: 18px;
 }
 
-.overlay-pill.locked .pill-cancel {
+.overlay-pill.locked .pill-assist {
   order: 0;
 }
 
-.overlay-pill.locked .pill-wave {
+.overlay-pill.locked .pill-cancel {
   order: 1;
 }
 
-.overlay-pill.locked .pill-confirm {
+.overlay-pill.locked .pill-wave {
   order: 2;
+}
+
+.overlay-pill.locked .pill-confirm {
+  order: 3;
 }
 
 .overlay-pill.locked .wave-box {
@@ -221,7 +270,8 @@
 /* Ease the hands-free controls in, so the hold → lock switch reads as one
  * smooth motion (tick growing in beside the waveform) rather than a jump. */
 .overlay-pill.locked .pill-cancel,
-.overlay-pill.locked .pill-confirm {
+.overlay-pill.locked .pill-confirm,
+.overlay-pill.locked .pill-assist {
   animation: control-in 220ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
 }
 
@@ -237,6 +287,10 @@
 }
 
 /* Mirror the control order for right-to-left layouts. */
+[dir="rtl"] .overlay-pill.locked .pill-assist {
+  order: 3;
+}
+
 [dir="rtl"] .overlay-pill.locked .pill-cancel {
   order: 2;
 }
@@ -248,13 +302,15 @@
 @media (prefers-reduced-motion: reduce) {
   .overlay-pill,
   .pill-cancel,
-  .pill-confirm {
+  .pill-confirm,
+  .pill-assist {
     transition: none;
   }
   .wave-box,
   .pill-wave .audio-waveform.sm,
   .overlay-pill.locked .pill-cancel,
-  .overlay-pill.locked .pill-confirm {
+  .overlay-pill.locked .pill-confirm,
+  .overlay-pill.locked .pill-assist {
     transition: none;
     animation: none;
   }

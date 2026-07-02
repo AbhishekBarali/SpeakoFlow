@@ -442,9 +442,15 @@ pub async fn search_with_plan(settings: &AppSettings, plan: &SearchPlan) -> Vec<
     let tbs_ref = tbs.as_deref();
 
     // Stage 1 — snippet search, every query in parallel.
-    let snippet_futs = queries
-        .iter()
-        .map(|q| snippet_search(settings, q.as_str(), tp.snippet_limit, tbs_ref, include_news));
+    let snippet_futs = queries.iter().map(|q| {
+        snippet_search(
+            settings,
+            q.as_str(),
+            tp.snippet_limit,
+            tbs_ref,
+            include_news,
+        )
+    });
     let per_query = futures_util::future::join_all(snippet_futs).await;
 
     let lists: Vec<Vec<Candidate>> = per_query
@@ -1188,10 +1194,7 @@ async fn search_serpapi(
     if let Some(kg) = value.get("knowledge_graph") {
         let title = kg.get("title").and_then(|v| v.as_str()).unwrap_or("");
         let url = kg.get("website").and_then(|v| v.as_str()).unwrap_or("");
-        let snippet = kg
-            .get("description")
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
+        let snippet = kg.get("description").and_then(|v| v.as_str()).unwrap_or("");
         if !snippet.is_empty() {
             push_candidate(&mut candidates, title, url, snippet, false);
         }

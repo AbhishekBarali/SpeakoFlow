@@ -1,107 +1,340 @@
-/* Assistant panel — a floating editorial card that speaks the same language
- * as the main SpeakoFlow window: warm near-black surfaces, off-white ink,
- * hairline rules, the brand sans (Plus Jakarta Sans) for the title, and the accent used only as an
- * atmospheric moment (orb glow, send action, status, focus) rather than as
- * saturated chrome everywhere.
+/* Assistant panel + pill — the STT recording overlay's calmer sibling.
  *
- * Customizable via CSS variables set from settings:
- *   --accent-from / --accent-to  (accent — the single colour moment)
- *   --panel-alpha                (surface opacity 0.5–1)
- *   --msg-font-size              (message text size)
+ * One dark-only visual language for both windows (the STT overlay is dark-only
+ * too): warm near-black glass, off-white ink, hairline edges, and depth from
+ * inner highlights rather than big drop shadows (both windows are transparent,
+ * so a large elevation would clip at the window bounds).
+ *
+ * Tokens live on `.assistant-scope` so the settings preview renders the exact
+ * same classes from the same stylesheet — it cannot drift from the real panel.
+ *
+ * Two knobs, both set from settings:
+ *   --as-msg-font   message text size
+ *   --as-alpha      surface opacity (0.5–1; 1 = fully opaque panel)
  */
 
-:root {
-  --accent-from: #6366f1;
-  --accent-to: #8b5cf6;
-  --panel-alpha: 1;
-  --msg-font-size: 13.5px;
+/* ---------- Theme tokens (dark only) ---------- */
 
-  --font-ui:
+.assistant-scope {
+  --as-alpha: 1;
+
+  /* The pill keeps the STT overlay's exact glass at full opacity and scales
+   * down with the user's opacity choice; the panel is solid at 1.0. */
+  --as-chip-surface: rgba(24, 22, 20, calc(0.94 * var(--as-alpha)));
+  --as-panel-surface: rgba(21, 19, 17, var(--as-alpha));
+  --as-ink: #f7f6f4;
+  --as-body: #d9d6d2;
+  --as-muted: #a9a39c;
+  --as-faint: #7b756d;
+  --as-hairline: rgba(255, 255, 255, 0.09);
+  --as-hairline-strong: rgba(255, 255, 255, 0.16);
+  --as-inner:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 0 0 0.5px rgba(0, 0, 0, 0.45);
+  --as-raise: rgba(255, 255, 255, 0.075);
+  --as-raise-strong: rgba(255, 255, 255, 0.13);
+  --as-inset-bg: rgba(0, 0, 0, 0.3);
+  --as-user-bg: rgba(255, 255, 255, 0.1);
+  --as-error: #fda4af;
+  --as-error-bg: rgba(244, 63, 94, 0.12);
+
+  --as-live: #e5484d;
+
+  --as-msg-font: 13.5px;
+  --as-font:
     "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont,
     "Segoe UI Variable Text", "Segoe UI", Roboto, sans-serif;
-  --font-display:
-    "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
 
-  --panel-radius: 18px;
-
-  /* Light editorial palette — soft warm white, matches the main app's :root */
-  --panel-surface: rgb(253 252 250 / calc(0.97 * var(--panel-alpha)));
-  --surface-strong: #eeebe4;
-  --surface-inset: #f6f4ef;
-  --ink: #2a2622;
-  --body: #5c5448;
-  --muted: #7c7466;
-  --muted-soft: #b7af9f;
-  --hairline: #e9e5dd;
-  --hairline-strong: #dad4c8;
-
-  /* Primary "ink pill" — used for the user's own messages */
-  --ink-pill-bg: #3d362e;
-  --ink-pill-fg: #fdfcfa;
-
-  --error-bg: rgba(220, 38, 38, 0.08);
-  --error-text: #b91c1c;
-
-  --shadow:
-    0 0 0 1px var(--hairline), 0 1px 2px rgba(40, 34, 28, 0.05),
-    0 16px 40px rgba(40, 34, 28, 0.14);
-}
-
-/* Dark inversion — applied when the user explicitly chooses Dark, with the
- * same token set mirrored under the media query for the pre-JS moment. */
-:root[data-theme="dark"] {
+  color: var(--as-ink);
+  font-family: var(--as-font);
   color-scheme: dark;
-  --panel-surface: rgb(28 25 23 / calc(0.96 * var(--panel-alpha)));
-  --surface-strong: #292524;
-  --surface-inset: #100d0c;
-  --ink: #fafaf9;
-  --body: #d6d3d1;
-  --muted: #a8a29e;
-  --muted-soft: #78716c;
-  --hairline: #292524;
-  --hairline-strong: #44403c;
-
-  --ink-pill-bg: #fafaf9;
-  --ink-pill-fg: #0c0a09;
-
-  --error-bg: rgba(244, 63, 94, 0.13);
-  --error-text: #fda4af;
-
-  --shadow:
-    0 0 0 1px var(--hairline), 0 1px 2px rgba(0, 0, 0, 0.4),
-    0 18px 44px rgba(0, 0, 0, 0.5);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme]) {
-    color-scheme: dark;
-    --panel-surface: rgb(28 25 23 / calc(0.96 * var(--panel-alpha)));
-    --surface-strong: #292524;
-    --surface-inset: #100d0c;
-    --ink: #fafaf9;
-    --body: #d6d3d1;
-    --muted: #a8a29e;
-    --muted-soft: #78716c;
-    --hairline: #292524;
-    --hairline-strong: #44403c;
-
-    --ink-pill-bg: #fafaf9;
-    --ink-pill-fg: #0c0a09;
-
-    --error-bg: rgba(244, 63, 94, 0.13);
-    --error-text: #fda4af;
-
-    --shadow:
-      0 0 0 1px var(--hairline), 0 1px 2px rgba(0, 0, 0, 0.4),
-      0 18px 44px rgba(0, 0, 0, 0.5);
-  }
 }
 
 * {
   box-sizing: border-box;
 }
 
-/* ---------- Panel shell ---------- */
+/* ---------- Window shell ----------
+ * The webview root child is forced to 100%×100% (index.html); the shell
+ * centres the pill or hosts the full-bleed panel. No gutter and no outer
+ * drop shadows: semi-transparent shadow pixels render as a milky band on
+ * Windows transparent windows (same reason the STT overlay avoids them) —
+ * depth comes from the hairline + inner highlight instead. */
+
+.assistant-shell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+/* =========================================================================
+ * The pill — a voice HUD, sized and toned like the STT overlay chip.
+ * ========================================================================= */
+
+.apill {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  box-sizing: border-box;
+  height: 34px;
+  min-width: 52px;
+  max-width: 100%;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--as-chip-surface);
+  border: 1px solid var(--as-hairline);
+  box-shadow: var(--as-inner);
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  user-select: none;
+  cursor: grab;
+  /* Reveal: fade + small settle, like the STT overlay. */
+  opacity: 0;
+  transform: scale(0.92) translateY(2px);
+  transition:
+    opacity 220ms ease-out,
+    transform 240ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.assistant-shell.fade-in .apill {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+}
+
+/* Small icon-only buttons inside the pill. */
+.apill-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 21px;
+  height: 21px;
+  padding: 0;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--as-ink);
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    transform 0.12s ease;
+}
+
+.apill-btn:hover {
+  background: var(--as-raise);
+}
+
+.apill-btn:active {
+  transform: scale(0.92);
+}
+
+.apill-btn.danger:hover {
+  background: var(--as-error-bg);
+  color: var(--as-error);
+}
+
+/* The idle mic — the pill's one standing affordance. Quiet disc; colour is
+ * earned only while actually recording (handled by the wave, not the mic). */
+.apill-mic {
+  border: 1px solid var(--as-hairline);
+  background: var(--as-raise);
+}
+
+.apill-mic:hover {
+  background: var(--as-raise-strong);
+}
+
+/* Waveform container — a fixed little spindle box, like the STT overlay. */
+.apill-wave {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 20px;
+  flex-shrink: 0;
+  transition: width 220ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.apill-wave.rest {
+  width: 40px;
+  opacity: 0.5;
+}
+
+/* Phase glyph (globe while searching, speaker while speaking) + spinner. */
+.apill-glyph {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  color: var(--as-muted);
+  pointer-events: none;
+}
+
+.apill-spin {
+  flex-shrink: 0;
+  color: var(--as-muted);
+  animation: apill-rotate 0.85s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes apill-rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Idle hover reveals expand/close inline: width eases from 0 — after a short
+ * hover-intent delay, so skimming the pill with the cursor never makes it
+ * twitch. Leaving collapses immediately (no delay on the way out). */
+.apill-reveal {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  width: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition:
+    width 260ms cubic-bezier(0.22, 0.61, 0.36, 1) 0ms,
+    opacity 200ms ease 0ms;
+}
+
+.apill:hover .apill-reveal,
+.apill:focus-within .apill-reveal {
+  width: 46px;
+  opacity: 1;
+  transition:
+    width 260ms cubic-bezier(0.22, 0.61, 0.36, 1) 340ms,
+    opacity 200ms ease 340ms;
+}
+
+/* Busy phases: the reveal must not slow a cancel down — a short beat only. */
+.apill:hover .apill-reveal.quick,
+.apill:focus-within .apill-reveal.quick {
+  transition:
+    width 220ms cubic-bezier(0.22, 0.61, 0.36, 1) 120ms,
+    opacity 180ms ease 120ms;
+}
+
+/* Busy cancel — hidden until the chip is hovered, then floats over the
+ * trailing edge (exactly the STT overlay's cancel affordance). */
+.apill-cancel {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%) scale(0.85);
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--as-chip-surface);
+  box-shadow: 0 0 0 1px var(--as-hairline), 0 0 6px 5px var(--as-chip-surface);
+  color: var(--as-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 0.16s ease,
+    transform 0.16s ease,
+    color 0.15s ease;
+}
+
+.apill:hover .apill-cancel {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(-50%) scale(1);
+}
+
+.apill-cancel:hover {
+  color: var(--as-error);
+}
+
+/* Hands-free lock: inline Cancel · wave · Done, like the STT locked layout. */
+.apill-done {
+  color: var(--as-ink);
+  background: var(--as-raise);
+  border: 1px solid var(--as-hairline);
+}
+
+.apill-done:hover {
+  background: var(--as-raise-strong);
+}
+
+/* Live-recording tint on the wave side so listening reads at a glance. */
+.apill.listening {
+  border-color: color-mix(in srgb, var(--as-live) 32%, var(--as-hairline));
+}
+
+/* Sticky screen-vision badge: always visible while armed; hovering it turns it
+ * into a one-click disarm. */
+.apill-screen {
+  position: absolute;
+  top: -5px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--as-ink);
+  color: var(--as-chip-surface);
+  box-shadow: 0 0 0 2px var(--as-chip-surface);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.apill-screen .apill-screen-off {
+  display: none;
+}
+
+.apill-screen:hover {
+  background: var(--as-error);
+  color: #fff;
+}
+
+.apill-screen:hover .apill-screen-on {
+  display: none;
+}
+
+.apill-screen:hover .apill-screen-off {
+  display: block;
+}
+
+/* Pill error: compact icon + short localized message. */
+.apill.error {
+  border-color: color-mix(in srgb, var(--as-error) 30%, var(--as-hairline));
+}
+
+.apill-error-text {
+  min-width: 0;
+  max-width: 168px;
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: var(--as-error);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+
+.apill-error-icon {
+  flex-shrink: 0;
+  color: var(--as-error);
+  pointer-events: none;
+}
+
+/* =========================================================================
+ * The expanded panel — one quiet chat card.
+ * ========================================================================= */
 
 .assistant-panel {
   position: relative;
@@ -109,41 +342,20 @@
   height: 100%;
   display: flex;
   flex-direction: column;
-  font-family: var(--font-ui);
-  font-size: 14px;
+  font-size: 13.5px;
   letter-spacing: 0.01em;
-  color: var(--ink);
-  background: var(--panel-surface);
-  backdrop-filter: blur(24px) saturate(1.4);
-  -webkit-backdrop-filter: blur(24px) saturate(1.4);
-  border-radius: var(--panel-radius);
-  box-shadow: var(--shadow);
+  color: var(--as-ink);
+  background: var(--as-panel-surface);
+  backdrop-filter: blur(22px) saturate(1.4);
+  -webkit-backdrop-filter: blur(22px) saturate(1.4);
+  border: 1px solid var(--as-hairline);
+  border-radius: 16px;
+  box-shadow: var(--as-inner);
   overflow: hidden;
-  animation: panel-in 0.22s ease-out;
+  animation: as-panel-in 0.2s ease-out;
 }
 
-/* Atmospheric accent orb — the only colour moment on the surface, drifting
- * behind the header just like the gradient orbs on the main canvas. */
-.assistant-panel::before {
-  content: "";
-  position: absolute;
-  top: -90px;
-  inset-inline-end: -70px;
-  width: 240px;
-  height: 240px;
-  border-radius: 9999px;
-  background: radial-gradient(
-    circle at 35% 35%,
-    var(--accent-from),
-    transparent 68%
-  );
-  opacity: 0.14;
-  filter: blur(36px);
-  pointer-events: none;
-  z-index: 0;
-}
-
-@keyframes panel-in {
+@keyframes as-panel-in {
   from {
     opacity: 0;
     transform: scale(0.99);
@@ -157,13 +369,11 @@
 /* ---------- Header ---------- */
 
 .assistant-header {
-  position: relative;
-  z-index: 1;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 11px 10px 11px 16px;
-  border-bottom: 1px solid var(--hairline);
+  padding: 9px 8px 9px 14px;
+  border-bottom: 1px solid var(--as-hairline);
   user-select: none;
   cursor: grab;
   flex-shrink: 0;
@@ -172,52 +382,56 @@
 .assistant-title {
   display: flex;
   align-items: center;
-  gap: 9px;
-  font-family: var(--font-display);
-  font-size: 17px;
-  font-weight: 500;
-  letter-spacing: -0.01em;
-  color: var(--ink);
+  gap: 8px;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  color: var(--as-ink);
 }
 
 .assistant-status-dot {
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent-from), var(--accent-to));
-  box-shadow: 0 0 7px color-mix(in srgb, var(--accent-from) 65%, transparent);
+  background: var(--as-faint);
+  transition: background 0.2s ease;
 }
 
 .assistant-status-dot.busy {
-  animation: dot-pulse 1.2s ease-in-out infinite;
+  background: var(--as-ink);
+  animation: as-dot-pulse 1.2s ease-in-out infinite;
 }
 
-@keyframes dot-pulse {
+@keyframes as-dot-pulse {
   0%,
   100% {
     transform: scale(1);
     opacity: 1;
   }
   50% {
-    transform: scale(1.4);
+    transform: scale(1.35);
     opacity: 0.55;
   }
 }
 
 .assistant-state-chip {
-  font-family: var(--font-ui);
   font-size: 10.5px;
   font-weight: 500;
   letter-spacing: 0.02em;
-  color: var(--muted);
-  background: var(--surface-strong);
-  border: 1px solid var(--hairline);
+  color: var(--as-muted);
+  background: var(--as-raise);
+  border: 1px solid var(--as-hairline);
   border-radius: 999px;
-  padding: 2px 9px;
-  animation: chip-in 0.18s ease-out;
+  padding: 2px 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  animation: as-chip-in 0.18s ease-out;
 }
 
-@keyframes chip-in {
+@keyframes as-chip-in {
   from {
     opacity: 0;
     transform: translateY(-2px);
@@ -231,19 +445,20 @@
 .assistant-header-actions {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 1px;
+  flex-shrink: 0;
 }
 
 .assistant-icon-button {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 27px;
+  height: 27px;
   border: none;
-  border-radius: 9px;
+  border-radius: 8px;
   background: transparent;
-  color: var(--muted);
+  color: var(--as-muted);
   cursor: pointer;
   transition:
     background 0.15s ease,
@@ -251,37 +466,35 @@
 }
 
 .assistant-icon-button:hover {
-  background: var(--surface-strong);
-  color: var(--ink);
+  background: var(--as-raise);
+  color: var(--as-ink);
 }
 
 .assistant-icon-button.close:hover {
-  background: rgba(220, 38, 38, 0.14);
-  color: #ef4444;
+  background: var(--as-error-bg);
+  color: var(--as-error);
 }
 
 .assistant-icon-button.active {
-  color: var(--ink);
-  background: var(--surface-strong);
+  color: var(--as-ink);
+  background: var(--as-raise);
 }
 
 .assistant-icon-button.pulsing {
-  animation: dot-pulse 1.2s ease-in-out infinite;
+  animation: as-dot-pulse 1.2s ease-in-out infinite;
 }
 
 /* ---------- Messages ---------- */
 
 .assistant-messages {
-  position: relative;
-  z-index: 1;
   flex: 1;
   overflow-y: auto;
-  padding: 16px 14px;
+  padding: 14px 14px 10px;
   display: flex;
   flex-direction: column;
-  gap: 9px;
+  gap: 10px;
   scrollbar-width: thin;
-  scrollbar-color: var(--hairline-strong) transparent;
+  scrollbar-color: var(--as-hairline-strong) transparent;
 }
 
 .assistant-empty {
@@ -290,27 +503,25 @@
   align-items: center;
   justify-content: center;
   text-align: center;
-  color: var(--muted);
-  font-size: 13px;
-  line-height: 1.65;
+  color: var(--as-muted);
+  font-size: 12.5px;
+  line-height: 1.7;
   white-space: pre-line;
-  padding: 0 26px;
+  padding: 0 24px;
 }
 
 .assistant-message {
   position: relative;
-  max-width: 86%;
-  border-radius: 16px;
-  padding: 9px 13px;
-  font-size: var(--msg-font-size);
+  max-width: 88%;
+  font-size: var(--as-msg-font);
   line-height: 1.55;
-  animation: bubble-in 0.2s ease-out;
+  animation: as-bubble-in 0.18s ease-out;
 }
 
-@keyframes bubble-in {
+@keyframes as-bubble-in {
   from {
     opacity: 0;
-    transform: translateY(4px);
+    transform: translateY(3px);
   }
   to {
     opacity: 1;
@@ -318,26 +529,65 @@
   }
 }
 
+/* User: a quiet raised bubble, same ink — no inverted block, no accent. */
 .assistant-message.user {
   align-self: flex-end;
-  background: var(--ink-pill-bg);
-  color: var(--ink-pill-fg);
-  border-bottom-right-radius: 6px;
+  background: var(--as-user-bg);
+  border: 1px solid var(--as-hairline);
+  color: var(--as-ink);
+  border-radius: 14px;
+  border-bottom-right-radius: 5px;
+  padding: 7px 11px;
 }
 
+/* Assistant: plain ink on the surface — editorial, no bubble chrome. */
 .assistant-message.assistant {
   align-self: flex-start;
-  background: var(--surface-strong);
-  border: 1px solid var(--hairline);
-  color: var(--ink);
-  border-bottom-left-radius: 6px;
+  color: var(--as-body);
+  padding: 0 2px;
 }
 
 .assistant-message.error {
+  align-self: stretch;
+  max-width: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  background: var(--as-error-bg);
+  border: 1px solid color-mix(in srgb, var(--as-error) 25%, transparent);
+  border-radius: 12px;
+  padding: 9px 11px;
+  color: var(--as-error);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.assistant-error-icon {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.assistant-error-body {
+  min-width: 0;
+}
+
+.assistant-error-detail {
+  margin-top: 3px;
+  font-size: 11px;
+  color: color-mix(in srgb, var(--as-error) 72%, var(--as-muted));
+  word-break: break-word;
+}
+
+/* Transient notice (e.g. web search failed, answering anyway). */
+.assistant-notice {
   align-self: flex-start;
-  background: var(--error-bg);
-  border: 1px solid color-mix(in srgb, var(--error-text) 30%, transparent);
-  color: var(--error-text);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--as-muted);
+  padding: 0 2px;
+  animation: as-bubble-in 0.18s ease-out;
 }
 
 .assistant-message-content {
@@ -375,25 +625,25 @@
 .assistant-message-content h2,
 .assistant-message-content h3,
 .assistant-message-content h4 {
-  font-family: var(--font-display);
-  font-size: 1.15em;
-  font-weight: 500;
-  letter-spacing: -0.01em;
+  font-size: 1.1em;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  color: var(--as-ink);
   margin: 11px 0 6px;
 }
 
 .assistant-message-content code {
   font-family: "Cascadia Code", "JetBrains Mono", Consolas, monospace;
   font-size: 0.9em;
-  background: var(--surface-inset);
-  border: 1px solid var(--hairline);
+  background: var(--as-inset-bg);
+  border: 1px solid var(--as-hairline);
   border-radius: 5px;
   padding: 1px 5px;
 }
 
 .assistant-message-content pre {
-  background: var(--surface-inset);
-  border: 1px solid var(--hairline);
+  background: var(--as-inset-bg);
+  border: 1px solid var(--as-hairline);
   border-radius: 10px;
   padding: 10px 12px;
   margin: 6px 0 8px;
@@ -409,15 +659,15 @@
 .assistant-message-content blockquote {
   margin: 6px 0 8px;
   padding: 2px 0 2px 11px;
-  border-inline-start: 3px solid var(--hairline-strong);
-  color: var(--muted);
+  border-inline-start: 2px solid var(--as-hairline-strong);
+  color: var(--as-muted);
 }
 
 .assistant-message-content a {
-  color: var(--ink);
+  color: var(--as-ink);
   text-decoration: underline;
   text-underline-offset: 2px;
-  text-decoration-color: var(--hairline-strong);
+  text-decoration-color: var(--as-hairline-strong);
 }
 
 .assistant-message-content table {
@@ -431,14 +681,88 @@
 
 .assistant-message-content th,
 .assistant-message-content td {
-  border: 1px solid var(--hairline);
+  border: 1px solid var(--as-hairline);
   padding: 4px 8px;
   text-align: left;
 }
 
 .assistant-message-content th {
-  background: var(--surface-inset);
+  background: var(--as-inset-bg);
   font-weight: 600;
+}
+
+/* Per-code-block copy: quiet button in the block's top corner on hover. */
+.code-block {
+  position: relative;
+}
+
+.code-copy {
+  position: absolute;
+  top: 6px;
+  inset-inline-end: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--as-hairline);
+  border-radius: 6px;
+  background: var(--as-panel-surface);
+  color: var(--as-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity 0.15s ease,
+    color 0.15s ease;
+}
+
+.code-block:hover .code-copy {
+  opacity: 1;
+}
+
+.code-copy:hover {
+  color: var(--as-ink);
+}
+
+/* Regenerate / continue on the latest answer — a quiet action row that only
+ * shows itself when the pointer is on the message. */
+.assistant-last-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.assistant-message:hover .assistant-last-actions,
+.assistant-last-actions:focus-within {
+  opacity: 1;
+}
+
+.assistant-last-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 9px;
+  border: 1px solid var(--as-hairline);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--as-muted);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.assistant-last-actions button:hover {
+  background: var(--as-raise);
+  color: var(--as-ink);
 }
 
 .screen-chip {
@@ -449,31 +773,26 @@
   font-size: 10.5px;
   font-weight: 500;
   letter-spacing: 0.02em;
-  color: color-mix(in srgb, var(--ink-pill-fg) 75%, transparent);
-  background: color-mix(in srgb, var(--ink-pill-fg) 14%, transparent);
+  color: var(--as-muted);
+  background: var(--as-inset-bg);
+  border: 1px solid var(--as-hairline);
   border-radius: 999px;
   padding: 2px 8px;
 }
 
-.assistant-message.assistant .screen-chip {
-  color: var(--muted);
-  background: var(--surface-inset);
-  border: 1px solid var(--hairline);
-}
-
 .bubble-copy {
   position: absolute;
-  top: 6px;
-  inset-inline-end: -32px;
+  top: 0;
+  inset-inline-end: -30px;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
-  border: 1px solid var(--hairline);
-  border-radius: 8px;
-  background: var(--panel-surface);
-  color: var(--muted);
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--as-hairline);
+  border-radius: 7px;
+  background: var(--as-panel-surface);
+  color: var(--as-muted);
   cursor: pointer;
   opacity: 0;
   transition:
@@ -487,26 +806,26 @@
 }
 
 .bubble-copy:hover {
-  color: var(--ink);
-  background: var(--surface-strong);
+  color: var(--as-ink);
+  background: var(--as-raise);
 }
 
-/* ---------- Listening / transcribing ---------- */
+/* ---------- Listening / transcribing (inline, panel expanded) ---------- */
 
 .assistant-listening {
   align-self: flex-start;
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 500;
-  color: var(--muted);
-  background: var(--surface-strong);
-  border: 1px solid var(--hairline);
-  border-radius: 16px;
-  border-bottom-left-radius: 6px;
-  padding: 7px 14px 7px 12px;
-  animation: bubble-in 0.2s ease-out;
+  color: var(--as-muted);
+  border: 1px solid var(--as-hairline);
+  background: var(--as-raise);
+  border-radius: 14px;
+  border-bottom-left-radius: 5px;
+  padding: 7px 13px 7px 11px;
+  animation: as-bubble-in 0.18s ease-out;
 }
 
 .listening-label {
@@ -515,13 +834,9 @@
   gap: 6px;
 }
 
-.listening-cam {
-  color: var(--accent-from);
-  flex-shrink: 0;
-}
-
+.listening-cam,
 .listening-lock {
-  color: var(--accent-from);
+  color: var(--as-muted);
   flex-shrink: 0;
 }
 
@@ -530,15 +845,15 @@
 .assistant-message.typing {
   display: flex;
   gap: 4px;
-  padding: 12px 14px;
+  padding: 8px 2px;
 }
 
 .typing-dot {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
-  background: var(--muted);
-  animation: typing-bounce 1.2s ease-in-out infinite;
+  background: var(--as-muted);
+  animation: as-typing 1.2s ease-in-out infinite;
 }
 
 .typing-dot:nth-child(2) {
@@ -549,7 +864,7 @@
   animation-delay: 0.3s;
 }
 
-@keyframes typing-bounce {
+@keyframes as-typing {
   0%,
   60%,
   100% {
@@ -557,21 +872,98 @@
     opacity: 0.4;
   }
   30% {
-    transform: translateY(-4px);
+    transform: translateY(-3px);
     opacity: 1;
   }
+}
+
+/* ---------- Attachments (pending, above the input row) ---------- */
+
+.assistant-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px 0;
+}
+
+.attachment-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 180px;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--as-hairline);
+  border-radius: 8px;
+  background: var(--as-raise);
+  color: var(--as-body);
+  font-size: 11.5px;
+  animation: as-chip-in 0.18s ease-out;
+}
+
+.attachment-chip .chip-name {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.attachment-chip img {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  object-fit: cover;
+}
+
+.attachment-chip .chip-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--as-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.attachment-chip .chip-remove:hover {
+  color: var(--as-error);
+  background: var(--as-error-bg);
+}
+
+/* Drag-a-file-over-the-panel highlight. */
+.assistant-drop-hint {
+  position: absolute;
+  inset: 6px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1.5px dashed var(--as-hairline-strong);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--as-panel-surface) 82%, transparent);
+  color: var(--as-muted);
+  font-size: 12.5px;
+  font-weight: 500;
+  pointer-events: none;
+  animation: as-bubble-in 0.15s ease-out;
 }
 
 /* ---------- Input row ---------- */
 
 .assistant-input-row {
-  position: relative;
-  z-index: 1;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 11px 12px 13px;
-  border-top: 1px solid var(--hairline);
+  gap: 6px;
+  padding: 10px 12px 12px;
+  border-top: 1px solid var(--as-hairline);
   flex-shrink: 0;
 }
 
@@ -579,13 +971,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   flex-shrink: 0;
-  border: 1px solid var(--hairline-strong);
-  border-radius: 11px;
-  background: var(--surface-strong);
-  color: var(--muted);
+  border: 1px solid var(--as-hairline);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--as-muted);
   cursor: pointer;
   transition:
     color 0.15s ease,
@@ -594,28 +986,28 @@
 }
 
 .assistant-attach-button:hover {
-  color: var(--ink);
-  border-color: var(--muted-soft);
+  color: var(--as-ink);
+  background: var(--as-raise);
 }
 
 .assistant-attach-button.armed {
-  background: var(--ink-pill-bg);
+  background: var(--as-ink);
   border-color: transparent;
-  color: var(--ink-pill-fg);
+  color: var(--as-panel-surface);
 }
 
 .assistant-input {
   flex: 1;
   min-width: 0;
-  height: 36px;
-  padding: 0 13px;
-  font-size: 13.5px;
+  height: 34px;
+  padding: 0 12px;
+  font-size: 13px;
   font-family: inherit;
   letter-spacing: 0.01em;
-  color: var(--ink);
-  background: var(--surface-strong);
-  border: 1px solid var(--hairline-strong);
-  border-radius: 11px;
+  color: var(--as-ink);
+  background: var(--as-inset-bg);
+  border: 1px solid var(--as-hairline);
+  border-radius: 10px;
   outline: none;
   transition:
     border-color 0.15s ease,
@@ -623,208 +1015,79 @@
 }
 
 .assistant-input::placeholder {
-  color: var(--muted-soft);
+  color: var(--as-faint);
 }
 
 .assistant-input:focus {
-  border-color: color-mix(
-    in srgb,
-    var(--accent-from) 60%,
-    var(--hairline-strong)
-  );
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-from) 16%, transparent);
+  border-color: var(--as-hairline-strong);
+  box-shadow: 0 0 0 3px var(--as-raise);
 }
 
 .assistant-send-button {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   flex-shrink: 0;
   border: none;
   border-radius: 50%;
-  background: var(--ink-pill-bg);
-  color: var(--ink-pill-fg);
+  background: var(--as-ink);
+  color: var(--as-panel-surface);
   cursor: pointer;
   transition:
     transform 0.15s ease,
-    box-shadow 0.15s ease,
     opacity 0.15s ease;
 }
 
 .assistant-send-button:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.24);
 }
 
 .assistant-send-button:disabled {
-  opacity: 0.4;
+  opacity: 0.35;
   cursor: default;
 }
 
-/* ---------- Pill (collapsed) mode ---------- */
+/* ---------- Settings preview ----------
+ * Renders real panel classes at a reduced footprint. Only layout is scoped
+ * here; every colour/token comes from the shared scope above. */
 
-.assistant-pill {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 0 10px 0 7px;
-  font-family: var(--font-ui);
-  color: var(--ink);
-  background: var(--panel-surface);
-  backdrop-filter: blur(24px) saturate(1.4);
-  -webkit-backdrop-filter: blur(24px) saturate(1.4);
-  border-radius: 999px;
-  /* The pill floats in a small transparent window with only a ~10px gutter, so
-   * it uses its own compact shadow rather than the panel's large elevation
-   * (var(--shadow)). That elevation's 18px offset + 44px blur overflowed the
-   * tiny window and got clipped into a hard rectangular "halo". This stays
-   * within the gutter so the chip reads as a cleanly floating lozenge. */
-  box-shadow:
-    0 0 0 1px var(--hairline),
-    0 1px 2px rgba(0, 0, 0, 0.2),
-    0 3px 8px rgba(0, 0, 0, 0.18);
-  overflow: hidden;
-  user-select: none;
-  cursor: grab;
-}
-
-/* Mic / stop button — quiet by default: a subtle ink-tinted disc with a hairline
- * ring and a crisp glyph, so the resting pill stays calm and modern instead of
- * leading with a bright solid circle. Colour is earned only by the active
- * recording state below (the pill's single colour moment). The tint is mixed
- * from --ink, so it adapts correctly to both the light and dark panel themes. */
-.pill-mic {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  flex-shrink: 0;
-  border: 1px solid color-mix(in srgb, var(--ink) 14%, transparent);
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--ink) 7%, transparent);
-  color: var(--ink);
-  cursor: pointer;
-  transition:
-    background 0.16s ease,
-    border-color 0.16s ease,
-    color 0.16s ease,
-    transform 0.12s ease,
-    box-shadow 0.22s ease;
-}
-
-.pill-mic-wrap {
-  position: relative;
-  flex-shrink: 0;
-  display: flex;
-}
-
-/* Small "vision" badge on the mic when a screenshot is part of the turn. */
-.pill-screen-badge {
-  position: absolute;
-  bottom: -2px;
-  inset-inline-end: -2px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 17px;
-  height: 17px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent-from), var(--accent-to));
-  color: #fff;
-  box-shadow: 0 0 0 2px var(--panel-surface);
-  animation: chip-in 0.18s ease-out;
-}
-
-.pill-mic:hover {
-  background: color-mix(in srgb, var(--ink) 13%, transparent);
-  border-color: color-mix(in srgb, var(--ink) 24%, transparent);
-}
-
-.pill-mic:active {
-  transform: scale(0.94);
-}
-
-/* Recording — the pill's single colour moment. A clean solid red (the
- * universal "recording" convention, so it conveys state rather than decorating)
- * with a soft halo that reads as "live". */
-.pill-mic.recording {
-  background: #e5484d;
-  border-color: transparent;
-  color: #fff;
-  box-shadow: 0 0 0 4px color-mix(in srgb, #e5484d 18%, transparent);
-}
-
-.pill-mic.recording:hover {
-  background: #ec5f63;
-  border-color: transparent;
-}
-
-/* Stop affordance (a turn is generating, or TTS is reading out a long reply).
- * Stays the quiet neutral disc — the animated waveform already signals that
- * something is happening, so the button just needs to read as "stop", distinct
- * from the red recording state. */
-.pill-mic.stopping {
-  background: color-mix(in srgb, var(--ink) 9%, transparent);
-  color: var(--ink);
-}
-
-.pill-wave {
-  flex: 1;
-  min-width: 0;
-  height: 38px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  /* The pill is tiny and rounded; clip so the waveform never touches the
-   * buttons or the rounded edge. */
+.assistant-preview {
+  border-radius: 14px;
   overflow: hidden;
 }
 
-/* Lock glyph shown in the collapsed pill while hands-free (tap-to-lock), so the
- * locked state reads differently from a plain hold-to-talk recording. Kept a
- * neutral ink tone (inherits the pill text colour) so it doesn't clash with the
- * recording button's warm accent. */
-.pill-lock-hint {
-  flex-shrink: 0;
-  opacity: 0.7;
-  pointer-events: none;
+.assistant-preview .assistant-panel {
+  height: auto;
+  animation: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
-/* Phase glyph on the pill's trailing edge — a globe while searching the web, a
- * speaker while reading the answer aloud. Quiet, neutral tone so it informs
- * without competing with the waveform. */
-.pill-phase-icon {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  color: var(--muted);
-  pointer-events: none;
+.assistant-preview .assistant-messages {
+  overflow-y: hidden;
 }
 
-.pill-status {
-  flex: 1;
-  min-width: 0;
-  font-size: 13px;
-  font-weight: 500;
-  letter-spacing: 0.01em;
-  color: var(--body);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
+/* ---------- Reduced motion ---------- */
 
 @media (prefers-reduced-motion: reduce) {
+  .apill,
+  .apill-wave,
+  .apill-reveal,
   .assistant-panel,
   .assistant-message,
   .assistant-listening,
+  .assistant-notice,
   .assistant-state-chip {
+    animation: none;
+    transition: none;
+  }
+
+  .apill-spin,
+  .assistant-status-dot.busy,
+  .assistant-icon-button.pulsing,
+  .typing-dot {
     animation: none;
   }
 }

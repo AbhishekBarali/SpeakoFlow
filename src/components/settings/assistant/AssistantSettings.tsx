@@ -20,6 +20,8 @@ import { Input } from "../../ui/Input";
 import { ShortcutInput } from "../ShortcutInput";
 import { useSettings } from "../../../hooks/useSettings";
 import { useKokoroTts } from "../../../assistant/useKokoroTts";
+import { FONT_SIZES } from "../../../assistant/appearance";
+import "../../../assistant/AssistantPanel.css";
 import { useModelStore } from "@/stores/modelStore";
 import { getModelCategory } from "@/lib/utils/modelCategory";
 
@@ -45,21 +47,6 @@ const KOKORO_VOICES = [
 /** Quick-pick playback speeds for the TTS speed control. Users can also type
  *  an arbitrary value (clamped to 0.25–4 by the backend). */
 const TTS_SPEED_PRESETS = [0.5, 1, 1.5, 2, 3];
-
-const ACCENTS: Record<string, [string, string]> = {
-  violet: ["#6366f1", "#8b5cf6"],
-  blue: ["#2563eb", "#06b6d4"],
-  emerald: ["#059669", "#34d399"],
-  rose: ["#e11d48", "#ec4899"],
-  amber: ["#d97706", "#f59e0b"],
-  mono: ["#52525b", "#71717a"],
-};
-
-const FONT_SIZES: Record<string, string> = {
-  small: "12px",
-  medium: "13px",
-  large: "14.5px",
-};
 
 /** Rotating set of playful lines spoken by the "Test voice" button. One is
  *  picked at random on each press instead of always saying the same thing.
@@ -171,124 +158,57 @@ const LoadableSelect: React.FC<{
   );
 };
 
-/** Explicit dark/light palettes for the live preview — mirror the real panel
- *  tokens in AssistantPanel.css so the preview is truthful for both themes
- *  regardless of the settings window's own appearance. */
-const PREVIEW_THEMES: Record<
-  "light" | "dark",
-  {
-    surface: string;
-    surfaceStrong: string;
-    ink: string;
-    hairline: string;
-    hairlineStrong: string;
-    mutedSoft: string;
-    inkPillBg: string;
-    inkPillFg: string;
-  }
-> = {
-  dark: {
-    surface: "#1c1917",
-    surfaceStrong: "#292524",
-    ink: "#fafaf9",
-    hairline: "#292524",
-    hairlineStrong: "#44403c",
-    mutedSoft: "#78716c",
-    inkPillBg: "#fafaf9",
-    inkPillFg: "#0c0a09",
-  },
-  light: {
-    surface: "#fdfcfa",
-    surfaceStrong: "#eeebe4",
-    ink: "#2a2622",
-    hairline: "#e9e5dd",
-    hairlineStrong: "#dad4c8",
-    mutedSoft: "#b7af9f",
-    inkPillBg: "#3d362e",
-    inkPillFg: "#fdfcfa",
-  },
-};
-
-/** Resolve the panel theme preference to a concrete light/dark for the preview;
- *  "auto" follows the settings window's current (app) theme. */
-const resolvePreviewTheme = (pref: string | undefined): "light" | "dark" => {
-  const p = pref ?? "auto";
-  if (p === "light" || p === "dark") return p;
-  return typeof document !== "undefined" &&
-    document.documentElement.dataset.theme === "dark"
-    ? "dark"
-    : "light";
-};
-
-/** Live preview of the assistant panel using the current appearance
- *  settings — mirrors the bubble/input styling of the real panel. */
+/** Live preview of the assistant panel. Renders the REAL panel classes from
+ *  AssistantPanel.css (dark-only, like the STT overlay), so the preview and
+ *  the actual panel share one stylesheet and can never drift. */
 const PanelPreview: React.FC<{
-  accent: string;
   fontSize: string;
   opacity: number;
-  theme: "light" | "dark";
-}> = ({ accent, fontSize, opacity, theme }) => {
+}> = ({ fontSize, opacity }) => {
   const { t } = useTranslation();
-  const [from, to] = ACCENTS[accent] ?? ACCENTS.violet;
   const fs = FONT_SIZES[fontSize] ?? FONT_SIZES.medium;
-  const accentGradient = `linear-gradient(135deg, ${from}, ${to})`;
-  const c = PREVIEW_THEMES[theme];
 
   return (
     <div
-      className="rounded-2xl p-3 flex flex-col gap-2"
-      style={{
-        opacity: Math.max(opacity, 0.5),
-        background: c.surface,
-        border: `1px solid ${c.hairline}`,
-      }}
+      className="assistant-scope assistant-preview"
+      style={
+        {
+          "--as-msg-font": fs,
+          "--as-alpha": String(Math.max(opacity, 0.5)),
+        } as React.CSSProperties
+      }
     >
-      <div className="flex items-center gap-2 pb-1">
-        <span
-          className="w-1.5 h-1.5 rounded-full shrink-0"
-          style={{ background: accentGradient }}
-        />
-        <span
-          className="font-display font-medium text-[15px] leading-none"
-          style={{ color: c.ink }}
-        >
-          {t("assistant.title")}
-        </span>
-      </div>
-      <div
-        className="self-end max-w-[75%] rounded-2xl rounded-br-md px-3 py-1.5"
-        style={{ fontSize: fs, background: c.inkPillBg, color: c.inkPillFg }}
-      >
-        {t("settings.assistant.appearance.previewUser")}
-      </div>
-      <div
-        className="self-start max-w-[75%] rounded-2xl rounded-bl-md px-3 py-1.5"
-        style={{
-          fontSize: fs,
-          background: c.surfaceStrong,
-          border: `1px solid ${c.hairline}`,
-          color: c.ink,
-        }}
-      >
-        {t("settings.assistant.appearance.previewAssistant")}
-      </div>
-      <div className="flex items-center gap-2 mt-1">
-        <div
-          className="flex-1 h-9 rounded-xl px-3 flex items-center"
-          style={{
-            fontSize: fs,
-            background: c.surfaceStrong,
-            border: `1px solid ${c.hairlineStrong}`,
-            color: c.mutedSoft,
-          }}
-        >
-          {t("assistant.inputPlaceholder")}
+      <div className="assistant-panel">
+        <div className="assistant-header">
+          <div className="assistant-title">
+            <span className="assistant-status-dot" />
+            {t("assistant.title")}
+          </div>
+          <div className="assistant-header-actions">
+            <span className="assistant-icon-button">
+              <Volume2 size={14} />
+            </span>
+          </div>
         </div>
-        <div
-          className="w-9 h-9 rounded-full flex items-center justify-center shrink-0"
-          style={{ background: c.inkPillBg, color: c.inkPillFg }}
-        >
-          <ArrowUp size={15} strokeWidth={2.5} />
+        <div className="assistant-messages">
+          <div className="assistant-message user">
+            <div className="assistant-message-content">
+              {t("settings.assistant.appearance.previewUser")}
+            </div>
+          </div>
+          <div className="assistant-message assistant">
+            <div className="assistant-message-content">
+              {t("settings.assistant.appearance.previewAssistant")}
+            </div>
+          </div>
+        </div>
+        <div className="assistant-input-row">
+          <div className="assistant-input" style={{ display: "flex", alignItems: "center", color: "var(--as-faint)" }}>
+            {t("assistant.inputPlaceholder")}
+          </div>
+          <span className="assistant-send-button">
+            <ArrowUp size={15} strokeWidth={2.5} />
+          </span>
         </div>
       </div>
     </div>
@@ -1031,6 +951,17 @@ export const AssistantSettings: React.FC = () => {
         />
         {settings?.assistant_tts_enabled && (
           <>
+            <ToggleSwitch
+              checked={settings?.assistant_tts_stop_on_dictation ?? false}
+              onChange={(checked) =>
+                setAndRefresh(
+                  commands.setAssistantTtsStopOnDictation(checked),
+                )
+              }
+              label={t("settings.assistant.tts.stopOnDictationLabel")}
+              description={t("settings.assistant.tts.stopOnDictationDescription")}
+              grouped={true}
+            />
             <SettingContainer
               title={t("settings.assistant.tts.engineLabel")}
               description={t("settings.assistant.tts.engineDescription")}
@@ -1427,106 +1358,8 @@ export const AssistantSettings: React.FC = () => {
           grouped={true}
         >
           <PanelPreview
-            accent={settings?.assistant_accent ?? "violet"}
             fontSize={settings?.assistant_font_size ?? "medium"}
             opacity={settings?.assistant_panel_opacity ?? 1}
-            theme={resolvePreviewTheme(settings?.assistant_panel_theme)}
-          />
-        </SettingContainer>
-        <SettingContainer
-          title={t("settings.assistant.appearance.themeLabel")}
-          description={t("settings.assistant.appearance.themeDescription")}
-          descriptionMode="tooltip"
-          layout="horizontal"
-          grouped={true}
-        >
-          <Dropdown
-            options={[
-              {
-                value: "auto",
-                label: t("settings.assistant.appearance.themes.auto"),
-              },
-              {
-                value: "light",
-                label: t("settings.assistant.appearance.themes.light"),
-              },
-              {
-                value: "dark",
-                label: t("settings.assistant.appearance.themes.dark"),
-              },
-            ]}
-            selectedValue={settings?.assistant_panel_theme ?? "auto"}
-            onSelect={(theme) =>
-              setAndRefresh(commands.setAssistantPanelTheme(theme))
-            }
-          />
-        </SettingContainer>
-        <SettingContainer
-          title={t("settings.assistant.appearance.sizeLabel")}
-          description={t("settings.assistant.appearance.sizeDescription")}
-          descriptionMode="tooltip"
-          layout="horizontal"
-          grouped={true}
-        >
-          <Dropdown
-            options={[
-              {
-                value: "compact",
-                label: t("settings.assistant.appearance.sizes.compact"),
-              },
-              {
-                value: "standard",
-                label: t("settings.assistant.appearance.sizes.standard"),
-              },
-              {
-                value: "large",
-                label: t("settings.assistant.appearance.sizes.large"),
-              },
-            ]}
-            selectedValue={settings?.assistant_panel_size ?? "standard"}
-            onSelect={(size) =>
-              setAndRefresh(commands.setAssistantPanelSize(size))
-            }
-          />
-        </SettingContainer>
-        <SettingContainer
-          title={t("settings.assistant.appearance.accentLabel")}
-          description={t("settings.assistant.appearance.accentDescription")}
-          descriptionMode="tooltip"
-          layout="horizontal"
-          grouped={true}
-        >
-          <Dropdown
-            options={[
-              {
-                value: "violet",
-                label: t("settings.assistant.appearance.accents.violet"),
-              },
-              {
-                value: "blue",
-                label: t("settings.assistant.appearance.accents.blue"),
-              },
-              {
-                value: "emerald",
-                label: t("settings.assistant.appearance.accents.emerald"),
-              },
-              {
-                value: "rose",
-                label: t("settings.assistant.appearance.accents.rose"),
-              },
-              {
-                value: "amber",
-                label: t("settings.assistant.appearance.accents.amber"),
-              },
-              {
-                value: "mono",
-                label: t("settings.assistant.appearance.accents.mono"),
-              },
-            ]}
-            selectedValue={settings?.assistant_accent ?? "violet"}
-            onSelect={(accent) =>
-              setAndRefresh(commands.setAssistantAccent(accent))
-            }
           />
         </SettingContainer>
         <SettingContainer

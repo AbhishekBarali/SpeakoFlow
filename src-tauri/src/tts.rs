@@ -78,6 +78,15 @@ pub fn stop_remote() {
     PLAYBACK_EPOCH.fetch_add(1, Ordering::SeqCst);
 }
 
+/// Stop ALL assistant speech — remote playback and the in-webview Kokoro
+/// engine. Used when a new recording starts so old speech never talks over
+/// the user's next dictation or question.
+pub fn stop_all(app: &AppHandle) {
+    stop_remote();
+    use tauri::Emitter;
+    let _ = app.emit("assistant-tts-stop", ());
+}
+
 /// Fetch speech audio for `text` using the configured remote engine and play
 /// it on the selected output device. Returns after playback finishes.
 pub async fn speak_remote(app: &AppHandle, settings: &AppSettings, text: String) {
@@ -126,8 +135,7 @@ pub async fn speak_remote_epoch(app: &AppHandle, settings: &AppSettings, text: S
         }
         Err(e) => {
             error!("TTS request failed: {}", e);
-            use tauri::Emitter;
-            let _ = app.emit("assistant-error", format!("TTS failed: {}", e));
+            crate::assistant::emit_error(app, "tts", e);
         }
     }
 }
@@ -445,7 +453,10 @@ pub async fn list_tts_voices(settings: &AppSettings) -> Result<Vec<TtsVoice>, St
                 })
                 .collect())
         }
-        other => Err(format!("Voice listing isn't supported for engine: {}", other)),
+        other => Err(format!(
+            "Voice listing isn't supported for engine: {}",
+            other
+        )),
     }
 }
 
@@ -595,7 +606,10 @@ pub async fn list_tts_models(settings: &AppSettings) -> Result<Vec<String>, Stri
     match settings.assistant_tts_engine.as_str() {
         "openai" => list_openai_tts_models(settings).await,
         "elevenlabs" => list_elevenlabs_models(settings).await,
-        other => Err(format!("Model listing isn't supported for engine: {}", other)),
+        other => Err(format!(
+            "Model listing isn't supported for engine: {}",
+            other
+        )),
     }
 }
 

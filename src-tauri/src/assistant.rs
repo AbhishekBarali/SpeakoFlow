@@ -11,7 +11,7 @@ use crate::web_search;
 use log::{debug, error, warn};
 use serde::Serialize;
 use serde_json::{json, Value};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter, Manager, WebviewWindowBuilder};
 use tauri_plugin_store::StoreExt;
@@ -21,16 +21,30 @@ pub const PANEL_LABEL: &str = "assistant_panel";
 const PANEL_MARGIN: f64 = 24.0;
 const PANEL_POSITION_KEY: &str = "assistant_panel_position";
 
-/// Collapsed "pill" mode dimensions (small floating button bar).
-const PILL_WIDTH: f64 = 232.0;
-const PILL_HEIGHT: f64 = 64.0;
+/// Collapsed "pill" mode: a small transparent window in which the chip floats
+/// and hugs its content, like the STT recording overlay (128×40 there).
+const PILL_WIDTH: f64 = 240.0;
+const PILL_HEIGHT: f64 = 44.0;
 
-/// Logical size for each panel size preset.
-pub fn panel_size_for(preset: &str) -> (f64, f64) {
-    match preset {
-        "compact" => (340.0, 440.0),
-        "large" => (560.0, 720.0),
-        _ => (420.0, 560.0),
+/// The one expanded panel size. There are no size presets; the window stays
+/// user-resizable, and a manual resize is remembered for the session (below)
+/// so collapse → expand round-trips keep it.
+const PANEL_WIDTH: f64 = 400.0;
+const PANEL_HEIGHT: f64 = 560.0;
+
+/// Session memory of the last expanded size (logical px), so collapsing to the
+/// pill and expanding again restores a manual resize. 0 = never resized — use
+/// the default. Not persisted: a fresh app start uses the standard size.
+static EXPANDED_W: AtomicU32 = AtomicU32::new(0);
+static EXPANDED_H: AtomicU32 = AtomicU32::new(0);
+
+fn expanded_size() -> (f64, f64) {
+    let w = EXPANDED_W.load(Ordering::SeqCst);
+    let h = EXPANDED_H.load(Ordering::SeqCst);
+    if w == 0 || h == 0 {
+        (PANEL_WIDTH, PANEL_HEIGHT)
+    } else {
+        (w as f64, h as f64)
     }
 }
 
@@ -39,8 +53,9 @@ pub fn panel_size_for(preset: &str) -> (f64, f64) {
 /// expanding (or collapsing) updates it for the rest of the session.
 static PILL_MODE: AtomicBool = AtomicBool::new(true);
 
-/// One-shot "attach a screenshot to the next turn" flag, set by the panel's
-/// camera button. Applies to BOTH typed and voice turns.
+/// Sticky "attach the screen to assistant turns" flag, set by the panel's
+/// camera toggle. Persists across turns until the user turns it off (the
+/// pill/panel show a camera badge the whole time it's armed).
 static SCREEN_ARMED: AtomicBool = AtomicBool::new(false);
 
 pub fn set_screen_armed(app: &AppHandle, armed: bool) {
@@ -48,19 +63,81 @@ pub fn set_screen_armed(app: &AppHandle, armed: bool) {
     let _ = app.emit("assistant-screen-armed", armed);
 }
 
-/// Consume the armed flag (returns true at most once per arm).
-pub fn take_screen_armed(app: &AppHandle) -> bool {
-    let armed = SCREEN_ARMED.swap(false, Ordering::SeqCst);
-    if armed {
-        let _ = app.emit("assistant-screen-armed", false);
-    }
-    armed
+/// Whether screen vision is currently armed. Sticky: reading does NOT clear it.
+pub fn screen_armed() -> bool {
+    SCREEN_ARMED.load(Ordering::SeqCst)
 }
 
 /// Appended to the stored user message when a screenshot was sent with it.
 /// The panel strips it for display and shows a chip instead; on later turns
 /// it tells the model a screenshot accompanied that message.
 pub const SCREENSHOT_MARKER: &str = "[screenshot attached]";
+
+/// Appended (one per image) when the user attached images to the message.
+/// Stripped for display like the screenshot marker — keep in sync with
+/// AssistantPanel.tsx.
+pub const IMAGE_MARKER: &str = "[image attached]";
+
+/// Prefix for per-file attachment markers: `[file attached: name.ext]`.
+/// Keep in sync with AssistantPanel.tsx.
+pub const FILE_MARKER_PREFIX: &str = "[file attached:";
+
+/// A text-like file attached to a turn as context (content extracted in the
+/// webview or by `assistant_read_file`).
+#[derive(Clone, serde::Deserialize, serde::Serialize, specta::Type)]
+pub struct FileAttachment {
+    pub name: String,
+    pub content: String,
+}
+
+/// Frozen full-screen capture waiting for the user to pick a region in the
+/// snip overlay. Captured BEFORE the overlay opens, so the dimmer (and any
+/// on-screen assistant window churn) can never photobomb the crop.
+pub static PENDING_SNIP: Mutex<Option<image::DynamicImage>> = Mutex::new(None);
+
+/// Attachments staged in the panel (chips above the input) and mirrored here
+/// so VOICE turns include them too — the pill/hotkey path runs entirely in
+/// Rust and can't see the webview's React state.
+static PENDING_ATTACHMENTS: Mutex<(Vec<String>, Vec<FileAttachment>)> =
+    Mutex::new((Vec::new(), Vec::new()));
+
+/// Mirror the panel's staged attachments (called on every add/remove).
+pub fn set_pending_attachments(images: Vec<String>, files: Vec<FileAttachment>) {
+    if let Ok(mut pending) = PENDING_ATTACHMENTS.lock() {
+        *pending = (images, files);
+    }
+}
+
+/// Take (and clear) the staged attachments for a turn that consumes them.
+/// Tells the panel so its chips clear as well.
+pub fn take_pending_attachments(app: &AppHandle) -> (Vec<String>, Vec<FileAttachment>) {
+    let taken = PENDING_ATTACHMENTS
+        .lock()
+        .map(|mut p| std::mem::take(&mut *p))
+        .unwrap_or_default();
+    if !taken.0.is_empty() || !taken.1.is_empty() {
+        let _ = app.emit("assistant-attachments-consumed", ());
+    }
+    taken
+}
+
+/// One-shot "route the current dictation to the assistant" flag, set by the
+/// STT overlay's Ask-Assistant button just before it commits the recording.
+/// Cleared on every dictation start so a stale click can never redirect a
+/// later, unrelated dictation.
+static TRANSCRIBE_REDIRECT: AtomicBool = AtomicBool::new(false);
+
+pub fn set_transcribe_redirect() {
+    TRANSCRIBE_REDIRECT.store(true, Ordering::SeqCst);
+}
+
+pub fn clear_transcribe_redirect() {
+    TRANSCRIBE_REDIRECT.store(false, Ordering::SeqCst);
+}
+
+pub fn take_transcribe_redirect() -> bool {
+    TRANSCRIBE_REDIRECT.swap(false, Ordering::SeqCst)
+}
 
 /// Phrases that signal the user is asking about what's on their screen.
 /// When the screenshot toggle is on, these auto-attach a capture even on the
@@ -157,6 +234,36 @@ impl AssistantConversation {
 #[derive(Clone, Serialize)]
 struct AssistantStatePayload {
     state: String,
+}
+
+/// Structured error payload: `code` is a stable identifier the panel maps to a
+/// short localized message (with a pill-sized variant); `detail` carries the
+/// raw provider/OS text for the expanded view and unknown-code fallback.
+#[derive(Clone, Serialize)]
+struct AssistantErrorPayload {
+    code: String,
+    detail: String,
+}
+
+/// Emit a user-facing assistant error. Codes the panel understands:
+/// `no_provider`, `no_model`, `engine_start`, `provider`, `vision_unsupported`,
+/// `screenshot_too_large`, `screen_capture`, `transcription`, `tts`,
+/// `mic_denied`, `mic_unavailable`.
+pub fn emit_error(app: &AppHandle, code: &str, detail: String) {
+    let _ = app.emit(
+        "assistant-error",
+        AssistantErrorPayload {
+            code: code.to_string(),
+            detail,
+        },
+    );
+}
+
+/// Emit a non-blocking notice (the turn keeps going). The panel shows it as a
+/// quiet transient line rather than an error bubble. Codes:
+/// `web_search_failed`.
+pub fn emit_notice(app: &AppHandle, code: &str) {
+    let _ = app.emit("assistant-notice", code.to_string());
 }
 
 /// Emit a pipeline state update to the panel:
@@ -299,8 +406,6 @@ fn save_position(app: &AppHandle) {
 
 /// Default position: bottom-right of the primary monitor (logical coords).
 fn default_position(app: &AppHandle) -> (f64, f64) {
-    let settings = get_settings(app);
-    let (panel_w, panel_h) = panel_size_for(&settings.assistant_panel_size);
     if let Ok(Some(monitor)) = app.primary_monitor() {
         let scale = monitor.scale_factor();
         let mw = monitor.size().width as f64 / scale;
@@ -308,8 +413,8 @@ fn default_position(app: &AppHandle) -> (f64, f64) {
         let mx = monitor.position().x as f64 / scale;
         let my = monitor.position().y as f64 / scale;
         (
-            mx + mw - panel_w - PANEL_MARGIN,
-            my + mh - panel_h - PANEL_MARGIN - 40.0, // keep clear of taskbar
+            mx + mw - PANEL_WIDTH - PANEL_MARGIN,
+            my + mh - PANEL_HEIGHT - PANEL_MARGIN - 40.0, // keep clear of taskbar
         )
     } else {
         (100.0, 100.0)
@@ -319,14 +424,12 @@ fn default_position(app: &AppHandle) -> (f64, f64) {
 /// Create the assistant panel window, hidden by default. Called once at setup.
 pub fn create_assistant_panel(app: &AppHandle) {
     let (x, y) = saved_position(app).unwrap_or_else(|| default_position(app));
-    let settings = get_settings(app);
-    let (panel_w, panel_h) = panel_size_for(&settings.assistant_panel_size);
     // Build at whichever size matches the current mode (pill by default) so the
     // first show doesn't briefly flash the large panel before collapsing.
     let (init_w, init_h) = if PILL_MODE.load(Ordering::SeqCst) {
         (PILL_WIDTH, PILL_HEIGHT)
     } else {
-        (panel_w, panel_h)
+        expanded_size()
     };
 
     let mut builder = WebviewWindowBuilder::new(
@@ -410,36 +513,222 @@ pub fn toggle_assistant_panel(app: &AppHandle) {
     }
 }
 
-/// Apply the configured size preset to the panel window (no-op in pill mode).
-pub fn apply_panel_size(app: &AppHandle) {
-    if PILL_MODE.load(Ordering::SeqCst) {
-        return;
-    }
+/// Collapse the panel to a small pill, or restore it to the expanded size.
+/// Collapsing remembers the current expanded size for the session so a manual
+/// resize survives the round-trip. The window's BOTTOM-LEFT corner stays
+/// anchored through both transitions (the pill usually sits near the bottom of
+/// the screen, so expanding grows upward instead of pushing below the screen
+/// edge), and the result is clamped onto the current monitor.
+pub fn set_panel_collapsed(app: &AppHandle, collapsed: bool) {
     if let Some(window) = app.get_webview_window(PANEL_LABEL) {
-        let settings = get_settings(app);
-        let (w, h) = panel_size_for(&settings.assistant_panel_size);
-        let _ = window.set_size(tauri::LogicalSize::new(w, h));
+        let scale = window
+            .current_monitor()
+            .ok()
+            .flatten()
+            .map(|m| m.scale_factor())
+            .unwrap_or(1.0);
+        let old_pos = window.outer_position().ok();
+        let old_size = window.inner_size().ok();
+
+        if collapsed && !PILL_MODE.load(Ordering::SeqCst) {
+            if let Some(size) = old_size {
+                let w = (size.width as f64 / scale).round() as u32;
+                let h = (size.height as f64 / scale).round() as u32;
+                // Ignore degenerate sizes (e.g. already pill-sized) so a stray
+                // double-collapse can't shrink the remembered panel.
+                if w > PILL_WIDTH as u32 && h > PILL_HEIGHT as u32 {
+                    EXPANDED_W.store(w, Ordering::SeqCst);
+                    EXPANDED_H.store(h, Ordering::SeqCst);
+                }
+            }
+        }
+        PILL_MODE.store(collapsed, Ordering::SeqCst);
+
+        let (new_w, new_h) = if collapsed {
+            (PILL_WIDTH, PILL_HEIGHT)
+        } else {
+            expanded_size()
+        };
+        let _ = window.set_size(tauri::LogicalSize::new(new_w, new_h));
+
+        // Bottom-left anchor + on-screen clamp.
+        if let (Some(pos), Some(size)) = (old_pos, old_size) {
+            let old_x = pos.x as f64 / scale;
+            let old_y = pos.y as f64 / scale;
+            let old_h = size.height as f64 / scale;
+            let mut new_x = old_x;
+            let mut new_y = old_y + old_h - new_h;
+            if let Ok(Some(monitor)) = window.current_monitor() {
+                let mx = monitor.position().x as f64 / scale;
+                let my = monitor.position().y as f64 / scale;
+                let mw = monitor.size().width as f64 / scale;
+                let mh = monitor.size().height as f64 / scale;
+                new_x = new_x.clamp(mx + 8.0, (mx + mw - new_w - 8.0).max(mx + 8.0));
+                new_y = new_y.clamp(my + 8.0, (my + mh - new_h - 8.0).max(my + 8.0));
+            }
+            let _ = window.set_position(tauri::LogicalPosition::new(new_x, new_y));
+        }
+
+        let _ = app.emit("assistant-collapsed", collapsed);
+    } else {
+        PILL_MODE.store(collapsed, Ordering::SeqCst);
     }
 }
 
-/// Collapse the panel to a small pill, or restore it to its configured size.
-pub fn set_panel_collapsed(app: &AppHandle, collapsed: bool) {
-    PILL_MODE.store(collapsed, Ordering::SeqCst);
-    if let Some(window) = app.get_webview_window(PANEL_LABEL) {
-        if collapsed {
-            let _ = window.set_size(tauri::LogicalSize::new(PILL_WIDTH, PILL_HEIGHT));
-        } else {
-            let settings = get_settings(app);
-            let (w, h) = panel_size_for(&settings.assistant_panel_size);
-            let _ = window.set_size(tauri::LogicalSize::new(w, h));
+// ---------------------------------------------------------------------------
+// Region snip overlay
+// ---------------------------------------------------------------------------
+
+pub const SNIP_LABEL: &str = "snip_overlay";
+
+/// Open the region-snip overlay for a frame that was just captured: store it
+/// in PENDING_SNIP, then cover the cursor's monitor with a transparent
+/// selection window. Called from an async command (worker thread) — building
+/// a webview inline on the main thread inside a command deadlocks WebView2 on
+/// Windows, so this must NOT be dispatched to the main thread.
+pub fn open_snip_overlay(app: &AppHandle, frame: image::DynamicImage) -> Result<(), String> {
+    if app.get_webview_window(SNIP_LABEL).is_some() {
+        return Ok(()); // already snipping
+    }
+
+    if let Ok(mut pending) = PENDING_SNIP.lock() {
+        *pending = Some(frame);
+    }
+
+    // Cover the monitor the cursor is on (physical coords); primary otherwise.
+    let cursor = crate::screenshot::cursor_position();
+    let monitor = match cursor {
+        Some((x, y)) => app
+            .monitor_from_point(x as f64, y as f64)
+            .ok()
+            .flatten()
+            .or_else(|| app.primary_monitor().ok().flatten()),
+        None => app.primary_monitor().ok().flatten(),
+    }
+    .ok_or_else(|| "No monitor available for region snip".to_string())?;
+
+    let window = WebviewWindowBuilder::new(
+        app,
+        SNIP_LABEL,
+        tauri::WebviewUrl::App("src/assistant/snip.html".into()),
+    )
+    .title("Snip")
+    .decorations(false)
+    .transparent(true)
+    .shadow(false)
+    .always_on_top(true)
+    .skip_taskbar(true)
+    .resizable(false)
+    .focused(true)
+    .visible(true)
+    .build()
+    .map_err(|e| format!("Couldn't open the snip overlay: {}", e))?;
+
+    // Position/size in PHYSICAL pixels so the overlay covers the monitor
+    // exactly regardless of DPI scale.
+    let _ = window.set_position(tauri::PhysicalPosition::new(
+        monitor.position().x,
+        monitor.position().y,
+    ));
+    let _ = window.set_size(tauri::PhysicalSize::new(
+        monitor.size().width,
+        monitor.size().height,
+    ));
+    let _ = window.set_focus();
+    #[cfg(target_os = "windows")]
+    force_panel_topmost(&window);
+    Ok(())
+}
+
+/// Close the snip overlay and, when a rectangle was chosen, crop it from the
+/// frozen frame and hand it to the panel as a pending image attachment via the
+/// `assistant-region-captured` event. `rect` is in the overlay's logical px.
+pub fn finish_region_snip(app: &AppHandle, scale: f64, rect: Option<(f64, f64, f64, f64)>) {
+    if let Some(window) = app.get_webview_window(SNIP_LABEL) {
+        let _ = window.close();
+    }
+    let frame = PENDING_SNIP.lock().ok().and_then(|mut p| p.take());
+    let Some(rect) = rect else {
+        return; // cancelled
+    };
+    let Some(frame) = frame else {
+        emit_error(app, "screen_capture", "No captured frame for snip".into());
+        return;
+    };
+
+    let (x, y, w, h) = rect;
+    let to_px = |v: f64| -> u32 { (v * scale).round().max(0.0) as u32 };
+    if w * scale < 4.0 || h * scale < 4.0 {
+        return; // a stray click, not a selection
+    }
+
+    let settings = get_settings(app);
+    let profile = settings
+        .active_assistant_provider()
+        .map(|p| crate::screenshot::CaptureProfile::for_base_url(&p.base_url))
+        .unwrap_or(crate::screenshot::CaptureProfile::Generous);
+
+    match crate::screenshot::encode_region_data_url(
+        &frame,
+        profile,
+        to_px(x),
+        to_px(y),
+        to_px(w),
+        to_px(h),
+    ) {
+        Ok(data_url) => {
+            let _ = app.emit("assistant-region-captured", data_url);
         }
-        let _ = app.emit("assistant-collapsed", collapsed);
+        Err(e) => emit_error(app, "screen_capture", e),
     }
 }
 
 // ---------------------------------------------------------------------------
 // Assistant pipeline
 // ---------------------------------------------------------------------------
+
+/// Run a voice-initiated assistant turn on a finished transcription: decide
+/// whether to attach the screen (sticky arm or "what's on my screen" phrasing),
+/// capture it, pick up any attachments staged in the panel, and run the turn.
+/// Shared by the assistant hotkey/pill path and the STT overlay's
+/// Ask-Assistant redirect.
+pub async fn run_voice_turn(app: AppHandle, transcription: String) {
+    let settings = get_settings(&app);
+    let wants_screen = screen_armed() || wants_screen_context(&transcription);
+    let screenshot = if wants_screen && settings.assistant_screenshot_enabled {
+        // Tiny body only for Azure; loopback (built-in/local engine) gets a
+        // balanced image, cloud gets the sharp one.
+        let profile = settings
+            .active_assistant_provider()
+            .map(|p| crate::screenshot::CaptureProfile::for_base_url(&p.base_url))
+            .unwrap_or(crate::screenshot::CaptureProfile::Generous);
+        let captured = tauri::async_runtime::spawn_blocking(move || {
+            crate::screenshot::capture_screen_data_url(profile)
+        })
+        .await;
+        match captured {
+            Ok(Ok(data_url)) => Some(data_url),
+            Ok(Err(e)) => {
+                // Don't silently send a text-only request when the user asked
+                // about their screen.
+                error!("Screen capture failed: {}", e);
+                emit_error(&app, "screen_capture", e);
+                emit_state(&app, "idle");
+                return;
+            }
+            Err(e) => {
+                error!("Screen capture task failed: {}", e);
+                emit_error(&app, "screen_capture", e.to_string());
+                emit_state(&app, "idle");
+                return;
+            }
+        }
+    } else {
+        None
+    };
+    let (images, files) = take_pending_attachments(&app);
+    run_assistant_turn(app, transcription, screenshot, images, files).await;
+}
 
 /// Resets the busy flag when a turn finishes, on every exit path.
 struct BusyReset(AppHandle);
@@ -523,10 +812,11 @@ fn recent_context_for_planner(app: &AppHandle) -> String {
         } else {
             "User"
         };
-        // Collapse whitespace and strip the screenshot marker, then bound length.
+        // Collapse whitespace and strip attachment markers, then bound length.
         let text: String = message
             .content
             .replace(SCREENSHOT_MARKER, "")
+            .replace(IMAGE_MARKER, "")
             .split_whitespace()
             .collect::<Vec<_>>()
             .join(" ");
@@ -544,20 +834,30 @@ fn recent_context_for_planner(app: &AppHandle) -> String {
 /// the panel via events, and append the reply to the conversation history.
 ///
 /// `screenshot` is an optional `data:image/...;base64,` URL captured from the
-/// user's screen; it is sent to the model only for this turn (the history
-/// keeps a text marker instead, so images never burn tokens twice).
+/// user's screen, `images` are user-attached pictures (same format), and
+/// `files` are text-like attachments whose content is inlined as context.
+/// Visuals are sent to the model only for this turn (the history keeps text
+/// markers instead, so images never burn tokens twice).
 ///
 /// Events emitted:
 /// - `assistant-conversation` (Vec<ChatMessage>): full snapshot after change
 /// - `assistant-token` (String): each streamed content delta
 /// - `assistant-tts` (String): short spoken summary (only when TTS enabled)
-/// - `assistant-error` (String): error description
-pub async fn run_assistant_turn(app: AppHandle, user_text: String, screenshot: Option<String>) {
+/// - `assistant-error` ({code, detail}): structured error description
+pub async fn run_assistant_turn(
+    app: AppHandle,
+    user_text: String,
+    screenshot: Option<String>,
+    images: Vec<String>,
+    files: Vec<FileAttachment>,
+) {
     let user_text = user_text.trim().to_string();
     if user_text.is_empty() {
         emit_state(&app, "idle");
         return;
     }
+    // Whether any picture rides along this turn (screen capture or attachment).
+    let has_visual = screenshot.is_some() || !images.is_empty();
 
     // Re-entrancy guard: a double-fired hotkey or repeated Enter must never
     // start a second concurrent turn (this caused duplicated messages).
@@ -576,8 +876,9 @@ pub async fn run_assistant_turn(app: AppHandle, user_text: String, screenshot: O
     let settings = get_settings(&app);
 
     let Some(provider) = settings.active_assistant_provider().cloned() else {
-        let _ = app.emit(
-            "assistant-error",
+        emit_error(
+            &app,
+            "no_provider",
             "No assistant provider configured. Pick one in Settings → Assistant.".to_string(),
         );
         emit_state(&app, "idle");
@@ -590,8 +891,9 @@ pub async fn run_assistant_turn(app: AppHandle, user_text: String, screenshot: O
         .cloned()
         .unwrap_or_default();
     if model.trim().is_empty() {
-        let _ = app.emit(
-            "assistant-error",
+        emit_error(
+            &app,
+            "no_model",
             format!(
                 "No model configured for provider '{}'. Set one in Settings → Assistant.",
                 provider.label
@@ -607,17 +909,22 @@ pub async fn run_assistant_turn(app: AppHandle, user_text: String, screenshot: O
         .cloned()
         .unwrap_or_default();
 
-    // Record the user message (text marker instead of raw image data) and show
-    // it in the panel immediately — before any web search runs, so the bubble
-    // appears right away while results are being fetched.
+    // Record the user message (text markers instead of raw image/file data)
+    // and show it in the panel immediately — before any web search runs, so the
+    // bubble appears right away while results are being fetched.
     {
         let conversation = app.state::<AssistantConversation>();
         let mut history = conversation.messages.lock().unwrap();
-        let stored = if screenshot.is_some() {
-            format!("{}\n\n{}", user_text, SCREENSHOT_MARKER)
-        } else {
-            user_text.clone()
-        };
+        let mut stored = user_text.clone();
+        for file in &files {
+            stored.push_str(&format!("\n{} {}]", FILE_MARKER_PREFIX, file.name));
+        }
+        for _ in &images {
+            stored.push_str(&format!("\n{}", IMAGE_MARKER));
+        }
+        if screenshot.is_some() {
+            stored.push_str(&format!("\n{}", SCREENSHOT_MARKER));
+        }
         history.push(ChatMessage {
             role: "user".to_string(),
             content: stored,
@@ -628,16 +935,16 @@ pub async fn run_assistant_turn(app: AppHandle, user_text: String, screenshot: O
     // the model (or the search) errors out before replying.
     persist_assistant_session(&app);
 
-    // Optional web search. Runs only when enabled and this isn't a screenshot
-    // turn (those are about the screen, not the web). A capable model plans the
-    // search — deciding whether one is actually needed and rewriting the (often
-    // messy, transcribed) request into clean queries — and then we fetch real
-    // page content to ground the answer. Any failure or timeout degrades
-    // gracefully: we answer without web context rather than breaking the turn.
-    // The cheap `should_search` pre-gate skips obvious non-search turns so we
-    // don't spend a planner round-trip on chit-chat, code, or math.
+    // Optional web search. Runs only when enabled and this isn't a visual
+    // turn (those are about the screen/images, not the web). A capable model
+    // plans the search — deciding whether one is actually needed and rewriting
+    // the (often messy, transcribed) request into clean queries — and then we
+    // fetch real page content to ground the answer. Any failure or timeout
+    // degrades gracefully: we answer without web context rather than breaking
+    // the turn. The cheap `should_search` pre-gate skips obvious non-search
+    // turns so we don't spend a planner round-trip on chit-chat, code, or math.
     let web_context: Option<String> = if settings.assistant_web_search_enabled
-        && screenshot.is_none()
+        && !has_visual
         && web_search::should_search(&user_text)
     {
         // Race every search stage against a Stop press: a slow search must never
@@ -743,6 +1050,9 @@ pub async fn run_assistant_turn(app: AppHandle, user_text: String, screenshot: O
                     }
                     Some(_) => {
                         debug!("Web search returned no results; answering without web context");
+                        // §4: never silent — tell the user the answer proceeds
+                        // without web results (covers failures and no-hits).
+                        emit_notice(&app, "web_search_failed");
                         None
                     }
                     None => None, // cancelled during search
@@ -766,11 +1076,9 @@ pub async fn run_assistant_turn(app: AppHandle, user_text: String, screenshot: O
     // Build the request: stable system prompt → history → new user msg.
     // (Cache-friendly: the prefix only ever grows by appending.) History is
     // capped (newest first wins) so request bodies stay small — critical for
-    // Azure, whose parser rejects oversized payloads. Screenshot turns get a
-    // much tighter cap: the image already dominates the body budget.
-    let (max_history_messages, max_history_chars) = if screenshot.is_some() {
-        // Screenshot turns keep a tight cap regardless of the user setting:
-        // the image already dominates the payload budget.
+    // Azure, whose parser rejects oversized payloads. Visual turns get a much
+    // tighter cap: the image(s) already dominate the body budget.
+    let (max_history_messages, max_history_chars) = if has_visual {
         (
             (settings.assistant_max_history_messages as usize).min(4),
             6_000usize,
@@ -844,28 +1152,59 @@ pub async fn run_assistant_turn(app: AppHandle, user_text: String, screenshot: O
         }
     }
     // Per-turn context prepended to the user's message for the request only
-    // (never stored in history): the live date/time always, plus web results
-    // when present. Keeping this in the user message rather than the cached
-    // system prefix means the timestamp stays fresh every turn without
-    // invalidating provider-side prompt caching.
+    // (never stored in history): the live date/time always, web results when
+    // present, and the content of any attached files. Keeping this in the user
+    // message rather than the cached system prefix means the timestamp stays
+    // fresh every turn without invalidating provider-side prompt caching.
     let mut preamble = current_datetime_line();
     if let Some(ctx) = &web_context {
         preamble.push_str("\n\n");
         preamble.push_str(ctx);
     }
+    // Inline attached files as clearly-delimited context blocks, individually
+    // and collectively bounded so a huge file can't blow the request budget.
+    const FILE_CHAR_CAP: usize = 20_000;
+    const FILES_TOTAL_CAP: usize = 40_000;
+    let mut files_budget = FILES_TOTAL_CAP;
+    for file in &files {
+        let take = file.content.len().min(FILE_CHAR_CAP).min(files_budget);
+        if take == 0 {
+            break;
+        }
+        let content: String = file.content.chars().take(take).collect();
+        files_budget = files_budget.saturating_sub(content.len());
+        let truncated = content.len() < file.content.len();
+        preamble.push_str(&format!(
+            "\n\nAttached file: {}{}\n---\n{}\n---",
+            file.name,
+            if truncated { " (truncated)" } else { "" },
+            content
+        ));
+    }
     let user_content = format!("{}\n\n{}", preamble, user_text);
 
-    match &screenshot {
-        Some(data_url) => messages.push(json!({
-            "role": "user",
-            "content": [
-                {"type": "text", "text": user_content},
-                {"type": "image_url", "image_url": {"url": data_url}}
-            ]
-        })),
-        None => {
-            messages.push(json!({"role": "user", "content": user_content}));
+    // Visuals: the screen capture (if any) first, then attached images, capped
+    // so a pile of attachments can't produce an oversized request.
+    const MAX_VISUALS: usize = 4;
+    let mut visuals: Vec<&String> = Vec::new();
+    if let Some(data_url) = &screenshot {
+        visuals.push(data_url);
+    }
+    for image in images.iter() {
+        if visuals.len() >= MAX_VISUALS {
+            break;
         }
+        visuals.push(image);
+    }
+
+    if visuals.is_empty() {
+        messages.push(json!({"role": "user", "content": user_content}));
+    } else {
+        let mut parts: Vec<Value> = vec![json!({"type": "text", "text": user_content})];
+        for url in &visuals {
+            parts.push(json!({"type": "image_url", "image_url": {"url": url}}));
+        }
+        messages.push(json!({"role": "user", "content": parts}));
     }
 
     emit_state(&app, "thinking");
@@ -879,10 +1218,7 @@ pub async fn run_assistant_turn(app: AppHandle, user_text: String, screenshot: O
     let _llm_activity_guard = if provider.id == "builtin" {
         let manager = app.state::<Arc<crate::managers::local_llm::LocalLlmManager>>();
         if let Err(e) = manager.ensure_running(&model).await {
-            let _ = app.emit(
-                "assistant-error",
-                format!("Built-in model couldn't start: {}", e),
-            );
+            emit_error(&app, "engine_start", e.to_string());
             emit_state(&app, "idle");
             return;
         }
@@ -892,11 +1228,12 @@ pub async fn run_assistant_turn(app: AppHandle, user_text: String, screenshot: O
     };
 
     debug!(
-        "Assistant turn: provider '{}', model '{}', {} messages, screenshot: {}",
+        "Assistant turn: provider '{}', model '{}', {} messages, visuals: {}, files: {}",
         provider.id,
         model,
         messages.len(),
-        screenshot.is_some()
+        visuals.len(),
+        files.len()
     );
 
     let cancel = {
@@ -971,19 +1308,17 @@ pub async fn run_assistant_turn(app: AppHandle, user_text: String, screenshot: O
         }
         Some(Err(e)) => {
             error!("Assistant request failed: {}", e);
-            let message = if e.contains("Unterminated string") && screenshot.is_some() {
-                "The request was cut off by the provider — the screenshot made it too large for this endpoint. It will be compressed harder next time; please try again.".to_string()
-            } else if screenshot.is_some() && is_vision_unsupported_error(&e) {
-                vision_unsupported_message(&provider.id, &model)
-            } else if screenshot.is_some() {
-                format!(
-                    "{}\n\nNote: a screenshot was attached — make sure the selected model supports image input (e.g. gpt-4o-mini, gpt-4.1-mini, gemini-flash, claude, llava).",
-                    e
-                )
+            if e.contains("Unterminated string") && has_visual {
+                emit_error(&app, "screenshot_too_large", e);
+            } else if has_visual && is_vision_unsupported_error(&e) {
+                emit_error(
+                    &app,
+                    "vision_unsupported",
+                    vision_unsupported_message(&provider.id, &model),
+                );
             } else {
-                e
-            };
-            let _ = app.emit("assistant-error", message);
+                emit_error(&app, "provider", e);
+            }
         }
     }
 
@@ -1030,4 +1365,261 @@ fn spawn_tts_speak(app: &AppHandle, settings: &crate::settings::AppSettings, ful
             crate::tts::speak_remote_epoch(&app, &settings, text, epoch).await;
         }
     });
+}
+
+// ---------------------------------------------------------------------------
+// Conversation quality-of-life: regenerate / continue / summarize
+// ---------------------------------------------------------------------------
+
+/// Strip attachment markers from a stored user message, leaving the text the
+/// user actually typed/said.
+fn strip_markers(text: &str) -> String {
+    text.lines()
+        .filter(|line| {
+            let t = line.trim();
+            t != SCREENSHOT_MARKER
+                && t != IMAGE_MARKER
+                && !(t.starts_with(FILE_MARKER_PREFIX) && t.ends_with(']'))
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+        .trim()
+        .to_string()
+}
+
+/// Regenerate the latest answer: drop the last assistant message and the user
+/// message that produced it, then re-run the turn with the same text. Visual
+/// attachments aren't stored (only markers), so a regenerated turn is
+/// text-only — the message text still tells the model what was asked.
+pub async fn regenerate_last(app: AppHandle) {
+    let text = {
+        let conversation = app.state::<AssistantConversation>();
+        let mut history = conversation.messages.lock().unwrap();
+        if matches!(history.last(), Some(m) if m.role == "assistant") {
+            history.pop();
+        }
+        match history.last() {
+            Some(m) if m.role == "user" => {
+                let t = strip_markers(&m.content);
+                history.pop();
+                Some(t)
+            }
+            _ => None,
+        }
+    };
+    emit_conversation(&app);
+    match text {
+        Some(t) if !t.is_empty() => {
+            run_assistant_turn(app, t, None, Vec::new(), Vec::new()).await;
+        }
+        _ => emit_state(&app, "idle"),
+    }
+}
+
+/// What a meta-turn does with its streamed result.
+pub enum MetaTurn {
+    /// Extend the last assistant message in place.
+    Continue,
+    /// Replace the whole conversation with a compact summary, so a long chat
+    /// stays coherent within the model's context budget.
+    Summarize,
+}
+
+/// Run a "meta" turn over the existing conversation: same provider/stream/
+/// cancel machinery as a normal turn, but the instruction is never stored in
+/// history — only its effect is (an extended last answer, or a summary that
+/// replaces the transcript).
+pub async fn run_meta_turn(app: AppHandle, kind: MetaTurn) {
+    {
+        let conversation = app.state::<AssistantConversation>();
+        if conversation.busy.swap(true, Ordering::SeqCst) {
+            debug!("Assistant busy; ignoring meta turn");
+            return;
+        }
+        // Nothing to do on an empty conversation.
+        let history = conversation.messages.lock().unwrap();
+        if history.is_empty() {
+            drop(history);
+            conversation.busy.store(false, Ordering::SeqCst);
+            return;
+        }
+    }
+    let _busy = BusyReset(app.clone());
+    app.state::<AssistantConversation>().begin_turn();
+
+    let settings = get_settings(&app);
+    let Some(provider) = settings.active_assistant_provider().cloned() else {
+        emit_error(
+            &app,
+            "no_provider",
+            "No assistant provider configured. Pick one in Settings → Assistant.".to_string(),
+        );
+        emit_state(&app, "idle");
+        return;
+    };
+    let model = settings
+        .assistant_models
+        .get(&provider.id)
+        .cloned()
+        .unwrap_or_default();
+    if model.trim().is_empty() {
+        emit_error(
+            &app,
+            "no_model",
+            format!(
+                "No model configured for provider '{}'. Set one in Settings → Assistant.",
+                provider.label
+            ),
+        );
+        emit_state(&app, "idle");
+        return;
+    }
+    let api_key = settings
+        .post_process_api_keys
+        .get(&provider.id)
+        .cloned()
+        .unwrap_or_default();
+
+    let instruction = match kind {
+        MetaTurn::Continue => {
+            "Continue your previous answer exactly where it stopped. Do not repeat or rephrase anything you already said — just carry on."
+        }
+        MetaTurn::Summarize => {
+            "Summarize our entire conversation so far into a compact brief that can replace it: preserve key facts, decisions, names, numbers, code worth keeping, and open questions. Be faithful and dense. Use Markdown."
+        }
+    };
+
+    // System prompt + capped history (including the last answer) + instruction.
+    let mut messages: Vec<Value> = Vec::new();
+    let mut system_content = settings.assistant_system_prompt.clone();
+    if !system_content.trim().is_empty() {
+        system_content.push_str("\n\n");
+    }
+    system_content.push_str(TIME_AWARENESS_NOTE);
+    messages.push(json!({"role": "system", "content": system_content}));
+    {
+        let conversation = app.state::<AssistantConversation>();
+        let history = conversation.messages.lock().unwrap();
+        let max_messages = (settings.assistant_max_history_messages as usize).max(8);
+        let mut kept: Vec<&ChatMessage> = Vec::new();
+        let mut chars = 0usize;
+        for message in history.iter().rev().take(max_messages) {
+            chars += message.content.len();
+            if chars > 24_000 && !kept.is_empty() {
+                break;
+            }
+            kept.push(message);
+        }
+        for message in kept.into_iter().rev() {
+            messages.push(json!({"role": message.role, "content": message.content}));
+        }
+    }
+    messages.push(json!({
+        "role": "user",
+        "content": format!("{}\n\n{}", current_datetime_line(), instruction),
+    }));
+
+    emit_state(&app, "thinking");
+
+    let _llm_activity_guard = if provider.id == "builtin" {
+        let manager = app.state::<Arc<crate::managers::local_llm::LocalLlmManager>>();
+        if let Err(e) = manager.ensure_running(&model).await {
+            emit_error(&app, "engine_start", e.to_string());
+            emit_state(&app, "idle");
+            return;
+        }
+        Some(manager.begin_request())
+    } else {
+        None
+    };
+
+    let cancel = app.state::<AssistantConversation>().cancel.clone();
+    let partial = Arc::new(Mutex::new(String::new()));
+    let partial_cb = partial.clone();
+    let app_for_tokens = app.clone();
+    let stream_fut =
+        llm_client::send_chat_stream(&provider, api_key, &model, messages, move |token| {
+            if let Ok(mut buf) = partial_cb.lock() {
+                buf.push_str(token);
+            }
+            let _ = app_for_tokens.emit("assistant-token", token.to_string());
+        });
+    tokio::pin!(stream_fut);
+
+    let outcome = tokio::select! {
+        result = &mut stream_fut => Some(result),
+        _ = cancel.notified() => None,
+    };
+
+    let mut speaking = false;
+    match outcome {
+        None => {
+            // Cancelled. For Continue, keep the partial extension (it's real
+            // content); for Summarize, keep the original transcript untouched.
+            crate::tts::stop_remote();
+            if matches!(kind, MetaTurn::Continue) {
+                let partial_text = partial
+                    .lock()
+                    .map(|b| b.trim().to_string())
+                    .unwrap_or_default();
+                if !partial_text.is_empty() {
+                    apply_continuation(&app, &partial_text);
+                    persist_assistant_session(&app);
+                }
+            }
+            emit_conversation(&app);
+            debug!("Assistant meta turn cancelled by user");
+        }
+        Some(Ok(full_text)) => {
+            let text = full_text.trim().to_string();
+            if !text.is_empty() {
+                match kind {
+                    MetaTurn::Continue => apply_continuation(&app, &text),
+                    MetaTurn::Summarize => {
+                        let conversation = app.state::<AssistantConversation>();
+                        let mut history = conversation.messages.lock().unwrap();
+                        history.clear();
+                        history.push(ChatMessage {
+                            role: "assistant".to_string(),
+                            content: text.clone(),
+                        });
+                    }
+                }
+                persist_assistant_session(&app);
+            }
+            emit_conversation(&app);
+
+            // Speak only continuations — a summary is a housekeeping artifact.
+            if matches!(kind, MetaTurn::Continue)
+                && !app.state::<AssistantConversation>().is_cancelled()
+                && settings.assistant_tts_enabled
+            {
+                spawn_tts_speak(&app, &settings, text);
+                speaking = true;
+            }
+        }
+        Some(Err(e)) => {
+            error!("Assistant meta turn failed: {}", e);
+            emit_error(&app, "provider", e);
+        }
+    }
+
+    emit_state(&app, if speaking { "speaking" } else { "idle" });
+}
+
+/// Append continuation text to the last assistant message (or start one if the
+/// conversation somehow ends on a user message).
+fn apply_continuation(app: &AppHandle, text: &str) {
+    let conversation = app.state::<AssistantConversation>();
+    let mut history = conversation.messages.lock().unwrap();
+    match history.last_mut() {
+        Some(last) if last.role == "assistant" => {
+            last.content.push_str("\n\n");
+            last.content.push_str(text);
+        }
+        _ => history.push(ChatMessage {
+            role: "assistant".to_string(),
+            content: text.to_string(),
+        }),
+    }
 }

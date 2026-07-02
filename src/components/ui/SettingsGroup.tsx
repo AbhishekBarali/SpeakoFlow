@@ -14,7 +14,7 @@ export const SettingsGroup: React.FC<SettingsGroupProps> = ({
   return (
     <div className="space-y-2.5">
       {title && (
-        <div className="px-1">
+        <div>
           <h2 className="text-[11px] font-semibold text-muted uppercase tracking-[0.1em]">
             {title}
           </h2>

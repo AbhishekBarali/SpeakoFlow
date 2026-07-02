@@ -994,11 +994,65 @@ async assistantSendText(text: string) : Promise<Result<null, string>> {
 }
 },
 /**
- * Send a typed message with a screenshot of the current screen attached.
+ * Send a typed message with everything the composer collected: attached
+ * images (data URLs, already downscaled), text-like files, and — when screen
+ * vision is armed — a fresh screenshot. A capture failure surfaces as an
+ * error but doesn't sink the turn (it proceeds without the screen).
  */
-async assistantSendTextWithScreen(text: string) : Promise<Result<null, string>> {
+async assistantSendComposed(text: string, images: string[], files: FileAttachment[], includeScreen: boolean) : Promise<Result<null, string>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("assistant_send_text_with_screen", { text }) };
+    return { status: "ok", data: await TAURI_INVOKE("assistant_send_composed", { text, images, files, includeScreen }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Read a text-like file (code, markdown, logs, csv…) for attachment as
+ * assistant context. Rejects binaries and (for now) PDFs with a clear error.
+ */
+async assistantReadFile(path: string) : Promise<Result<FileAttachment, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("assistant_read_file", { path }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Load an image file from disk as a provider-ready data URL (downscaled).
+ */
+async assistantReadImage(path: string) : Promise<Result<string, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("assistant_read_image", { path }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Start the draw-a-box region screenshot flow: freeze the screen (off the
+ * main thread), then open the selection overlay on the cursor's monitor.
+ * Async on purpose — async commands run on a worker thread, from which Tauri
+ * can create windows safely; doing it inline on the main thread inside a
+ * sync command deadlocks/crashes WebView2 on Windows.
+ */
+async assistantBeginRegionSnip() : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("assistant_begin_region_snip") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Finish (or cancel, with `rect: None`) the region snip. Called by the snip
+ * overlay webview; the cropped image reaches the panel via the
+ * `assistant-region-captured` event.
+ */
+async assistantFinishRegionSnip(rect: SnipRect | null) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("assistant_finish_region_snip", { rect }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -1007,6 +1061,41 @@ async assistantSendTextWithScreen(text: string) : Promise<Result<null, string>> 
 async assistantGetConversation() : Promise<Result<ChatMessage[], string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("assistant_get_conversation") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Regenerate the latest answer (re-runs the last user message).
+ */
+async assistantRegenerate() : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("assistant_regenerate") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Ask the model to continue its previous answer where it stopped; the
+ * continuation is appended to that answer.
+ */
+async assistantContinue() : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("assistant_continue") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Compact the conversation into a summary that replaces the transcript
+ * (the panel's `/summarize` command).
+ */
+async assistantSummarize() : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("assistant_summarize") };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -1092,25 +1181,9 @@ async setAssistantResponseLength(length: AssistantResponseLength) : Promise<Resu
     else return { status: "error", error: e  as any };
 }
 },
-async setAssistantPanelOpacity(opacity: number) : Promise<Result<null, string>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("set_assistant_panel_opacity", { opacity }) };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
 async setAssistantFontSize(size: string) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("set_assistant_font_size", { size }) };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
-async setAssistantAccent(accent: string) : Promise<Result<null, string>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("set_assistant_accent", { accent }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -1178,17 +1251,44 @@ async setAssistantTtsSpeed(speed: number) : Promise<Result<null, string>> {
     else return { status: "error", error: e  as any };
 }
 },
-async setAssistantPanelSize(size: string) : Promise<Result<null, string>> {
+async setAssistantPanelOpacity(opacity: number) : Promise<Result<null, string>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("set_assistant_panel_size", { size }) };
+    return { status: "ok", data: await TAURI_INVOKE("set_assistant_panel_opacity", { opacity }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
 },
-async setAssistantPanelTheme(theme: string) : Promise<Result<null, string>> {
+/**
+ * Whether starting a dictation silences a still-playing assistant reply.
+ */
+async setAssistantTtsStopOnDictation(enabled: boolean) : Promise<Result<null, string>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("set_assistant_panel_theme", { theme }) };
+    return { status: "ok", data: await TAURI_INVOKE("set_assistant_tts_stop_on_dictation", { enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Mirror the panel's staged attachment chips into the backend so voice turns
+ * (pill mic / hotkey) send them too.
+ */
+async assistantSetPendingAttachments(images: string[], files: FileAttachment[]) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("assistant_set_pending_attachments", { images, files }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Route the dictation currently being recorded to the assistant (the STT
+ * overlay's Ask-Assistant button), then commit it like a normal finish.
+ */
+async redirectTranscriptionToAssistant() : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("redirect_transcription_to_assistant") };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -1488,13 +1588,24 @@ assistant_tts_speed?: number; assistant_max_history_messages?: number;
  * Applied when the engine starts; ignored by external providers
  * (Ollama / LM Studio / cloud), which manage their own context.
  */
-local_llm_context_size?: number; assistant_response_length?: AssistantResponseLength; assistant_panel_opacity?: number; assistant_font_size?: string; assistant_accent?: string; assistant_panel_size?: string; 
+local_llm_context_size?: number; assistant_response_length?: AssistantResponseLength; assistant_font_size?: string; 
 /**
- * Appearance of the floating assistant panel: "auto" (follow the app
- * theme), "light", or "dark". A light/dark choice overrides the app-wide
- * theme for the panel only.
+ * Surface opacity of the floating assistant panel (0.5–1.0). At 1.0 the
+ * panel is fully opaque; lower values let the desktop blur through.
+ * 
+ * Note: the old `assistant_accent`, `assistant_panel_size`, and
+ * `assistant_panel_theme` customization fields were removed (the panel is
+ * dark-only now) — serde silently ignores those keys in previously stored
+ * settings.
  */
-assistant_panel_theme?: string; 
+assistant_panel_opacity?: number; 
+/**
+ * Whether starting a plain dictation should silence an assistant reply
+ * that is still being read aloud. Off by default — earphone users often
+ * want to keep listening while they dictate. (Asking the assistant a NEW
+ * question always interrupts the previous answer, regardless.)
+ */
+assistant_tts_stop_on_dictation?: boolean; 
 /**
  * Whether the assistant may search the web. When on, an automatic
  * heuristic decides per-question whether a search is actually worthwhile
@@ -1649,6 +1760,11 @@ export type EngineType = "Whisper" | "Parakeet" | "Moonshine" | "MoonshineStream
  * Not a transcription engine.
  */
 "Kokoro"
+/**
+ * A text-like file attached to a turn as context (content extracted in the
+ * webview or by `assistant_read_file`).
+ */
+export type FileAttachment = { name: string; content: string }
 export type GpuDeviceOption = { id: number; name: string; total_vram_mb: number }
 /**
  * A single `.gguf` file inside a repo.
@@ -1796,6 +1912,10 @@ content?: string }
 export type SecretMap = Partial<{ [key in string]: string }>
 export type SecretString = string
 export type ShortcutBinding = { id: string; name: string; description: string; default_binding: string; current_binding: string }
+/**
+ * Rectangle chosen in the snip overlay, in that window's logical pixels.
+ */
+export type SnipRect = { x: number; y: number; width: number; height: number }
 export type SoundTheme = "marimba" | "pop" | "click" | "custom"
 /**
  * UI appearance preference. `System` follows the OS; `Light` / `Dark` pin the

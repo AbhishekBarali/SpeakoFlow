@@ -451,6 +451,15 @@ impl ShortcutAction for TranscribeAction {
         let start_time = Instant::now();
         debug!("TranscribeAction::start called for binding: {}", binding_id);
 
+        // A fresh dictation can't be redirected by a stale Ask-Assistant click.
+        crate::assistant::clear_transcribe_redirect();
+
+        // Optionally silence a still-playing assistant reply. Off by default —
+        // earphone users often want to keep listening while they dictate.
+        if get_settings(app).assistant_tts_stop_on_dictation {
+            crate::tts::stop_all(app);
+        }
+
         // Load model in the background
         let tm = app.state::<Arc<TranscriptionManager>>();
         let rm = app.state::<Arc<AudioRecordingManager>>();
@@ -666,6 +675,17 @@ impl ShortcutAction for TranscribeAction {
                                 transcription
                             );
 
+                            // Rerouted to the assistant (the overlay's Ask-
+                            // Assistant button): hand the transcript to the
+                            // assistant instead of pasting it anywhere.
+                            if crate::assistant::take_transcribe_redirect() {
+                                utils::hide_recording_overlay(&ah);
+                                change_tray_icon(&ah, TrayIconState::Idle);
+                                crate::assistant::show_assistant_panel(&ah);
+                                crate::assistant::run_voice_turn(ah.clone(), transcription).await;
+                                return;
+                            }
+
                             if post_process {
                                 show_processing_overlay(&ah);
                             }
@@ -768,6 +788,10 @@ impl ShortcutAction for AssistantAction {
     fn start(&self, app: &AppHandle, binding_id: &str, _shortcut_str: &str) {
         debug!("AssistantAction::start called for binding: {}", binding_id);
 
+        // Starting a new question interrupts the previous spoken answer — the
+        // assistant must never talk over the user's next recording.
+        crate::tts::stop_all(app);
+
         let tm = app.state::<Arc<TranscriptionManager>>();
         let rm = app.state::<Arc<AudioRecordingManager>>();
 
@@ -840,6 +864,14 @@ impl ShortcutAction for AssistantAction {
                 } else {
                     "unknown"
                 };
+                // Mirror the failure onto the assistant surfaces (pill/panel)
+                // so a voice turn that can't start is never a silent no-op.
+                let assistant_code = match error_type {
+                    "microphone_permission_denied" => "mic_denied",
+                    "no_input_device" => "mic_unavailable",
+                    _ => "mic_error",
+                };
+                crate::assistant::emit_error(app, assistant_code, err.clone());
                 let _ = app.emit(
                     "recording-error",
                     RecordingErrorEvent {
@@ -887,55 +919,14 @@ impl ShortcutAction for AssistantAction {
             match tm.transcribe(samples) {
                 Ok(transcription) => {
                     change_tray_icon(&ah, TrayIconState::Idle);
-
-                    let settings = crate::settings::get_settings(&ah);
-                    let wants_screen = crate::assistant::take_screen_armed(&ah)
-                        || crate::assistant::wants_screen_context(&transcription);
-                    let screenshot = if wants_screen && settings.assistant_screenshot_enabled {
-                        // Tiny body only for Azure; loopback (built-in/local
-                        // engine) gets a balanced image, cloud gets the sharp one.
-                        let profile = settings
-                            .active_assistant_provider()
-                            .map(|p| crate::screenshot::CaptureProfile::for_base_url(&p.base_url))
-                            .unwrap_or(crate::screenshot::CaptureProfile::Generous);
-                        let captured = tauri::async_runtime::spawn_blocking(move || {
-                            crate::screenshot::capture_screen_data_url(profile)
-                        })
-                        .await;
-                        match captured {
-                            Ok(Ok(data_url)) => Some(data_url),
-                            Ok(Err(e)) => {
-                                // Don't silently send a text-only request when
-                                // the user asked about their screen.
-                                error!("Screen capture failed: {}", e);
-                                let _ = ah.emit(
-                                    "assistant-error",
-                                    format!("Screen capture failed: {}", e),
-                                );
-                                crate::assistant::emit_state(&ah, "idle");
-                                return;
-                            }
-                            Err(e) => {
-                                error!("Screen capture task failed: {}", e);
-                                let _ = ah.emit(
-                                    "assistant-error",
-                                    format!("Screen capture failed: {}", e),
-                                );
-                                crate::assistant::emit_state(&ah, "idle");
-                                return;
-                            }
-                        }
-                    } else {
-                        None
-                    };
-
-                    crate::assistant::run_assistant_turn(ah.clone(), transcription, screenshot)
-                        .await;
+                    // Screen decision + staged attachments + turn, shared with
+                    // the STT overlay's Ask-Assistant redirect.
+                    crate::assistant::run_voice_turn(ah.clone(), transcription).await;
                 }
                 Err(err) => {
                     error!("Assistant transcription error: {}", err);
                     change_tray_icon(&ah, TrayIconState::Idle);
-                    let _ = ah.emit("assistant-error", format!("Transcription failed: {}", err));
+                    crate::assistant::emit_error(&ah, "transcription", err.to_string());
                     crate::assistant::emit_state(&ah, "idle");
                 }
             }

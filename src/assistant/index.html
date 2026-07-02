@@ -14,13 +14,12 @@
         width: 100%;
         height: 100%;
       }
-      /* Gutter so the panel's drop shadow has room to render
-         inside the transparent window */
+      /* The React shell owns per-mode layout: the pill floats centered in the
+         transparent window; the expanded panel adds its own shadow gutter. */
       #root {
         width: 100%;
         height: 100%;
         overflow: hidden;
-        padding: 10px;
       }
       #root > * {
         width: 100% !important;

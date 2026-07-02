@@ -87,62 +87,6 @@ export const watchSystemTheme = (
   return () => media.removeEventListener("change", handler);
 };
 
-/**
- * Assistant-panel appearance.
- *
- * The floating panel follows the app-wide theme by default ("auto"), but the
- * user can override it to force light or dark for the panel only. The resolved
- * concrete theme is cached under a dedicated key so the panel window can paint
- * the right palette before React mounts (no flash) without clobbering the
- * app-wide preference (both windows share localStorage on the same origin).
- */
-export type AssistantThemePref = "auto" | "light" | "dark";
+// (The assistant panel is dark-only, styled like the STT recording overlay —
+// it no longer participates in theme resolution.)
 
-const ASSISTANT_STORAGE_KEY = "speakoflow-assistant-theme";
-
-const isResolvedTheme = (value: unknown): value is ResolvedTheme =>
-  value === "light" || value === "dark";
-
-/**
- * Resolve the panel's effective concrete theme. "auto" follows the app-wide
- * preference (which itself may be "system"); an explicit light/dark wins.
- */
-export const resolveAssistantTheme = (
-  pref: AssistantThemePref,
-  appPref: ThemePreference,
-): ResolvedTheme => (pref === "auto" ? resolveTheme(appPref) : pref);
-
-/**
- * Apply the panel's effective theme and cache the resolved value so the next
- * panel load can paint it before React mounts.
- */
-export const applyAssistantTheme = (
-  pref: AssistantThemePref,
-  appPref: ThemePreference,
-): void => {
-  const resolved = resolveAssistantTheme(pref, appPref);
-  setResolvedAttribute(resolved);
-  try {
-    localStorage.setItem(ASSISTANT_STORAGE_KEY, resolved);
-  } catch {
-    // Best-effort cache only.
-  }
-};
-
-/**
- * Apply the cached panel theme synchronously, before React renders, to avoid a
- * flash. Falls back to the app-wide cached preference when the panel has no
- * cached value yet (i.e. it has never been overridden).
- */
-export const applyCachedAssistantTheme = (): void => {
-  try {
-    const stored = localStorage.getItem(ASSISTANT_STORAGE_KEY);
-    if (isResolvedTheme(stored)) {
-      setResolvedAttribute(stored);
-      return;
-    }
-  } catch {
-    // localStorage unavailable — fall through to the app preference.
-  }
-  setResolvedAttribute(resolveTheme(getCachedPreference()));
-};

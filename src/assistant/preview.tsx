@@ -1,13 +1,16 @@
 import React, { useEffect, useState } from "react";
 import ReactDOM from "react-dom/client";
 import {
+  AlertCircle,
+  Camera,
+  CameraOff,
   Check,
   Globe,
-  Lock,
+  Loader2,
   Maximize2,
   Mic,
-  Square,
   Volume2,
+  X,
 } from "lucide-react";
 import AudioWaveform, {
   type WaveMode,
@@ -19,19 +22,26 @@ import "@fontsource/plus-jakarta-sans/500.css";
 import "@fontsource/plus-jakarta-sans/600.css";
 
 // THROWAWAY visual-verification harness for the collapsed assistant pill.
-// Not shipped — delete after design iteration. Reproduces the pill markup from
-// AssistantPanel.tsx in every state so we can screenshot it in a browser.
+// Not shipped — for eyeballing every pill state in a plain browser (no
+// Playwright, per the redesign brief). Mirrors the pill markup from
+// AssistantPanel.tsx; ?theme=light flips the palette.
 
 type Demo =
   | "idle"
+  | "idle-armed"
   | "listening"
   | "listening-locked"
+  | "transcribing"
   | "thinking"
   | "speaking"
-  | "searching";
+  | "searching"
+  | "error";
+
+// Sample copy for the demo states (not user-facing — the harness is dev-only).
+const SAMPLE_ERROR = "Mic access blocked";
 
 /** Plausible live vocal spectrum (16 bands), regenerated each tick so the
- *  reactive listening states actually move in the screenshots. */
+ *  reactive listening states actually move. */
 function useFakeLevels(active: boolean): number[] {
   const [levels, setLevels] = useState<number[]>(new Array(16).fill(0));
   useEffect(() => {
@@ -54,9 +64,15 @@ function useFakeLevels(active: boolean): number[] {
 const Pill: React.FC<{ demo: Demo }> = ({ demo }) => {
   const isListening = demo === "listening" || demo === "listening-locked";
   const locked = demo === "listening-locked";
-  const pillStop =
-    demo === "thinking" || demo === "speaking" || demo === "searching";
-  const showPillWave = isListening || pillStop;
+  const busy =
+    isListening ||
+    demo === "transcribing" ||
+    demo === "thinking" ||
+    demo === "speaking" ||
+    demo === "searching";
+  const showError = demo === "error";
+  const armed = demo === "idle-armed";
+  const working = demo === "thinking" || demo === "transcribing";
   const levels = useFakeLevels(isListening);
 
   const waveMode: WaveMode = isListening
@@ -65,82 +81,120 @@ const Pill: React.FC<{ demo: Demo }> = ({ demo }) => {
       ? "flow"
       : "shimmer";
 
-  const phaseIcon =
-    demo === "searching" ? (
-      <Globe size={14} strokeWidth={2} />
-    ) : demo === "speaking" ? (
-      <Volume2 size={14} strokeWidth={2} />
-    ) : null;
-
-  const label = demo === "idle" ? "Assistant" : "";
-
   return (
-    <div className="assistant-pill" role="status">
-      <div className="pill-mic-wrap">
-        <button
-          className={`pill-mic${isListening ? " recording" : ""}${
-            pillStop ? " stopping" : ""
-          }`}
-        >
-          {isListening ? (
-            locked ? (
-              <Check size={16} strokeWidth={2.75} />
-            ) : (
-              <Mic size={17} strokeWidth={2} />
-            )
-          ) : pillStop ? (
-            <Square size={15} strokeWidth={2.5} />
-          ) : (
-            <Mic size={17} strokeWidth={2} />
+    <div
+      className={`apill${isListening ? " listening" : ""}${
+        showError ? " error" : ""
+      }`}
+      role="status"
+    >
+      {showError ? (
+        <>
+          <AlertCircle size={14} className="apill-error-icon" />
+          <span className="apill-error-text">{SAMPLE_ERROR}</span>
+          <button className="apill-cancel">
+            <X size={13} strokeWidth={2.5} />
+          </button>
+        </>
+      ) : locked ? (
+        <>
+          <button className="apill-btn danger">
+            <X size={14} strokeWidth={2.5} />
+          </button>
+          <div className="apill-wave">
+            <AudioWaveform
+              levels={levels}
+              size="sm"
+              barCount={12}
+              mode="reactive"
+              active
+            />
+          </div>
+          <button className="apill-btn apill-done">
+            <Check size={14} strokeWidth={2.75} />
+          </button>
+        </>
+      ) : busy ? (
+        <>
+          {demo === "searching" && (
+            <span className="apill-glyph">
+              <Globe size={13} strokeWidth={2} />
+            </span>
           )}
-        </button>
-      </div>
-      {showPillWave ? (
-        <div className="pill-wave">
-          {isListening && locked && (
-            <Lock className="pill-lock-hint" size={13} strokeWidth={2.5} />
+          {demo === "speaking" && (
+            <span className="apill-glyph">
+              <Volume2 size={13} strokeWidth={2} />
+            </span>
           )}
-          <AudioWaveform
-            levels={isListening ? levels : []}
-            size="md"
-            barCount={isListening && locked ? 13 : 16}
-            mode={waveMode}
-          />
-        </div>
+          <div className="apill-wave">
+            <AudioWaveform
+              levels={isListening ? levels : []}
+              size="sm"
+              barCount={12}
+              mode={waveMode}
+              active={isListening}
+            />
+          </div>
+          {working && (
+            <Loader2 size={12} strokeWidth={2.5} className="apill-spin" />
+          )}
+          <button className="apill-cancel">
+            <X size={13} strokeWidth={2.5} />
+          </button>
+        </>
       ) : (
-        <span className="pill-status">{label}</span>
+        <>
+          <button className="apill-btn apill-mic">
+            <Mic size={13} strokeWidth={2.25} />
+          </button>
+          <div className="apill-wave rest">
+            <AudioWaveform
+              levels={[]}
+              size="sm"
+              barCount={8}
+              mode="reactive"
+              active={false}
+            />
+          </div>
+          <div className="apill-reveal">
+            <button className="apill-btn">
+              <Maximize2 size={12} strokeWidth={2.25} />
+            </button>
+            <button className="apill-btn danger">
+              <X size={13} strokeWidth={2.5} />
+            </button>
+          </div>
+        </>
       )}
-      {phaseIcon && (
-        <span className="pill-phase-icon" aria-hidden="true">
-          {phaseIcon}
-        </span>
+      {(armed || demo === "listening") && !showError && (
+        <button className="apill-screen">
+          <Camera size={9} strokeWidth={2.5} className="apill-screen-on" />
+          <CameraOff size={9} strokeWidth={2.5} className="apill-screen-off" />
+        </button>
       )}
-      <button className="assistant-icon-button">
-        <Maximize2 size={14} />
-      </button>
     </div>
   );
 };
 
 const DEMOS: Demo[] = [
   "idle",
+  "idle-armed",
   "listening",
   "listening-locked",
+  "transcribing",
   "thinking",
   "speaking",
   "searching",
+  "error",
 ];
 
 const App: React.FC = () => {
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const theme = params.get("theme") === "light" ? "light" : "dark";
-    document.documentElement.dataset.theme = theme;
-    document.body.dataset.bg = theme;
+    document.body.dataset.bg = "dark";
   }, []);
 
   return (
-    <div className="grid">
+    <div className="grid assistant-scope">
       {DEMOS.map((demo) => (
         <div className="row" key={demo}>
           <div className="label">{demo}</div>

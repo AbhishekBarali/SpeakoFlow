@@ -261,8 +261,15 @@ function App() {
     return <Onboarding onModelSelected={handleModelSelected} />;
   }
 
-  // Page header: just the section title. Each screen's name is self-explanatory
-  // (General, Models, Advanced…), so no explanatory subtitle is needed.
+  // Page header: section title plus a one-line subtitle. The subtitle keys live
+  // under sectionSubtitles.* and are looked up via the section's labelKey (which
+  // is already camelCase, e.g. "sidebar.postProcessing") so the lookup matches
+  // even where the SECTIONS_CONFIG key differs (e.g. "postprocessing").
+  const sectionLabelKey = SECTIONS_CONFIG[currentSection].labelKey;
+  const sectionSubtitleKey = sectionLabelKey.replace(
+    "sidebar.",
+    "sectionSubtitles.",
+  );
 
   return (
     <div
@@ -313,12 +320,15 @@ function App() {
                   "radial-gradient(circle at 70% 40%, var(--color-canvas-orb-2), transparent 72%)",
               }}
             />
-            <div className="relative z-10 flex flex-col items-center px-6 py-8 gap-6">
+            <div className="relative z-10 flex flex-col items-center px-6 pt-6 pb-8 gap-5">
               <AccessibilityPermissions />
-              <header className="max-w-3xl w-full mx-auto">
-                <h1 className="font-display text-[2.25rem] leading-[1.08] tracking-[-0.02em] text-balance text-ink">
-                  {t(SECTIONS_CONFIG[currentSection].labelKey)}
+              <header className="max-w-3xl w-full mx-auto space-y-1.5">
+                <h1 className="font-display text-[1.75rem] leading-[1.15] tracking-[-0.02em] text-balance text-ink">
+                  {t(sectionLabelKey)}
                 </h1>
+                <p className="text-sm text-muted leading-relaxed text-balance">
+                  {t(sectionSubtitleKey)}
+                </p>
               </header>
               {renderSettingsContent(currentSection)}
             </div>

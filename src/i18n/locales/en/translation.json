@@ -765,6 +765,8 @@
         "title": "Voice Output (TTS)",
         "enableLabel": "Speak responses aloud",
         "enableDescription": "Reads the assistant's reply out loud. Use the Response length option (under System Prompt) to keep spoken replies short.",
+        "stopOnDictationLabel": "Stop speech when dictation starts",
+        "stopOnDictationDescription": "Silence a reply that's still being read aloud when you start a new dictation. Leave off to keep listening (handy with earphones). Asking the assistant a new question always interrupts the old answer.",
         "engineLabel": "TTS engine",
         "engineDescription": "Kokoro runs locally and free (uses your GPU via WebGPU). The OpenAI-compatible engine works with OpenAI, Azure OpenAI, Groq, or any local server exposing /audio/speech. ElevenLabs uses your ElevenLabs API key. Azure AI Speech uses a regional Neural TTS endpoint with SSML voices.",
         "engines": {
@@ -815,33 +817,9 @@
       "appearance": {
         "title": "Panel Appearance",
         "previewLabel": "Preview",
-        "previewDescription": "Live preview of your theme, accent, text size, and opacity choices.",
+        "previewDescription": "Live preview of the panel with your text size and opacity.",
         "previewUser": "Hey, what can you do?",
         "previewAssistant": "Lots! Ask me anything — I can even look at your screen.",
-        "themeLabel": "Panel theme",
-        "themeDescription": "Appearance of the floating panel. Auto follows the app theme; Light or Dark overrides it for the panel only.",
-        "themes": {
-          "auto": "Auto (match app)",
-          "light": "Light",
-          "dark": "Dark"
-        },
-        "sizeLabel": "Panel size",
-        "sizeDescription": "Size of the floating panel window. You can also collapse it to a tiny pill from the panel header.",
-        "sizes": {
-          "compact": "Compact",
-          "standard": "Standard",
-          "large": "Large"
-        },
-        "accentLabel": "Accent color",
-        "accentDescription": "Color of your message bubbles, buttons, and highlights in the assistant panel.",
-        "accents": {
-          "violet": "Violet",
-          "blue": "Ocean Blue",
-          "emerald": "Emerald",
-          "rose": "Rose",
-          "amber": "Amber",
-          "mono": "Monochrome"
-        },
         "fontSizeLabel": "Text size",
         "fontSizeDescription": "Size of the chat text in the assistant panel.",
         "fontSizes": {
@@ -850,7 +828,7 @@
           "large": "Large"
         },
         "opacityLabel": "Panel opacity",
-        "opacityDescription": "How opaque the floating panel background is. Lower values let you see through it."
+        "opacityDescription": "How opaque the floating panel is. 100% is fully solid; lower values let the desktop blur through."
       }
     }
   },
@@ -932,7 +910,8 @@
     "processing": "Processing...",
     "locked": "Recording hands-free — press the hotkey again or done to stop",
     "cancel": "Cancel",
-    "done": "Done"
+    "done": "Done",
+    "askAssistant": "Ask the assistant instead of typing this"
   },
   "assistant": {
     "title": "Assistant",
@@ -945,9 +924,24 @@
     "clear": "Clear conversation",
     "hide": "Hide panel",
     "copy": "Copy",
+    "copyCode": "Copy code",
+    "regenerate": "Regenerate",
+    "continueAnswer": "Continue",
     "screenAttached": "Screen",
-    "attachScreen": "Attach a screenshot of your screen",
-    "detachScreen": "Don't attach screenshot",
+    "attachScreen": "Screen vision — attach a screenshot to each message until turned off",
+    "detachScreen": "Turn off screen vision",
+    "attach": {
+      "file": "Attach an image or file",
+      "snip": "Snip a region of the screen",
+      "image": "Image",
+      "imageCount": "{{count}} image",
+      "imageCount_other": "{{count}} images",
+      "remove": "Remove attachment",
+      "dropHint": "Drop to attach"
+    },
+    "snip": {
+      "hint": "Drag to snip a region — Esc to cancel"
+    },
     "webSearch": {
       "enable": "Enable web search",
       "disable": "Disable web search"
@@ -963,7 +957,12 @@
       "stop": "Stop and send",
       "idle": "Assistant",
       "expand": "Expand panel",
-      "collapse": "Collapse to pill"
+      "collapse": "Collapse to pill",
+      "close": "Close assistant",
+      "cancel": "Cancel without sending",
+      "cancelTurn": "Cancel",
+      "dismiss": "Dismiss",
+      "disarmScreen": "Screen vision is on — click to turn it off"
     },
     "status": {
       "listening": "Listening...",
@@ -972,6 +971,41 @@
       "searching": "Searching the web...",
       "thinking": "Thinking...",
       "speaking": "Speaking..."
+    },
+    "errors": {
+      "generic": "Something went wrong. Please try again.",
+      "genericShort": "Something went wrong",
+      "no_provider": "No assistant model is set up yet. Pick a provider in Settings → Assistant.",
+      "no_providerShort": "No model set up",
+      "no_model": "Your provider has no model selected. Choose one in Settings → Assistant.",
+      "no_modelShort": "No model selected",
+      "engine_start": "The built-in model couldn't start. Try again, or pick a different model in Settings → Assistant.",
+      "engine_startShort": "Model couldn't start",
+      "provider": "The model couldn't answer. Check your API key and connection, then try again.",
+      "providerShort": "Couldn't get an answer",
+      "vision_unsupported": "This model can't read screenshots. Pick a vision-capable model in Settings → Assistant, or ask again without the screen.",
+      "vision_unsupportedShort": "Model can't see images",
+      "screenshot_too_large": "The screenshot was too large for this provider. Please try again — it will be compressed harder.",
+      "screenshot_too_largeShort": "Screenshot too large",
+      "screen_capture": "Couldn't capture the screen. Try again, or ask without screen vision.",
+      "screen_captureShort": "Screen capture failed",
+      "transcription": "Couldn't transcribe your voice. Please try speaking again.",
+      "transcriptionShort": "Transcription failed",
+      "tts": "The spoken reply failed. Check your TTS settings, or read the answer in the panel.",
+      "ttsShort": "Voice reply failed",
+      "tts_local": "The local voice couldn't load. Check your connection or switch TTS engines in Settings.",
+      "tts_localShort": "Voice couldn't load",
+      "mic_denied": "Microphone access is blocked. Allow it in your system privacy settings.",
+      "mic_deniedShort": "Mic access blocked",
+      "mic_unavailable": "No microphone was found. Connect one and try again.",
+      "mic_unavailableShort": "No microphone found",
+      "mic_error": "The microphone couldn't start. It may be in use by another app.",
+      "mic_errorShort": "Mic couldn't start",
+      "file_read": "That file couldn't be attached.",
+      "file_readShort": "Couldn't attach file"
+    },
+    "notices": {
+      "web_search_failed": "Web search didn't return results — answering without them."
     }
   }
 }
