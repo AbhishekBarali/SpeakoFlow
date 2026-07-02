@@ -153,20 +153,13 @@ pub fn assistant_get_conversation(app: AppHandle) -> Result<Vec<ChatMessage>, St
     Ok(history.clone())
 }
 
-/// Regenerate the latest answer (re-runs the last user message).
+/// Regenerate the latest answer (re-runs the last user message). The previous
+/// variant stays saved in History under its old row — regenerating forks a new
+/// one — so earlier answers remain reachable.
 #[tauri::command]
 #[specta::specta]
 pub async fn assistant_regenerate(app: AppHandle) -> Result<(), String> {
     assistant::regenerate_last(app).await;
-    Ok(())
-}
-
-/// Ask the model to continue its previous answer where it stopped; the
-/// continuation is appended to that answer.
-#[tauri::command]
-#[specta::specta]
-pub async fn assistant_continue(app: AppHandle) -> Result<(), String> {
-    assistant::run_meta_turn(app, assistant::MetaTurn::Continue).await;
     Ok(())
 }
 
@@ -175,7 +168,32 @@ pub async fn assistant_continue(app: AppHandle) -> Result<(), String> {
 #[tauri::command]
 #[specta::specta]
 pub async fn assistant_summarize(app: AppHandle) -> Result<(), String> {
-    assistant::run_meta_turn(app, assistant::MetaTurn::Summarize).await;
+    assistant::run_summarize_turn(app).await;
+    Ok(())
+}
+
+/// Load a past conversation from History into the panel and open it, so the
+/// user can continue where they left off. Future turns update that same row.
+#[tauri::command]
+#[specta::specta]
+pub fn assistant_resume_session(app: AppHandle, id: i64) -> Result<(), String> {
+    let conversation = app.state::<AssistantConversation>();
+    if conversation.is_busy() {
+        return Err("The assistant is answering right now — stop it first.".to_string());
+    }
+    let hm = app
+        .try_state::<std::sync::Arc<crate::managers::history::HistoryManager>>()
+        .ok_or_else(|| "History unavailable".to_string())?;
+    let entry = hm
+        .get_assistant_session(id)
+        .map_err(|e| format!("Couldn't load the conversation: {}", e))?
+        .ok_or_else(|| "That conversation no longer exists.".to_string())?;
+
+    conversation.load_session(entry.id, entry.messages);
+    assistant::emit_conversation(&app);
+    // Open straight into the full panel — resuming is a reading/typing flow.
+    assistant::set_panel_collapsed(&app, false);
+    assistant::show_assistant_panel(&app);
     Ok(())
 }
 

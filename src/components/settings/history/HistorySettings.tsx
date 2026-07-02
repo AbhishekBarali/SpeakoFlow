@@ -16,6 +16,7 @@ import {
   FolderOpen,
   Camera,
   MessageCircle,
+  MessageSquarePlus,
   RotateCcw,
   Star,
   Trash2,
@@ -407,6 +408,17 @@ export const HistorySettings: React.FC = () => {
     [loadAssistantSessions],
   );
 
+  /** Load a past conversation back into the assistant panel and open it. */
+  const resumeAssistantSession = useCallback(
+    async (id: number) => {
+      const result = await commands.assistantResumeSession(id);
+      if (result.status !== "ok") {
+        toast.error(String(result.error));
+      }
+    },
+    [],
+  );
+
   const openRecordingsFolder = async () => {
     try {
       const result = await commands.openRecordingsFolder();
@@ -475,6 +487,7 @@ export const HistorySettings: React.FC = () => {
                 onToggleExpand={() => toggleExpandAssistant(item.session.id)}
                 onCopyConversation={() => copyConversation(item.session)}
                 onDelete={() => deleteAssistantSession(item.session.id)}
+                onResume={() => void resumeAssistantSession(item.session.id)}
               />
             ),
           )}
@@ -660,6 +673,7 @@ interface AssistantHistoryEntryProps {
   onToggleExpand: () => void;
   onCopyConversation: () => void;
   onDelete: () => Promise<void>;
+  onResume: () => void;
 }
 
 /**
@@ -674,6 +688,7 @@ const AssistantHistoryEntryComponent: React.FC<AssistantHistoryEntryProps> = ({
   onToggleExpand,
   onCopyConversation,
   onDelete,
+  onResume,
 }) => {
   const { t, i18n } = useTranslation();
   const [showCopied, setShowCopied] = useState(false);
@@ -722,6 +737,12 @@ const AssistantHistoryEntryComponent: React.FC<AssistantHistoryEntryProps> = ({
           </span>
         </button>
         <div className="flex items-center shrink-0">
+          <IconButton
+            onClick={onResume}
+            title={t("settings.history.resumeConversation")}
+          >
+            <MessageSquarePlus width={16} height={16} />
+          </IconButton>
           <IconButton
             onClick={handleCopy}
             title={t("settings.history.copyConversation")}

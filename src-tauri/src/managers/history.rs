@@ -864,6 +864,22 @@ impl HistoryManager {
         Ok(())
     }
 
+    /// Fetch a single assistant conversation by id (for resuming it in the
+    /// panel from the History view). `Ok(None)` when the row no longer exists.
+    pub fn get_assistant_session(&self, id: i64) -> Result<Option<AssistantHistoryEntry>> {
+        let conn = self.get_connection()?;
+        let mut stmt = conn.prepare(
+            "SELECT id, timestamp, updated_at, title, messages
+             FROM assistant_history
+             WHERE id = ?1",
+        )?;
+        let mut rows = stmt.query_map(params![id], Self::map_assistant_entry)?;
+        match rows.next() {
+            Some(entry) => Ok(Some(entry?)),
+            None => Ok(None),
+        }
+    }
+
     /// Trim the oldest conversations beyond [`Self::ASSISTANT_SESSION_CAP`].
     fn cleanup_assistant_sessions(&self) -> Result<()> {
         let conn = self.get_connection()?;

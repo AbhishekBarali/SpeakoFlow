@@ -1067,23 +1067,13 @@ async assistantGetConversation() : Promise<Result<ChatMessage[], string>> {
 }
 },
 /**
- * Regenerate the latest answer (re-runs the last user message).
+ * Regenerate the latest answer (re-runs the last user message). The previous
+ * variant stays saved in History under its old row — regenerating forks a new
+ * one — so earlier answers remain reachable.
  */
 async assistantRegenerate() : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("assistant_regenerate") };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
-/**
- * Ask the model to continue its previous answer where it stopped; the
- * continuation is appended to that answer.
- */
-async assistantContinue() : Promise<Result<null, string>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("assistant_continue") };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -1096,6 +1086,18 @@ async assistantContinue() : Promise<Result<null, string>> {
 async assistantSummarize() : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("assistant_summarize") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Load a past conversation from History into the panel and open it, so the
+ * user can continue where they left off. Future turns update that same row.
+ */
+async assistantResumeSession(id: number) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("assistant_resume_session", { id }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };

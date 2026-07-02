@@ -19,7 +19,11 @@ use tokio::sync::Notify;
 
 pub const PANEL_LABEL: &str = "assistant_panel";
 const PANEL_MARGIN: f64 = 24.0;
+/// Where the PILL last sat (legacy key — keeps existing stored positions).
 const PANEL_POSITION_KEY: &str = "assistant_panel_position";
+/// Where the EXPANDED panel last sat. Each form remembers its own place, so
+/// expanding never dumps the panel wherever the pill happened to be dragged.
+const PANEL_POSITION_EXPANDED_KEY: &str = "assistant_panel_position_expanded";
 
 /// Collapsed "pill" mode: a small transparent window in which the chip floats
 /// and hugs its content, like the STT recording overlay (128×40 there).
@@ -29,7 +33,7 @@ const PILL_HEIGHT: f64 = 44.0;
 /// The one expanded panel size. There are no size presets; the window stays
 /// user-resizable, and a manual resize is remembered for the session (below)
 /// so collapse → expand round-trips keep it.
-const PANEL_WIDTH: f64 = 400.0;
+const PANEL_WIDTH: f64 = 420.0;
 const PANEL_HEIGHT: f64 = 560.0;
 
 /// Session memory of the last expanded size (logical px), so collapsing to the
@@ -193,6 +197,11 @@ impl AssistantConversation {
         }
     }
 
+    /// Whether a turn is currently in flight.
+    pub fn is_busy(&self) -> bool {
+        self.busy.load(Ordering::SeqCst)
+    }
+
     /// Mark the start of a new turn: clears any leftover cancel signal so a
     /// Stop from a previous turn can never suppress this one.
     pub fn begin_turn(&self) {
@@ -216,6 +225,17 @@ impl AssistantConversation {
     pub fn reset_session(&self) {
         if let Ok(mut id) = self.session_id.lock() {
             *id = None;
+        }
+    }
+
+    /// Replace the in-memory conversation with a session loaded from History,
+    /// pointing future persists at that row so resuming continues it.
+    pub fn load_session(&self, id: i64, messages: Vec<ChatMessage>) {
+        if let Ok(mut history) = self.messages.lock() {
+            *history = messages;
+        }
+        if let Ok(mut session) = self.session_id.lock() {
+            *session = Some(id);
         }
     }
 
@@ -373,18 +393,33 @@ fn force_panel_topmost(window: &tauri::webview::WebviewWindow) {
     });
 }
 
-fn saved_position(app: &AppHandle) -> Option<(f64, f64)> {
+/// Storage key for the current mode's position slot.
+fn position_key() -> &'static str {
+    if PILL_MODE.load(Ordering::SeqCst) {
+        PANEL_POSITION_KEY
+    } else {
+        PANEL_POSITION_EXPANDED_KEY
+    }
+}
+
+fn saved_position_for(app: &AppHandle, key: &str) -> Option<(f64, f64)> {
     let store = app
         .store(crate::portable::store_path(
             crate::settings::SETTINGS_STORE_PATH,
         ))
         .ok()?;
-    let value = store.get(PANEL_POSITION_KEY)?;
+    let value = store.get(key)?;
     let x = value.get("x")?.as_f64()?;
     let y = value.get("y")?.as_f64()?;
     Some((x, y))
 }
 
+fn saved_position(app: &AppHandle) -> Option<(f64, f64)> {
+    saved_position_for(app, PANEL_POSITION_KEY)
+}
+
+/// Persist the window's current position into the slot for the CURRENT mode
+/// (pill or expanded), so each form remembers its own place.
 fn save_position(app: &AppHandle) {
     if let Some(window) = app.get_webview_window(PANEL_LABEL) {
         if let (Ok(pos), Ok(monitor)) = (window.outer_position(), window.current_monitor()) {
@@ -393,7 +428,7 @@ fn save_position(app: &AppHandle) {
                 crate::settings::SETTINGS_STORE_PATH,
             )) {
                 store.set(
-                    PANEL_POSITION_KEY,
+                    position_key(),
                     serde_json::json!({
                         "x": pos.x as f64 / scale,
                         "y": pos.y as f64 / scale,
@@ -514,11 +549,10 @@ pub fn toggle_assistant_panel(app: &AppHandle) {
 }
 
 /// Collapse the panel to a small pill, or restore it to the expanded size.
-/// Collapsing remembers the current expanded size for the session so a manual
-/// resize survives the round-trip. The window's BOTTOM-LEFT corner stays
-/// anchored through both transitions (the pill usually sits near the bottom of
-/// the screen, so expanding grows upward instead of pushing below the screen
-/// edge), and the result is clamped onto the current monitor.
+/// Each form remembers its own last position (separate slots), so expanding
+/// brings the panel back where the PANEL last was — not wherever the pill was
+/// dragged. First-ever expand falls back to growing upward from the pill
+/// (bottom-left anchor). Everything is clamped onto the current monitor.
 pub fn set_panel_collapsed(app: &AppHandle, collapsed: bool) {
     if let Some(window) = app.get_webview_window(PANEL_LABEL) {
         let scale = window
@@ -530,6 +564,8 @@ pub fn set_panel_collapsed(app: &AppHandle, collapsed: bool) {
         let old_pos = window.outer_position().ok();
         let old_size = window.inner_size().ok();
 
+        // Remember the current form's position + (for the panel) its size.
+        save_position(app);
         if collapsed && !PILL_MODE.load(Ordering::SeqCst) {
             if let Some(size) = old_size {
                 let w = (size.width as f64 / scale).round() as u32;
@@ -551,23 +587,35 @@ pub fn set_panel_collapsed(app: &AppHandle, collapsed: bool) {
         };
         let _ = window.set_size(tauri::LogicalSize::new(new_w, new_h));
 
-        // Bottom-left anchor + on-screen clamp.
-        if let (Some(pos), Some(size)) = (old_pos, old_size) {
-            let old_x = pos.x as f64 / scale;
-            let old_y = pos.y as f64 / scale;
-            let old_h = size.height as f64 / scale;
-            let mut new_x = old_x;
-            let mut new_y = old_y + old_h - new_h;
-            if let Ok(Some(monitor)) = window.current_monitor() {
-                let mx = monitor.position().x as f64 / scale;
-                let my = monitor.position().y as f64 / scale;
-                let mw = monitor.size().width as f64 / scale;
-                let mh = monitor.size().height as f64 / scale;
-                new_x = new_x.clamp(mx + 8.0, (mx + mw - new_w - 8.0).max(mx + 8.0));
-                new_y = new_y.clamp(my + 8.0, (my + mh - new_h - 8.0).max(my + 8.0));
-            }
-            let _ = window.set_position(tauri::LogicalPosition::new(new_x, new_y));
+        // Restore the target form's own remembered position; fall back to a
+        // bottom-left anchor on the current spot (grows upward, never off the
+        // bottom of the screen).
+        let target_key = if collapsed {
+            PANEL_POSITION_KEY
+        } else {
+            PANEL_POSITION_EXPANDED_KEY
+        };
+        let (mut new_x, mut new_y) = match saved_position_for(app, target_key) {
+            Some(pos) => pos,
+            None => match (old_pos, old_size) {
+                (Some(pos), Some(size)) => {
+                    let old_x = pos.x as f64 / scale;
+                    let old_y = pos.y as f64 / scale;
+                    let old_h = size.height as f64 / scale;
+                    (old_x, old_y + old_h - new_h)
+                }
+                _ => default_position(app),
+            },
+        };
+        if let Ok(Some(monitor)) = window.current_monitor() {
+            let mx = monitor.position().x as f64 / scale;
+            let my = monitor.position().y as f64 / scale;
+            let mw = monitor.size().width as f64 / scale;
+            let mh = monitor.size().height as f64 / scale;
+            new_x = new_x.clamp(mx + 8.0, (mx + mw - new_w - 8.0).max(mx + 8.0));
+            new_y = new_y.clamp(my + 8.0, (my + mh - new_h - 8.0).max(my + 8.0));
         }
+        let _ = window.set_position(tauri::LogicalPosition::new(new_x, new_y));
 
         let _ = app.emit("assistant-collapsed", collapsed);
     } else {
@@ -1368,7 +1416,7 @@ fn spawn_tts_speak(app: &AppHandle, settings: &crate::settings::AppSettings, ful
 }
 
 // ---------------------------------------------------------------------------
-// Conversation quality-of-life: regenerate / continue / summarize
+// Conversation quality-of-life: regenerate / summarize
 // ---------------------------------------------------------------------------
 
 /// Strip attachment markers from a stored user message, leaving the text the
@@ -1388,8 +1436,12 @@ fn strip_markers(text: &str) -> String {
 }
 
 /// Regenerate the latest answer: drop the last assistant message and the user
-/// message that produced it, then re-run the turn with the same text. Visual
-/// attachments aren't stored (only markers), so a regenerated turn is
+/// message that produced it, then re-run the turn with the same text. The
+/// conversation FORKS in History — the pre-regenerate transcript stays saved
+/// in its old row and the new attempt gets a fresh row, so earlier variants
+/// remain reachable (and resumable) from the History view.
+///
+/// Visual attachments aren't stored (only markers), so a regenerated turn is
 /// text-only — the message text still tells the model what was asked.
 pub async fn regenerate_last(app: AppHandle) {
     let text = {
@@ -1407,6 +1459,8 @@ pub async fn regenerate_last(app: AppHandle) {
             _ => None,
         }
     };
+    // Fork: keep the old variant's row intact; persist into a new one.
+    app.state::<AssistantConversation>().reset_session();
     emit_conversation(&app);
     match text {
         Some(t) if !t.is_empty() => {
@@ -1416,24 +1470,15 @@ pub async fn regenerate_last(app: AppHandle) {
     }
 }
 
-/// What a meta-turn does with its streamed result.
-pub enum MetaTurn {
-    /// Extend the last assistant message in place.
-    Continue,
-    /// Replace the whole conversation with a compact summary, so a long chat
-    /// stays coherent within the model's context budget.
-    Summarize,
-}
-
-/// Run a "meta" turn over the existing conversation: same provider/stream/
-/// cancel machinery as a normal turn, but the instruction is never stored in
-/// history — only its effect is (an extended last answer, or a summary that
-/// replaces the transcript).
-pub async fn run_meta_turn(app: AppHandle, kind: MetaTurn) {
+/// Compact the conversation into a summary that replaces the transcript (the
+/// panel's `/summarize` command): same provider/stream/cancel machinery as a
+/// normal turn, but the instruction is never stored in history — only its
+/// effect is. On cancel or error the original transcript stays untouched.
+pub async fn run_summarize_turn(app: AppHandle) {
     {
         let conversation = app.state::<AssistantConversation>();
         if conversation.busy.swap(true, Ordering::SeqCst) {
-            debug!("Assistant busy; ignoring meta turn");
+            debug!("Assistant busy; ignoring summarize");
             return;
         }
         // Nothing to do on an empty conversation.
@@ -1480,14 +1525,7 @@ pub async fn run_meta_turn(app: AppHandle, kind: MetaTurn) {
         .cloned()
         .unwrap_or_default();
 
-    let instruction = match kind {
-        MetaTurn::Continue => {
-            "Continue your previous answer exactly where it stopped. Do not repeat or rephrase anything you already said — just carry on."
-        }
-        MetaTurn::Summarize => {
-            "Summarize our entire conversation so far into a compact brief that can replace it: preserve key facts, decisions, names, numbers, code worth keeping, and open questions. Be faithful and dense. Use Markdown."
-        }
-    };
+    let instruction = "Summarize our entire conversation so far into a compact brief that can replace it: preserve key facts, decisions, names, numbers, code worth keeping, and open questions. Be faithful and dense. Use Markdown.";
 
     // System prompt + capped history (including the last answer) + instruction.
     let mut messages: Vec<Value> = Vec::new();
@@ -1551,75 +1589,34 @@ pub async fn run_meta_turn(app: AppHandle, kind: MetaTurn) {
         _ = cancel.notified() => None,
     };
 
-    let mut speaking = false;
     match outcome {
         None => {
-            // Cancelled. For Continue, keep the partial extension (it's real
-            // content); for Summarize, keep the original transcript untouched.
+            // Cancelled — keep the original transcript untouched.
             crate::tts::stop_remote();
-            if matches!(kind, MetaTurn::Continue) {
-                let partial_text = partial
-                    .lock()
-                    .map(|b| b.trim().to_string())
-                    .unwrap_or_default();
-                if !partial_text.is_empty() {
-                    apply_continuation(&app, &partial_text);
-                    persist_assistant_session(&app);
-                }
-            }
             emit_conversation(&app);
-            debug!("Assistant meta turn cancelled by user");
+            debug!("Assistant summarize cancelled by user");
         }
         Some(Ok(full_text)) => {
             let text = full_text.trim().to_string();
             if !text.is_empty() {
-                match kind {
-                    MetaTurn::Continue => apply_continuation(&app, &text),
-                    MetaTurn::Summarize => {
-                        let conversation = app.state::<AssistantConversation>();
-                        let mut history = conversation.messages.lock().unwrap();
-                        history.clear();
-                        history.push(ChatMessage {
-                            role: "assistant".to_string(),
-                            content: text.clone(),
-                        });
-                    }
+                {
+                    let conversation = app.state::<AssistantConversation>();
+                    let mut history = conversation.messages.lock().unwrap();
+                    history.clear();
+                    history.push(ChatMessage {
+                        role: "assistant".to_string(),
+                        content: text,
+                    });
                 }
                 persist_assistant_session(&app);
             }
             emit_conversation(&app);
-
-            // Speak only continuations — a summary is a housekeeping artifact.
-            if matches!(kind, MetaTurn::Continue)
-                && !app.state::<AssistantConversation>().is_cancelled()
-                && settings.assistant_tts_enabled
-            {
-                spawn_tts_speak(&app, &settings, text);
-                speaking = true;
-            }
         }
         Some(Err(e)) => {
-            error!("Assistant meta turn failed: {}", e);
+            error!("Assistant summarize failed: {}", e);
             emit_error(&app, "provider", e);
         }
     }
 
-    emit_state(&app, if speaking { "speaking" } else { "idle" });
-}
-
-/// Append continuation text to the last assistant message (or start one if the
-/// conversation somehow ends on a user message).
-fn apply_continuation(app: &AppHandle, text: &str) {
-    let conversation = app.state::<AssistantConversation>();
-    let mut history = conversation.messages.lock().unwrap();
-    match history.last_mut() {
-        Some(last) if last.role == "assistant" => {
-            last.content.push_str("\n\n");
-            last.content.push_str(text);
-        }
-        _ => history.push(ChatMessage {
-            role: "assistant".to_string(),
-            content: text.to_string(),
-        }),
-    }
+    emit_state(&app, "idle");
 }

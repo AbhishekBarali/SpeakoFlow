@@ -21,7 +21,6 @@ import {
   Maximize2,
   Mic,
   Minimize2,
-  MoveRight,
   Paperclip,
   RotateCcw,
   Scissors,
@@ -995,13 +994,9 @@ const AssistantPanel: React.FC = () => {
             <span
               className={`assistant-status-dot${busy ? " busy" : ""}`}
               data-tauri-drag-region
+              title={busy ? t(`assistant.status.${state}`) : undefined}
             />
             {t("assistant.title")}
-            {busy && (
-              <span className={`assistant-state-chip ${state}`}>
-                {t(`assistant.status.${state}`)}
-              </span>
-            )}
           </div>
           <div className="assistant-header-actions">
             <button
@@ -1091,16 +1086,9 @@ const AssistantPanel: React.FC = () => {
                     <button
                       onClick={() => void commands.assistantRegenerate()}
                       title={t("assistant.regenerate")}
+                      aria-label={t("assistant.regenerate")}
                     >
                       <RotateCcw size={12.5} />
-                      {t("assistant.regenerate")}
-                    </button>
-                    <button
-                      onClick={() => void commands.assistantContinue()}
-                      title={t("assistant.continueAnswer")}
-                    >
-                      <MoveRight size={12.5} />
-                      {t("assistant.continueAnswer")}
                     </button>
                   </div>
                 )}
