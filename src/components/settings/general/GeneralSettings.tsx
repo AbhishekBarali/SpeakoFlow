@@ -34,7 +34,10 @@ export const GeneralSettings: React.FC = () => {
   const isLinux = type() === "linux";
   return (
     <div className="max-w-2xl w-full mx-auto space-y-8">
-      <SettingsGroup title={t("settings.general.shortcut.title")} icon={Keyboard}>
+      <SettingsGroup
+        title={t("settings.general.shortcut.title")}
+        icon={Keyboard}
+      >
         <ShortcutInput
           shortcutId="transcribe"
           grouped={true}

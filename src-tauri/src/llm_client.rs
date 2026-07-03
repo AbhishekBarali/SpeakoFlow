@@ -48,6 +48,13 @@ struct ChatCompletionRequest {
     reasoning: Option<ReasoningConfig>,
     #[serde(skip_serializing_if = "Option::is_none")]
     stream: Option<bool>,
+    /// OpenAI-style tool definitions (`[{type:"function", function:{…}}]`).
+    /// Only sent on the tool-calling web-search path.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tools: Option<Value>,
+    /// Tool choice policy ("auto" for the web-search path). Sent only with `tools`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tool_choice: Option<Value>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -334,6 +341,8 @@ pub async fn send_chat_completion_with_schema(
         reasoning_effort,
         reasoning,
         stream: None,
+        tools: None,
+        tool_choice: None,
     };
 
     let response = client
@@ -380,6 +389,45 @@ struct StreamChoice {
 struct StreamDelta {
     #[serde(default)]
     content: Option<String>,
+    #[serde(default)]
+    tool_calls: Option<Vec<StreamToolCall>>,
+}
+
+/// A streamed tool-call delta. `id`/`name` arrive on the first chunk for an
+/// index; `arguments` streams in fragments that must be concatenated per index.
+#[derive(Debug, Deserialize)]
+struct StreamToolCall {
+    #[serde(default)]
+    index: usize,
+    #[serde(default)]
+    id: Option<String>,
+    #[serde(default)]
+    function: Option<StreamToolCallFn>,
+}
+
+#[derive(Debug, Deserialize)]
+struct StreamToolCallFn {
+    #[serde(default)]
+    name: Option<String>,
+    #[serde(default)]
+    arguments: Option<String>,
+}
+
+/// A fully-assembled tool call the model asked us to run.
+#[derive(Debug, Clone)]
+pub struct ToolCall {
+    pub id: String,
+    pub name: String,
+    /// Raw JSON arguments string (parse at the call site).
+    pub arguments: String,
+}
+
+/// Outcome of one streamed tool-calling round: any content the model streamed
+/// (via `on_token`) is accumulated in `text`; if the model instead asked to run
+/// tools, they're in `tool_calls` (and `text` is usually empty).
+pub struct ToolStreamOutcome {
+    pub text: String,
+    pub tool_calls: Vec<ToolCall>,
 }
 
 /// Send a streaming chat completion request to an OpenAI-compatible API.
@@ -414,6 +462,8 @@ pub async fn send_chat_stream(
         reasoning_effort: None,
         reasoning: None,
         stream: Some(true),
+        tools: None,
+        tool_choice: None,
     };
 
     let response = client
@@ -479,6 +529,150 @@ pub async fn send_chat_stream(
 
     // Stream ended without [DONE]; return what we have.
     Ok(full_text)
+}
+
+/// Streaming chat completion WITH tool support (the web-search tool-calling
+/// path). Sends `tools` + `tool_choice: "auto"`; streams any assistant content
+/// via `on_token`, and if the model instead requests tool calls, assembles and
+/// returns them. The caller runs the tool(s), appends the results as messages,
+/// and calls this again. Not used for the built-in/local engine (small models
+/// handle tools poorly) — the caller gates on provider capability and falls
+/// back to the planner path.
+pub async fn send_chat_stream_with_tools(
+    provider: &PostProcessProvider,
+    api_key: String,
+    model: &str,
+    mut messages: Vec<Value>,
+    tools: Value,
+    tool_choice: Value,
+    mut on_token: impl FnMut(&str),
+) -> Result<ToolStreamOutcome, String> {
+    let base_url = effective_base_url(provider);
+    let url = format!("{}/chat/completions", base_url);
+    let client = create_client(provider, &api_key)?;
+
+    if provider.id == "builtin" {
+        fold_system_into_first_user(&mut messages);
+    }
+
+    let request_body = ChatCompletionRequest {
+        model: model.to_string(),
+        messages,
+        response_format: None,
+        reasoning_effort: None,
+        reasoning: None,
+        stream: Some(true),
+        tools: Some(tools),
+        tool_choice: Some(tool_choice),
+    };
+
+    let response = client
+        .post(&url)
+        .json(&request_body)
+        .send()
+        .await
+        .map_err(|e| format!("HTTP request failed: {}", e))?;
+
+    let status = response.status();
+    if !status.is_success() {
+        let error_text = response
+            .text()
+            .await
+            .unwrap_or_else(|_| "Failed to read error response".to_string());
+        return Err(format!(
+            "API request failed with status {}: {}",
+            status, error_text
+        ));
+    }
+
+    let mut stream = response.bytes_stream();
+    let mut line_buf = String::new();
+    let mut full_text = String::new();
+    // Accumulate tool-call fragments by index: (id, name, arguments).
+    let mut acc: Vec<(String, String, String)> = Vec::new();
+
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk.map_err(|e| format!("Stream read failed: {}", e))?;
+        line_buf.push_str(&String::from_utf8_lossy(&chunk));
+
+        while let Some(newline_pos) = line_buf.find('\n') {
+            let line: String = line_buf.drain(..=newline_pos).collect();
+            let line = line.trim();
+            let Some(data) = line.strip_prefix("data:") else {
+                continue;
+            };
+            let data = data.trim();
+            if data == "[DONE]" {
+                return Ok(ToolStreamOutcome {
+                    text: full_text,
+                    tool_calls: assemble_tool_calls(acc),
+                });
+            }
+            match serde_json::from_str::<StreamChunk>(data) {
+                Ok(parsed) => {
+                    let Some(choice) = parsed.choices.first() else {
+                        continue;
+                    };
+                    if let Some(token) = choice.delta.content.as_deref() {
+                        if !token.is_empty() {
+                            full_text.push_str(token);
+                            on_token(token);
+                        }
+                    }
+                    if let Some(tcs) = &choice.delta.tool_calls {
+                        for tc in tcs {
+                            // Grow the accumulator so `index` is addressable.
+                            while acc.len() <= tc.index {
+                                acc.push((String::new(), String::new(), String::new()));
+                            }
+                            let slot = &mut acc[tc.index];
+                            if let Some(id) = &tc.id {
+                                if !id.is_empty() {
+                                    slot.0 = id.clone();
+                                }
+                            }
+                            if let Some(f) = &tc.function {
+                                if let Some(name) = &f.name {
+                                    if !name.is_empty() {
+                                        slot.1 = name.clone();
+                                    }
+                                }
+                                if let Some(args) = &f.arguments {
+                                    slot.2.push_str(args);
+                                }
+                            }
+                        }
+                    }
+                }
+                Err(e) => {
+                    debug!("Skipping unparsable SSE chunk: {} ({})", data, e);
+                }
+            }
+        }
+    }
+
+    Ok(ToolStreamOutcome {
+        text: full_text,
+        tool_calls: assemble_tool_calls(acc),
+    })
+}
+
+/// Turn accumulated (id, name, arguments) fragments into ToolCalls, dropping any
+/// entry without a function name (defensive against malformed streams).
+fn assemble_tool_calls(acc: Vec<(String, String, String)>) -> Vec<ToolCall> {
+    acc.into_iter()
+        .enumerate()
+        .filter(|(_, (_, name, _))| !name.is_empty())
+        .map(|(i, (id, name, arguments))| ToolCall {
+            id: if id.is_empty() {
+                format!("call_{}", i)
+            } else {
+                id
+            },
+            name,
+            arguments,
+        })
+        .collect()
 }
 
 /// Fetch available models from an OpenAI-compatible API

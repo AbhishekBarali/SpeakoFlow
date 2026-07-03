@@ -447,12 +447,23 @@ pub(crate) async fn process_transcription_output(
 }
 
 impl ShortcutAction for TranscribeAction {
-    fn start(&self, app: &AppHandle, binding_id: &str, _shortcut_str: &str) {
+    fn start(&self, app: &AppHandle, binding_id: &str, shortcut_str: &str) {
         let start_time = Instant::now();
         debug!("TranscribeAction::start called for binding: {}", binding_id);
 
         // A fresh dictation can't be redirected by a stale Ask-Assistant click.
         crate::assistant::clear_transcribe_redirect();
+
+        // Route the transcript: an in-app dictation (the Create-with-AI persona
+        // box uses source "in-app") delivers its text to the webview via an
+        // event; every other dictation pastes into the focused OS window as
+        // usual. Setting/clearing here — rather than in the command — means a
+        // stale in-app click can never hijack a later global dictation.
+        if shortcut_str == "in-app" {
+            crate::assistant::set_dictate_to_field();
+        } else {
+            crate::assistant::clear_dictate_to_field();
+        }
 
         // Optionally silence a still-playing assistant reply. Off by default —
         // earphone users often want to keep listening while they dictate.
@@ -683,6 +694,22 @@ impl ShortcutAction for TranscribeAction {
                                 change_tray_icon(&ah, TrayIconState::Idle);
                                 crate::assistant::show_assistant_panel(&ah);
                                 crate::assistant::run_voice_turn(ah.clone(), transcription).await;
+                                return;
+                            }
+
+                            // In-app dictation (e.g. the Create-with-AI persona
+                            // description box): deliver the transcript to the
+                            // webview as an event so it lands in the focused
+                            // in-app field reliably, without a synthetic paste
+                            // or touching the OS clipboard.
+                            if crate::assistant::take_dictate_to_field() {
+                                utils::hide_recording_overlay(&ah);
+                                change_tray_icon(&ah, TrayIconState::Idle);
+                                if let Err(e) =
+                                    ah.emit("dictation-transcript", transcription.clone())
+                                {
+                                    error!("Failed to emit dictation-transcript: {}", e);
+                                }
                                 return;
                             }
 

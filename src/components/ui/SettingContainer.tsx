@@ -1,6 +1,6 @@
 import React, { useRef, useState } from "react";
 import { Tooltip } from "./Tooltip";
-import { TONE_TILE, type SettingIcon, type SettingTone } from "./tones";
+import { type SettingIcon, type SettingTone } from "./tones";
 
 interface SettingContainerProps {
   title: string;
@@ -25,22 +25,6 @@ interface SettingContainerProps {
   /** @deprecated Kept for call-site compatibility. */
   tooltipPosition?: "top" | "bottom";
 }
-
-/** Soft-tinted rounded tile holding a row's leading icon. */
-const IconTile: React.FC<{
-  icon: SettingIcon;
-  tone: SettingTone;
-  disabled?: boolean;
-}> = ({ icon: Icon, tone, disabled }) => (
-  <span
-    aria-hidden
-    className={`grid place-items-center h-9 w-9 rounded-[11px] shrink-0 elev-chip ${TONE_TILE[tone]} ${
-      disabled ? "opacity-50" : ""
-    }`}
-  >
-    <Icon className="w-[18px] h-[18px]" strokeWidth={2} />
-  </span>
-);
 
 /** Small circled-i affordance revealing a tooltip with deep-dive help. */
 const InfoHint: React.FC<{ text: string }> = ({ text }) => {
@@ -86,8 +70,6 @@ export const SettingContainer: React.FC<SettingContainerProps> = ({
   title,
   description,
   info,
-  icon,
-  tone = "teal",
   children,
   grouped = false,
   layout = "horizontal",
@@ -112,12 +94,9 @@ export const SettingContainer: React.FC<SettingContainerProps> = ({
             : "px-4 py-3 rounded-xl border border-hairline bg-surface"
         }
       >
-        <div className="mb-2.5 flex items-start gap-3">
-          {icon && <IconTile icon={icon} tone={tone} disabled={disabled} />}
-          <div className="min-w-0 flex-1">
-            {titleRow}
-            {description && <p className={descriptionClasses}>{description}</p>}
-          </div>
+        <div className="mb-2.5 min-w-0">
+          {titleRow}
+          {description && <p className={descriptionClasses}>{description}</p>}
         </div>
         <div className="w-full">{children}</div>
       </div>
@@ -132,7 +111,6 @@ export const SettingContainer: React.FC<SettingContainerProps> = ({
           : "flex items-center gap-3 px-4 py-3 rounded-xl border border-hairline bg-surface"
       }
     >
-      {icon && <IconTile icon={icon} tone={tone} disabled={disabled} />}
       <div className="min-w-0 flex-1">
         {titleRow}
         {description && <p className={descriptionClasses}>{description}</p>}

@@ -258,8 +258,6 @@
     opacity 200ms ease 340ms;
 }
 
-
-
 /* Busy phases: the reveal must not slow a cancel down — a short beat only. */
 .apill:hover .apill-reveal.quick,
 .apill:focus-within .apill-reveal.quick {
@@ -394,6 +392,34 @@
   flex-shrink: 0;
   color: var(--as-error);
   pointer-events: none;
+}
+
+/* Pill notice: a quiet globe + short muted text (e.g. web search found
+ * nothing). Non-blocking and deliberately understated — it self-clears with
+ * the transient timer and never uses the error red. */
+.apill-notice {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  color: var(--as-muted);
+  pointer-events: none;
+}
+
+.apill-notice-icon {
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+.apill-notice-text {
+  min-width: 0;
+  max-width: 130px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* =========================================================================

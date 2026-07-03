@@ -110,7 +110,19 @@ pub struct FileAttachment {
 /// Frozen full-screen capture waiting for the user to pick a region in the
 /// snip overlay. Captured BEFORE the overlay opens, so the dimmer (and any
 /// on-screen assistant window churn) can never photobomb the crop.
-pub static PENDING_SNIP: Mutex<Option<image::DynamicImage>> = Mutex::new(None);
+pub static PENDING_SNIP: Mutex<Option<PendingSnip>> = Mutex::new(None);
+
+/// A frozen frame awaiting a region crop, bundled with the LOGICAL (CSS-pixel)
+/// size of the overlay drawn over it. The selection rectangle arrives in the
+/// overlay's CSS pixels; the finish step maps it onto the frame's real pixels
+/// using the ratio of these two sizes — which never trusts a reported scale
+/// factor (that can be wrong, or silently default to 1.0, on a high-DPI display
+/// and mis-crop), so the crop lands correctly at any display scale.
+pub struct PendingSnip {
+    pub frame: image::DynamicImage,
+    pub logical_w: f64,
+    pub logical_h: f64,
+}
 
 /// Attachments staged in the panel (chips above the input) and mirrored here
 /// so VOICE turns include them too — the pill/hotkey path runs entirely in
@@ -154,6 +166,27 @@ pub fn clear_transcribe_redirect() {
 
 pub fn take_transcribe_redirect() -> bool {
     TRANSCRIBE_REDIRECT.swap(false, Ordering::SeqCst)
+}
+
+/// One-shot "deliver this dictation's transcript to the app's own UI as an
+/// event, instead of pasting it into the focused OS window" flag. Set when an
+/// in-app dictation (source `"in-app"`, e.g. the Create-with-AI persona
+/// description box) starts, and consumed when that recording completes. This is
+/// what makes an in-app mic button reliable: the transcript arrives in the
+/// webview via the `dictation-transcript` event rather than through a synthetic
+/// paste that depends on OS focus.
+static DICTATE_TO_FIELD: AtomicBool = AtomicBool::new(false);
+
+pub fn set_dictate_to_field() {
+    DICTATE_TO_FIELD.store(true, Ordering::SeqCst);
+}
+
+pub fn clear_dictate_to_field() {
+    DICTATE_TO_FIELD.store(false, Ordering::SeqCst);
+}
+
+pub fn take_dictate_to_field() -> bool {
+    DICTATE_TO_FIELD.swap(false, Ordering::SeqCst)
 }
 
 /// Phrases that signal the user is asking about what's on their screen.
@@ -698,10 +731,6 @@ pub fn open_snip_overlay(
         return Ok(()); // already snipping
     }
 
-    if let Ok(mut pending) = PENDING_SNIP.lock() {
-        *pending = Some(frame);
-    }
-
     // Cover the chosen monitor using LOGICAL coordinates set at BUILD time.
     // Positioning/sizing AFTER build via PhysicalPosition/PhysicalSize is
     // unreliable across monitors: tao converts physical values using the scale
@@ -715,6 +744,17 @@ pub fn open_snip_overlay(
     let logical_y = monitor.position().y as f64 / scale;
     let logical_w = (monitor.size().width as f64 / scale).max(1.0);
     let logical_h = (monitor.size().height as f64 / scale).max(1.0);
+
+    // Stash the frozen frame together with the overlay's logical size, so the
+    // finish step can map the selection (measured in the overlay's CSS pixels)
+    // straight onto the frame's real pixels without trusting a scale factor.
+    if let Ok(mut pending) = PENDING_SNIP.lock() {
+        *pending = Some(PendingSnip {
+            frame,
+            logical_w,
+            logical_h,
+        });
+    }
 
     let mut builder = WebviewWindowBuilder::new(
         app,
@@ -752,24 +792,50 @@ pub fn open_snip_overlay(
 
 /// Close the snip overlay and, when a rectangle was chosen, crop it from the
 /// frozen frame and hand it to the panel as a pending image attachment via the
-/// `assistant-region-captured` event. `rect` is in the overlay's logical px.
-pub fn finish_region_snip(app: &AppHandle, scale: f64, rect: Option<(f64, f64, f64, f64)>) {
+/// `assistant-region-captured` event. `rect` is in the overlay's CSS pixels; it
+/// is mapped onto the frame's real pixels using the ratio of the frame size to
+/// the overlay's logical size (stored in [`PendingSnip`]) — robust to any
+/// display scaling.
+pub fn finish_region_snip(app: &AppHandle, rect: Option<(f64, f64, f64, f64)>) {
     if let Some(window) = app.get_webview_window(SNIP_LABEL) {
         let _ = window.close();
     }
-    let frame = PENDING_SNIP.lock().ok().and_then(|mut p| p.take());
+    let pending = PENDING_SNIP.lock().ok().and_then(|mut p| p.take());
     let Some(rect) = rect else {
         return; // cancelled
     };
-    let Some(frame) = frame else {
+    let Some(PendingSnip {
+        frame,
+        logical_w,
+        logical_h,
+    }) = pending
+    else {
         emit_error(app, "screen_capture", "No captured frame for snip".into());
         return;
     };
 
+    // Map the selection from the overlay's CSS pixels onto the frame's real
+    // pixels via the ratio of the two coordinate spaces. This never multiplies
+    // by a reported scale factor (which can be wrong — or default to 1.0 — on a
+    // high-DPI display and silently mis-crop), so it lands correctly at any
+    // display scale.
+    let (frame_w, frame_h) = (frame.width() as f64, frame.height() as f64);
+    let sx = if logical_w > 0.0 {
+        frame_w / logical_w
+    } else {
+        1.0
+    };
+    let sy = if logical_h > 0.0 {
+        frame_h / logical_h
+    } else {
+        1.0
+    };
     let (x, y, w, h) = rect;
-    let to_px = |v: f64| -> u32 { (v * scale).round().max(0.0) as u32 };
-    if w * scale < 4.0 || h * scale < 4.0 {
-        return; // a stray click, not a selection
+    let to_px = |v: f64, s: f64| -> u32 { (v * s).round().max(0.0) as u32 };
+
+    // Ignore a stray click: a selection under ~4 real pixels isn't a crop.
+    if w * sx < 4.0 || h * sy < 4.0 {
+        return;
     }
 
     let settings = get_settings(app);
@@ -781,10 +847,10 @@ pub fn finish_region_snip(app: &AppHandle, scale: f64, rect: Option<(f64, f64, f
     match crate::screenshot::encode_region_data_url(
         &frame,
         profile,
-        to_px(x),
-        to_px(y),
-        to_px(w),
-        to_px(h),
+        to_px(x, sx),
+        to_px(y, sy),
+        to_px(w, sx),
+        to_px(h, sy),
     ) {
         Ok(data_url) => {
             let _ = app.emit("assistant-region-captured", data_url);
@@ -894,7 +960,7 @@ fn vision_unsupported_message(provider_id: &str, model: &str) -> String {
 /// is being supplied (and to use it for "today/now/latest" questions). It's
 /// byte-identical every turn — the changing timestamp goes in the user message
 /// instead — so it doesn't disturb provider-side prompt caching.
-const TIME_AWARENESS_NOTE: &str = "The user's current local date and time is provided at the top of their message. Treat it as the present moment for any time-related question (today, now, this week, how long ago, latest, etc.) — never guess the date from your training data.";
+const TIME_AWARENESS_NOTE: &str = "The user's current local date and time is provided at the top of their message — treat it as the present moment. Use it to resolve relative time references (today, yesterday, tonight, last week, this month, this year, how long ago) into concrete dates, and when looking something up, build the query around the correct date. Never guess the current date from your training data; your training is frozen at a past cutoff, so anything that can change over time may be out of date.";
 
 /// The current local date/time line prepended to each request's user message.
 /// LLMs have no clock, so this is the production-standard way to keep "what's
@@ -1038,6 +1104,57 @@ fn run_cat_turn(
     emit_state(app, if speaking { "speaking" } else { "idle" });
 }
 
+/// The `web_search` tool definition handed to tool-capable models. The model
+/// decides whether to call it; when it does, we run the search and feed the
+/// results back. The description mirrors the planner's guidance so search
+/// behavior stays consistent across the two paths.
+fn web_search_tool_def() -> Value {
+    json!([{
+        "type": "function",
+        "function": {
+            "name": "web_search",
+            "description": "Search the live web for current or external facts — news, prices, weather, sports scores, schedules, product releases/versions, who currently holds a role, or any recent/niche fact your training data wouldn't reliably know. Returns titles and short snippets. Call this ONLY when the answer needs current or external information; for greetings, general knowledge, writing, coding, or math, answer directly without searching.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "A concise, keyword-rich search query, as you would type it into a search engine."
+                    },
+                    "freshness": {
+                        "type": "string",
+                        "enum": ["none", "day", "week", "month", "year"],
+                        "description": "How recent results should be; use 'day'/'week' for breaking news, 'none' when recency doesn't matter."
+                    },
+                    "news": {
+                        "type": "boolean",
+                        "description": "True for current events / breaking news topics."
+                    }
+                },
+                "required": ["query"]
+            }
+        }
+    }])
+}
+
+/// Parse the JSON arguments of a `web_search` tool call into (query, freshness,
+/// news). Tolerates missing/extra fields and malformed JSON (returns empties).
+fn parse_web_search_args(raw: &str) -> (String, Option<String>, bool) {
+    let v: Value = serde_json::from_str(raw).unwrap_or(Value::Null);
+    let query = v
+        .get("query")
+        .and_then(|q| q.as_str())
+        .unwrap_or("")
+        .trim()
+        .to_string();
+    let freshness = v
+        .get("freshness")
+        .and_then(|f| f.as_str())
+        .map(|s| s.to_string());
+    let news = v.get("news").and_then(|n| n.as_bool()).unwrap_or(false);
+    (query, freshness, news)
+}
+
 /// Run one assistant turn: record the user message, stream the LLM answer to
 /// the panel via events, and append the reply to the conversation history.
 ///
@@ -1132,6 +1249,43 @@ pub async fn run_assistant_turn(
         .cloned()
         .unwrap_or_default();
 
+    // Providers that need a compact request body: Azure's gateway rejects
+    // oversized JSON, and the local engine (built-in, or an Ollama/LM Studio
+    // loopback server) runs a small context window. Used both to trim history
+    // and — on visual turns — to shrink the web-search context so the combined
+    // image + snippets payload stays within the provider's limits.
+    let base_url_lc = provider.base_url.to_ascii_lowercase();
+    let needs_small_body = provider.id == "builtin"
+        || base_url_lc.contains("azure")
+        || base_url_lc.contains("127.0.0.1")
+        || base_url_lc.contains("localhost");
+
+    // Decide how web search runs this turn (only when enabled and the cheap
+    // local pre-gate says it's plausibly a search — chit-chat/code/math never
+    // search):
+    //   • OpenRouter (non-visual) → its native `:online` search (server-side).
+    //   • Other cloud (non-visual) → tool calling: the model itself decides and
+    //     calls our `web_search` tool inline (no separate planner round-trip).
+    //   • Local engine, or ANY visual turn → the planner path: pre-search and
+    //     inject the results as text (avoids sending tools alongside an image,
+    //     and small local models handle tool calling poorly).
+    let is_openrouter = provider.id == "openrouter" || base_url_lc.contains("openrouter");
+    let is_local_engine = provider.id == "builtin"
+        || base_url_lc.contains("127.0.0.1")
+        || base_url_lc.contains("localhost");
+    let web_wanted = settings.assistant_web_search_enabled && web_search::should_search(&user_text);
+    let web_via_online =
+        web_wanted && is_openrouter && !has_visual && settings.assistant_prefer_provider_web_search;
+    let web_via_tools = web_wanted && !is_openrouter && !is_local_engine && !has_visual;
+    let web_via_planner = web_wanted && !web_via_online && !web_via_tools;
+    // OpenRouter's `:online` model suffix turns on its built-in web search
+    // server-side; every other path uses the model name unchanged.
+    let request_model = if web_via_online {
+        format!("{}:online", model)
+    } else {
+        model.clone()
+    };
+
     // Record the user message (text markers instead of raw image/file data)
     // and show it in the panel immediately — before any web search runs, so the
     // bubble appears right away while results are being fetched.
@@ -1148,18 +1302,18 @@ pub async fn run_assistant_turn(
     // the model (or the search) errors out before replying.
     persist_assistant_session(&app);
 
-    // Optional web search. Runs only when enabled and this isn't a visual
-    // turn (those are about the screen/images, not the web). A capable model
-    // plans the search — deciding whether one is actually needed and rewriting
-    // the (often messy, transcribed) request into clean queries — and then we
-    // fetch real page content to ground the answer. Any failure or timeout
-    // degrades gracefully: we answer without web context rather than breaking
-    // the turn. The cheap `should_search` pre-gate skips obvious non-search
-    // turns so we don't spend a planner round-trip on chit-chat, code, or math.
-    let web_context: Option<String> = if settings.assistant_web_search_enabled
-        && !has_visual
-        && web_search::should_search(&user_text)
-    {
+    // Optional web search. Runs whenever it's enabled and the request looks
+    // like it needs current/external facts — including turns that also carry a
+    // screenshot or image, so "what's the current price of this?" about a photo
+    // works. A capable model plans the search (deciding whether one is actually
+    // needed and rewriting the often-messy transcribed request into clean
+    // queries), then we fetch real page content to ground the answer. Any
+    // failure or timeout degrades gracefully: we answer without web context and
+    // show a small notice rather than breaking the turn. The cheap
+    // `should_search` pre-gate skips obvious non-search turns so we don't spend
+    // a planner round-trip on chit-chat, code, or math. On visual turns the
+    // web-context budget is trimmed below (the image already fills the body).
+    let web_context: Option<String> = if web_via_planner {
         // Race every search stage against a Stop press: a slow search must never
         // trap the user in the "searching" state with no way out.
         let cancel = app.state::<AssistantConversation>().cancel.clone();
@@ -1257,8 +1411,16 @@ pub async fn run_assistant_turn(
                             results.len(),
                             plan.queries.len()
                         );
-                        let budget =
+                        let mut budget =
                             web_search::context_budget_for(settings.assistant_search_depth);
+                        // On a visual turn the image already dominates the
+                        // request body, so trim the web-context budget to keep
+                        // the combined payload within limits — tightly for
+                        // constrained providers (Azure's JSON-body cap, the
+                        // local engine's small context), moderately for cloud.
+                        if has_visual {
+                            budget = budget.min(if needs_small_body { 3_000 } else { 8_000 });
+                        }
                         Some(web_search::format_results_for_prompt(&results, budget))
                     }
                     Some(_) => {
@@ -1287,20 +1449,34 @@ pub async fn run_assistant_turn(
     }
 
     // Build the request: stable system prompt → history → new user msg.
-    // (Cache-friendly: the prefix only ever grows by appending.) History is
-    // capped (newest first wins) so request bodies stay small — critical for
-    // Azure, whose parser rejects oversized payloads. Visual turns get a much
-    // tighter cap: the image(s) already dominate the body budget.
-    let (max_history_messages, max_history_chars) = if has_visual {
-        (
-            (settings.assistant_max_history_messages as usize).min(4),
-            6_000usize,
-        )
+    // (Cache-friendly: the prefix only ever grows by appending.)
+    //
+    // The visible "Messages History" setting is the source of truth for HOW
+    // MANY past messages to send. A *secondary* character cap only guards
+    // providers that genuinely need a small request body:
+    //   • Azure — its gateway/parser rejects oversized JSON bodies.
+    //   • The local engine (built-in, or an Ollama/LM Studio loopback server) —
+    //     it runs a small context window, so a huge history would overflow it.
+    // Cloud APIs (OpenAI, Anthropic, Groq, OpenRouter, …) have large context
+    // windows, so they get exactly the history the user asked for — no hidden
+    // token/char cap. Visual turns still trim tighter on the constrained
+    // providers because the image already dominates their body budget; cloud
+    // visual turns keep the user's full message count.
+    let (max_history_messages, max_history_chars) = if needs_small_body {
+        if has_visual {
+            (
+                (settings.assistant_max_history_messages as usize).min(4),
+                6_000usize,
+            )
+        } else {
+            (
+                settings.assistant_max_history_messages as usize,
+                24_000usize,
+            )
+        }
     } else {
-        (
-            settings.assistant_max_history_messages as usize,
-            24_000usize,
-        )
+        // Cloud API: honor the Messages History setting; don't secretly trim.
+        (settings.assistant_max_history_messages as usize, usize::MAX)
     };
     let mut messages: Vec<Value> = Vec::new();
     let system_content = {
@@ -1311,28 +1487,59 @@ pub async fn run_assistant_turn(
             content.push_str("\n\n");
         }
         content.push_str(TIME_AWARENESS_NOTE);
-        // When web search is enabled, tell the model it HAS that capability on
-        // every turn — even ones where the app didn't auto-search — so it never
-        // denies having internet access and can offer to look things up. Stable
-        // text → cache-safe.
-        if settings.assistant_web_search_enabled {
+        // Tell the model about its web capability. On the tool-calling path it
+        // must actively CALL the `web_search` tool, so it gets a tool-oriented
+        // instruction; on the other paths the app runs search for it, so it
+        // gets the "results may be added for you" note. Either way it never
+        // denies having internet access. Stable per-mode text → cache-safe.
+        if web_via_tools {
+            if !content.trim().is_empty() {
+                content.push_str("\n\n");
+            }
+            content.push_str(
+                "IMPORTANT — your situation and tools:\n\
+                 • Your training data has a fixed cutoff and is very likely OUT OF DATE for \
+                 anything that changes over time: who currently holds an office, role, or title; \
+                 prices; scores and standings; schedules; software versions; and recent events. \
+                 The user's real current date is provided with their message — treat it as now.\n\
+                 • You have a web_search tool that returns live results from the internet.\n\
+                 How to use it:\n\
+                 1. For ANY question about current, recent, or changeable facts, you MUST call \
+                 web_search BEFORE answering. Do not answer from memory even if you feel certain — \
+                 your memory can be years out of date and confidently wrong (e.g. who holds a \
+                 political office).\n\
+                 2. Base current-fact answers only on what the results actually say. When the \
+                 results confirm something, state it plainly and confidently — do NOT hedge with \
+                 \"appears to be\", \"suggests\", or \"as of my knowledge\".\n\
+                 3. If you couldn't search or the results don't cover it, say you're not certain \
+                 and offer to look it up — never guess a current fact.\n\
+                 4. For timeless things (definitions, concepts, math, coding, writing, \
+                 translation, general how-to), just answer directly without searching.\n\
+                 Examples:\n\
+                 • \"What's the capital of France?\" → answer directly (timeless).\n\
+                 • \"Who is the current president / PM / CEO of X?\" → web_search FIRST, then answer.\n\
+                 • \"Latest iPhone price\", \"who won yesterday's match\", \"weather today\" → web_search FIRST.\n\
+                 • \"Explain how recursion works\" → answer directly (timeless).",
+            );
+        } else if settings.assistant_web_search_enabled {
             content.push_str("\n\n");
             content.push_str(web_search::WEB_SEARCH_CAPABILITY_NOTE);
         }
-        // Append the user's response-length preference (if any) so a single
-        // system prompt covers both display and spoken output.
-        if let Some(directive) = settings.assistant_response_length.directive() {
+        // Append the response-length preference (if any) so a single system
+        // prompt covers both display and spoken output. The active persona can
+        // override the global setting, so this resolves per-persona first.
+        if let Some(directive) = settings.effective_response_length().directive() {
             if !content.trim().is_empty() {
                 content.push_str("\n\n");
             }
             content.push_str(directive);
         }
         // On web-search turns, tell the model to ground its answer in the
-        // results that are prepended to the user's message below — and, crucially,
-        // to treat them as its OWN findings (never "the results you sent"). The
-        // directive adapts to TTS: speech-friendly prose when the reply is spoken,
-        // richer Markdown (tables/bullets) when it's only read on screen.
-        if web_context.is_some() {
+        // results (whether prepended to the user's message on the planner path,
+        // or returned via the web_search tool) — and to treat them as its OWN
+        // findings (never "the results you sent"). The directive adapts to TTS:
+        // speech-friendly prose when spoken, richer Markdown when read on screen.
+        if web_context.is_some() || web_via_tools {
             if !content.trim().is_empty() {
                 content.push_str("\n\n");
             }
@@ -1456,21 +1663,134 @@ pub async fn run_assistant_turn(
 
     // Accumulate streamed tokens so a cancelled turn can keep the partial reply.
     let partial = Arc::new(Mutex::new(String::new()));
-    let partial_cb = partial.clone();
-    let app_for_tokens = app.clone();
-    let stream_fut =
-        llm_client::send_chat_stream(&provider, api_key.clone(), &model, messages, move |token| {
-            if let Ok(mut buf) = partial_cb.lock() {
-                buf.push_str(token);
-            }
-            let _ = app_for_tokens.emit("assistant-token", token.to_string());
-        });
-    tokio::pin!(stream_fut);
 
-    // Race the stream against a Stop request. notify_waiters wakes this select.
-    let outcome = tokio::select! {
-        result = &mut stream_fut => Some(result),
-        _ = cancel.notified() => None,
+    // Generation. On the tool-calling path the model may call our `web_search`
+    // tool; we run it, feed the results back, and let it continue (up to a few
+    // rounds). Otherwise it's a plain stream (which, for OpenRouter, may carry
+    // the `:online` suffix so the search happens server-side). Both stream
+    // tokens via `assistant-token` and resolve to the final answer text, then
+    // flow through the shared outcome handling below.
+    let outcome = if web_via_tools {
+        let tools = web_search_tool_def();
+        // Safety net (same intent as the planner path's force-search): capable
+        // models are often over-confident and answer "who is the current …"
+        // from stale training data instead of searching. For clearly
+        // time-sensitive or explicitly-requested queries, FORCE the web_search
+        // tool on the first round; otherwise let the model decide (auto).
+        let force_search = web_search::is_explicit_search_request(&user_text)
+            || web_search::looks_time_sensitive(&user_text);
+        let partial_cb = partial.clone();
+        let app_tokens = app.clone();
+        let app_state = app.clone();
+        let provider_c = provider.clone();
+        let api_key_c = api_key.clone();
+        let model_c = model.clone();
+        let settings_c = settings.clone();
+        let loop_fut = async move {
+            let mut msgs = messages;
+            let mut answer = String::new();
+            // A small round cap: one search round covers almost every question;
+            // the cap just prevents a pathological tool-call loop.
+            for round in 0..3usize {
+                // Force the tool only on the first round of a warranted search;
+                // afterwards use "auto" so the model answers with the results
+                // instead of being forced to search again (which would loop).
+                let tool_choice = if round == 0 && force_search {
+                    json!({ "type": "function", "function": { "name": "web_search" } })
+                } else {
+                    json!("auto")
+                };
+                let po = partial_cb.clone();
+                let ao = app_tokens.clone();
+                let round_out = llm_client::send_chat_stream_with_tools(
+                    &provider_c,
+                    api_key_c.clone(),
+                    &model_c,
+                    msgs.clone(),
+                    tools.clone(),
+                    tool_choice,
+                    move |token| {
+                        if let Ok(mut buf) = po.lock() {
+                            buf.push_str(token);
+                        }
+                        let _ = ao.emit("assistant-token", token.to_string());
+                    },
+                )
+                .await?;
+                if round_out.tool_calls.is_empty() {
+                    answer = round_out.text;
+                    break;
+                }
+                // The model asked to search — reflect that in the panel.
+                emit_state(&app_state, "searching");
+                let tool_calls_json: Vec<Value> = round_out
+                    .tool_calls
+                    .iter()
+                    .map(|tc| {
+                        json!({
+                            "id": tc.id,
+                            "type": "function",
+                            "function": { "name": tc.name, "arguments": tc.arguments }
+                        })
+                    })
+                    .collect();
+                msgs.push(json!({
+                    "role": "assistant",
+                    "content": round_out.text,
+                    "tool_calls": tool_calls_json
+                }));
+                for tc in &round_out.tool_calls {
+                    let (query, freshness, news) = parse_web_search_args(&tc.arguments);
+                    let results = if tc.name == "web_search" && !query.is_empty() {
+                        web_search::run_tool_search(&settings_c, &query, freshness.as_deref(), news)
+                            .await
+                    } else {
+                        Vec::new()
+                    };
+                    let content = if results.is_empty() {
+                        "No results found for that query.".to_string()
+                    } else {
+                        let budget =
+                            web_search::context_budget_for(settings_c.assistant_search_depth);
+                        web_search::format_results_for_prompt(&results, budget)
+                    };
+                    msgs.push(json!({
+                        "role": "tool",
+                        "tool_call_id": tc.id,
+                        "content": content
+                    }));
+                }
+                emit_state(&app_state, "thinking");
+                answer = round_out.text;
+            }
+            Ok::<String, String>(answer)
+        };
+        tokio::pin!(loop_fut);
+        tokio::select! {
+            result = &mut loop_fut => Some(result),
+            _ = cancel.notified() => None,
+        }
+    } else {
+        let partial_cb = partial.clone();
+        let app_for_tokens = app.clone();
+        let stream_fut = llm_client::send_chat_stream(
+            &provider,
+            api_key.clone(),
+            &request_model,
+            messages,
+            move |token| {
+                if let Ok(mut buf) = partial_cb.lock() {
+                    buf.push_str(token);
+                }
+                let _ = app_for_tokens.emit("assistant-token", token.to_string());
+            },
+        );
+        tokio::pin!(stream_fut);
+        // Race the stream against a Stop request. notify_waiters wakes this select.
+        tokio::select! {
+            result = &mut stream_fut => Some(result),
+            _ = cancel.notified() => None,
+        }
     };
 
     // Whether a spoken reply is starting. When it is, the turn ends in a

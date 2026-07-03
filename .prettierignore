@@ -14,6 +14,7 @@ src-tauri/gen
 
 # Generated files
 src/bindings.ts
+graphify-out
 
 # Misc
 .DS_Store

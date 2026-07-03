@@ -118,6 +118,38 @@ fn show_main_window(app: &AppHandle) {
     );
 }
 
+/// Persist the main window's current size (logical px) so it reopens at the
+/// size the user left it. Called when the window loses focus or is closed to
+/// the tray — natural, low-frequency save points, so there's no write churn
+/// during a resize drag. Only the "main" window is remembered (the assistant
+/// panel and overlays manage their own geometry); minimized states and no-op
+/// writes are skipped.
+fn save_main_window_size(window: &tauri::Window) {
+    if window.label() != "main" {
+        return;
+    }
+    if window.is_minimized().unwrap_or(false) {
+        return;
+    }
+    let Ok(size) = window.inner_size() else {
+        return;
+    };
+    if size.width == 0 || size.height == 0 {
+        return;
+    }
+    let scale = window.scale_factor().unwrap_or(1.0);
+    let width = size.width as f64 / scale;
+    let height = size.height as f64 / scale;
+    let app = window.app_handle();
+    let mut settings = get_settings(&app);
+    if settings.main_window_width == Some(width) && settings.main_window_height == Some(height) {
+        return;
+    }
+    settings.main_window_width = Some(width);
+    settings.main_window_height = Some(height);
+    crate::settings::write_settings(&app, settings);
+}
+
 #[allow(unused_variables)]
 fn should_force_show_permissions_window(app: &AppHandle) -> bool {
     #[cfg(target_os = "windows")]
@@ -178,6 +210,20 @@ fn initialize_core_logic(app_handle: &AppHandle) {
     app_handle.manage(transcription_manager.clone());
     app_handle.manage(history_manager.clone());
     app_handle.manage(local_llm_manager.clone());
+
+    // Apply history retention once, at startup. This is the ONLY place old
+    // recordings are pruned: changing the history limit / retention period
+    // just persists the value (see commands::history), so nothing is ever
+    // deleted mid-session — a changed limit takes effect on the next launch.
+    // Runs off-thread so DB/file IO can't delay window creation.
+    {
+        let history_manager = history_manager.clone();
+        std::thread::spawn(move || {
+            if let Err(e) = history_manager.cleanup_old_entries() {
+                log::error!("Startup history cleanup failed: {}", e);
+            }
+        });
+    }
 
     // Start the idle watcher that unloads the built-in LLM after it has been
     // idle for the configured timeout, freeing RAM/VRAM when it's not in use.
@@ -540,6 +586,7 @@ pub fn run(cli_args: CliArgs) {
             commands::assistant::assistant_stop,
             commands::assistant::set_assistant_max_history_messages,
             commands::assistant::set_assistant_web_search_enabled,
+            commands::assistant::set_assistant_prefer_provider_web_search,
             commands::assistant::set_assistant_web_search_provider,
             commands::assistant::set_assistant_web_search_max_results,
             commands::assistant::set_assistant_search_depth,
@@ -678,6 +725,47 @@ pub fn run(cli_args: CliArgs) {
 
             let mut settings = get_settings(&app.handle());
 
+            // Size the main window. Prefer the size the user last left it at
+            // (remembered across launches); otherwise use a default that fits
+            // the settings content — a sidebar plus the centered, width-capped
+            // content column with comfortable margins — rather than sprawling
+            // to fill the whole display (which just strands the content in a big
+            // empty frame). The chosen size is clamped to the current monitor so
+            // a size remembered from a larger screen still fits a smaller one,
+            // then centered. Logical pixels, so it behaves the same at any DPI.
+            {
+                // Content-fitting default (not display-relative).
+                const DEFAULT_W: f64 = 1000.0;
+                const DEFAULT_H: f64 = 720.0;
+                // Keep in sync with min_inner_size on the builder.
+                const MIN_W: f64 = 680.0;
+                const MIN_H: f64 = 570.0;
+
+                let mut width = settings.main_window_width.unwrap_or(DEFAULT_W);
+                let mut height = settings.main_window_height.unwrap_or(DEFAULT_H);
+
+                if let Some(monitor) = main_webview
+                    .current_monitor()
+                    .ok()
+                    .flatten()
+                    .or_else(|| main_webview.primary_monitor().ok().flatten())
+                {
+                    let scale = monitor.scale_factor();
+                    let mon_w = monitor.size().width as f64 / scale;
+                    let mon_h = monitor.size().height as f64 / scale;
+                    // Leave room for the taskbar/dock and a small margin.
+                    if mon_w > 0.0 {
+                        width = width.min(mon_w - 40.0).max(MIN_W);
+                    }
+                    if mon_h > 0.0 {
+                        height = height.min(mon_h - 100.0).max(MIN_H);
+                    }
+                }
+
+                let _ = main_webview.set_size(tauri::LogicalSize::new(width, height));
+                let _ = main_webview.center();
+            }
+
             // Match the native window (title bar) theme to the appearance
             // choice so it doesn't stay dark while the UI is light. System
             // maps to None, which lets the OS drive the title bar.
@@ -753,6 +841,8 @@ pub fn run(cli_args: CliArgs) {
         })
         .on_window_event(|window, event| match event {
             tauri::WindowEvent::CloseRequested { api, .. } => {
+                // Remember the size before hiding, so it reopens as left.
+                save_main_window_size(window);
                 api.prevent_close();
                 let _res = window.hide();
 
@@ -779,6 +869,11 @@ pub fn run(cli_args: CliArgs) {
                 utils::change_tray_icon(&window.app_handle(), utils::TrayIconState::Idle);
                 // Re-tint the title bar / taskbar mark for the new theme.
                 tray::update_window_icon(&window.app_handle());
+            }
+            tauri::WindowEvent::Focused(false) => {
+                // Backup save point: catches a resize followed by quitting via
+                // the tray (which may never fire CloseRequested).
+                save_main_window_size(window);
             }
             _ => {}
         })

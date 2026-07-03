@@ -7,7 +7,7 @@ import {
 } from "../../lib/utils/keyboard";
 import { ResetButton } from "../ui/ResetButton";
 import { SettingContainer } from "../ui/SettingContainer";
-import { TONE_PILL, type SettingIcon, type SettingTone } from "../ui/tones";
+import { type SettingIcon, type SettingTone } from "../ui/tones";
 import { useSettings } from "../../hooks/useSettings";
 import { useOsType } from "../../hooks/useOsType";
 import { commands } from "@/bindings";
@@ -288,7 +288,7 @@ export const GlobalShortcutInput: React.FC<GlobalShortcutInputProps> = ({
           </div>
         ) : (
           <div
-            className={`px-2.5 py-1 text-[13px] font-medium border rounded-md cursor-pointer transition-all ${TONE_PILL[tone]} elev-chip hover:brightness-[1.06]`}
+            className="px-2.5 py-1 text-[13px] font-medium border rounded-md cursor-pointer transition-all bg-surface-strong text-ink border-hairline-strong elev-chip hover:brightness-[1.03]"
             onClick={() => startRecording(shortcutId)}
           >
             {formatKeyCombination(binding.current_binding, osType)}

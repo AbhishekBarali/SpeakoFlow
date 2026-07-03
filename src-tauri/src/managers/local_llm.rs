@@ -34,9 +34,12 @@ use tauri::{AppHandle, Emitter, Manager};
 /// Ollama's default (11434) so a user's existing Ollama install is untouched.
 const ENGINE_PORT: u16 = 11435;
 
-/// Default context window if the user hasn't chosen one. Kept modest so memory
-/// stays reasonable on the small models this feature targets.
-pub const DEFAULT_CONTEXT_SIZE: u32 = 4096;
+/// Default context window if the user hasn't chosen one. 8192 leaves room for
+/// the system prompt, chat history, a screenshot (vision models can spend
+/// ~1k+ tokens on one image), and the reply — a 4096 window overflows on a
+/// screenshot + web-search turn. Users can raise it (16384 is a good target on
+/// machines with RAM to spare) or lower it to save memory.
+pub const DEFAULT_CONTEXT_SIZE: u32 = 8192;
 
 /// Lower bound for the user-configurable context window (tokens). Below this a
 /// model can't hold a useful prompt.

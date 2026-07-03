@@ -134,6 +134,16 @@ pub struct AssistantCharacter {
     /// duplicated; only `default` is protected from deletion.
     #[serde(default)]
     pub builtin: bool,
+    /// Optional one-line role/description shown as the card subtitle in the
+    /// persona picker (e.g. "Short, direct answers"). Purely cosmetic — it
+    /// never reaches the model.
+    #[serde(default)]
+    pub description: String,
+    /// Optional per-persona reply-length override. `None` inherits the global
+    /// `assistant_response_length`; `Some(_)` wins for this persona's turns so
+    /// a "Concise" persona can stay short while an "In-Depth" one runs long.
+    #[serde(default)]
+    pub response_length: Option<AssistantResponseLength>,
 }
 
 /// Case transform applied to the output of a text replacement rule.
@@ -785,6 +795,12 @@ pub struct AppSettings {
     /// providers, which always use the planner.
     #[serde(default)]
     pub assistant_local_search_smart: bool,
+    /// When the active assistant provider has its OWN built-in web search
+    /// (currently OpenRouter's `:online`), prefer it over the app's own search.
+    /// Providers without native search always use the app's search regardless.
+    /// Default true, so OpenRouter uses its built-in search out of the box.
+    #[serde(default = "default_assistant_prefer_provider_web_search")]
+    pub assistant_prefer_provider_web_search: bool,
     /// API keys for the keyed search providers, keyed by provider id
     /// ("serper", "brave", "tavily", "exa", "serpapi").
     #[serde(default = "default_web_search_api_keys")]
@@ -793,6 +809,15 @@ pub struct AppSettings {
     pub theme: Theme,
     #[serde(default)]
     pub ui_text_size: UiTextSize,
+    /// Remembered main-window size in logical pixels, saved when the user
+    /// resizes/closes the window and restored (clamped to the current monitor)
+    /// on the next launch. `None` until first set — the code then falls back to
+    /// a sensible content-fitting default. Only the size is remembered, not the
+    /// position, so the window can't reopen off-screen after a monitor change.
+    #[serde(default)]
+    pub main_window_width: Option<f64>,
+    #[serde(default)]
+    pub main_window_height: Option<f64>,
 }
 
 fn default_model() -> String {
@@ -877,6 +902,10 @@ fn default_app_language() -> String {
 }
 
 fn default_show_tray_icon() -> bool {
+    true
+}
+
+fn default_assistant_prefer_provider_web_search() -> bool {
     true
 }
 
@@ -1162,6 +1191,8 @@ fn default_assistant_character(system_prompt: &str) -> AssistantCharacter {
         avatar: String::new(),
         kind: AssistantCharacterKind::Llm,
         builtin: true,
+        description: "Balanced, general-purpose help".to_string(),
+        response_length: None,
     }
 }
 
@@ -1172,40 +1203,59 @@ pub fn default_assistant_characters(system_prompt: &str) -> Vec<AssistantCharact
     vec![
         default_assistant_character(system_prompt),
         AssistantCharacter {
-            id: "math_teacher".to_string(),
-            name: "Math Teacher".to_string(),
-            prompt: "You are a patient, encouraging math teacher. Explain concepts step by step in plain language, show your working, and use short worked examples instead of jargon. When it helps, check the learner's understanding with a quick question. The user is speaking to you, so expect transcription quirks and infer the intended math.".to_string(),
-            greeting: "Hi! What are we working on today?".to_string(),
+            id: "concise".to_string(),
+            name: "Concise".to_string(),
+            prompt: "You are a fast, no-nonsense assistant. Answer in as few words as the question allows — usually one or two sentences — with no preamble, no filler, and no restating the question. Get straight to the point; only expand if the user explicitly asks. The user is speaking to you, so expect transcription quirks and infer their intent.".to_string(),
+            greeting: String::new(),
             avatar: String::new(),
             kind: AssistantCharacterKind::Llm,
             builtin: true,
+            description: "Short, direct answers".to_string(),
+            response_length: Some(AssistantResponseLength::Short),
         },
         AssistantCharacter {
-            id: "short_explainer".to_string(),
-            name: "Short Explainer".to_string(),
-            prompt: "You explain things as briefly and clearly as possible. Answer in one to three short sentences, in plain language, with no preamble and no filler. If a topic truly needs more, give only the single most useful extra sentence and stop.".to_string(),
-            greeting: "Ask me anything — I'll keep it short.".to_string(),
+            id: "in_depth".to_string(),
+            name: "In-Depth".to_string(),
+            prompt: "You are a thorough, patient explainer. Break topics down step by step in plain language, define the key terms, and use short concrete examples. Anticipate the natural follow-up and answer it too. Stay well-structured but never padded — depth should always earn its place. The user is speaking to you, so expect transcription quirks and infer their intent.".to_string(),
+            greeting: String::new(),
             avatar: String::new(),
             kind: AssistantCharacterKind::Llm,
             builtin: true,
+            description: "Thorough, step-by-step explanations".to_string(),
+            response_length: Some(AssistantResponseLength::Long),
         },
         AssistantCharacter {
-            id: "karen".to_string(),
-            name: "Karen".to_string(),
-            prompt: "You are 'Karen', a comedic, over-the-top entitled-customer character. You're dramatic, you keep threatening to speak to the manager, and you're certain you're always right — but it's all in good fun: never cruel, never discriminatory, and never aimed at real people or groups. Despite the theatrics, you actually help the user with what they asked, just wrapped in melodramatic Karen flair. Keep it light and PG.".to_string(),
-            greeting: "Excuse me. I'd like to speak to the manager… but fine, I suppose you'll have to do. What do you need?".to_string(),
+            id: "coding".to_string(),
+            name: "Coding".to_string(),
+            prompt: "You are a senior software engineer. Give precise, correct, idiomatic code with brief explanations of the parts that matter. Prefer complete, runnable snippets; call out edge cases, pitfalls, and the trade-offs of your approach. Assume a capable developer and skip the basics unless asked. The user is speaking to you, so expect transcription quirks (misheard identifiers, symbols spoken as words) and infer the intended code.".to_string(),
+            greeting: String::new(),
             avatar: String::new(),
             kind: AssistantCharacterKind::Llm,
             builtin: true,
+            description: "Precise help with code".to_string(),
+            response_length: None,
         },
         AssistantCharacter {
-            id: "cat".to_string(),
-            name: "Cat".to_string(),
-            prompt: String::new(),
-            greeting: "meow?".to_string(),
+            id: "wordsmith".to_string(),
+            name: "Wordsmith".to_string(),
+            prompt: "You are a sharp writing editor. Improve clarity, flow, and tone while preserving the author's voice and meaning. When asked to rewrite, return the improved text first, then a one-line note on what you changed. Keep grammar and word choice natural, not stiff. The user is speaking to you, so expect transcription quirks and infer their intent.".to_string(),
+            greeting: String::new(),
             avatar: String::new(),
-            kind: AssistantCharacterKind::Cat,
+            kind: AssistantCharacterKind::Llm,
             builtin: true,
+            description: "Polishes and rewrites your writing".to_string(),
+            response_length: None,
+        },
+        AssistantCharacter {
+            id: "research".to_string(),
+            name: "Research".to_string(),
+            prompt: "You are a careful research assistant. Lead with the direct answer, then the key supporting points. Distinguish what is well-established from what is uncertain, and flag when a claim would benefit from a live source. Be balanced and precise rather than breezy. The user is speaking to you, so expect transcription quirks and infer their intent.".to_string(),
+            greeting: String::new(),
+            avatar: String::new(),
+            kind: AssistantCharacterKind::Llm,
+            builtin: true,
+            description: "Analytical answers, source-aware".to_string(),
+            response_length: Some(AssistantResponseLength::Medium),
         },
     ]
 }
@@ -1759,9 +1809,12 @@ pub fn get_default_settings() -> AppSettings {
         assistant_web_search_daily_credit_budget: default_assistant_web_search_daily_credit_budget(
         ),
         assistant_local_search_smart: false,
+        assistant_prefer_provider_web_search: default_assistant_prefer_provider_web_search(),
         web_search_api_keys: default_web_search_api_keys(),
         theme: Theme::System,
         ui_text_size: UiTextSize::default(),
+        main_window_width: None,
+        main_window_height: None,
     }
 }
 
@@ -1804,6 +1857,16 @@ impl AppSettings {
             }
         }
         self.assistant_system_prompt.clone()
+    }
+
+    /// The reply-length preference that applies to the current turn: the active
+    /// persona's own override when it sets one, otherwise the global
+    /// `assistant_response_length`. Feeds the directive appended to the system
+    /// prompt, so each persona can run short or long independently.
+    pub fn effective_response_length(&self) -> AssistantResponseLength {
+        self.active_character()
+            .and_then(|c| c.response_length)
+            .unwrap_or(self.assistant_response_length)
     }
 
     pub fn post_process_provider(&self, provider_id: &str) -> Option<&PostProcessProvider> {

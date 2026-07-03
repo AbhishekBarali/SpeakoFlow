@@ -8,35 +8,40 @@
 
 /*
  * Design system — quiet, neutral, native-feeling.
- * Modeled on macOS System Settings: neutral gray canvas, white cards,
- * near-black ink, one deep-teal accent, hairline rules. No decorative
- * gradients or pastels — hierarchy comes from type weight, spacing and
- * surface contrast; the teal appears only on primary actions, selection and
- * live states so it stays a signature, not chrome. The dark inversion lives
- * under :root[data-theme="dark"] further below. Inter carries the whole UI.
+ * Light mode is modeled on macOS System Settings: a soft cool-gray canvas,
+ * pure-white cards, near-black neutral ink, hairline rules, and the one
+ * signature deep-teal accent (the brand color — it lives in the logo and the
+ * "Flow" wordmark). No decorative gradients or pastels — hierarchy comes from
+ * type weight, spacing and surface contrast; the teal appears only on primary
+ * actions, selection and live states so it stays a signature, not chrome.
+ * Floating menus frost the content behind them for a light glassmorphism read.
+ * The dark inversion (warm near-black + luminous teal) lives under
+ * :root[data-theme="dark"] further below. Inter carries the whole UI.
  */
 @theme {
-  /* === Surfaces (warm cream — stepped so white cards pop off the pane) === */
-  --color-canvas: #f3ecdd; /* content pane floor (soft cream) */
-  --color-canvas-soft: #e8ddc9; /* chrome: title bar / sidebar / footer */
-  --color-surface: #fffdf8; /* cards (bright warm white — floats on the pane) */
-  --color-surface-strong: #ebe0cb; /* badges, plates, hover fills */
+  /* === Surfaces (clean cool neutrals — white cards float on a soft gray pane) === */
+  --color-canvas: #f4f5f7; /* content pane floor (soft cool gray) */
+  --color-canvas-soft: #eaecef; /* chrome: title bar / sidebar / footer */
+  --color-surface: #ffffff; /* cards (pure white — floats crisply on the pane) */
+  --color-surface-strong: #eef0f3; /* badges, plates, hover fills */
 
-  /* === Ink / text (warm near-black) === */
-  --color-ink: #2a2620; /* display + primary text */
-  --color-ink-soft: #3b352c; /* emphasis */
-  --color-body: #574f42; /* running text */
-  --color-muted: #756c5c; /* sub-titles, captions */
-  --color-muted-soft: #afa593; /* disabled, hints */
+  /* === Ink / text (neutral near-black — no warm tint) === */
+  --color-ink: #16181d; /* display + primary text */
+  --color-ink-soft: #2a2d34; /* emphasis */
+  --color-body: #444851; /* running text */
+  --color-muted: #6b7180; /* sub-titles, captions */
+  --color-muted-soft: #a3a9b5; /* disabled, hints */
 
-  /* === Hairlines (warm) === */
-  --color-hairline: #e4d9c4; /* default 1px divider */
-  --color-hairline-strong: #d2c5ac; /* stronger panel outline */
+  /* === Hairlines (neutral cool) === */
+  --color-hairline: #e6e8ec; /* default 1px divider */
+  --color-hairline-strong: #d4d8de; /* stronger panel outline */
 
-  /* === Accent (deep teal — the one color moment) ===
-   * Voice is a wave; "Flow" is the brand. A petrol teal reads calm and
-   * premium against the neutral grays, and is distinct from default-blue
-   * apps. AA on white/canvas as text (≥4.6:1); white passes on the fill. */
+  /* === Accent (signature deep teal — the one color moment) ===
+   * The brand color: it lives in the logo and the "Flow" wordmark, so the UI
+   * follows it. A petrol teal reads calm and premium against the clean
+   * white/gray surfaces and is distinct from default-blue apps. AA on white as
+   * text (~4.6:1); white passes on the fill. (Dark mode keeps its brighter
+   * luminous teal.) */
   --color-accent: #0f766e; /* primary actions, active states */
   --color-accent-strong: #0c5f58; /* hover / pressed */
 
@@ -59,10 +64,10 @@
   --color-text: var(--color-ink);
   --color-background-ui: var(--color-accent); /* primary action fill */
   --color-logo-primary: var(--color-accent); /* accent / active */
-  --color-logo-stroke: #3b352c;
+  --color-logo-stroke: #2a2d34;
   --color-text-stroke: #ffffff;
   /* neutral gray: solid it reads as a muted label, at low opacity ≈ a hairline */
-  --color-mid-gray: #8b8272;
+  --color-mid-gray: #8a8f9a;
 
   /* === Type families ===
    * One family across the app: Inter. Weight + size carry the hierarchy
@@ -79,7 +84,8 @@
 }
 
 /* Explicit light selection — hint native controls/scrollbars to light. The
- * creamy values above already apply to :root, so no token overrides needed. */
+ * clean neutral values above already apply to :root, so no token overrides
+ * needed. */
 :root[data-theme="light"] {
   color-scheme: light;
 }
@@ -250,47 +256,48 @@
 }
 
 /* ============================================================================
- * Depth — soft, warm-tinted elevation + subtle glass
+ * Depth — soft, neutral elevation + frosted glass
  * ----------------------------------------------------------------------------
- * The flat design read as "colored but lifeless". These give tactile depth:
- * cards float, tiles and pills feel like raised soft chips, floating menus
- * frost the content behind them. Shadows are tinted warm (not pure black) so
- * they sit naturally on the cream palette and stay subtle; dark mode swaps to
- * deeper, cooler shadows. Kept gentle on purpose — depth, not drop-shadow soup.
+ * White cards float above a soft gray pane; tiles and pills read as gently
+ * raised chips; floating menus frost the content behind them. Light shadows
+ * are neutral/cool (a hint of slate, never warm brown) and kept subtle so the
+ * palette stays clean and airy — depth, not drop-shadow soup. Dark mode swaps
+ * to deeper, cooler shadows below (left unchanged).
  * ==========================================================================*/
 @layer components {
   /* Grouped setting cards — clearly float above the pane (layered soft shadow
    * + a faint top highlight for the "lit from above" cue). */
   .elev-card {
     box-shadow:
-      0 1px 2px rgba(72, 58, 34, 0.07),
-      0 6px 14px -4px rgba(72, 58, 34, 0.13),
-      0 18px 34px -14px rgba(72, 58, 34, 0.18),
-      inset 0 1px 0 rgba(255, 255, 255, 0.6);
+      0 1px 2px rgba(15, 23, 42, 0.05),
+      0 6px 16px -6px rgba(15, 23, 42, 0.08),
+      0 20px 40px -20px rgba(15, 23, 42, 0.1),
+      inset 0 1px 0 rgba(255, 255, 255, 0.9);
   }
 
   /* Small controls (icon tiles, shortcut pills) — soft raised chip: top
-   * highlight + real drop shadow, the core neumorphic cue. */
+   * highlight + a light drop shadow, refined for the clean white surface. */
   .elev-chip {
     box-shadow:
-      0 2px 5px rgba(72, 58, 34, 0.2),
-      0 1px 1px rgba(72, 58, 34, 0.1),
-      inset 0 1px 0 rgba(255, 255, 255, 0.75);
+      0 1px 2px rgba(15, 23, 42, 0.06),
+      0 2px 6px -2px rgba(15, 23, 42, 0.1),
+      inset 0 1px 0 rgba(255, 255, 255, 0.9);
   }
 
   /* The content pane, lifted off the chrome toward the sidebar. */
   .elev-pane {
     box-shadow:
-      -2px 0 14px -6px rgba(72, 58, 34, 0.12),
-      -10px 0 44px -22px rgba(72, 58, 34, 0.22);
+      -2px 0 14px -6px rgba(15, 23, 42, 0.05),
+      -10px 0 44px -22px rgba(15, 23, 42, 0.08);
   }
 
   /* Frosted glass for floating menus / popovers (they overlay real content,
-   * so the blur is genuinely visible). */
+   * so the blur is genuinely visible). Translucent white + a strong blur gives
+   * the minimalistic glassmorphism read. */
   .glass-menu {
-    background-color: color-mix(in srgb, var(--color-surface) 82%, transparent);
-    backdrop-filter: saturate(160%) blur(20px);
-    -webkit-backdrop-filter: saturate(160%) blur(20px);
+    background-color: color-mix(in srgb, var(--color-surface) 72%, transparent);
+    backdrop-filter: saturate(180%) blur(24px);
+    -webkit-backdrop-filter: saturate(180%) blur(24px);
   }
 }
 

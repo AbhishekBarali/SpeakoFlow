@@ -32,7 +32,11 @@ import {
   VolumeX,
   X,
 } from "lucide-react";
-import { commands, type AppSettings, type AssistantCharacter } from "@/bindings";
+import {
+  commands,
+  type AppSettings,
+  type AssistantCharacter,
+} from "@/bindings";
 import { syncLanguageFromSettings } from "@/i18n";
 import { AudioWaveform } from "@/components/shared";
 import { FONT_SIZES, errorKind, type AssistantError } from "./appearance";
@@ -129,8 +133,14 @@ async function downscaleToDataUrl(blob: Blob): Promise<string> {
   return canvas.toDataURL("image/jpeg", 0.8);
 }
 
-/** How long transient errors/notices linger on the pill before self-clearing. */
-const TRANSIENT_MS = 8000;
+/** How long a transient error / notice lingers on the pill before self-clearing. */
+const TRANSIENT_MS = 5000;
+
+/** How long a blocking error (needs a settings/permission fix) lingers before
+ *  self-clearing. Longer than a transient hiccup so there's time to read the
+ *  fix, but it STILL clears — an always-on-top pill must never get permanently
+ *  stuck showing a stale error. */
+const BLOCKING_MS = 7000;
 
 /** How long the collapsed pill sits idle (at rest, no hover) before it dims to
  *  a quiet, thin sliver so it stays out of the user's way. Any activity or a
@@ -303,6 +313,10 @@ const AssistantPanel: React.FC = () => {
   const [dropActive, setDropActive] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
   const sendingRef = useRef(false);
+  // Remembers the last pipeline state so we can tell a brand-new turn (idle →
+  // active) from a mid-turn transition — used to clear a stale notice only at
+  // the start of the next turn, never mid-turn.
+  const prevStateRef = useRef<AssistantState>("idle");
   // Tracks whether audio actually began during the current "speaking" phase,
   // so we can detect when playback *ends* and hand the UI back to idle.
   const spokeRef = useRef(false);
@@ -321,7 +335,8 @@ const AssistantPanel: React.FC = () => {
   const screenshotEnabled = settings?.assistant_screenshot_enabled ?? true;
   const webSearchEnabled = settings?.assistant_web_search_enabled ?? false;
   const characters = settings?.assistant_characters ?? [];
-  const activeCharacterId = settings?.assistant_active_character_id ?? "default";
+  const activeCharacterId =
+    settings?.assistant_active_character_id ?? "default";
   const activeCharacter =
     characters.find((c) => c.id === activeCharacterId) ?? characters[0] ?? null;
   const tts = useKokoroTts(ttsEnabled, ttsVoice, ttsDtype, ttsSpeed);
@@ -429,20 +444,30 @@ const AssistantPanel: React.FC = () => {
 
       track(
         await listen<{ state: AssistantState }>("assistant-state", (e) => {
-          setState(e.payload.state);
-          if (e.payload.state !== "listening") {
+          const next = e.payload.state;
+          // A brand-new turn (idle → active) clears any lingering notice from
+          // the previous turn. Mid-turn transitions (e.g. searching → thinking)
+          // must NOT clear it, or the "no web results" heads-up would vanish
+          // before it's seen. Otherwise the transient timer clears it.
+          if (prevStateRef.current === "idle" && next !== "idle") {
+            setNotice(null);
+          }
+          prevStateRef.current = next;
+          setState(next);
+          if (next !== "listening") {
             setLocked(false);
           }
-          if (e.payload.state !== "idle") {
+          if (next !== "idle") {
             setError(null);
             // A new turn is active — allow its eventual spoken reply through,
             // clearing any suppression left by a previous Stop.
             suppressTtsRef.current = false;
           }
-          // The turn finished — drop the per-turn indicators.
-          if (e.payload.state === "idle") {
+          // The turn finished — drop the per-turn indicators. The notice is
+          // intentionally kept so it can surface on the collapsed pill after
+          // the turn ends (it self-clears via the transient timer).
+          if (next === "idle") {
             setVisionActive(false);
-            setNotice(null);
           }
         }),
       );
@@ -571,11 +596,15 @@ const AssistantPanel: React.FC = () => {
     };
   }, [refreshSettings]);
 
-  // Transient errors/notices self-clear so the pill can't get stuck showing a
-  // stale hiccup; blocking errors persist until dismissed or fixed.
+  // Every error self-clears so the always-on-top pill can never get stuck
+  // showing a stale error forever (the bug where e.g. "Model can't see images"
+  // lingered indefinitely). Blocking errors — which carry a fix — linger a bit
+  // longer than transient hiccups; both can still be dismissed early with the ×
+  // or resolved in settings.
   useEffect(() => {
-    if (!error || errorKind(error) !== "transient") return;
-    const timer = window.setTimeout(() => setError(null), TRANSIENT_MS);
+    if (!error) return;
+    const ms = errorKind(error) === "blocking" ? BLOCKING_MS : TRANSIENT_MS;
+    const timer = window.setTimeout(() => setError(null), ms);
     return () => window.clearTimeout(timer);
   }, [error]);
 
@@ -585,19 +614,37 @@ const AssistantPanel: React.FC = () => {
     return () => window.clearTimeout(timer);
   }, [notice]);
 
-  // Surface a local Kokoro load/playback failure (§4: TTS errors are not
-  // silent). Only once per failure — the hook stays in "error" until retried.
-  // A voice failure also ends the "speaking" phase so the pill can't hang.
+  // Surface a local Kokoro failure (§4: TTS errors are not silent), mapping the
+  // hook's reason to a precise, actionable message. Only once per failure — the
+  // hook keeps the error set until it's retried or cleared. A failure also ends
+  // the "speaking" phase so the pill can't hang.
   useEffect(() => {
-    if (tts.status === "error" && !kokoroErrorRef.current) {
+    const err = tts.error;
+    if (err && !kokoroErrorRef.current) {
       kokoroErrorRef.current = true;
-      setError({ code: "tts_local", detail: "" });
+      const code =
+        err.reason === "blocked"
+          ? "tts_blocked"
+          : err.reason === "playback"
+            ? "tts_playback"
+            : "tts_local"; // load / synthesis
+      setError({ code, detail: "" });
       setState((s) => (s === "speaking" ? "idle" : s));
     }
-    if (tts.status !== "error") {
+    if (!err) {
       kokoroErrorRef.current = false;
     }
-  }, [tts.status]);
+  }, [tts.error]);
+
+  // When local voice audio was blocked from auto-playing, the very next click in
+  // the panel is exactly the user gesture the system was waiting for — replay
+  // the held clip on it, so "tap the panel to hear it" just works.
+  useEffect(() => {
+    if (tts.error?.reason !== "blocked") return;
+    const onGesture = () => tts.retry();
+    window.addEventListener("pointerdown", onGesture, { once: true });
+    return () => window.removeEventListener("pointerdown", onGesture);
+  }, [tts.error, tts.retry]);
 
   const busy = state !== "idle";
   const isListening = state === "listening";
@@ -947,6 +994,9 @@ const AssistantPanel: React.FC = () => {
       state === "thinking" || state === "transcribing" || isVoicePreparing;
     const showError = !!error && !busy;
     const pillBusy = showStop && !showError;
+    // A quiet post-turn heads-up (e.g. web search found nothing), shown only at
+    // rest so it never competes with the working waveform. Self-clears.
+    const showNotice = !!notice && !showStop && !showError;
 
     const pillStatus = showError
       ? errorShort(error)
@@ -1097,15 +1147,37 @@ const AssistantPanel: React.FC = () => {
               >
                 <Mic size={13} strokeWidth={2.25} />
               </button>
-              <div className="apill-wave rest" data-tauri-drag-region>
-                <AudioWaveform
-                  levels={[]}
-                  size="sm"
-                  barCount={8}
-                  mode="reactive"
-                  active={false}
-                />
-              </div>
+              {showNotice ? (
+                <span
+                  className="apill-notice"
+                  role="status"
+                  data-tauri-drag-region
+                  title={t(`assistant.notices.${notice}`, {
+                    defaultValue: t("assistant.notices.web_search_failed"),
+                  })}
+                >
+                  <Globe
+                    size={11}
+                    strokeWidth={2}
+                    className="apill-notice-icon"
+                  />
+                  <span className="apill-notice-text">
+                    {t("assistant.notices.web_search_failedShort", {
+                      defaultValue: t("assistant.notices.web_search_failed"),
+                    })}
+                  </span>
+                </span>
+              ) : (
+                <div className="apill-wave rest" data-tauri-drag-region>
+                  <AudioWaveform
+                    levels={[]}
+                    size="sm"
+                    barCount={8}
+                    mode="reactive"
+                    active={false}
+                  />
+                </div>
+              )}
               <div className="apill-reveal">
                 <button
                   className="apill-btn"

@@ -2,6 +2,18 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 export type TtsStatus = "off" | "loading" | "ready" | "speaking" | "error";
 
+/** Why local (Kokoro) speech failed, so the panel can show a precise, useful
+ *  message instead of going silent:
+ *  - `load`      — the model couldn't download / initialize.
+ *  - `synthesis` — the model loaded but couldn't turn text into audio.
+ *  - `blocked`   — the system blocked auto-play (needs a user gesture); the
+ *                  clip is kept queued so a later click can replay it.
+ *  - `playback`  — the audio element failed to play (output device issue). */
+export type KokoroErrorReason = "load" | "synthesis" | "blocked" | "playback";
+export interface KokoroError {
+  reason: KokoroErrorReason;
+}
+
 /** Minimal surface of the kokoro-js model we use (erases its strict voice
  *  union type so the voice id can come from settings). */
 interface KokoroModel {
@@ -50,6 +62,9 @@ export function useKokoroTts(
   const [status, setStatus] = useState<TtsStatus>("off");
   /** Model download progress 0-100 while status === "loading". */
   const [progress, setProgress] = useState(0);
+  /** Last failure reason, or null when healthy. Surfaced to the panel so a
+   *  failure is explained rather than silent. */
+  const [error, setError] = useState<KokoroError | null>(null);
 
   // Playback queue state (refs: updated from async generators)
   const queueRef = useRef<Blob[]>([]);
@@ -115,6 +130,7 @@ export function useKokoroTts(
       })().catch((e: unknown) => {
         loadingRef.current = null;
         setStatus("error");
+        setError({ reason: "load" });
         throw e;
       });
     }
@@ -126,6 +142,7 @@ export function useKokoroTts(
     if (enabled) {
       ensureLoaded().catch(() => {});
     } else {
+      setError(null);
       setStatus((s) => (s === "speaking" || s === "ready" ? "off" : s));
     }
   }, [enabled, ensureLoaded]);
@@ -138,6 +155,7 @@ export function useKokoroTts(
       el.pause();
       playingRef.current = null;
     }
+    setError(null);
     setStatus((s) => (s === "speaking" ? "ready" : s));
   }, []);
 
@@ -173,18 +191,64 @@ export function useKokoroTts(
     el.playbackRate = Math.min(4, Math.max(0.25, speedRef.current || 1));
     el.preservesPitch = true;
     playingRef.current = el;
-    const done = () => {
+
+    // Guard against double-advancing if both the promise and an element event
+    // fire for the same clip.
+    let settled = false;
+    const advance = () => {
+      if (settled) return;
+      settled = true;
       URL.revokeObjectURL(url);
       pump(generation);
     };
-    el.onended = done;
-    el.onerror = done;
-    void el.play().catch(done);
+    el.onended = advance;
+    el.onerror = advance;
+
+    void el.play().catch((err: unknown) => {
+      if (settled) return;
+      // Superseded by a newer generation (Stop / new reply): just clean up.
+      if (generation !== generationRef.current) {
+        settled = true;
+        URL.revokeObjectURL(url);
+        return;
+      }
+      const blocked =
+        !!err &&
+        typeof err === "object" &&
+        (err as { name?: string }).name === "NotAllowedError";
+      if (blocked) {
+        // The OS/WebView blocked auto-play because there was no recent user
+        // gesture in this window. Keep the clip queued so a later click can
+        // replay it, and surface WHY it went quiet instead of failing silently.
+        settled = true;
+        URL.revokeObjectURL(url);
+        queueRef.current.unshift(next);
+        playingRef.current = null;
+        setError({ reason: "blocked" });
+        setStatus((s) => (s === "speaking" ? "ready" : s));
+        return;
+      }
+      // Any other playback failure (bad output device, decode error): report it,
+      // then move on so one bad clip can't wedge the whole queue.
+      setError({ reason: "playback" });
+      advance();
+    });
   }, []);
+
+  /** Replay whatever is still queued — used after a `blocked` failure, once a
+   *  user gesture has unlocked audio in this window. */
+  const retry = useCallback(() => {
+    setError(null);
+    if (queueRef.current.length > 0) {
+      setStatus("speaking");
+      pump(generationRef.current);
+    }
+  }, [pump]);
 
   const speak = useCallback(
     async (text: string, force = false) => {
       if ((!enabled && !force) || !text.trim()) return;
+      setError(null);
       try {
         const model = await ensureLoaded();
         stop();
@@ -210,11 +274,14 @@ export function useKokoroTts(
         }
       } catch (e) {
         console.error("Kokoro TTS failed:", e);
+        // A load failure already set reason "load"; only mark synthesis when the
+        // model was loaded but generating audio threw.
+        setError((prev) => prev ?? { reason: "synthesis" });
         setStatus("error");
       }
     },
     [enabled, voice, ensureLoaded, stop, pump],
   );
 
-  return { status, progress, speak, stop };
+  return { status, progress, error, speak, stop, retry };
 }

@@ -124,14 +124,27 @@ pub async fn speak_remote_epoch(app: &AppHandle, settings: &AppSettings, text: S
             // even though the turn itself is already idle.
             use tauri::Emitter;
             let _ = app.emit("assistant-tts-playing", true);
-            // rodio playback blocks; run it off the async runtime.
-            let _ = tauri::async_runtime::spawn_blocking(move || {
-                if let Err(e) = play_audio_bytes(audio_bytes, device, volume, epoch) {
-                    error!("TTS playback failed: {}", e);
-                }
+            // rodio playback blocks; run it off the async runtime. Map the
+            // error to a String so it can cross the spawn_blocking boundary
+            // (the boxed error isn't Send).
+            let play_result = tauri::async_runtime::spawn_blocking(move || {
+                play_audio_bytes(audio_bytes, device, volume, epoch).map_err(|e| e.to_string())
             })
             .await;
             let _ = app.emit("assistant-tts-playing", false);
+            // Surface a real playback failure (bad/removed output device, decode
+            // error) instead of failing silently — but stay quiet when the clip
+            // was simply superseded by a Stop (which returns Ok, not Err).
+            if let Ok(Err(e)) = play_result {
+                error!("TTS playback failed: {}", e);
+                if current_epoch() == epoch {
+                    crate::assistant::emit_error(
+                        app,
+                        "tts",
+                        format!("Couldn't play the voice on your output device: {}", e),
+                    );
+                }
+            }
         }
         Err(e) => {
             error!("TTS request failed: {}", e);

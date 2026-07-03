@@ -93,10 +93,13 @@ const selectStyles: StylesConfig<SelectOption, false> = {
     zIndex: 30,
     borderRadius: 12,
     overflow: "hidden",
-    backgroundColor: surfaceBg,
+    backgroundColor:
+      "color-mix(in srgb, var(--color-surface) 78%, transparent)",
+    backdropFilter: "saturate(180%) blur(24px)",
+    WebkitBackdropFilter: "saturate(180%) blur(24px)",
     color: "var(--color-text)",
     border: "1px solid var(--color-hairline)",
-    boxShadow: "0 10px 30px rgba(0, 0, 0, 0.12)",
+    boxShadow: "0 12px 32px rgba(15, 23, 42, 0.14)",
   }),
   option: (base, state) => ({
     ...base,

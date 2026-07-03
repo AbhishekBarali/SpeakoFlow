@@ -302,7 +302,10 @@ impl HistoryManager {
 
         debug!("Saved history entry with id {}", entry.id);
 
-        self.cleanup_old_entries()?;
+        // Retention cleanup is intentionally NOT run here. History is only
+        // pruned once, at app startup (see `initialize_core_logic` in lib.rs),
+        // so recordings never disappear while the user is actively using the
+        // app or editing the limit — changes take effect on the next restart.
 
         // Emit typed event for real-time frontend updates
         if let Err(e) = (HistoryUpdatePayload::Added {

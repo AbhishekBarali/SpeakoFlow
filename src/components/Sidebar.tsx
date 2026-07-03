@@ -139,19 +139,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
               type="button"
               aria-current={isActive ? "page" : undefined}
               title={t(section.labelKey)}
-              className={`flex gap-2.5 items-center h-[34px] w-full rounded-lg cursor-pointer transition-colors duration-150 text-start ${
+              className={`group flex gap-2.5 items-center h-[34px] w-full rounded-lg cursor-pointer transition-colors duration-150 text-start ${
                 collapsed ? "justify-center px-0" : "px-2.5"
               } ${
                 isActive
-                  ? "bg-accent/10 text-accent font-medium"
-                  : "text-body font-normal hover:text-ink hover:bg-ink/4"
+                  ? "bg-accent/12 text-accent font-medium"
+                  : "text-body font-normal hover:text-ink hover:bg-ink/6"
               }`}
               onClick={() => onSectionChange(section.id)}
             >
               <Icon
                 width={16}
                 height={16}
-                className={`shrink-0 ${isActive ? "opacity-100" : "opacity-70"}`}
+                className={`shrink-0 transition-opacity ${
+                  isActive
+                    ? "opacity-100"
+                    : "opacity-70 group-hover:opacity-100"
+                }`}
               />
               {!collapsed && (
                 <span className="text-[13px] truncate">

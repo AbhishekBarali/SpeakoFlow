@@ -26,7 +26,7 @@
     "advanced": "Advanced",
     "postProcessing": "Post Process",
     "assistant": "Assistant",
-    "characters": "Characters",
+    "characters": "Personas",
     "history": "History",
     "debug": "Debug",
     "about": "About",
@@ -584,19 +584,20 @@
         "description": "Sensitivity for custom word corrections"
       },
       "historyLimit": {
-        "title": "History Limit",
-        "description": "",
-        "entries": "entries"
+        "title": "History limit",
+        "description": "The maximum number of recordings to keep. Applied the next time you start the app.",
+        "entries": "recordings"
       },
       "recordingRetention": {
-        "title": "Auto-Delete Recordings",
-        "description": "",
+        "title": "Auto-delete recordings",
+        "description": "How old recordings are cleaned up. Changes take effect the next time you start the app.",
         "never": "Never",
-        "preserveLimit": "Keep latest {{count}}",
+        "preserveLimit": "Keep a set number",
         "days3": "After 3 days",
         "weeks2": "After 2 weeks",
         "months3": "After 3 months",
-        "placeholder": "Select retention period..."
+        "placeholder": "Select retention period...",
+        "savedToast": "Saved — takes effect the next time you start the app."
       },
       "alwaysOnMicrophone": {
         "label": "Always-On Microphone",
@@ -721,7 +722,7 @@
         "builtinReady": "Runs fully on your device. No API key, no setup.",
         "builtinEngineMissing": "First use downloads a small local engine automatically (one time), then runs fully offline. No setup needed.",
         "contextSizeLabel": "Context window",
-        "contextSizeDescription": "Tokens the local model keeps in context. Larger remembers more but uses more memory. Default 4096.",
+        "contextSizeDescription": "Tokens the local model keeps in context — it must hold the system prompt, chat history, any screenshot (vision models can spend 1,000+ tokens on a single image), and the reply. Larger fits more and is needed for reliable screen vision + web search, but uses more memory. Default 8192; 16384 is recommended if your machine has the RAM to spare. You can lower it later to save memory.",
         "unloadTimeoutLabel": "Unload from memory after",
         "unloadTimeoutDescription": "Free up RAM/VRAM by unloading the local model after it has been idle this long. It reloads automatically on next use."
       },
@@ -731,31 +732,43 @@
         "description": "Sets the assistant's behavior."
       },
       "characters": {
-        "title": "Characters",
-        "description": "Personas you can talk to. The active character sets the assistant's name and personality, and its prompt replaces the plain system prompt. Switch anytime from the panel header.",
-        "galleryLabel": "Your characters",
-        "editSection": "Edit character",
+        "title": "Personas",
+        "description": "Task-focused profiles you can switch between. The active persona sets the assistant's name, role, and instructions — and how long its replies run. Switch anytime from the panel header.",
+        "galleryLabel": "Your personas",
+        "editSection": "Edit persona",
         "avatarLabel": "Avatar",
         "active": "Active",
         "meowsOnly": "Meows only",
         "builtin": "Built-in",
         "custom": "Custom",
         "new": "New",
-        "newName": "New character",
+        "newName": "New persona",
         "copyName": "{{name}} copy",
         "createAi": "Create with AI",
         "import": "Import",
-        "aiTitle": "Describe your character",
+        "aiTitle": "Describe your persona",
         "aiClose": "Close",
-        "aiPlaceholder": "e.g. a patient chess coach who explains every move, or a cheerful barista who loves puns",
+        "aiPlaceholder": "e.g. a concise release-notes writer, or a patient tutor who explains every step",
         "aiDictate": "Dictate the description",
         "aiDictateStop": "Stop dictation",
         "generate": "Generate",
         "avatarUpload": "Upload image",
         "avatarRemove": "Remove",
         "nameLabel": "Name",
-        "promptLabel": "Personality (system prompt)",
-        "greetingLabel": "Greeting",
+        "roleLabel": "Role",
+        "rolePlaceholder": "Short description shown on the card (optional)",
+        "promptLabel": "Instructions (system prompt)",
+        "responseLength": {
+          "label": "Response length",
+          "hint": "How long this persona's replies run. \"Inherit\" follows your global Assistant setting.",
+          "options": {
+            "inherit": "Inherit global",
+            "short": "Short",
+            "medium": "Medium",
+            "long": "Long"
+          }
+        },
+        "greetingLabel": "Greeting (optional)",
         "greetingPlaceholder": "Optional opening line shown in an empty chat",
         "catNote": "The Cat ignores the AI entirely — it just meows. Nothing to configure here.",
         "duplicate": "Duplicate",
@@ -788,6 +801,8 @@
         "title": "Web Search",
         "enableLabel": "Allow web search",
         "enableDescription": "Let the assistant search the web when a question needs current information.",
+        "openRouterNativeLabel": "Use OpenRouter's built-in search",
+        "openRouterNativeDescription": "When on, OpenRouter runs the search itself (its :online mode) using your OpenRouter credits. When off, the app searches with your search provider below.",
         "providerLabel": "Search provider",
         "providerDescription": "Serper is a good default. Every provider has a free tier.",
         "providers": {
@@ -983,7 +998,7 @@
   "assistant": {
     "title": "Assistant",
     "character": {
-      "switch": "Switch character"
+      "switch": "Switch persona"
     },
     "empty": "Ask by voice with your assistant shortcut,\nor type below.",
     "inputPlaceholder": "Message…",
@@ -1065,6 +1080,10 @@
       "ttsShort": "Voice reply failed",
       "tts_local": "The local voice couldn't load. Check your connection or switch TTS engines in Settings.",
       "tts_localShort": "Voice couldn't load",
+      "tts_blocked": "Your system blocked the voice from playing on its own. Click anywhere in the panel to hear the reply.",
+      "tts_blockedShort": "Tap the panel to hear it",
+      "tts_playback": "Couldn't play the voice on your output device. Check your speaker/output settings, then try again.",
+      "tts_playbackShort": "Voice playback failed",
       "mic_denied": "Microphone access is blocked. Allow it in your system privacy settings.",
       "mic_deniedShort": "Mic access blocked",
       "mic_unavailable": "No microphone was found. Connect one and try again.",
@@ -1075,7 +1094,8 @@
       "file_readShort": "Couldn't attach file"
     },
     "notices": {
-      "web_search_failed": "Web search didn't return results — answering without them."
+      "web_search_failed": "Web search didn't return results — answering without them.",
+      "web_search_failedShort": "No web results"
     }
   }
 }

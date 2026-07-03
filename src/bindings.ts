@@ -551,11 +551,13 @@ async commitRecording() : Promise<void> {
 },
 /**
  * Start/stop a plain dictation recording programmatically, for in-app
- * "dictate into this field" mic buttons (e.g. the Create-with-AI character
+ * "dictate into this field" mic buttons (e.g. the Create-with-AI persona
  * description box). Hands-free toggle like the assistant pill mic: the first
- * call starts recording, the second stops it — the transcript is then pasted
- * into whatever field currently has keyboard focus, exactly like the global
- * dictation shortcut. No-op if the coordinator isn't ready yet.
+ * call starts recording, the second stops it. Because this recording uses the
+ * `"in-app"` source, its transcript is delivered to the webview via the
+ * `dictation-transcript` event (the field listens for it) instead of being
+ * pasted into the focused OS window — reliable and clipboard-free. No-op if the
+ * coordinator isn't ready yet.
  */
 async toggleDictation() : Promise<Result<null, string>> {
     try {
@@ -1593,6 +1595,19 @@ async setAssistantWebSearchEnabled(enabled: boolean) : Promise<Result<null, stri
 }
 },
 /**
+ * Prefer the provider's OWN built-in web search (currently OpenRouter's
+ * `:online`) over the app's search. Providers without native search always use
+ * the app's search regardless of this flag.
+ */
+async setAssistantPreferProviderWebSearch(enabled: boolean) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_assistant_prefer_provider_web_search", { enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * Choose the search backend: "serper" (default), "brave", "tavily", "exa", or
  * "serpapi". All are snippet-only and use a single API key.
  */
@@ -1862,10 +1877,25 @@ assistant_web_search_daily_credit_budget?: number;
  */
 assistant_local_search_smart?: boolean; 
 /**
+ * When the active assistant provider has its OWN built-in web search
+ * (currently OpenRouter's `:online`), prefer it over the app's own search.
+ * Providers without native search always use the app's search regardless.
+ * Default true, so OpenRouter uses its built-in search out of the box.
+ */
+assistant_prefer_provider_web_search?: boolean; 
+/**
  * API keys for the keyed search providers, keyed by provider id
  * ("serper", "brave", "tavily", "exa", "serpapi").
  */
-web_search_api_keys?: SecretMap; theme?: Theme; ui_text_size?: UiTextSize }
+web_search_api_keys?: SecretMap; theme?: Theme; ui_text_size?: UiTextSize; 
+/**
+ * Remembered main-window size in logical pixels, saved when the user
+ * resizes/closes the window and restored (clamped to the current monitor)
+ * on the next launch. `None` until first set — the code then falls back to
+ * a sensible content-fitting default. Only the size is remembered, not the
+ * position, so the window can't reopen off-screen after a monitor change.
+ */
+main_window_width?: number | null; main_window_height?: number | null }
 /**
  * A selectable assistant persona ("character"). The active character's
  * `prompt` overrides the plain `assistant_system_prompt` for LLM turns; its
@@ -1903,7 +1933,19 @@ kind?: AssistantCharacterKind;
  * True for characters shipped with the app. Built-ins may be edited or
  * duplicated; only `default` is protected from deletion.
  */
-builtin?: boolean }
+builtin?: boolean; 
+/**
+ * Optional one-line role/description shown as the card subtitle in the
+ * persona picker (e.g. "Short, direct answers"). Purely cosmetic — it
+ * never reaches the model.
+ */
+description?: string; 
+/**
+ * Optional per-persona reply-length override. `None` inherits the global
+ * `assistant_response_length`; `Some(_)` wins for this persona's turns so
+ * a "Concise" persona can stay short while an "In-Depth" one runs long.
+ */
+response_length?: AssistantResponseLength | null }
 /**
  * What powers a character's replies. Most characters are `Llm` (their `prompt`
  * becomes the system prompt). `Cat` is a joke character that ignores the LLM

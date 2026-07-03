@@ -36,6 +36,7 @@ SpeakoFlow started as a fork of the excellent [Handy](https://github.com/cjpais/
   - **Brave** — Brave's own independent index
   - **Tavily** — search tuned for AI assistants, returns a short synthesized answer too
   - **Exa** — neural/semantic search
+- If your assistant provider is **OpenRouter**, you can instead let it run the search itself (its `:online` mode, billed to your OpenRouter credits) rather than plugging in a separate search key — toggle "Use OpenRouter's built-in search" in the same settings page
 - Built for speed and small prompts: only short snippets come back (never full pages), a quick local heuristic skips searches for chit-chat or coding, and a slow search degrades gracefully instead of stalling the answer
 
 ### 🔊 Spoken answers (TTS)
@@ -49,11 +50,13 @@ SpeakoFlow started as a fork of the excellent [Handy](https://github.com/cjpais/
   - **ElevenLabs** — bring your API key and voice ID
   - **Azure AI Speech** — neural voices (e.g. `en-US-JennyNeural`) via your Speech resource key
 
-### 🎭 Characters (personas)
+### 🎭 Personas
 
-- Give the assistant a personality: pick an active character from a gallery, and its persona prompt takes over the assistant's replies
-- Edit the name, avatar, persona prompt, and greeting — or describe a character in a sentence and let the LLM write it for you (dictate the description by voice, right in the app)
-- Duplicate, import/export as JSON to share, or delete — plus a built-in **Cat** that just meows, no model required
+- Switch the assistant between task-focused profiles: each persona sets the assistant's name, role, instructions, and how long its replies run
+- Ships with ready-made built-ins — **Concise**, **In-Depth**, **Coding**, **Wordsmith**, and **Research** — alongside the default general-purpose assistant
+- Each persona carries a one-line **role** (shown on its card) and an optional **response length** (Short / Medium / Long, or inherit your global Assistant setting), so a "Concise" persona stays terse while an "In-Depth" one runs long — independent of the others
+- Edit the name, avatar, instructions, and greeting — or describe a persona in a sentence and let the LLM write it for you (dictate the description by voice, right in the app)
+- Duplicate, import/export as JSON to share, or delete — and switch the active persona anytime from the panel header
 
 ### 🎨 Make it yours
 
@@ -63,18 +66,18 @@ SpeakoFlow started as a fork of the excellent [Handy](https://github.com/cjpais/
 
 ## What's different from Handy?
 
-|                                          | Handy | SpeakoFlow                                                      |
-| ---------------------------------------- | ----- | --------------------------------------------------------------- |
-| Local dictation                          | ✅    | ✅ (unchanged core)                                             |
-| AI assistant chat panel                  | —     | ✅ floating glass panel, streaming                              |
-| Screen vision (screenshots to the model) | —     | ✅ hotkey, voice intent, or camera button                       |
-| Web search                               | —     | ✅ Serper / SerpAPI / Brave / Tavily / Exa (bring your own key) |
-| Spoken answers (TTS)                     | —     | ✅ Kokoro local / OpenAI-compatible / ElevenLabs / Azure        |
-| Assistant characters (personas)          | —     | ✅ persona gallery, LLM-generated, import/export                |
-| Hands-free dictation toggle              | —     | ✅ dedicated F9 binding                                         |
-| Built-in offline LLM (llama.cpp)         | —     | ✅ runs a downloaded model, no server                           |
-| Local LLM preset (Ollama / LM Studio)    | —     | ✅                                                              |
-| Panel customization + pill mode          | —     | ✅                                                              |
+|                                          | Handy | SpeakoFlow                                                           |
+| ---------------------------------------- | ----- | -------------------------------------------------------------------- |
+| Local dictation                          | ✅    | ✅ (unchanged core)                                                  |
+| AI assistant chat panel                  | —     | ✅ floating glass panel, streaming                                   |
+| Screen vision (screenshots to the model) | —     | ✅ hotkey, voice intent, or camera button                            |
+| Web search                               | —     | ✅ Serper / SerpAPI / Brave / Tavily / Exa (bring your own key)      |
+| Spoken answers (TTS)                     | —     | ✅ Kokoro local / OpenAI-compatible / ElevenLabs / Azure             |
+| Assistant personas (task profiles)       | —     | ✅ persona gallery, per-persona length, LLM-generated, import/export |
+| Hands-free dictation toggle              | —     | ✅ dedicated F9 binding                                              |
+| Built-in offline LLM (llama.cpp)         | —     | ✅ runs a downloaded model, no server                                |
+| Local LLM preset (Ollama / LM Studio)    | —     | ✅                                                                   |
+| Panel customization + pill mode          | —     | ✅                                                                   |
 
 Everything is wired through the same provider system, so one API key works for assistant answers, dictation post-processing, and remote TTS.
 

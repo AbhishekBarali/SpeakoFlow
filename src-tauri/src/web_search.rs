@@ -419,6 +419,34 @@ pub async fn search(settings: &AppSettings, query: &str) -> Result<Vec<SearchRes
     Ok(cands.into_iter().take(5).map(candidate_to_result).collect())
 }
 
+/// Run a single web search requested by the model's `web_search` tool call.
+/// Reuses the full plan pipeline (parallel snippet search + local rerank) with
+/// a one-query plan built from the tool arguments, so tool-calling turns get
+/// the same retrieval quality as the planner path. Never errors: a failure
+/// returns an empty list so the model can answer without web context.
+pub async fn run_tool_search(
+    settings: &AppSettings,
+    query: &str,
+    freshness: Option<&str>,
+    news: bool,
+) -> Vec<SearchResult> {
+    let query = query.trim();
+    if query.is_empty() {
+        return Vec::new();
+    }
+    let freshness = match freshness.map(|f| f.trim().to_ascii_lowercase()) {
+        Some(ref f) if matches!(f.as_str(), "day" | "week" | "month" | "year") => f.clone(),
+        _ => "none".to_string(),
+    };
+    let plan = SearchPlan {
+        needs_search: true,
+        queries: vec![truncate_chars(query, 480)],
+        freshness,
+        news,
+    };
+    search_with_plan(settings, &plan).await
+}
+
 /// Execute a full search plan: snippet-search every query in parallel, then
 /// merge + rerank locally and hand the top sources to the model. Per-query
 /// errors are swallowed (logged) so one bad query never sinks the whole turn.

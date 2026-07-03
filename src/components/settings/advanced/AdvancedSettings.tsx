@@ -62,11 +62,13 @@ export const AdvancedSettings: React.FC = () => {
       </SettingsGroup>
 
       <SettingsGroup title={t("settings.advanced.groups.history")}>
-        <HistoryLimit descriptionMode="tooltip" grouped={true} />
         <RecordingRetentionPeriodSelector
           descriptionMode="tooltip"
           grouped={true}
         />
+        {getSetting("recording_retention_period") === "preserve_limit" && (
+          <HistoryLimit descriptionMode="tooltip" grouped={true} />
+        )}
       </SettingsGroup>
 
       {experimentalEnabled && (

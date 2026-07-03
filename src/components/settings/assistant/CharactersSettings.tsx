@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { open, save } from "@tauri-apps/plugin-dialog";
+import { listen } from "@tauri-apps/api/event";
 import {
   Copy,
   Download,
@@ -14,10 +15,15 @@ import {
   Wand2,
   X,
 } from "lucide-react";
-import { commands, type AssistantCharacter } from "@/bindings";
+import {
+  commands,
+  type AssistantCharacter,
+  type AssistantResponseLength,
+} from "@/bindings";
 import { Button } from "@/components/ui/Button";
 import { Input } from "../../ui/Input";
 import { Textarea } from "@/components/ui";
+import { Dropdown } from "../../ui/Dropdown";
 import { useSettings } from "../../../hooks/useSettings";
 
 /** A stable-ish unique id for a new/imported/duplicated character. The backend
@@ -29,35 +35,39 @@ const IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "gif", "webp", "bmp"];
 
 /** Round avatar: the uploaded image, a cat emoji for the Cat, or the name's
  *  first initial as a fallback. */
-const Avatar: React.FC<{ character: AssistantCharacter | null; size: number }> =
-  ({ character, size }) => {
-    if (character?.avatar) {
-      return (
-        <img
-          src={character.avatar}
-          alt=""
-          className="rounded-full object-cover shrink-0"
-          style={{ width: size, height: size }}
-        />
-      );
-    }
-    const fallback =
-      character?.kind === "cat"
-        ? "🐱"
-        : (character?.name.trim()[0] ?? "?").toUpperCase();
+const Avatar: React.FC<{
+  character: AssistantCharacter | null;
+  size: number;
+}> = ({ character, size }) => {
+  if (character?.avatar) {
     return (
-      <span
-        className="rounded-full bg-hairline-strong/60 text-body flex items-center justify-center shrink-0 select-none font-semibold"
-        style={{ width: size, height: size, fontSize: Math.round(size * 0.42) }}
-        aria-hidden
-      >
-        {fallback}
-      </span>
+      <img
+        src={character.avatar}
+        alt=""
+        className="rounded-full object-cover shrink-0"
+        style={{ width: size, height: size }}
+      />
     );
-  };
+  }
+  const fallback =
+    character?.kind === "cat"
+      ? "🐱"
+      : (character?.name.trim()[0] ?? "?").toUpperCase();
+  return (
+    <span
+      className="rounded-full bg-hairline-strong/60 text-body flex items-center justify-center shrink-0 select-none font-semibold"
+      style={{ width: size, height: size, fontSize: Math.round(size * 0.42) }}
+      aria-hidden
+    >
+      {fallback}
+    </span>
+  );
+};
 
 /** Small uppercase section label, matching the SettingsGroup heading style. */
-const SectionLabel: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+const SectionLabel: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => (
   <h2 className="px-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted">
     {children}
   </h2>
@@ -93,6 +103,7 @@ export const CharactersSettings: React.FC = () => {
   const selected = characters.find((c) => c.id === activeId) ?? characters[0];
 
   const [draftName, setDraftName] = useState("");
+  const [draftDescription, setDraftDescription] = useState("");
   const [draftPrompt, setDraftPrompt] = useState("");
   const [draftGreeting, setDraftGreeting] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -101,18 +112,44 @@ export const CharactersSettings: React.FC = () => {
   const [aiDesc, setAiDesc] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
-  // In-app dictation for the "Describe your character" box. The dictation
-  // pipeline pastes the transcript into whatever field has keyboard focus, so
-  // we keep the textarea focused while recording.
+  // In-app dictation for the "Describe your persona" box. The transcript is
+  // delivered to this webview via the `dictation-transcript` event (see the
+  // listener effect below) rather than pasted into the focused OS field, so no
+  // focus juggling is needed — `dictating` just drives the mic button's state.
   const aiBoxRef = useRef<HTMLDivElement>(null);
   const [dictating, setDictating] = useState(false);
 
   // Reseed the editable drafts whenever the selected character changes.
   useEffect(() => {
     setDraftName(selected?.name ?? "");
+    setDraftDescription(selected?.description ?? "");
     setDraftPrompt(selected?.prompt ?? "");
     setDraftGreeting(selected?.greeting ?? "");
   }, [selected?.id]);
+
+  // In-app dictation delivers its transcript here as an event (see the
+  // `toggle_dictation` command and `DICTATE_TO_FIELD` in the backend) rather
+  // than pasting into the focused OS window, which is unreliable for a webview
+  // textarea. Subscribe only while the Create-with-AI box is open, and append
+  // whatever comes back to the description.
+  useEffect(() => {
+    if (!showAi) return;
+    let cancelled = false;
+    let unlisten: (() => void) | undefined;
+    void listen<string>("dictation-transcript", (event) => {
+      const text = (event.payload ?? "").trim();
+      setDictating(false);
+      if (!text) return;
+      setAiDesc((prev) => (prev.trim() ? `${prev.trimEnd()} ${text}` : text));
+    }).then((fn) => {
+      if (cancelled) fn();
+      else unlisten = fn;
+    });
+    return () => {
+      cancelled = true;
+      unlisten?.();
+    };
+  }, [showAi]);
 
   const saveCharacters = useCallback(
     async (next: AssistantCharacter[]): Promise<boolean> => {
@@ -161,6 +198,8 @@ export const CharactersSettings: React.FC = () => {
       avatar: "",
       kind: "llm",
       builtin: false,
+      description: "",
+      response_length: null,
     };
     if (await saveCharacters([...characters, character])) {
       await activate(id);
@@ -218,7 +257,7 @@ export const CharactersSettings: React.FC = () => {
       const path = await open({
         multiple: false,
         directory: false,
-        filters: [{ name: "Character", extensions: ["json"] }],
+        filters: [{ name: "Persona", extensions: ["json"] }],
       });
       if (typeof path !== "string") return;
       const res = await commands.assistantImportCharacter(path);
@@ -237,8 +276,8 @@ export const CharactersSettings: React.FC = () => {
     if (!selected) return;
     try {
       const path = await save({
-        defaultPath: `${selected.name || "character"}.json`,
-        filters: [{ name: "Character", extensions: ["json"] }],
+        defaultPath: `${selected.name || "persona"}.json`,
+        filters: [{ name: "Persona", extensions: ["json"] }],
       });
       if (!path) return;
       const res = await commands.assistantExportCharacter(selected.id, path);
@@ -268,6 +307,8 @@ export const CharactersSettings: React.FC = () => {
         avatar: "",
         kind: "llm",
         builtin: false,
+        description: "",
+        response_length: null,
       };
       if (await saveCharacters([...characters, character])) {
         await activate(id);
@@ -283,11 +324,9 @@ export const CharactersSettings: React.FC = () => {
   }, [aiDesc, characters, saveCharacters, activate]);
 
   // Toggle in-app dictation for the description box. First tap starts a
-  // hands-free recording, second tap stops it; the transcript is pasted into
-  // the focused textarea by the normal dictation pipeline.
+  // hands-free recording, second tap stops it; the transcript comes back
+  // through the `dictation-transcript` event and is appended to the box.
   const toggleDictation = useCallback(async () => {
-    // Keep (or restore) focus on the textarea so the paste lands there.
-    aiBoxRef.current?.querySelector("textarea")?.focus();
     setDictating((d) => !d);
     try {
       await commands.toggleDictation();
@@ -312,8 +351,8 @@ export const CharactersSettings: React.FC = () => {
 
   const subtitle = (c: AssistantCharacter): string => {
     if (c.kind === "cat") return t("settings.assistant.characters.meowsOnly");
-    const greeting = c.greeting?.trim();
-    if (greeting) return greeting;
+    const description = c.description?.trim();
+    if (description) return description;
     return c.builtin
       ? t("settings.assistant.characters.builtin")
       : t("settings.assistant.characters.custom");
@@ -412,8 +451,8 @@ export const CharactersSettings: React.FC = () => {
               />
               <button
                 type="button"
-                // Don't steal focus from the textarea on click, so the dictated
-                // text pastes into the box rather than the button.
+                // Keep the textarea's caret/selection intact on click; the
+                // transcript arrives via the dictation-transcript event.
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={toggleDictation}
                 title={t(
@@ -506,6 +545,21 @@ export const CharactersSettings: React.FC = () => {
               />
             </Field>
 
+            <Field label={t("settings.assistant.characters.roleLabel")}>
+              <Input
+                type="text"
+                value={draftDescription}
+                onChange={(e) => setDraftDescription(e.target.value)}
+                onBlur={() => {
+                  const description = draftDescription.trim();
+                  if (description !== (selected.description ?? ""))
+                    patchSelected({ description });
+                }}
+                placeholder={t("settings.assistant.characters.rolePlaceholder")}
+                className="w-full"
+              />
+            </Field>
+
             {isCat ? (
               <div className="rounded-lg border border-hairline bg-surface-strong/40 px-3.5 py-3">
                 <p className="text-xs text-muted leading-relaxed">
@@ -527,21 +581,71 @@ export const CharactersSettings: React.FC = () => {
               </Field>
             )}
 
-            <Field label={t("settings.assistant.characters.greetingLabel")}>
-              <Input
-                type="text"
-                value={draftGreeting}
-                onChange={(e) => setDraftGreeting(e.target.value)}
-                onBlur={() => {
-                  if (draftGreeting !== selected.greeting)
-                    patchSelected({ greeting: draftGreeting });
-                }}
-                placeholder={t(
-                  "settings.assistant.characters.greetingPlaceholder",
-                )}
-                className="w-full"
-              />
-            </Field>
+            {!isCat && (
+              <div className="space-y-1.5">
+                <span className="block text-[11px] font-medium uppercase tracking-wide text-muted">
+                  {t("settings.assistant.characters.responseLength.label")}
+                </span>
+                <Dropdown
+                  options={[
+                    {
+                      value: "inherit",
+                      label: t(
+                        "settings.assistant.characters.responseLength.options.inherit",
+                      ),
+                    },
+                    {
+                      value: "short",
+                      label: t(
+                        "settings.assistant.characters.responseLength.options.short",
+                      ),
+                    },
+                    {
+                      value: "medium",
+                      label: t(
+                        "settings.assistant.characters.responseLength.options.medium",
+                      ),
+                    },
+                    {
+                      value: "long",
+                      label: t(
+                        "settings.assistant.characters.responseLength.options.long",
+                      ),
+                    },
+                  ]}
+                  selectedValue={selected.response_length ?? "inherit"}
+                  onSelect={(value) =>
+                    patchSelected({
+                      response_length:
+                        value === "inherit"
+                          ? null
+                          : (value as AssistantResponseLength),
+                    })
+                  }
+                />
+                <p className="text-[11px] text-muted leading-relaxed">
+                  {t("settings.assistant.characters.responseLength.hint")}
+                </p>
+              </div>
+            )}
+
+            <div className="border-t border-hairline pt-4">
+              <Field label={t("settings.assistant.characters.greetingLabel")}>
+                <Input
+                  type="text"
+                  value={draftGreeting}
+                  onChange={(e) => setDraftGreeting(e.target.value)}
+                  onBlur={() => {
+                    if (draftGreeting !== selected.greeting)
+                      patchSelected({ greeting: draftGreeting });
+                  }}
+                  placeholder={t(
+                    "settings.assistant.characters.greetingPlaceholder",
+                  )}
+                  className="w-full"
+                />
+              </Field>
+            </div>
 
             <div className="flex items-center gap-2 border-t border-hairline pt-4">
               <Button variant="secondary" size="sm" onClick={duplicate}>

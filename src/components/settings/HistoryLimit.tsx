@@ -1,5 +1,6 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
 import { useSettings } from "../../hooks/useSettings";
 import { Input } from "../ui/Input";
 import { SettingContainer } from "../ui/SettingContainer";
@@ -25,6 +26,12 @@ export const HistoryLimit: React.FC<HistoryLimitProps> = ({
     }
   };
 
+  // The new limit is applied on the next app start, not instantly. Confirm on
+  // blur (rather than per keystroke) so the user gets one clear signal.
+  const handleBlur = () => {
+    toast.success(t("settings.debug.recordingRetention.savedToast"));
+  };
+
   return (
     <SettingContainer
       title={t("settings.debug.historyLimit.title")}
@@ -40,6 +47,7 @@ export const HistoryLimit: React.FC<HistoryLimitProps> = ({
           max="1000"
           value={historyLimit}
           onChange={handleChange}
+          onBlur={handleBlur}
           disabled={isUpdating("history_limit")}
           className="w-20"
         />

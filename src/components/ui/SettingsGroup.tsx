@@ -22,14 +22,11 @@ export const SettingsGroup: React.FC<SettingsGroupProps> = ({
       {title &&
         (Icon ? (
           <div className="px-1">
-            <div className="flex items-center gap-2">
-              <Icon className="w-[17px] h-[17px] text-accent" strokeWidth={2} />
-              <h2 className="text-[15px] font-semibold tracking-tight text-accent">
-                {title}
-              </h2>
-            </div>
+            <h2 className="text-[15px] font-semibold tracking-tight text-accent">
+              {title}
+            </h2>
             {description && (
-              <p className="text-xs text-muted mt-1 ms-[25px]">{description}</p>
+              <p className="text-xs text-muted mt-1">{description}</p>
             )}
           </div>
         ) : (

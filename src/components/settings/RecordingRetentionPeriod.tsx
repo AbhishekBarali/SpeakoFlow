@@ -1,5 +1,6 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
 import { Dropdown } from "../ui/Dropdown";
 import { SettingContainer } from "../ui/SettingContainer";
 import { useSettings } from "../../hooks/useSettings";
@@ -17,22 +18,22 @@ export const RecordingRetentionPeriodSelector: React.FC<RecordingRetentionPeriod
 
     const selectedRetentionPeriod =
       getSetting("recording_retention_period") || "never";
-    const historyLimit = getSetting("history_limit") || 5;
 
     const handleRetentionPeriodSelect = async (period: string) => {
       await updateSetting(
         "recording_retention_period",
         period as RecordingRetentionPeriod,
       );
+      // Cleanup is deferred to the next app start, so tell the user their
+      // choice was saved and won't act instantly.
+      toast.success(t("settings.debug.recordingRetention.savedToast"));
     };
 
     const retentionOptions = [
       { value: "never", label: t("settings.debug.recordingRetention.never") },
       {
         value: "preserve_limit",
-        label: t("settings.debug.recordingRetention.preserveLimit", {
-          count: Number(historyLimit),
-        }),
+        label: t("settings.debug.recordingRetention.preserveLimit"),
       },
       { value: "days3", label: t("settings.debug.recordingRetention.days3") },
       { value: "weeks2", label: t("settings.debug.recordingRetention.weeks2") },

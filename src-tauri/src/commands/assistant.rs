@@ -145,13 +145,8 @@ pub struct SnipRect {
 /// `assistant-region-captured` event.
 #[tauri::command]
 #[specta::specta]
-pub fn assistant_finish_region_snip(
-    app: AppHandle,
-    window: tauri::WebviewWindow,
-    rect: Option<SnipRect>,
-) -> Result<(), String> {
-    let scale = window.scale_factor().unwrap_or(1.0);
-    assistant::finish_region_snip(&app, scale, rect.map(|r| (r.x, r.y, r.width, r.height)));
+pub fn assistant_finish_region_snip(app: AppHandle, rect: Option<SnipRect>) -> Result<(), String> {
+    assistant::finish_region_snip(&app, rect.map(|r| (r.x, r.y, r.width, r.height)));
     Ok(())
 }
 
@@ -668,6 +663,22 @@ pub fn set_assistant_max_history_messages(app: AppHandle, count: u32) -> Result<
 pub fn set_assistant_web_search_enabled(app: AppHandle, enabled: bool) -> Result<(), String> {
     let mut settings = get_settings(&app);
     settings.assistant_web_search_enabled = enabled;
+    write_settings(&app, settings);
+    emit_settings_changed(&app);
+    Ok(())
+}
+
+/// Prefer the provider's OWN built-in web search (currently OpenRouter's
+/// `:online`) over the app's search. Providers without native search always use
+/// the app's search regardless of this flag.
+#[tauri::command]
+#[specta::specta]
+pub fn set_assistant_prefer_provider_web_search(
+    app: AppHandle,
+    enabled: bool,
+) -> Result<(), String> {
+    let mut settings = get_settings(&app);
+    settings.assistant_prefer_provider_web_search = enabled;
     write_settings(&app, settings);
     emit_settings_changed(&app);
     Ok(())

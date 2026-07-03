@@ -7,7 +7,7 @@ import {
   normalizeKey,
 } from "../../lib/utils/keyboard";
 import { SettingContainer } from "../ui/SettingContainer";
-import { TONE_PILL, type SettingIcon, type SettingTone } from "../ui/tones";
+import { type SettingIcon, type SettingTone } from "../ui/tones";
 import { useSettings } from "../../hooks/useSettings";
 import { useOsType } from "../../hooks/useOsType";
 
@@ -169,7 +169,7 @@ export const TapToLock: React.FC<TapToLockProps> = React.memo(
             className={
               recording
                 ? "px-2.5 py-1 text-[13px] font-medium border border-accent bg-accent/10 text-accent rounded-md"
-                : `px-2.5 py-1 text-[13px] font-medium border rounded-md cursor-pointer transition-all ${TONE_PILL[tone]} elev-chip hover:brightness-[1.06]`
+                : "px-2.5 py-1 text-[13px] font-medium border rounded-md cursor-pointer transition-all bg-surface-strong text-ink border-hairline-strong elev-chip hover:brightness-[1.03]"
             }
           >
             {display}

@@ -28,6 +28,8 @@ export const ERROR_KINDS: Record<string, AssistantErrorKind> = {
   transcription: "transient",
   tts: "transient",
   tts_local: "transient",
+  tts_blocked: "transient",
+  tts_playback: "transient",
   mic_error: "transient",
   file_read: "transient",
 };

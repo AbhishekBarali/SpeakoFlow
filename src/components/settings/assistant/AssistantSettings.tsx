@@ -257,7 +257,7 @@ export const AssistantSettings: React.FC = () => {
 
   const [model, setModel] = useState("");
   const [historyLimit, setHistoryLimit] = useState("12");
-  const [contextSize, setContextSize] = useState("4096");
+  const [contextSize, setContextSize] = useState("8192");
   const [apiKey, setApiKey] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
   const [ttsBaseUrl, setTtsBaseUrl] = useState("");
@@ -423,13 +423,13 @@ export const AssistantSettings: React.FC = () => {
   // local input state, clamped + persisted on blur. Only shown for the
   // built-in provider (external providers manage their own context).
   useEffect(() => {
-    setContextSize(String(settings?.local_llm_context_size ?? 4096));
+    setContextSize(String(settings?.local_llm_context_size ?? 8192));
   }, [settings?.local_llm_context_size]);
 
   const handleContextSizeBlur = async () => {
     const parsed = Math.max(
       512,
-      Math.min(32768, parseInt(contextSize, 10) || 4096),
+      Math.min(32768, parseInt(contextSize, 10) || 8192),
     );
     setContextSize(String(parsed));
     await commands.setLocalLlmContextSize(parsed);
@@ -815,7 +815,9 @@ export const AssistantSettings: React.FC = () => {
               }
               onSelect={(value) =>
                 setAndRefresh(
-                  commands.setLocalLlmUnloadTimeout(value as ModelUnloadTimeout),
+                  commands.setLocalLlmUnloadTimeout(
+                    value as ModelUnloadTimeout,
+                  ),
                 )
               }
               className="min-w-[200px]"
@@ -847,6 +849,21 @@ export const AssistantSettings: React.FC = () => {
         />
         {webSearchEnabled && (
           <>
+            {selectedProviderId === "openrouter" && (
+              <ToggleSwitch
+                checked={settings?.assistant_prefer_provider_web_search ?? true}
+                onChange={(checked) =>
+                  setAndRefresh(
+                    commands.setAssistantPreferProviderWebSearch(checked),
+                  )
+                }
+                label={t("settings.assistant.webSearch.openRouterNativeLabel")}
+                info={t(
+                  "settings.assistant.webSearch.openRouterNativeDescription",
+                )}
+                grouped={true}
+              />
+            )}
             <SettingContainer
               title={t("settings.assistant.webSearch.providerLabel")}
               info={t("settings.assistant.webSearch.providerDescription")}

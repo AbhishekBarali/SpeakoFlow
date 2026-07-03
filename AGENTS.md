@@ -69,7 +69,8 @@ SpeakoFlow is a cross-platform desktop voice assistant (dictation, AI chat panel
 - `shortcut/mod.rs` - Global keyboard shortcut handling (two engines: `handy-keys` and the Tauri global-shortcut plugin)
 - `settings.rs` - Application settings management
 - `secret_store.rs` - API keys in the OS keychain (`keyring`), hydrated into settings on load
-- `assistant.rs` - Assistant turn pipeline (LLM chat, screen vision, characters/personas)
+- `assistant.rs` - Assistant turn pipeline (LLM chat, screen vision, characters/personas, per-persona response-length)
+- `llm_client.rs` - Shared OpenAI-compatible chat client used by the assistant, post-processing, and remote TTS: SSE streaming, tool-calling (the web-search path), structured/JSON-schema output, model listing, provider auth (Anthropic `x-api-key`, Azure `api-key`, OpenRouter `HTTP-Referer`/`X-Title`), Azure base-URL normalization to `/openai/v1`, and system-prompt folding for the built-in local engine (Gemma-style templates that reject a `system` role)
 - `tts.rs` / `web_search.rs` - Spoken answers and optional web search
 - `transcription_coordinator.rs` - Single-threaded recording state machine (also gates tap-to-lock arming)
 - `overlay.rs` - Recording overlay window (platform-specific)
@@ -84,7 +85,7 @@ floating assistant panel (`assistant/`), and the recording overlay (`overlay/`).
 - `App.tsx` - Main settings window: renders the custom `TitleBar`, the sidebar, and the active section (also drives the onboarding flow)
 - `components/` - React UI components:
   - `TitleBar.tsx` - Custom window chrome (brand wordmark + minimize/close). The native chrome is disabled in `lib.rs`, so this bar also acts as the drag region; macOS keeps native traffic lights via an overlay title bar
-  - `Sidebar.tsx` - Section navigation rail (`SECTIONS_CONFIG` defines the sections: general, models, advanced, history, post-processing, assistant, characters, debug, about)
+  - `Sidebar.tsx` - Section navigation rail (`SECTIONS_CONFIG` defines the sections: general, models, advanced, history, post-processing, assistant, characters, debug, about). The `characters` section is labeled "Personas" in the UI; the internal key stays `characters` so code and locale keys don't churn
   - `settings/` - Settings UI, one folder/section (`general/`, `advanced/`, `history/`, `assistant/`, `models/`, `post-processing/`, `debug/`, `about/`) plus shared row components
   - `model-selector/` - Model management interface
   - `onboarding/` - First-run experience

@@ -30,11 +30,13 @@ pub fn commit_recording(app: AppHandle) {
 }
 
 /// Start/stop a plain dictation recording programmatically, for in-app
-/// "dictate into this field" mic buttons (e.g. the Create-with-AI character
+/// "dictate into this field" mic buttons (e.g. the Create-with-AI persona
 /// description box). Hands-free toggle like the assistant pill mic: the first
-/// call starts recording, the second stops it — the transcript is then pasted
-/// into whatever field currently has keyboard focus, exactly like the global
-/// dictation shortcut. No-op if the coordinator isn't ready yet.
+/// call starts recording, the second stops it. Because this recording uses the
+/// `"in-app"` source, its transcript is delivered to the webview via the
+/// `dictation-transcript` event (the field listens for it) instead of being
+/// pasted into the focused OS window — reliable and clipboard-free. No-op if the
+/// coordinator isn't ready yet.
 #[tauri::command]
 #[specta::specta]
 pub fn toggle_dictation(app: AppHandle) -> Result<(), String> {
