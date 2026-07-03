@@ -7,6 +7,7 @@ import {
 } from "../../lib/utils/keyboard";
 import { ResetButton } from "../ui/ResetButton";
 import { SettingContainer } from "../ui/SettingContainer";
+import { TONE_PILL, type SettingIcon, type SettingTone } from "../ui/tones";
 import { useSettings } from "../../hooks/useSettings";
 import { useOsType } from "../../hooks/useOsType";
 import { commands } from "@/bindings";
@@ -17,6 +18,8 @@ interface GlobalShortcutInputProps {
   grouped?: boolean;
   shortcutId: string;
   disabled?: boolean;
+  icon?: SettingIcon;
+  tone?: SettingTone;
 }
 
 export const GlobalShortcutInput: React.FC<GlobalShortcutInputProps> = ({
@@ -24,6 +27,8 @@ export const GlobalShortcutInput: React.FC<GlobalShortcutInputProps> = ({
   grouped = false,
   shortcutId,
   disabled = false,
+  icon,
+  tone = "teal",
 }) => {
   const { t } = useTranslation();
   const { getSetting, updateBinding, resetBinding, isUpdating, isLoading } =
@@ -266,6 +271,8 @@ export const GlobalShortcutInput: React.FC<GlobalShortcutInputProps> = ({
     <SettingContainer
       title={translatedName}
       description={translatedDescription}
+      icon={icon}
+      tone={tone}
       descriptionMode={descriptionMode}
       grouped={grouped}
       disabled={disabled}
@@ -275,13 +282,13 @@ export const GlobalShortcutInput: React.FC<GlobalShortcutInputProps> = ({
         {editingShortcutId === shortcutId ? (
           <div
             ref={(ref) => setShortcutRef(shortcutId, ref)}
-            className="px-2 py-1 text-[13px] font-medium border border-accent bg-accent/10 text-accent rounded-md"
+            className="px-2.5 py-1 text-[13px] font-medium border border-accent bg-accent/10 text-accent rounded-md"
           >
             {formatCurrentKeys()}
           </div>
         ) : (
           <div
-            className="px-2 py-1 text-[13px] font-medium bg-surface-strong/60 border border-hairline-strong text-ink rounded-md cursor-pointer hover:bg-surface-strong transition-colors"
+            className={`px-2.5 py-1 text-[13px] font-medium border rounded-md cursor-pointer transition-all ${TONE_PILL[tone]} elev-chip hover:brightness-[1.06]`}
             onClick={() => startRecording(shortcutId)}
           >
             {formatKeyCombination(binding.current_binding, osType)}

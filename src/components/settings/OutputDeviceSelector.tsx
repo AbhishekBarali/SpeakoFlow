@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Dropdown } from "../ui/Dropdown";
 import { SettingContainer } from "../ui/SettingContainer";
 import { ResetButton } from "../ui/ResetButton";
+import type { SettingIcon, SettingTone } from "../ui/tones";
 import { useSettings } from "../../hooks/useSettings";
 import type { AudioDevice } from "@/bindings";
 
@@ -10,11 +11,19 @@ interface OutputDeviceSelectorProps {
   descriptionMode?: "inline" | "tooltip";
   grouped?: boolean;
   disabled?: boolean;
+  icon?: SettingIcon;
+  tone?: SettingTone;
 }
 
 export const OutputDeviceSelector: React.FC<OutputDeviceSelectorProps> =
   React.memo(
-    ({ descriptionMode = "tooltip", grouped = false, disabled = false }) => {
+    ({
+      descriptionMode = "tooltip",
+      grouped = false,
+      disabled = false,
+      icon,
+      tone,
+    }) => {
       const { t } = useTranslation();
       const {
         getSetting,
@@ -47,6 +56,8 @@ export const OutputDeviceSelector: React.FC<OutputDeviceSelectorProps> =
       return (
         <SettingContainer
           title={t("settings.sound.outputDevice.title")}
+          icon={icon}
+          tone={tone}
           descriptionMode={descriptionMode}
           grouped={grouped}
           disabled={disabled}

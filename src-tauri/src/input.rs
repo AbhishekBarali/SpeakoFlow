@@ -34,21 +34,28 @@ pub fn send_paste_ctrl_v(enigo: &mut Enigo) -> Result<(), String> {
     #[cfg(target_os = "linux")]
     let (modifier_key, v_key_code) = (Key::Control, Key::Unicode('v'));
 
-    // Press modifier + V
+    // Press the modifier, then click V. From the moment the modifier is down we
+    // must guarantee a matching release — even if clicking V fails — otherwise
+    // the modifier (Ctrl/Cmd) is left "pressed" at the OS level, which shows up
+    // as a key stuck down continuously.
     enigo
         .key(modifier_key, enigo::Direction::Press)
         .map_err(|e| format!("Failed to press modifier key: {}", e))?;
-    enigo
+
+    let click = enigo
         .key(v_key_code, enigo::Direction::Click)
-        .map_err(|e| format!("Failed to click V key: {}", e))?;
+        .map_err(|e| format!("Failed to click V key: {}", e));
 
-    std::thread::sleep(std::time::Duration::from_millis(100));
+    if click.is_ok() {
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
 
-    enigo
+    let release = enigo
         .key(modifier_key, enigo::Direction::Release)
-        .map_err(|e| format!("Failed to release modifier key: {}", e))?;
+        .map_err(|e| format!("Failed to release modifier key: {}", e));
 
-    Ok(())
+    // Always attempt the release; surface the click error first if it failed.
+    click.and(release)
 }
 
 /// Sends a Ctrl+Shift+V paste command.
@@ -63,27 +70,36 @@ pub fn send_paste_ctrl_shift_v(enigo: &mut Enigo) -> Result<(), String> {
     #[cfg(target_os = "linux")]
     let (modifier_key, v_key_code) = (Key::Control, Key::Unicode('v'));
 
-    // Press Ctrl/Cmd + Shift + V
+    // Hold modifier + Shift, click V, then release both. Any failure after a key
+    // goes down must still release everything, or Ctrl/Shift can be left stuck
+    // "pressed" at the OS level.
     enigo
         .key(modifier_key, enigo::Direction::Press)
         .map_err(|e| format!("Failed to press modifier key: {}", e))?;
-    enigo
-        .key(Key::Shift, enigo::Direction::Press)
-        .map_err(|e| format!("Failed to press Shift key: {}", e))?;
-    enigo
+
+    // If Shift fails to press, release the modifier we already pressed.
+    if let Err(e) = enigo.key(Key::Shift, enigo::Direction::Press) {
+        let _ = enigo.key(modifier_key, enigo::Direction::Release);
+        return Err(format!("Failed to press Shift key: {}", e));
+    }
+
+    let click = enigo
         .key(v_key_code, enigo::Direction::Click)
-        .map_err(|e| format!("Failed to click V key: {}", e))?;
+        .map_err(|e| format!("Failed to click V key: {}", e));
 
-    std::thread::sleep(std::time::Duration::from_millis(100));
+    if click.is_ok() {
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
 
-    enigo
+    let release_shift = enigo
         .key(Key::Shift, enigo::Direction::Release)
-        .map_err(|e| format!("Failed to release Shift key: {}", e))?;
-    enigo
+        .map_err(|e| format!("Failed to release Shift key: {}", e));
+    let release_modifier = enigo
         .key(modifier_key, enigo::Direction::Release)
-        .map_err(|e| format!("Failed to release modifier key: {}", e))?;
+        .map_err(|e| format!("Failed to release modifier key: {}", e));
 
-    Ok(())
+    // Always release both; surface the first error encountered.
+    click.and(release_shift).and(release_modifier)
 }
 
 /// Sends a Shift+Insert paste command (Windows and Linux only).
@@ -95,21 +111,25 @@ pub fn send_paste_shift_insert(enigo: &mut Enigo) -> Result<(), String> {
     #[cfg(not(target_os = "windows"))]
     let insert_key_code = Key::Other(0x76); // XK_Insert (keycode 118 / 0x76, also used as fallback)
 
-    // Press Shift + Insert
+    // Hold Shift, click Insert, then release Shift. Release even if the Insert
+    // click fails, so Shift is never left stuck "pressed".
     enigo
         .key(Key::Shift, enigo::Direction::Press)
         .map_err(|e| format!("Failed to press Shift key: {}", e))?;
-    enigo
+
+    let click = enigo
         .key(insert_key_code, enigo::Direction::Click)
-        .map_err(|e| format!("Failed to click Insert key: {}", e))?;
+        .map_err(|e| format!("Failed to click Insert key: {}", e));
 
-    std::thread::sleep(std::time::Duration::from_millis(100));
+    if click.is_ok() {
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
 
-    enigo
+    let release = enigo
         .key(Key::Shift, enigo::Direction::Release)
-        .map_err(|e| format!("Failed to release Shift key: {}", e))?;
+        .map_err(|e| format!("Failed to release Shift key: {}", e));
 
-    Ok(())
+    click.and(release)
 }
 
 /// Pastes text directly using the enigo text method.
@@ -120,4 +140,20 @@ pub fn paste_text_direct(enigo: &mut Enigo, text: &str) -> Result<(), String> {
         .map_err(|e| format!("Failed to send text directly: {}", e))?;
 
     Ok(())
+}
+
+/// Releases the common modifier keys (Ctrl, Shift, Alt, and Meta/Cmd/Super).
+///
+/// This is a safety net for synthetic-input flows. If a paste key-combo is
+/// interrupted midway (an intermediate `enigo` call errors), a modifier could
+/// otherwise be left "pressed" at the OS level, which manifests as a key being
+/// held down continuously (e.g. Ctrl appearing stuck on). Sending a release for
+/// a key that isn't currently down is harmless, so it's always safe to clear
+/// them all after we're done synthesizing keystrokes.
+pub fn release_all_modifiers(enigo: &mut Enigo) {
+    for key in [Key::Control, Key::Shift, Key::Alt, Key::Meta] {
+        // Ignore errors: this is best-effort cleanup, and there's nothing useful
+        // to do if a release fails.
+        let _ = enigo.key(key, enigo::Direction::Release);
+    }
 }

@@ -13,8 +13,6 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
-import Logo from "./Logo";
-import Wordmark from "./Wordmark";
 import { useSettings } from "../hooks/useSettings";
 import {
   GeneralSettings,
@@ -125,28 +123,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <div
-      className={`flex flex-col h-full border-e border-hairline bg-canvas-soft pt-5 pb-3 overflow-hidden transition-[width] duration-200 ease-out motion-reduce:transition-none ${
+      className={`flex flex-col h-full bg-canvas-soft pt-4 pb-3 overflow-hidden transition-[width] duration-200 ease-out motion-reduce:transition-none ${
         collapsed ? "w-16 items-center px-2" : "w-52 px-3"
       }`}
     >
-      {/* Brand — full lockup when expanded (teal mark + wordmark), mark only
-          when collapsed. Sized to lead the rail: the logo is the one piece of
-          brand color on the page, so it carries the hierarchy. */}
-      <div
-        className={`flex mb-7 ${
-          collapsed ? "justify-center" : "items-center ps-2.5"
-        }`}
-      >
-        {collapsed ? (
-          <Logo className="text-accent h-6 w-auto shrink-0" />
-        ) : (
-          <div className="flex items-center gap-2 min-w-0">
-            <Logo className="text-accent h-[26px] w-auto shrink-0" />
-            <Wordmark className="text-[17px] truncate" />
-          </div>
-        )}
-      </div>
-
+      {/* Brand lives in the TitleBar now; the rail is pure navigation. */}
       <nav className="flex flex-col w-full gap-px">
         {availableSections.map((section) => {
           const Icon = section.icon;

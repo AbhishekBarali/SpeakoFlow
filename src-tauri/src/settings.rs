@@ -554,8 +554,11 @@ pub struct AppSettings {
     /// The key you tap while holding a push-to-talk **assistant** recording to
     /// lock it hands-free, so you can release the hotkey and keep talking to the
     /// assistant. Separate from the dictation `tap_to_lock_key` so it can be a
-    /// different combo (defaults to Space). Accepts a modifier ("shift", "ctrl",
-    /// …) or a plain key name ("space", "tab", …). Clear it (empty) to disable.
+    /// different combo (defaults to Shift). Accepts a modifier ("shift", "ctrl",
+    /// …) or a plain key name ("tab", "f8", …). Pick a key that isn't part of
+    /// your assistant record shortcut — one that overlaps (e.g. Space while the
+    /// shortcut is ctrl+alt+space) is ignored, since the held key would instantly
+    /// lock the recording. Clear it (empty) to disable.
     #[serde(default = "default_assistant_tap_to_lock_key")]
     pub assistant_tap_to_lock_key: String,
     pub audio_feedback: bool,
@@ -1306,7 +1309,11 @@ fn default_tap_to_lock_key() -> String {
 }
 
 fn default_assistant_tap_to_lock_key() -> String {
-    "space".to_string()
+    // Shift, not Space: the default assistant shortcut (e.g. ctrl+alt+space)
+    // already holds Space, and a lock key that overlaps the record shortcut
+    // can't work (the held key would instantly lock it). Shift sits outside
+    // every default record shortcut, so tap-to-lock works out of the box.
+    "shift".to_string()
 }
 
 fn default_assistant_font_size() -> String {

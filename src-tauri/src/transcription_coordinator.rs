@@ -43,6 +43,30 @@ pub fn recording_mode(push_to_talk_default: bool, is_lock_variant: bool) -> Reco
     }
 }
 
+/// Whether the tap-to-lock `lock_key` is entirely contained in the active record
+/// `shortcut`. When it is, the lock key is already held to record, so arming
+/// tap-to-lock would fire immediately off that held key's auto-repeat and wrongly
+/// lock the recording — callers skip arming in that case. Tokens are lowercased
+/// and modifier aliases unified so "alt"/"option" and "cmd"/"super" still match.
+fn tap_lock_within_shortcut(lock_key: &str, shortcut: &str) -> bool {
+    fn norm(token: &str) -> String {
+        match token.trim().to_ascii_lowercase().as_str() {
+            "control" => "ctrl".to_string(),
+            "option" | "opt" => "alt".to_string(),
+            "cmd" | "command" | "meta" | "win" | "windows" => "super".to_string(),
+            other => other.to_string(),
+        }
+    }
+    fn tokens(s: &str) -> std::collections::HashSet<String> {
+        s.split('+').map(norm).filter(|t| !t.is_empty()).collect()
+    }
+    let lock = tokens(lock_key);
+    if lock.is_empty() {
+        return false;
+    }
+    lock.is_subset(&tokens(shortcut))
+}
+
 /// Commands processed sequentially by the coordinator thread.
 enum Command {
     Input {
@@ -129,7 +153,7 @@ impl TranscriptionCoordinator {
                                                 // Both dictation and the assistant
                                                 // support this, each with its own
                                                 // configured shortcut (the assistant's
-                                                // defaults to Space) so they can differ.
+                                                // defaults to Shift) so they can differ.
                                                 // An empty shortcut means off.
                                                 RecordingMode::Hold => {
                                                     let settings = get_settings(&app);
@@ -138,7 +162,19 @@ impl TranscriptionCoordinator {
                                                     } else {
                                                         settings.tap_to_lock_key.trim()
                                                     };
-                                                    if !shortcut.is_empty() {
+                                                    // Skip arming when the lock key is itself part
+                                                    // of the record shortcut being held (e.g. lock
+                                                    // "space" while holding "ctrl+alt+space"): the
+                                                    // held key auto-repeats key-down events, which
+                                                    // would fire the watcher and instantly (and
+                                                    // wrongly) lock the recording. The lock key must
+                                                    // live outside the record shortcut to work.
+                                                    if !shortcut.is_empty()
+                                                        && !tap_lock_within_shortcut(
+                                                            shortcut,
+                                                            &hotkey_string,
+                                                        )
+                                                    {
                                                         if let Some(lw) =
                                                             app.try_state::<LockWatch>()
                                                         {

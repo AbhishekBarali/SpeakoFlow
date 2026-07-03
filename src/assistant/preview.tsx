@@ -170,10 +170,13 @@ const Pill: React.FC<{ demo: Demo }> = ({ demo }) => {
           </div>
         </>
       )}
-      {(armed || demo === "listening") && !showError && (
-        <button className="apill-screen">
-          <Camera size={9} strokeWidth={2.5} className="apill-screen-on" />
-          <CameraOff size={9} strokeWidth={2.5} className="apill-screen-off" />
+      {!showError && (
+        <button className={`apill-screen${armed ? " armed" : ""}`}>
+          {armed ? (
+            <Camera size={9} strokeWidth={2.5} />
+          ) : (
+            <CameraOff size={9} strokeWidth={2.5} />
+          )}
         </button>
       )}
     </div>

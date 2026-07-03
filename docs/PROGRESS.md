@@ -122,6 +122,26 @@ Three problems made web search feel broken even on strong models. Fixed in order
 - **Firecrawl removed; more free SERP providers added.** This is a quick search-and-chat assistant, not a research tool, so full-page fetching/scraping was dropped entirely. Removed the Firecrawl provider, the `/v2/scrape` stage, and the Firecrawl-specific credit guard (and its UI: "Read full pages" + "daily credit budget"). Web search is now strictly snippet-first. Provider set is now **Serper** (default), **Brave**, **Tavily** (AI-search, returns a synthesized answer), **Exa** (neural), and **SerpAPI** (Google) — all single-key, all with a free tier, all routed through the same planner → snippet-search → local rerank pipeline. Freshness maps to each API's own param (Serper/SerpAPI `tbs`, Brave `freshness`, Tavily `time_range`, Exa `startPublishedDate`). Legacy `firecrawl`/`duckduckgo` settings migrate to Serper on load. The deprecated `fetch_content`/`daily_credit_budget` settings + commands are kept as no-ops for back-compat/bindings stability.
 - **New doc: [`prompts-reference.md`](./prompts-reference.md)** maps every LLM instruction in the app (the system-prompt assembly order, the planner prompt, the grounding/capability directives, response-length directives, the post-process prompt) with file/symbol locations and a "symptom → which prompt" table.
 
+## Phase 2.1 — Assistant characters (personas) (done)
+
+The assistant can now take on a **character**: a named persona with its own prompt, avatar, and greeting. Characters live in their own settings section (`characters` in the sidebar) and are backed by `assistant_characters` in settings.
+
+- **Persona gallery.** Pick an active character; its persona prompt overrides the plain system prompt for LLM turns. Each character has a name, optional avatar image, persona prompt, and greeting.
+- **Author however you like.** Create a blank character, **generate one with the LLM** from a one-line description, duplicate an existing one, or import/export as JSON to share. Delete removes it from the gallery.
+- **Voice-authored descriptions.** The "generate from a description" flow accepts **in-app dictation** — describe the character out loud and the local STT fills the field, so persona creation stays hands-on-keyboard-optional.
+- **Built-in Cat.** A special `cat` character ignores the model entirely and just meows — a zero-cost way to sanity-check the panel without spending a token.
+
+## Phase 2.2 — Desktop shell & settings redesign (done)
+
+A branding + UI wave that reshapes the window shell and the settings surface, plus two input-reliability fixes.
+
+- **Custom title bar.** Native window decorations are dropped on Windows/Linux (`decorations(false)` in `lib.rs`); the webview now draws its own chrome via `TitleBar.tsx` (brand wordmark + minimize/close, doubling as the drag region). macOS keeps the window decorated but uses an **overlay title bar** (`TitleBarStyle::Overlay` + `hidden_title`) so the native traffic lights still work. Needs the `core:window:allow-minimize`/`allow-close` capabilities; close still hides to the tray. The brand moved out of the sidebar (now pure navigation) into the title bar.
+- **Warm palette + depth.** The cool neutral-gray theme was reworked into a **warm cream** palette (stepped so bright cards float off the pane), with new soft, warm-tinted elevation utilities (`.elev-card`, `.elev-chip`, `.elev-pane`) and a frosted `.glass-menu` for popovers. Dark mode swaps to deeper, cooler shadows.
+- **iOS-style setting rows.** A new tone system (`ui/tones.ts`: `SettingTone`, `TONE_TILE`, `TONE_PILL`) gives each setting row a soft-tinted rounded icon tile, and `SettingsGroup` gained an optional accent-icon header. Applied to the **General** and **Models** sections first; the treatment is opt-in per component so the remaining sections keep the quieter label style until they're migrated.
+- **Tap-to-lock hardening.** The assistant tap-to-lock key now **defaults to Shift** instead of Space (the default assistant shortcut already holds Space, and a lock key contained in the record shortcut can't work — the held key would instantly lock the recording). `transcription_coordinator.rs` gained `tap_lock_within_shortcut()`, which skips arming when the lock key is a subset of the active record shortcut (modifier aliases normalized so `alt`/`option` and `cmd`/`super` match).
+- **Paste modifier safety net.** Synthetic-paste key combos (`input.rs`) now always release their modifiers — even if an intermediate `enigo` call fails — via the new `input::release_all_modifiers`. This fixes the class of bug where an interrupted paste leaves Ctrl/Shift/Alt/Cmd "pressed" at the OS level (a key appearing stuck down).
+- **Screen-vision toggle.** The collapsed assistant pill's camera badge is now a true toggle: hover to reveal it when off (click to arm), and once armed it stays visible in every state as the "capture is on" indicator (click to disarm) — one control for both directions instead of an arm-only button.
+
 ## Roadmap
 
 - **Phase 2**: SQLite conversation history (rusqlite already bundled), Anthropic/Bedrock `cache_control`, token/cost display

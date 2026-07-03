@@ -22,7 +22,7 @@ SpeakoFlow started as a fork of the excellent [Handy](https://github.com/cjpais/
 ### 👁️ Screen vision
 
 - Press **Ctrl + Alt + Shift + Space** — or just _say_ "what's on my screen?" — and the assistant sees a screenshot of your active monitor
-- The camera button in the panel arms a screenshot for your next message (typed _or_ spoken)
+- The camera button on the panel (and its collapsed pill) toggles screen vision on or off — one click to arm a capture for your next message (typed _or_ spoken), click again to turn it back off
 - Captures are adaptively compressed to fit strict provider payload limits (verified against Azure's 128 KiB JSON-string cap)
 - One master toggle guarantees nothing is ever captured if you don't want it
 
@@ -49,6 +49,12 @@ SpeakoFlow started as a fork of the excellent [Handy](https://github.com/cjpais/
   - **ElevenLabs** — bring your API key and voice ID
   - **Azure AI Speech** — neural voices (e.g. `en-US-JennyNeural`) via your Speech resource key
 
+### 🎭 Characters (personas)
+
+- Give the assistant a personality: pick an active character from a gallery, and its persona prompt takes over the assistant's replies
+- Edit the name, avatar, persona prompt, and greeting — or describe a character in a sentence and let the LLM write it for you (dictate the description by voice, right in the app)
+- Duplicate, import/export as JSON to share, or delete — plus a built-in **Cat** that just meows, no model required
+
 ### 🎨 Make it yours
 
 - Six accent colors, three text sizes, three panel sizes, adjustable opacity — with a live preview in settings
@@ -64,6 +70,7 @@ SpeakoFlow started as a fork of the excellent [Handy](https://github.com/cjpais/
 | Screen vision (screenshots to the model) | —     | ✅ hotkey, voice intent, or camera button                       |
 | Web search                               | —     | ✅ Serper / SerpAPI / Brave / Tavily / Exa (bring your own key) |
 | Spoken answers (TTS)                     | —     | ✅ Kokoro local / OpenAI-compatible / ElevenLabs / Azure        |
+| Assistant characters (personas)          | —     | ✅ persona gallery, LLM-generated, import/export                |
 | Hands-free dictation toggle              | —     | ✅ dedicated F9 binding                                         |
 | Built-in offline LLM (llama.cpp)         | —     | ✅ runs a downloaded model, no server                           |
 | Local LLM preset (Ollama / LM Studio)    | —     | ✅                                                              |

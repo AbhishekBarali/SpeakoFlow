@@ -1,5 +1,6 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
+import { AudioLines, Globe, Languages } from "lucide-react";
 import { SettingsGroup } from "../../ui/SettingsGroup";
 import { LanguageSelector } from "../LanguageSelector";
 import { TranslateToEnglish } from "../TranslateToEnglish";
@@ -27,16 +28,24 @@ export const ModelSettingsCard: React.FC = () => {
       title={t("settings.modelSettings.title", {
         model: currentModelInfo.name,
       })}
+      icon={AudioLines}
     >
       {supportsLanguageSelection && (
         <LanguageSelector
           descriptionMode="tooltip"
           grouped={true}
           supportedLanguages={currentModelInfo.supported_languages}
+          icon={Globe}
+          tone="emerald"
         />
       )}
       {supportsTranslation && (
-        <TranslateToEnglish descriptionMode="tooltip" grouped={true} />
+        <TranslateToEnglish
+          descriptionMode="tooltip"
+          grouped={true}
+          icon={Languages}
+          tone="violet"
+        />
       )}
     </SettingsGroup>
   );

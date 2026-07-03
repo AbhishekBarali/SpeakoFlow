@@ -614,19 +614,19 @@ pub fn paste(text: String, app_handle: AppHandle) -> Result<(), String> {
         .lock()
         .map_err(|e| format!("Failed to lock Enigo: {}", e))?;
 
-    // Perform the paste operation
-    match paste_method {
+    // Perform the paste operation. Capture the result instead of using `?` so we
+    // can always run the modifier-release safety net below, even on failure.
+    let paste_result: Result<(), String> = match paste_method {
         PasteMethod::None => {
             info!("PasteMethod::None selected - skipping paste action");
+            Ok(())
         }
-        PasteMethod::Direct => {
-            paste_direct(
-                &mut enigo,
-                &text,
-                #[cfg(target_os = "linux")]
-                settings.typing_tool,
-            )?;
-        }
+        PasteMethod::Direct => paste_direct(
+            &mut enigo,
+            &text,
+            #[cfg(target_os = "linux")]
+            settings.typing_tool,
+        ),
         PasteMethod::CtrlV | PasteMethod::CtrlShiftV | PasteMethod::ShiftInsert => {
             paste_via_clipboard(
                 &mut enigo,
@@ -634,22 +634,41 @@ pub fn paste(text: String, app_handle: AppHandle) -> Result<(), String> {
                 &app_handle,
                 &paste_method,
                 paste_delay_ms,
-            )?
+            )
         }
-        PasteMethod::ExternalScript => {
-            let script_path = settings
-                .external_script_path
-                .as_ref()
-                .filter(|p| !p.is_empty())
-                .ok_or("External script path is not configured")?;
-            paste_via_external_script(&text, script_path)?;
-        }
+        PasteMethod::ExternalScript => match settings
+            .external_script_path
+            .as_ref()
+            .filter(|p| !p.is_empty())
+        {
+            Some(script_path) => paste_via_external_script(&text, script_path),
+            None => Err("External script path is not configured".to_string()),
+        },
+    };
+
+    // Auto-submit (Enter / Ctrl+Enter / Cmd+Enter) only when the paste succeeded.
+    let submit_result: Result<(), String> =
+        if paste_result.is_ok() && should_send_auto_submit(settings.auto_submit, paste_method) {
+            std::thread::sleep(Duration::from_millis(50));
+            send_return_key(&mut enigo, settings.auto_submit_key)
+        } else {
+            Ok(())
+        };
+
+    // Safety net: for any method that synthesizes keystrokes, make sure we never
+    // leave a modifier (Ctrl/Shift/Alt/Cmd) stuck "pressed" at the OS level if a
+    // key-combo was interrupted midway — the classic cause of a key appearing to
+    // be held down continuously after a paste.
+    if !matches!(
+        paste_method,
+        PasteMethod::None | PasteMethod::ExternalScript
+    ) {
+        input::release_all_modifiers(&mut enigo);
     }
 
-    if should_send_auto_submit(settings.auto_submit, paste_method) {
-        std::thread::sleep(Duration::from_millis(50));
-        send_return_key(&mut enigo, settings.auto_submit_key)?;
-    }
+    // Surface the first error now that the cleanup has run.
+    paste_result?;
+    submit_result?;
 
     // After pasting, optionally copy to clipboard based on settings
     if settings.clipboard_handling == ClipboardHandling::CopyToClipboard {

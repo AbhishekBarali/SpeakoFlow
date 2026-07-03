@@ -258,6 +258,8 @@
     opacity 200ms ease 340ms;
 }
 
+
+
 /* Busy phases: the reveal must not slow a cancel down — a short beat only. */
 .apill:hover .apill-reveal.quick,
 .apill:focus-within .apill-reveal.quick {
@@ -321,8 +323,11 @@
   border-color: color-mix(in srgb, var(--as-live) 32%, var(--as-hairline));
 }
 
-/* Sticky screen-vision badge: always visible while armed; hovering it turns it
- * into a one-click disarm. */
+/* Screen-vision toggle badge (top-right). Hidden by default; appears on pill
+ * hover so it's there to enable but never clutters, and — once armed — stays
+ * visible in every state as the "capture is on" indicator. The icon is chosen
+ * in JSX (Camera when armed, CameraOff when not); hovering shows the red
+ * "click to change" cue. */
 .apill-screen {
   position: absolute;
   top: -5px;
@@ -335,30 +340,36 @@
   padding: 0;
   border: none;
   border-radius: 50%;
-  background: var(--as-ink);
-  color: var(--as-chip-surface);
+  background: var(--as-raise);
+  color: var(--as-muted);
   box-shadow: 0 0 0 2px var(--as-chip-surface);
   cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
   transition:
+    opacity 0.16s ease,
     background 0.15s ease,
     color 0.15s ease;
 }
 
-.apill-screen .apill-screen-off {
-  display: none;
+/* Off state: reveal on hover so it's available to enable, never permanent. */
+.apill:hover .apill-screen {
+  opacity: 1;
+  pointer-events: auto;
 }
 
+/* Armed: prominent, and pinned visible even without hover. */
+.apill-screen.armed {
+  opacity: 1;
+  pointer-events: auto;
+  background: var(--as-ink);
+  color: var(--as-chip-surface);
+}
+
+/* Hover cue (both states): red = "click to change". */
 .apill-screen:hover {
   background: var(--as-error);
   color: #fff;
-}
-
-.apill-screen:hover .apill-screen-on {
-  display: none;
-}
-
-.apill-screen:hover .apill-screen-off {
-  display: block;
 }
 
 /* Pill error: compact icon + short localized message. */

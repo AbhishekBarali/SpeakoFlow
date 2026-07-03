@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { type ReactNode, useEffect, useState, useRef } from "react";
 import { toast, Toaster } from "sonner";
 import { useTranslation } from "react-i18next";
 import { listen } from "@tauri-apps/api/event";
@@ -13,6 +13,7 @@ import AccessibilityPermissions from "./components/AccessibilityPermissions";
 import Footer from "./components/footer";
 import Onboarding, { AccessibilityOnboarding } from "./components/onboarding";
 import { Sidebar, SidebarSection, SECTIONS_CONFIG } from "./components/Sidebar";
+import TitleBar from "./components/TitleBar";
 import { useSettings } from "./hooks/useSettings";
 import { useSettingsStore } from "./stores/settingsStore";
 import { commands } from "@/bindings";
@@ -248,27 +249,70 @@ function App() {
     setOnboardingStep("done");
   };
 
-  // Still checking onboarding status
-  if (onboardingStep === null) {
-    return null;
-  }
-
-  if (onboardingStep === "accessibility") {
-    return <AccessibilityOnboarding onComplete={handleAccessibilityComplete} />;
-  }
-
-  if (onboardingStep === "model") {
-    return <Onboarding onModelSelected={handleModelSelected} />;
-  }
-
-  // Page header: just the section title. Subtitles and decorative canvas orbs
-  // were removed for a quieter, native-feeling settings surface.
+  // Page header: section title plus a short subtitle for context (subtitles
+  // live in `sectionSubtitles.*`; not every section has one).
   const sectionLabelKey = SECTIONS_CONFIG[currentSection].labelKey;
+  const sectionSubtitleKey = `sectionSubtitles.${currentSection}`;
+  const hasSubtitle = i18n.exists(sectionSubtitleKey);
+
+  // The window has no native chrome (see lib.rs), so the TitleBar renders on
+  // every screen and the body swaps underneath it. This keeps the window
+  // draggable/closable during onboarding too.
+  let body: ReactNode = null;
+  if (onboardingStep === "accessibility") {
+    body = (
+      <div className="flex-1 min-h-0">
+        <AccessibilityOnboarding onComplete={handleAccessibilityComplete} />
+      </div>
+    );
+  } else if (onboardingStep === "model") {
+    body = (
+      <div className="flex-1 min-h-0">
+        <Onboarding onModelSelected={handleModelSelected} />
+      </div>
+    );
+  } else if (onboardingStep === "done") {
+    body = (
+      <>
+        {/* Main content area that takes remaining space. The row carries the
+            cream "chrome" color; the content column is a rounded pane inset
+            into it (title bar + sidebar form a continuous chrome L, the pane
+            floats on top with a soft top-left curve). */}
+        <div className="flex-1 flex overflow-hidden bg-canvas-soft">
+          <Sidebar
+            activeSection={currentSection}
+            onSectionChange={setCurrentSection}
+          />
+          {/* Scrollable content area — inset rounded pane */}
+          <div className="flex-1 flex flex-col overflow-hidden bg-canvas rounded-ss-[18px] border-s border-t border-hairline elev-pane">
+            <div className="flex-1 overflow-y-auto overflow-x-hidden relative">
+              <div className="relative z-10 flex flex-col items-center px-8 pt-7 pb-10 gap-6">
+                <AccessibilityPermissions />
+                <header className="max-w-2xl w-full mx-auto">
+                  <h1 className="font-display text-2xl leading-tight text-ink">
+                    {t(sectionLabelKey)}
+                  </h1>
+                  {hasSubtitle && (
+                    <p className="mt-1 text-sm leading-snug text-muted max-w-xl">
+                      {t(sectionSubtitleKey)}
+                    </p>
+                  )}
+                </header>
+                {renderSettingsContent(currentSection)}
+              </div>
+            </div>
+          </div>
+        </div>
+        {/* Fixed footer at bottom */}
+        <Footer />
+      </>
+    );
+  }
 
   return (
     <div
       dir={direction}
-      className="h-screen flex flex-col select-none cursor-default"
+      className="h-screen flex flex-col select-none cursor-default overflow-hidden"
     >
       <Toaster
         theme="system"
@@ -282,29 +326,8 @@ function App() {
           },
         }}
       />
-      {/* Main content area that takes remaining space */}
-      <div className="flex-1 flex overflow-hidden">
-        <Sidebar
-          activeSection={currentSection}
-          onSectionChange={setCurrentSection}
-        />
-        {/* Scrollable content area */}
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <div className="flex-1 overflow-y-auto overflow-x-hidden relative">
-            <div className="relative z-10 flex flex-col items-center px-8 pt-8 pb-10 gap-6">
-              <AccessibilityPermissions />
-              <header className="max-w-2xl w-full mx-auto">
-                <h1 className="font-display text-2xl leading-tight text-ink">
-                  {t(sectionLabelKey)}
-                </h1>
-              </header>
-              {renderSettingsContent(currentSection)}
-            </div>
-          </div>
-        </div>
-      </div>
-      {/* Fixed footer at bottom */}
-      <Footer />
+      <TitleBar />
+      {body}
     </div>
   );
 }

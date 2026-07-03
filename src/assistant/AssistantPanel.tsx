@@ -884,10 +884,15 @@ const AssistantPanel: React.FC = () => {
     setCollapsed(value);
   }, []);
 
-  const disarmScreen = useCallback(async () => {
-    setAttachScreen(false);
-    await commands.setAssistantScreenArmed(false);
-  }, []);
+  // Toggle screen-vision straight from the collapsed pill's hover controls, so
+  // it can be armed AND disarmed without opening the panel — one control, shown
+  // only on hover (no separate always-on badge). Derived from the raw state,
+  // not `screenActive`, which is declared later in render.
+  const toggleScreen = useCallback(async () => {
+    const next = !(visionActive || attachScreen);
+    setAttachScreen(next);
+    await commands.setAssistantScreenArmed(next);
+  }, [visionActive, attachScreen]);
 
   /** Localized primary message for a structured error (falls back to the raw
    *  backend detail for unknown codes / webview-side failures). */
@@ -1121,19 +1126,31 @@ const AssistantPanel: React.FC = () => {
               </div>
             </>
           )}
-          {screenActive && !showError && (
+          {/* Screen-vision toggle: a small top-right badge. When armed it stays
+              visible in every state (so you always know capture is on); when off
+              it's hidden until you hover the pill, so it's there to enable but
+              never clutters. One control — click to arm, click to disarm. */}
+          {screenshotEnabled && !showError && (
             <button
-              className="apill-screen"
-              onClick={disarmScreen}
-              title={t("assistant.pill.disarmScreen")}
-              aria-label={t("assistant.pill.disarmScreen")}
+              className={`apill-screen${screenActive ? " armed" : ""}`}
+              onClick={toggleScreen}
+              title={
+                screenActive
+                  ? t("assistant.pill.disarmScreen")
+                  : t("assistant.pill.armScreen")
+              }
+              aria-label={
+                screenActive
+                  ? t("assistant.pill.disarmScreen")
+                  : t("assistant.pill.armScreen")
+              }
+              aria-pressed={screenActive}
             >
-              <Camera size={9} strokeWidth={2.5} className="apill-screen-on" />
-              <CameraOff
-                size={9}
-                strokeWidth={2.5}
-                className="apill-screen-off"
-              />
+              {screenActive ? (
+                <Camera size={9} strokeWidth={2.5} />
+              ) : (
+                <CameraOff size={9} strokeWidth={2.5} />
+              )}
             </button>
           )}
         </div>

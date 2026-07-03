@@ -7,12 +7,15 @@ import {
   normalizeKey,
 } from "../../lib/utils/keyboard";
 import { SettingContainer } from "../ui/SettingContainer";
+import { TONE_PILL, type SettingIcon, type SettingTone } from "../ui/tones";
 import { useSettings } from "../../hooks/useSettings";
 import { useOsType } from "../../hooks/useOsType";
 
 interface TapToLockProps {
   descriptionMode?: "inline" | "tooltip";
   grouped?: boolean;
+  icon?: SettingIcon;
+  tone?: SettingTone;
   /** Which setting this control edits. Defaults to the dictation lock key, so
    *  existing call sites keep working; the assistant passes its own key. */
   settingKey?: "tap_to_lock_key" | "assistant_tap_to_lock_key";
@@ -49,6 +52,8 @@ const MODIFIERS = [
 export const TapToLock: React.FC<TapToLockProps> = React.memo(
   ({
     grouped = false,
+    icon,
+    tone = "teal",
     settingKey = "tap_to_lock_key",
     fallback = "shift",
     labelKey = "settings.general.tapToLock.label",
@@ -152,6 +157,8 @@ export const TapToLock: React.FC<TapToLockProps> = React.memo(
       <SettingContainer
         title={t(labelKey)}
         info={t(infoKey)}
+        icon={icon}
+        tone={tone}
         grouped={grouped}
         layout="horizontal"
       >
@@ -161,8 +168,8 @@ export const TapToLock: React.FC<TapToLockProps> = React.memo(
             onClick={recording ? undefined : start}
             className={
               recording
-                ? "px-2 py-1 text-[13px] font-medium border border-accent bg-accent/10 text-accent rounded-md"
-                : "px-2 py-1 text-[13px] font-medium bg-surface-strong/60 border border-hairline-strong text-ink rounded-md cursor-pointer hover:bg-surface-strong transition-colors"
+                ? "px-2.5 py-1 text-[13px] font-medium border border-accent bg-accent/10 text-accent rounded-md"
+                : `px-2.5 py-1 text-[13px] font-medium border rounded-md cursor-pointer transition-all ${TONE_PILL[tone]} elev-chip hover:brightness-[1.06]`
             }
           >
             {display}

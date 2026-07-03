@@ -1,5 +1,6 @@
 import React from "react";
 import { SettingContainer } from "./SettingContainer";
+import type { SettingIcon, SettingTone } from "./tones";
 
 interface ToggleSwitchProps {
   checked: boolean;
@@ -10,6 +11,9 @@ interface ToggleSwitchProps {
   description?: string;
   /** Deep-dive help behind the (i) hint. */
   info?: string;
+  /** Optional leading icon tile (see SettingContainer). */
+  icon?: SettingIcon;
+  tone?: SettingTone;
   descriptionMode?: "inline" | "tooltip";
   grouped?: boolean;
   tooltipPosition?: "top" | "bottom";
@@ -23,6 +27,8 @@ export const ToggleSwitch: React.FC<ToggleSwitchProps> = ({
   label,
   description,
   info,
+  icon,
+  tone,
   descriptionMode = "tooltip",
   grouped = false,
   tooltipPosition = "top",
@@ -32,6 +38,8 @@ export const ToggleSwitch: React.FC<ToggleSwitchProps> = ({
       title={label}
       description={description}
       info={info}
+      icon={icon}
+      tone={tone}
       descriptionMode={descriptionMode}
       grouped={grouped}
       disabled={disabled}

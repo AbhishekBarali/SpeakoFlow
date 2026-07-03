@@ -654,6 +654,26 @@ pub fn run(cli_args: CliArgs) {
                 win_builder = win_builder.data_directory(data_dir.join("webview"));
             }
 
+            // Custom title bar: the top of the window is drawn by the webview
+            // (see src/components/TitleBar.tsx) so the brand + window controls
+            // live inside the app surface instead of an empty native caption.
+            //   - Windows/Linux: drop the native chrome entirely and render our
+            //     own minimize/close controls. Mouse edge-resize still works
+            //     with `resizable(true)` on Tauri 2 stable.
+            //   - macOS: keep the window decorated but make the title bar an
+            //     overlay so the native traffic lights still show and behave,
+            //     while our content (and drag region) extends to the top edge.
+            #[cfg(not(target_os = "macos"))]
+            {
+                win_builder = win_builder.decorations(false);
+            }
+            #[cfg(target_os = "macos")]
+            {
+                win_builder = win_builder
+                    .title_bar_style(tauri::TitleBarStyle::Overlay)
+                    .hidden_title(true);
+            }
+
             let main_webview = win_builder.build()?;
 
             let mut settings = get_settings(&app.handle());

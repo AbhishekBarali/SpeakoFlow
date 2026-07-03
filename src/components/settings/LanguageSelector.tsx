@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { SettingContainer } from "../ui/SettingContainer";
 import { ResetButton } from "../ui/ResetButton";
+import type { SettingIcon, SettingTone } from "../ui/tones";
 import { useSettings } from "../../hooks/useSettings";
 import { LANGUAGES } from "../../lib/constants/languages";
 
@@ -9,12 +10,16 @@ interface LanguageSelectorProps {
   descriptionMode?: "inline" | "tooltip";
   grouped?: boolean;
   supportedLanguages?: string[];
+  icon?: SettingIcon;
+  tone?: SettingTone;
 }
 
 export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
   descriptionMode = "tooltip",
   grouped = false,
   supportedLanguages,
+  icon,
+  tone,
 }) => {
   const { t } = useTranslation();
   const { getSetting, updateSetting, resetSetting, isUpdating } = useSettings();
@@ -102,6 +107,8 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
     <SettingContainer
       title={t("settings.general.language.title")}
       info={t("settings.general.language.description")}
+      icon={icon}
+      tone={tone}
       descriptionMode={descriptionMode}
       grouped={grouped}
     >
@@ -136,7 +143,7 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
           </button>
 
           {isOpen && !isUpdating("selected_language") && (
-            <div className="absolute top-full left-0 right-0 mt-1 bg-surface border border-hairline rounded-xl shadow-lg z-50 max-h-60 overflow-hidden">
+            <div className="absolute top-full left-0 right-0 mt-1.5 glass-menu border border-hairline rounded-xl shadow-lg z-50 max-h-60 overflow-hidden">
               {/* Search input */}
               <div className="p-2 border-b border-hairline">
                 <input

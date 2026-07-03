@@ -59,8 +59,9 @@ async changeTapToLockKeySetting(key: string) : Promise<Result<null, string>> {
 /**
  * Set the key that a tap converts a hold **assistant** recording to hands-free.
  * Separate from the dictation lock key so the assistant can use a different
- * combo (defaults to Space). Accepts a modifier or a plain key name; empty
- * disables it. Persisted; takes effect on the next assistant recording (the
+ * combo (defaults to Shift). Accepts a modifier or a plain key name; empty
+ * disables it. A key that overlaps the assistant record shortcut is ignored at
+ * arm time. Persisted; takes effect on the next assistant recording (the
  * watcher reads it fresh each time it arms).
  */
 async changeAssistantTapToLockKeySetting(key: string) : Promise<Result<null, string>> {
@@ -1739,8 +1740,11 @@ tap_to_lock_key?: string;
  * The key you tap while holding a push-to-talk **assistant** recording to
  * lock it hands-free, so you can release the hotkey and keep talking to the
  * assistant. Separate from the dictation `tap_to_lock_key` so it can be a
- * different combo (defaults to Space). Accepts a modifier ("shift", "ctrl",
- * …) or a plain key name ("space", "tab", …). Clear it (empty) to disable.
+ * different combo (defaults to Shift). Accepts a modifier ("shift", "ctrl",
+ * …) or a plain key name ("tab", "f8", …). Pick a key that isn't part of
+ * your assistant record shortcut — one that overlaps (e.g. Space while the
+ * shortcut is ctrl+alt+space) is ignored, since the held key would instantly
+ * lock the recording. Clear it (empty) to disable.
  */
 assistant_tap_to_lock_key?: string; audio_feedback: boolean; audio_feedback_volume?: number; sound_theme?: SoundTheme; start_hidden?: boolean; autostart_enabled?: boolean; update_checks_enabled?: boolean; selected_model?: string; always_on_microphone?: boolean; selected_microphone?: string | null; clamshell_microphone?: string | null; selected_output_device?: string | null; translate_to_english?: boolean; selected_language?: string; overlay_position?: OverlayPosition; debug_mode?: boolean; log_level?: LogLevel; custom_words?: string[]; 
 /**

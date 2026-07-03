@@ -2,11 +2,14 @@ import React from "react";
 import { useTranslation } from "react-i18next";
 import { Dropdown } from "../ui/Dropdown";
 import { SettingContainer } from "../ui/SettingContainer";
+import type { SettingIcon, SettingTone } from "../ui/tones";
 import { useSettings } from "@/hooks/useSettings";
 import type { UiTextSize } from "@/bindings";
 
 interface TextSizeSelectorProps {
   grouped?: boolean;
+  icon?: SettingIcon;
+  tone?: SettingTone;
 }
 
 /**
@@ -15,7 +18,7 @@ interface TextSizeSelectorProps {
  * together — no per-component font juggling.
  */
 export const TextSizeSelector: React.FC<TextSizeSelectorProps> = React.memo(
-  ({ grouped = false }) => {
+  ({ grouped = false, icon, tone }) => {
     const { t } = useTranslation();
     const { settings, updateSetting } = useSettings();
 
@@ -31,6 +34,8 @@ export const TextSizeSelector: React.FC<TextSizeSelectorProps> = React.memo(
       <SettingContainer
         title={t("appearance.textSize")}
         info={t("appearance.textSizeDescription")}
+        icon={icon}
+        tone={tone}
         grouped={grouped}
       >
         <Dropdown

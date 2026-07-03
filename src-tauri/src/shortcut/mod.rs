@@ -514,15 +514,13 @@ pub fn change_tap_to_lock_key_setting(app: AppHandle, key: String) -> Result<(),
 
 /// Set the key that a tap converts a hold **assistant** recording to hands-free.
 /// Separate from the dictation lock key so the assistant can use a different
-/// combo (defaults to Space). Accepts a modifier or a plain key name; empty
-/// disables it. Persisted; takes effect on the next assistant recording (the
+/// combo (defaults to Shift). Accepts a modifier or a plain key name; empty
+/// disables it. A key that overlaps the assistant record shortcut is ignored at
+/// arm time. Persisted; takes effect on the next assistant recording (the
 /// watcher reads it fresh each time it arms).
 #[tauri::command]
 #[specta::specta]
-pub fn change_assistant_tap_to_lock_key_setting(
-    app: AppHandle,
-    key: String,
-) -> Result<(), String> {
+pub fn change_assistant_tap_to_lock_key_setting(app: AppHandle, key: String) -> Result<(), String> {
     let mut settings = settings::get_settings(&app);
     settings.assistant_tap_to_lock_key = key;
     settings::write_settings(&app, settings);

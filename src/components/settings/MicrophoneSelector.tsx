@@ -3,15 +3,18 @@ import { useTranslation } from "react-i18next";
 import { Dropdown } from "../ui/Dropdown";
 import { SettingContainer } from "../ui/SettingContainer";
 import { ResetButton } from "../ui/ResetButton";
+import type { SettingIcon, SettingTone } from "../ui/tones";
 import { useSettings } from "../../hooks/useSettings";
 
 interface MicrophoneSelectorProps {
   descriptionMode?: "inline" | "tooltip";
   grouped?: boolean;
+  icon?: SettingIcon;
+  tone?: SettingTone;
 }
 
 export const MicrophoneSelector: React.FC<MicrophoneSelectorProps> = React.memo(
-  ({ descriptionMode = "tooltip", grouped = false }) => {
+  ({ descriptionMode = "tooltip", grouped = false, icon, tone }) => {
     const { t } = useTranslation();
     const {
       getSetting,
@@ -44,6 +47,8 @@ export const MicrophoneSelector: React.FC<MicrophoneSelectorProps> = React.memo(
     return (
       <SettingContainer
         title={t("settings.sound.microphone.title")}
+        icon={icon}
+        tone={tone}
         descriptionMode={descriptionMode}
         grouped={grouped}
       >

@@ -66,22 +66,31 @@ SpeakoFlow is a cross-platform desktop voice assistant (dictation, AI chat panel
   - `vad/` - Voice Activity Detection (Silero VAD)
 - `commands/` - Tauri command handlers for frontend communication
 - `cli.rs` - CLI argument definitions (clap derive)
-- `shortcut.rs` - Global keyboard shortcut handling
+- `shortcut/mod.rs` - Global keyboard shortcut handling (two engines: `handy-keys` and the Tauri global-shortcut plugin)
 - `settings.rs` - Application settings management
+- `secret_store.rs` - API keys in the OS keychain (`keyring`), hydrated into settings on load
+- `assistant.rs` - Assistant turn pipeline (LLM chat, screen vision, characters/personas)
+- `tts.rs` / `web_search.rs` - Spoken answers and optional web search
+- `transcription_coordinator.rs` - Single-threaded recording state machine (also gates tap-to-lock arming)
 - `overlay.rs` - Recording overlay window (platform-specific)
 - `signal_handle.rs` - `send_transcription_input()` reusable function
 - `utils.rs` - Platform detection helpers
 
 ### Frontend Structure (src/)
 
-- `App.tsx` - Main component with onboarding flow
+The app ships three Vite entry points: the main settings window (`App.tsx`), the
+floating assistant panel (`assistant/`), and the recording overlay (`overlay/`).
+
+- `App.tsx` - Main settings window: renders the custom `TitleBar`, the sidebar, and the active section (also drives the onboarding flow)
 - `components/` - React UI components:
-  - `settings/` - Settings UI
+  - `TitleBar.tsx` - Custom window chrome (brand wordmark + minimize/close). The native chrome is disabled in `lib.rs`, so this bar also acts as the drag region; macOS keeps native traffic lights via an overlay title bar
+  - `Sidebar.tsx` - Section navigation rail (`SECTIONS_CONFIG` defines the sections: general, models, advanced, history, post-processing, assistant, characters, debug, about)
+  - `settings/` - Settings UI, one folder/section (`general/`, `advanced/`, `history/`, `assistant/`, `models/`, `post-processing/`, `debug/`, `about/`) plus shared row components
   - `model-selector/` - Model management interface
   - `onboarding/` - First-run experience
-  - `overlay/` - Recording overlay UI
-  - `update-checker/` - App update notifications
-  - `shared/`, `ui/`, `icons/`, `footer/` - Shared components
+  - `ui/` - Shared primitives; `ui/tones.ts` defines the semantic icon-tile / pill color tones (`SettingTone`, `TONE_TILE`, `TONE_PILL`) used by the iOS-style setting rows
+  - `footer/`, `icons/` - Footer and icon components
+- `assistant/` - Floating always-on-top AI chat panel (own window): streaming chat, screen vision, TTS, collapse-to-pill (`AssistantPanel.tsx`, `preview.tsx`)
 - `hooks/useSettings.ts` - Settings state management hook
 - `stores/settingsStore.ts` - Zustand store for settings
 - `bindings.ts` - Auto-generated Tauri type bindings (via tauri-specta)
@@ -98,6 +107,10 @@ SpeakoFlow is a cross-platform desktop voice assistant (dictation, AI chat panel
 
 **State Flow:** Zustand → Tauri Command → Rust State → Persistence (tauri-plugin-store)
 
+**Custom Title Bar:** Native window decorations are disabled on Windows/Linux (`decorations(false)` in `lib.rs`); the webview draws the chrome via `TitleBar.tsx` (brand + minimize/close, which needs the `core:window:allow-minimize`/`allow-close` capabilities). macOS keeps the window decorated with an overlay title bar (`TitleBarStyle::Overlay` + `hidden_title`) so the native traffic lights still work. Close hides to the tray (see `on_window_event`).
+
+**Paste Safety Net:** Synthetic-paste flows (`input.rs`) always release modifiers after a key combo, via `input::release_all_modifiers`, so an interrupted paste can never leave Ctrl/Shift/Alt/Cmd stuck "pressed" at the OS level.
+
 ### Technology Stack
 
 **Core Libraries:**
@@ -105,7 +118,8 @@ SpeakoFlow is a cross-platform desktop voice assistant (dictation, AI chat panel
 - `whisper-rs` - Local Whisper inference with GPU acceleration
 - `cpal` - Cross-platform audio I/O
 - `vad-rs` - Voice Activity Detection
-- `rdev` - Global keyboard shortcuts
+- `handy-keys` - Global keyboard shortcuts (supports modifier-only combos like `Ctrl+Super`); Tauri's global-shortcut plugin is the alternative engine, selected via the `keyboard_implementation` setting
+- `rdev` - Low-level input access (cursor position / virtual input)
 - `rubato` - Audio resampling
 - `rodio` - Audio playback for feedback sounds
 

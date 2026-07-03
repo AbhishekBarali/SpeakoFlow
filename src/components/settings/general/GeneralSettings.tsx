@@ -1,6 +1,19 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
 import { type } from "@tauri-apps/plugin-os";
+import {
+  Keyboard,
+  AudioLines,
+  Ban,
+  Lock,
+  Palette,
+  SunMoon,
+  Type,
+  Volume2,
+  Mic,
+  MicOff,
+  Headphones,
+} from "lucide-react";
 import { MicrophoneSelector } from "../MicrophoneSelector";
 import { ShortcutInput } from "../ShortcutInput";
 import { SettingsGroup } from "../../ui/SettingsGroup";
@@ -21,26 +34,65 @@ export const GeneralSettings: React.FC = () => {
   const isLinux = type() === "linux";
   return (
     <div className="max-w-2xl w-full mx-auto space-y-8">
-      <SettingsGroup title={t("settings.general.shortcut.title")}>
-        <ShortcutInput shortcutId="transcribe" grouped={true} />
+      <SettingsGroup title={t("settings.general.shortcut.title")} icon={Keyboard}>
+        <ShortcutInput
+          shortcutId="transcribe"
+          grouped={true}
+          icon={AudioLines}
+          tone="teal"
+        />
         {/* Cancel shortcut is hidden on Linux (dynamic shortcut instability). */}
-        {!isLinux && <ShortcutInput shortcutId="cancel" grouped={true} />}
-        <TapToLock descriptionMode="tooltip" grouped={true} />
+        {!isLinux && (
+          <ShortcutInput
+            shortcutId="cancel"
+            grouped={true}
+            icon={Ban}
+            tone="rose"
+          />
+        )}
+        <TapToLock
+          descriptionMode="tooltip"
+          grouped={true}
+          icon={Lock}
+          tone="violet"
+        />
       </SettingsGroup>
-      <SettingsGroup title={t("appearance.title")}>
-        <AppearanceSelector descriptionMode="tooltip" grouped={true} />
-        <TextSizeSelector grouped={true} />
+      <SettingsGroup title={t("appearance.title")} icon={Palette}>
+        <AppearanceSelector
+          descriptionMode="tooltip"
+          grouped={true}
+          icon={SunMoon}
+          tone="amber"
+        />
+        <TextSizeSelector grouped={true} icon={Type} tone="sky" />
       </SettingsGroup>
       <ModelSettingsCard />
-      <SettingsGroup title={t("settings.sound.title")}>
-        <MicrophoneSelector descriptionMode="tooltip" grouped={true} />
-        <AudioFeedback descriptionMode="tooltip" grouped={true} />
+      <SettingsGroup title={t("settings.sound.title")} icon={Volume2}>
+        <MicrophoneSelector
+          descriptionMode="tooltip"
+          grouped={true}
+          icon={Mic}
+          tone="teal"
+        />
+        <AudioFeedback
+          descriptionMode="tooltip"
+          grouped={true}
+          icon={Volume2}
+          tone="amber"
+        />
         <MoreOptions>
-          <MuteWhileRecording descriptionMode="tooltip" grouped={true} />
+          <MuteWhileRecording
+            descriptionMode="tooltip"
+            grouped={true}
+            icon={MicOff}
+            tone="rose"
+          />
           <OutputDeviceSelector
             descriptionMode="tooltip"
             grouped={true}
             disabled={!audioFeedbackEnabled}
+            icon={Headphones}
+            tone="sky"
           />
           <VolumeSlider disabled={!audioFeedbackEnabled} />
         </MoreOptions>

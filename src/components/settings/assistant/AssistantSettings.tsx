@@ -656,7 +656,7 @@ export const AssistantSettings: React.FC = () => {
         <TapToLock
           grouped={true}
           settingKey="assistant_tap_to_lock_key"
-          fallback="space"
+          fallback="shift"
           labelKey="settings.assistant.tapToLock.label"
           infoKey="settings.assistant.tapToLock.info"
           offKey="settings.assistant.tapToLock.off"

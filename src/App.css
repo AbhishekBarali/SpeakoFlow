@@ -16,22 +16,22 @@
  * under :root[data-theme="dark"] further below. Inter carries the whole UI.
  */
 @theme {
-  /* === Surfaces (neutral, cool-tinted grays) === */
-  --color-canvas: #f5f5f7; /* page floor */
-  --color-canvas-soft: #ebebed; /* sidebar / footer bands */
-  --color-surface: #ffffff; /* cards */
-  --color-surface-strong: #e9e9ec; /* badges, plates, hover fills */
+  /* === Surfaces (warm cream — stepped so white cards pop off the pane) === */
+  --color-canvas: #f3ecdd; /* content pane floor (soft cream) */
+  --color-canvas-soft: #e8ddc9; /* chrome: title bar / sidebar / footer */
+  --color-surface: #fffdf8; /* cards (bright warm white — floats on the pane) */
+  --color-surface-strong: #ebe0cb; /* badges, plates, hover fills */
 
-  /* === Ink / text (neutral near-black) === */
-  --color-ink: #1d1d1f; /* display + primary text */
-  --color-ink-soft: #303033; /* emphasis */
-  --color-body: #47474c; /* running text */
-  --color-muted: #75757c; /* sub-titles, captions */
-  --color-muted-soft: #b3b3ba; /* disabled, hints */
+  /* === Ink / text (warm near-black) === */
+  --color-ink: #2a2620; /* display + primary text */
+  --color-ink-soft: #3b352c; /* emphasis */
+  --color-body: #574f42; /* running text */
+  --color-muted: #756c5c; /* sub-titles, captions */
+  --color-muted-soft: #afa593; /* disabled, hints */
 
-  /* === Hairlines === */
-  --color-hairline: #e4e4e8; /* default 1px divider */
-  --color-hairline-strong: #d4d4da; /* stronger panel outline */
+  /* === Hairlines (warm) === */
+  --color-hairline: #e4d9c4; /* default 1px divider */
+  --color-hairline-strong: #d2c5ac; /* stronger panel outline */
 
   /* === Accent (deep teal — the one color moment) ===
    * Voice is a wave; "Flow" is the brand. A petrol teal reads calm and
@@ -59,10 +59,10 @@
   --color-text: var(--color-ink);
   --color-background-ui: var(--color-accent); /* primary action fill */
   --color-logo-primary: var(--color-accent); /* accent / active */
-  --color-logo-stroke: #303033;
+  --color-logo-stroke: #3b352c;
   --color-text-stroke: #ffffff;
   /* neutral gray: solid it reads as a muted label, at low opacity ≈ a hairline */
-  --color-mid-gray: #8e8e93;
+  --color-mid-gray: #8b8272;
 
   /* === Type families ===
    * One family across the app: Inter. Weight + size carry the hierarchy
@@ -135,19 +135,19 @@
  * the stored preference (so a system-dark user never flashes light). */
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --color-canvas: #1c1c1e;
-  --color-canvas-soft: #161618;
-  --color-surface: #26262a;
-  --color-surface-strong: #35353b;
+  --color-canvas: #1d1a16;
+  --color-canvas-soft: #161410;
+  --color-surface: #2c2823;
+  --color-surface-strong: #3b362e;
 
-  --color-ink: #f5f5f7;
-  --color-ink-soft: #e4e4e7;
-  --color-body: #d1d1d6;
-  --color-muted: #98989f;
-  --color-muted-soft: #606067;
+  --color-ink: #f6f3ec;
+  --color-ink-soft: #e6e1d7;
+  --color-body: #d3cdc1;
+  --color-muted: #9c9488;
+  --color-muted-soft: #635d52;
 
-  --color-hairline: #34343a;
-  --color-hairline-strong: #45454c;
+  --color-hairline: #35312a;
+  --color-hairline-strong: #48423a;
 
   /* Accent lifts to a luminous teal so it reads as color, not glare, on the
    * near-black surfaces; on-color text flips to a deep teal-black. */
@@ -164,8 +164,8 @@
   --color-text: var(--color-ink);
   --color-background-ui: var(--color-accent);
   --color-logo-primary: var(--color-accent);
-  --color-logo-stroke: #e4e4e7;
-  --color-mid-gray: #98989d;
+  --color-logo-stroke: #e6e1d7;
+  --color-mid-gray: #9c9488;
 }
 
 /* Pre-JS fallback: honor the OS preference only until the data-theme attribute
@@ -199,8 +199,8 @@
     --color-text: var(--color-ink);
     --color-background-ui: var(--color-accent);
     --color-logo-primary: var(--color-accent);
-    --color-logo-stroke: #e4e4e7;
-    --color-mid-gray: #98989d;
+    --color-logo-stroke: #e6e1d7;
+    --color-mid-gray: #9c9488;
   }
 }
 
@@ -247,4 +247,70 @@
   fill: var(--color-logo-stroke);
   stroke: var(--color-logo-stroke);
   stroke-width: 1;
+}
+
+/* ============================================================================
+ * Depth — soft, warm-tinted elevation + subtle glass
+ * ----------------------------------------------------------------------------
+ * The flat design read as "colored but lifeless". These give tactile depth:
+ * cards float, tiles and pills feel like raised soft chips, floating menus
+ * frost the content behind them. Shadows are tinted warm (not pure black) so
+ * they sit naturally on the cream palette and stay subtle; dark mode swaps to
+ * deeper, cooler shadows. Kept gentle on purpose — depth, not drop-shadow soup.
+ * ==========================================================================*/
+@layer components {
+  /* Grouped setting cards — clearly float above the pane (layered soft shadow
+   * + a faint top highlight for the "lit from above" cue). */
+  .elev-card {
+    box-shadow:
+      0 1px 2px rgba(72, 58, 34, 0.07),
+      0 6px 14px -4px rgba(72, 58, 34, 0.13),
+      0 18px 34px -14px rgba(72, 58, 34, 0.18),
+      inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  }
+
+  /* Small controls (icon tiles, shortcut pills) — soft raised chip: top
+   * highlight + real drop shadow, the core neumorphic cue. */
+  .elev-chip {
+    box-shadow:
+      0 2px 5px rgba(72, 58, 34, 0.2),
+      0 1px 1px rgba(72, 58, 34, 0.1),
+      inset 0 1px 0 rgba(255, 255, 255, 0.75);
+  }
+
+  /* The content pane, lifted off the chrome toward the sidebar. */
+  .elev-pane {
+    box-shadow:
+      -2px 0 14px -6px rgba(72, 58, 34, 0.12),
+      -10px 0 44px -22px rgba(72, 58, 34, 0.22);
+  }
+
+  /* Frosted glass for floating menus / popovers (they overlay real content,
+   * so the blur is genuinely visible). */
+  .glass-menu {
+    background-color: color-mix(in srgb, var(--color-surface) 82%, transparent);
+    backdrop-filter: saturate(160%) blur(20px);
+    -webkit-backdrop-filter: saturate(160%) blur(20px);
+  }
+}
+
+:root[data-theme="dark"] .elev-card {
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.5),
+    0 6px 14px -4px rgba(0, 0, 0, 0.5),
+    0 18px 36px -14px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+:root[data-theme="dark"] .elev-chip {
+  box-shadow:
+    0 2px 5px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+:root[data-theme="dark"] .elev-pane {
+  box-shadow:
+    -2px 0 16px -6px rgba(0, 0, 0, 0.4),
+    -10px 0 48px -22px rgba(0, 0, 0, 0.55);
+}
+:root[data-theme="dark"] .glass-menu {
+  background-color: color-mix(in srgb, var(--color-surface) 80%, transparent);
 }
