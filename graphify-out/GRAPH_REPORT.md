@@ -1,16 +1,16 @@
-# Graph Report - handy  (2026-07-02)
+# Graph Report - handy  (2026-07-03)
 
 ## Corpus Check
-- 272 files · ~357,740 words
+- 275 files · ~375,558 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 2905 nodes · 6151 edges · 168 communities (152 shown, 16 thin omitted)
-- Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 217 edges (avg confidence: 0.81)
+- 2949 nodes · 6311 edges · 167 communities (151 shown, 16 thin omitted)
+- Extraction: 97% EXTRACTED · 3% INFERRED · 0% AMBIGUOUS · INFERRED: 217 edges (avg confidence: 0.81)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `ccef17be`
+- Built from commit: `7f465dab`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -101,7 +101,7 @@
 - [[_COMMUNITY_compilerOptions|compilerOptions]]
 - [[_COMMUNITY_utils|utils]]
 - [[_COMMUNITY_clamshell|clamshell]]
-- [[_COMMUNITY_get_bindings|get_bindings]]
+- [[_COMMUNITY_Community 86|Community 86]]
 - [[_COMMUNITY_build|build]]
 - [[_COMMUNITY_security|security]]
 - [[_COMMUNITY_bundle|bundle]]
@@ -157,7 +157,6 @@
 - [[_COMMUNITY_Community 153|Community 153]]
 - [[_COMMUNITY_Community 154|Community 154]]
 - [[_COMMUNITY_Community 155|Community 155]]
-- [[_COMMUNITY_Community 156|Community 156]]
 - [[_COMMUNITY_Community 158|Community 158]]
 - [[_COMMUNITY_Community 159|Community 159]]
 - [[_COMMUNITY_Community 160|Community 160]]
@@ -172,13 +171,13 @@
 ## God Nodes (most connected - your core abstractions)
 1. `get_settings()` - 102 edges
 2. `useSettings()` - 81 edges
-3. `String` - 62 edges
-4. `String` - 61 edges
-5. `AppHandle` - 60 edges
+3. `String` - 64 edges
+4. `AppHandle` - 62 edges
+5. `String` - 61 edges
 6. `Result` - 59 edges
-7. `Result` - 57 edges
-8. `AppHandle` - 54 edges
-9. `get_default_settings()` - 54 edges
+7. `Result` - 59 edges
+8. `get_default_settings()` - 56 edges
+9. `AppHandle` - 54 edges
 10. `AppSettings` - 45 edges
 
 ## Surprising Connections (you probably didn't know these)
@@ -225,31 +224,31 @@
 - **Tray Status Indicator (idle/recording/transcribing)** — resources_tray_idle, resources_tray_recording, resources_tray_transcribing [INFERRED 0.75]
 - **SpeakoFlow Logo Asset Set** — icons_logo, icons_icon, resources_speakoflow, public_favicon [INFERRED 0.75]
 
-## Communities (168 total, 16 thin omitted)
+## Communities (167 total, 16 thin omitted)
 
 ### Community 0 - "Tauri Commands & Settings API"
 Cohesion: 0.07
-Nodes (111): AssistantCharacter, AssistantResponseLength, AzureVoice, assistant_begin_region_snip(), assistant_clear_conversation(), assistant_export_character(), assistant_finish_region_snip(), assistant_generate_character() (+103 more)
+Nodes (109): AssistantCharacter, AssistantResponseLength, AzureVoice, assistant_begin_region_snip(), assistant_clear_conversation(), assistant_export_character(), assistant_finish_region_snip(), assistant_generate_character() (+101 more)
 
 ### Community 1 - "Core Rust Command Modules"
-Cohesion: 0.09
-Nodes (82): AvailableAccelerators, KeyboardImplementation, LLMPrompt, OrtAcceleratorSetting, add_post_process_prompt(), apply_and_reload_accelerator(), BindingResponse, change_app_language_setting() (+74 more)
+Cohesion: 0.08
+Nodes (84): AvailableAccelerators, KeyboardImplementation, LLMPrompt, OrtAcceleratorSetting, add_post_process_prompt(), apply_and_reload_accelerator(), BindingResponse, change_app_language_setting() (+76 more)
 
 ### Community 2 - "Community 2"
 Cohesion: 0.11
 Nodes (21): contentMaxX, contentMaxY, contentMinY, font, fontBuf, glyphs, ICON_SIZES, original (+13 more)
 
 ### Community 3 - "Post-Processing Settings UI"
-Cohesion: 0.06
-Nodes (31): AboutSettings(), ACKNOWLEDGMENTS, IMAGE_EXTENSIONS, DebugPathsProps, LogDirectory(), LogDirectoryProps, LOG_LEVEL_OPTIONS, LogLevelSelector() (+23 more)
+Cohesion: 0.07
+Nodes (31): KEYBOARD_IMPLEMENTATION_OPTIONS, KeyboardImplementationSelector(), KeyboardImplementationSelectorProps, LOG_LEVEL_OPTIONS, LogLevelSelectorProps, PostProcessingSettingsApi, PostProcessingSettingsApiComponent(), PostProcessingSettingsPrompts (+23 more)
 
 ### Community 4 - "Web Search Backend"
 Cohesion: 0.09
 Nodes (61): AppSettings, AssistantSearchDepth, Client, Duration, Option, PostProcessProvider, Result, Self (+53 more)
 
 ### Community 5 - "Model Selection UI"
-Cohesion: 0.06
-Nodes (37): Footer(), LlmModelSelector(), ModelDropdownProps, ModelSelector(), ModelSelectorProps, ModelStatus, ModelStatus, ModelStatusButton() (+29 more)
+Cohesion: 0.13
+Nodes (14): ModelSelector(), AddCustomModelDialog(), AddCustomModelDialogProps, CATEGORY_TABS, ModelsSettings(), HfGgufFile, HfModelSummary, HfRepoFiles (+6 more)
 
 ### Community 6 - "Model Manager"
 Cohesion: 0.10
@@ -276,8 +275,8 @@ Cohesion: 0.09
 Nodes (30): boosts_quiet_audio_toward_target(), caps_gain_for_near_silent_noise(), does_not_attenuate_loud_audio(), normalize_peak(), output_is_always_in_range(), silence_is_noop(), apply_accelerator_settings(), AvailableAccelerators (+22 more)
 
 ### Community 12 - "TS Bindings & Assistant Settings"
-Cohesion: 0.05
-Nodes (38): KOKORO_DTYPES, KOKORO_VOICES, TEST_PHRASES, TTS_SPEED_PRESETS, ModelUnloadTimeoutProps, ModelUnloadTimeoutSetting(), AssistantCharacterKind, AssistantResponseLength (+30 more)
+Cohesion: 0.04
+Nodes (57): KOKORO_DTYPES, KOKORO_VOICES, TEST_PHRASES, TTS_SPEED_PRESETS, PostProcessProviderState, AccelerationSelector(), AccelerationSelectorProps, encodeWhisperValue() (+49 more)
 
 ### Community 13 - "Audio Recording Manager"
 Cohesion: 0.09
@@ -285,7 +284,7 @@ Nodes (28): CpalDeviceInfo, list_input_devices(), list_output_devices(), AudioRe
 
 ### Community 14 - "App Bootstrap (lib.rs)"
 Cohesion: 0.09
-Nodes (37): CliArgs, cancel_operation(), commit_recording(), get_app_dir_path(), get_app_settings(), get_default_settings(), get_log_dir_path(), initialize_enigo() (+29 more)
+Nodes (43): cancel_operation(), commit_recording(), get_app_dir_path(), get_app_settings(), get_default_settings(), get_log_dir_path(), initialize_enigo(), initialize_shortcuts() (+35 more)
 
 ### Community 15 - "Audio Recorder Pipeline"
 Cohesion: 0.10
@@ -297,27 +296,27 @@ Nodes (40): apply_custom_words(), build_ngram(), collapse_stutters(), extract_pu
 
 ### Community 17 - "Global Keyboard Shortcuts"
 Cohesion: 0.13
-Nodes (31): HotkeyId, HotkeyManager, Modifiers, FrontendKeyEvent, HandyKeysState, init_shortcuts(), ManagerCommand, modifiers_to_strings() (+23 more)
+Nodes (31): HotkeyId, HotkeyManager, FrontendKeyEvent, HandyKeysState, init_shortcuts(), ManagerCommand, modifiers_to_strings(), register_cancel_shortcut() (+23 more)
 
 ### Community 18 - "Advanced Settings & Text Replacements UI"
-Cohesion: 0.10
-Nodes (23): AppendTrailingSpace, AppendTrailingSpaceProps, AutostartToggle, AutostartToggleProps, ExperimentalToggle, ExperimentalToggleProps, LazyStreamClose, LazyStreamCloseProps (+15 more)
+Cohesion: 0.07
+Nodes (34): UseSettingsReturn, AppendTrailingSpace, AppendTrailingSpaceProps, AutostartToggle, AutostartToggleProps, AutoSubmit, AutoSubmitOptionValue, AutoSubmitProps (+26 more)
 
 ### Community 19 - "Clipboard & Paste Output"
 Cohesion: 0.15
 Nodes (36): AutoSubmitKey, PasteMethod, get_available_typing_tools(), is_dotool_available(), is_kwtype_available(), is_wl_copy_available(), is_wtype_available(), is_xdotool_available() (+28 more)
 
 ### Community 20 - "Debug Settings & Sidebar UI"
-Cohesion: 0.07
-Nodes (30): UseSettingsReturn, ResetIconProps, AppearanceSelector, AppearanceSelectorProps, AudioFeedback, AudioFeedbackProps, ClamshellMicrophoneSelectorProps, MicrophoneSelector (+22 more)
+Cohesion: 0.12
+Nodes (16): ACKNOWLEDGMENTS, LogDirectory(), LogDirectoryProps, ModelSettingsCard(), AppDataDirectory(), AppDataDirectoryProps, AppLanguageSelector, AppLanguageSelectorProps (+8 more)
 
 ### Community 21 - "Product Docs & Design Concepts"
 Cohesion: 0.20
 Nodes (11): Pipeline Processing, Silero VAD, whisper-rs, ONNX Runtime, 📖 Philosophy, Secure API-Key Storage (planned), keyring crate, Eager/Streaming Transcription (+3 more)
 
 ### Community 22 - "Settings Defaults"
-Cohesion: 0.10
-Nodes (34): debug_output_redacts_api_keys(), default_app_language(), default_assistant_max_history_messages(), default_assistant_panel_opacity(), default_assistant_provider_id(), default_assistant_screenshot_enabled(), default_assistant_tts_speed(), default_assistant_web_search_daily_credit_budget() (+26 more)
+Cohesion: 0.09
+Nodes (36): debug_output_redacts_api_keys(), default_app_language(), default_assistant_max_history_messages(), default_assistant_panel_opacity(), default_assistant_provider_id(), default_assistant_screenshot_enabled(), default_assistant_tap_to_lock_key(), default_assistant_tts_speed() (+28 more)
 
 ### Community 23 - "LLM Client"
 Cohesion: 0.12
@@ -325,15 +324,15 @@ Nodes (39): ChatChoice, ChatMessageResponse, HeaderMap, azure_openai_host(), bui
 
 ### Community 24 - "Shortcut Input Components"
 Cohesion: 0.11
-Nodes (23): HistorySettings(), useOsType(), AutoSubmit, AutoSubmitOptionValue, AutoSubmitProps, GlobalShortcutInput(), GlobalShortcutInputProps, HandyKeysEvent (+15 more)
+Nodes (34): DebugPathsProps, useOsType(), ResetIconProps, AppearanceSelectorProps, AudioFeedbackProps, GlobalShortcutInput(), GlobalShortcutInputProps, HandyKeysEvent (+26 more)
 
 ### Community 25 - "Transcription Coordinator & Shortcuts"
-Cohesion: 0.12
-Nodes (25): handle_shortcut_event(), init_shortcuts(), register_cancel_shortcut(), register_one(), register_shortcut(), unregister_cancel_shortcut(), unregister_one(), unregister_shortcut() (+17 more)
+Cohesion: 0.11
+Nodes (26): handle_shortcut_event(), init_shortcuts(), register_cancel_shortcut(), register_one(), register_shortcut(), unregister_cancel_shortcut(), unregister_one(), unregister_shortcut() (+18 more)
 
 ### Community 26 - "App Settings Model"
-Cohesion: 0.15
-Nodes (10): Default, AutoSubmitKey, ClipboardHandling, KeyboardImplementation, PasteMethod, Theme, TypingTool, UiTextSize (+2 more)
+Cohesion: 0.13
+Nodes (12): Default, AutoSubmitKey, ClipboardHandling, KeyboardImplementation, OrtAcceleratorSetting, PasteMethod, persist_hydrated_secrets(), Theme (+4 more)
 
 ### Community 27 - "Frontend Dependencies"
 Cohesion: 0.07
@@ -344,12 +343,12 @@ Cohesion: 0.27
 Nodes (27): add_custom_llm_model(), cancel_download(), delete_model(), download_model(), get_available_models(), get_current_model(), get_model_info(), get_transcription_model_status() (+19 more)
 
 ### Community 29 - "Settings Store & Acceleration"
-Cohesion: 0.10
-Nodes (21): KEYBOARD_IMPLEMENTATION_OPTIONS, KeyboardImplementationSelector(), KeyboardImplementationSelectorProps, ProviderSelectProps, AccelerationSelector(), AccelerationSelectorProps, encodeWhisperValue(), ORT_LABELS (+13 more)
+Cohesion: 0.16
+Nodes (18): CliArgs, Filter, LevelFilter, Signals, build_console_filter(), initialize_core_logic(), level_filter_from_u8(), run() (+10 more)
 
 ### Community 30 - "System Tray"
-Cohesion: 0.05
-Nodes (85): is_microphone_access_denied(), is_no_input_device_error(), BaseDirectory, delete_assistant_history_entry(), delete_history_entry(), get_assistant_history_entries(), get_audio_file_path(), get_history_entries() (+77 more)
+Cohesion: 0.06
+Nodes (69): is_microphone_access_denied(), is_no_input_device_error(), delete_assistant_history_entry(), delete_history_entry(), get_assistant_history_entries(), get_audio_file_path(), get_history_entries(), retry_history_entry_transcription() (+61 more)
 
 ### Community 31 - "General Settings UI"
 Cohesion: 0.14
@@ -364,8 +363,8 @@ Cohesion: 0.15
 Nodes (15): apply_accelerator_settings(), AvailableAccelerators, get_available_accelerators(), GpuDeviceOption, LoadingGuard, ModelStateEvent, TranscriptionManager, AppHandle (+7 more)
 
 ### Community 34 - "Secret Store & Settings Load"
-Cohesion: 0.10
-Nodes (18): D, Debug, Deref, DerefMut, Deserialize, From, default_tts_base_url_for_engine(), default_tts_model_for_engine() (+10 more)
+Cohesion: 0.12
+Nodes (16): D, Debug, Deref, DerefMut, Deserialize, From, hydrate_secrets(), LogLevel (+8 more)
 
 ### Community 35 - "TypeScript Config"
 Cohesion: 0.08
@@ -376,16 +375,16 @@ Cohesion: 0.22
 Nodes (16): main(), print_devices(), print_help(), RecorderMode, RecorderState, save_audio(), CpalDeviceInfo, Display (+8 more)
 
 ### Community 37 - "Assistant Defaults & Sound Theme"
-Cohesion: 0.14
-Nodes (20): AssistantCharacter, AssistantCharacterKind, default_active_character_id(), default_assistant_character(), default_assistant_characters(), default_assistant_font_size(), default_assistant_panel_size(), default_assistant_system_prompt() (+12 more)
+Cohesion: 0.12
+Nodes (23): AssistantCharacter, AssistantCharacterKind, default_active_character_id(), default_assistant_character(), default_assistant_characters(), default_assistant_font_size(), default_assistant_panel_size(), default_assistant_system_prompt() (+15 more)
 
 ### Community 38 - "Community 38"
-Cohesion: 0.29
-Nodes (9): applyCachedTheme(), applyThemePreference(), getCachedPreference(), isValidPreference(), prefersDark(), ResolvedTheme, resolveTheme(), setResolvedAttribute() (+1 more)
+Cohesion: 0.15
+Nodes (16): Footer(), applyCachedTheme(), applyThemePreference(), getCachedPreference(), isValidPreference(), prefersDark(), ResolvedTheme, resolveTheme() (+8 more)
 
 ### Community 39 - "History Settings UI"
-Cohesion: 0.19
-Nodes (9): Language, LANGUAGES, ModelSettingsCard(), LanguageSelector(), LanguageSelectorProps, TranslateToEnglish, TranslateToEnglishProps, SettingsGroup() (+1 more)
+Cohesion: 0.23
+Nodes (21): BaseDirectory, get_sound_base_dir(), get_sound_path(), play_audio_file(), play_feedback_sound(), play_feedback_sound_blocking(), play_sound_async(), play_sound_at_path() (+13 more)
 
 ### Community 40 - "Nix Build Scripts"
 Cohesion: 0.15
@@ -396,24 +395,24 @@ Cohesion: 0.16
 Nodes (13): app_data_dir(), app_log_dir(), data_dir(), init(), is_valid_portable_marker(), resolve_app_data(), store_path(), AppHandle (+5 more)
 
 ### Community 42 - "Audio Waveform & Shared UI"
-Cohesion: 0.18
-Nodes (10): Demo, DEMOS, Pill(), useFakeLevels(), AudioWaveform(), AudioWaveformProps, resample(), SELF_SILHOUETTE (+2 more)
+Cohesion: 0.13
+Nodes (12): Demo, DEMOS, Pill(), useFakeLevels(), AudioWaveform(), AudioWaveformProps, resample(), SELF_SILHOUETTE (+4 more)
 
 ### Community 43 - "i18n, RTL & Overlay"
-Cohesion: 0.20
-Nodes (14): getSupportedLanguage(), localeModules, resources, SUPPORTED_LANGUAGES, SupportedLanguageCode, syncLanguageFromSettings(), LANGUAGE_METADATA, OverlayState (+6 more)
+Cohesion: 0.15
+Nodes (15): Rect, getSupportedLanguage(), localeModules, resources, SUPPORTED_LANGUAGES, SupportedLanguageCode, syncLanguageFromSettings(), LANGUAGE_METADATA (+7 more)
 
 ### Community 44 - "Paste & Custom Words UI"
-Cohesion: 0.09
-Nodes (23): PostProcessingSettings(), PostProcessingSettingsApi, PostProcessingSettingsApiComponent(), PostProcessingSettingsPrompts, PostProcessingSettingsPromptsComponent(), ApiKeyField, ApiKeyFieldProps, BaseUrlField (+15 more)
+Cohesion: 0.10
+Nodes (14): IMAGE_EXTENSIONS, ApiKeyField, ApiKeyFieldProps, BaseUrlField, BaseUrlFieldProps, CustomWords, CustomWordsProps, HistoryLimitProps (+6 more)
 
 ### Community 45 - "huggingface"
 Cohesion: 0.21
 Nodes (14): extract_quant(), HfGgufFile, HfModelSummary, HfRepoFiles, list_repo_gguf_files(), RawHfModel, RawTreeEntry, resolve_url() (+6 more)
 
 ### Community 46 - "AboutSettings"
-Cohesion: 0.09
-Nodes (31): AdvancedSettings(), AssistantSettings(), CharactersSettings(), Logo(), LogoProps, LogoLockup(), LogoLockupProps, IconProps (+23 more)
+Cohesion: 0.07
+Nodes (46): AboutSettings(), AdvancedSettings(), AssistantSettings(), CharactersSettings(), Logo(), LogoProps, LogoLockup(), LogoLockupProps (+38 more)
 
 ### Community 47 - "apple_intelligence.swift"
 Cohesion: 0.18
@@ -428,12 +427,8 @@ Cohesion: 0.15
 Nodes (17): Assistant turn assembly (run_assistant_turn), Prompts Reference (map of every LLM instruction), Assistant system prompt, Web-search grounding directive, P11 — Assistant Settings Split & Personas, P3 — Update System, Tray Home & About, P6 — Provider Audit (LLM, Web Search, TTS), SpeakoFlow Release Checklist (progress tracker) (+9 more)
 
 ### Community 50 - "AssistantPanel"
-Cohesion: 0.09
-Nodes (16): AssistantError, AssistantErrorKind, ERROR_KINDS, errorKind(), FONT_SIZES, AssistantPanel(), AssistantState, DisplayMessage (+8 more)
-
-### Community 51 - "App"
-Cohesion: 0.19
-Nodes (9): ButtonConfig, PermissionState, SidebarSection, watchSystemTheme(), App(), OnboardingStep, renderSettingsContent(), ModelStateEvent (+1 more)
+Cohesion: 0.08
+Nodes (19): AssistantError, AssistantErrorKind, ERROR_KINDS, errorKind(), FONT_SIZES, AssistantPanel(), AssistantState, DisplayMessage (+11 more)
 
 ### Community 52 - "screenshot"
 Cohesion: 0.26
@@ -460,8 +455,8 @@ Cohesion: 0.33
 Nodes (13): get_local_llm_status(), set_local_llm_context_size(), set_local_llm_unload_timeout(), start_local_llm(), stop_local_llm(), LocalLlmManager, LocalLlmStatus, AppHandle (+5 more)
 
 ### Community 58 - "input"
-Cohesion: 0.27
-Nodes (12): EnigoState, get_cursor_position(), paste_text_direct(), send_paste_ctrl_shift_v(), send_paste_ctrl_v(), send_paste_shift_insert(), AppHandle, Enigo (+4 more)
+Cohesion: 0.26
+Nodes (13): EnigoState, get_cursor_position(), paste_text_direct(), release_all_modifiers(), send_paste_ctrl_shift_v(), send_paste_ctrl_v(), send_paste_shift_insert(), AppHandle (+5 more)
 
 ### Community 59 - "Select"
 Cohesion: 0.18
@@ -472,8 +467,8 @@ Cohesion: 0.21
 Nodes (10): colorize(), colors, __dirname, getAllKeyPaths(), LANGUAGES, loadTranslationFile(), LOCALES_DIR, TranslationData (+2 more)
 
 ### Community 61 - "LockWatch"
-Cohesion: 0.24
-Nodes (9): create_listener(), LockWatch, run(), AppHandle, Arc, AtomicBool, KeyboardListener, Option (+1 more)
+Cohesion: 0.23
+Nodes (15): create_listener(), LockCombo, LockWatch, modifier_bit(), normalize_key_name(), parse_lock_combo(), run(), AppHandle (+7 more)
 
 ### Community 62 - "FrameResampler"
 Cohesion: 0.24
@@ -571,9 +566,9 @@ Nodes (6): read_wav_samples(), save_wav_file(), verify_wav_file(), P, Result, Ve
 Cohesion: 0.48
 Nodes (6): is_clamshell(), is_laptop(), test_clamshell_check(), test_is_laptop(), Result, String
 
-### Community 86 - "get_bindings"
-Cohesion: 0.40
-Nodes (6): default_model_for_provider(), default_post_process_api_keys(), default_post_process_models(), default_post_process_providers(), ensure_post_process_defaults(), HashMap
+### Community 86 - "Community 86"
+Cohesion: 0.17
+Nodes (13): Language, LANGUAGES, LlmModelSelector(), ModelDropdownProps, getLanguageDisplayText(), ModelCard(), ModelCardProps, ModelInfo (+5 more)
 
 ### Community 87 - "build"
 Cohesion: 0.48
@@ -596,8 +591,8 @@ Cohesion: 0.33
 Nodes (6): Capitalization, default_post_process_prompts(), default_text_replacements(), LLMPrompt, Replacement, Vec
 
 ### Community 92 - "Community 92"
-Cohesion: 0.33
-Nodes (4): KokoroModel, ProgressEvent, TextSplitter, TtsStatus
+Cohesion: 0.11
+Nodes (16): allGlyphs, boxRx, contentMaxX, contentMaxY, contentMinY, font, fontBuf, ICON_SIZES (+8 more)
 
 ### Community 93 - "macOS"
 Cohesion: 0.33
@@ -684,20 +679,20 @@ Cohesion: 0.05
 Nodes (36): 0. Architecture snapshot (so any session has context), 1. How to run parallel sessions safely, 2. Release scope decision (do this first, 30 min, human), 3. The six tracks and their conflict matrix, 4. Tasks by phase (each block = one AI session), 5. Parallelization waves (the actual schedule), 6. Pre-release QA & security checklist (the "what else to test"), 7. Explicitly post-v1 (do not block release) (+28 more)
 
 ### Community 124 - "Community 124"
-Cohesion: 0.14
-Nodes (26): Option, String, AppHandle, HistoryEntry, Option, String, WebviewWindow, AppTheme (+18 more)
+Cohesion: 0.17
+Nodes (10): Wordmark(), WordmarkProps, AccessibilityOnboarding(), AccessibilityOnboardingProps, PermissionPlatform, PermissionsState, PermissionStatus, ModelCardStatus (+2 more)
 
 ### Community 143 - "Community 143"
-Cohesion: 0.17
-Nodes (11): AppSettings, AssistantResponseLength, AssistantSearchDepth, hydrate_secrets(), load_or_create_app_settings(), migrate_plaintext_secrets(), ModelUnloadTimeout, OrtAcceleratorSetting (+3 more)
+Cohesion: 0.24
+Nodes (6): AppSettings, AssistantResponseLength, AssistantSearchDepth, ModelUnloadTimeout, PostProcessProvider, Option
 
 ### Community 144 - "Community 144"
 Cohesion: 0.11
 Nodes (15): AssistantHistoryEntryComponent(), AssistantHistoryEntryProps, assistantMarkdown, FeedItem, HistoryEntryComponent(), HistoryEntryProps, OpenRecordingsButtonProps, AssistantHistoryEntry (+7 more)
 
 ### Community 145 - "Community 145"
-Cohesion: 0.22
-Nodes (9): Wordmark(), WordmarkProps, AccessibilityOnboarding(), AccessibilityOnboardingProps, PermissionPlatform, PermissionsState, PermissionStatus, SoundPicker() (+1 more)
+Cohesion: 0.21
+Nodes (9): DownloadProgress, DownloadProgressDisplay(), DownloadProgressDisplayProps, DownloadStats, ModelSelectorProps, ModelStatus, ModelStatus, ModelStatusButton() (+1 more)
 
 ### Community 146 - "Community 146"
 Cohesion: 0.10
@@ -705,15 +700,15 @@ Nodes (20): [ ] P10 — Assistant panel: size, layout, screenshot feature, [ ] P
 
 ### Community 147 - "Community 147"
 Cohesion: 0.24
-Nodes (6): DownloadProgress, DownloadProgressDisplay(), DownloadProgressDisplayProps, DownloadStats, ProgressBarProps, ProgressData
+Nodes (7): emptyRule(), nextKey(), Row, TextReplacements, TextReplacementsProps, withKey(), Capitalization
 
 ### Community 148 - "Community 148"
 Cohesion: 0.10
 Nodes (19): Adding a New Language, Contributing Translations to SpeakoFlow, Currently Supported Languages, Do:, Don't:, File Structure, Handling Plurals, Handling Variables (+11 more)
 
 ### Community 149 - "Community 149"
-Cohesion: 0.38
-Nodes (7): get_bindings(), get_history_limit(), get_recording_retention_period(), get_stored_binding(), RecordingRetentionPeriod, ShortcutBinding, AppHandle
+Cohesion: 0.17
+Nodes (15): default_model_for_provider(), default_post_process_api_keys(), default_post_process_models(), default_post_process_providers(), ensure_post_process_defaults(), get_bindings(), get_history_limit(), get_recording_retention_period() (+7 more)
 
 ### Community 150 - "Community 150"
 Cohesion: 0.12
@@ -744,8 +739,8 @@ Cohesion: 0.17
 Nodes (11): Background: what was actually wrong, Cost reality (correcting the earlier worry), Future plan / roadmap, Provider landscape (for future choices), Sources, TL;DR, Web Search: Moving to Serper (and dropping DuckDuckGo), What changed in this iteration (+3 more)
 
 ### Community 159 - "Community 159"
-Cohesion: 0.18
-Nodes (10): Phase 0 — Toolchain & build (done), Phase 1.5 — Reliability & UX wave (done), Phase 1.7 — Web search (done), Phase 1.8 — Secure API-key storage in the OS keychain (done), Phase 1.9 — Web search quality overhaul (done), Phase 1 — Assistant mode (done), Phase 2.0 — Web search: reliability, answer quality, and a snippet-only provider set (done), Project goal (+2 more)
+Cohesion: 0.15
+Nodes (12): Phase 0 — Toolchain & build (done), Phase 1.5 — Reliability & UX wave (done), Phase 1.7 — Web search (done), Phase 1.8 — Secure API-key storage in the OS keychain (done), Phase 1.9 — Web search quality overhaul (done), Phase 1 — Assistant mode (done), Phase 2.0 — Web search: reliability, answer quality, and a snippet-only provider set (done), Phase 2.1 — Assistant characters (personas) (done) (+4 more)
 
 ### Community 160 - "Community 160"
 Cohesion: 0.20
@@ -768,8 +763,8 @@ Cohesion: 0.22
 Nodes (8): 0. The big picture: how an assistant turn is assembled, 1. Assistant chat prompts, 2. Web-search prompts (`src-tauri/src/web_search.rs`), 3. Dictation post-processing prompt (`src-tauri/src/settings.rs`), 4. Text-to-speech (TTS), 5. Not prompts (but easy to mistake for them), Prompts Reference — where every LLM instruction in SpeakoFlow lives, Quick "the assistant is doing X wrong" → look here
 
 ### Community 165 - "Community 165"
-Cohesion: 0.25
-Nodes (8): Azure Payload Saga, 🤖 Assistant panel (the "Ultra" part), 🎙️ Dictation (local, offline), 🎨 Make it yours, 👁️ Screen vision, 🔊 Spoken answers (TTS), 🌐 Web search (optional), What it does
+Cohesion: 0.22
+Nodes (9): Azure Payload Saga, 🤖 Assistant panel (the "Ultra" part), 🎭 Characters (personas), 🎙️ Dictation (local, offline), 🎨 Make it yours, 👁️ Screen vision, 🔊 Spoken answers (TTS), 🌐 Web search (optional) (+1 more)
 
 ### Community 166 - "Community 166"
 Cohesion: 0.67
@@ -782,7 +777,7 @@ Nodes (4): Web Search Evolution, Serper (search), Web Search Providers, Web Sear
   docs/FEATURE_PLAN.md · relation: conceptually_related_to
 
 ## Knowledge Gaps
-- **872 isolated node(s):** `LinkEntry`, `Manifest`, `BinSpec`, `HealedEntry`, `BinEntry` (+867 more)
+- **876 isolated node(s):** `LinkEntry`, `Manifest`, `BinSpec`, `HealedEntry`, `BinEntry` (+871 more)
   These have ≤1 connection - possible missing edges or undocumented components.
 - **16 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
@@ -793,13 +788,13 @@ _Questions this graph is uniquely positioned to answer:_
   _Edge tagged AMBIGUOUS (relation: conceptually_related_to) - confidence is low._
 - **What is the exact relationship between `Deterministic Text Replacements` and `Assistant Mode (Phase 1)`?**
   _Edge tagged AMBIGUOUS (relation: conceptually_related_to) - confidence is low._
-- **Why does `get_settings()` connect `Tauri Commands & Settings API` to `Core Rust Command Modules`, `Secret Store & Settings Load`, `Assistant Defaults & Sound Theme`, `Model Manager`, `Assistant Turn Orchestration`, `Transcription Manager`, `Audio Recording Manager`, `App Bootstrap (lib.rs)`, `Community 143`, `Global Keyboard Shortcuts`, `Clipboard & Paste Output`, `Community 149`, `Settings Defaults`, `System Tray`, `get_bindings`, `set_local_llm_context_size`, `Model Catalog`, `Transcription Coordinator & Shortcuts`?**
-  _High betweenness centrality (0.115) - this node is a cross-community bridge._
-- **Why does `Debug` connect `Secret Store & Settings Load` to `App Bootstrap (lib.rs)`, `utils`, `screenshot`, `LLM Client`, `System Tray`?**
-  _High betweenness centrality (0.013) - this node is a cross-community bridge._
+- **Why does `get_settings()` connect `Tauri Commands & Settings API` to `Core Rust Command Modules`, `Secret Store & Settings Load`, `Assistant Defaults & Sound Theme`, `Model Manager`, `Assistant Turn Orchestration`, `Transcription Manager`, `Audio Recording Manager`, `App Bootstrap (lib.rs)`, `Community 143`, `Global Keyboard Shortcuts`, `Clipboard & Paste Output`, `Community 149`, `Settings Defaults`, `System Tray`, `set_local_llm_context_size`, `Model Catalog`, `Settings Store & Acceleration`, `Transcription Coordinator & Shortcuts`?**
+  _High betweenness centrality (0.121) - this node is a cross-community bridge._
+- **Why does `Debug` connect `Secret Store & Settings Load` to `App Bootstrap (lib.rs)`, `utils`, `screenshot`, `LLM Client`, `Settings Store & Acceleration`?**
+  _High betweenness centrality (0.017) - this node is a cross-community bridge._
 - **Are the 91 inferred relationships involving `get_settings()` (e.g. with `assistant_export_character()` and `assistant_generate_character()`) actually correct?**
   _`get_settings()` has 91 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `LinkEntry`, `Manifest`, `BinSpec` to the rest of the system?**
-  _875 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _879 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Tauri Commands & Settings API` be split into smaller, more focused modules?**
-  _Cohesion score 0.07002018320136624 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.07207207207207207 - nodes in this community are weakly interconnected._
