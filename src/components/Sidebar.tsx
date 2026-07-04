@@ -10,6 +10,7 @@ import {
   Sparkles,
   MessageCircle,
   Users,
+  Notebook,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
@@ -24,6 +25,7 @@ import {
   ModelsSettings,
   AssistantSettings,
   CharactersSettings,
+  MemorySettings,
 } from "./settings";
 
 export type SidebarSection = keyof typeof SECTIONS_CONFIG;
@@ -84,6 +86,12 @@ export const SECTIONS_CONFIG = {
     labelKey: "sidebar.characters",
     icon: Users,
     component: CharactersSettings,
+    enabled: () => true,
+  },
+  memory: {
+    labelKey: "sidebar.memory",
+    icon: Notebook,
+    component: MemorySettings,
     enabled: () => true,
   },
   debug: {

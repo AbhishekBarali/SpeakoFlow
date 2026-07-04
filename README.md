@@ -1,6 +1,6 @@
 # SpeakoFlow
 
-**A free, local-first voice assistant for your desktop — dictation, a floating AI chat panel, screen vision, and spoken answers, all from one global hotkey.**
+**A free, local-first voice assistant for your desktop — dictation, a floating AI chat panel, screen vision, spoken answers, and a private on-device memory, all from one global hotkey.**
 
 SpeakoFlow started as a fork of the excellent [Handy](https://github.com/cjpais/Handy) dictation app and is growing into something different: a full Wispr Flow–style voice assistant that you own. Speech-to-text stays 100 % local; the assistant brain is any OpenAI-compatible LLM you point it at — OpenAI, Anthropic, Groq, OpenRouter, Z.AI, Cerebras, AWS Bedrock, Azure OpenAI (via a custom endpoint), an Ollama / LM Studio server, or the **built-in local LLM** that runs fully offline with no server to set up.
 
@@ -16,13 +16,16 @@ SpeakoFlow started as a fork of the excellent [Handy](https://github.com/cjpais/
 
 - Press **Ctrl + Alt + Space**, ask a question by voice, and a streaming answer appears in a floating, always-on-top glass panel
 - Type into the panel too — it's a full chat with conversation memory
+- Attach images or files to a message; every screen capture and picture you send shows as a small inline thumbnail you can click to enlarge, right in the chat and in History
 - Markdown answers, one-click copy, draggable anywhere, remembers its position
 - **Collapse to pill**: shrink the panel to a tiny floating button bar with a click-to-talk mic
 
 ### 👁️ Screen vision
 
-- Press **Ctrl + Alt + Shift + Space** — or just _say_ "what's on my screen?" — and the assistant sees a screenshot of your active monitor
+- Press **Ctrl + Alt + Shift + Space** — or just _say_ "what's on my screen?" — and the assistant sees your screen. On a multi-monitor setup it grabs the display your mouse is on, so it captures the screen you're actually working on
 - The camera button on the panel (and its collapsed pill) toggles screen vision on or off — one click to arm a capture for your next message (typed _or_ spoken), click again to turn it back off
+- **Capture timing** (Settings → Assistant → Screen Vision): for voice questions, grab the screen the moment you start asking (the default — so it reflects what you were looking at when you began) or wait until the message is sent. Typed messages always capture on send
+- What you sent shows as a small thumbnail on the message — click to enlarge — so you can always see exactly what the assistant saw
 - Captures are adaptively compressed to fit strict provider payload limits (verified against Azure's 128 KiB JSON-string cap)
 - One master toggle guarantees nothing is ever captured if you don't want it
 
@@ -50,13 +53,24 @@ SpeakoFlow started as a fork of the excellent [Handy](https://github.com/cjpais/
   - **ElevenLabs** — bring your API key and voice ID
   - **Azure AI Speech** — neural voices (e.g. `en-US-JennyNeural`) via your Speech resource key
 
-### 🎭 Personas
+### 🎭 Profiles (personas)
 
-- Switch the assistant between task-focused profiles: each persona sets the assistant's name, role, instructions, and how long its replies run
-- Ships with ready-made built-ins — **Concise**, **In-Depth**, **Coding**, **Wordsmith**, and **Research** — alongside the default general-purpose assistant
-- Each persona carries a one-line **role** (shown on its card) and an optional **response length** (Short / Medium / Long, or inherit your global Assistant setting), so a "Concise" persona stays terse while an "In-Depth" one runs long — independent of the others
-- Edit the name, avatar, instructions, and greeting — or describe a persona in a sentence and let the LLM write it for you (dictate the description by voice, right in the app)
-- Duplicate, import/export as JSON to share, or delete — and switch the active persona anytime from the panel header
+- Switch the assistant between task-focused profiles: each one sets the assistant's name, role, instructions, and how long its replies run
+- Ships with ready-made built-ins — **Companion** (warm and empathetic, for talking something through), **Quick** (fast, friendly, one or two sentences), and **Unfiltered** (blunt, honest feedback, no sugar-coating) — alongside the default general-purpose assistant
+- Each profile carries a one-line **role** (shown on its card) and an optional **response length** (Short / Medium / Long, or inherit your global Assistant setting), so "Quick" stays terse while another runs long — independent of the others
+- Edit the name, avatar, instructions, and greeting — or describe a profile in a sentence and let the LLM write it for you (dictate the description by voice, right in the app)
+- Duplicate, import/export as JSON to share, or delete — and switch the active profile anytime from the panel header
+- Tweaked a built-in and want it back? **Restore default** resets it to the shipped version, and **Restore built-ins** re-adds any you deleted — your custom profiles are left untouched
+
+### 🧠 Personal memory (local, private, off by default)
+
+- Let the assistant remember you between chats: a short always-on **"About You"** summary plus a list of durable **notes** (your preferred tone, the tools you use, projects you're working on)
+- **Fully on-device and yours to see** — everything lives in your local settings, and Settings → Memory shows exactly what's stored, note by note, with confidence and whether it was learned or added by you
+- **Learns quietly, off the hot path**: it distills durable facts from a conversation only when it ends (you close the panel, clear the chat, or hit "Update memory"), never slowing down a live reply — and it reuses whatever assistant model you already picked, including the fully-offline built-in one
+- **You're in control**: add/edit/delete notes yourself, tune how much gets used per reply (Light / Balanced / Detailed), export or import it as JSON, or wipe it entirely
+- **Incognito** switch for a private chat that's neither remembered nor personalized from memory
+- **Safe by design**: it refuses to store secrets, passwords, or ID/card numbers, ignores instruction-like text (so a saved note can't hijack the assistant), and remembered facts are always advisory — your current message always wins
+- Off until you turn it on
 
 ### 🎨 Make it yours
 
@@ -70,10 +84,12 @@ SpeakoFlow started as a fork of the excellent [Handy](https://github.com/cjpais/
 | ---------------------------------------- | ----- | -------------------------------------------------------------------- |
 | Local dictation                          | ✅    | ✅ (unchanged core)                                                  |
 | AI assistant chat panel                  | —     | ✅ floating glass panel, streaming                                   |
-| Screen vision (screenshots to the model) | —     | ✅ hotkey, voice intent, or camera button                            |
+| Screen vision (screen sent to the model) | —     | ✅ hotkey, voice intent, or camera button; multi-monitor; capture timing |
+| Inline image thumbnails (chat + history) | —     | ✅ click-to-enlarge, persisted with each message                     |
 | Web search                               | —     | ✅ Serper / SerpAPI / Brave / Tavily / Exa (bring your own key)      |
 | Spoken answers (TTS)                     | —     | ✅ Kokoro local / OpenAI-compatible / ElevenLabs / Azure             |
-| Assistant personas (task profiles)       | —     | ✅ persona gallery, per-persona length, LLM-generated, import/export |
+| Assistant profiles (task personas)       | —     | ✅ profile gallery, per-profile length, LLM-generated, import/export |
+| Personal memory (local "About You" + notes) | —  | ✅ two-tier, offline distillation, incognito, export/import          |
 | Hands-free dictation toggle              | —     | ✅ dedicated F9 binding                                              |
 | Built-in offline LLM (llama.cpp)         | —     | ✅ runs a downloaded model, no server                                |
 | Local LLM preset (Ollama / LM Studio)    | —     | ✅                                                                   |
@@ -104,7 +120,8 @@ On macOS the modifier defaults to `Option` in place of `Ctrl`/`Alt` (e.g. `Optio
    - **Local** for an Ollama / LM Studio server, or any of the hosted presets (OpenAI, Anthropic, Groq, OpenRouter, Z.AI, Cerebras, AWS Bedrock) with an API key
    - For screen vision, the model must support images (`gpt-4o-mini`, `gpt-4.1-mini`, `gemini-flash`, …)
 3. Optionally enable **Web search** in the same settings page (add a free Serper API key)
-4. Press `Ctrl + Alt + Space` and ask something
+4. Optionally turn on **Personal memory** in **Settings → Memory** so the assistant remembers you between chats (off by default)
+5. Press `Ctrl + Alt + Space` and ask something
 
 ### Building from source
 
@@ -122,6 +139,7 @@ See [BUILD.md](BUILD.md) for platform prerequisites (Rust, CMake, Vulkan SDK on 
 - **Assistant questions + optional screenshots**: sent only to the LLM provider _you_ configure — which can be the built-in local model or your own Ollama / LM Studio server
 - **Web search** (off by default): when on, only your search query goes to the provider you pick (Serper by default), and just short snippets come back — your conversation is never sent
 - **TTS**: local by default (Kokoro); remote only if you choose a remote engine
+- **Personal memory** (off by default): stays entirely on your device in local settings — nothing is uploaded. When on, only the small "About You" block and the notes relevant to your message ride along in the prompt to your chosen LLM, just like the rest of the conversation. Incognito skips it, and you can inspect, edit, export, or wipe it anytime
 - **Fully offline option**: pair the Built-in (Local) LLM with Kokoro TTS and web search off, and nothing leaves your machine at all
 - No telemetry, no accounts, no cloud middleman
 

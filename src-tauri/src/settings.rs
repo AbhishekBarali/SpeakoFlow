@@ -146,6 +146,80 @@ pub struct AssistantCharacter {
     pub response_length: Option<AssistantResponseLength>,
 }
 
+/// How sure we are about a remembered fact. Facts the user stated explicitly
+/// are `High`; facts the model inferred from a conversation are `Low`. Feeds
+/// pruning (low-confidence notes fade first) and injection ordering.
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum MemoryConfidence {
+    Low,
+    #[default]
+    Medium,
+    High,
+}
+
+/// A single durable fact the assistant has learned (or been told) about the
+/// user. Notes are pulled into a turn by relevance, within a token budget —
+/// never all at once — and are fully user-editable in Settings → Memory.
+#[derive(Serialize, Deserialize, Debug, Clone, Type)]
+pub struct MemoryNote {
+    /// Stable identifier for edit/delete.
+    pub id: String,
+    /// The fact itself, as a short canonical statement ("Prefers metric units").
+    pub text: String,
+    /// ISO date (YYYY-MM-DD) the note was created or last confirmed. Drives
+    /// recency ordering and decay.
+    #[serde(default)]
+    pub updated: String,
+    /// How reliable the note is.
+    #[serde(default)]
+    pub confidence: MemoryConfidence,
+    /// Where the note came from: `"user"` (typed/dictated explicitly) or
+    /// `"auto"` (distilled from a conversation). Purely informational.
+    #[serde(default)]
+    pub source: String,
+}
+
+/// The user's personal, local-first memory: a short always-on "About You"
+/// summary plus a list of durable notes. Stored on-device in settings and
+/// injected (in part) into assistant turns only when
+/// `assistant_memory_enabled` is on and the conversation isn't incognito.
+#[derive(Serialize, Deserialize, Debug, Clone, Default, Type)]
+pub struct UserMemory {
+    /// The always-on summary injected into every reply (kept to a few
+    /// sentences). Empty until the user or a distillation pass fills it.
+    #[serde(default)]
+    pub about_you: String,
+    /// Durable facts, selected by relevance within the detail budget.
+    #[serde(default)]
+    pub notes: Vec<MemoryNote>,
+}
+
+/// How much memory to inject each turn — a token-budget dial. `Light` keeps
+/// only the summary; `Balanced` adds a few relevant notes; `Detailed` adds
+/// more. Keeps memory cost flat regardless of how much has been learned.
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum MemoryDetail {
+    Light,
+    #[default]
+    Balanced,
+    Detailed,
+}
+
+impl MemoryDetail {
+    /// Approximate character budget for the injected memory block (summary +
+    /// notes). ~4.5 chars/token, so these map to roughly 150 / 400 / 800
+    /// tokens. A hard ceiling: memory cost stays bounded as the store grows.
+    pub fn char_budget(self) -> usize {
+        match self {
+            MemoryDetail::Light => 700,
+            MemoryDetail::Balanced => 1_800,
+            MemoryDetail::Detailed => 3_600,
+        }
+    }
+}
+
 /// Case transform applied to the output of a text replacement rule.
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default, Type)]
 #[serde(rename_all = "snake_case")]
@@ -281,6 +355,24 @@ impl AssistantResponseLength {
             ),
         }
     }
+}
+
+/// When a screen capture is taken for an assistant turn.
+///
+/// This only changes the timing for **voice** questions (where there's a real
+/// gap between starting and finishing the question); typed messages always
+/// capture at send, since the panel is already on screen either way.
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum VisionCaptureTiming {
+    /// Capture the moment you start asking (voice: at hotkey/mic press), so it
+    /// grabs what you were looking at when you began — not what's on screen
+    /// after you finish talking. This is the default.
+    #[default]
+    Immediate,
+    /// Capture when the message is actually sent (voice: after you stop talking
+    /// and it transcribes). The original behaviour.
+    OnSend,
 }
 
 /// How thorough a web search should be. This is the single dial that replaces
@@ -682,6 +774,9 @@ pub struct AppSettings {
     pub assistant_system_prompt: String,
     #[serde(default = "default_assistant_screenshot_enabled")]
     pub assistant_screenshot_enabled: bool,
+    /// When a screen capture is taken for a voice turn (immediate vs at-send).
+    #[serde(default)]
+    pub assistant_vision_capture_timing: VisionCaptureTiming,
     #[serde(default)]
     pub assistant_tts_enabled: bool,
     #[serde(default = "default_assistant_tts_engine")]
@@ -737,6 +832,24 @@ pub struct AppSettings {
     /// Id of the currently active character (defaults to `"default"`).
     #[serde(default = "default_active_character_id")]
     pub assistant_active_character_id: String,
+    /// Whether the assistant keeps a local, personal memory of the user (an
+    /// always-on "About You" summary plus durable notes) and injects the
+    /// relevant parts into each reply. Off by default; everything stays on this
+    /// device and is fully user-editable in Settings → Memory.
+    #[serde(default)]
+    pub assistant_memory_enabled: bool,
+    /// The user's personal memory: a short always-on summary + durable notes.
+    #[serde(default)]
+    pub assistant_memory: UserMemory,
+    /// How much memory to inject each turn (a token-budget dial). Light keeps
+    /// only the summary; Balanced adds a few relevant notes; Detailed adds more.
+    #[serde(default)]
+    pub assistant_memory_detail: MemoryDetail,
+    /// When true, this conversation is "incognito": memory is neither injected
+    /// into replies nor learned from the conversation. A quick switch so a
+    /// private chat leaves no trace in memory.
+    #[serde(default)]
+    pub assistant_memory_incognito: bool,
     #[serde(default = "default_assistant_font_size")]
     pub assistant_font_size: String,
     /// Surface opacity of the floating assistant panel (0.5–1.0). At 1.0 the
@@ -1196,66 +1309,47 @@ fn default_assistant_character(system_prompt: &str) -> AssistantCharacter {
     }
 }
 
-/// Built-in starter characters seeded on first run. `default` is always first
-/// and can never be deleted; the rest are editable, duplicatable examples that
-/// show off what personas can do.
+/// Built-in starter profiles seeded on first run. `default` is always first and
+/// can never be deleted; the rest are editable, duplicatable examples that show
+/// off what profiles can do. A small, tasteful set: a balanced assistant, a
+/// warm companion, a quick answerer, and a blunt/honest one. (Existing users'
+/// saved profiles are untouched when this list changes — it only affects fresh
+/// installs and the "Restore" actions.)
 pub fn default_assistant_characters(system_prompt: &str) -> Vec<AssistantCharacter> {
     vec![
         default_assistant_character(system_prompt),
         AssistantCharacter {
-            id: "concise".to_string(),
-            name: "Concise".to_string(),
-            prompt: "You are a fast, no-nonsense assistant. Answer in as few words as the question allows — usually one or two sentences — with no preamble, no filler, and no restating the question. Get straight to the point; only expand if the user explicitly asks. The user is speaking to you, so expect transcription quirks and infer their intent.".to_string(),
+            id: "companion".to_string(),
+            name: "Companion".to_string(),
+            prompt: "You are a warm, empathetic companion for when the user wants to talk something through. Listen first, acknowledge and validate how they feel, and stay gentle, patient, and non-judgmental. Reflect back what you hear, ask caring follow-up questions, and don't rush to 'fix' things unless they ask. Keep a calm, human tone. You are not a therapist or a substitute for professional care; if the user mentions wanting to harm themselves or is in crisis, gently and briefly encourage them to reach out to a local emergency number or a crisis line (in the US, call or text 988), then stay supportive. The user is speaking to you, so expect transcription quirks and infer their intent.".to_string(),
             greeting: String::new(),
             avatar: String::new(),
             kind: AssistantCharacterKind::Llm,
             builtin: true,
-            description: "Short, direct answers".to_string(),
+            description: "Warm, empathetic support".to_string(),
+            response_length: Some(AssistantResponseLength::Medium),
+        },
+        AssistantCharacter {
+            id: "quick".to_string(),
+            name: "Quick".to_string(),
+            prompt: "You are a fast, friendly assistant that gives quick, clean answers. Reply in as few words as the question honestly allows — usually one or two sentences — with no preamble, no filler, and no restating the question. Stay warm and natural, just brief: get straight to the useful part and only expand if the user asks. The user is speaking to you, so expect transcription quirks and infer their intent.".to_string(),
+            greeting: String::new(),
+            avatar: String::new(),
+            kind: AssistantCharacterKind::Llm,
+            builtin: true,
+            description: "Fast, friendly, to the point".to_string(),
             response_length: Some(AssistantResponseLength::Short),
         },
         AssistantCharacter {
-            id: "in_depth".to_string(),
-            name: "In-Depth".to_string(),
-            prompt: "You are a thorough, patient explainer. Break topics down step by step in plain language, define the key terms, and use short concrete examples. Anticipate the natural follow-up and answer it too. Stay well-structured but never padded — depth should always earn its place. The user is speaking to you, so expect transcription quirks and infer their intent.".to_string(),
+            id: "unfiltered".to_string(),
+            name: "Unfiltered".to_string(),
+            prompt: "You are a blunt, brutally honest advisor. Prioritize truth and usefulness over politeness: don't flatter, don't hedge, and don't pad answers with disclaimers or pleasantries. If something is wrong, weak, or a bad idea, say so plainly and explain exactly why. Disagree openly, name the real risks and trade-offs, and give the hard feedback most people would soften. Be direct and concise, and skip the \"great question\" niceties. Critique the idea or the work, not the person — stay honest and constructive rather than insulting. The user is speaking to you, so expect transcription quirks and infer their intent.".to_string(),
             greeting: String::new(),
             avatar: String::new(),
             kind: AssistantCharacterKind::Llm,
             builtin: true,
-            description: "Thorough, step-by-step explanations".to_string(),
-            response_length: Some(AssistantResponseLength::Long),
-        },
-        AssistantCharacter {
-            id: "coding".to_string(),
-            name: "Coding".to_string(),
-            prompt: "You are a senior software engineer. Give precise, correct, idiomatic code with brief explanations of the parts that matter. Prefer complete, runnable snippets; call out edge cases, pitfalls, and the trade-offs of your approach. Assume a capable developer and skip the basics unless asked. The user is speaking to you, so expect transcription quirks (misheard identifiers, symbols spoken as words) and infer the intended code.".to_string(),
-            greeting: String::new(),
-            avatar: String::new(),
-            kind: AssistantCharacterKind::Llm,
-            builtin: true,
-            description: "Precise help with code".to_string(),
+            description: "Blunt, honest feedback — no sugar-coating".to_string(),
             response_length: None,
-        },
-        AssistantCharacter {
-            id: "wordsmith".to_string(),
-            name: "Wordsmith".to_string(),
-            prompt: "You are a sharp writing editor. Improve clarity, flow, and tone while preserving the author's voice and meaning. When asked to rewrite, return the improved text first, then a one-line note on what you changed. Keep grammar and word choice natural, not stiff. The user is speaking to you, so expect transcription quirks and infer their intent.".to_string(),
-            greeting: String::new(),
-            avatar: String::new(),
-            kind: AssistantCharacterKind::Llm,
-            builtin: true,
-            description: "Polishes and rewrites your writing".to_string(),
-            response_length: None,
-        },
-        AssistantCharacter {
-            id: "research".to_string(),
-            name: "Research".to_string(),
-            prompt: "You are a careful research assistant. Lead with the direct answer, then the key supporting points. Distinguish what is well-established from what is uncertain, and flag when a claim would benefit from a live source. Be balanced and precise rather than breezy. The user is speaking to you, so expect transcription quirks and infer their intent.".to_string(),
-            greeting: String::new(),
-            avatar: String::new(),
-            kind: AssistantCharacterKind::Llm,
-            builtin: true,
-            description: "Analytical answers, source-aware".to_string(),
-            response_length: Some(AssistantResponseLength::Medium),
         },
     ]
 }
@@ -1779,6 +1873,7 @@ pub fn get_default_settings() -> AppSettings {
         },
         assistant_system_prompt: default_assistant_system_prompt(),
         assistant_screenshot_enabled: default_assistant_screenshot_enabled(),
+        assistant_vision_capture_timing: VisionCaptureTiming::default(),
         assistant_tts_enabled: false,
         assistant_tts_engine: default_assistant_tts_engine(),
         assistant_tts_voice: default_assistant_tts_voice(),
@@ -1797,6 +1892,10 @@ pub fn get_default_settings() -> AppSettings {
         assistant_response_length: AssistantResponseLength::default(),
         assistant_characters: default_assistant_characters(&default_assistant_system_prompt()),
         assistant_active_character_id: default_active_character_id(),
+        assistant_memory_enabled: false,
+        assistant_memory: UserMemory::default(),
+        assistant_memory_detail: MemoryDetail::default(),
+        assistant_memory_incognito: false,
         assistant_font_size: default_assistant_font_size(),
         assistant_panel_opacity: default_assistant_panel_opacity(),
         assistant_panel_size: default_assistant_panel_size(),

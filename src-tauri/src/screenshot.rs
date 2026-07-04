@@ -93,12 +93,23 @@ fn encode_jpeg(img: &DynamicImage, quality: u8) -> Result<Vec<u8>, String> {
     Ok(buf)
 }
 
-/// Capture the active monitor and return a `data:image/jpeg;base64,...` URL,
+/// Capture a full monitor and return a `data:image/jpeg;base64,...` URL,
 /// adaptively compressed to the budget for the chosen [`CaptureProfile`].
-pub fn capture_screen_data_url(profile: CaptureProfile) -> Result<String, String> {
+///
+/// `None` captures the monitor under the mouse cursor (the screen the user is
+/// working on — the right default for multi-monitor setups), falling back to
+/// the primary. `Some((x, y))` (physical pixels) targets the monitor containing
+/// that point, falling back to the cursor's monitor, then the primary.
+pub fn capture_screen_data_url_at(
+    point: Option<(i32, i32)>,
+    profile: CaptureProfile,
+) -> Result<String, String> {
     let start = std::time::Instant::now();
 
-    let monitor = pick_monitor()?;
+    let monitor = match point {
+        Some((x, y)) => Monitor::from_point(x, y).or_else(|_| pick_monitor())?,
+        None => pick_monitor()?,
+    };
     let rgba = monitor
         .capture_image()
         .map_err(|e| format!("Screen capture failed: {}", e))?;
@@ -216,13 +227,40 @@ pub fn image_file_to_avatar_data_url(path: &str) -> Result<String, String> {
     Ok(format!("data:image/jpeg;base64,{}", encoded))
 }
 
+/// Longest edge (px) and JPEG quality for the small, persisted **display
+/// thumbnails** stored on a message so the panel can show what was sent and
+/// enlarge it on hover. Kept small so a chat with many vision turns doesn't
+/// bloat the history file — big enough to recognise the screen at a glance,
+/// not the full-resolution frame sent to the model.
+const THUMBNAIL_MAX_DIM: u32 = 640;
+const THUMBNAIL_QUALITY: u8 = 60;
+
+/// Downscale an existing `data:image/...;base64,...` URL into a small JPEG
+/// thumbnail data URL for on-message display + persistence. Used for both the
+/// screen capture and user-attached images: the full-resolution copy still goes
+/// to the model for that one turn, while only this compact thumbnail is stored
+/// in the conversation history.
+pub fn data_url_to_thumbnail(data_url: &str) -> Result<String, String> {
+    let b64 = data_url
+        .split_once(',')
+        .map(|(_, rest)| rest)
+        .ok_or_else(|| "Not a data URL".to_string())?;
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(b64)
+        .map_err(|e| format!("Bad image data: {}", e))?;
+    let img = image::load_from_memory(&bytes).map_err(|e| format!("Can't decode image: {}", e))?;
+    let buf = encode_jpeg(&scaled(&img, THUMBNAIL_MAX_DIM), THUMBNAIL_QUALITY)?;
+    let encoded = base64::engine::general_purpose::STANDARD.encode(&buf);
+    Ok(format!("data:image/jpeg;base64,{}", encoded))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn capture_works_on_this_machine() {
-        let result = capture_screen_data_url(CaptureProfile::Conservative);
+        let result = capture_screen_data_url_at(None, CaptureProfile::Conservative);
         match result {
             Ok(url) => {
                 assert!(url.starts_with("data:image/jpeg;base64,"));

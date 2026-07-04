@@ -9,6 +9,7 @@ import {
   Loader2,
   Mic,
   Plus,
+  RotateCcw,
   Square,
   Trash2,
   Upload,
@@ -233,6 +234,35 @@ export const CharactersSettings: React.FC = () => {
     }
   }, [characters, selected, saveCharacters, activate]);
 
+  // Reset an edited built-in persona back to the version shipped with the app.
+  const restoreDefault = useCallback(async () => {
+    if (!selected?.builtin) return;
+    const res = await commands.assistantRestoreBuiltinCharacter(selected.id);
+    if (res.status === "error") {
+      setError(res.error);
+      return;
+    }
+    setError(null);
+    // Sync the editor fields immediately (the selected id is unchanged, so the
+    // draft-reseeding effect won't fire on its own).
+    setDraftName(res.data.name);
+    setDraftDescription(res.data.description ?? "");
+    setDraftPrompt(res.data.prompt ?? "");
+    setDraftGreeting(res.data.greeting ?? "");
+    await refreshSettings();
+  }, [selected, refreshSettings]);
+
+  // Re-add any built-in personas that were deleted (leaves customs untouched).
+  const restoreMissing = useCallback(async () => {
+    const res = await commands.assistantRestoreMissingBuiltins();
+    if (res.status === "error") {
+      setError(res.error);
+      return;
+    }
+    setError(null);
+    await refreshSettings();
+  }, [refreshSettings]);
+
   const uploadAvatar = useCallback(async () => {
     try {
       const path = await open({
@@ -420,6 +450,10 @@ export const CharactersSettings: React.FC = () => {
           <Button variant="secondary" size="sm" onClick={importCharacter}>
             <Upload size={14} />
             {t("settings.assistant.characters.import")}
+          </Button>
+          <Button variant="secondary" size="sm" onClick={restoreMissing}>
+            <RotateCcw size={14} />
+            {t("settings.assistant.characters.restoreBuiltins")}
           </Button>
         </div>
 
@@ -656,6 +690,12 @@ export const CharactersSettings: React.FC = () => {
                 <Download size={14} />
                 {t("settings.assistant.characters.export")}
               </Button>
+              {selected.builtin && (
+                <Button variant="secondary" size="sm" onClick={restoreDefault}>
+                  <RotateCcw size={14} />
+                  {t("settings.assistant.characters.restoreDefault")}
+                </Button>
+              )}
               {selected.id !== "default" && (
                 <Button
                   variant="danger-ghost"

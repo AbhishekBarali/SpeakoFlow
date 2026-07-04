@@ -26,7 +26,8 @@
     "advanced": "Advanced",
     "postProcessing": "Post Process",
     "assistant": "Assistant",
-    "characters": "Personas",
+    "characters": "Profiles",
+    "memory": "Memory",
     "history": "History",
     "debug": "Debug",
     "about": "About",
@@ -44,6 +45,7 @@
     "history": "Your recent transcriptions and assistant conversations, stored on this device.",
     "postProcessing": "Clean up and reshape transcripts with a language model.",
     "assistant": "Connect a model, then tune voice, screen vision, web search, and the panel.",
+    "memory": "A private, on-device profile the assistant remembers you by — fully yours to see and edit.",
     "debug": "Diagnostics and developer tools.",
     "about": "Version, data locations, and credits."
   },
@@ -183,6 +185,65 @@
     }
   },
   "settings": {
+    "personalMemory": {
+      "enable": {
+        "label": "Remember me",
+        "description": "Let the assistant keep and use a personal memory. Off by default."
+      },
+      "incognito": {
+        "label": "Incognito chat",
+        "description": "For this conversation, don't use memory and don't learn anything new."
+      },
+      "detail": {
+        "label": "Memory detail",
+        "description": "How much memory to add to each reply. More detail is richer but uses more tokens.",
+        "options": {
+          "light": "Light",
+          "balanced": "Balanced",
+          "detailed": "Detailed"
+        }
+      },
+      "aboutYou": {
+        "label": "About you",
+        "fieldLabel": "Summary",
+        "placeholder": "e.g. Prefers short, direct answers. Works in Rust and TypeScript. Building a desktop voice assistant.",
+        "hint": "Always included when memory is on. Keep it to a few sentences — this is the assistant's at-a-glance picture of you.",
+        "edit": "Edit",
+        "done": "Done",
+        "empty": "Nothing saved yet — the assistant fills this in as it learns, or click Edit to write your own.",
+        "collapsedEmpty": "Nothing saved yet"
+      },
+      "notes": {
+        "label": "Notes",
+        "empty": "No notes yet. Add one below, or let the assistant learn them from your chats.",
+        "add": "Add",
+        "addPlaceholder": "Add something to remember…",
+        "delete": "Delete note",
+        "learned": "learned",
+        "added": "added by you"
+      },
+      "confidence": {
+        "high": "High confidence",
+        "medium": "Medium confidence",
+        "low": "Low confidence"
+      },
+      "actions": {
+        "label": "Manage"
+      },
+      "distill": {
+        "label": "Learn from this chat now",
+        "description": "Pull durable facts from your current conversation into memory, right now.",
+        "button": "Update memory"
+      },
+      "export": "Export",
+      "import": "Import",
+      "wipe": {
+        "button": "Wipe memory",
+        "confirm": "Delete everything the assistant remembers?",
+        "yes": "Delete all",
+        "cancel": "Cancel"
+      }
+    },
     "modelSettings": {
       "title": "{{model}} Settings",
       "noSettingsNeeded": "This model works automatically with no configuration needed."
@@ -219,7 +280,7 @@
           },
           "assistant_vision": {
             "name": "Ask with Screen",
-            "description": "Ask by voice with a screenshot attached so it can see your screen."
+            "description": "Ask by voice with your screen attached so it can see what you're looking at."
           },
           "assistant_panel_toggle": {
             "name": "Show or Hide Panel",
@@ -556,7 +617,7 @@
       "hideConversation": "Hide conversation",
       "roleUser": "You",
       "roleAssistant": "Assistant",
-      "screenshotAttached": "Screenshot",
+      "screenshotAttached": "Vision",
       "messageCount_one": "{{count}} message",
       "messageCount_other": "{{count}} messages",
       "deleteAssistantError": "Failed to delete conversation. Please try again."
@@ -732,21 +793,21 @@
         "description": "Sets the assistant's behavior."
       },
       "characters": {
-        "title": "Personas",
-        "description": "Task-focused profiles you can switch between. The active persona sets the assistant's name, role, and instructions — and how long its replies run. Switch anytime from the panel header.",
-        "galleryLabel": "Your personas",
-        "editSection": "Edit persona",
+        "title": "Profiles",
+        "description": "Task-focused profiles you can switch between. The active profile sets the assistant's name, role, and instructions — and how long its replies run. Switch anytime from the panel header.",
+        "galleryLabel": "Your profiles",
+        "editSection": "Edit profile",
         "avatarLabel": "Avatar",
         "active": "Active",
         "meowsOnly": "Meows only",
         "builtin": "Built-in",
         "custom": "Custom",
         "new": "New",
-        "newName": "New persona",
+        "newName": "New profile",
         "copyName": "{{name}} copy",
         "createAi": "Create with AI",
         "import": "Import",
-        "aiTitle": "Describe your persona",
+        "aiTitle": "Describe your profile",
         "aiClose": "Close",
         "aiPlaceholder": "e.g. a concise release-notes writer, or a patient tutor who explains every step",
         "aiDictate": "Dictate the description",
@@ -760,7 +821,7 @@
         "promptLabel": "Instructions (system prompt)",
         "responseLength": {
           "label": "Response length",
-          "hint": "How long this persona's replies run. \"Inherit\" follows your global Assistant setting.",
+          "hint": "How long this profile's replies run. \"Inherit\" follows your global Assistant setting.",
           "options": {
             "inherit": "Inherit global",
             "short": "Short",
@@ -773,6 +834,8 @@
         "catNote": "The Cat ignores the AI entirely — it just meows. Nothing to configure here.",
         "duplicate": "Duplicate",
         "export": "Export",
+        "restoreDefault": "Restore default",
+        "restoreBuiltins": "Restore built-ins",
         "delete": "Delete"
       },
       "behavior": {
@@ -794,8 +857,16 @@
       },
       "vision": {
         "title": "Screen Vision",
-        "enableLabel": "Allow screenshots",
-        "enableDescription": "Let the assistant capture your screen when you ask about it. Requires a vision-capable model."
+        "enableLabel": "Allow screen vision",
+        "enableDescription": "Let the assistant see your screen when you ask about it. Requires a vision-capable model.",
+        "timing": {
+          "label": "When to capture",
+          "description": "For voice questions: capture the moment you start asking, or wait until the message is sent. Typed messages always capture on send.",
+          "options": {
+            "immediate": "When I ask",
+            "on_send": "When the message sends"
+          }
+        }
       },
       "webSearch": {
         "title": "Web Search",
@@ -1012,7 +1083,7 @@
     "copyCode": "Copy code",
     "regenerate": "Regenerate answer (the old one stays in History)",
     "screenAttached": "Screen",
-    "attachScreen": "Screen vision — attach a screenshot to each message until turned off",
+    "attachScreen": "Screen vision — attach your screen to each message until turned off",
     "detachScreen": "Turn off screen vision",
     "attach": {
       "file": "Attach an image or file",
@@ -1051,7 +1122,7 @@
     },
     "status": {
       "listening": "Listening…",
-      "locked": "Listening hands-free",
+      "locked": "Listening",
       "transcribing": "Transcribing…",
       "searching": "Searching the web...",
       "thinking": "Thinking...",
@@ -1068,10 +1139,10 @@
       "engine_startShort": "Model couldn't start",
       "provider": "The model couldn't answer. Check your API key and connection, then try again.",
       "providerShort": "Couldn't get an answer",
-      "vision_unsupported": "This model can't read screenshots. Pick a vision-capable model in Settings → Assistant, or ask again without the screen.",
+      "vision_unsupported": "This model can't read your screen. Pick a vision-capable model in Settings → Assistant, or ask again without screen vision.",
       "vision_unsupportedShort": "Model can't see images",
-      "screenshot_too_large": "The screenshot was too large for this provider. Please try again — it will be compressed harder.",
-      "screenshot_too_largeShort": "Screenshot too large",
+      "screenshot_too_large": "The screen capture was too large for this provider. Please try again — it will be compressed harder.",
+      "screenshot_too_largeShort": "Screen capture too large",
       "screen_capture": "Couldn't capture the screen. Try again, or ask without screen vision.",
       "screen_captureShort": "Screen capture failed",
       "transcription": "Couldn't transcribe your voice. Please try speaking again.",

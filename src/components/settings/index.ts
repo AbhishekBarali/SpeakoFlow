@@ -8,6 +8,7 @@ export { PostProcessingSettings } from "./post-processing/PostProcessingSettings
 export { ModelsSettings } from "./models/ModelsSettings";
 export { AssistantSettings } from "./assistant/AssistantSettings";
 export { CharactersSettings } from "./assistant/CharactersSettings";
+export { MemorySettings } from "./assistant/MemorySettings";
 
 // Individual setting components
 export { MicrophoneSelector } from "./MicrophoneSelector";

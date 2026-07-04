@@ -13,6 +13,7 @@ mod input;
 mod llm_client;
 mod lock_watch;
 mod managers;
+mod memory;
 mod overlay;
 pub mod portable;
 mod screenshot;
@@ -557,7 +558,10 @@ pub fn run(cli_args: CliArgs) {
             commands::assistant::assistant_import_character,
             commands::assistant::assistant_export_character,
             commands::assistant::assistant_generate_character,
+            commands::assistant::assistant_restore_builtin_character,
+            commands::assistant::assistant_restore_missing_builtins,
             commands::assistant::set_assistant_screenshot_enabled,
+            commands::assistant::set_assistant_vision_capture_timing,
             commands::assistant::set_assistant_tts_enabled,
             commands::assistant::set_assistant_tts_voice,
             commands::assistant::set_assistant_response_length,
@@ -595,6 +599,17 @@ pub fn run(cli_args: CliArgs) {
             commands::assistant::set_assistant_web_search_fetch_content,
             commands::assistant::set_assistant_web_search_api_key,
             commands::assistant::assistant_test_web_search,
+            commands::memory::set_assistant_memory_enabled,
+            commands::memory::set_assistant_memory_detail,
+            commands::memory::set_assistant_memory_incognito,
+            commands::memory::set_assistant_memory_about_you,
+            commands::memory::add_assistant_memory_note,
+            commands::memory::update_assistant_memory_note,
+            commands::memory::delete_assistant_memory_note,
+            commands::memory::clear_assistant_memory,
+            commands::memory::export_assistant_memory,
+            commands::memory::import_assistant_memory,
+            commands::memory::assistant_distill_memory_now,
             helpers::clamshell::is_laptop,
         ])
         .events(collect_events![managers::history::HistoryUpdatePayload,]);

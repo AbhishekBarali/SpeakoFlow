@@ -25,6 +25,10 @@ pub fn cancel_current_operation(app: &AppHandle) {
     let recording_was_active = audio_manager.is_recording();
     audio_manager.cancel_recording();
 
+    // Drop any screen frame grabbed at the start of a voice question (Immediate
+    // vision timing) so a cancelled capture never rides along with a later turn.
+    crate::assistant::clear_immediate_capture();
+
     // Update tray icon and hide overlay
     change_tray_icon(app, crate::tray::TrayIconState::Idle);
     hide_recording_overlay(app);

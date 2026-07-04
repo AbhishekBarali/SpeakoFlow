@@ -8,6 +8,7 @@ import {
   type AssistantResponseLength,
   type AssistantSearchDepth,
   type ModelUnloadTimeout,
+  type VisionCaptureTiming,
 } from "@/bindings";
 import {
   Dropdown,
@@ -836,6 +837,37 @@ export const AssistantSettings: React.FC = () => {
           info={t("settings.assistant.vision.enableDescription")}
           grouped={true}
         />
+        {(settings?.assistant_screenshot_enabled ?? true) && (
+          <SettingContainer
+            title={t("settings.assistant.vision.timing.label")}
+            info={t("settings.assistant.vision.timing.description")}
+            layout="horizontal"
+            grouped={true}
+          >
+            <Dropdown
+              options={[
+                {
+                  value: "immediate",
+                  label: t("settings.assistant.vision.timing.options.immediate"),
+                },
+                {
+                  value: "on_send",
+                  label: t("settings.assistant.vision.timing.options.on_send"),
+                },
+              ]}
+              selectedValue={
+                settings?.assistant_vision_capture_timing ?? "immediate"
+              }
+              onSelect={(value) =>
+                setAndRefresh(
+                  commands.setAssistantVisionCaptureTiming(
+                    value as VisionCaptureTiming,
+                  ),
+                )
+              }
+            />
+          </SettingContainer>
+        )}
       </SettingsGroup>
 
       <SettingsGroup title={t("settings.assistant.webSearch.title")}>

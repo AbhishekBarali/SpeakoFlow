@@ -57,6 +57,10 @@ interface DisplayMessage {
   screenshot?: boolean;
   images?: number;
   files?: string[];
+  /** Display thumbnails (data URLs) for the visuals sent with this message —
+   *  the screen capture first (if any), then attached images. Present on new
+   *  messages; empty on older history (which falls back to the text chips). */
+  thumbnails?: string[];
 }
 
 /** Must match the marker constants in src-tauri/src/assistant.rs */
@@ -147,7 +151,11 @@ const BLOCKING_MS = 7000;
  *  hover brings it straight back. */
 const PILL_IDLE_DIM_MS = 6000;
 
-function toDisplay(raw: { role: string; content: string }): DisplayMessage {
+function toDisplay(raw: {
+  role: string;
+  content: string;
+  images?: string[];
+}): DisplayMessage {
   const role = raw.role === "assistant" ? "assistant" : "user";
   let screenshot = false;
   let images = 0;
@@ -169,12 +177,14 @@ function toDisplay(raw: { role: string; content: string }): DisplayMessage {
     }
     kept.push(line);
   }
+  const thumbnails = raw.images && raw.images.length ? raw.images : undefined;
   return {
     role,
     content: kept.join("\n").trim(),
     screenshot: screenshot || undefined,
     images: images || undefined,
     files: files.length ? files : undefined,
+    thumbnails,
   };
 }
 
@@ -199,8 +209,7 @@ const CopyButton: React.FC<{ content: string; title: string }> = ({
 
 /** `<pre>` renderer with a hover copy button, so each code block is
  *  individually copyable (the whole-answer copy stays too). */
-const CodeBlock: React.FC<React.HTMLAttributes<HTMLPreElement>> = ({
-  children,
+const CodeBlock: React.FC<React.HTMLAttributes<HTMLPreElement>> = ({  children,
   ...rest
 }) => {
   const { t } = useTranslation();
@@ -227,6 +236,93 @@ const CodeBlock: React.FC<React.HTMLAttributes<HTMLPreElement>> = ({
       >
         {copied ? <Check size={12} /> : <Copy size={12} />}
       </button>
+    </div>
+  );
+};
+
+/** Small inline preview thumbnails of the image(s) sent with a message (screen
+ *  capture and/or attached pictures). Clicking a thumbnail pops a larger
+ *  preview so you can tell exactly what the assistant was sent — the
+ *  full-resolution frame goes to the model, these compact copies are stored
+ *  with the message and survive restarts. The first thumbnail carries a small
+ *  camera badge when it's a screen capture. Click again (or the backdrop, or
+ *  Esc) to dismiss. */
+const MessageThumbnails: React.FC<{
+  urls: string[];
+  hasScreen?: boolean;
+  screenLabel: string;
+}> = ({ urls, hasScreen, screenLabel }) => {
+  const [preview, setPreview] = useState<{
+    url: string;
+    left: number;
+    top: number;
+    above: boolean;
+  } | null>(null);
+
+  const toggle = (el: HTMLElement, url: string) => {
+    setPreview((cur) => {
+      // Clicking the open thumbnail again closes it.
+      if (cur && cur.url === url) return null;
+      const rect = el.getBoundingClientRect();
+      const maxW = Math.min(320, window.innerWidth - 24);
+      let left = rect.left + rect.width / 2 - maxW / 2;
+      left = Math.max(12, Math.min(left, window.innerWidth - maxW - 12));
+      // Prefer showing the enlarged preview above the thumbnail; flip below when
+      // there isn't enough headroom (e.g. a message near the top of the panel).
+      const above = rect.top > 220;
+      const top = above ? rect.top - 8 : rect.bottom + 8;
+      return { url, left, top, above };
+    });
+  };
+
+  // Dismiss the popped preview on Escape.
+  useEffect(() => {
+    if (!preview) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setPreview(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [preview]);
+
+  return (
+    <div className="msg-thumbs">
+      {urls.map((url, i) => (
+        <button
+          key={i}
+          type="button"
+          className="msg-thumb"
+          onClick={(e) => toggle(e.currentTarget, url)}
+          aria-label={hasScreen && i === 0 ? screenLabel : undefined}
+        >
+          <img src={url} alt="" draggable={false} />
+          {hasScreen && i === 0 && (
+            <span className="msg-thumb-badge" aria-hidden>
+              <Camera size={9} strokeWidth={2.5} />
+            </span>
+          )}
+        </button>
+      ))}
+      {preview && (
+        <>
+          <div
+            className="msg-thumb-backdrop"
+            onClick={() => setPreview(null)}
+          />
+          <div
+            className={`msg-thumb-preview${preview.above ? " above" : ""}`}
+            style={{ left: preview.left, top: preview.top }}
+            onClick={() => setPreview(null)}
+          >
+            <img
+              className="msg-thumb-preview-img"
+              src={preview.url}
+              alt=""
+              draggable={false}
+            />
+          </div>
+        </>
+      )}
     </div>
   );
 };
@@ -501,7 +597,7 @@ const AssistantPanel: React.FC = () => {
       );
 
       track(
-        await listen<{ role: string; content: string }[]>(
+        await listen<{ role: string; content: string; images?: string[] }[]>(
           "assistant-conversation",
           (e) => {
             setHistory(e.payload.map(toDisplay));
@@ -1342,19 +1438,29 @@ const AssistantPanel: React.FC = () => {
                   message.content
                 )}
               </div>
-              {message.screenshot && (
-                <span className="screen-chip">
-                  <Camera size={11} />
-                  {t("assistant.screenAttached")}
-                </span>
-              )}
-              {(message.images ?? 0) > 0 && (
-                <span className="screen-chip">
-                  <ImagePlus size={11} />
-                  {t("assistant.attach.imageCount", {
-                    count: message.images,
-                  })}
-                </span>
+              {message.thumbnails ? (
+                <MessageThumbnails
+                  urls={message.thumbnails}
+                  hasScreen={message.screenshot}
+                  screenLabel={t("assistant.screenAttached")}
+                />
+              ) : (
+                <>
+                  {message.screenshot && (
+                    <span className="screen-chip">
+                      <Camera size={11} />
+                      {t("assistant.screenAttached")}
+                    </span>
+                  )}
+                  {(message.images ?? 0) > 0 && (
+                    <span className="screen-chip">
+                      <ImagePlus size={11} />
+                      {t("assistant.attach.imageCount", {
+                        count: message.images,
+                      })}
+                    </span>
+                  )}
+                </>
               )}
               {message.files?.map((name) => (
                 <span className="screen-chip" key={name}>
@@ -1441,6 +1547,14 @@ const AssistantPanel: React.FC = () => {
                   <div className="assistant-error-detail">{error.detail}</div>
                 )}
               </div>
+              <button
+                className="assistant-error-dismiss"
+                onClick={() => setError(null)}
+                title={t("assistant.pill.dismiss")}
+                aria-label={t("assistant.pill.dismiss")}
+              >
+                <X size={13} strokeWidth={2.5} />
+              </button>
             </div>
           )}
         </div>
@@ -1540,7 +1654,12 @@ const AssistantPanel: React.FC = () => {
                 ? t("assistant.inputPlaceholderScreen")
                 : t("assistant.inputPlaceholder")
             }
-            onChange={(e) => setInput(e.target.value)}
+            onChange={(e) => {
+              setInput(e.target.value);
+              // Typing a new message clears any lingering error so the user
+              // isn't blocked by (or waiting out) a stale failure notice.
+              if (error) setError(null);
+            }}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.repeat) {
                 void sendText();

@@ -10,6 +10,14 @@ use specta::Type;
 pub struct ChatMessage {
     pub role: String,
     pub content: String,
+    /// Small JPEG **display thumbnails** (data URLs) for any images that rode
+    /// along with this message — a screen capture and/or user-attached pictures.
+    /// Display + history only: these are never sent to the model (the full-res
+    /// copy is sent once, for that turn), they just let the panel show and
+    /// hover-enlarge what was sent, and survive restarts. Older history rows
+    /// (and text-only turns) simply have an empty list.
+    #[serde(default)]
+    pub images: Vec<String>,
 }
 
 #[derive(Debug, Serialize)]

@@ -815,6 +815,35 @@ impl ShortcutAction for AssistantAction {
     fn start(&self, app: &AppHandle, binding_id: &str, _shortcut_str: &str) {
         debug!("AssistantAction::start called for binding: {}", binding_id);
 
+        // Vision timing: when set to Immediate and the camera is armed, grab the
+        // screen NOW — at the start of the question — so it reflects what the
+        // user was looking at when they began, not what's on screen after they
+        // stop talking. The frame is stashed and consumed by `run_voice_turn`.
+        // Always clear first so a stale/cancelled capture can never leak in.
+        crate::assistant::clear_immediate_capture();
+        {
+            let settings = get_settings(app);
+            if settings.assistant_screenshot_enabled
+                && settings.assistant_vision_capture_timing
+                    == crate::settings::VisionCaptureTiming::Immediate
+                && crate::assistant::screen_armed()
+                && !settings.active_character_is_cat()
+            {
+                let profile = settings
+                    .active_assistant_provider()
+                    .map(|p| crate::screenshot::CaptureProfile::for_base_url(&p.base_url))
+                    .unwrap_or(crate::screenshot::CaptureProfile::Generous);
+                // Grab the monitor the mouse cursor is on right now (the screen
+                // the user is working on), falling back to the primary display.
+                std::thread::spawn(move || {
+                    match crate::screenshot::capture_screen_data_url_at(None, profile) {
+                        Ok(url) => crate::assistant::stash_immediate_capture(url),
+                        Err(e) => debug!("Immediate vision capture failed: {}", e),
+                    }
+                });
+            }
+        }
+
         // Starting a new question interrupts the previous spoken answer — the
         // assistant must never talk over the user's next recording.
         crate::tts::stop_all(app);

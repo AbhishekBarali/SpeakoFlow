@@ -5,6 +5,7 @@ import React, {
   useRef,
   useState,
 } from "react";
+import { createPortal } from "react-dom";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { readFile } from "@tauri-apps/plugin-fs";
@@ -14,6 +15,7 @@ import {
   Copy,
   FolderOpen,
   Camera,
+  FileText,
   MessageCircle,
   MessageSquarePlus,
   RotateCcw,
@@ -35,20 +37,35 @@ import { formatDateTime } from "@/utils/dateFormat";
 import { AudioPlayer } from "../../ui/AudioPlayer";
 import { Button } from "../../ui/Button";
 
-/** Must match SCREENSHOT_MARKER in src-tauri/src/assistant.rs */
+/** Must match the marker constants in src-tauri/src/assistant.rs */
 const SCREENSHOT_MARKER = "[screenshot attached]";
+const IMAGE_MARKER = "[image attached]";
+const FILE_MARKER_PREFIX = "[file attached:";
 
-/** Strip the screenshot marker the backend appends to stored user messages. */
+/** Strip the attachment markers the backend appends to stored user messages,
+ *  returning the clean text plus what rode along (screen capture / files). */
 const cleanMessageContent = (
   raw: string,
-): { text: string; screenshot: boolean } => {
-  if (raw.endsWith(SCREENSHOT_MARKER)) {
-    return {
-      text: raw.slice(0, -SCREENSHOT_MARKER.length).trimEnd(),
-      screenshot: true,
-    };
+): { text: string; screenshot: boolean; files: string[] } => {
+  let screenshot = false;
+  const files: string[] = [];
+  const kept: string[] = [];
+  for (const line of raw.split("\n")) {
+    const trimmed = line.trim();
+    if (trimmed === SCREENSHOT_MARKER) {
+      screenshot = true;
+      continue;
+    }
+    if (trimmed === IMAGE_MARKER) {
+      continue;
+    }
+    if (trimmed.startsWith(FILE_MARKER_PREFIX) && trimmed.endsWith("]")) {
+      files.push(trimmed.slice(FILE_MARKER_PREFIX.length, -1).trim());
+      continue;
+    }
+    kept.push(line);
   }
-  return { text: raw, screenshot: false };
+  return { text: kept.join("\n").trim(), screenshot, files };
 };
 
 /**
@@ -124,8 +141,84 @@ const IconButton: React.FC<{
   </button>
 );
 
-const PAGE_SIZE = 30;
+/** Thumbnails of the image(s) sent with a stored message — the screen capture
+ *  (badged) and/or attached pictures. Click one to pop a full-size lightbox
+ *  (click anywhere, or Esc, to close). The compact thumbnails are what the app
+ *  persists in history; the full-resolution frame only ever went to the model. */
+const HistoryThumbnails: React.FC<{
+  urls: string[];
+  hasScreen?: boolean;
+  isUser: boolean;
+  screenLabel: string;
+}> = ({ urls, hasScreen, isUser, screenLabel }) => {
+  const [open, setOpen] = useState<string | null>(null);
+  const [shown, setShown] = useState(false);
 
+  useEffect(() => {
+    if (!open) return;
+    setShown(false);
+    const raf = requestAnimationFrame(() => setShown(true));
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <>
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {urls.map((url, i) => (
+          <button
+            key={i}
+            type="button"
+            onClick={() => setOpen(url)}
+            aria-label={hasScreen && i === 0 ? screenLabel : undefined}
+            className={`relative h-12 w-16 cursor-zoom-in overflow-hidden rounded-lg border transition-transform hover:-translate-y-0.5 active:scale-95 ${
+              isUser ? "border-on-primary/25" : "border-hairline"
+            }`}
+          >
+            <img
+              src={url}
+              alt=""
+              draggable={false}
+              className="h-full w-full object-cover"
+            />
+            {hasScreen && i === 0 && (
+              <span className="absolute bottom-0.5 end-0.5 flex h-3.5 w-3.5 items-center justify-center rounded bg-black/60 text-white">
+                <Camera width={9} height={9} />
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+      {open &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[100] flex cursor-zoom-out items-center justify-center bg-black/70 p-10"
+            onClick={() => setOpen(null)}
+            role="button"
+            tabIndex={-1}
+          >
+            <img
+              src={open}
+              alt=""
+              draggable={false}
+              className={`max-h-full max-w-full rounded-xl shadow-2xl transition-all duration-150 ${
+                shown ? "scale-100 opacity-100" : "scale-90 opacity-0"
+              }`}
+            />
+          </div>,
+          document.body,
+        )}
+    </>
+  );
+};
+
+const PAGE_SIZE = 30;
 interface OpenRecordingsButtonProps {
   onClick: () => void;
   label: string;
@@ -782,8 +875,11 @@ const AssistantHistoryEntryComponent: React.FC<AssistantHistoryEntryProps> = ({
       {expanded && (
         <div className="flex flex-col gap-2 pt-1.5 ps-[19px]">
           {session.messages.map((message, index) => {
-            const { text, screenshot } = cleanMessageContent(message.content);
+            const { text, screenshot, files } = cleanMessageContent(
+              message.content,
+            );
             const isUser = message.role === "user";
+            const thumbnails = message.images ?? [];
             return (
               <div
                 key={index}
@@ -803,18 +899,40 @@ const AssistantHistoryEntryComponent: React.FC<AssistantHistoryEntryProps> = ({
                       {text}
                     </ReactMarkdown>
                   )}
-                  {screenshot && (
+                  {thumbnails.length > 0 ? (
+                    <HistoryThumbnails
+                      urls={thumbnails}
+                      hasScreen={screenshot}
+                      isUser={isUser}
+                      screenLabel={t("settings.history.screenshotAttached")}
+                    />
+                  ) : (
+                    screenshot && (
+                      <span
+                        className={`mt-1.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                          isUser
+                            ? "bg-on-primary/20 text-on-primary/90"
+                            : "bg-mid-gray/15 text-muted"
+                        }`}
+                      >
+                        <Camera width={10} height={10} />
+                        {t("settings.history.screenshotAttached")}
+                      </span>
+                    )
+                  )}
+                  {files.map((name) => (
                     <span
-                      className={`mt-1.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                      key={name}
+                      className={`mt-1.5 me-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${
                         isUser
                           ? "bg-on-primary/20 text-on-primary/90"
                           : "bg-mid-gray/15 text-muted"
                       }`}
                     >
-                      <Camera width={10} height={10} />
-                      {t("settings.history.screenshotAttached")}
+                      <FileText width={10} height={10} />
+                      {name}
                     </span>
-                  )}
+                  ))}
                 </div>
               </div>
             );

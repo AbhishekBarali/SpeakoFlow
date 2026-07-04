@@ -1297,9 +1297,49 @@ async assistantGenerateCharacter(description: string) : Promise<Result<Generated
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * Reset a built-in persona to the version shipped with the app (its original
+ * name, role, prompt, greeting, avatar, and reply length). Custom personas
+ * have no shipped default, so this only works on built-in ids. This is the
+ * "reload" for a built-in whose prompt/details you edited (or wiped) and want
+ * back.
+ */
+async assistantRestoreBuiltinCharacter(id: string) : Promise<Result<AssistantCharacter, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("assistant_restore_builtin_character", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Re-add any built-in personas the user deleted, leaving their custom personas
+ * and their edits to still-present built-ins untouched. Returns how many were
+ * restored (0 if none were missing).
+ */
+async assistantRestoreMissingBuiltins() : Promise<Result<number, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("assistant_restore_missing_builtins") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async setAssistantScreenshotEnabled(enabled: boolean) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("set_assistant_screenshot_enabled", { enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Choose when a screen capture is taken for a voice turn: `Immediate` (the
+ * moment you start asking) or `OnSend` (when the message actually sends).
+ */
+async setAssistantVisionCaptureTiming(timing: VisionCaptureTiming) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_assistant_vision_capture_timing", { timing }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -1706,6 +1746,134 @@ async assistantTestWebSearch(query: string) : Promise<Result<SearchResult[], str
 }
 },
 /**
+ * Turn the personal-memory feature on or off. Off by default.
+ */
+async setAssistantMemoryEnabled(enabled: boolean) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_assistant_memory_enabled", { enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Set how much memory is injected per turn (the token-budget dial).
+ */
+async setAssistantMemoryDetail(detail: MemoryDetail) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_assistant_memory_detail", { detail }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Toggle incognito: when on, this conversation is neither remembered nor
+ * personalized from memory.
+ */
+async setAssistantMemoryIncognito(incognito: boolean) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_assistant_memory_incognito", { incognito }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Replace the always-on "About You" summary (user-edited in Settings).
+ */
+async setAssistantMemoryAboutYou(text: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_assistant_memory_about_you", { text }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Add a user-authored note (explicit → high confidence). Returns the new note.
+ */
+async addAssistantMemoryNote(text: string) : Promise<Result<MemoryNote, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("add_assistant_memory_note", { text }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Edit an existing note's text (keeps it user-owned; bumps its date).
+ */
+async updateAssistantMemoryNote(id: string, text: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("update_assistant_memory_note", { id, text }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Delete a single note by id.
+ */
+async deleteAssistantMemoryNote(id: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("delete_assistant_memory_note", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Wipe the entire personal memory (summary + all notes). Does not change the
+ * enabled toggle.
+ */
+async clearAssistantMemory() : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("clear_assistant_memory") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Export the whole memory to a JSON file on disk (path chosen via the UI's
+ * save dialog). Your data, in a portable, human-readable file.
+ */
+async exportAssistantMemory(path: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("export_assistant_memory", { path }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Import memory from a JSON file (path chosen via the UI's file dialog),
+ * replacing the current memory. Sensitive/oversized entries are filtered out
+ * on the way in.
+ */
+async importAssistantMemory(path: string) : Promise<Result<UserMemory, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("import_assistant_memory", { path }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Distill memory from the CURRENT conversation right now (the "Update memory
+ * from this chat" button). Runs the offline extraction pass immediately so the
+ * user can see it work without waiting for the conversation to end.
+ */
+async assistantDistillMemoryNow() : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("assistant_distill_memory_now") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * Stub implementation for non-macOS platforms
  * Always returns false since laptop detection is macOS-specific
  */
@@ -1775,7 +1943,11 @@ text_replacements?: Replacement[]; model_unload_timeout?: ModelUnloadTimeout;
  * sidecar) is unloaded to free RAM/VRAM. Mirrors `model_unload_timeout`
  * but applies to the LLM used for post-processing and the assistant.
  */
-local_llm_unload_timeout?: ModelUnloadTimeout; word_correction_threshold?: number; history_limit?: number; recording_retention_period?: RecordingRetentionPeriod; paste_method?: PasteMethod; clipboard_handling?: ClipboardHandling; auto_submit?: boolean; auto_submit_key?: AutoSubmitKey; post_process_enabled?: boolean; post_process_provider_id?: string; post_process_providers?: PostProcessProvider[]; post_process_api_keys?: SecretMap; post_process_models?: Partial<{ [key in string]: string }>; post_process_prompts?: LLMPrompt[]; post_process_selected_prompt_id?: string | null; mute_while_recording?: boolean; append_trailing_space?: boolean; app_language?: string; experimental_enabled?: boolean; lazy_stream_close?: boolean; keyboard_implementation?: KeyboardImplementation; show_tray_icon?: boolean; paste_delay_ms?: number; typing_tool?: TypingTool; external_script_path: string | null; custom_filler_words?: string[] | null; whisper_accelerator?: WhisperAcceleratorSetting; ort_accelerator?: OrtAcceleratorSetting; whisper_gpu_device?: number; extra_recording_buffer_ms?: number; assistant_provider_id?: string; assistant_models?: Partial<{ [key in string]: string }>; assistant_system_prompt?: string; assistant_screenshot_enabled?: boolean; assistant_tts_enabled?: boolean; assistant_tts_engine?: string; assistant_tts_voice?: string; assistant_tts_base_url?: string; assistant_tts_api_key?: SecretString; assistant_tts_model?: string; assistant_tts_remote_voice?: string; 
+local_llm_unload_timeout?: ModelUnloadTimeout; word_correction_threshold?: number; history_limit?: number; recording_retention_period?: RecordingRetentionPeriod; paste_method?: PasteMethod; clipboard_handling?: ClipboardHandling; auto_submit?: boolean; auto_submit_key?: AutoSubmitKey; post_process_enabled?: boolean; post_process_provider_id?: string; post_process_providers?: PostProcessProvider[]; post_process_api_keys?: SecretMap; post_process_models?: Partial<{ [key in string]: string }>; post_process_prompts?: LLMPrompt[]; post_process_selected_prompt_id?: string | null; mute_while_recording?: boolean; append_trailing_space?: boolean; app_language?: string; experimental_enabled?: boolean; lazy_stream_close?: boolean; keyboard_implementation?: KeyboardImplementation; show_tray_icon?: boolean; paste_delay_ms?: number; typing_tool?: TypingTool; external_script_path: string | null; custom_filler_words?: string[] | null; whisper_accelerator?: WhisperAcceleratorSetting; ort_accelerator?: OrtAcceleratorSetting; whisper_gpu_device?: number; extra_recording_buffer_ms?: number; assistant_provider_id?: string; assistant_models?: Partial<{ [key in string]: string }>; assistant_system_prompt?: string; assistant_screenshot_enabled?: boolean; 
+/**
+ * When a screen capture is taken for a voice turn (immediate vs at-send).
+ */
+assistant_vision_capture_timing?: VisionCaptureTiming; assistant_tts_enabled?: boolean; assistant_tts_engine?: string; assistant_tts_voice?: string; assistant_tts_base_url?: string; assistant_tts_api_key?: SecretString; assistant_tts_model?: string; assistant_tts_remote_voice?: string; 
 /**
  * Per-engine remote-TTS configuration. The flat `assistant_tts_base_url`,
  * `assistant_tts_model`, `assistant_tts_remote_voice`, and
@@ -1809,7 +1981,29 @@ assistant_characters?: AssistantCharacter[];
 /**
  * Id of the currently active character (defaults to `"default"`).
  */
-assistant_active_character_id?: string; assistant_font_size?: string; 
+assistant_active_character_id?: string; 
+/**
+ * Whether the assistant keeps a local, personal memory of the user (an
+ * always-on "About You" summary plus durable notes) and injects the
+ * relevant parts into each reply. Off by default; everything stays on this
+ * device and is fully user-editable in Settings → Memory.
+ */
+assistant_memory_enabled?: boolean; 
+/**
+ * The user's personal memory: a short always-on summary + durable notes.
+ */
+assistant_memory?: UserMemory; 
+/**
+ * How much memory to inject each turn (a token-budget dial). Light keeps
+ * only the summary; Balanced adds a few relevant notes; Detailed adds more.
+ */
+assistant_memory_detail?: MemoryDetail; 
+/**
+ * When true, this conversation is "incognito": memory is neither injected
+ * into replies nor learned from the conversation. A quick switch so a
+ * private chat leaves no trace in memory.
+ */
+assistant_memory_incognito?: boolean; assistant_font_size?: string; 
 /**
  * Surface opacity of the floating assistant panel (0.5–1.0). At 1.0 the
  * panel is fully opaque; lower values let the desktop blur through.
@@ -2053,7 +2247,16 @@ export type Capitalization =
  * Capitalize the first character of the replacement.
  */
 "capitalize"
-export type ChatMessage = { role: string; content: string }
+export type ChatMessage = { role: string; content: string; 
+/**
+ * Small JPEG **display thumbnails** (data URLs) for any images that rode
+ * along with this message — a screen capture and/or user-attached pictures.
+ * Display + history only: these are never sent to the model (the full-res
+ * copy is sent once, for that turn), they just let the panel show and
+ * hover-enlarge what was sent, and survive restarts. Older history rows
+ * (and text-only turns) simply have an empty list.
+ */
+images?: string[] }
 export type ClipboardHandling = "dont_modify" | "copy_to_clipboard"
 export type CustomSounds = { start: boolean; stop: boolean }
 export type EngineType = "Whisper" | "Parakeet" | "Moonshine" | "MoonshineStreaming" | "SenseVoice" | "GigaAM" | "Canary" | "Cohere" | 
@@ -2163,6 +2366,46 @@ port: number;
  */
 error: string | null }
 export type LogLevel = "trace" | "debug" | "info" | "warn" | "error"
+/**
+ * How sure we are about a remembered fact. Facts the user stated explicitly
+ * are `High`; facts the model inferred from a conversation are `Low`. Feeds
+ * pruning (low-confidence notes fade first) and injection ordering.
+ */
+export type MemoryConfidence = "low" | "medium" | "high"
+/**
+ * How much memory to inject each turn — a token-budget dial. `Light` keeps
+ * only the summary; `Balanced` adds a few relevant notes; `Detailed` adds
+ * more. Keeps memory cost flat regardless of how much has been learned.
+ */
+export type MemoryDetail = "light" | "balanced" | "detailed"
+/**
+ * A single durable fact the assistant has learned (or been told) about the
+ * user. Notes are pulled into a turn by relevance, within a token budget —
+ * never all at once — and are fully user-editable in Settings → Memory.
+ */
+export type MemoryNote = { 
+/**
+ * Stable identifier for edit/delete.
+ */
+id: string; 
+/**
+ * The fact itself, as a short canonical statement ("Prefers metric units").
+ */
+text: string; 
+/**
+ * ISO date (YYYY-MM-DD) the note was created or last confirmed. Drives
+ * recency ordering and decay.
+ */
+updated?: string; 
+/**
+ * How reliable the note is.
+ */
+confidence?: MemoryConfidence; 
+/**
+ * Where the note came from: `"user"` (typed/dictated explicitly) or
+ * `"auto"` (distilled from a conversation). Purely informational.
+ */
+source?: string }
 export type ModelInfo = { id: string; name: string; description: string; filename: string; url: string | null; sha256: string | null; size_mb: number; is_downloaded: boolean; is_downloading: boolean; partial_size: number; is_directory: boolean; engine_type: EngineType; accuracy_score: number; speed_score: number; supports_translation: boolean; is_recommended: boolean; supported_languages: string[]; supports_language_selection: boolean; is_custom: boolean }
 export type ModelLoadStatus = { is_loaded: boolean; current_model: string | null }
 export type ModelUnloadTimeout = "never" | "immediately" | "min_2" | "min_5" | "min_10" | "min_15" | "hour_1" | "sec_15"
@@ -2257,6 +2500,41 @@ export type TypingTool = "auto" | "wtype" | "kwtype" | "dotool" | "ydotool" | "x
  * "large", "extra_large") to match the values the settings dropdown uses.
  */
 export type UiTextSize = "default" | "large" | "extra_large"
+/**
+ * The user's personal, local-first memory: a short always-on "About You"
+ * summary plus a list of durable notes. Stored on-device in settings and
+ * injected (in part) into assistant turns only when
+ * `assistant_memory_enabled` is on and the conversation isn't incognito.
+ */
+export type UserMemory = { 
+/**
+ * The always-on summary injected into every reply (kept to a few
+ * sentences). Empty until the user or a distillation pass fills it.
+ */
+about_you?: string; 
+/**
+ * Durable facts, selected by relevance within the detail budget.
+ */
+notes?: MemoryNote[] }
+/**
+ * When a screen capture is taken for an assistant turn.
+ * 
+ * This only changes the timing for **voice** questions (where there's a real
+ * gap between starting and finishing the question); typed messages always
+ * capture at send, since the panel is already on screen either way.
+ */
+export type VisionCaptureTiming = 
+/**
+ * Capture the moment you start asking (voice: at hotkey/mic press), so it
+ * grabs what you were looking at when you began — not what's on screen
+ * after you finish talking. This is the default.
+ */
+"immediate" | 
+/**
+ * Capture when the message is actually sent (voice: after you stop talking
+ * and it transcribes). The original behaviour.
+ */
+"on_send"
 export type WhisperAcceleratorSetting = "auto" | "cpu" | "gpu"
 export type WindowsMicrophonePermissionStatus = { supported: boolean; overall_access: PermissionAccess; device_access: PermissionAccess; app_access: PermissionAccess; desktop_app_access: PermissionAccess }
 

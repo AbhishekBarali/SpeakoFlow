@@ -851,6 +851,34 @@
   word-break: break-word;
 }
 
+/* Manual dismiss (×) for the expanded error card — mirrors the pill's × so the
+   user can clear a failure notice immediately instead of waiting out the
+   auto-dismiss timer. */
+.assistant-error-dismiss {
+  flex-shrink: 0;
+  margin-left: auto;
+  margin-top: -1px;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: color-mix(in srgb, var(--as-error) 70%, transparent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.assistant-error-dismiss:hover {
+  background: color-mix(in srgb, var(--as-error) 14%, transparent);
+  color: var(--as-error);
+}
+
 /* Transient notice (e.g. web search failed, answering anyway). */
 .assistant-notice {
   align-self: flex-start;
@@ -1048,6 +1076,115 @@
   border: 1px solid var(--as-hairline);
   border-radius: 999px;
   padding: 2px 8px;
+}
+
+/* Inline preview thumbnails of the image(s) sent with a message. */
+.msg-thumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 7px;
+}
+
+.msg-thumb {
+  position: relative;
+  width: 64px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--as-hairline);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--as-inset-bg);
+  cursor: zoom-in;
+  transition:
+    border-color 0.15s ease,
+    transform 0.12s ease;
+}
+
+.msg-thumb:hover,
+.msg-thumb:focus-visible {
+  border-color: var(--as-accent, var(--as-muted));
+  transform: translateY(-1px);
+  outline: none;
+}
+
+/* A little press feedback when you click to pop the preview. */
+.msg-thumb:active {
+  transform: scale(0.95);
+}
+
+.msg-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.msg-thumb-badge {
+  position: absolute;
+  bottom: 2px;
+  inset-inline-end: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.62);
+  color: #fff;
+}
+
+/* Invisible click-catcher behind the popped preview so a click anywhere
+   dismisses it. */
+.msg-thumb-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 49;
+}
+
+/* Enlarged preview popped on click — fixed to the viewport so the scrolling
+   message list can't clip it. Positioned by the component; `.above` anchors its
+   bottom edge to the thumbnail (grows upward). */
+.msg-thumb-preview {
+  position: fixed;
+  z-index: 50;
+  max-width: 320px;
+  padding: 4px;
+  border: 1px solid var(--as-hairline);
+  border-radius: 10px;
+  background: var(--as-panel-surface);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.5);
+  cursor: zoom-out;
+}
+
+.msg-thumb-preview.above {
+  transform: translateY(-100%);
+}
+
+.msg-thumb-preview-img {
+  display: block;
+  max-width: 312px;
+  max-height: 58vh;
+  border-radius: 7px;
+  /* Pop in from the thumbnail. The outer element owns any translate (above),
+     so the scale lives here to avoid clobbering it. */
+  transform-origin: center bottom;
+  animation: msg-thumb-pop 0.14s ease-out;
+}
+
+.msg-thumb-preview:not(.above) .msg-thumb-preview-img {
+  transform-origin: center top;
+}
+
+@keyframes msg-thumb-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.86);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .bubble-copy {

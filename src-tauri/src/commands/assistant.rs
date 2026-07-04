@@ -36,8 +36,10 @@ pub async fn assistant_send_composed(
             .active_assistant_provider()
             .map(|p| crate::screenshot::CaptureProfile::for_base_url(&p.base_url))
             .unwrap_or(crate::screenshot::CaptureProfile::Generous);
+        // Capture the monitor the mouse cursor is on (falls back to primary),
+        // so multi-monitor users get the screen they're actually working on.
         match tauri::async_runtime::spawn_blocking(move || {
-            crate::screenshot::capture_screen_data_url(profile)
+            crate::screenshot::capture_screen_data_url_at(None, profile)
         })
         .await
         {
@@ -209,15 +211,28 @@ pub fn assistant_resume_session(app: AppHandle, id: i64) -> Result<(), String> {
 #[specta::specta]
 pub fn assistant_clear_conversation(app: AppHandle) -> Result<(), String> {
     let conversation = app.state::<AssistantConversation>();
+    // Learn from the conversation before wiping it — but only if there's new,
+    // substantial content since the last pass. `take_distillable` enforces that
+    // (and marks it), so clearing right after a close never double-distills.
+    let snapshot = conversation.take_distillable();
     conversation
         .messages
         .lock()
         .map_err(|e| format!("Conversation lock poisoned: {}", e))?
         .clear();
-    // Detach from the saved row so the next turn starts a new conversation in
-    // history rather than appending to the one the user just cleared.
+    // Detach from the saved row and reset the distill marker for the fresh chat.
     conversation.reset_session();
+    conversation.reset_distilled_marker();
     assistant::emit_conversation(&app);
+
+    // Fire-and-forget distillation of the just-ended conversation, off the hot
+    // path. `distill_and_store` re-checks the memory toggles before doing work.
+    if let Some(messages) = snapshot {
+        let app_for_memory = app.clone();
+        tauri::async_runtime::spawn(async move {
+            crate::memory::distill_and_store(app_for_memory, messages).await;
+        });
+    }
     Ok(())
 }
 
@@ -287,6 +302,21 @@ fn emit_settings_changed(app: &AppHandle) {
 pub fn set_assistant_screenshot_enabled(app: AppHandle, enabled: bool) -> Result<(), String> {
     let mut settings = get_settings(&app);
     settings.assistant_screenshot_enabled = enabled;
+    write_settings(&app, settings);
+    emit_settings_changed(&app);
+    Ok(())
+}
+
+/// Choose when a screen capture is taken for a voice turn: `Immediate` (the
+/// moment you start asking) or `OnSend` (when the message actually sends).
+#[tauri::command]
+#[specta::specta]
+pub fn set_assistant_vision_capture_timing(
+    app: AppHandle,
+    timing: crate::settings::VisionCaptureTiming,
+) -> Result<(), String> {
+    let mut settings = get_settings(&app);
+    settings.assistant_vision_capture_timing = timing;
     write_settings(&app, settings);
     emit_settings_changed(&app);
     Ok(())
@@ -924,6 +954,67 @@ pub fn assistant_export_character(app: AppHandle, id: String, path: String) -> R
     let json = serde_json::to_string_pretty(character).map_err(|e| e.to_string())?;
     std::fs::write(&path, json).map_err(|e| format!("Couldn't write file: {}", e))?;
     Ok(())
+}
+
+/// Reset a built-in persona to the version shipped with the app (its original
+/// name, role, prompt, greeting, avatar, and reply length). Custom personas
+/// have no shipped default, so this only works on built-in ids. This is the
+/// "reload" for a built-in whose prompt/details you edited (or wiped) and want
+/// back.
+#[tauri::command]
+#[specta::specta]
+pub fn assistant_restore_builtin_character(
+    app: AppHandle,
+    id: String,
+) -> Result<AssistantCharacter, String> {
+    // Passing an empty prompt makes the canonical "default" persona fall back to
+    // its shipped system prompt, so this restores the true factory version.
+    let shipped = crate::settings::default_assistant_characters("");
+    let canonical = shipped
+        .into_iter()
+        .find(|c| c.id == id)
+        .ok_or_else(|| "That isn't a built-in persona.".to_string())?;
+
+    let mut settings = get_settings(&app);
+    let existing = settings
+        .assistant_characters
+        .iter_mut()
+        .find(|c| c.id == id)
+        .ok_or_else(|| "That persona no longer exists.".to_string())?;
+    *existing = canonical.clone();
+    // Keep the plain system prompt in sync with the base assistant.
+    if id == "default" {
+        settings.assistant_system_prompt = canonical.prompt.clone();
+    }
+    write_settings(&app, settings);
+    emit_settings_changed(&app);
+    Ok(canonical)
+}
+
+/// Re-add any built-in personas the user deleted, leaving their custom personas
+/// and their edits to still-present built-ins untouched. Returns how many were
+/// restored (0 if none were missing).
+#[tauri::command]
+#[specta::specta]
+pub fn assistant_restore_missing_builtins(app: AppHandle) -> Result<u32, String> {
+    let shipped = crate::settings::default_assistant_characters("");
+    let mut settings = get_settings(&app);
+    let mut restored = 0u32;
+    for canonical in shipped {
+        if !settings
+            .assistant_characters
+            .iter()
+            .any(|c| c.id == canonical.id)
+        {
+            settings.assistant_characters.push(canonical);
+            restored += 1;
+        }
+    }
+    if restored > 0 {
+        write_settings(&app, settings);
+        emit_settings_changed(&app);
+    }
+    Ok(restored)
 }
 
 /// A persona drafted by the model from a short description. Not persisted by

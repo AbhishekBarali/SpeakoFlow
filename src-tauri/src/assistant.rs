@@ -11,7 +11,7 @@ use crate::web_search;
 use log::{debug, error, warn};
 use serde::Serialize;
 use serde_json::{json, Value};
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter, Manager, WebviewWindowBuilder};
 use tauri_plugin_store::StoreExt;
@@ -83,6 +83,62 @@ pub fn set_screen_armed(app: &AppHandle, armed: bool) {
 /// Whether screen vision is currently armed. Sticky: reading does NOT clear it.
 pub fn screen_armed() -> bool {
     SCREEN_ARMED.load(Ordering::SeqCst)
+}
+
+/// A screen capture taken *early* — at the moment a voice recording starts —
+/// when the "Vision capture timing" setting is `Immediate`. Stashed here by
+/// `AssistantAction::start` and consumed by `run_voice_turn`, so the frame
+/// reflects what the user was looking at when they *began* the question rather
+/// than whatever is on screen after they finish talking. Holds the full-res
+/// model data URL. Cleared at the start of every voice recording so a
+/// cancelled/stale capture can never leak into a later turn.
+static PENDING_IMMEDIATE_CAPTURE: Mutex<Option<String>> = Mutex::new(None);
+
+/// Store an immediate (recording-start) screen capture for the next voice turn.
+pub fn stash_immediate_capture(data_url: String) {
+    if let Ok(mut slot) = PENDING_IMMEDIATE_CAPTURE.lock() {
+        *slot = Some(data_url);
+    }
+}
+
+/// Clear any stashed immediate capture (start of a new recording / on cancel).
+pub fn clear_immediate_capture() {
+    if let Ok(mut slot) = PENDING_IMMEDIATE_CAPTURE.lock() {
+        *slot = None;
+    }
+}
+
+/// Take (and clear) the stashed immediate capture, if one was taken at the
+/// start of this recording.
+fn take_immediate_capture() -> Option<String> {
+    PENDING_IMMEDIATE_CAPTURE
+        .lock()
+        .ok()
+        .and_then(|mut s| s.take())
+}
+
+/// Build small display thumbnails (data URLs) for the visuals attached to a
+/// turn — the screen capture first (if any), then user-attached images — so the
+/// panel can show and hover-enlarge what was sent, and it persists in history.
+/// The full-resolution copies still go to the model; only these compact
+/// thumbnails are stored. Runs the JPEG work off the async runtime; a thumbnail
+/// that fails to encode is skipped (display-only — it never blocks the turn).
+async fn build_message_thumbnails(screenshot: Option<String>, images: Vec<String>) -> Vec<String> {
+    if screenshot.is_none() && images.is_empty() {
+        return Vec::new();
+    }
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut thumbs = Vec::new();
+        for src in screenshot.iter().chain(images.iter()) {
+            match crate::screenshot::data_url_to_thumbnail(src) {
+                Ok(thumb) => thumbs.push(thumb),
+                Err(e) => warn!("Vision thumbnail generation failed: {}", e),
+            }
+        }
+        thumbs
+    })
+    .await
+    .unwrap_or_default()
 }
 
 /// Appended to the stored user message when a screenshot was sent with it.
@@ -230,6 +286,10 @@ pub struct AssistantConversation {
     /// `None` before the first save and after the conversation is cleared.
     /// Lets each turn update the same row instead of creating duplicates.
     session_id: Mutex<Option<i64>>,
+    /// Number of messages that had been distilled into memory as of the last
+    /// distillation pass. A dirty-guard so closing the panel only triggers a
+    /// learn pass when the conversation has actually grown since last time.
+    last_distilled_len: AtomicUsize,
 }
 
 impl AssistantConversation {
@@ -240,6 +300,7 @@ impl AssistantConversation {
             cancel: Arc::new(Notify::new()),
             cancelled: AtomicBool::new(false),
             session_id: Mutex::new(None),
+            last_distilled_len: AtomicUsize::new(0),
         }
     }
 
@@ -272,6 +333,36 @@ impl AssistantConversation {
         if let Ok(mut id) = self.session_id.lock() {
             *id = None;
         }
+    }
+
+    /// Snapshot the conversation for distillation IF it has grown since the
+    /// last pass and holds at least two user turns. Marks the new length as
+    /// distilled so repeated closes don't re-run on unchanged content.
+    pub fn take_distillable(&self) -> Option<Vec<ChatMessage>> {
+        let history = self.messages.lock().ok()?;
+        let len = history.len();
+        let last = self.last_distilled_len.load(Ordering::SeqCst);
+        let user_turns = history.iter().filter(|m| m.role == "user").count();
+        if len > last && user_turns >= 2 {
+            self.last_distilled_len.store(len, Ordering::SeqCst);
+            Some(history.clone())
+        } else {
+            None
+        }
+    }
+
+    /// Mark the current conversation length as already distilled (e.g. after a
+    /// manual "Update memory" pass) so a later close won't redo the same work.
+    pub fn mark_distilled_current(&self) {
+        if let Ok(history) = self.messages.lock() {
+            self.last_distilled_len
+                .store(history.len(), Ordering::SeqCst);
+        }
+    }
+
+    /// Forget the distilled marker (conversation cleared / new session loaded).
+    pub fn reset_distilled_marker(&self) {
+        self.last_distilled_len.store(0, Ordering::SeqCst);
     }
 
     /// Replace the in-memory conversation with a session loaded from History,
@@ -583,6 +674,22 @@ pub fn hide_assistant_panel(app: &AppHandle) {
     if let Some(window) = app.get_webview_window(PANEL_LABEL) {
         let _ = window.hide();
     }
+    // Learn from the conversation when the panel is closed — the common way to
+    // "end" a chat besides Clear (users often just close it when it gets long).
+    // Guarded so it only runs when memory is on, the chat isn't incognito, and
+    // there's genuinely new content since the last pass, so opening/closing the
+    // panel repeatedly never spends a wasted model call.
+    let settings = crate::settings::get_settings(app);
+    if settings.assistant_memory_enabled && !settings.assistant_memory_incognito {
+        if let Some(conversation) = app.try_state::<AssistantConversation>() {
+            if let Some(messages) = conversation.take_distillable() {
+                let app_for_memory = app.clone();
+                tauri::async_runtime::spawn(async move {
+                    crate::memory::distill_and_store(app_for_memory, messages).await;
+                });
+            }
+        }
+    }
 }
 
 pub fn toggle_assistant_panel(app: &AppHandle) {
@@ -798,7 +905,14 @@ pub fn open_snip_overlay(
 /// display scaling.
 pub fn finish_region_snip(app: &AppHandle, rect: Option<(f64, f64, f64, f64)>) {
     if let Some(window) = app.get_webview_window(SNIP_LABEL) {
-        let _ = window.close();
+        // Destroy (not close): the app-wide `CloseRequested` handler calls
+        // `prevent_close()` + `hide()` for every window, so `close()` would only
+        // HIDE this overlay. A hidden snip window still satisfies the
+        // `get_webview_window(SNIP_LABEL).is_some()` guard in
+        // `open_snip_overlay`, so the next snip would silently no-op ("already
+        // snipping") and the overlay would never reappear. `destroy()` tears the
+        // window down for real so a fresh snip can open every time.
+        let _ = window.destroy();
     }
     let pending = PENDING_SNIP.lock().ok().and_then(|mut p| p.take());
     let Some(rect) = rect else {
@@ -874,32 +988,51 @@ pub async fn run_voice_turn(app: AppHandle, transcription: String) {
     // capture one even if the toggle/phrasing would normally arm it.
     let wants_screen = !settings.active_character_is_cat()
         && (screen_armed() || wants_screen_context(&transcription));
+
+    // An immediate (recording-start) capture may already be waiting — taken
+    // when the "Vision capture timing" setting is Immediate and the camera was
+    // armed. Take it regardless so it never lingers into a later turn; only use
+    // it when this turn actually wants the screen.
+    let immediate = take_immediate_capture();
+
     let screenshot = if wants_screen && settings.assistant_screenshot_enabled {
-        // Tiny body only for Azure; loopback (built-in/local engine) gets a
-        // balanced image, cloud gets the sharp one.
-        let profile = settings
-            .active_assistant_provider()
-            .map(|p| crate::screenshot::CaptureProfile::for_base_url(&p.base_url))
-            .unwrap_or(crate::screenshot::CaptureProfile::Generous);
-        let captured = tauri::async_runtime::spawn_blocking(move || {
-            crate::screenshot::capture_screen_data_url(profile)
-        })
-        .await;
-        match captured {
-            Ok(Ok(data_url)) => Some(data_url),
-            Ok(Err(e)) => {
-                // Don't silently send a text-only request when the user asked
-                // about their screen.
-                error!("Screen capture failed: {}", e);
-                emit_error(&app, "screen_capture", e);
-                emit_state(&app, "idle");
-                return;
-            }
-            Err(e) => {
-                error!("Screen capture task failed: {}", e);
-                emit_error(&app, "screen_capture", e.to_string());
-                emit_state(&app, "idle");
-                return;
+        // Reuse the frame grabbed when the user started speaking — but only when
+        // vision is still armed (the same arm that triggered that early
+        // capture). A turn that only wants the screen because of a "what's on my
+        // screen" phrase always captures fresh below.
+        if let Some(data_url) = immediate.filter(|_| screen_armed()) {
+            Some(data_url)
+        } else {
+            // Capture now (On-send timing, or a "what's on my screen" phrase we
+            // could only detect after transcription). Tiny body only for Azure;
+            // loopback (built-in/local engine) gets a balanced image, cloud gets
+            // the sharp one. Target the monitor the mouse cursor is on — with
+            // multiple displays that's the screen the user is actually working
+            // on (the panel rarely moves, the cursor follows attention).
+            let profile = settings
+                .active_assistant_provider()
+                .map(|p| crate::screenshot::CaptureProfile::for_base_url(&p.base_url))
+                .unwrap_or(crate::screenshot::CaptureProfile::Generous);
+            let captured = tauri::async_runtime::spawn_blocking(move || {
+                crate::screenshot::capture_screen_data_url_at(None, profile)
+            })
+            .await;
+            match captured {
+                Ok(Ok(data_url)) => Some(data_url),
+                Ok(Err(e)) => {
+                    // Don't silently send a text-only request when the user asked
+                    // about their screen.
+                    error!("Screen capture failed: {}", e);
+                    emit_error(&app, "screen_capture", e);
+                    emit_state(&app, "idle");
+                    return;
+                }
+                Err(e) => {
+                    error!("Screen capture task failed: {}", e);
+                    emit_error(&app, "screen_capture", e.to_string());
+                    emit_state(&app, "idle");
+                    return;
+                }
             }
         }
     } else {
@@ -1071,6 +1204,7 @@ fn run_cat_turn(
     files: &[FileAttachment],
     images: &[String],
     has_screenshot: bool,
+    thumbnails: Vec<String>,
 ) {
     {
         let conversation = app.state::<AssistantConversation>();
@@ -1078,6 +1212,7 @@ fn run_cat_turn(
         history.push(ChatMessage {
             role: "user".to_string(),
             content: compose_stored_user_message(user_text, files, images, has_screenshot),
+            images: thumbnails,
         });
     }
     emit_conversation(app);
@@ -1090,6 +1225,7 @@ fn run_cat_turn(
         history.push(ChatMessage {
             role: "assistant".to_string(),
             content: reply.clone(),
+            images: Vec::new(),
         });
     }
     emit_conversation(app);
@@ -1200,6 +1336,11 @@ pub async fn run_assistant_turn(
 
     let settings = get_settings(&app);
 
+    // Build the small display thumbnails once (screen capture first, then
+    // attached images), before branching. Stored on the user message so the
+    // panel can show + hover-enlarge what was sent, and it persists in history.
+    let thumbnails = build_message_thumbnails(screenshot.clone(), images.clone()).await;
+
     // The "Cat" character ignores the model entirely: no provider, no web
     // search, no vision — it just meows. Handle it up front so it works even
     // when no LLM provider/model is configured.
@@ -1211,6 +1352,7 @@ pub async fn run_assistant_turn(
             &files,
             &images,
             screenshot.is_some(),
+            thumbnails,
         );
         return;
     }
@@ -1295,6 +1437,7 @@ pub async fn run_assistant_turn(
         history.push(ChatMessage {
             role: "user".to_string(),
             content: compose_stored_user_message(&user_text, &files, &images, screenshot.is_some()),
+            images: thumbnails,
         });
     }
     emit_conversation(&app);
@@ -1533,6 +1676,17 @@ pub async fn run_assistant_turn(
                 content.push_str("\n\n");
             }
             content.push_str(directive);
+        }
+        // Personal memory: append an advisory "About You" block (plus the notes
+        // relevant to this message, within the detail budget) when memory is on
+        // and the conversation isn't incognito. Placed late so the earlier
+        // prompt prefix stays stable/cache-friendly; the block itself states
+        // that it's advisory and never overrides the user's current message.
+        if let Some(block) = crate::memory::build_memory_block(&settings, &user_text) {
+            if !content.trim().is_empty() {
+                content.push_str("\n\n");
+            }
+            content.push_str(&block);
         }
         // On web-search turns, tell the model to ground its answer in the
         // results (whether prepended to the user's message on the planner path,
@@ -1812,6 +1966,7 @@ pub async fn run_assistant_turn(
                 history.push(ChatMessage {
                     role: "assistant".to_string(),
                     content: partial_text,
+                    images: Vec::new(),
                 });
             }
             emit_conversation(&app);
@@ -1825,6 +1980,7 @@ pub async fn run_assistant_turn(
                 history.push(ChatMessage {
                     role: "assistant".to_string(),
                     content: full_text.clone(),
+                    images: Vec::new(),
                 });
             }
             emit_conversation(&app);
@@ -2091,6 +2247,7 @@ pub async fn run_summarize_turn(app: AppHandle) {
                     history.push(ChatMessage {
                         role: "assistant".to_string(),
                         content: text,
+                        images: Vec::new(),
                     });
                 }
                 persist_assistant_session(&app);
