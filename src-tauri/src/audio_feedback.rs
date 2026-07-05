@@ -9,9 +9,13 @@ use std::path::{Path, PathBuf};
 use std::thread;
 use tauri::{AppHandle, Manager};
 
+#[derive(Clone, Copy)]
 pub enum SoundType {
     Start,
     Stop,
+    /// The tap-to-lock cue played when a push-to-talk hold is converted to
+    /// hands-free. Theme-independent — always `popo_lock.wav`.
+    Lock,
 }
 
 fn resolve_sound_path(
@@ -20,7 +24,7 @@ fn resolve_sound_path(
     sound_type: SoundType,
 ) -> Option<PathBuf> {
     let sound_file = get_sound_path(settings, sound_type);
-    let base_dir = get_sound_base_dir(settings);
+    let base_dir = get_sound_base_dir(settings, sound_type);
     match base_dir {
         tauri::path::BaseDirectory::AppData => {
             crate::portable::resolve_app_data(app, &sound_file).ok()
@@ -31,6 +35,8 @@ fn resolve_sound_path(
 
 fn get_sound_path(settings: &AppSettings, sound_type: SoundType) -> String {
     match (settings.sound_theme, sound_type) {
+        // The lock cue is theme-independent and always ships in resources.
+        (_, SoundType::Lock) => "resources/popo_lock.wav".to_string(),
         (SoundTheme::Custom, SoundType::Start) => "custom_start.wav".to_string(),
         (SoundTheme::Custom, SoundType::Stop) => "custom_stop.wav".to_string(),
         (_, SoundType::Start) => settings.sound_theme.to_start_path(),
@@ -38,9 +44,13 @@ fn get_sound_path(settings: &AppSettings, sound_type: SoundType) -> String {
     }
 }
 
-fn get_sound_base_dir(settings: &AppSettings) -> tauri::path::BaseDirectory {
-    match settings.sound_theme {
-        SoundTheme::Custom => tauri::path::BaseDirectory::AppData,
+fn get_sound_base_dir(settings: &AppSettings, sound_type: SoundType) -> tauri::path::BaseDirectory {
+    match (settings.sound_theme, sound_type) {
+        // Custom start/stop live in the user's app-data dir; everything else
+        // (built-in themes and the shared lock cue) is a bundled resource.
+        (SoundTheme::Custom, SoundType::Start) | (SoundTheme::Custom, SoundType::Stop) => {
+            tauri::path::BaseDirectory::AppData
+        }
         _ => tauri::path::BaseDirectory::Resource,
     }
 }

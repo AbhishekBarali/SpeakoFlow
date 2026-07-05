@@ -6,13 +6,13 @@
 //! with heavy parallelism and tight timeouts.
 //!
 //! Pipeline:
-//! 1. **Planner** (`plan_search`): a capable LLM decides whether a live search
-//!    is needed and rewrites the user's (often transcribed) request into 1–4
-//!    clean queries, picks a freshness window, and flags whether this is a
-//!    current-events/news topic.
+//! 1. **Model-decided** (`run_tool_search`): the assistant model itself calls
+//!    the `web_search` tool when it needs current facts, passing its own query,
+//!    freshness window, and news flag — there is no separate planner or keyword
+//!    gate deciding for it.
 //! 2. **Snippet search** (`snippet_search`): run each query in parallel against
 //!    the configured provider and get back fast title+snippet results. News
-//!    sources are pulled in when the planner flags a current-events topic, and
+//!    sources are pulled in when the model flags a current-events topic, and
 //!    a freshness window is applied when the topic is time-sensitive.
 //! 3. **Local rerank** (`rerank`): score the merged snippets by lexical overlap
 //!    with the query plus a recency boost — purely local, no extra network or
@@ -30,12 +30,11 @@
 //! **Exa** (neural/semantic search), and **SerpAPI** (Google SERP). Any unknown
 //! or legacy provider value routes to Serper.
 
-use crate::llm_client;
-use crate::settings::{AppSettings, AssistantSearchDepth, PostProcessProvider};
+use crate::settings::{AppSettings, AssistantSearchDepth};
 use log::{debug, warn};
 use once_cell::sync::Lazy;
 use regex::Regex;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use serde_json::json;
 use specta::Type;
 use std::collections::HashSet;
@@ -53,9 +52,6 @@ const TITLE_MAX_CHARS: usize = 160;
 
 /// Absolute per-result content cap (a tier may ask for less).
 const CONTENT_HARD_CAP: usize = 4_000;
-
-/// Hard cap on how many distinct queries the planner may run for one turn.
-const MAX_QUERIES: usize = 4;
 
 /// Upper bound on results per provider call.
 const MAX_RESULTS_HARD: usize = 10;
@@ -137,213 +133,21 @@ pub fn web_search_system_directive(tts_enabled: bool) -> String {
 pub const WEB_SEARCH_CAPABILITY_NOTE: &str = "You have a live web search tool available in this app, and the user's current local date is provided with each message. Your training data has a cutoff and may be out of date, but you are NOT stuck in your training year: trust the provided current date, and rely on web search for anything time-sensitive (recent events, news, sports results, prices, releases, schedules, who currently holds a role) rather than answering from stale memory or assuming an old year. Use the tool ONLY when a question genuinely needs current or external facts. For greetings, small talk, opinions, advice, explanations, definitions, writing, coding, math, or anything you already know well, just answer directly — do NOT search. When a search is warranted the app runs it automatically and adds the results to the user's message; on a turn that arrives without results, never claim you cannot access the internet — if you're unsure about something current, give your best answer and offer to look it up.";
 
 // ---------------------------------------------------------------------------
-// Search planner (decides whether to search + rewrites the query)
+// Search plan (retrieval input)
 // ---------------------------------------------------------------------------
 
-/// Instruction block for the planner LLM.
-const PLANNER_SYSTEM_PROMPT: &str = "You are the search planner for a voice assistant. The user's latest message may be a rough, possibly garbled voice transcription (filler words, misheard proper nouns, missing punctuation) in any language.\n\nDecide whether answering it well requires a live web search. Search for: current events, news, prices, weather, sports scores and fixtures, schedules, product releases/versions, people's current roles, and any niche or time-sensitive fact that a model's training data would not reliably know. Do NOT search for: greetings or small talk, questions about the assistant itself, or things you can answer from your own knowledge (general explanations, definitions, writing, brainstorming, coding, math, translation).\n\nWhen a search is warranted, rewrite the request into 1 to 4 focused, keyword-rich web search queries: correct likely transcription errors and proper names, strip filler, and split a multi-part question into separate queries. Use the conversation context to make follow-up questions self-contained (resolve pronouns like \"it\"/\"they\" to the actual subject). Use today's date to disambiguate which instance of a recurring thing the user means (e.g. which year's tournament, the latest model version). Keep each query concise, as a person would type it into a search box.\n\nSet \"freshness\" to the tightest window that fits: \"day\" or \"week\" for breaking news and live events, \"month\" or \"year\" for recent-but-not-breaking topics, or \"none\" when recency doesn't matter. Set \"news\" to true when the question is about current events, breaking news, sports, or anything where fresh news coverage is the best source — this pulls in news articles, not just static web pages.";
-
-/// The planner's structured decision.
-#[derive(Debug, Clone, Deserialize)]
+/// A set of ready-to-run web queries plus retrieval hints. Built directly from
+/// the model's `web_search` tool call (see `run_tool_search`) and consumed by
+/// `search_with_plan`; the model itself decides whether and what to search, so
+/// there is no separate planner or keyword heuristic anymore.
+#[derive(Debug, Clone)]
 pub struct SearchPlan {
-    /// Whether a live web search should run for this turn.
-    #[serde(default)]
-    pub needs_search: bool,
-    /// Cleaned, search-ready queries (1–4 after sanitizing).
-    #[serde(default)]
+    /// Cleaned, search-ready queries.
     pub queries: Vec<String>,
     /// Freshness window: "none" | "day" | "week" | "month" | "year".
-    #[serde(default = "default_freshness")]
     pub freshness: String,
     /// Whether to include news-source results (current events / breaking news).
-    #[serde(default)]
     pub news: bool,
-}
-
-fn default_freshness() -> String {
-    "none".to_string()
-}
-
-impl SearchPlan {
-    /// A plan derived purely from cheap local signals — no LLM call. It searches
-    /// **only when the query actually looks time-sensitive**, so casual
-    /// conversation never triggers a search. Used for the built-in local model
-    /// (whose small, possibly-cold engine isn't worth a planning round-trip) and
-    /// as the planner-failure fallback.
-    pub fn heuristic(user_text: &str) -> Self {
-        let q = user_text.trim();
-        if q.is_empty() || (!is_explicit_search_request(q) && !looks_time_sensitive(q)) {
-            return SearchPlan {
-                needs_search: false,
-                queries: Vec::new(),
-                freshness: "none".to_string(),
-                news: false,
-            };
-        }
-        let ql = q.to_lowercase();
-        let news = [
-            "news",
-            "score",
-            "result",
-            "won",
-            "winner",
-            "breaking",
-            "election",
-            "match",
-            "game",
-            "standings",
-            "fixture",
-            "headline",
-        ]
-        .iter()
-        .any(|s| ql.contains(s));
-        let freshness = if ["today", "tonight", "right now", "breaking", "live"]
-            .iter()
-            .any(|s| ql.contains(s))
-        {
-            "day"
-        } else if news {
-            "week"
-        } else {
-            "month"
-        };
-        SearchPlan {
-            needs_search: true,
-            queries: vec![truncate_chars(q, 480)],
-            freshness: freshness.to_string(),
-            news,
-        }
-    }
-
-    /// Clean up model output: trim/dedupe/cap queries and normalize freshness.
-    fn sanitize(&mut self, user_text: &str) {
-        let mut seen = HashSet::new();
-        let mut cleaned = Vec::new();
-        for q in self.queries.drain(..) {
-            let q = q.trim();
-            if q.is_empty() {
-                continue;
-            }
-            // Keep queries reasonably short for the SERP APIs.
-            let q = truncate_chars(q, 480);
-            if seen.insert(q.to_lowercase()) {
-                cleaned.push(q);
-            }
-            if cleaned.len() >= MAX_QUERIES {
-                break;
-            }
-        }
-        self.queries = cleaned;
-
-        // If the model wants a search but gave no usable query, fall back to the
-        // raw request rather than silently skipping the search.
-        if self.needs_search && self.queries.is_empty() {
-            let q = user_text.trim();
-            if q.is_empty() {
-                self.needs_search = false;
-            } else {
-                self.queries.push(truncate_chars(q, 480));
-            }
-        }
-
-        self.freshness = match self.freshness.trim().to_lowercase().as_str() {
-            "day" | "week" | "month" | "year" | "none" => self.freshness.trim().to_lowercase(),
-            "hour" => "day".to_string(),
-            _ => "none".to_string(),
-        };
-    }
-}
-
-/// Ask the assistant's own (capable) model to plan the search.
-pub async fn plan_search(
-    provider: &PostProcessProvider,
-    api_key: String,
-    model: &str,
-    supports_structured_output: bool,
-    recent_context: &str,
-    user_text: &str,
-) -> Result<SearchPlan, String> {
-    let today = chrono::Local::now().format("%A, %B %-d, %Y").to_string();
-
-    let mut system = String::with_capacity(PLANNER_SYSTEM_PROMPT.len() + 64);
-    system.push_str(PLANNER_SYSTEM_PROMPT);
-    system.push_str("\n\nToday's date is ");
-    system.push_str(&today);
-    system.push('.');
-
-    let mut user = String::new();
-    if !recent_context.trim().is_empty() {
-        user.push_str("Conversation so far:\n");
-        user.push_str(recent_context.trim());
-        user.push_str("\n\n");
-    }
-    user.push_str("New user request (may be a rough voice transcription): \"");
-    user.push_str(user_text.trim());
-    user.push('"');
-
-    let schema = if supports_structured_output {
-        Some(json!({
-            "type": "object",
-            "properties": {
-                "needs_search": { "type": "boolean" },
-                "queries": { "type": "array", "items": { "type": "string" } },
-                "freshness": { "type": "string", "enum": ["none", "day", "week", "month", "year"] },
-                "news": { "type": "boolean" }
-            },
-            "required": ["needs_search", "queries", "freshness", "news"],
-            "additionalProperties": false
-        }))
-    } else {
-        system.push_str("\n\nReply with ONLY a JSON object of this exact shape, no prose and no code fences: {\"needs_search\": true|false, \"queries\": [\"...\"], \"freshness\": \"none|day|week|month|year\", \"news\": true|false}.");
-        None
-    };
-
-    debug!("Planning web search for {:?}", user_text);
-
-    let raw = llm_client::send_chat_completion_with_schema(
-        provider,
-        api_key,
-        model,
-        user,
-        Some(system),
-        schema,
-        None,
-        None,
-    )
-    .await?
-    .ok_or_else(|| "Search planner returned an empty response".to_string())?;
-
-    let mut plan = parse_plan(&raw).ok_or_else(|| {
-        format!(
-            "Could not parse a search plan from the model output: {}",
-            truncate_chars(raw.trim(), 200)
-        )
-    })?;
-    plan.sanitize(user_text);
-    debug!(
-        "Search plan: needs_search={}, freshness={}, news={}, queries={:?}",
-        plan.needs_search, plan.freshness, plan.news, plan.queries
-    );
-    Ok(plan)
-}
-
-/// Parse the planner's JSON, tolerating models that wrap it in prose or fences.
-fn parse_plan(raw: &str) -> Option<SearchPlan> {
-    let trimmed = raw
-        .trim()
-        .trim_start_matches("```json")
-        .trim_matches('`')
-        .trim();
-    if let Ok(p) = serde_json::from_str::<SearchPlan>(trimmed) {
-        return Some(p);
-    }
-    // Fall back to the first {...} block anywhere in the text.
-    let start = raw.find('{')?;
-    let end = raw.rfind('}')?;
-    if end <= start {
-        return None;
-    }
-    serde_json::from_str::<SearchPlan>(&raw[start..=end]).ok()
 }
 
 // ---------------------------------------------------------------------------
@@ -439,7 +243,6 @@ pub async fn run_tool_search(
         _ => "none".to_string(),
     };
     let plan = SearchPlan {
-        needs_search: true,
         queries: vec![truncate_chars(query, 480)],
         freshness,
         news,
@@ -683,300 +486,6 @@ pub fn format_results_for_prompt(results: &[SearchResult], total_budget: usize) 
         }
     }
     out
-}
-
-/// Fast, allocation-light heuristic used as a cheap *pre-gate* before the LLM
-/// planner: it skips clear non-search work (chit-chat, questions about the
-/// assistant, text-generation/coding tasks, pure arithmetic, "explain/define"
-/// requests). Everything else proceeds to the planner.
-pub fn should_search(query: &str) -> bool {
-    let q = query.trim().to_lowercase();
-    if q.is_empty() {
-        return false;
-    }
-
-    // Conversational small talk / greetings — including ones with leading
-    // greetings or trailing address terms like "Hey, what's up, bro?".
-    if is_small_talk(&q) {
-        return false;
-    }
-
-    const SELF_REFERENTIAL: [&str; 8] = [
-        "who are you",
-        "what are you",
-        "what can you do",
-        "what is your name",
-        "your name",
-        "help me",
-        "what do you do",
-        "introduce yourself",
-    ];
-    if SELF_REFERENTIAL.iter().any(|p| q.contains(p)) {
-        return false;
-    }
-
-    const TASK_PREFIXES: [&str; 18] = [
-        "write ",
-        "compose ",
-        "draft ",
-        "create ",
-        "generate ",
-        "make a ",
-        "translate ",
-        "summarize ",
-        "summarise ",
-        "rewrite ",
-        "rephrase ",
-        "paraphrase ",
-        "fix ",
-        "refactor ",
-        "debug ",
-        "improve ",
-        "correct ",
-        "proofread ",
-    ];
-    if TASK_PREFIXES.iter().any(|p| q.starts_with(p)) {
-        return false;
-    }
-
-    if q.contains("```") || q.contains("def ") || q.contains("function ") {
-        return false;
-    }
-
-    if is_simple_math(&q) {
-        return false;
-    }
-
-    const CONCEPTUAL_PREFIXES: [&str; 5] = [
-        "explain ",
-        "define ",
-        "what is a ",
-        "what is an ",
-        "what does it mean",
-    ];
-    if CONCEPTUAL_PREFIXES.iter().any(|p| q.starts_with(p)) {
-        return false;
-    }
-
-    true
-}
-
-/// Rough detector for "this is just arithmetic".
-fn is_simple_math(q: &str) -> bool {
-    let mut has_op = false;
-    for c in q.chars() {
-        match c {
-            '0'..='9' | ' ' | '.' | ',' | '(' | ')' => {}
-            '+' | '-' | '*' | '/' | '^' | '%' | '=' => has_op = true,
-            _ => return false,
-        }
-    }
-    has_op
-}
-
-/// Detect conversational small talk / greetings, robust to leading greetings and
-/// trailing address terms (e.g. "Hey, what's up, bro?" → small talk). Normalizes
-/// the text (drop apostrophes, punctuation → spaces), strips a leading greeting
-/// word and trailing address words, then matches the remainder against a set of
-/// known chit-chat phrases. Deliberately exact-match on the remainder so real
-/// questions that merely start the same way ("what's up with the World Cup")
-/// are NOT treated as small talk.
-fn is_small_talk(q: &str) -> bool {
-    let mut normalized = String::with_capacity(q.len());
-    for c in q.chars() {
-        if c.is_alphanumeric() {
-            normalized.extend(c.to_lowercase());
-        } else if matches!(c, '\'' | '\u{2019}' | '`') {
-            // drop apostrophes so "what's" -> "whats"
-        } else {
-            normalized.push(' ');
-        }
-    }
-    let mut words: Vec<&str> = normalized.split_whitespace().collect();
-
-    const TRAILING: [&str; 11] = [
-        "bro", "man", "dude", "buddy", "bruh", "mate", "pal", "sir", "friend", "ya", "there",
-    ];
-    while let Some(last) = words.last() {
-        if TRAILING.contains(last) {
-            words.pop();
-        } else {
-            break;
-        }
-    }
-
-    const LEADING: [&str; 8] = ["hey", "hi", "hello", "yo", "hiya", "heya", "sup", "wassup"];
-    while let Some(first) = words.first() {
-        if LEADING.contains(first) {
-            words.remove(0);
-        } else {
-            break;
-        }
-    }
-
-    let phrase = words.join(" ");
-    const SMALL_TALK: [&str; 27] = [
-        "", // bare greeting like "hey bro"
-        "thanks",
-        "thank you",
-        "ty",
-        "ok",
-        "okay",
-        "cool",
-        "nice",
-        "lol",
-        "bye",
-        "good morning",
-        "good night",
-        "good evening",
-        "good afternoon",
-        "whats up",
-        "whats good",
-        "whats new",
-        "wassup",
-        "hows it going",
-        "how is it going",
-        "how are you",
-        "how are you doing",
-        "how have you been",
-        "hows your day",
-        "hows life",
-        "how is life",
-        "nice to meet you",
-    ];
-    SMALL_TALK.contains(&phrase.as_str())
-}
-
-/// Cheap positive signal that a query likely needs *current / external* info.
-/// Used by the built-in model path and the planner-failure fallback so those
-/// search only when it actually looks necessary — never on greetings or
-/// chit-chat. Single-word signals are matched on whole words (so "now" doesn't
-/// fire on "know"); phrases and recent-year tokens are matched on the substring.
-pub fn looks_time_sensitive(query: &str) -> bool {
-    let q = query.to_lowercase();
-    let words: HashSet<&str> = q
-        .split(|c: char| !c.is_alphanumeric())
-        .filter(|w| !w.is_empty())
-        .collect();
-
-    const WORD_SIGNALS: [&str; 44] = [
-        "latest",
-        "current",
-        "currently",
-        "today",
-        "tonight",
-        "tomorrow",
-        "yesterday",
-        "recent",
-        "recently",
-        "breaking",
-        "news",
-        "headline",
-        "headlines",
-        "score",
-        "scores",
-        "result",
-        "results",
-        "won",
-        "winner",
-        "standings",
-        "fixture",
-        "fixtures",
-        "schedule",
-        "upcoming",
-        "price",
-        "prices",
-        "cost",
-        "stock",
-        "stocks",
-        "weather",
-        "forecast",
-        "temperature",
-        "released",
-        "launched",
-        "announced",
-        "update",
-        "updates",
-        "president",
-        "champion",
-        "election",
-        "trending",
-        "happening",
-        "nowadays",
-        "today's",
-    ];
-    if WORD_SIGNALS.iter().any(|s| words.contains(s)) {
-        return true;
-    }
-
-    const PHRASE_SIGNALS: [&str; 10] = [
-        "right now",
-        "this week",
-        "this month",
-        "this year",
-        "how much is",
-        "who is the",
-        "who's the",
-        "prime minister",
-        "exchange rate",
-        "going on",
-    ];
-    if PHRASE_SIGNALS.iter().any(|p| q.contains(p)) {
-        return true;
-    }
-
-    contains_recent_year(&q)
-}
-
-/// Detects an explicit instruction to search the web ("search online for X",
-/// "look it up", "google that"). When present we search regardless of model or
-/// mode — the user asked directly, so no judgement call is needed.
-pub fn is_explicit_search_request(query: &str) -> bool {
-    let q = query.to_lowercase();
-    const PHRASES: [&str; 18] = [
-        "search online",
-        "search the web",
-        "search the internet",
-        "search for",
-        "search up",
-        "web search",
-        "look it up",
-        "look that up",
-        "look this up",
-        "google it",
-        "google that",
-        "check online",
-        "check the web",
-        "do a web search",
-        "do a search",
-        "can you search",
-        "please search",
-        "search and tell",
-    ];
-    PHRASES.iter().any(|p| q.contains(p))
-}
-
-/// Detects a standalone 4-digit year token in 2000–2099 (a strong "specific /
-/// current event" signal, e.g. "world cup 2026").
-fn contains_recent_year(q: &str) -> bool {
-    let bytes = q.as_bytes();
-    let n = bytes.len();
-    let mut i = 0;
-    while i + 4 <= n {
-        if bytes[i] == b'2'
-            && bytes[i + 1] == b'0'
-            && bytes[i + 2].is_ascii_digit()
-            && bytes[i + 3].is_ascii_digit()
-        {
-            let prev_digit = i > 0 && bytes[i - 1].is_ascii_digit();
-            let next_digit = i + 4 < n && bytes[i + 4].is_ascii_digit();
-            if !prev_digit && !next_digit {
-                return true;
-            }
-        }
-        i += 1;
-    }
-    false
 }
 
 // ---------------------------------------------------------------------------
@@ -1660,79 +1169,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn should_search_skips_small_talk_and_tasks() {
-        assert!(!should_search("hi"));
-        assert!(!should_search("thanks"));
-        assert!(!should_search("write a haiku about the sea"));
-        assert!(!should_search("translate this to French"));
-        assert!(!should_search("who are you"));
-        assert!(!should_search("12 * (3 + 4)"));
-        assert!(!should_search("explain how recursion works"));
-        assert!(!should_search("define entropy"));
-        // Conversational greetings with leading/trailing filler (the screenshot bug).
-        assert!(!should_search("Hey, what's up, bro?"));
-        assert!(!should_search("how are you doing"));
-        assert!(!should_search("sup man"));
-        assert!(!should_search("yo dude"));
-        assert!(!should_search("how's it going"));
-    }
-
-    #[test]
-    fn should_search_passes_lookups_to_planner() {
-        assert!(should_search("who is the prime minister of canada"));
-        assert!(should_search("what's the weather in Paris"));
-        assert!(should_search("latest iphone price"));
-        assert!(should_search("what's going on with the world cup"));
-        // "what's up WITH X" is a real question, not the "what's up" greeting.
-        assert!(should_search("what's up with the world cup"));
-    }
-
-    #[test]
-    fn looks_time_sensitive_detects_signals_and_years() {
-        assert!(looks_time_sensitive("world cup 2026 result"));
-        assert!(looks_time_sensitive("latest iphone price"));
-        assert!(looks_time_sensitive("weather in paris today"));
-        assert!(looks_time_sensitive("who is the prime minister of canada"));
-        assert!(looks_time_sensitive("what is going on with the election"));
-        // Not time-sensitive: chit-chat and evergreen/conceptual questions.
-        assert!(!looks_time_sensitive("hey whats up bro"));
-        assert!(!looks_time_sensitive("tell me a joke"));
-        assert!(!looks_time_sensitive("how do llms work"));
-        // "now" must not fire on words like "know".
-        assert!(!looks_time_sensitive("how do you know that"));
-    }
-
-    #[test]
-    fn heuristic_plan_searches_only_when_warranted() {
-        let chat = SearchPlan::heuristic("hey what's up bro");
-        assert!(!chat.needs_search);
-        assert!(chat.queries.is_empty());
-
-        let wc = SearchPlan::heuristic("world cup 2026 result");
-        assert!(wc.needs_search);
-        assert!(wc.news); // "result" → news
-        assert_eq!(wc.queries.len(), 1);
-
-        let breaking = SearchPlan::heuristic("breaking news on the election today");
-        assert!(breaking.needs_search);
-        assert_eq!(breaking.freshness, "day");
-    }
-
-    #[test]
-    fn explicit_request_forces_search_even_without_signals() {
-        assert!(is_explicit_search_request(
-            "search online for the best ramen"
-        ));
-        assert!(is_explicit_search_request("can you look it up"));
-        assert!(is_explicit_search_request("google that for me"));
-        assert!(!is_explicit_search_request("what is the capital of france"));
-        // A query with no time signal still searches when explicitly requested.
-        let p = SearchPlan::heuristic("search the web for the best ramen recipe");
-        assert!(p.needs_search);
-        assert_eq!(p.queries.len(), 1);
-    }
-
-    #[test]
     fn build_tbs_combines_sort_and_window() {
         assert_eq!(build_tbs("day", true), Some("sbd:1,qdr:d".to_string()));
         assert_eq!(build_tbs("week", false), Some("qdr:w".to_string()));
@@ -1752,44 +1188,6 @@ mod tests {
         // Exa maps the window to an ISO start date (or None when unbounded).
         assert!(exa_start_date_from_tbs(Some("qdr:w")).is_some());
         assert_eq!(exa_start_date_from_tbs(None), None);
-    }
-
-    #[test]
-    fn parse_plan_handles_plain_and_fenced_json() {
-        let plain =
-            r#"{"needs_search": true, "queries": ["a", "b"], "freshness": "week", "news": true}"#;
-        let p = parse_plan(plain).expect("plain json");
-        assert!(p.needs_search);
-        assert_eq!(p.queries.len(), 2);
-        assert_eq!(p.freshness, "week");
-        assert!(p.news);
-
-        // News omitted → defaults to false, still parses.
-        let fenced = "Sure!\n```json\n{\"needs_search\": false, \"queries\": [], \"freshness\": \"none\"}\n```";
-        let p = parse_plan(fenced).expect("fenced json");
-        assert!(!p.needs_search);
-        assert!(p.queries.is_empty());
-        assert!(!p.news);
-    }
-
-    #[test]
-    fn sanitize_dedupes_caps_and_fixes_freshness() {
-        let mut plan = SearchPlan {
-            needs_search: true,
-            queries: vec![
-                "  Tesla earnings ".to_string(),
-                "tesla earnings".to_string(), // dup (case/space)
-                "tesla stock".to_string(),
-                "tesla news".to_string(),
-                "tesla revenue".to_string(),
-            ],
-            freshness: "HOUR".to_string(),
-            news: false,
-        };
-        plan.sanitize("tesla earnings");
-        assert_eq!(plan.queries.len(), MAX_QUERIES);
-        assert_eq!(plan.queries[0], "Tesla earnings");
-        assert_eq!(plan.freshness, "day"); // "hour" normalized to "day"
     }
 
     #[test]

@@ -1,5 +1,6 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
 import { RefreshCw, Volume2, ArrowUp, Globe } from "lucide-react";
 import {
   commands,
@@ -373,12 +374,89 @@ export const AssistantSettings: React.FC = () => {
   };
 
   const ttsEngine = settings?.assistant_tts_engine ?? "kokoro";
+  const ttsEnabled = settings?.assistant_tts_enabled ?? false;
   const ttsVoice = settings?.assistant_tts_voice ?? "af_heart";
   const ttsDtype = settings?.assistant_tts_kokoro_dtype ?? "fp32";
   const ttsSpeed = settings?.assistant_tts_speed ?? 1;
-  // Lazy (not preloaded) Kokoro instance used only by the Test button in this
-  // settings window; force-speaks regardless of the enabled toggle.
-  const kokoroTest = useKokoroTts(false, ttsVoice, ttsDtype, ttsSpeed);
+  // Preload the local Kokoro voice as soon as it's the selected engine (and TTS
+  // is on), so its ~80 MB of weights are downloaded and cached here — before
+  // the user ever opens the assistant — instead of stalling the first spoken
+  // reply. The same instance still backs the Test button, which force-speaks
+  // regardless of `enabled`, so a test reuses the already-loaded model.
+  const preloadKokoro = ttsEnabled && ttsEngine === "kokoro";
+  const kokoroTest = useKokoroTts(preloadKokoro, ttsVoice, ttsDtype, ttsSpeed);
+
+  // Small "downloading voice… → ready" toast so the background download isn't
+  // invisible. A cache hit resolves well under the delay below, so no toast
+  // flashes on every visit once the model is already downloaded.
+  const {
+    status: kokoroStatus,
+    progress: kokoroProgress,
+    error: kokoroError,
+  } = kokoroTest;
+  const kokoroToastIdRef = useRef<string | number | null>(null);
+  const kokoroToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+
+  useEffect(() => {
+    const TOAST_ID = "kokoro-voice-download";
+
+    if (kokoroStatus === "loading") {
+      if (kokoroToastIdRef.current != null) {
+        // Already showing — keep the percentage fresh as it climbs.
+        toast.loading(
+          t("settings.assistant.tts.downloadProgress", {
+            progress: kokoroProgress,
+          }),
+          { id: TOAST_ID },
+        );
+      } else if (kokoroToastTimerRef.current == null) {
+        // Defer surfacing the toast so a fast cache hit never flashes one.
+        kokoroToastTimerRef.current = setTimeout(() => {
+          kokoroToastTimerRef.current = null;
+          kokoroToastIdRef.current = toast.loading(
+            t("settings.assistant.tts.downloadStart"),
+            { id: TOAST_ID },
+          );
+        }, 600);
+      }
+      return;
+    }
+
+    // Left the loading state: cancel a still-pending (fast download) timer.
+    if (kokoroToastTimerRef.current != null) {
+      clearTimeout(kokoroToastTimerRef.current);
+      kokoroToastTimerRef.current = null;
+    }
+    // Only report an outcome if we actually surfaced a download in progress.
+    if (kokoroToastIdRef.current != null) {
+      if (kokoroStatus === "error" || kokoroError?.reason === "load") {
+        toast.error(t("settings.assistant.tts.downloadError"), {
+          id: TOAST_ID,
+        });
+      } else {
+        toast.success(t("settings.assistant.tts.downloadReady"), {
+          id: TOAST_ID,
+        });
+      }
+      kokoroToastIdRef.current = null;
+    }
+  }, [kokoroStatus, kokoroProgress, kokoroError, t]);
+
+  // Tidy up a pending timer / lingering toast if the user leaves this page
+  // mid-download.
+  useEffect(
+    () => () => {
+      if (kokoroToastTimerRef.current != null) {
+        clearTimeout(kokoroToastTimerRef.current);
+      }
+      if (kokoroToastIdRef.current != null) {
+        toast.dismiss(kokoroToastIdRef.current);
+      }
+    },
+    [],
+  );
 
   const handleTestTts = async () => {
     setTestState("testing");

@@ -58,7 +58,7 @@ SpeakoFlow is a cross-platform desktop voice assistant (dictation, AI chat panel
 - `lib.rs` - Main entry point, Tauri setup, manager initialization
 - `managers/` - Core business logic:
   - `audio.rs` - Audio recording and device management
-  - `model.rs` - Model downloading and management
+  - `model.rs` - Model downloading and management: resilient downloads that auto-retry with exponential backoff and resume from a `.partial` file via HTTP `Range` (`attempt_download`, `AttemptOutcome`, `HttpStatusError` sorting transient vs. permanent failures), plus an ordered source list — a reliable mirror first, the canonical Hugging Face URL as fallback (`download_candidates` / `mirror_url_for`; mirrors not yet populated, see `docs/TODO_BEFORE_RELEASE.md`)
   - `transcription.rs` - Speech-to-text processing pipeline
   - `history.rs` - Transcription history storage
 - `audio_toolkit/` - Low-level audio processing:
@@ -66,16 +66,19 @@ SpeakoFlow is a cross-platform desktop voice assistant (dictation, AI chat panel
   - `vad/` - Voice Activity Detection (Silero VAD)
 - `commands/` - Tauri command handlers for frontend communication
 - `cli.rs` - CLI argument definitions (clap derive)
-- `shortcut/mod.rs` - Global keyboard shortcut handling (two engines: `handy-keys` and the Tauri global-shortcut plugin)
-- `settings.rs` - Application settings management
+- `shortcut/mod.rs` - Global keyboard shortcut handling (two engines: `handy-keys` and the Tauri global-shortcut plugin). Both engines route through the shared `shortcut/handler.rs::handle_shortcut_event`, which strips the `.lock` suffix, resolves recording mode (Hold vs. hands-free lock), forces the assistant hotkey to push-to-talk (`RecordingMode::Hold`, only locking when the Shift variant is tapped mid-recording), and routes the cancel/`Esc` binding to either an active recording or a busy assistant reply
+- `settings.rs` - Application settings management (recent additions: `sound_theme`; the experimental AI-Correction fields `post_process_enabled` / `post_process_tone` / `post_process_timeout_secs`; and the `experimental_enabled` gate that hides in-development features)
 - `secret_store.rs` - API keys in the OS keychain (`keyring`), hydrated into settings on load
-- `assistant.rs` - Assistant turn pipeline (LLM chat, screen vision, profiles/personas, per-profile response-length); injects the advisory personal-memory block late in the prompt and triggers offline memory distillation when a conversation ends
+- `assistant.rs` - Assistant turn pipeline (`run_assistant_turn`): LLM chat, screen vision, profiles/personas, per-profile response-length. Runs a bounded tool-calling loop (`llm_client::send_chat_stream_with_tools`, `tool_choice = "auto"`, max ~3 rounds) exposing `assistant_tool_defs()` — the `web_search` and `get_current_datetime` tools — so the model itself decides when to search. Injects the advisory personal-memory block late in the prompt and triggers offline memory distillation when a conversation ends
 - `memory.rs` - Local-first personal memory: a two-tier profile (always-on "About You" summary + durable notes) selected by keyword relevance within a per-turn token budget, learned via offline distillation at the end of a conversation, with safety guardrails (no secrets/PII, no instruction-shaped text, advisory-only) plus consolidation/decay/pruning
 - `screenshot.rs` - Screen capture for vision: grabs the monitor under the mouse cursor (`capture_screen_data_url_at`, multi-monitor aware), adaptively JPEG-compresses to the provider's payload budget, and builds the small persisted display thumbnails (`data_url_to_thumbnail`)
 - `llm_client.rs` - Shared OpenAI-compatible chat client used by the assistant, post-processing, and remote TTS: SSE streaming, tool-calling (the web-search path), structured/JSON-schema output, model listing, provider auth (Anthropic `x-api-key`, Azure `api-key`, OpenRouter `HTTP-Referer`/`X-Title`), Azure base-URL normalization to `/openai/v1`, and system-prompt folding for the built-in local engine (Gemma-style templates that reject a `system` role)
-- `tts.rs` / `web_search.rs` - Spoken answers and optional web search
+- `tts.rs` - Spoken answers (Kokoro local / OpenAI-compatible / ElevenLabs / Azure AI Speech)
+- `web_search.rs` - Optional web search, fully model-decided: the assistant calls a `web_search` tool and `run_tool_search` turns the tool args into a one-query `SearchPlan` fed to `search_with_plan` (parallel snippet search + local rerank) — there is no separate planner or keyword heuristic. Five snippet-only backends (Serper default, Brave, Tavily, Exa, SerpAPI); a `WEB_SEARCH_CAPABILITY_NOTE` is folded into the system prompt when search is enabled. OpenRouter's server-side `:online` search is the one opt-in exception for OpenRouter users
 - `transcription_coordinator.rs` - Single-threaded recording state machine (also gates tap-to-lock arming)
+- `actions.rs` - Post-recording output pipeline: pastes the transcript and runs the optional, experimental **AI Correction** post-processing pass (`post_process_transcription`, `resolve_post_process_provider_and_model`, `prewarm_builtin_llm`) — cleanup plus a tone directive (`PostProcessTone::directive()`) in a single LLM call, wrapped in `tokio::time::timeout(post_process_timeout_secs)` and falling back to the raw transcription on timeout or failure
 - `overlay.rs` - Recording overlay window (platform-specific)
+- `audio_feedback.rs` - Feedback-sound playback with selectable themes (`SoundTheme`: Default/Marimba/Pop/Click/Custom, resolved per start/stop from bundled resources), a theme-independent tap-to-lock cue (`SoundType::Lock`), and `play_test_sound` for in-settings previews
 - `signal_handle.rs` - `send_transcription_input()` reusable function
 - `utils.rs` - Platform detection helpers
 
@@ -90,7 +93,7 @@ floating assistant panel (`assistant/`), and the recording overlay (`overlay/`).
   - `Sidebar.tsx` - Section navigation rail (`SECTIONS_CONFIG` defines the sections: general, models, advanced, history, post-processing, assistant, characters, memory, debug, about). The `characters` section is labeled "Profiles" in the UI; the internal key stays `characters` so code and locale keys don't churn
   - `settings/` - Settings UI, one folder/section (`general/`, `advanced/`, `history/`, `assistant/`, `models/`, `post-processing/`, `debug/`, `about/`) plus shared row components. The `memory` and `characters`/Profiles sections both live under `assistant/` (`MemorySettings.tsx`, `CharactersSettings.tsx`)
   - `model-selector/` - Model management interface
-  - `onboarding/` - First-run experience
+  - `onboarding/` - First-run setup wizard: a two-step flow (`OnboardingLayout.tsx` chrome + segmented "Step N of total" progress) — Step 1 picks a speech-to-text model (`Onboarding.tsx`), Step 2 optionally downloads a local assistant LLM in the background (`LlmOnboarding.tsx`), pointing the built-in provider at the model only once the file is on disk
   - `ui/` - Shared primitives; `ui/tones.ts` defines the semantic icon-tile / pill color tones (`SettingTone`, `TONE_TILE`, `TONE_PILL`) used by the iOS-style setting rows
   - `footer/`, `icons/` - Footer and icon components
 - `assistant/` - Floating always-on-top AI chat panel (own window): streaming chat, screen vision, TTS, collapse-to-pill, and inline image thumbnails (screen captures + attached images) with click-to-enlarge (`AssistantPanel.tsx`, `preview.tsx`)

@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { Button } from "../ui/Button";
 import { Dropdown, DropdownOption } from "../ui/Dropdown";
 import { PlayIcon } from "lucide-react";
@@ -15,13 +16,15 @@ export const SoundPicker: React.FC<SoundPickerProps> = ({
   label,
   description,
 }) => {
+  const { t } = useTranslation();
   const { getSetting, updateSetting } = useSettings();
   const playTestSound = useSettingsStore((state) => state.playTestSound);
   const customSounds = useSettingsStore((state) => state.customSounds);
 
-  const selectedTheme = getSetting("sound_theme") ?? "marimba";
+  const selectedTheme = getSetting("sound_theme") ?? "dictation";
 
   const options: DropdownOption[] = [
+    { value: "dictation", label: t("settings.sound.soundTheme.default") },
     { value: "marimba", label: "Marimba" },
     { value: "pop", label: "Pop" },
     { value: "click", label: "Click" },
@@ -50,7 +53,7 @@ export const SoundPicker: React.FC<SoundPickerProps> = ({
           onSelect={(value) =>
             updateSetting(
               "sound_theme",
-              value as "marimba" | "pop" | "click" | "custom",
+              value as "dictation" | "marimba" | "pop" | "click" | "custom",
             )
           }
           options={options}
@@ -59,7 +62,7 @@ export const SoundPicker: React.FC<SoundPickerProps> = ({
           variant="ghost"
           size="sm"
           onClick={handlePlayBothSounds}
-          title="Preview sound theme (plays start then stop)"
+          title={t("settings.sound.soundTheme.preview")}
         >
           <PlayIcon className="h-4 w-4" />
         </Button>

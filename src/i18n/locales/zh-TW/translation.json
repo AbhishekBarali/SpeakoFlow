@@ -18,6 +18,25 @@
     "about": "關於"
   },
   "onboarding": {
+    "steps": {
+      "progress": "第 {{current}} 步，共 {{total}} 步",
+      "counter": "第 {{current}} 步，共 {{total}} 步 · {{label}}",
+      "speechToText": "語音轉文字",
+      "aiModel": "AI 模型"
+    },
+    "speechToText": {
+      "title": "選擇語音轉文字模型",
+      "subtitle": "此功能完全在您的裝置上執行，將語音轉換為文字。請選擇適合您電腦的模型——隨時可以更改。"
+    },
+    "aiModel": {
+      "title": "新增本機 AI 模型",
+      "subtitle": "為助理、螢幕視覺與轉錄整理提供支援——完全在您的裝置上離線執行。此為選用項目；您也可以稍後連接雲端服務供應商。",
+      "skip": "暫時略過",
+      "skipHint": "選用。您可以隨時在「設定」中下載模型或連接雲端服務供應商。",
+      "continue": "繼續",
+      "downloadingHint": "您的模型正在背景下載——您可以立即開始使用應用程式。",
+      "downloadStarted": "正在背景下載您的 AI 模型。"
+    },
     "subtitle": "首先，請選擇一種模型",
     "recommended": "推薦",
     "download": "下載",

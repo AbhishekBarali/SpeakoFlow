@@ -29,6 +29,19 @@ pub fn cancel_current_operation(app: &AppHandle) {
     // vision timing) so a cancelled capture never rides along with a later turn.
     crate::assistant::clear_immediate_capture();
 
+    // Abort any in-flight assistant turn (streaming LLM answer) and silence a
+    // spoken reply that's playing or about to play, so cancel (Esc / the pill's
+    // stop button) stops a reply mid-generation — not only a recording. All of
+    // these are no-ops when the assistant is idle.
+    if let Some(conversation) = app.try_state::<crate::assistant::AssistantConversation>() {
+        conversation.request_cancel();
+    }
+    crate::tts::stop_remote();
+    {
+        use tauri::Emitter;
+        let _ = app.emit("assistant-tts-stop", ());
+    }
+
     // Update tray icon and hide overlay
     change_tray_icon(app, crate::tray::TrayIconState::Idle);
     hide_recording_overlay(app);

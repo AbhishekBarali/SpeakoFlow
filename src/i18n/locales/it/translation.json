@@ -18,6 +18,25 @@
     "about": "Informazioni"
   },
   "onboarding": {
+    "steps": {
+      "progress": "Passaggio {{current}} di {{total}}",
+      "counter": "Passaggio {{current}} di {{total}} · {{label}}",
+      "speechToText": "Trascrizione",
+      "aiModel": "Modello IA"
+    },
+    "speechToText": {
+      "title": "Scegli un modello di trascrizione",
+      "subtitle": "Funziona interamente sul tuo dispositivo per trasformare la tua voce in testo. Scegli quello più adatto al tuo computer: puoi cambiarlo in qualsiasi momento."
+    },
+    "aiModel": {
+      "title": "Aggiungi un modello IA locale",
+      "subtitle": "Alimenta l'assistente, la visione dello schermo e la pulizia delle trascrizioni, funzionando completamente offline sul tuo dispositivo. È facoltativo; puoi anche collegare un provider cloud in seguito.",
+      "skip": "Salta per ora",
+      "skipHint": "Facoltativo. Puoi scaricare un modello o collegare un provider cloud in qualsiasi momento nelle Impostazioni.",
+      "continue": "Continua",
+      "downloadingHint": "Il tuo modello si sta scaricando in background: puoi iniziare subito a usare l'app.",
+      "downloadStarted": "Download del tuo modello IA in background."
+    },
     "subtitle": "Per cominciare, scegli un modello di riconoscimento vocale",
     "recommended": "Raccomandato",
     "download": "Scarica",

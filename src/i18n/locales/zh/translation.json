@@ -18,6 +18,25 @@
     "about": "关于"
   },
   "onboarding": {
+    "steps": {
+      "progress": "第 {{current}} 步，共 {{total}} 步",
+      "counter": "第 {{current}} 步，共 {{total}} 步 · {{label}}",
+      "speechToText": "语音转文字",
+      "aiModel": "AI 模型"
+    },
+    "speechToText": {
+      "title": "选择语音转文字模型",
+      "subtitle": "该功能完全在您的设备上运行，将语音转换为文字。请选择适合您电脑的模型——随时可以更改。"
+    },
+    "aiModel": {
+      "title": "添加本地 AI 模型",
+      "subtitle": "为助手、屏幕视觉和转录清理提供支持——完全在您的设备上离线运行。此为可选项；您也可以稍后连接云服务提供商。",
+      "skip": "暂时跳过",
+      "skipHint": "可选。您可以随时在“设置”中下载模型或连接云服务提供商。",
+      "continue": "继续",
+      "downloadingHint": "您的模型正在后台下载——您可以立即开始使用应用。",
+      "downloadStarted": "正在后台下载您的 AI 模型。"
+    },
     "subtitle": "请选择一个转录模型以开始使用",
     "recommended": "推荐",
     "download": "下载",

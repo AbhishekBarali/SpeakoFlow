@@ -236,6 +236,13 @@ impl TranscriptionCoordinator {
                                     }
                                     use tauri::Emitter;
                                     let _ = app.emit("recording-locked", true);
+                                    // Audible confirmation that the hold is now
+                                    // hands-free. Respects the audio-feedback
+                                    // toggle/volume and is a no-op when off.
+                                    crate::audio_feedback::play_feedback_sound(
+                                        &app,
+                                        crate::audio_feedback::SoundType::Lock,
+                                    );
                                 }
                             }
                         }

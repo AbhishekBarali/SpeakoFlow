@@ -1,16 +1,23 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import type { ModelInfo } from "@/bindings";
+import { getModelCategory } from "@/lib/utils/modelCategory";
 import type { ModelCardStatus } from "./ModelCard";
 import ModelCard from "./ModelCard";
-import Wordmark from "../Wordmark";
+import OnboardingLayout from "./OnboardingLayout";
+import { Button } from "../ui/Button";
 import { useModelStore } from "../../stores/modelStore";
 
 interface OnboardingProps {
   onModelSelected: () => void;
 }
 
+/**
+ * Step 1 of the first-run flow: choose a speech-to-text (transcription) model.
+ * Only transcription engines are shown here — the AI/LLM models live in their
+ * own step (see LlmOnboarding) so the two are never mixed into one flat list.
+ */
 const Onboarding: React.FC<OnboardingProps> = ({ onModelSelected }) => {
   const { t } = useTranslation();
   const {
@@ -24,8 +31,59 @@ const Onboarding: React.FC<OnboardingProps> = ({ onModelSelected }) => {
     downloadStats,
   } = useModelStore();
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
+  // Guards against firing `selectModel` more than once for the same model. The
+  // watcher effect below re-runs on every store change (models, download maps,
+  // …), and because `selectModel` is async those re-runs could otherwise kick
+  // off several concurrent selects for one model — which is what produced a
+  // stack of duplicate error toasts when one call raced ahead of the others.
+  const attemptedSelectRef = useRef<string | null>(null);
 
   const isDownloading = selectedModelId !== null;
+
+  // Only speech-to-text (transcription) models belong in this step.
+  const sttModels = useMemo(
+    () => models.filter((m: ModelInfo) => getModelCategory(m) === "stt"),
+    [models],
+  );
+
+  const featuredModels = useMemo(
+    () =>
+      sttModels.filter(
+        (m: ModelInfo) => !m.is_downloaded && m.is_recommended,
+      ),
+    [sttModels],
+  );
+
+  const otherModels = useMemo(
+    () =>
+      sttModels
+        .filter((m: ModelInfo) => !m.is_downloaded && !m.is_recommended)
+        .sort(
+          (a: ModelInfo, b: ModelInfo) => Number(a.size_mb) - Number(b.size_mb),
+        ),
+    [sttModels],
+  );
+
+  // An already-downloaded speech-to-text model (if any). Lets the user skip the
+  // download step and jump straight in — handy when testing, since the models
+  // are otherwise re-downloaded on every fresh run.
+  const installedModel = useMemo(
+    () => sttModels.find((m: ModelInfo) => m.is_downloaded) ?? null,
+    [sttModels],
+  );
+
+  const handleUseInstalled = () => {
+    if (!installedModel) return;
+    selectModel(installedModel.id).then((success) => {
+      if (success) {
+        onModelSelected();
+      } else {
+        toast.error(t("onboarding.errors.selectModel"), {
+          id: "onboarding-select-model",
+        });
+      }
+    });
+  };
 
   // Watch for the selected model to finish downloading + verifying + extracting
   useEffect(() => {
@@ -42,13 +100,21 @@ const Onboarding: React.FC<OnboardingProps> = ({ onModelSelected }) => {
       !stillVerifying &&
       !stillExtracting
     ) {
+      // Only attempt the select once per model, even if the effect re-runs
+      // while the async call is still in flight.
+      if (attemptedSelectRef.current === selectedModelId) return;
+      attemptedSelectRef.current = selectedModelId;
+
       // Model is ready — select it and transition
       selectModel(selectedModelId).then((success) => {
         if (success) {
           onModelSelected();
         } else {
-          toast.error(t("onboarding.errors.selectModel"));
+          toast.error(t("onboarding.errors.selectModel"), {
+            id: "onboarding-select-model",
+          });
           setSelectedModelId(null);
+          attemptedSelectRef.current = null;
         }
       });
     }
@@ -60,6 +126,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ onModelSelected }) => {
     extractingModels,
     selectModel,
     onModelSelected,
+    t,
   ]);
 
   const handleDownloadModel = async (modelId: string) => {
@@ -89,55 +156,58 @@ const Onboarding: React.FC<OnboardingProps> = ({ onModelSelected }) => {
   };
 
   return (
-    <div className="h-full w-full flex flex-col p-6 gap-4 inset-0">
-      <div className="flex flex-col items-center gap-2 shrink-0">
-        <Wordmark className="text-4xl" />
-        <p className="text-xl text-body max-w-md mx-auto">
-          {t("onboarding.subtitle")}
-        </p>
-      </div>
+    <OnboardingLayout
+      step={1}
+      totalSteps={2}
+      title={t("onboarding.speechToText.title")}
+      subtitle={t("onboarding.speechToText.subtitle")}
+      footer={
+        installedModel ? (
+          <>
+            <p className="text-xs text-muted-soft max-w-[60%]">
+              {t("onboarding.speechToText.installedHint")}
+            </p>
+            <Button
+              variant="secondary"
+              size="lg"
+              onClick={handleUseInstalled}
+              disabled={isDownloading}
+            >
+              {t("onboarding.speechToText.useInstalled")}
+            </Button>
+          </>
+        ) : undefined
+      }
+    >
+      {featuredModels.map((model: ModelInfo) => (
+        <ModelCard
+          key={model.id}
+          model={model}
+          variant="featured"
+          status={getModelStatus(model.id)}
+          disabled={isDownloading}
+          onSelect={handleDownloadModel}
+          onDownload={handleDownloadModel}
+          downloadProgress={getModelDownloadProgress(model.id)}
+          downloadSpeed={getModelDownloadSpeed(model.id)}
+          showScores={false}
+        />
+      ))}
 
-      <div className="max-w-[600px] w-full mx-auto text-center flex-1 flex flex-col min-h-0">
-        <div className="flex flex-col gap-4 pb-6">
-          {models
-            .filter((m: ModelInfo) => !m.is_downloaded)
-            .filter((model: ModelInfo) => model.is_recommended)
-            .map((model: ModelInfo) => (
-              <ModelCard
-                key={model.id}
-                model={model}
-                variant="featured"
-                status={getModelStatus(model.id)}
-                disabled={isDownloading}
-                onSelect={handleDownloadModel}
-                onDownload={handleDownloadModel}
-                downloadProgress={getModelDownloadProgress(model.id)}
-                downloadSpeed={getModelDownloadSpeed(model.id)}
-              />
-            ))}
-
-          {models
-            .filter((m: ModelInfo) => !m.is_downloaded)
-            .filter((model: ModelInfo) => !model.is_recommended)
-            .sort(
-              (a: ModelInfo, b: ModelInfo) =>
-                Number(a.size_mb) - Number(b.size_mb),
-            )
-            .map((model: ModelInfo) => (
-              <ModelCard
-                key={model.id}
-                model={model}
-                status={getModelStatus(model.id)}
-                disabled={isDownloading}
-                onSelect={handleDownloadModel}
-                onDownload={handleDownloadModel}
-                downloadProgress={getModelDownloadProgress(model.id)}
-                downloadSpeed={getModelDownloadSpeed(model.id)}
-              />
-            ))}
-        </div>
-      </div>
-    </div>
+      {otherModels.map((model: ModelInfo) => (
+        <ModelCard
+          key={model.id}
+          model={model}
+          status={getModelStatus(model.id)}
+          disabled={isDownloading}
+          onSelect={handleDownloadModel}
+          onDownload={handleDownloadModel}
+          downloadProgress={getModelDownloadProgress(model.id)}
+          downloadSpeed={getModelDownloadSpeed(model.id)}
+          showScores={false}
+        />
+      ))}
+    </OnboardingLayout>
   );
 };
 

@@ -18,6 +18,25 @@
     "about": "Info"
   },
   "onboarding": {
+    "steps": {
+      "progress": "Schritt {{current}} von {{total}}",
+      "counter": "Schritt {{current}} von {{total}} · {{label}}",
+      "speechToText": "Transkription",
+      "aiModel": "KI-Modell"
+    },
+    "speechToText": {
+      "title": "Transkriptionsmodell wählen",
+      "subtitle": "Dies läuft vollständig auf deinem Gerät und wandelt deine Stimme in Text um. Wähle das Modell, das zu deinem Rechner passt — du kannst es jederzeit ändern."
+    },
+    "aiModel": {
+      "title": "Lokales KI-Modell hinzufügen",
+      "subtitle": "Treibt den Assistenten, die Bildschirmansicht und die Transkript-Bereinigung an — vollständig offline auf deinem Gerät. Das ist optional; du kannst später auch einen Cloud-Anbieter verbinden.",
+      "skip": "Vorerst überspringen",
+      "skipHint": "Optional. Du kannst jederzeit in den Einstellungen ein Modell herunterladen oder einen Cloud-Anbieter verbinden.",
+      "continue": "Weiter",
+      "downloadingHint": "Dein Modell wird im Hintergrund heruntergeladen — du kannst die App sofort verwenden.",
+      "downloadStarted": "Dein KI-Modell wird im Hintergrund heruntergeladen."
+    },
     "subtitle": "Wähle ein Transkriptionsmodell, um loszulegen",
     "recommended": "Empfohlen",
     "download": "Herunterladen",

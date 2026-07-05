@@ -11,7 +11,10 @@ import { ModelStateEvent, RecordingErrorEvent } from "./lib/types/events";
 import "./App.css";
 import AccessibilityPermissions from "./components/AccessibilityPermissions";
 import Footer from "./components/footer";
-import Onboarding, { AccessibilityOnboarding } from "./components/onboarding";
+import Onboarding, {
+  AccessibilityOnboarding,
+  LlmOnboarding,
+} from "./components/onboarding";
 import { Sidebar, SidebarSection, SECTIONS_CONFIG } from "./components/Sidebar";
 import TitleBar from "./components/TitleBar";
 import { useSettings } from "./hooks/useSettings";
@@ -24,7 +27,15 @@ import {
   type ThemePreference,
 } from "@/lib/theme";
 
-type OnboardingStep = "accessibility" | "model" | "done";
+type OnboardingStep = "accessibility" | "model" | "llm" | "done";
+
+// TEMP (testing only): when true, the full first-run onboarding is shown on
+// EVERY launch, regardless of whether models are already installed. This lets
+// us iterate on the onboarding + model-download flow without reinstalling.
+// Set back to `false` (or delete this constant and the guard in
+// `checkOnboardingStatus`) to restore the normal "onboard new users only"
+// behavior before shipping.
+const FORCE_ONBOARDING = true;
 
 const renderSettingsContent = (section: SidebarSection) => {
   const ActiveComponent =
@@ -181,6 +192,16 @@ function App() {
   };
 
   const checkOnboardingStatus = async () => {
+    // TEMP (testing only): force the full onboarding flow on every launch so we
+    // can iterate on the first-run experience and the model-download step
+    // without reinstalling. Remove this guard (and the FORCE_ONBOARDING
+    // constant above) to restore normal behavior.
+    if (FORCE_ONBOARDING) {
+      setIsReturningUser(false);
+      setOnboardingStep("accessibility");
+      return;
+    }
+
     try {
       // Check if they have any models available
       const result = await commands.hasAnyModelsAvailable();
@@ -245,7 +266,12 @@ function App() {
   };
 
   const handleModelSelected = () => {
-    // Transition to main app - user has started a download
+    // Speech-to-text is set up; guide new users to pick an AI model next.
+    setOnboardingStep("llm");
+  };
+
+  const handleLlmComplete = () => {
+    // AI model step finished (chosen or skipped) — enter the main app.
     setOnboardingStep("done");
   };
 
@@ -269,6 +295,12 @@ function App() {
     body = (
       <div className="flex-1 min-h-0">
         <Onboarding onModelSelected={handleModelSelected} />
+      </div>
+    );
+  } else if (onboardingStep === "llm") {
+    body = (
+      <div className="flex-1 min-h-0">
+        <LlmOnboarding onComplete={handleLlmComplete} />
       </div>
     );
   } else if (onboardingStep === "done") {

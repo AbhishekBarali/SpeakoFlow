@@ -55,6 +55,9 @@ interface ModelCardProps {
   downloadProgress?: number;
   downloadSpeed?: number; // MB/s
   showRecommended?: boolean;
+  /** Show the accuracy/speed meters. Off in the first-run onboarding to keep
+   *  the cards clean and focused on the description. */
+  showScores?: boolean;
 }
 
 /** Accuracy / speed as a slim aligned bar. Label sits in its own fixed
@@ -100,6 +103,7 @@ const ModelCard: React.FC<ModelCardProps> = ({
   downloadProgress,
   downloadSpeed,
   showRecommended = true,
+  showScores = true,
 }) => {
   const { t } = useTranslation();
   const isFeatured = variant === "featured";
@@ -194,7 +198,7 @@ const ModelCard: React.FC<ModelCardProps> = ({
             {displayDescription}
           </p>
         </div>
-        {(model.accuracy_score > 0 || model.speed_score > 0) && (
+        {showScores && (model.accuracy_score > 0 || model.speed_score > 0) && (
           <div className="hidden sm:flex flex-col gap-1.5 ms-4 shrink-0">
             <ScoreMeter
               label={t("onboarding.modelCard.accuracy")}

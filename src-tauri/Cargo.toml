@@ -70,7 +70,7 @@ tar = "0.4.44"
 flate2 = "1.0"
 zip = "2"
 sha2 = "0.10"
-transcribe-rs = { version = "0.3.8", features = ["whisper-cpp", "onnx"] }
+transcribe-rs = { version = "0.3.11", features = ["whisper-cpp", "onnx"] }
 handy-keys = "0.2.4"
 ferrous-opencc = "0.2.3"
 clap = { version = "4", features = ["derive"] }
@@ -92,7 +92,7 @@ tauri-plugin-single-instance = "2.3.2"
 tauri-plugin-updater = "2.10.0"
 
 [target.'cfg(windows)'.dependencies]
-transcribe-rs = { version = "0.3.3", features = ["whisper-vulkan", "ort-directml"] }
+transcribe-rs = { version = "0.3.11", features = ["whisper-vulkan", "ort-directml"] }
 # Secure API-key storage via the Windows Credential Manager. `windows-native`
 # uses windows-sys (no extra C/system build dependency).
 keyring = { version = "3", features = ["windows-native"] }
@@ -107,7 +107,7 @@ winreg = "0.55"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 tauri-nspanel = { git = "https://github.com/ahkohd/tauri-nspanel", branch = "v2.1" }
-transcribe-rs = { version = "0.3.3", features = ["whisper-metal"] }
+transcribe-rs = { version = "0.3.11", features = ["whisper-metal"] }
 # Secure API-key storage via the macOS Keychain. `apple-native` uses the
 # system Security framework (no extra C/system build dependency).
 keyring = { version = "3", features = ["apple-native"] }
@@ -115,7 +115,7 @@ keyring = { version = "3", features = ["apple-native"] }
 [target.'cfg(target_os = "linux")'.dependencies]
 gtk-layer-shell = { version = "0.8", features = ["v0_6"] }
 gtk = "0.18"
-transcribe-rs = { version = "0.3.3", features = ["whisper-vulkan"] }
+transcribe-rs = { version = "0.3.11", features = ["whisper-vulkan"] }
 # Secure API-key storage via the Secret Service (GNOME Keyring / KWallet).
 # `async-secret-service` + `crypto-rust` use the pure-Rust zbus + RustCrypto
 # stack, so the Linux build needs NO libdbus/OpenSSL system headers (keeps the

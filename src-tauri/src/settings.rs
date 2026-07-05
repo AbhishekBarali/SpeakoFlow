@@ -93,6 +93,48 @@ pub struct LLMPrompt {
     pub prompt: String,
 }
 
+/// Optional tone applied during dictation post-processing ("AI Correction").
+/// `None` leaves wording as-is (cleanup only); the others tell the LLM to
+/// rephrase the cleaned text into that register while preserving meaning.
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum PostProcessTone {
+    #[default]
+    None,
+    Formal,
+    Casual,
+    Professional,
+    Friendly,
+    Concise,
+}
+
+impl PostProcessTone {
+    /// A directive appended to the post-processing prompt, or `None` for
+    /// `PostProcessTone::None` (cleanup only, no rewording). Each directive
+    /// explicitly permits rephrasing so it doesn't fight the cleanup prompt's
+    /// "don't paraphrase" instruction — but always preserves the meaning.
+    pub fn directive(&self) -> Option<&'static str> {
+        match self {
+            PostProcessTone::None => None,
+            PostProcessTone::Formal => Some(
+                "Then rewrite the result in a formal tone: polished, respectful, and professional. You may rephrase wording and restructure sentences to achieve this, but preserve the original meaning and intent.",
+            ),
+            PostProcessTone::Casual => Some(
+                "Then rewrite the result in a casual, relaxed, conversational tone. You may rephrase wording to achieve this, but preserve the original meaning and intent.",
+            ),
+            PostProcessTone::Professional => Some(
+                "Then rewrite the result in a professional, workplace-appropriate tone: clear, courteous, and businesslike. You may rephrase wording to achieve this, but preserve the original meaning and intent.",
+            ),
+            PostProcessTone::Friendly => Some(
+                "Then rewrite the result in a warm, friendly, approachable tone. You may rephrase wording to achieve this, but preserve the original meaning and intent.",
+            ),
+            PostProcessTone::Concise => Some(
+                "Then tighten the result to be as concise as possible: remove redundancy and wordiness while keeping all essential information and the original meaning.",
+            ),
+        }
+    }
+}
+
 /// What powers a character's replies. Most characters are `Llm` (their `prompt`
 /// becomes the system prompt). `Cat` is a joke character that ignores the LLM
 /// entirely and just meows — see `assistant::run_cat_turn`.
@@ -474,6 +516,9 @@ impl ModelUnloadTimeout {
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Type)]
 #[serde(rename_all = "snake_case")]
 pub enum SoundTheme {
+    /// SpeakoFlow's own start/stop cues — the default. Ships a matching lock
+    /// cue (`popo_lock.wav`) used by every theme for tap-to-lock.
+    Dictation,
     Marimba,
     Pop,
     Click,
@@ -483,6 +528,7 @@ pub enum SoundTheme {
 impl SoundTheme {
     fn as_str(&self) -> &'static str {
         match self {
+            SoundTheme::Dictation => "dictation",
             SoundTheme::Marimba => "marimba",
             SoundTheme::Pop => "pop",
             SoundTheme::Click => "click",
@@ -517,11 +563,12 @@ impl Default for Theme {
 }
 
 /// UI text size for the main window. Applied as a webview zoom factor so the
-/// whole interface scales together. Serialized snake_case ("default",
+/// whole interface scales together. Serialized snake_case ("small", "default",
 /// "large", "extra_large") to match the values the settings dropdown uses.
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Type)]
 #[serde(rename_all = "snake_case")]
 pub enum UiTextSize {
+    Small,
     Default,
     Large,
     ExtraLarge,
@@ -537,6 +584,7 @@ impl UiTextSize {
     /// Webview zoom factor for this size step.
     pub fn zoom_factor(&self) -> f64 {
         match self {
+            UiTextSize::Small => 0.9,
             UiTextSize::Default => 1.0,
             UiTextSize::Large => 1.1,
             UiTextSize::ExtraLarge => 1.2,
@@ -737,6 +785,10 @@ pub struct AppSettings {
     pub post_process_prompts: Vec<LLMPrompt>,
     #[serde(default)]
     pub post_process_selected_prompt_id: Option<String>,
+    #[serde(default)]
+    pub post_process_tone: PostProcessTone,
+    #[serde(default = "default_post_process_timeout_secs")]
+    pub post_process_timeout_secs: u32,
     #[serde(default)]
     pub mute_while_recording: bool,
     #[serde(default)]
@@ -1001,11 +1053,17 @@ fn default_audio_feedback_volume() -> f32 {
 }
 
 fn default_sound_theme() -> SoundTheme {
-    SoundTheme::Click
+    SoundTheme::Dictation
 }
 
 fn default_post_process_enabled() -> bool {
     false
+}
+
+/// Default seconds before dictation post-processing gives up and pastes the raw
+/// transcription instead. Keeps a stalled LLM from ever holding up the paste.
+fn default_post_process_timeout_secs() -> u32 {
+    10
 }
 
 fn default_app_language() -> String {
@@ -1848,6 +1906,8 @@ pub fn get_default_settings() -> AppSettings {
         post_process_models: default_post_process_models(),
         post_process_prompts: default_post_process_prompts(),
         post_process_selected_prompt_id: None,
+        post_process_tone: PostProcessTone::default(),
+        post_process_timeout_secs: default_post_process_timeout_secs(),
         mute_while_recording: false,
         append_trailing_space: false,
         app_language: default_app_language(),

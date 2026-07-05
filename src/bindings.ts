@@ -243,6 +243,22 @@ async changePostProcessEnabledSetting(enabled: boolean) : Promise<Result<null, s
     else return { status: "error", error: e  as any };
 }
 },
+async changePostProcessToneSetting(tone: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("change_post_process_tone_setting", { tone }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async changePostProcessTimeoutSetting(seconds: number) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("change_post_process_timeout_setting", { seconds }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async changeExperimentalEnabledSetting(enabled: boolean) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("change_experimental_enabled_setting", { enabled }) };
@@ -1943,7 +1959,7 @@ text_replacements?: Replacement[]; model_unload_timeout?: ModelUnloadTimeout;
  * sidecar) is unloaded to free RAM/VRAM. Mirrors `model_unload_timeout`
  * but applies to the LLM used for post-processing and the assistant.
  */
-local_llm_unload_timeout?: ModelUnloadTimeout; word_correction_threshold?: number; history_limit?: number; recording_retention_period?: RecordingRetentionPeriod; paste_method?: PasteMethod; clipboard_handling?: ClipboardHandling; auto_submit?: boolean; auto_submit_key?: AutoSubmitKey; post_process_enabled?: boolean; post_process_provider_id?: string; post_process_providers?: PostProcessProvider[]; post_process_api_keys?: SecretMap; post_process_models?: Partial<{ [key in string]: string }>; post_process_prompts?: LLMPrompt[]; post_process_selected_prompt_id?: string | null; mute_while_recording?: boolean; append_trailing_space?: boolean; app_language?: string; experimental_enabled?: boolean; lazy_stream_close?: boolean; keyboard_implementation?: KeyboardImplementation; show_tray_icon?: boolean; paste_delay_ms?: number; typing_tool?: TypingTool; external_script_path: string | null; custom_filler_words?: string[] | null; whisper_accelerator?: WhisperAcceleratorSetting; ort_accelerator?: OrtAcceleratorSetting; whisper_gpu_device?: number; extra_recording_buffer_ms?: number; assistant_provider_id?: string; assistant_models?: Partial<{ [key in string]: string }>; assistant_system_prompt?: string; assistant_screenshot_enabled?: boolean; 
+local_llm_unload_timeout?: ModelUnloadTimeout; word_correction_threshold?: number; history_limit?: number; recording_retention_period?: RecordingRetentionPeriod; paste_method?: PasteMethod; clipboard_handling?: ClipboardHandling; auto_submit?: boolean; auto_submit_key?: AutoSubmitKey; post_process_enabled?: boolean; post_process_provider_id?: string; post_process_providers?: PostProcessProvider[]; post_process_api_keys?: SecretMap; post_process_models?: Partial<{ [key in string]: string }>; post_process_prompts?: LLMPrompt[]; post_process_selected_prompt_id?: string | null; post_process_tone?: PostProcessTone; post_process_timeout_secs?: number; mute_while_recording?: boolean; append_trailing_space?: boolean; app_language?: string; experimental_enabled?: boolean; lazy_stream_close?: boolean; keyboard_implementation?: KeyboardImplementation; show_tray_icon?: boolean; paste_delay_ms?: number; typing_tool?: TypingTool; external_script_path: string | null; custom_filler_words?: string[] | null; whisper_accelerator?: WhisperAcceleratorSetting; ort_accelerator?: OrtAcceleratorSetting; whisper_gpu_device?: number; extra_recording_buffer_ms?: number; assistant_provider_id?: string; assistant_models?: Partial<{ [key in string]: string }>; assistant_system_prompt?: string; assistant_screenshot_enabled?: boolean; 
 /**
  * When a screen capture is taken for a voice turn (immediate vs at-send).
  */
@@ -2416,6 +2432,12 @@ export type PaginatedHistory = { entries: HistoryEntry[]; has_more: boolean }
 export type PasteMethod = "ctrl_v" | "direct" | "none" | "shift_insert" | "ctrl_shift_v" | "external_script"
 export type PermissionAccess = "allowed" | "denied" | "unknown"
 export type PostProcessProvider = { id: string; label: string; base_url: string; allow_base_url_edit?: boolean; models_endpoint?: string | null; supports_structured_output?: boolean }
+/**
+ * Optional tone applied during dictation post-processing ("AI Correction").
+ * `None` leaves wording as-is (cleanup only); the others tell the LLM to
+ * rephrase the cleaned text into that register while preserving meaning.
+ */
+export type PostProcessTone = "none" | "formal" | "casual" | "professional" | "friendly" | "concise"
 export type RecordingRetentionPeriod = "never" | "preserve_limit" | "days_3" | "weeks_2" | "months_3"
 /**
  * A single deterministic find/replace rule applied to the transcript.
@@ -2472,7 +2494,12 @@ export type ShortcutBinding = { id: string; name: string; description: string; d
  * Rectangle chosen in the snip overlay, in that window's logical pixels.
  */
 export type SnipRect = { x: number; y: number; width: number; height: number }
-export type SoundTheme = "marimba" | "pop" | "click" | "custom"
+export type SoundTheme = 
+/**
+ * SpeakoFlow's own start/stop cues — the default. Ships a matching lock
+ * cue (`popo_lock.wav`) used by every theme for tap-to-lock.
+ */
+"dictation" | "marimba" | "pop" | "click" | "custom"
 /**
  * UI appearance preference. `System` follows the OS; `Light` / `Dark` pin the
  * theme regardless of the OS setting. Serialized lowercase ("light", "dark",
@@ -2496,10 +2523,10 @@ label: string }
 export type TypingTool = "auto" | "wtype" | "kwtype" | "dotool" | "ydotool" | "xdotool"
 /**
  * UI text size for the main window. Applied as a webview zoom factor so the
- * whole interface scales together. Serialized snake_case ("default",
+ * whole interface scales together. Serialized snake_case ("small", "default",
  * "large", "extra_large") to match the values the settings dropdown uses.
  */
-export type UiTextSize = "default" | "large" | "extra_large"
+export type UiTextSize = "small" | "default" | "large" | "extra_large"
 /**
  * The user's personal, local-first memory: a short always-on "About You"
  * summary plus a list of durable notes. Stored on-device in settings and

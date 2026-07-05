@@ -40,7 +40,7 @@ SpeakoFlow started as a fork of the excellent [Handy](https://github.com/cjpais/
   - **Tavily** — search tuned for AI assistants, returns a short synthesized answer too
   - **Exa** — neural/semantic search
 - If your assistant provider is **OpenRouter**, you can instead let it run the search itself (its `:online` mode, billed to your OpenRouter credits) rather than plugging in a separate search key — toggle "Use OpenRouter's built-in search" in the same settings page
-- Built for speed and small prompts: only short snippets come back (never full pages), a quick local heuristic skips searches for chit-chat or coding, and a slow search degrades gracefully instead of stalling the answer
+- Built for speed and small prompts: the assistant model itself decides when to search and with what query — it calls a `web_search` tool mid-answer only when a question actually needs fresh facts, so casual chatter stays instant. Only short snippets come back (never full pages), and a slow search degrades gracefully instead of stalling the answer
 
 ### 🔊 Spoken answers (TTS)
 
@@ -76,6 +76,7 @@ SpeakoFlow started as a fork of the excellent [Handy](https://github.com/cjpais/
 
 - Six accent colors, three text sizes, three panel sizes, adjustable opacity — with a live preview in settings
 - Configurable system prompt and reply-length control (Short / Medium / Long)
+- Pick your dictation feedback sound — Default, Marimba, Pop, Click, or your own custom start/stop clips — with a preview button that plays it before you commit
 - Every hotkey is rebindable
 
 ## What's different from Handy?
@@ -103,17 +104,17 @@ Everything is wired through the same provider system, so one API key works for a
 | ------------------------------- | ---------------------------- |
 | Dictate (hold)                  | `Ctrl + Space`               |
 | Hands-free dictation (toggle)   | `F9`                         |
-| Dictate with AI post-processing | `Ctrl + Shift + Space`       |
+| Dictate with AI post-processing (experimental) | `Ctrl + Shift + Space` |
 | Ask the assistant               | `Ctrl + Alt + Space`         |
 | Ask about your screen           | `Ctrl + Alt + Shift + Space` |
 | Show / hide the panel           | `Ctrl + Alt + A`             |
-| Cancel the current recording    | `Esc`                        |
+| Cancel the recording or a streaming reply | `Esc`              |
 
 On macOS the modifier defaults to `Option` in place of `Ctrl`/`Alt` (e.g. `Option + Space` to dictate). Every shortcut is rebindable in settings.
 
 ## Getting started
 
-1. Install and launch — pick a transcription model when prompted (Parakeet V3 is a great default)
+1. Install and launch — a short setup wizard walks you through picking a transcription model (Parakeet V3 is a great default) and, optionally, downloading a local AI model for the assistant. Model downloads auto-retry and resume where they left off if the connection drops, so large files don't have to start over
 2. Open **Settings → Assistant** and pick a provider:
    - **Built-in (Local)** — fully offline, no key; just download a small LLM from the model picker and you're set
    - **Custom** for Azure OpenAI — base URL `https://{your-resource}.openai.azure.com/openai/v1` (or your `cognitiveservices.azure.com` domain), model = your deployment name

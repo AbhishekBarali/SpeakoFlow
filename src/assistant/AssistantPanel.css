@@ -108,6 +108,7 @@
   transition:
     opacity 220ms ease-out,
     transform 240ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    width 240ms cubic-bezier(0.22, 0.61, 0.36, 1),
     height 260ms cubic-bezier(0.22, 0.61, 0.36, 1),
     padding 240ms ease-out;
 }
@@ -117,14 +118,19 @@
   transform: scale(1) translateY(0);
 }
 
-/* Idle-dim: after a spell of inactivity the resting pill fades and thins to a
- * quiet sliver so it stays out of the user's way. Hovering it — or any
- * activity, which drops the class — brings it straight back. Scoped under
- * `.fade-in` so it outranks the reveal rule above that pins opacity to 1. */
+/* Idle-dim: after a spell of inactivity the resting pill fades and shrinks to a
+ * small, compact nub (not a full-width sliver) so it stays well out of the
+ * user's way. It collapses on BOTH axes — a fixed narrow width + clipped
+ * overflow, on top of the thin height — then hovering it (or any activity,
+ * which drops the class) snaps it straight back. Scoped under `.fade-in` so it
+ * outranks the reveal rule above that pins opacity to 1. */
 .assistant-shell.fade-in .apill.dimmed {
+  width: 54px;
+  min-width: 0;
   height: 14px;
-  padding: 0 12px;
+  padding: 0;
   opacity: 0.32;
+  overflow: hidden;
   cursor: default;
 }
 
@@ -133,9 +139,12 @@
 }
 
 .assistant-shell.fade-in .apill.dimmed:hover {
+  width: auto;
+  min-width: 52px;
   height: 34px;
   padding: 0 8px;
   opacity: 1;
+  overflow: visible;
   cursor: grab;
 }
 
@@ -316,9 +325,15 @@
   background: var(--as-raise-strong);
 }
 
-/* Live-recording tint on the wave side so listening reads at a glance. */
+/* Live-recording cue. A whisper-thin, low-opacity accent ring (no blurry outer
+ * glow — that read as a cheap red halo on the desktop) is also what tells the
+ * assistant's hands-free (locked) pill apart from the STT overlay's locked
+ * pill: a quiet warm edge the dictation chip never has, without adding width. */
 .apill.listening {
-  border-color: color-mix(in srgb, var(--as-live) 32%, var(--as-hairline));
+  border-color: color-mix(in srgb, var(--as-live) 30%, var(--as-hairline));
+  box-shadow:
+    var(--as-inner),
+    0 0 0 1px color-mix(in srgb, var(--as-live) 12%, transparent);
 }
 
 /* Screen-vision toggle badge (top-right). Hidden by default; appears on pill

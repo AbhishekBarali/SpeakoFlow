@@ -30,21 +30,43 @@ const PANEL_POSITION_EXPANDED_KEY: &str = "assistant_panel_position_expanded";
 const PILL_WIDTH: f64 = 240.0;
 const PILL_HEIGHT: f64 = 44.0;
 
-/// The default expanded panel size (the "standard" preset). The window stays
-/// user-resizable; the size preset chosen in Panel Appearance settings picks
-/// the base dimensions, and a manual resize is remembered for the session
-/// (below) so collapse → expand round-trips keep it.
-const PANEL_WIDTH: f64 = 420.0;
-const PANEL_HEIGHT: f64 = 560.0;
+/// The default expanded panel size (the "standard" preset — a comfortable
+/// middle size). The window stays user-resizable; the size preset chosen in
+/// Panel Appearance settings picks the base dimensions, and a manual resize is
+/// remembered for the session (below) so collapse → expand round-trips keep it.
+const PANEL_WIDTH: f64 = 390.0;
+const PANEL_HEIGHT: f64 = 500.0;
 
 /// Logical width/height for each panel-size preset. Unknown/legacy values fall
-/// back to the "standard" default.
+/// back to the "standard" default. Presets are further clamped to the current
+/// monitor (see `clamp_to_monitor`) so they always fit the screen.
 fn panel_preset_size(size: &str) -> (f64, f64) {
     match size {
-        "compact" => (360.0, 460.0),
-        "large" => (520.0, 680.0),
+        "compact" => (340.0, 430.0),
+        "large" => (470.0, 620.0),
         _ => (PANEL_WIDTH, PANEL_HEIGHT),
     }
+}
+
+/// Clamp a desired logical panel size so it never exceeds the monitor it's on.
+/// This makes the panel screen-adaptive: on a small display the preset (or a
+/// remembered manual resize) shrinks to fit; on a large display it keeps its
+/// full size. A margin is left so the panel never covers the whole screen or
+/// sits under the taskbar. Falls back to the requested size if the monitor
+/// can't be read (e.g. the window doesn't exist yet at first creation).
+fn clamp_to_monitor(app: &AppHandle, w: f64, h: f64) -> (f64, f64) {
+    if let Some(window) = app.get_webview_window(PANEL_LABEL) {
+        if let Ok(Some(monitor)) = window.current_monitor() {
+            let scale = monitor.scale_factor();
+            let size = monitor.size();
+            let mon_w = size.width as f64 / scale;
+            let mon_h = size.height as f64 / scale;
+            let max_w = (mon_w * 0.92).max(PILL_WIDTH);
+            let max_h = (mon_h * 0.85).max(PILL_HEIGHT);
+            return (w.min(max_w), h.min(max_h));
+        }
+    }
+    (w, h)
 }
 
 /// Session memory of the last expanded size (logical px), so collapsing to the
@@ -57,12 +79,14 @@ static EXPANDED_H: AtomicU32 = AtomicU32::new(0);
 fn expanded_size(app: &AppHandle) -> (f64, f64) {
     let w = EXPANDED_W.load(Ordering::SeqCst);
     let h = EXPANDED_H.load(Ordering::SeqCst);
-    if w == 0 || h == 0 {
+    let (base_w, base_h) = if w == 0 || h == 0 {
         // No manual resize this session — use the chosen size preset.
         panel_preset_size(&get_settings(app).assistant_panel_size)
     } else {
         (w as f64, h as f64)
-    }
+    };
+    // Always keep the panel within the current monitor so it fits any screen.
+    clamp_to_monitor(app, base_w, base_h)
 }
 
 /// Whether the panel is currently collapsed to the pill. Starts collapsed so
@@ -414,13 +438,6 @@ pub fn emit_error(app: &AppHandle, code: &str, detail: String) {
             detail,
         },
     );
-}
-
-/// Emit a non-blocking notice (the turn keeps going). The panel shows it as a
-/// quiet transient line rather than an error bubble. Codes:
-/// `web_search_failed`.
-pub fn emit_notice(app: &AppHandle, code: &str) {
-    let _ = app.emit("assistant-notice", code.to_string());
 }
 
 /// Emit a pipeline state update to the panel:
@@ -1089,57 +1106,31 @@ fn vision_unsupported_message(provider_id: &str, model: &str) -> String {
     }
 }
 
-/// Fixed clause appended to the system prompt so the model knows a live clock
-/// is being supplied (and to use it for "today/now/latest" questions). It's
-/// byte-identical every turn — the changing timestamp goes in the user message
-/// instead — so it doesn't disturb provider-side prompt caching.
-const TIME_AWARENESS_NOTE: &str = "The user's current local date and time is provided at the top of their message — treat it as the present moment. Use it to resolve relative time references (today, yesterday, tonight, last week, this month, this year, how long ago) into concrete dates, and when looking something up, build the query around the correct date. Never guess the current date from your training data; your training is frozen at a past cutoff, so anything that can change over time may be out of date.";
+/// The "Tools" section of the system prompt, included only on a web-search
+/// turn. It describes BOTH tools the model may call this turn — `web_search`
+/// and `get_current_datetime` — explains when to reach for each, and (reusing
+/// the shared, TTS-aware directive) how to present web findings. Fixed text →
+/// cache-safe.
+fn tools_system_section(tts_enabled: bool) -> String {
+    let mut s = String::from(
+        "## Tools\n\
+         You can call tools before answering; use one only when it genuinely helps, then reply normally.\n\
+         • web_search(query, freshness, news): live web results (titles + short snippets). Call it BEFORE answering any question about current, recent, or changeable facts — news, prices, sports scores, schedules, software versions, who currently holds a role or title, or recent events — because your training data has a fixed cutoff and may be out of date. For timeless things (definitions, concepts, math, coding, writing, translation, general how-to), answer directly without searching. Never claim you cannot access the internet.\n\
+         • get_current_datetime(): the user's current local date and time. Call it whenever you need the present moment — to say what day or time it is, or to turn a relative reference (today, yesterday, this week, how long until X) into a concrete date, including before building a web_search query.\n\n",
+    );
+    s.push_str(&web_search::web_search_system_directive(tts_enabled));
+    s
+}
 
-/// The current local date/time line prepended to each request's user message.
-/// LLMs have no clock, so this is the production-standard way to keep "what's
-/// the date / what time is it / how many days until X" answers correct: inject
-/// the real time fresh on every turn, with an explicit UTC offset so the model
-/// can reason across time zones. (Kept in the user message rather than the
-/// cached system prefix so it never invalidates prompt caching.)
+/// The user's current local date/time, returned to the model when it calls the
+/// `get_current_datetime` tool. LLMs have no clock, so this is how "what's the
+/// date / what time is it / how many days until X" answers stay correct — with
+/// an explicit UTC offset so the model can reason across time zones.
 fn current_datetime_line() -> String {
     let now = chrono::Local::now();
     // e.g. "Current date and time: Saturday, June 20, 2026, 2:34 PM (UTC+05:30)."
     now.format("Current date and time: %A, %B %-d, %Y, %-I:%M %p (UTC%:z).")
         .to_string()
-}
-
-/// Build a short transcript of the most recent conversation turns to give the
-/// search planner context, so follow-up questions ("what about its price?")
-/// can be resolved into self-contained queries. Excludes the just-recorded
-/// current message and the screenshot marker, and bounds each line so the
-/// planner prompt stays small.
-fn recent_context_for_planner(app: &AppHandle) -> String {
-    let conversation = app.state::<AssistantConversation>();
-    let history = conversation.messages.lock().unwrap();
-    let mut lines: Vec<String> = Vec::new();
-    // Skip the latest user message (just pushed above); take the few before it.
-    for message in history.iter().rev().skip(1).take(4) {
-        let role = if message.role == "assistant" {
-            "Assistant"
-        } else {
-            "User"
-        };
-        // Collapse whitespace and strip attachment markers, then bound length.
-        let text: String = message
-            .content
-            .replace(SCREENSHOT_MARKER, "")
-            .replace(IMAGE_MARKER, "")
-            .split_whitespace()
-            .collect::<Vec<_>>()
-            .join(" ");
-        if text.is_empty() {
-            continue;
-        }
-        let text: String = text.chars().take(300).collect();
-        lines.push(format!("{}: {}", role, text));
-    }
-    lines.reverse();
-    lines.join("\n")
 }
 
 /// Build the stored form of a user message: the text plus one marker line per
@@ -1240,37 +1231,50 @@ fn run_cat_turn(
     emit_state(app, if speaking { "speaking" } else { "idle" });
 }
 
-/// The `web_search` tool definition handed to tool-capable models. The model
-/// decides whether to call it; when it does, we run the search and feed the
-/// results back. The description mirrors the planner's guidance so search
-/// behavior stays consistent across the two paths.
-fn web_search_tool_def() -> Value {
-    json!([{
-        "type": "function",
-        "function": {
-            "name": "web_search",
-            "description": "Search the live web for current or external facts — news, prices, weather, sports scores, schedules, product releases/versions, who currently holds a role, or any recent/niche fact your training data wouldn't reliably know. Returns titles and short snippets. Call this ONLY when the answer needs current or external information; for greetings, general knowledge, writing, coding, or math, answer directly without searching.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "A concise, keyword-rich search query, as you would type it into a search engine."
+/// The tool definitions handed to tool-capable models on a web-search turn: a
+/// live `web_search` and an on-demand `get_current_datetime`. The model decides
+/// entirely on its own whether and when to call either; when it does, we run
+/// the tool and feed the result back so it can finish its answer.
+fn assistant_tool_defs() -> Value {
+    json!([
+        {
+            "type": "function",
+            "function": {
+                "name": "web_search",
+                "description": "Search the live web for current or external facts — news, prices, weather, sports scores, schedules, product releases/versions, who currently holds a role, or any recent/niche fact your training data wouldn't reliably know. Returns titles and short snippets. Call this ONLY when the answer needs current or external information; for greetings, general knowledge, writing, coding, or math, answer directly without searching.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": "A concise, keyword-rich search query, as you would type it into a search engine."
+                        },
+                        "freshness": {
+                            "type": "string",
+                            "enum": ["none", "day", "week", "month", "year"],
+                            "description": "How recent results should be; use 'day'/'week' for breaking news, 'none' when recency doesn't matter."
+                        },
+                        "news": {
+                            "type": "boolean",
+                            "description": "True for current events / breaking news topics."
+                        }
                     },
-                    "freshness": {
-                        "type": "string",
-                        "enum": ["none", "day", "week", "month", "year"],
-                        "description": "How recent results should be; use 'day'/'week' for breaking news, 'none' when recency doesn't matter."
-                    },
-                    "news": {
-                        "type": "boolean",
-                        "description": "True for current events / breaking news topics."
-                    }
-                },
-                "required": ["query"]
+                    "required": ["query"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "get_current_datetime",
+                "description": "Get the user's current local date and time. Call this when you need the present moment — to answer what day or time it is, or to resolve a relative reference (today, yesterday, tonight, this week, this month, this year, how long until X) into a concrete date, including before building a web_search query. Takes no arguments.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {}
+                }
             }
         }
-    }])
+    ])
 }
 
 /// Parse the JSON arguments of a `web_search` tool call into (query, freshness,
@@ -1402,24 +1406,22 @@ pub async fn run_assistant_turn(
         || base_url_lc.contains("127.0.0.1")
         || base_url_lc.contains("localhost");
 
-    // Decide how web search runs this turn (only when enabled and the cheap
-    // local pre-gate says it's plausibly a search — chit-chat/code/math never
-    // search):
-    //   • OpenRouter (non-visual) → its native `:online` search (server-side).
-    //   • Other cloud (non-visual) → tool calling: the model itself decides and
-    //     calls our `web_search` tool inline (no separate planner round-trip).
-    //   • Local engine, or ANY visual turn → the planner path: pre-search and
-    //     inject the results as text (avoids sending tools alongside an image,
-    //     and small local models handle tool calling poorly).
+    // Web search is now fully model-decided. When the user has it enabled we
+    // expose a `web_search` tool and let the model choose whether to call it —
+    // no keyword pre-gate, no planner, no forced searches. The one exception is
+    // OpenRouter's server-side `:online` search, kept as an opt-in for
+    // OpenRouter users (billed to their credits). Every other provider — cloud
+    // OR the built-in local engine — uses inline tool calling.
     let is_openrouter = provider.id == "openrouter" || base_url_lc.contains("openrouter");
-    let is_local_engine = provider.id == "builtin"
-        || base_url_lc.contains("127.0.0.1")
-        || base_url_lc.contains("localhost");
-    let web_wanted = settings.assistant_web_search_enabled && web_search::should_search(&user_text);
-    let web_via_online =
-        web_wanted && is_openrouter && !has_visual && settings.assistant_prefer_provider_web_search;
-    let web_via_tools = web_wanted && !is_openrouter && !is_local_engine && !has_visual;
-    let web_via_planner = web_wanted && !web_via_online && !web_via_tools;
+    let web_wanted = settings.assistant_web_search_enabled;
+    // `:online` only applies to non-visual turns (its server-side search can't
+    // pair with an inline image); a visual OpenRouter turn uses the tool path
+    // like everyone else.
+    let web_via_online = web_wanted
+        && is_openrouter
+        && !has_visual
+        && settings.assistant_prefer_provider_web_search;
+    let web_via_tools = web_wanted && !web_via_online;
     // OpenRouter's `:online` model suffix turns on its built-in web search
     // server-side; every other path uses the model name unchanged.
     let request_model = if web_via_online {
@@ -1444,143 +1446,6 @@ pub async fn run_assistant_turn(
     // Save right after the user message so the question is preserved even if
     // the model (or the search) errors out before replying.
     persist_assistant_session(&app);
-
-    // Optional web search. Runs whenever it's enabled and the request looks
-    // like it needs current/external facts — including turns that also carry a
-    // screenshot or image, so "what's the current price of this?" about a photo
-    // works. A capable model plans the search (deciding whether one is actually
-    // needed and rewriting the often-messy transcribed request into clean
-    // queries), then we fetch real page content to ground the answer. Any
-    // failure or timeout degrades gracefully: we answer without web context and
-    // show a small notice rather than breaking the turn. The cheap
-    // `should_search` pre-gate skips obvious non-search turns so we don't spend
-    // a planner round-trip on chit-chat, code, or math. On visual turns the
-    // web-context budget is trimmed below (the image already fills the body).
-    let web_context: Option<String> = if web_via_planner {
-        // Race every search stage against a Stop press: a slow search must never
-        // trap the user in the "searching" state with no way out.
-        let cancel = app.state::<AssistantConversation>().cancel.clone();
-
-        // Stage 1 — decide whether to search and craft queries. Cloud/custom
-        // models always use the LLM planner (the smart decider). The built-in
-        // local model uses the fast keyword heuristic by default, or the same
-        // planner when the user enabled "smart" local search — in which case we
-        // load its engine first so the planning call isn't cold. `None` means
-        // skip (cancelled).
-        let use_planner = if provider.id == "builtin" {
-            settings.assistant_local_search_smart && {
-                let manager = app.state::<Arc<crate::managers::local_llm::LocalLlmManager>>();
-                match manager.ensure_running(&model).await {
-                    Ok(_) => true,
-                    Err(e) => {
-                        warn!(
-                            "Built-in engine couldn't start for planning ({}); using heuristic",
-                            e
-                        );
-                        false
-                    }
-                }
-            }
-        } else {
-            true
-        };
-
-        let mut plan_opt: Option<web_search::SearchPlan> = if use_planner {
-            // The planner is a quick LLM call; show "thinking" while it decides
-            // (we only switch to "searching" once a search actually runs).
-            emit_state(&app, "thinking");
-            let recent = recent_context_for_planner(&app);
-            let planned = tokio::select! {
-                r = web_search::plan_search(
-                    &provider,
-                    api_key.clone(),
-                    &model,
-                    provider.supports_structured_output,
-                    &recent,
-                    &user_text,
-                ) => Some(r),
-                _ = cancel.notified() => None,
-            };
-            match planned {
-                Some(Ok(plan)) => Some(plan),
-                Some(Err(e)) => {
-                    warn!(
-                        "Search planner failed ({}); falling back to a signal heuristic",
-                        e
-                    );
-                    Some(web_search::SearchPlan::heuristic(&user_text))
-                }
-                None => None, // cancelled during planning
-            }
-        } else {
-            Some(web_search::SearchPlan::heuristic(&user_text))
-        };
-
-        // Force a search even when the planner judged one unnecessary, in two
-        // cases: (1) the user explicitly asked ("search the web for …"), or
-        // (2) the question clearly needs current/external facts — a role holder,
-        // price, score, weather, a recent year, etc. Capable models are often
-        // over-confident and answer "who is the current …" questions straight
-        // from stale training data instead of searching; this deterministic
-        // guard is the fail-safe for that (the `should_search` pre-gate has
-        // already screened out chit-chat, code and math before we get here).
-        if let Some(plan) = plan_opt.as_mut() {
-            if !plan.needs_search
-                && (web_search::is_explicit_search_request(&user_text)
-                    || web_search::looks_time_sensitive(&user_text))
-            {
-                plan.needs_search = true;
-                if plan.queries.is_empty() {
-                    plan.queries
-                        .push(user_text.trim().chars().take(480).collect());
-                }
-            }
-        }
-
-        // Stage 2 — retrieve, only when the decision calls for it. The
-        // "searching" state is emitted here (not earlier) so the panel never
-        // shows "Searching the web…" on a turn that decides NOT to search.
-        match plan_opt {
-            Some(plan) if plan.needs_search && !plan.queries.is_empty() => {
-                emit_state(&app, "searching");
-                let search_result = tokio::select! {
-                    r = web_search::search_with_plan(&settings, &plan) => Some(r),
-                    _ = cancel.notified() => None,
-                };
-                match search_result {
-                    Some(results) if !results.is_empty() => {
-                        debug!(
-                            "Web search returned {} results across {} queries",
-                            results.len(),
-                            plan.queries.len()
-                        );
-                        let mut budget =
-                            web_search::context_budget_for(settings.assistant_search_depth);
-                        // On a visual turn the image already dominates the
-                        // request body, so trim the web-context budget to keep
-                        // the combined payload within limits — tightly for
-                        // constrained providers (Azure's JSON-body cap, the
-                        // local engine's small context), moderately for cloud.
-                        if has_visual {
-                            budget = budget.min(if needs_small_body { 3_000 } else { 8_000 });
-                        }
-                        Some(web_search::format_results_for_prompt(&results, budget))
-                    }
-                    Some(_) => {
-                        debug!("Web search returned no results; answering without web context");
-                        // §4: never silent — tell the user the answer proceeds
-                        // without web results (covers failures and no-hits).
-                        emit_notice(&app, "web_search_failed");
-                        None
-                    }
-                    None => None, // cancelled during search
-                }
-            }
-            _ => None,
-        }
-    } else {
-        None
-    };
 
     // If the user pressed Stop during the search (or anytime up to here), abort
     // before spending a model call. The question stays in the panel/history.
@@ -1623,85 +1488,43 @@ pub async fn run_assistant_turn(
     };
     let mut messages: Vec<Value> = Vec::new();
     let system_content = {
-        let mut content = settings.effective_system_prompt();
-        // Always note that a live date/time accompanies the user's message, so
-        // time-relative answers are correct. Fixed text → cache-safe.
-        if !content.trim().is_empty() {
-            content.push_str("\n\n");
+        // Assemble the system prompt as clearly-separated sections, including a
+        // section ONLY when it does work this turn. On a plain chat turn that's
+        // just the persona (plus an optional length preference), so a small
+        // model isn't buried under scaffolding it doesn't need. Order is stable
+        // and cache-friendly: persona → length → memory → tools.
+        let mut sections: Vec<String> = Vec::new();
+
+        // 1. Persona — the core instructions (active profile, or the default).
+        let persona = settings.effective_system_prompt();
+        if !persona.trim().is_empty() {
+            sections.push(persona.trim().to_string());
         }
-        content.push_str(TIME_AWARENESS_NOTE);
-        // Tell the model about its web capability. On the tool-calling path it
-        // must actively CALL the `web_search` tool, so it gets a tool-oriented
-        // instruction; on the other paths the app runs search for it, so it
-        // gets the "results may be added for you" note. Either way it never
-        // denies having internet access. Stable per-mode text → cache-safe.
-        if web_via_tools {
-            if !content.trim().is_empty() {
-                content.push_str("\n\n");
-            }
-            content.push_str(
-                "IMPORTANT — your situation and tools:\n\
-                 • Your training data has a fixed cutoff and is very likely OUT OF DATE for \
-                 anything that changes over time: who currently holds an office, role, or title; \
-                 prices; scores and standings; schedules; software versions; and recent events. \
-                 The user's real current date is provided with their message — treat it as now.\n\
-                 • You have a web_search tool that returns live results from the internet.\n\
-                 How to use it:\n\
-                 1. For ANY question about current, recent, or changeable facts, you MUST call \
-                 web_search BEFORE answering. Do not answer from memory even if you feel certain — \
-                 your memory can be years out of date and confidently wrong (e.g. who holds a \
-                 political office).\n\
-                 2. Base current-fact answers only on what the results actually say. When the \
-                 results confirm something, state it plainly and confidently — do NOT hedge with \
-                 \"appears to be\", \"suggests\", or \"as of my knowledge\".\n\
-                 3. If you couldn't search or the results don't cover it, say you're not certain \
-                 and offer to look it up — never guess a current fact.\n\
-                 4. For timeless things (definitions, concepts, math, coding, writing, \
-                 translation, general how-to), just answer directly without searching.\n\
-                 Examples:\n\
-                 • \"What's the capital of France?\" → answer directly (timeless).\n\
-                 • \"Who is the current president / PM / CEO of X?\" → web_search FIRST, then answer.\n\
-                 • \"Latest iPhone price\", \"who won yesterday's match\", \"weather today\" → web_search FIRST.\n\
-                 • \"Explain how recursion works\" → answer directly (timeless).",
-            );
-        } else if settings.assistant_web_search_enabled {
-            content.push_str("\n\n");
-            content.push_str(web_search::WEB_SEARCH_CAPABILITY_NOTE);
-        }
-        // Append the response-length preference (if any) so a single system
-        // prompt covers both display and spoken output. The active persona can
-        // override the global setting, so this resolves per-persona first.
+
+        // 2. Reply-length preference (persona override, else the global dial).
         if let Some(directive) = settings.effective_response_length().directive() {
-            if !content.trim().is_empty() {
-                content.push_str("\n\n");
-            }
-            content.push_str(directive);
+            sections.push(directive.to_string());
         }
-        // Personal memory: append an advisory "About You" block (plus the notes
-        // relevant to this message, within the detail budget) when memory is on
-        // and the conversation isn't incognito. Placed late so the earlier
-        // prompt prefix stays stable/cache-friendly; the block itself states
-        // that it's advisory and never overrides the user's current message.
+
+        // 3. Personal memory — advisory "About You" block, only when memory is
+        //    on, not incognito, and something relevant was selected.
         if let Some(block) = crate::memory::build_memory_block(&settings, &user_text) {
-            if !content.trim().is_empty() {
-                content.push_str("\n\n");
-            }
-            content.push_str(&block);
+            sections.push(block);
         }
-        // On web-search turns, tell the model to ground its answer in the
-        // results (whether prepended to the user's message on the planner path,
-        // or returned via the web_search tool) — and to treat them as its OWN
-        // findings (never "the results you sent"). The directive adapts to TTS:
-        // speech-friendly prose when spoken, richer Markdown when read on screen.
-        if web_context.is_some() || web_via_tools {
-            if !content.trim().is_empty() {
-                content.push_str("\n\n");
-            }
-            content.push_str(&web_search::web_search_system_directive(
-                settings.assistant_tts_enabled,
-            ));
+
+        // 4. Tools — only when web search is on. One labeled section that
+        //    explains BOTH tools the model can call this turn (web_search and
+        //    get_current_datetime), when to use each, and how to present web
+        //    findings. On the OpenRouter `:online` path the model has no local
+        //    tools (search runs server-side), so it gets a short capability
+        //    note instead.
+        if web_via_tools {
+            sections.push(tools_system_section(settings.assistant_tts_enabled));
+        } else if web_via_online {
+            sections.push(web_search::WEB_SEARCH_CAPABILITY_NOTE.to_string());
         }
-        content
+
+        sections.join("\n\n")
     };
     messages.push(json!({
         "role": "system",
@@ -1726,15 +1549,11 @@ pub async fn run_assistant_turn(
         }
     }
     // Per-turn context prepended to the user's message for the request only
-    // (never stored in history): the live date/time always, web results when
-    // present, and the content of any attached files. Keeping this in the user
-    // message rather than the cached system prefix means the timestamp stays
-    // fresh every turn without invalidating provider-side prompt caching.
-    let mut preamble = current_datetime_line();
-    if let Some(ctx) = &web_context {
-        preamble.push_str("\n\n");
-        preamble.push_str(ctx);
-    }
+    // (never stored in history): the content of any attached files. Date/time
+    // is no longer injected — the model pulls it on demand via the
+    // get_current_datetime tool — and web results arrive as tool messages, not
+    // inline text, so neither rides along here.
+    let mut preamble = String::new();
     // Inline attached files as clearly-delimited context blocks, individually
     // and collectively bounded so a huge file can't blow the request budget.
     const FILE_CHAR_CAP: usize = 20_000;
@@ -1755,7 +1574,13 @@ pub async fn run_assistant_turn(
             content
         ));
     }
-    let user_content = format!("{}\n\n{}", preamble, user_text);
+    // No files → send the message as-is; otherwise lead with the file blocks,
+    // then the user's message.
+    let user_content = if preamble.trim().is_empty() {
+        user_text.clone()
+    } else {
+        format!("{}\n\n{}", preamble.trim_start(), user_text)
+    };
 
     // Visuals: the screen capture (if any) first, then attached images, capped
     // so a pile of attachments can't produce an oversized request.
@@ -1825,14 +1650,7 @@ pub async fn run_assistant_turn(
     // tokens via `assistant-token` and resolve to the final answer text, then
     // flow through the shared outcome handling below.
     let outcome = if web_via_tools {
-        let tools = web_search_tool_def();
-        // Safety net (same intent as the planner path's force-search): capable
-        // models are often over-confident and answer "who is the current …"
-        // from stale training data instead of searching. For clearly
-        // time-sensitive or explicitly-requested queries, FORCE the web_search
-        // tool on the first round; otherwise let the model decide (auto).
-        let force_search = web_search::is_explicit_search_request(&user_text)
-            || web_search::looks_time_sensitive(&user_text);
+        let tools = assistant_tool_defs();
         let partial_cb = partial.clone();
         let app_tokens = app.clone();
         let app_state = app.clone();
@@ -1845,15 +1663,10 @@ pub async fn run_assistant_turn(
             let mut answer = String::new();
             // A small round cap: one search round covers almost every question;
             // the cap just prevents a pathological tool-call loop.
-            for round in 0..3usize {
-                // Force the tool only on the first round of a warranted search;
-                // afterwards use "auto" so the model answers with the results
-                // instead of being forced to search again (which would loop).
-                let tool_choice = if round == 0 && force_search {
-                    json!({ "type": "function", "function": { "name": "web_search" } })
-                } else {
-                    json!("auto")
-                };
+            for _ in 0..3usize {
+                // The model alone decides whether to call a tool; we never
+                // force one.
+                let tool_choice = json!("auto");
                 let po = partial_cb.clone();
                 let ao = app_tokens.clone();
                 let round_out = llm_client::send_chat_stream_with_tools(
@@ -1875,8 +1688,12 @@ pub async fn run_assistant_turn(
                     answer = round_out.text;
                     break;
                 }
-                // The model asked to search — reflect that in the panel.
-                emit_state(&app_state, "searching");
+                // Reflect tool use in the panel: "searching" only when the
+                // model actually called web_search (a get_current_datetime call
+                // stays in "thinking").
+                if round_out.tool_calls.iter().any(|tc| tc.name == "web_search") {
+                    emit_state(&app_state, "searching");
+                }
                 let tool_calls_json: Vec<Value> = round_out
                     .tool_calls
                     .iter()
@@ -1894,19 +1711,31 @@ pub async fn run_assistant_turn(
                     "tool_calls": tool_calls_json
                 }));
                 for tc in &round_out.tool_calls {
-                    let (query, freshness, news) = parse_web_search_args(&tc.arguments);
-                    let results = if tc.name == "web_search" && !query.is_empty() {
-                        web_search::run_tool_search(&settings_c, &query, freshness.as_deref(), news)
-                            .await
-                    } else {
-                        Vec::new()
-                    };
-                    let content = if results.is_empty() {
-                        "No results found for that query.".to_string()
-                    } else {
-                        let budget =
-                            web_search::context_budget_for(settings_c.assistant_search_depth);
-                        web_search::format_results_for_prompt(&results, budget)
+                    let content = match tc.name.as_str() {
+                        "web_search" => {
+                            let (query, freshness, news) = parse_web_search_args(&tc.arguments);
+                            if query.is_empty() {
+                                "No query was provided to web_search.".to_string()
+                            } else {
+                                let results = web_search::run_tool_search(
+                                    &settings_c,
+                                    &query,
+                                    freshness.as_deref(),
+                                    news,
+                                )
+                                .await;
+                                if results.is_empty() {
+                                    "No results found for that query.".to_string()
+                                } else {
+                                    let budget = web_search::context_budget_for(
+                                        settings_c.assistant_search_depth,
+                                    );
+                                    web_search::format_results_for_prompt(&results, budget)
+                                }
+                            }
+                        }
+                        "get_current_datetime" => current_datetime_line(),
+                        other => format!("Unknown tool '{}'.", other),
                     };
                     msgs.push(json!({
                         "role": "tool",
@@ -2170,11 +1999,7 @@ pub async fn run_summarize_turn(app: AppHandle) {
 
     // System prompt + capped history (including the last answer) + instruction.
     let mut messages: Vec<Value> = Vec::new();
-    let mut system_content = settings.assistant_system_prompt.clone();
-    if !system_content.trim().is_empty() {
-        system_content.push_str("\n\n");
-    }
-    system_content.push_str(TIME_AWARENESS_NOTE);
+    let system_content = settings.assistant_system_prompt.clone();
     messages.push(json!({"role": "system", "content": system_content}));
     {
         let conversation = app.state::<AssistantConversation>();

@@ -18,6 +18,25 @@
     "about": "Hakkında"
   },
   "onboarding": {
+    "steps": {
+      "progress": "Adım {{current}}/{{total}}",
+      "counter": "Adım {{current}}/{{total}} · {{label}}",
+      "speechToText": "Transkripsiyon",
+      "aiModel": "Yapay zekâ modeli"
+    },
+    "speechToText": {
+      "title": "Bir transkripsiyon modeli seçin",
+      "subtitle": "Bu, sesinizi metne dönüştürmek için tamamen cihazınızda çalışır. Makinenize uygun olanı seçin — istediğiniz zaman değiştirebilirsiniz."
+    },
+    "aiModel": {
+      "title": "Yerel bir yapay zekâ modeli ekleyin",
+      "subtitle": "Asistanı, ekran görüşünü ve transkript temizlemeyi çalıştırır — cihazınızda tamamen çevrimdışı olarak. Bu isteğe bağlıdır; daha sonra bir bulut sağlayıcısı da bağlayabilirsiniz.",
+      "skip": "Şimdilik atla",
+      "skipHint": "İsteğe bağlı. İstediğiniz zaman Ayarlar'dan bir model indirebilir veya bir bulut sağlayıcısı bağlayabilirsiniz.",
+      "continue": "Devam et",
+      "downloadingHint": "Modeliniz arka planda indiriliyor — uygulamayı hemen kullanmaya başlayabilirsiniz.",
+      "downloadStarted": "Yapay zekâ modeliniz arka planda indiriliyor."
+    },
     "subtitle": "Başlamak için bir transkripsiyon modeli seçin",
     "recommended": "Önerilen",
     "download": "İndir",

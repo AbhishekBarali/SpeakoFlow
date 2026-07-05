@@ -1017,6 +1017,14 @@ const AssistantPanel: React.FC = () => {
     await commands.commitRecording();
   }, []);
 
+  // Keep a click on a pill button from being swallowed by the window drag
+  // region: the whole pill is draggable (data-tauri-drag-region), so a plain
+  // mousedown on a button starts a native window-move and the button's click
+  // never lands. Stopping propagation on mousedown lets onClick fire reliably.
+  const stopDrag = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+  }, []);
+
   const toggleWebSearch = useCallback(async () => {
     await commands.setAssistantWebSearchEnabled(!webSearchEnabled);
     await refreshSettings();
@@ -1110,10 +1118,6 @@ const AssistantPanel: React.FC = () => {
         ? "flow"
         : "shimmer";
 
-    // What the hover-reveal × does right now.
-    const cancelAction =
-      isListening || state === "transcribing" ? cancelVoice : stopTurn;
-
     return (
       <div className={shellClass} data-tauri-drag-region>
         <div
@@ -1134,6 +1138,7 @@ const AssistantPanel: React.FC = () => {
               <button
                 className="apill-cancel"
                 onClick={() => setError(null)}
+                onMouseDown={stopDrag}
                 title={t("assistant.pill.dismiss")}
                 aria-label={t("assistant.pill.dismiss")}
               >
@@ -1142,15 +1147,21 @@ const AssistantPanel: React.FC = () => {
             </>
           ) : isListening && locked ? (
             // Hands-free lock: inline Cancel · wave · Done, like the STT
-            // overlay's locked layout. The ✓ finishes and sends.
+            // overlay's locked layout. The ✓ finishes and sends. This pill is
+            // told apart from the STT overlay's locked pill by its soft accent
+            // ring (.apill.listening) + rounded-rect shape — a quiet cue rather
+            // than an extra leading glyph that would lengthen the chip.
+            // onMouseDown stops the drag-region from swallowing the click (the
+            // whole pill is a drag surface), so ✗/✓ reliably register.
             <>
               <button
                 className="apill-btn danger"
                 onClick={cancelVoice}
+                onMouseDown={(e) => e.stopPropagation()}
                 title={t("assistant.pill.cancel")}
                 aria-label={t("assistant.pill.cancel")}
               >
-                <X size={12} strokeWidth={2.5} />
+                <X size={13} strokeWidth={2.5} />
               </button>
               <div className="apill-wave" data-tauri-drag-region>
                 <AudioWaveform
@@ -1164,10 +1175,11 @@ const AssistantPanel: React.FC = () => {
               <button
                 className="apill-btn apill-done"
                 onClick={finishVoice}
+                onMouseDown={(e) => e.stopPropagation()}
                 title={t("assistant.finish")}
                 aria-label={t("assistant.finish")}
               >
-                <Check size={12} strokeWidth={2.75} />
+                <Check size={13} strokeWidth={2.75} />
               </button>
             </>
           ) : pillBusy || isListening ? (
@@ -1213,23 +1225,42 @@ const AssistantPanel: React.FC = () => {
               {isWorkingPhase && (
                 <Loader2 size={12} strokeWidth={2.5} className="apill-spin" />
               )}
+              {/* Stop: a clear, always-visible square while the assistant is
+                  thinking, searching, or speaking, so the turn can be stopped
+                  without hunting for a hover-only control. During voice capture
+                  (listening/transcribing) the hover ✗ cancels instead. */}
+              {showStop && !isListening && state !== "transcribing" && (
+                <button
+                  className="apill-btn danger apill-stop"
+                  onClick={stopTurn}
+                  onMouseDown={stopDrag}
+                  title={t("assistant.stop")}
+                  aria-label={t("assistant.stop")}
+                >
+                  <Square size={11} strokeWidth={2.75} />
+                </button>
+              )}
               <div className="apill-reveal quick">
                 <button
                   className="apill-btn"
                   onClick={() => collapse(false)}
+                  onMouseDown={stopDrag}
                   title={t("assistant.pill.expand")}
                   aria-label={t("assistant.pill.expand")}
                 >
                   <Maximize2 size={11} strokeWidth={2.25} />
                 </button>
-                <button
-                  className="apill-btn danger"
-                  onClick={cancelAction}
-                  title={t("assistant.pill.cancelTurn")}
-                  aria-label={t("assistant.pill.cancelTurn")}
-                >
-                  <X size={12} strokeWidth={2.5} />
-                </button>
+                {(isListening || state === "transcribing") && (
+                  <button
+                    className="apill-btn danger"
+                    onClick={cancelVoice}
+                    onMouseDown={stopDrag}
+                    title={t("assistant.pill.cancelTurn")}
+                    aria-label={t("assistant.pill.cancelTurn")}
+                  >
+                    <X size={12} strokeWidth={2.5} />
+                  </button>
+                )}
               </div>
             </>
           ) : (
@@ -1238,6 +1269,7 @@ const AssistantPanel: React.FC = () => {
               <button
                 className="apill-btn apill-mic"
                 onClick={toggleVoice}
+                onMouseDown={stopDrag}
                 title={t("assistant.pill.talk")}
                 aria-label={t("assistant.pill.talk")}
               >
@@ -1278,6 +1310,7 @@ const AssistantPanel: React.FC = () => {
                 <button
                   className="apill-btn"
                   onClick={() => collapse(false)}
+                  onMouseDown={stopDrag}
                   title={t("assistant.pill.expand")}
                   aria-label={t("assistant.pill.expand")}
                 >
@@ -1286,6 +1319,7 @@ const AssistantPanel: React.FC = () => {
                 <button
                   className="apill-btn danger"
                   onClick={hidePanel}
+                  onMouseDown={stopDrag}
                   title={t("assistant.pill.close")}
                   aria-label={t("assistant.pill.close")}
                 >
@@ -1302,6 +1336,7 @@ const AssistantPanel: React.FC = () => {
             <button
               className={`apill-screen${screenActive ? " armed" : ""}`}
               onClick={toggleScreen}
+              onMouseDown={stopDrag}
               title={
                 screenActive
                   ? t("assistant.pill.disarmScreen")

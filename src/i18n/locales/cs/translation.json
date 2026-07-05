@@ -18,6 +18,25 @@
     "about": "O aplikaci"
   },
   "onboarding": {
+    "steps": {
+      "progress": "Krok {{current}} z {{total}}",
+      "counter": "Krok {{current}} z {{total}} · {{label}}",
+      "speechToText": "Přepis",
+      "aiModel": "Model AI"
+    },
+    "speechToText": {
+      "title": "Vyberte model přepisu",
+      "subtitle": "Běží zcela na vašem zařízení a převádí váš hlas na text. Vyberte ten, který se hodí pro váš počítač — kdykoli jej můžete změnit."
+    },
+    "aiModel": {
+      "title": "Přidat místní model AI",
+      "subtitle": "Pohání asistenta, zobrazení obrazovky a čištění přepisů — běží zcela offline na vašem zařízení. Je to volitelné; později můžete také připojit cloudového poskytovatele.",
+      "skip": "Zatím přeskočit",
+      "skipHint": "Volitelné. Model můžete stáhnout nebo připojit cloudového poskytovatele kdykoli v Nastavení.",
+      "continue": "Pokračovat",
+      "downloadingHint": "Váš model se stahuje na pozadí — aplikaci můžete začít používat ihned.",
+      "downloadStarted": "Stahování vašeho modelu AI na pozadí."
+    },
     "subtitle": "Pro začátek vyberte model pro přepis",
     "recommended": "Doporučeno",
     "download": "Stáhnout",

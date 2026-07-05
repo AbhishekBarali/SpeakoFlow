@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { RefreshCcw } from "lucide-react";
-import { commands } from "@/bindings";
+import { commands, type PostProcessTone } from "@/bindings";
 
 import { Alert } from "../../ui/Alert";
 import {
@@ -423,6 +423,48 @@ export const PostProcessingSettingsPrompts = React.memo(
 );
 PostProcessingSettingsPrompts.displayName = "PostProcessingSettingsPrompts";
 
+const PostProcessingToneComponent: React.FC = () => {
+  const { t } = useTranslation();
+  const { getSetting, updateSetting } = useSettings();
+
+  const tone = getSetting("post_process_tone") ?? "none";
+
+  const options = (
+    [
+      "none",
+      "formal",
+      "casual",
+      "professional",
+      "friendly",
+      "concise",
+    ] as PostProcessTone[]
+  ).map((value) => ({
+    value,
+    label: t(`settings.postProcessing.tone.options.${value}`),
+  }));
+
+  return (
+    <SettingContainer
+      title={t("settings.postProcessing.tone.title")}
+      description={t("settings.postProcessing.tone.description")}
+      descriptionMode="tooltip"
+      layout="horizontal"
+      grouped={true}
+    >
+      <Dropdown
+        selectedValue={tone}
+        options={options}
+        onSelect={(value) =>
+          updateSetting("post_process_tone", value as PostProcessTone)
+        }
+      />
+    </SettingContainer>
+  );
+};
+
+export const PostProcessingTone = React.memo(PostProcessingToneComponent);
+PostProcessingTone.displayName = "PostProcessingTone";
+
 export const PostProcessingSettings: React.FC = () => {
   const { t } = useTranslation();
 
@@ -438,6 +480,10 @@ export const PostProcessingSettings: React.FC = () => {
 
       <SettingsGroup title={t("settings.postProcessing.api.title")}>
         <PostProcessingSettingsApi />
+      </SettingsGroup>
+
+      <SettingsGroup title={t("settings.postProcessing.tone.title")}>
+        <PostProcessingTone />
       </SettingsGroup>
 
       <SettingsGroup title={t("settings.postProcessing.prompts.title")}>

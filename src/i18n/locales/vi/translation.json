@@ -18,6 +18,25 @@
     "about": "Giới thiệu"
   },
   "onboarding": {
+    "steps": {
+      "progress": "Bước {{current}} trên {{total}}",
+      "counter": "Bước {{current}} trên {{total}} · {{label}}",
+      "speechToText": "Chuyển giọng nói thành văn bản",
+      "aiModel": "Mô hình AI"
+    },
+    "speechToText": {
+      "title": "Chọn một mô hình chuyển giọng nói thành văn bản",
+      "subtitle": "Chạy hoàn toàn trên thiết bị của bạn để chuyển giọng nói thành văn bản. Hãy chọn mô hình phù hợp với máy của bạn — bạn có thể thay đổi bất cứ lúc nào."
+    },
+    "aiModel": {
+      "title": "Thêm mô hình AI cục bộ",
+      "subtitle": "Cung cấp năng lượng cho trợ lý, khả năng xem màn hình và dọn dẹp bản ghi — chạy hoàn toàn ngoại tuyến trên thiết bị của bạn. Đây là tùy chọn; bạn cũng có thể kết nối nhà cung cấp đám mây sau.",
+      "skip": "Bỏ qua bây giờ",
+      "skipHint": "Tùy chọn. Bạn có thể tải mô hình hoặc kết nối nhà cung cấp đám mây bất cứ lúc nào trong Cài đặt.",
+      "continue": "Tiếp tục",
+      "downloadingHint": "Mô hình của bạn đang được tải xuống ở chế độ nền — bạn có thể bắt đầu sử dụng ứng dụng ngay.",
+      "downloadStarted": "Đang tải mô hình AI của bạn ở chế độ nền."
+    },
     "subtitle": "Để bắt đầu, hãy chọn một mô hình chuyển đổi giọng nói",
     "recommended": "Đề xuất",
     "download": "Tải xuống",

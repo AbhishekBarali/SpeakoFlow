@@ -17,6 +17,30 @@ use std::time::{Duration, Instant};
 use tar::Archive;
 use tauri::{AppHandle, Emitter, Manager};
 
+/// Outcome of a single download attempt for one URL.
+enum AttemptOutcome {
+    /// The full body was written to the partial file (caller then finalizes).
+    Completed,
+    /// The user cancelled mid-stream (partial is kept for a later resume).
+    Cancelled,
+}
+
+/// Error carrying the HTTP status of a failed download response, so the retry
+/// loop can distinguish a transient/server error (worth retrying the same URL)
+/// from a permanent client error like 404 (skip straight to the next mirror).
+#[derive(Debug)]
+struct HttpStatusError {
+    status: reqwest::StatusCode,
+}
+
+impl std::fmt::Display for HttpStatusError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "server returned HTTP {}", self.status)
+    }
+}
+
+impl std::error::Error for HttpStatusError {}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
 pub enum EngineType {
     Whisper,
@@ -1534,6 +1558,172 @@ impl ModelManager {
         Ok(())
     }
 
+    /// Ordered list of URLs to try when downloading a model: any reliable
+    /// mirror(s) first, then the canonical (original) source as a fallback.
+    /// The downloader tries each in turn (retrying transient failures), so a
+    /// flaky primary self-heals or falls back automatically.
+    fn download_candidates(model_info: &ModelInfo) -> Vec<String> {
+        let mut urls = Vec::new();
+        if let Some(mirror) = Self::mirror_url_for(&model_info.id) {
+            urls.push(mirror);
+        }
+        if let Some(url) = &model_info.url {
+            // Avoid trying the same URL twice if a mirror equals the canonical.
+            if !urls.iter().any(|u| u == url) {
+                urls.push(url.clone());
+            }
+        }
+        urls
+    }
+
+    /// A reliable self-hosted mirror for a bundled model, if one has been
+    /// published. GitHub release assets are a great fit (global CDN, free) for
+    /// files under GitHub's 2 GB per-asset limit — e.g. the small Gemma 3 1B.
+    /// Larger models fall back to their canonical Hugging Face URL, which the
+    /// downloader retries and resumes automatically.
+    ///
+    /// To activate a mirror: upload the exact model file as a GitHub release
+    /// asset on the SpeakoFlow repo, then return its `browser_download_url`
+    /// here. Until then this returns `None` and the canonical URL is used.
+    /// Full steps + per-model checklist: docs/TODO_BEFORE_RELEASE.md §2.
+    // Intentional template: the match is a placeholder for per-model mirror
+    // arms that maintainers uncomment once assets are uploaded, so keep it even
+    // though it currently has only the wildcard arm.
+    #[allow(clippy::match_single_binding)]
+    fn mirror_url_for(model_id: &str) -> Option<String> {
+        match model_id {
+            // Example — uncomment and set the real release URL once the asset
+            // is uploaded (Gemma 3 1B is 806 MB, well under the 2 GB limit):
+            // "gemma-3-1b" => Some(
+            //     "https://github.com/AbhishekBarali/SpeakoFlow/releases/download/models-v1/gemma-3-1b-it-Q4_K_M.gguf".to_string(),
+            // ),
+            _ => None,
+        }
+    }
+
+    /// Download `url` into the model's `.partial` file, resuming from whatever
+    /// is already on disk. Returns `Completed` once the whole body is written,
+    /// `Cancelled` if the user aborted mid-stream, or an `Err` for a transport,
+    /// stream, or HTTP error (which the caller may retry). The partial file is
+    /// preserved on error so the next attempt resumes instead of restarting.
+    async fn attempt_download(
+        &self,
+        model_id: &str,
+        url: &str,
+        partial_path: &Path,
+        cancel_flag: &Arc<AtomicBool>,
+    ) -> Result<AttemptOutcome> {
+        // Resume from the current partial size, if present.
+        let mut resume_from = if partial_path.exists() {
+            partial_path.metadata()?.len()
+        } else {
+            0
+        };
+
+        // A tuned client: a connect timeout stops a dead endpoint from hanging
+        // forever, and a User-Agent keeps hosts like Hugging Face from rejecting
+        // the request. Redirects (HF → CDN) are followed by default.
+        let client = reqwest::Client::builder()
+            .connect_timeout(Duration::from_secs(30))
+            .user_agent(concat!("SpeakoFlow/", env!("CARGO_PKG_VERSION")))
+            .build()?;
+
+        let mut request = client.get(url);
+        if resume_from > 0 {
+            request = request.header("Range", format!("bytes={}-", resume_from));
+        }
+        let mut response = request.send().await?;
+
+        // Asked to resume but got 200 (not 206): the server ignored the Range,
+        // so restart fresh to avoid appending a full body onto the partial.
+        if resume_from > 0 && response.status() == reqwest::StatusCode::OK {
+            warn!(
+                "Server ignored range request for model {}, restarting download",
+                model_id
+            );
+            drop(response);
+            let _ = fs::remove_file(partial_path);
+            resume_from = 0;
+            response = client.get(url).send().await?;
+        }
+
+        let status = response.status();
+        if !status.is_success() && status != reqwest::StatusCode::PARTIAL_CONTENT {
+            return Err(HttpStatusError { status }.into());
+        }
+
+        let total_size = if resume_from > 0 {
+            resume_from + response.content_length().unwrap_or(0)
+        } else {
+            response.content_length().unwrap_or(0)
+        };
+
+        let mut downloaded = resume_from;
+        let mut stream = response.bytes_stream();
+        let mut file = if resume_from > 0 {
+            std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(partial_path)?
+        } else {
+            std::fs::File::create(partial_path)?
+        };
+
+        let emit_progress = |downloaded: u64| {
+            let _ = self.app_handle.emit(
+                "model-download-progress",
+                &DownloadProgress {
+                    model_id: model_id.to_string(),
+                    downloaded,
+                    total: total_size,
+                    percentage: if total_size > 0 {
+                        (downloaded as f64 / total_size as f64) * 100.0
+                    } else {
+                        0.0
+                    },
+                },
+            );
+        };
+
+        emit_progress(downloaded);
+
+        // Throttle progress events to max 10/sec (100ms intervals).
+        let mut last_emit = Instant::now();
+        let throttle_duration = Duration::from_millis(100);
+
+        while let Some(chunk) = stream.next().await {
+            if cancel_flag.load(Ordering::Relaxed) {
+                drop(file);
+                info!("Download cancelled for: {}", model_id);
+                return Ok(AttemptOutcome::Cancelled);
+            }
+            let chunk = chunk?;
+            file.write_all(&chunk)?;
+            downloaded += chunk.len() as u64;
+            if last_emit.elapsed() >= throttle_duration {
+                emit_progress(downloaded);
+                last_emit = Instant::now();
+            }
+        }
+
+        // Ensure 100% is shown, then flush and close before the caller moves it.
+        emit_progress(downloaded);
+        file.flush()?;
+        drop(file);
+
+        // A short read means the connection dropped before the body finished.
+        // Keep the partial and report a (retryable) error so the caller resumes.
+        if total_size > 0 && downloaded < total_size {
+            return Err(anyhow::anyhow!(
+                "incomplete download: got {} of {} bytes",
+                downloaded,
+                total_size
+            ));
+        }
+
+        Ok(AttemptOutcome::Completed)
+    }
+
     pub async fn download_model(&self, model_id: &str) -> Result<()> {
         let model_info = {
             let models = self.available_models.lock().unwrap();
@@ -1543,9 +1733,12 @@ impl ModelManager {
         let model_info =
             model_info.ok_or_else(|| anyhow::anyhow!("Model not found: {}", model_id))?;
 
-        let url = model_info
-            .url
-            .ok_or_else(|| anyhow::anyhow!("No download URL for model"))?;
+        // Build the ordered list of sources to try (reliable mirror first, then
+        // the canonical URL). Empty only if the model has no URL at all.
+        let candidates = Self::download_candidates(&model_info);
+        if candidates.is_empty() {
+            return Err(anyhow::anyhow!("No download URL for model"));
+        }
         let model_path = self.models_dir.join(&model_info.filename);
         let partial_path = self
             .models_dir
@@ -1571,16 +1764,6 @@ impl ModelManager {
             return Ok(());
         }
 
-        // Check if we have a partial download to resume
-        let mut resume_from = if partial_path.exists() {
-            let size = partial_path.metadata()?.len();
-            info!("Resuming download of model {} from byte {}", model_id, size);
-            size
-        } else {
-            info!("Starting fresh download of model {} from {}", model_id, url);
-            0
-        };
-
         // Mark as downloading
         {
             let mut models = self.available_models.lock().unwrap();
@@ -1605,148 +1788,82 @@ impl ModelManager {
             disarmed: false,
         };
 
-        // Create HTTP client with range request for resuming
-        let client = reqwest::Client::new();
-        let mut request = client.get(&url);
+        // Try each source in turn; within a source, retry transient failures a
+        // few times with exponential backoff. The partial file is preserved
+        // across attempts, so every retry resumes rather than restarting — this
+        // is what turns a flaky Hugging Face download into a reliable one.
+        const MAX_ATTEMPTS_PER_URL: u32 = 4;
+        let mut downloaded_ok = false;
+        let mut last_error: Option<anyhow::Error> = None;
 
-        if resume_from > 0 {
-            request = request.header("Range", format!("bytes={}-", resume_from));
-        }
-
-        let mut response = request.send().await?;
-
-        // If we tried to resume but server returned 200 (not 206 Partial Content),
-        // the server doesn't support range requests. Delete partial file and restart
-        // fresh to avoid file corruption (appending full file to partial).
-        if resume_from > 0 && response.status() == reqwest::StatusCode::OK {
-            warn!(
-                "Server doesn't support range requests for model {}, restarting download",
-                model_id
-            );
-            drop(response);
-            let _ = fs::remove_file(&partial_path);
-
-            // Reset resume_from since we're starting fresh
-            resume_from = 0;
-
-            // Restart download without range header
-            response = client.get(&url).send().await?;
-        }
-
-        // Check for success or partial content status
-        if !response.status().is_success()
-            && response.status() != reqwest::StatusCode::PARTIAL_CONTENT
-        {
-            return Err(anyhow::anyhow!(
-                "Failed to download model: HTTP {}",
-                response.status()
-            ));
-        }
-
-        let total_size = if resume_from > 0 {
-            // For resumed downloads, add the resume point to content length
-            resume_from + response.content_length().unwrap_or(0)
-        } else {
-            response.content_length().unwrap_or(0)
-        };
-
-        let mut downloaded = resume_from;
-        let mut stream = response.bytes_stream();
-
-        // Open file for appending if resuming, or create new if starting fresh
-        let mut file = if resume_from > 0 {
-            std::fs::OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open(&partial_path)?
-        } else {
-            std::fs::File::create(&partial_path)?
-        };
-
-        // Emit initial progress
-        let initial_progress = DownloadProgress {
-            model_id: model_id.to_string(),
-            downloaded,
-            total: total_size,
-            percentage: if total_size > 0 {
-                (downloaded as f64 / total_size as f64) * 100.0
+        'sources: for (source_idx, url) in candidates.iter().enumerate() {
+            if source_idx > 0 {
+                info!(
+                    "Falling back to alternate source for model {}: {}",
+                    model_id, url
+                );
             } else {
-                0.0
-            },
-        };
-        let _ = self
-            .app_handle
-            .emit("model-download-progress", &initial_progress);
-
-        // Throttle progress events to max 10/sec (100ms intervals)
-        let mut last_emit = Instant::now();
-        let throttle_duration = Duration::from_millis(100);
-
-        // Download with progress
-        while let Some(chunk) = stream.next().await {
-            // Check if download was cancelled
-            if cancel_flag.load(Ordering::Relaxed) {
-                drop(file);
-                info!("Download cancelled for: {}", model_id);
-                // Keep partial file for resume functionality.
-                // Guard handles is_downloading + cancel_flags cleanup on drop.
-                return Ok(());
+                info!("Downloading model {} from {}", model_id, url);
             }
 
-            let chunk = chunk?;
+            for attempt in 1..=MAX_ATTEMPTS_PER_URL {
+                if cancel_flag.load(Ordering::Relaxed) {
+                    // Guard handles is_downloading + cancel_flags cleanup on drop.
+                    return Ok(());
+                }
 
-            file.write_all(&chunk)?;
-            downloaded += chunk.len() as u64;
+                match self
+                    .attempt_download(model_id, url, &partial_path, &cancel_flag)
+                    .await
+                {
+                    Ok(AttemptOutcome::Completed) => {
+                        downloaded_ok = true;
+                        break 'sources;
+                    }
+                    Ok(AttemptOutcome::Cancelled) => {
+                        // Partial kept for resume; guard cleans up state on drop.
+                        return Ok(());
+                    }
+                    Err(e) => {
+                        // A 4xx (except 408/429) is permanent for this URL, so
+                        // stop retrying it and fall through to the next source.
+                        let retryable = match e.downcast_ref::<HttpStatusError>() {
+                            Some(HttpStatusError { status }) => {
+                                status.is_server_error()
+                                    || *status == reqwest::StatusCode::REQUEST_TIMEOUT
+                                    || *status == reqwest::StatusCode::TOO_MANY_REQUESTS
+                            }
+                            None => true, // transport / stream / IO error
+                        };
 
-            let percentage = if total_size > 0 {
-                (downloaded as f64 / total_size as f64) * 100.0
-            } else {
-                0.0
-            };
+                        warn!(
+                            "Download attempt {}/{} for model {} from {} failed: {}",
+                            attempt, MAX_ATTEMPTS_PER_URL, model_id, url, e
+                        );
+                        last_error = Some(e);
 
-            // Emit progress event (throttled to avoid UI freeze)
-            if last_emit.elapsed() >= throttle_duration {
-                let progress = DownloadProgress {
-                    model_id: model_id.to_string(),
-                    downloaded,
-                    total: total_size,
-                    percentage,
-                };
-                let _ = self.app_handle.emit("model-download-progress", &progress);
-                last_emit = Instant::now();
+                        if !retryable {
+                            break; // try the next source, if any
+                        }
+                        if attempt < MAX_ATTEMPTS_PER_URL {
+                            // Interruptible exponential backoff: 1s, 2s, 4s.
+                            let backoff = Duration::from_secs(1u64 << (attempt - 1));
+                            let deadline = Instant::now() + backoff;
+                            while Instant::now() < deadline {
+                                if cancel_flag.load(Ordering::Relaxed) {
+                                    return Ok(());
+                                }
+                                tokio::time::sleep(Duration::from_millis(200)).await;
+                            }
+                        }
+                    }
+                }
             }
         }
 
-        // Emit final progress to ensure 100% is shown
-        let final_progress = DownloadProgress {
-            model_id: model_id.to_string(),
-            downloaded,
-            total: total_size,
-            percentage: if total_size > 0 {
-                (downloaded as f64 / total_size as f64) * 100.0
-            } else {
-                100.0
-            },
-        };
-        let _ = self
-            .app_handle
-            .emit("model-download-progress", &final_progress);
-
-        file.flush()?;
-        drop(file); // Ensure file is closed before moving
-
-        // Verify downloaded file size matches expected size
-        if total_size > 0 {
-            let actual_size = partial_path.metadata()?.len();
-            if actual_size != total_size {
-                // Download is incomplete/corrupted - delete partial and return error
-                let _ = fs::remove_file(&partial_path);
-                return Err(anyhow::anyhow!(
-                    "Download incomplete: expected {} bytes, got {} bytes",
-                    total_size,
-                    actual_size
-                ));
-            }
+        if !downloaded_ok {
+            return Err(last_error
+                .unwrap_or_else(|| anyhow::anyhow!("Failed to download model {}", model_id)));
         }
 
         // Verify SHA256 checksum. Runs in a blocking thread so the async executor is not

@@ -20,6 +20,7 @@ import { SettingsGroup } from "../../ui/SettingsGroup";
 import { MoreOptions } from "../../ui/MoreOptions";
 import { OutputDeviceSelector } from "../OutputDeviceSelector";
 import { AudioFeedback } from "../AudioFeedback";
+import { SoundPicker } from "../SoundPicker";
 import { AppearanceSelector } from "../AppearanceSelector";
 import { TextSizeSelector } from "../TextSizeSelector";
 import { TapToLock } from "../TapToLock";
@@ -83,6 +84,12 @@ export const GeneralSettings: React.FC = () => {
           icon={Volume2}
           tone="amber"
         />
+        {audioFeedbackEnabled && (
+          <SoundPicker
+            label={t("settings.sound.soundTheme.label")}
+            description={t("settings.sound.soundTheme.description")}
+          />
+        )}
         <MoreOptions>
           <MuteWhileRecording
             descriptionMode="tooltip"

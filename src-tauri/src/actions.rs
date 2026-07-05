@@ -34,6 +34,11 @@ struct RecordingErrorEvent {
 struct FinishGuard(AppHandle);
 impl Drop for FinishGuard {
     fn drop(&mut self) {
+        // The whole pipeline (recording + transcription + any assistant
+        // generation) is done, so drop the cancel shortcut here rather than at
+        // recording-stop. Keeping it registered through generation is what lets
+        // Esc abort a streaming assistant answer, not just a recording.
+        shortcut::unregister_cancel_shortcut(&self.0);
         if let Some(c) = self.0.try_state::<TranscriptionCoordinator>() {
             c.notify_processing_finished();
         }
@@ -84,32 +89,49 @@ fn prewarm_builtin_llm(app: &AppHandle, model: String) {
     });
 }
 
+/// Pick the provider + model used for dictation post-processing. Prefers the
+/// explicit post-process selection; when that isn't configured, falls back to
+/// the assistant's provider + model. The assistant and post-processing share
+/// the same provider catalog and API-key store, so this "just works" out of the
+/// box — and on the built-in local engine it reuses the model that's already
+/// loaded, avoiding a GGUF reload when the user bounces between chat and
+/// dictation. Returns `None` only when neither is configured.
+fn resolve_post_process_provider_and_model(
+    settings: &AppSettings,
+) -> Option<(crate::settings::PostProcessProvider, String)> {
+    if let Some(provider) = settings.active_post_process_provider() {
+        if let Some(model) = settings
+            .post_process_models
+            .get(&provider.id)
+            .filter(|m| !m.trim().is_empty())
+        {
+            return Some((provider.clone(), model.clone()));
+        }
+    }
+    // Fall back to the assistant's provider + model (shared catalog + keys).
+    let provider = settings.active_assistant_provider()?;
+    let model = settings
+        .assistant_models
+        .get(&provider.id)
+        .filter(|m| !m.trim().is_empty())?;
+    debug!("Post-processing reusing the assistant's provider/model (no dedicated fix model set)");
+    Some((provider.clone(), model.clone()))
+}
+
 async fn post_process_transcription(
     app: &AppHandle,
     settings: &AppSettings,
     transcription: &str,
 ) -> Option<String> {
-    let provider = match settings.active_post_process_provider().cloned() {
-        Some(provider) => provider,
+    let (provider, model) = match resolve_post_process_provider_and_model(settings) {
+        Some(pair) => pair,
         None => {
-            debug!("Post-processing enabled but no provider is selected");
+            debug!(
+                "Post-processing skipped: no dedicated fix model and no assistant model configured"
+            );
             return None;
         }
     };
-
-    let model = settings
-        .post_process_models
-        .get(&provider.id)
-        .cloned()
-        .unwrap_or_default();
-
-    if model.trim().is_empty() {
-        debug!(
-            "Post-processing skipped because provider '{}' has no model configured",
-            provider.id
-        );
-        return None;
-    }
 
     let selected_prompt_id = match &settings.post_process_selected_prompt_id {
         Some(id) => id.clone(),
@@ -185,10 +207,19 @@ async fn post_process_transcription(
         _ => (None, None),
     };
 
+    // Optional tone directive (formal/casual/…) layered onto the cleanup
+    // instructions so a single LLM call does cleanup + tone. `None` for the
+    // default (cleanup only, no rewording).
+    let tone_directive = settings.post_process_tone.directive();
+
     if provider.supports_structured_output {
         debug!("Using structured outputs for provider '{}'", provider.id);
 
-        let system_prompt = build_system_prompt(&prompt);
+        let mut system_prompt = build_system_prompt(&prompt);
+        if let Some(directive) = tone_directive {
+            system_prompt.push_str("\n\n");
+            system_prompt.push_str(directive);
+        }
         let user_content = transcription.to_string();
 
         // Handle Apple Intelligence separately since it uses native Swift APIs
@@ -303,7 +334,11 @@ async fn post_process_transcription(
     }
 
     // Legacy mode: Replace ${output} variable in the prompt with the actual text
-    let processed_prompt = prompt.replace("${output}", transcription);
+    let mut processed_prompt = prompt.replace("${output}", transcription);
+    if let Some(directive) = tone_directive {
+        processed_prompt.push_str("\n\n");
+        processed_prompt.push_str(directive);
+    }
     debug!("Processed prompt length: {} chars", processed_prompt.len());
 
     match crate::llm_client::send_chat_completion(
@@ -405,19 +440,38 @@ pub(crate) async fn process_transcription_output(
     }
 
     if post_process {
-        if let Some(processed_text) = post_process_transcription(app, &settings, &final_text).await
+        // Cap post-processing so a slow or stuck LLM can never hold up the
+        // paste. On timeout — or any failure inside — we fall through and paste
+        // the raw transcription, so the user never loses their words.
+        let timeout =
+            std::time::Duration::from_secs(settings.post_process_timeout_secs.max(1) as u64);
+        match tokio::time::timeout(
+            timeout,
+            post_process_transcription(app, &settings, &final_text),
+        )
+        .await
         {
-            post_processed_text = Some(processed_text.clone());
-            final_text = processed_text;
+            Ok(Some(processed_text)) => {
+                post_processed_text = Some(processed_text.clone());
+                final_text = processed_text;
 
-            if let Some(prompt_id) = &settings.post_process_selected_prompt_id {
-                if let Some(prompt) = settings
-                    .post_process_prompts
-                    .iter()
-                    .find(|prompt| &prompt.id == prompt_id)
-                {
-                    post_process_prompt = Some(prompt.prompt.clone());
+                if let Some(prompt_id) = &settings.post_process_selected_prompt_id {
+                    if let Some(prompt) = settings
+                        .post_process_prompts
+                        .iter()
+                        .find(|prompt| &prompt.id == prompt_id)
+                    {
+                        post_process_prompt = Some(prompt.prompt.clone());
+                    }
                 }
+            }
+            // Skipped or failed internally — keep the raw transcription.
+            Ok(None) => {}
+            Err(_) => {
+                warn!(
+                    "Post-processing timed out after {}s; pasting the raw transcription",
+                    settings.post_process_timeout_secs
+                );
             }
         }
     } else if final_text != transcription {
@@ -528,31 +582,23 @@ impl ShortcutAction for TranscribeAction {
                 recording_error = Some(e);
             }
         } else {
-            // On-demand mode: Start recording first, then play audio feedback, then apply mute
-            // This allows the microphone to be activated before playing the sound
-            debug!("On-demand mode: Starting recording first, then audio feedback");
+            // On-demand mode: open the mic + start capture, then immediately
+            // cue the user and apply mute. Playing the start sound the moment
+            // recording starts — rather than waiting a variable amount of time
+            // for the mic to warm up — keeps the feedback timing consistent and
+            // snappy. The cue's own duration naturally covers device warm-up
+            // before the user begins speaking, so first words aren't clipped.
+            debug!("On-demand mode: starting recording, then audio feedback");
             let recording_start_time = Instant::now();
             match rm.try_start_recording(&binding_id) {
                 Ok(()) => {
                     debug!("Recording started in {:?}", recording_start_time.elapsed());
-                    // Wait until the microphone is actually delivering audio
-                    // before cueing the user to speak. On a warm stream this
-                    // fires almost immediately; on a cold device (laptop
-                    // power-saving, USB/Bluetooth wake-up) it waits out the
-                    // warm-up so the first words aren't clipped. A short timeout
-                    // fallback guarantees a misbehaving device can never hang
-                    // the cue.
                     let app_clone = app.clone();
                     let rm_clone = Arc::clone(&rm);
+                    // The blocking helper exits immediately when audio feedback
+                    // is disabled, so we always reuse this thread to keep mute
+                    // sequenced right after the (possible) cue.
                     std::thread::spawn(move || {
-                        let ready =
-                            rm_clone.wait_for_capture_ready(std::time::Duration::from_millis(400));
-                        debug!(
-                            "Capture ready: {} — handling audio feedback/mute sequence",
-                            ready
-                        );
-                        // Helper handles disabled audio feedback by returning early, so we reuse it
-                        // to keep mute sequencing consistent in every mode.
                         play_feedback_sound_blocking(&app_clone, SoundType::Start);
                         rm_clone.apply_mute();
                     });
@@ -940,7 +986,10 @@ impl ShortcutAction for AssistantAction {
     }
 
     fn stop(&self, app: &AppHandle, binding_id: &str, _shortcut_str: &str) {
-        shortcut::unregister_cancel_shortcut(app);
+        // NOTE: the cancel shortcut is intentionally NOT unregistered here (as
+        // it is for dictation). It stays registered through transcription and
+        // the assistant's answer generation so Esc can stop a streaming reply;
+        // the pipeline's FinishGuard drops it when the whole turn completes.
         debug!("AssistantAction::stop called for binding: {}", binding_id);
 
         let ah = app.clone();

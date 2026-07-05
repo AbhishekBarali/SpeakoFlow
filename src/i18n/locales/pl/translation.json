@@ -18,6 +18,25 @@
     "about": "O programie"
   },
   "onboarding": {
+    "steps": {
+      "progress": "Krok {{current}} z {{total}}",
+      "counter": "Krok {{current}} z {{total}} · {{label}}",
+      "speechToText": "Transkrypcja",
+      "aiModel": "Model AI"
+    },
+    "speechToText": {
+      "title": "Wybierz model transkrypcji",
+      "subtitle": "Działa w całości na Twoim urządzeniu i zamienia głos na tekst. Wybierz model odpowiedni dla Twojego komputera — możesz go zmienić w dowolnej chwili."
+    },
+    "aiModel": {
+      "title": "Dodaj lokalny model AI",
+      "subtitle": "Napędza asystenta, podgląd ekranu i czyszczenie transkrypcji — działając całkowicie offline na Twoim urządzeniu. To opcjonalne; możesz też później podłączyć dostawcę w chmurze.",
+      "skip": "Pomiń na razie",
+      "skipHint": "Opcjonalne. Model możesz pobrać lub podłączyć dostawcę w chmurze w dowolnym momencie w Ustawieniach.",
+      "continue": "Kontynuuj",
+      "downloadingHint": "Twój model pobiera się w tle — możesz od razu zacząć korzystać z aplikacji.",
+      "downloadStarted": "Pobieranie modelu AI w tle."
+    },
     "subtitle": "Aby rozpocząć, wybierz model transkrypcji",
     "recommended": "Polecane",
     "download": "Pobierz",

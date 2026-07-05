@@ -291,13 +291,12 @@
       -10px 0 44px -22px rgba(15, 23, 42, 0.08);
   }
 
-  /* Frosted glass for floating menus / popovers (they overlay real content,
-   * so the blur is genuinely visible). Translucent white + a strong blur gives
-   * the minimalistic glassmorphism read. */
+  /* Floating menus / popovers overlay real content (settings rows, the chat),
+   * so they must be OPAQUE — a translucent fill let the rows underneath bleed
+   * through and made options hard to read. Depth comes from the border +
+   * shadow on the element itself, not from letting the background show. */
   .glass-menu {
-    background-color: color-mix(in srgb, var(--color-surface) 72%, transparent);
-    backdrop-filter: saturate(180%) blur(24px);
-    -webkit-backdrop-filter: saturate(180%) blur(24px);
+    background-color: var(--color-surface);
   }
 }
 
@@ -319,5 +318,5 @@
     -10px 0 48px -22px rgba(0, 0, 0, 0.55);
 }
 :root[data-theme="dark"] .glass-menu {
-  background-color: color-mix(in srgb, var(--color-surface) 80%, transparent);
+  background-color: var(--color-surface);
 }

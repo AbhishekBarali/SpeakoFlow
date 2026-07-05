@@ -14,6 +14,7 @@ import { TypingToolSetting } from "../TypingTool";
 import { ClipboardHandlingSetting } from "../ClipboardHandling";
 import { AutoSubmit } from "../AutoSubmit";
 import { PostProcessingToggle } from "../PostProcessingToggle";
+import { PostProcessTimeout } from "../PostProcessTimeout";
 import { AppendTrailingSpace } from "../AppendTrailingSpace";
 import { HistoryLimit } from "../HistoryLimit";
 import { RecordingRetentionPeriodSelector } from "../RecordingRetentionPeriod";
@@ -22,6 +23,7 @@ import { useSettings } from "../../../hooks/useSettings";
 import { KeyboardImplementationSelector } from "../debug/KeyboardImplementationSelector";
 import { AccelerationSelector } from "../AccelerationSelector";
 import { LazyStreamClose } from "../LazyStreamClose";
+import { AlwaysOnMicrophone } from "../AlwaysOnMicrophone";
 
 export const AdvancedSettings: React.FC = () => {
   const { t } = useTranslation();
@@ -73,7 +75,11 @@ export const AdvancedSettings: React.FC = () => {
 
       {experimentalEnabled && (
         <SettingsGroup title={t("settings.advanced.groups.experimental")}>
+          <AlwaysOnMicrophone descriptionMode="tooltip" grouped={true} />
           <PostProcessingToggle descriptionMode="tooltip" grouped={true} />
+          {getSetting("post_process_enabled") && (
+            <PostProcessTimeout descriptionMode="tooltip" grouped={true} />
+          )}
           <KeyboardImplementationSelector
             descriptionMode="tooltip"
             grouped={true}

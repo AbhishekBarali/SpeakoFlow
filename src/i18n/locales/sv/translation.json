@@ -18,6 +18,25 @@
     "about": "Om"
   },
   "onboarding": {
+    "steps": {
+      "progress": "Steg {{current}} av {{total}}",
+      "counter": "Steg {{current}} av {{total}} · {{label}}",
+      "speechToText": "Transkribering",
+      "aiModel": "AI-modell"
+    },
+    "speechToText": {
+      "title": "Välj en transkriberingsmodell",
+      "subtitle": "Detta körs helt på din enhet och omvandlar din röst till text. Välj den som passar din dator — du kan ändra den när som helst."
+    },
+    "aiModel": {
+      "title": "Lägg till en lokal AI-modell",
+      "subtitle": "Driver assistenten, skärmvisning och rensning av transkriberingar — helt offline på din enhet. Detta är valfritt; du kan även ansluta en molnleverantör senare.",
+      "skip": "Hoppa över tills vidare",
+      "skipHint": "Valfritt. Du kan ladda ner en modell eller ansluta en molnleverantör när som helst i Inställningar.",
+      "continue": "Fortsätt",
+      "downloadingHint": "Din modell laddas ner i bakgrunden — du kan börja använda appen direkt.",
+      "downloadStarted": "Laddar ner din AI-modell i bakgrunden."
+    },
     "subtitle": "För att komma igång, välj en transkriptionsmodell",
     "recommended": "Rekommenderat",
     "download": "Ladda ner",

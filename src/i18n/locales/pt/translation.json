@@ -18,6 +18,25 @@
     "about": "Sobre"
   },
   "onboarding": {
+    "steps": {
+      "progress": "Etapa {{current}} de {{total}}",
+      "counter": "Etapa {{current}} de {{total}} · {{label}}",
+      "speechToText": "Transcrição",
+      "aiModel": "Modelo de IA"
+    },
+    "speechToText": {
+      "title": "Escolha um modelo de transcrição",
+      "subtitle": "Isto é executado totalmente no seu dispositivo para transformar sua voz em texto. Escolha o que se adapta à sua máquina — você pode mudar a qualquer momento."
+    },
+    "aiModel": {
+      "title": "Adicionar um modelo de IA local",
+      "subtitle": "Alimenta o assistente, a visão de tela e a limpeza de transcrições — funcionando totalmente offline no seu dispositivo. Isto é opcional; você também pode conectar um provedor na nuvem mais tarde.",
+      "skip": "Ignorar por agora",
+      "skipHint": "Opcional. Você pode baixar um modelo ou conectar um provedor na nuvem a qualquer momento nas Configurações.",
+      "continue": "Continuar",
+      "downloadingHint": "Seu modelo está sendo baixado em segundo plano — você pode começar a usar o app imediatamente.",
+      "downloadStarted": "Baixando seu modelo de IA em segundo plano."
+    },
     "subtitle": "Para começar, escolha um modelo de transcrição",
     "recommended": "Recomendado",
     "download": "Baixar",

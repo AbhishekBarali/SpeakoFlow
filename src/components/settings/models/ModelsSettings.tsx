@@ -106,6 +106,13 @@ export const ModelsSettings: React.FC = () => {
     }
     const model = models.find((m: ModelInfo) => m.id === modelId);
     const category = model ? getModelCategory(model) : "stt";
+    // A model that isn't on disk can never be "active" — guard this first so a
+    // stale selection (e.g. an LLM download that failed after being chosen)
+    // shows as downloadable again instead of a dead-end "active" card with no
+    // way to (re)download it.
+    if (!model?.is_downloaded) {
+      return "downloadable";
+    }
     // STT uses the recording model; LLM uses the built-in assistant model.
     if (category === "stt" && modelId === currentModel) {
       return "active";
@@ -113,10 +120,7 @@ export const ModelsSettings: React.FC = () => {
     if (category === "llm" && modelId === activeLlmId) {
       return "active";
     }
-    if (model?.is_downloaded) {
-      return "available";
-    }
-    return "downloadable";
+    return "available";
   };
 
   const getDownloadProgress = (modelId: string): number | undefined => {
@@ -139,6 +143,13 @@ export const ModelsSettings: React.FC = () => {
     setSwitchingModelId(modelId);
     try {
       if (category === "llm") {
+        // Never point the assistant at a model that isn't on disk — that's the
+        // state that used to strand users. If somehow triggered for a missing
+        // model, download it instead of marking it active.
+        if (!model?.is_downloaded) {
+          await downloadModel(modelId);
+          return;
+        }
         // Assign the model to the built-in (local) assistant provider and make
         // that provider active, mirroring the footer LLM selector.
         await commands.changeAssistantModelSetting("builtin", modelId);

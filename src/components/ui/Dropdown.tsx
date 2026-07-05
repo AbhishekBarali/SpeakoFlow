@@ -69,8 +69,11 @@ export const Dropdown: React.FC<DropdownProps> = ({
         }`}
         onClick={handleToggle}
         disabled={disabled}
+        title={selectedOption?.label || placeholder}
       >
-        <span className="truncate">{selectedOption?.label || placeholder}</span>
+        <span className="truncate min-w-0">
+          {selectedOption?.label || placeholder}
+        </span>
         <svg
           className={`w-4 h-4 ms-2 transition-transform duration-200 ${isOpen ? "transform rotate-180" : ""}`}
           fill="none"
@@ -86,7 +89,7 @@ export const Dropdown: React.FC<DropdownProps> = ({
         </svg>
       </button>
       {isOpen && !disabled && (
-        <div className="absolute top-full left-0 right-0 mt-1.5 glass-menu border border-hairline rounded-xl shadow-lg z-50 max-h-60 overflow-y-auto p-1">
+        <div className="absolute top-full left-0 right-0 mt-1.5 glass-menu border border-hairline rounded-xl shadow-lg z-50 max-h-60 overflow-y-auto overflow-x-hidden p-1">
           {options.length === 0 ? (
             <div className="px-2.5 py-1.5 text-sm text-muted">
               {t("common.noOptionsFound")}
@@ -96,15 +99,16 @@ export const Dropdown: React.FC<DropdownProps> = ({
               <button
                 key={option.value}
                 type="button"
-                className={`w-full px-2.5 py-1.5 text-sm text-start rounded-lg hover:bg-surface-strong transition-colors duration-150 ${
+                className={`flex items-center w-full px-2.5 py-1.5 text-sm text-start rounded-lg overflow-hidden hover:bg-surface-strong transition-colors duration-150 ${
                   selectedValue === option.value
                     ? "bg-surface-strong font-medium"
                     : ""
                 } ${option.disabled ? "opacity-50 cursor-not-allowed" : ""}`}
                 onClick={() => handleSelect(option.value)}
                 disabled={option.disabled}
+                title={option.label}
               >
-                <span className="truncate">{option.label}</span>
+                <span className="truncate min-w-0 flex-1">{option.label}</span>
               </button>
             ))
           )}

@@ -401,8 +401,11 @@ fn register_all_shortcuts_for_implementation(
             continue;
         }
 
-        // Skip post-processing shortcut when the feature is disabled
-        if id == "transcribe_with_post_process" && !current_settings.post_process_enabled {
+        // Skip the post-processing shortcut unless BOTH Experimental Features
+        // and AI Correction are enabled (it lives under Experimental).
+        if id == "transcribe_with_post_process"
+            && (!current_settings.post_process_enabled || !current_settings.experimental_enabled)
+        {
             continue;
         }
 
@@ -550,13 +553,14 @@ pub fn change_audio_feedback_volume_setting(app: AppHandle, volume: f32) -> Resu
 pub fn change_sound_theme_setting(app: AppHandle, theme: String) -> Result<(), String> {
     let mut settings = settings::get_settings(&app);
     let parsed = match theme.as_str() {
+        "dictation" => SoundTheme::Dictation,
         "marimba" => SoundTheme::Marimba,
         "pop" => SoundTheme::Pop,
         "click" => SoundTheme::Click,
         "custom" => SoundTheme::Custom,
         other => {
-            warn!("Invalid sound theme '{}', defaulting to marimba", other);
-            SoundTheme::Marimba
+            warn!("Invalid sound theme '{}', defaulting to dictation", other);
+            SoundTheme::Dictation
         }
     };
     settings.sound_theme = parsed;
@@ -604,6 +608,7 @@ pub fn change_theme_setting(app: AppHandle, theme: String) -> Result<(), String>
 pub fn change_ui_text_size_setting(app: AppHandle, size: String) -> Result<(), String> {
     let mut settings = settings::get_settings(&app);
     let parsed = match size.as_str() {
+        "small" => UiTextSize::Small,
         "default" => UiTextSize::Default,
         "large" => UiTextSize::Large,
         "extra_large" => UiTextSize::ExtraLarge,
@@ -946,13 +951,14 @@ pub fn change_post_process_enabled_setting(app: AppHandle, enabled: bool) -> Res
     settings.post_process_enabled = enabled;
     settings::write_settings(&app, settings.clone());
 
-    // Register or unregister the post-processing shortcut
+    // AI Correction lives under Experimental, so its hotkey is only active when
+    // BOTH toggles are on.
     if let Some(binding) = settings
         .bindings
         .get("transcribe_with_post_process")
         .cloned()
     {
-        if enabled {
+        if enabled && settings.experimental_enabled {
             let _ = register_shortcut(&app, binding);
         } else {
             let _ = unregister_shortcut(&app, binding);
@@ -964,10 +970,57 @@ pub fn change_post_process_enabled_setting(app: AppHandle, enabled: bool) -> Res
 
 #[tauri::command]
 #[specta::specta]
+pub fn change_post_process_tone_setting(app: AppHandle, tone: String) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    settings.post_process_tone = match tone.as_str() {
+        "none" => crate::settings::PostProcessTone::None,
+        "formal" => crate::settings::PostProcessTone::Formal,
+        "casual" => crate::settings::PostProcessTone::Casual,
+        "professional" => crate::settings::PostProcessTone::Professional,
+        "friendly" => crate::settings::PostProcessTone::Friendly,
+        "concise" => crate::settings::PostProcessTone::Concise,
+        other => {
+            warn!("Invalid post-process tone '{}', defaulting to none", other);
+            crate::settings::PostProcessTone::None
+        }
+    };
+    settings::write_settings(&app, settings);
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn change_post_process_timeout_setting(app: AppHandle, seconds: u32) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    // Clamp to a sane range: long enough to allow a model load + short reply,
+    // short enough that a stall still falls back promptly.
+    settings.post_process_timeout_secs = seconds.clamp(2, 120);
+    settings::write_settings(&app, settings);
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
 pub fn change_experimental_enabled_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
     let mut settings = settings::get_settings(&app);
     settings.experimental_enabled = enabled;
-    settings::write_settings(&app, settings);
+    settings::write_settings(&app, settings.clone());
+
+    // Keep the AI Correction hotkey in sync: it's active only when BOTH
+    // Experimental Features and AI Correction are enabled. Turning Experimental
+    // off therefore also stops the post-processing hotkey from firing.
+    if let Some(binding) = settings
+        .bindings
+        .get("transcribe_with_post_process")
+        .cloned()
+    {
+        if enabled && settings.post_process_enabled {
+            let _ = register_shortcut(&app, binding);
+        } else {
+            let _ = unregister_shortcut(&app, binding);
+        }
+    }
+
     Ok(())
 }
 

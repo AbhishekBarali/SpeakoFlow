@@ -25,6 +25,7 @@ export const TextSizeSelector: React.FC<TextSizeSelectorProps> = React.memo(
     const current = (settings?.ui_text_size ?? "default") as UiTextSize;
 
     const options = [
+      { value: "small", label: t("appearance.textSizeSmall") },
       { value: "default", label: t("appearance.textSizeDefault") },
       { value: "large", label: t("appearance.textSizeLarge") },
       { value: "extra_large", label: t("appearance.textSizeExtraLarge") },

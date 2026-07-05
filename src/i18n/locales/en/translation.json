@@ -7,6 +7,7 @@
     "dark": "Dark",
     "textSize": "Text size",
     "textSizeDescription": "Scale the size of text and controls across the app.",
+    "textSizeSmall": "Small",
     "textSizeDefault": "Default",
     "textSizeLarge": "Large",
     "textSizeExtraLarge": "Extra large"
@@ -51,6 +52,30 @@
   },
   "onboarding": {
     "subtitle": "To get started, choose a transcription model",
+    "steps": {
+      "progress": "Step {{current}} of {{total}}",
+      "counter": "Step {{current}} of {{total}} · {{label}}",
+      "speechToText": "Speech-to-text",
+      "aiModel": "AI model"
+    },
+    "speechToText": {
+      "title": "Choose a speech-to-text model",
+      "subtitle": "This runs fully on your device to turn your voice into text. Pick the one that fits your machine — you can change it anytime.",
+      "installedHint": "You already have a model installed — skip the download.",
+      "useInstalled": "Use installed model"
+    },
+    "aiModel": {
+      "title": "Add a local AI model",
+      "subtitle": "Powers the assistant, screen vision, and transcript cleanup — running fully offline on your machine. This is optional; you can also connect a cloud provider later.",
+      "skip": "Skip for now",
+      "skipHint": "Optional. You can download a model or connect a cloud provider anytime in Settings.",
+      "continue": "Continue",
+      "downloadingHint": "Your model is downloading in the background — you can start using the app right away.",
+      "downloadStarted": "Downloading your AI model in the background."
+    },
+    "errors": {
+      "selectModel": "Couldn't select that model. Please try again."
+    },
     "recommended": "Recommended",
     "download": "Download",
     "downloading": "Downloading...",
@@ -375,6 +400,12 @@
         "label": "Audio Feedback",
         "description": "Play a sound when recording starts and stops"
       },
+      "soundTheme": {
+        "label": "Feedback Sound",
+        "description": "Choose the start/stop cue played during dictation",
+        "default": "Default",
+        "preview": "Preview sound (plays start then stop)"
+      },
       "outputDevice": {
         "title": "Output Device",
         "description": "Select your preferred audio output device for feedback sounds",
@@ -394,7 +425,18 @@
         "transcription": "Transcription",
         "textReplacements": "Text Replacements",
         "history": "History",
+        "aiCorrection": "AI Correction",
         "experimental": "Experimental"
+      },
+      "aiCorrection": {
+        "label": "AI Correction (in development)",
+        "description": "Experimental: clean up dictation with an LLM. Rough and unpolished — off by default.",
+        "info": "Runs an LLM over your dictation to fix punctuation, remove filler words, and optionally adjust the tone. Applies to dictation only (not the assistant chat) and runs on its own hotkey. It adds a delay since the LLM runs after transcription; if the LLM fails or times out, your raw text is pasted instead. Uses your assistant's model by default. This feature is still in development — you can't yet pick a built-in local model from its own list, and it needs more tuning before it's a main feature."
+      },
+      "postProcessTimeout": {
+        "title": "AI Correction timeout",
+        "description": "How long to wait for the LLM before giving up and pasting your raw transcription instead. On the built-in local model, allow enough time for it to load on first use.",
+        "seconds": "{{seconds}} seconds"
       },
       "experimentalToggle": {
         "label": "Experimental Features",
@@ -540,6 +582,18 @@
       "title": "Post Process",
       "hotkey": {
         "title": "Hotkey"
+      },
+      "tone": {
+        "title": "Tone",
+        "description": "Optionally rewrite your corrected dictation in a chosen tone. \"None\" just cleans up the text without changing the wording.",
+        "options": {
+          "none": "None (cleanup only)",
+          "formal": "Formal",
+          "casual": "Casual",
+          "professional": "Professional",
+          "friendly": "Friendly",
+          "concise": "Concise"
+        }
       },
       "api": {
         "title": "API (OpenAI Compatible)",
@@ -935,6 +989,10 @@
         "testing": "Testing…",
         "testOk": "Played ✓",
         "testPhrase": "Hi! This is a test of SpeakoFlow's voice output.",
+        "downloadStart": "Downloading Kokoro voice…",
+        "downloadProgress": "Downloading Kokoro voice… {{progress}}%",
+        "downloadReady": "Kokoro voice ready ✓",
+        "downloadError": "Couldn't download the Kokoro voice model",
         "baseUrlLabel": "TTS Base URL",
         "baseUrlDescription": "OpenAI-compatible TTS endpoint. A base URL or a full /audio/speech URL both work.",
         "azureBaseUrlLabel": "Speech Endpoint",
