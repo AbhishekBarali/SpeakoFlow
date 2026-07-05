@@ -447,6 +447,11 @@ pub fn init_shortcuts(app: &AppHandle) -> Result<(), String> {
             .cloned()
             .unwrap_or(default_binding);
 
+        // An empty binding means "disabled" — nothing to register.
+        if binding.current_binding.trim().is_empty() {
+            continue;
+        }
+
         if let Err(e) = state.register(&binding) {
             error!(
                 "Failed to register handy-keys shortcut {} during init: {}",
@@ -474,6 +479,10 @@ pub fn register_cancel_shortcut(app: &AppHandle) {
         let app_clone = app.clone();
         tauri::async_runtime::spawn(async move {
             if let Some(cancel_binding) = get_settings(&app_clone).bindings.get("cancel").cloned() {
+                // Empty binding = cancel shortcut disabled.
+                if cancel_binding.current_binding.trim().is_empty() {
+                    return;
+                }
                 if let Some(state) = app_clone.try_state::<HandyKeysState>() {
                     if let Err(e) = state.register(&cancel_binding) {
                         error!("Failed to register cancel shortcut: {}", e);
@@ -507,6 +516,10 @@ pub fn unregister_cancel_shortcut(app: &AppHandle) {
 
 /// Register a shortcut
 pub fn register_shortcut(app: &AppHandle, binding: ShortcutBinding) -> Result<(), String> {
+    // An empty binding means "disabled" — nothing to register.
+    if binding.current_binding.trim().is_empty() {
+        return Ok(());
+    }
     let state = app
         .try_state::<HandyKeysState>()
         .ok_or("HandyKeysState not initialized")?;
@@ -515,6 +528,9 @@ pub fn register_shortcut(app: &AppHandle, binding: ShortcutBinding) -> Result<()
 
 /// Unregister a shortcut
 pub fn unregister_shortcut(app: &AppHandle, binding: ShortcutBinding) -> Result<(), String> {
+    if binding.current_binding.trim().is_empty() {
+        return Ok(());
+    }
     let state = app
         .try_state::<HandyKeysState>()
         .ok_or("HandyKeysState not initialized")?;

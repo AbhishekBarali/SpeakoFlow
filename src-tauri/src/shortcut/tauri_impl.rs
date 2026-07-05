@@ -36,6 +36,11 @@ pub fn init_shortcuts(app: &AppHandle) {
             .cloned()
             .unwrap_or(default_binding);
 
+        // An empty binding means "disabled" — nothing to register.
+        if binding.current_binding.trim().is_empty() {
+            continue;
+        }
+
         if let Err(e) = register_shortcut(app, binding) {
             error!("Failed to register shortcut {} during init: {}", id, e);
         }
@@ -74,6 +79,10 @@ pub fn validate_shortcut(raw: &str) -> Result<(), String> {
 
 /// Register a shortcut using Tauri's global-shortcut plugin.
 pub fn register_shortcut(app: &AppHandle, binding: ShortcutBinding) -> Result<(), String> {
+    // An empty binding means "disabled" — nothing to register.
+    if binding.current_binding.trim().is_empty() {
+        return Ok(());
+    }
     register_one(app, &binding.id, &binding.current_binding)
 }
 
@@ -131,6 +140,9 @@ fn register_one(app: &AppHandle, binding_id: &str, hotkey: &str) -> Result<(), S
 
 /// Unregister a shortcut from Tauri's global-shortcut plugin.
 pub fn unregister_shortcut(app: &AppHandle, binding: ShortcutBinding) -> Result<(), String> {
+    if binding.current_binding.trim().is_empty() {
+        return Ok(());
+    }
     unregister_one(app, &binding.current_binding)
 }
 
@@ -171,6 +183,10 @@ pub fn register_cancel_shortcut(app: &AppHandle) {
         let app_clone = app.clone();
         tauri::async_runtime::spawn(async move {
             if let Some(cancel_binding) = get_settings(&app_clone).bindings.get("cancel").cloned() {
+                // Empty binding = cancel shortcut disabled.
+                if cancel_binding.current_binding.trim().is_empty() {
+                    return;
+                }
                 if let Err(e) = register_shortcut(&app_clone, cancel_binding) {
                     error!("Failed to register cancel shortcut: {}", e);
                 }

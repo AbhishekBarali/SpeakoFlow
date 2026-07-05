@@ -136,6 +136,13 @@ keyring = { version = "3", features = [
 tauri-runtime = { git = "https://github.com/cjpais/tauri.git", branch = "handy-2.10.2" }
 tauri-runtime-wry = { git = "https://github.com/cjpais/tauri.git", branch = "handy-2.10.2" }
 tauri-utils = { git = "https://github.com/cjpais/tauri.git", branch = "handy-2.10.2" }
+# Vendored handy-keys with a fix for OS-level stuck keys on Windows: the
+# low-level hook now blocks a key's UP (and auto-repeats) if-and-only-if it
+# blocked that key's DOWN, instead of re-evaluating the hotkey match per event.
+# Re-evaluating desyncs down/up whenever modifiers change mid-press (sloppy
+# press order, tap-to-lock Shift taps, hotkeys registered mid-hold) and left
+# keys "pressed forever" system-wide. See vendor/handy-keys/src/platform/windows/listener.rs.
+handy-keys = { path = "vendor/handy-keys" }
 
 [dev-dependencies]
 tempfile = "3"

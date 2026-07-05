@@ -1507,14 +1507,23 @@ fn default_tap_to_lock() -> bool {
 }
 
 fn default_tap_to_lock_key() -> String {
+    // Windows: Space — the record shortcuts are modifier-only (ctrl_left+super
+    // / ctrl_left+alt), so Space is free and is the most natural "lock it" tap.
+    #[cfg(target_os = "windows")]
+    return "space".to_string();
+    #[cfg(not(target_os = "windows"))]
     "shift".to_string()
 }
 
 fn default_assistant_tap_to_lock_key() -> String {
-    // Shift, not Space: the default assistant shortcut (e.g. ctrl+alt+space)
-    // already holds Space, and a lock key that overlaps the record shortcut
-    // can't work (the held key would instantly lock it). Shift sits outside
-    // every default record shortcut, so tap-to-lock works out of the box.
+    // Windows: Space (see default_tap_to_lock_key — record combos are
+    // modifier-only there, so Space can't overlap the held shortcut).
+    #[cfg(target_os = "windows")]
+    return "space".to_string();
+    // Elsewhere: Shift, not Space — the default assistant shortcut (e.g.
+    // option+ctrl+space) already holds Space, and a lock key that overlaps the
+    // record shortcut can't work (the held key would instantly lock it).
+    #[cfg(not(target_os = "windows"))]
     "shift".to_string()
 }
 
@@ -1774,8 +1783,11 @@ fn ensure_post_process_defaults(settings: &mut AppSettings) -> bool {
 pub const SETTINGS_STORE_PATH: &str = "settings_store.json";
 
 pub fn get_default_settings() -> AppSettings {
+    // Windows: modifier-only push-to-talk (hold Left Ctrl + Win to dictate,
+    // tap Space to lock hands-free). Keeps letter/space keys free and can't
+    // collide with in-app text shortcuts.
     #[cfg(target_os = "windows")]
-    let default_shortcut = "ctrl+space";
+    let default_shortcut = "ctrl_left+super";
     #[cfg(target_os = "macos")]
     let default_shortcut = "option+space";
     #[cfg(target_os = "linux")]
@@ -1821,14 +1833,22 @@ pub fn get_default_settings() -> AppSettings {
             id: "cancel".to_string(),
             name: "Cancel".to_string(),
             description: "Cancels the current recording.".to_string(),
-            default_binding: "escape".to_string(),
-            current_binding: "escape".to_string(),
+            // Disabled by default: a global Esc cancel swallows Esc presses
+            // meant for other apps (closing dialogs/menus) whenever a recording
+            // or assistant reply is active. Users can record a key to enable it.
+            default_binding: "".to_string(),
+            current_binding: "".to_string(),
         },
     );
 
     #[cfg(target_os = "macos")]
     let default_assistant_shortcut = "option+ctrl+space";
-    #[cfg(not(target_os = "macos"))]
+    // Windows: modifier-only hold (Left Ctrl + Left Alt), tap Space to go
+    // hands-free. Left-side keys specifically: AltGr on international layouts
+    // reports as Left Ctrl + Right Alt, which must NOT start the assistant.
+    #[cfg(target_os = "windows")]
+    let default_assistant_shortcut = "ctrl_left+alt_left";
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
     let default_assistant_shortcut = "ctrl+alt+space";
 
     bindings.insert(
@@ -1851,7 +1871,12 @@ pub fn get_default_settings() -> AppSettings {
 
     #[cfg(target_os = "macos")]
     let default_panel_toggle_shortcut = "option+ctrl+a";
-    #[cfg(not(target_os = "macos"))]
+    // Windows: must NOT contain the assistant's modifier-only combo
+    // (ctrl_left+alt) as a subset, or opening the panel would also start an
+    // assistant recording. Ctrl+Shift+A stays clear of both recording combos.
+    #[cfg(target_os = "windows")]
+    let default_panel_toggle_shortcut = "ctrl+shift+a";
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
     let default_panel_toggle_shortcut = "ctrl+alt+a";
 
     bindings.insert(
@@ -2293,6 +2318,40 @@ pub fn load_or_create_app_settings(app: &AppHandle) -> AppSettings {
                 debug!("Found existing settings: {:?}", settings);
                 let default_settings = get_default_settings();
                 let mut updated = false;
+
+                // Migrate bindings still sitting on an older release's default
+                // to the current default. Customized bindings are left alone,
+                // but their "reset" target (default_binding) is refreshed.
+                // Covers the Esc-cancel removal and the Windows modifier-only
+                // remap (transcribe/assistant/panel toggle).
+                for (key, code_default) in &default_settings.bindings {
+                    if let Some(stored) = settings.bindings.get_mut(key) {
+                        if stored.default_binding != code_default.default_binding {
+                            if stored.current_binding == stored.default_binding {
+                                debug!(
+                                    "Migrating '{}' binding default: '{}' -> '{}'",
+                                    key, stored.default_binding, code_default.default_binding
+                                );
+                                stored.current_binding = code_default.default_binding.clone();
+                            }
+                            stored.default_binding = code_default.default_binding.clone();
+                            updated = true;
+                        }
+                    }
+                }
+                // The Windows tap-to-lock default moved from Shift to Space
+                // alongside the modifier-only record combos.
+                #[cfg(target_os = "windows")]
+                {
+                    if settings.tap_to_lock_key == "shift" {
+                        settings.tap_to_lock_key = "space".to_string();
+                        updated = true;
+                    }
+                    if settings.assistant_tap_to_lock_key == "shift" {
+                        settings.assistant_tap_to_lock_key = "space".to_string();
+                        updated = true;
+                    }
+                }
 
                 // Merge default bindings into existing settings
                 for (key, value) in default_settings.bindings {

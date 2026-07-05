@@ -117,8 +117,9 @@ pub fn change_binding(
     id: String,
     binding: String,
 ) -> Result<BindingResponse, String> {
-    // Reject empty bindings — every shortcut should have a value
-    if binding.trim().is_empty() {
+    // Reject empty bindings — every shortcut should have a value. Exception:
+    // the cancel binding may be empty, which disables it (its default).
+    if binding.trim().is_empty() && id != "cancel" {
         return Err("Binding cannot be empty".to_string());
     }
 

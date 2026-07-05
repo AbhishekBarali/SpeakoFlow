@@ -810,7 +810,7 @@
       },
       "tapToLock": {
         "label": "Tap to Lock",
-        "info": "While holding the assistant shortcut, tap this to lock hands-free so you can let go and keep talking. Defaults to Shift. Pick a key that isn't part of your assistant shortcut (one that overlaps, like Space when the shortcut is Ctrl+Alt+Space, is ignored), or clear it to turn this off.",
+        "info": "While holding the assistant shortcut, tap this to lock hands-free so you can let go and keep talking. Pick a key that isn't part of your assistant shortcut (one that overlaps is ignored), or clear it to turn this off.",
         "off": "Off",
         "clear": "Clear"
       },
