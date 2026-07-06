@@ -53,6 +53,7 @@ export const AdvancedSettings: React.FC = () => {
       </SettingsGroup>
 
       <SettingsGroup title={t("settings.advanced.groups.transcription")}>
+        <AlwaysOnMicrophone descriptionMode="tooltip" grouped={true} />
         <CustomWords descriptionMode="tooltip" grouped />
         <MoreOptions>
           <AppendTrailingSpace descriptionMode="tooltip" grouped={true} />
@@ -75,7 +76,6 @@ export const AdvancedSettings: React.FC = () => {
 
       {experimentalEnabled && (
         <SettingsGroup title={t("settings.advanced.groups.experimental")}>
-          <AlwaysOnMicrophone descriptionMode="tooltip" grouped={true} />
           <PostProcessingToggle descriptionMode="tooltip" grouped={true} />
           {getSetting("post_process_enabled") && (
             <PostProcessTimeout descriptionMode="tooltip" grouped={true} />
