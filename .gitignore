@@ -58,3 +58,17 @@ graphify-out/*
 
 # Firecrawl MCP diagnostic scratch files (may contain API keys)
 .fc_*
+
+# Internal marketing/testing website — kept out of the app repo
+speakoflow-website/
+
+# Demo / marketing capture tooling (not shipped, regenerable, dev-only).
+# The capture harness, its config, the demo-only entry points, and the
+# generated screenshots are all kept out of the public repo.
+demo-assets/
+demo-capture/
+playwright.capture.config.ts
+src/assistant/panel-demo.html
+src/assistant/panel-demo.tsx
+src/overlay/preview.html
+src/overlay/preview.tsx

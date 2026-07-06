@@ -75,8 +75,7 @@ Before any code, lock these down — several tasks depend on them:
   `com.abhishekbarali.speakoflow`). This is the keychain service name in
   `secret_store.rs` and the app-data folder, so pick the final value **once**;
   changing it later orphans users' saved keys and settings.
-- **First public version:** currently `0.8.3`. Decide `0.1.0` (honest "early")
-  or `1.0.0` (confident). Set in `tauri.conf.json` + `Cargo.toml` + `package.json`.
+- **First public version:** currently `1.0.0`. Set in `tauri.conf.json` + `Cargo.toml` + `package.json`.
 - **Code signing:** you cannot use cjpais's cert (it's in `signCommand`). Decide:
   ship unsigned (document SmartScreen/Gatekeeper warnings), or self-sign, or
   buy a cert later. This gates the installer track.

@@ -32,7 +32,7 @@ The moving parts, all wired up in this repo:
    `/releases/latest/download/<asset>` path always serves the asset from the
    release currently marked **Latest**.
 3. The plugin compares `latest.json`'s `version` to the running app version
-   (`0.8.3` today, from `Cargo.toml` / `tauri.conf.json` / `package.json`).
+   (`1.0.0` today, from `Cargo.toml` / `tauri.conf.json` / `package.json`).
 4. If newer, the matching platform entry's installer is downloaded, its
    `signature` is **verified against `pubkey`**, then installed; the app relaunches.
 
@@ -99,7 +99,7 @@ exist), so releases are produced manually. A CI recommendation is in §8.
 - `src-tauri/Cargo.toml` → `[package] version`
 - `package.json` → `version`
 
-(Today all three read `0.8.3`. Bump to e.g. `0.8.4`.)
+(Today all three read `1.0.0`. Bump to e.g. `1.0.1`.)
 
 ### 3.2 Build signed artifacts
 
