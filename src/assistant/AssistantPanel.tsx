@@ -1225,21 +1225,6 @@ const AssistantPanel: React.FC = () => {
               {isWorkingPhase && (
                 <Loader2 size={12} strokeWidth={2.5} className="apill-spin" />
               )}
-              {/* Stop: a clear, always-visible square while the assistant is
-                  thinking, searching, or speaking, so the turn can be stopped
-                  without hunting for a hover-only control. During voice capture
-                  (listening/transcribing) the hover ✗ cancels instead. */}
-              {showStop && !isListening && state !== "transcribing" && (
-                <button
-                  className="apill-btn danger apill-stop"
-                  onClick={stopTurn}
-                  onMouseDown={stopDrag}
-                  title={t("assistant.stop")}
-                  aria-label={t("assistant.stop")}
-                >
-                  <Square size={11} strokeWidth={2.75} />
-                </button>
-              )}
               <div className="apill-reveal quick">
                 <button
                   className="apill-btn"
@@ -1250,6 +1235,22 @@ const AssistantPanel: React.FC = () => {
                 >
                   <Maximize2 size={11} strokeWidth={2.25} />
                 </button>
+                {/* Stop: revealed on hover so the resting pill stays a calm
+                    "playing" wave (speaker + waveform). Hovering while the
+                    assistant is thinking, searching, or speaking exposes the
+                    square to stop the turn. During voice capture
+                    (listening/transcribing) the ✗ below cancels instead. */}
+                {showStop && !isListening && state !== "transcribing" && (
+                  <button
+                    className="apill-btn danger apill-stop"
+                    onClick={stopTurn}
+                    onMouseDown={stopDrag}
+                    title={t("assistant.stop")}
+                    aria-label={t("assistant.stop")}
+                  >
+                    <Square size={11} strokeWidth={2.75} />
+                  </button>
+                )}
                 {(isListening || state === "transcribing") && (
                   <button
                     className="apill-btn danger"
