@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { RefreshCcw } from "lucide-react";
 import { commands, type PostProcessTone } from "@/bindings";
@@ -13,6 +13,8 @@ import {
 import { Button } from "../../ui/Button";
 import { ResetButton } from "../../ui/ResetButton";
 import { Input } from "../../ui/Input";
+import { useModelStore } from "@/stores/modelStore";
+import { getModelCategory } from "@/lib/utils/modelCategory";
 
 import { ProviderSelect } from "../PostProcessingSettingsApi/ProviderSelect";
 import { BaseUrlField } from "../PostProcessingSettingsApi/BaseUrlField";
@@ -20,11 +22,24 @@ import { ApiKeyField } from "../PostProcessingSettingsApi/ApiKeyField";
 import { ModelSelect } from "../PostProcessingSettingsApi/ModelSelect";
 import { usePostProcessProviderState } from "../PostProcessingSettingsApi/usePostProcessProviderState";
 import { ShortcutInput } from "../ShortcutInput";
+import { PostProcessingToggle } from "../PostProcessingToggle";
+import { PostProcessTimeout } from "../PostProcessTimeout";
 import { useSettings } from "../../../hooks/useSettings";
 
 const PostProcessingSettingsApiComponent: React.FC = () => {
   const { t } = useTranslation();
   const state = usePostProcessProviderState();
+
+  // Built-in (Local) provider: no API key, and the model is picked from the
+  // LLMs already downloaded in the Models tab — never a hand-typed name or an
+  // API key. Mirrors the Assistant provider UI so the two behave identically.
+  const isBuiltin = state.selectedProvider?.id === "builtin";
+  const { models } = useModelStore();
+  const llmModels = useMemo(
+    () =>
+      models.filter((m) => getModelCategory(m) === "llm" && m.is_downloaded),
+    [models],
+  );
 
   return (
     <>
@@ -52,7 +67,7 @@ const PostProcessingSettingsApiComponent: React.FC = () => {
         ) : null
       ) : (
         <>
-          {state.selectedProvider?.id === "custom" && (
+          {state.selectedProvider?.allow_base_url_edit && (
             <SettingContainer
               title={t("settings.postProcessing.api.baseUrl.title")}
               description={t("settings.postProcessing.api.baseUrl.description")}
@@ -74,71 +89,106 @@ const PostProcessingSettingsApiComponent: React.FC = () => {
             </SettingContainer>
           )}
 
+          {!isBuiltin && (
+            <SettingContainer
+              title={t("settings.postProcessing.api.apiKey.title")}
+              description={t("settings.postProcessing.api.apiKey.description")}
+              descriptionMode="tooltip"
+              layout="horizontal"
+              grouped={true}
+            >
+              <div className="flex items-center gap-2">
+                <ApiKeyField
+                  value={state.apiKey}
+                  onBlur={state.handleApiKeyChange}
+                  placeholder={t(
+                    "settings.postProcessing.api.apiKey.placeholder",
+                  )}
+                  disabled={state.isApiKeyUpdating}
+                  className="min-w-[320px]"
+                />
+              </div>
+            </SettingContainer>
+          )}
+        </>
+      )}
+
+      {!state.isAppleProvider &&
+        (isBuiltin ? (
           <SettingContainer
-            title={t("settings.postProcessing.api.apiKey.title")}
-            description={t("settings.postProcessing.api.apiKey.description")}
+            title={t("settings.postProcessing.api.model.title")}
+            description={t("settings.postProcessing.api.builtin.modelDescription")}
             descriptionMode="tooltip"
             layout="horizontal"
             grouped={true}
           >
-            <div className="flex items-center gap-2">
-              <ApiKeyField
-                value={state.apiKey}
-                onBlur={state.handleApiKeyChange}
-                placeholder={t(
-                  "settings.postProcessing.api.apiKey.placeholder",
-                )}
-                disabled={state.isApiKeyUpdating}
-                className="min-w-[320px]"
-              />
+            <div className="flex flex-col items-end gap-1">
+              {llmModels.length > 0 ? (
+                <Dropdown
+                  options={llmModels.map((m) => ({
+                    value: m.id,
+                    label: m.name,
+                  }))}
+                  selectedValue={state.model}
+                  onSelect={(value) => state.handleModelSelect(value)}
+                  placeholder={t(
+                    "settings.postProcessing.api.builtin.modelPlaceholder",
+                  )}
+                  className="min-w-[320px]"
+                />
+              ) : (
+                <span className="text-xs text-mid-gray/70 max-w-[360px] text-right">
+                  {t("settings.postProcessing.api.builtin.noModels")}
+                </span>
+              )}
+              <span className="text-xs text-mid-gray/70 max-w-[360px] text-right">
+                {t("settings.postProcessing.api.builtin.ready")}
+              </span>
             </div>
           </SettingContainer>
-        </>
-      )}
-
-      {!state.isAppleProvider && (
-        <SettingContainer
-          title={t("settings.postProcessing.api.model.title")}
-          description={
-            state.isCustomProvider
-              ? t("settings.postProcessing.api.model.descriptionCustom")
-              : t("settings.postProcessing.api.model.descriptionDefault")
-          }
-          descriptionMode="tooltip"
-          layout="stacked"
-          grouped={true}
-        >
-          <div className="flex items-center gap-2">
-            <ModelSelect
-              value={state.model}
-              options={state.modelOptions}
-              disabled={state.isModelUpdating}
-              isLoading={state.isFetchingModels}
-              placeholder={
-                state.modelOptions.length > 0
-                  ? t(
-                      "settings.postProcessing.api.model.placeholderWithOptions",
-                    )
-                  : t("settings.postProcessing.api.model.placeholderNoOptions")
-              }
-              onSelect={state.handleModelSelect}
-              onCreate={state.handleModelCreate}
-              onBlur={() => {}}
-              className="flex-1 min-w-[380px]"
-            />
-            <ResetButton
-              onClick={state.handleRefreshModels}
-              disabled={state.isFetchingModels}
-              ariaLabel={t("settings.postProcessing.api.model.refreshModels")}
-              className="flex h-10 w-10 items-center justify-center"
-            >
-              <RefreshCcw
-                className={`h-4 w-4 ${state.isFetchingModels ? "animate-spin" : ""}`}
+        ) : (
+          <SettingContainer
+            title={t("settings.postProcessing.api.model.title")}
+            description={
+              state.isCustomProvider
+                ? t("settings.postProcessing.api.model.descriptionCustom")
+                : t("settings.postProcessing.api.model.descriptionDefault")
+            }
+            descriptionMode="tooltip"
+            layout="stacked"
+            grouped={true}
+          >
+            <div className="flex items-center gap-2">
+              <ModelSelect
+                value={state.model}
+                options={state.modelOptions}
+                disabled={state.isModelUpdating}
+                isLoading={state.isFetchingModels}
+                placeholder={
+                  state.modelOptions.length > 0
+                    ? t(
+                        "settings.postProcessing.api.model.placeholderWithOptions",
+                      )
+                    : t("settings.postProcessing.api.model.placeholderNoOptions")
+                }
+                onSelect={state.handleModelSelect}
+                onCreate={state.handleModelCreate}
+                onBlur={() => {}}
+                className="flex-1 min-w-[380px]"
               />
-            </ResetButton>
-          </div>
-        </SettingContainer>
-      )}
+              <ResetButton
+                onClick={state.handleRefreshModels}
+                disabled={state.isFetchingModels}
+                ariaLabel={t("settings.postProcessing.api.model.refreshModels")}
+                className="flex h-10 w-10 items-center justify-center"
+              >
+                <RefreshCcw
+                  className={`h-4 w-4 ${state.isFetchingModels ? "animate-spin" : ""}`}
+                />
+              </ResetButton>
+            </div>
+          </SettingContainer>
+        ))}
     </>
   );
 };
@@ -467,9 +517,18 @@ PostProcessingTone.displayName = "PostProcessingTone";
 
 export const PostProcessingSettings: React.FC = () => {
   const { t } = useTranslation();
+  const { getSetting } = useSettings();
+  const enabled = getSetting("post_process_enabled") ?? false;
 
   return (
     <div className="max-w-2xl w-full mx-auto space-y-6">
+      <SettingsGroup title={t("settings.postProcessing.enable.title")}>
+        <PostProcessingToggle descriptionMode="tooltip" grouped={true} />
+        {enabled && (
+          <PostProcessTimeout descriptionMode="tooltip" grouped={true} />
+        )}
+      </SettingsGroup>
+
       <SettingsGroup title={t("settings.postProcessing.hotkey.title")}>
         <ShortcutInput
           shortcutId="transcribe_with_post_process"

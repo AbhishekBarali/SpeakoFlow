@@ -104,7 +104,7 @@ Everything is wired through the same provider system, so one API key works for a
 | ------------------------------- | ---------------------------- |
 | Dictate (hold)                  | `Ctrl + Space`               |
 | Hands-free dictation (toggle)   | `F9`                         |
-| Dictate with AI post-processing (experimental) | `Ctrl + Shift + Space` |
+| Dictate with AI post-processing (AI Correction) | `Ctrl + Shift + Space` |
 | Ask the assistant               | `Ctrl + Alt + Space`         |
 | Ask about your screen           | `Ctrl + Alt + Shift + Space` |
 | Show / hide the panel           | `Ctrl + Alt + A`             |

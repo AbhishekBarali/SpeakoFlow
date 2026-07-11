@@ -102,7 +102,10 @@ export const usePostProcessProviderState = (): PostProcessProviderState => {
         const hasBaseUrl = (provider?.base_url ?? "").trim() !== "";
         const hasApiKey = apiKey.trim() !== "";
 
-        if (provider?.id === "custom" ? hasBaseUrl : hasApiKey) {
+        // Base-URL providers (Custom, Local, Azure) are reachable once the URL
+        // is set; key-based providers need the key. The built-in local provider
+        // picks its model from downloaded models, so it never auto-fetches.
+        if (provider?.allow_base_url_edit ? hasBaseUrl : hasApiKey) {
           void fetchPostProcessModels(providerId);
         }
       }
@@ -118,7 +121,9 @@ export const usePostProcessProviderState = (): PostProcessProviderState => {
 
   const handleBaseUrlChange = useCallback(
     (value: string) => {
-      if (!selectedProvider || selectedProvider.id !== "custom") {
+      // Any provider that allows editing its base URL (Custom, Local, Azure
+      // OpenAI) — not just Custom. Azure in particular is unusable without it.
+      if (!selectedProvider || !selectedProvider.allow_base_url_edit) {
         return;
       }
       const trimmed = value.trim();

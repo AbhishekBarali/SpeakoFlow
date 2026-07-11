@@ -83,11 +83,13 @@ Hugging Face URL is used directly (with retry/resume).
 
 ---
 
-## 3. AI Correction (dictation post-processing) — experimental, in development
+## 3. AI Correction (dictation post-processing)
 
-**Status:** Intentionally shelved behind Experimental Features. Off by default.
-**Severity:** Low — feature is hidden and non-default; core dictation/assistant
-are unaffected.
+**Status:** Promoted out of Experimental — a first-class, opt-in feature. Off by
+default; the user enables it from the toggle at the top of the Post Process
+settings page.
+**Severity:** Low — off by default and only ever invoked by its own hotkey; core
+dictation/assistant are unaffected.
 
 ### What it is
 
@@ -99,38 +101,36 @@ text instead of the raw transcript. It runs on its own hotkey
 configurable timeout, and always falls back to the raw transcription on any
 failure or timeout.
 
-### Why it's deferred
+### Resolved (this pass)
 
-The plumbing works, but the UX isn't polished enough to be a main feature yet:
+- **No longer gated behind Experimental.** The **Post Process** section is
+  always visible in the sidebar; the feature is toggled on/off from an enable
+  switch at the top of that page (moved out of Advanced → Experimental). The
+  hotkey registers whenever `post_process_enabled` is true — the old
+  `experimental_enabled` requirement is gone (`shortcut/mod.rs`,
+  `shortcut/handy_keys.rs`, `shortcut/tauri_impl.rs`).
+- **Built-in local model picker.** The built-in (Local) provider now hides the
+  API-key field and lists the user's downloaded LLM models in a dropdown
+  (mirroring the Assistant picker) instead of showing an empty "Type a model
+  name" field.
+- **Azure / editable Base URL.** The Base URL field now renders for any provider
+  that allows editing it (Custom, Local, **Azure OpenAI**) — not just Custom —
+  so Azure post-processing is configurable. The base URL is stored on the shared
+  provider object, so it's the same value the Assistant page edits.
+- **Tone now takes effect.** Tone directives are appended as an explicit,
+  highest-priority override (`actions.rs::append_tone_directive`) so they win
+  over a cleanup prompt that insists on "don't paraphrase / output exactly" —
+  previously that conflict made tone appear to do nothing.
+- **Default prompt cleaned up.** The shipped "Improve Transcriptions" prompt is
+  self-contained: no `{{agentName}}`/app-specific placeholders, keeps the
+  `<transcript>` prompt-injection defense and the never-answer-the-content rule.
 
-- **Built-in local model picker is incomplete.** In Post Process → Model, the
-  built-in (local) provider shows an empty "Type a model name" field and does
-  not list the user's downloaded local models the way the Assistant model picker
-  does. The runtime falls back to the assistant's model, so it still functions,
-  but the empty field makes it look broken and there's no clear way to choose a
-  dedicated small model (e.g. Gemma 1B) from the UI.
-- Needs prompt/tone tuning and real-world testing before it's trustworthy as a
-  default correction step.
+### Remaining follow-ups
 
-### Current gating (as shipped)
-
-- The **AI Correction** toggle lives inside **Advanced → Experimental Features**
-  (only visible when Experimental is enabled), and its own toggle must then be
-  turned on — a deliberate two-step gate.
-- The **Post Process** settings section (provider / model / tone / prompts) only
-  appears when _both_ `experimental_enabled` **and** `post_process_enabled` are
-  true (`src/components/Sidebar.tsx`).
-- The long explanation lives behind the row's (i) info hint; the inline
-  description is kept short and flags it as "in development."
-
-### Future work (when picked up)
-
-1. Give the built-in provider a proper **downloaded-local-model dropdown** in the
-   Post Process model field (mirror the Assistant/Models picker), and a hint that
-   picking a _different_ local model than the assistant causes a GGUF reload when
-   switching between chat and dictation.
-2. Tune the cleanup + tone prompts; validate output quality across models.
-3. Decide whether it graduates out of Experimental and, if so, revisit defaults.
+1. Real-world quality validation of the cleanup + tone prompts across models
+   (especially small local GGUFs).
+2. Optional hint that picking a _different_ built-in local model than the
+   assistant causes a GGUF reload when switching between chat and dictation.
 
 Implementation touchpoints: `src-tauri/src/actions.rs`
 (`post_process_transcription`, `resolve_post_process_provider_and_model`,

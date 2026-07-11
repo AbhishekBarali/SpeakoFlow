@@ -23,11 +23,9 @@ pub fn init_shortcuts(app: &AppHandle) {
         if id == "cancel" {
             continue; // Skip cancel shortcut, it will be registered dynamically
         }
-        // Skip the post-processing shortcut unless BOTH Experimental Features
-        // and AI Correction are enabled (it lives under Experimental).
-        if id == "transcribe_with_post_process"
-            && (!user_settings.post_process_enabled || !user_settings.experimental_enabled)
-        {
+        // Skip the post-processing (AI Correction) shortcut when the feature is
+        // turned off. Gated only by its own toggle now — not by Experimental.
+        if id == "transcribe_with_post_process" && !user_settings.post_process_enabled {
             continue;
         }
         let binding = user_settings

@@ -74,9 +74,10 @@ export const SECTIONS_CONFIG = {
     labelKey: "sidebar.postProcessing",
     icon: Sparkles,
     component: PostProcessingSettings,
-    enabled: (settings) =>
-      (settings?.post_process_enabled ?? false) &&
-      (settings?.experimental_enabled ?? false),
+    // AI Correction is a first-class feature now (no longer gated behind
+    // Experimental). The section is always visible; the feature itself is
+    // toggled on/off from the enable switch at the top of the page.
+    enabled: () => true,
   },
   assistant: {
     labelKey: "sidebar.assistant",

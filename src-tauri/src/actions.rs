@@ -84,6 +84,57 @@ fn build_system_prompt(prompt_template: &str) -> String {
     prompt_template.replace("${output}", "").trim().to_string()
 }
 
+/// Append the optional tone directive as an explicit, highest-priority override
+/// so it wins over a cleanup prompt that insists on "don't paraphrase / output
+/// exactly / keep the wording" — that conflict is why tone previously appeared
+/// to do nothing. No-op for `PostProcessTone::None`. Used by both the
+/// structured-output and legacy paths so tone behaves identically either way.
+fn append_tone_directive(prompt: &mut String, tone: crate::settings::PostProcessTone) {
+    if let Some(directive) = tone.directive() {
+        prompt.push_str(
+            "\n\n---\nTONE (highest priority — this overrides any earlier instruction to keep the exact wording, word order, or formality):\n",
+        );
+        prompt.push_str(directive);
+    }
+}
+
+/// Clean an LLM's post-processing output before it's pasted. A deterministic
+/// safety net that does NOT depend on the model obeying the prompt: weak/local
+/// models sometimes echo the prompt's `<transcript>` wrapper verbatim, wrap the
+/// answer in a Markdown code fence, or add stray surrounding whitespace. None of
+/// that should ever land in the user's document. Also removes the zero-width
+/// characters some models insert. Only the exact `<transcript>` wrapper tags are
+/// stripped — never arbitrary angle-bracket text the speaker may have dictated.
+fn sanitize_post_process_output(s: &str) -> String {
+    let mut text = strip_invisible_chars(s).trim().to_string();
+
+    // Strip a single surrounding Markdown code fence: ```lang\n … \n``` (or a
+    // one-line ```…```). Only when the whole output is fenced, which is a model
+    // artifact — dictated text virtually never both starts and ends with ```.
+    if text.starts_with("```") && text.ends_with("```") && text.len() > 6 {
+        let after_open = &text[3..];
+        let body = match after_open.find('\n') {
+            Some(nl) => &after_open[nl + 1..],
+            None => after_open,
+        };
+        let body = body.strip_suffix("```").unwrap_or(body);
+        text = body.trim().to_string();
+    }
+
+    // Remove the literal <transcript> wrapper tags that weak models copy from
+    // the prompt. `str::replace` is UTF-8 safe and only matches the exact tags.
+    for tag in [
+        "<transcript>",
+        "</transcript>",
+        "<TRANSCRIPT>",
+        "</TRANSCRIPT>",
+    ] {
+        text = text.replace(tag, "");
+    }
+
+    text.trim().to_string()
+}
+
 /// Kick off loading the built-in LLM engine in the background so its (slow)
 /// first-time load overlaps with recording + transcription instead of blocking
 /// the first response. Errors are ignored here; the real request path surfaces
@@ -221,64 +272,67 @@ async fn post_process_transcription(
         _ => (None, None),
     };
 
-    // Optional tone directive (formal/casual/…) layered onto the cleanup
-    // instructions so a single LLM call does cleanup + tone. `None` for the
-    // default (cleanup only, no rewording).
-    let tone_directive = settings.post_process_tone.directive();
+    // Instructions become the SYSTEM message and the raw transcript the USER
+    // message — for BOTH structured and non-structured providers. Sending the
+    // transcript as its own turn (instead of concatenating it onto the
+    // instructions in one blob) is what makes weak/local models behave: given a
+    // single message that opens with a wall of raw text, they tend to echo it
+    // back verbatim — `<transcript>` tags and all. `build_system_prompt` strips
+    // the legacy `${output}` placeholder, so older custom prompts that used it
+    // keep working (the transcript still arrives as the user turn).
+    let mut system_prompt = build_system_prompt(&prompt);
+    // Optional tone directive (formal/casual/…), appended as an explicit
+    // highest-priority override so it can't be smothered by the cleanup prompt.
+    append_tone_directive(&mut system_prompt, settings.post_process_tone);
+    let user_content = transcription.to_string();
 
-    if provider.supports_structured_output {
-        debug!("Using structured outputs for provider '{}'", provider.id);
-
-        let mut system_prompt = build_system_prompt(&prompt);
-        if let Some(directive) = tone_directive {
-            system_prompt.push_str("\n\n");
-            system_prompt.push_str(directive);
-        }
-        let user_content = transcription.to_string();
-
-        // Handle Apple Intelligence separately since it uses native Swift APIs
-        if provider.id == APPLE_INTELLIGENCE_PROVIDER_ID {
-            #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
-            {
-                if !apple_intelligence::check_apple_intelligence_availability() {
-                    debug!(
-                        "Apple Intelligence selected but not currently available on this device"
-                    );
-                    return None;
-                }
-
-                let token_limit = model.trim().parse::<i32>().unwrap_or(0);
-                return match apple_intelligence::process_text_with_system_prompt(
-                    &system_prompt,
-                    &user_content,
-                    token_limit,
-                ) {
-                    Ok(result) => {
-                        if result.trim().is_empty() {
-                            debug!("Apple Intelligence returned an empty response");
-                            None
-                        } else {
-                            let result = strip_invisible_chars(&result);
-                            debug!(
-                                "Apple Intelligence post-processing succeeded. Output length: {} chars",
-                                result.len()
-                            );
-                            Some(result)
-                        }
-                    }
-                    Err(err) => {
-                        error!("Apple Intelligence post-processing failed: {}", err);
-                        None
-                    }
-                };
-            }
-
-            #[cfg(not(all(target_os = "macos", target_arch = "aarch64")))]
-            {
-                debug!("Apple Intelligence provider selected on unsupported platform");
+    // Apple Intelligence uses native Swift APIs rather than the HTTP client.
+    if provider.id == APPLE_INTELLIGENCE_PROVIDER_ID {
+        #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+        {
+            if !apple_intelligence::check_apple_intelligence_availability() {
+                debug!("Apple Intelligence selected but not currently available on this device");
                 return None;
             }
+
+            let token_limit = model.trim().parse::<i32>().unwrap_or(0);
+            return match apple_intelligence::process_text_with_system_prompt(
+                &system_prompt,
+                &user_content,
+                token_limit,
+            ) {
+                Ok(result) => {
+                    let result = sanitize_post_process_output(&result);
+                    if result.is_empty() {
+                        debug!("Apple Intelligence returned an empty response");
+                        None
+                    } else {
+                        debug!(
+                            "Apple Intelligence post-processing succeeded. Output length: {} chars",
+                            result.len()
+                        );
+                        Some(result)
+                    }
+                }
+                Err(err) => {
+                    error!("Apple Intelligence post-processing failed: {}", err);
+                    None
+                }
+            };
         }
+
+        #[cfg(not(all(target_os = "macos", target_arch = "aarch64")))]
+        {
+            debug!("Apple Intelligence provider selected on unsupported platform");
+            return None;
+        }
+    }
+
+    // Structured-output providers: ask for a JSON object and extract the
+    // `transcription` field. On any failure, fall through to a plain-text
+    // request below rather than losing the turn.
+    if provider.supports_structured_output {
+        debug!("Using structured outputs for provider '{}'", provider.id);
 
         // Define JSON schema for transcription output
         let json_schema = serde_json::json!({
@@ -297,8 +351,8 @@ async fn post_process_transcription(
             &provider,
             api_key.clone(),
             &model,
-            user_content,
-            Some(system_prompt),
+            user_content.clone(),
+            Some(system_prompt.clone()),
             Some(json_schema),
             reasoning_effort.clone(),
             reasoning.clone(),
@@ -312,7 +366,7 @@ async fn post_process_transcription(
                         if let Some(transcription_value) =
                             json.get(TRANSCRIPTION_FIELD).and_then(|t| t.as_str())
                         {
-                            let result = strip_invisible_chars(transcription_value);
+                            let result = sanitize_post_process_output(transcription_value);
                             debug!(
                                 "Structured output post-processing succeeded for provider '{}'. Output length: {} chars",
                                 provider.id,
@@ -321,7 +375,7 @@ async fn post_process_transcription(
                             return Some(result);
                         } else {
                             error!("Structured output response missing 'transcription' field");
-                            return Some(strip_invisible_chars(&content));
+                            return Some(sanitize_post_process_output(&content));
                         }
                     }
                     Err(e) => {
@@ -329,7 +383,7 @@ async fn post_process_transcription(
                             "Failed to parse structured output JSON: {}. Returning raw content.",
                             e
                         );
-                        return Some(strip_invisible_chars(&content));
+                        return Some(sanitize_post_process_output(&content));
                     }
                 }
             }
@@ -339,34 +393,30 @@ async fn post_process_transcription(
             }
             Err(e) => {
                 warn!(
-                    "Structured output failed for provider '{}': {}. Falling back to legacy mode.",
+                    "Structured output failed for provider '{}': {}. Falling back to a plain-text request.",
                     provider.id, e
                 );
-                // Fall through to legacy mode below
+                // Fall through to the plain-text request below.
             }
         }
     }
 
-    // Legacy mode: Replace ${output} variable in the prompt with the actual text
-    let mut processed_prompt = prompt.replace("${output}", transcription);
-    if let Some(directive) = tone_directive {
-        processed_prompt.push_str("\n\n");
-        processed_prompt.push_str(directive);
-    }
-    debug!("Processed prompt length: {} chars", processed_prompt.len());
-
-    match crate::llm_client::send_chat_completion(
+    // Plain-text request: non-structured providers (built-in local, Groq, …) and
+    // the structured fallback above. Same system+user shape, just no JSON schema.
+    match crate::llm_client::send_chat_completion_with_schema(
         &provider,
         api_key,
         &model,
-        processed_prompt,
+        user_content,
+        Some(system_prompt),
+        None,
         reasoning_effort,
         reasoning,
     )
     .await
     {
         Ok(Some(content)) => {
-            let content = strip_invisible_chars(&content);
+            let content = sanitize_post_process_output(&content);
             debug!(
                 "LLM post-processing succeeded for provider '{}'. Output length: {} chars",
                 provider.id,
@@ -549,18 +599,22 @@ impl ShortcutAction for TranscribeAction {
         // Live/streaming transcription. Start the streaming worker now so it
         // waits for the model load and begins consuming frames as soon as
         // recording starts. The batch transcribe() path stays the fallback
-        // (see stop()). It runs when the user has streaming explicitly enabled,
-        // OR when the resolved recording-overlay style is Live (which needs the
-        // running transcript) — for a streaming-capable model that's the
-        // capability-aware default. When neither holds, none of the streaming
-        // machinery runs and behavior is unchanged.
+        // (see stop()).
+        //
+        // Streaming is strictly capability-gated: it only ever runs for a model
+        // that natively supports live streaming (e.g. Parakeet, Nemotron). For
+        // such a model it's on automatically — the Auto overlay default already
+        // resolves to Live, so a first-run user gets streaming with no settings
+        // toggle. A model that does not support streaming never starts the
+        // worker (so streaming can't be attempted on it and misbehave), even if
+        // the global live-transcription toggle happens to be on.
         {
             let s = get_settings(app);
-            let want_stream = s.live_transcription_enabled
-                || crate::settings::resolve_overlay_style(
-                    s.overlay_style,
-                    crate::overlay::selected_model_supports_live(app),
-                ) == crate::settings::OverlayStyle::Live;
+            let supports_live = crate::overlay::selected_model_supports_live(app);
+            let want_stream = supports_live
+                && (s.live_transcription_enabled
+                    || crate::settings::resolve_overlay_style(s.overlay_style, supports_live)
+                        == crate::settings::OverlayStyle::Live);
             if want_stream {
                 tm.start_stream();
             }
@@ -1165,3 +1219,91 @@ pub static ACTION_MAP: Lazy<HashMap<String, Arc<dyn ShortcutAction>>> = Lazy::ne
     );
     map
 });
+
+
+
+#[cfg(test)]
+mod tests {
+    use super::{append_tone_directive, build_system_prompt, sanitize_post_process_output};
+    use crate::settings::PostProcessTone;
+
+    #[test]
+    fn tone_none_leaves_prompt_untouched() {
+        let base = "Clean up the transcript. Do not paraphrase.".to_string();
+        let mut prompt = base.clone();
+        append_tone_directive(&mut prompt, PostProcessTone::None);
+        assert_eq!(prompt, base, "None tone must not alter the cleanup prompt");
+    }
+
+    #[test]
+    fn tone_directive_is_appended_as_override() {
+        let mut prompt = "Clean up the transcript. Output exactly the cleaned text.".to_string();
+        append_tone_directive(&mut prompt, PostProcessTone::Formal);
+
+        // The tone text itself must be present…
+        assert!(
+            prompt.contains(PostProcessTone::Formal.directive().unwrap()),
+            "formal directive text should be appended"
+        );
+        // …framed as an explicit, highest-priority override so it wins over a
+        // "keep the exact wording" cleanup prompt (the original tone bug).
+        assert!(
+            prompt.contains("highest priority"),
+            "directive should be framed as a priority override"
+        );
+        // And it must come AFTER the base cleanup prompt, not replace it.
+        assert!(prompt.starts_with("Clean up the transcript."));
+    }
+
+    #[test]
+    fn every_non_none_tone_has_a_directive() {
+        for tone in [
+            PostProcessTone::Formal,
+            PostProcessTone::Casual,
+            PostProcessTone::Professional,
+            PostProcessTone::Friendly,
+            PostProcessTone::Concise,
+        ] {
+            assert!(
+                tone.directive().is_some_and(|d| !d.trim().is_empty()),
+                "{:?} must provide a non-empty directive",
+                tone
+            );
+        }
+    }
+
+    #[test]
+    fn build_system_prompt_strips_output_placeholder() {
+        let out = build_system_prompt("<transcript>\n${output}\n</transcript>\nClean it.");
+        assert!(!out.contains("${output}"), "placeholder should be removed");
+        assert!(out.contains("Clean it."));
+    }
+
+    #[test]
+    fn sanitizer_strips_leaked_transcript_tags() {
+        // The exact screenshot-1 failure: a weak model echoed the wrapper tags.
+        let raw = "<transcript>one two three ten</transcript>";
+        assert_eq!(sanitize_post_process_output(raw), "one two three ten");
+        // Multi-line with surrounding whitespace, uppercase variant too.
+        let raw2 = "\n<TRANSCRIPT>\nHello there.\n</TRANSCRIPT>\n";
+        assert_eq!(sanitize_post_process_output(raw2), "Hello there.");
+    }
+
+    #[test]
+    fn sanitizer_strips_surrounding_code_fence() {
+        let fenced = "```\nCleaned text here.\n```";
+        assert_eq!(sanitize_post_process_output(fenced), "Cleaned text here.");
+        let fenced_lang = "```text\nCleaned text here.\n```";
+        assert_eq!(sanitize_post_process_output(fenced_lang), "Cleaned text here.");
+    }
+
+    #[test]
+    fn sanitizer_leaves_clean_text_untouched() {
+        let clean = "Can you send me the report by Friday?";
+        assert_eq!(sanitize_post_process_output(clean), clean);
+        // A lone angle-bracket phrase the speaker dictated must NOT be mangled —
+        // only the exact <transcript> wrapper tags are removed.
+        let dictated = "Use the <div> tag here.";
+        assert_eq!(sanitize_post_process_output(dictated), dictated);
+    }
+}

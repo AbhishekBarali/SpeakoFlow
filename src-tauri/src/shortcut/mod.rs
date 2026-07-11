@@ -402,11 +402,10 @@ fn register_all_shortcuts_for_implementation(
             continue;
         }
 
-        // Skip the post-processing shortcut unless BOTH Experimental Features
-        // and AI Correction are enabled (it lives under Experimental).
-        if id == "transcribe_with_post_process"
-            && (!current_settings.post_process_enabled || !current_settings.experimental_enabled)
-        {
+        // Skip the post-processing (AI Correction) shortcut when the feature is
+        // turned off. It's a first-class feature now, gated only by its own
+        // `post_process_enabled` toggle — no longer by Experimental.
+        if id == "transcribe_with_post_process" && !current_settings.post_process_enabled {
             continue;
         }
 
@@ -952,14 +951,14 @@ pub fn change_post_process_enabled_setting(app: AppHandle, enabled: bool) -> Res
     settings.post_process_enabled = enabled;
     settings::write_settings(&app, settings.clone());
 
-    // AI Correction lives under Experimental, so its hotkey is only active when
-    // BOTH toggles are on.
+    // AI Correction is a first-class feature; its hotkey is active whenever the
+    // feature itself is enabled.
     if let Some(binding) = settings
         .bindings
         .get("transcribe_with_post_process")
         .cloned()
     {
-        if enabled && settings.experimental_enabled {
+        if enabled {
             let _ = register_shortcut(&app, binding);
         } else {
             let _ = unregister_shortcut(&app, binding);
@@ -1007,20 +1006,9 @@ pub fn change_experimental_enabled_setting(app: AppHandle, enabled: bool) -> Res
     settings.experimental_enabled = enabled;
     settings::write_settings(&app, settings.clone());
 
-    // Keep the AI Correction hotkey in sync: it's active only when BOTH
-    // Experimental Features and AI Correction are enabled. Turning Experimental
-    // off therefore also stops the post-processing hotkey from firing.
-    if let Some(binding) = settings
-        .bindings
-        .get("transcribe_with_post_process")
-        .cloned()
-    {
-        if enabled && settings.post_process_enabled {
-            let _ = register_shortcut(&app, binding);
-        } else {
-            let _ = unregister_shortcut(&app, binding);
-        }
-    }
+    // AI Correction is no longer gated by Experimental, so toggling this flag
+    // no longer touches the post-processing hotkey — that hotkey is managed
+    // solely by `change_post_process_enabled_setting`.
 
     Ok(())
 }

@@ -522,6 +522,21 @@ impl LocalLlmManager {
             .arg(self.port.to_string())
             .arg("-c")
             .arg(context_size.to_string())
+            // ONE generation slot. Without this, llama-server defaults to
+            // several parallel slots (observed: n_slots = 4) and SPLITS the
+            // context window across them — so each turn gets only a fraction of
+            // the tokens (e.g. n_ctx_slot = 1792 out of ~7168). A single desktop
+            // conversation then overflows its slot almost immediately, and a
+            // vision turn overflows instantly (one screenshot alone costs
+            // ~1000-2000 tokens). That surfaces in the engine log as
+            // `decode: failed to find free space in the KV cache` plus
+            // `truncated = 1`, and to the user as replies that "work for a while
+            // then break." This app is single-user, so one slot owning the FULL
+            // context window is both correct and far more reliable; overlapping
+            // requests (assistant + post-processing) simply queue instead of
+            // fighting over a fragmented KV cache.
+            .arg("--parallel")
+            .arg("1")
             // Offload as many layers to the GPU as fit; CPU-only builds ignore this.
             .arg("-ngl")
             .arg("999")

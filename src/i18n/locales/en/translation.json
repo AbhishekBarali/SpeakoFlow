@@ -639,6 +639,9 @@
     },
     "postProcessing": {
       "title": "Post Process",
+      "enable": {
+        "title": "AI Correction"
+      },
       "hotkey": {
         "title": "Hotkey"
       },
@@ -668,13 +671,19 @@
         },
         "baseUrl": {
           "title": "Base URL",
-          "description": "API base URL for the selected provider. Only the custom provider can be edited.",
+          "description": "API base URL for the selected provider. Editable for Custom, Local, and Azure OpenAI (set it to your resource, e.g. https://your-resource.openai.azure.com/openai/v1).",
           "placeholder": "https://api.openai.com/v1"
         },
         "apiKey": {
           "title": "API Key",
           "description": "API key for the selected provider.",
           "placeholder": "sk-..."
+        },
+        "builtin": {
+          "modelDescription": "Pick a model you've downloaded in the Models tab. It runs on your device with no API key or setup.",
+          "modelPlaceholder": "Select a downloaded model",
+          "noModels": "No local models yet. Download one from the Models tab under \"Language Model\".",
+          "ready": "Runs fully on your device. No API key, no setup."
         },
         "model": {
           "title": "Model",
@@ -691,7 +700,7 @@
         "title": "Prompt",
         "selectedPrompt": {
           "title": "Selected Prompt",
-          "description": "Select a template for refining transcriptions or create a new one. Use ${output} inside the prompt text to reference the captured transcript."
+          "description": "Select a template for cleaning up transcriptions, or create your own. Your transcribed text is sent to the model automatically — just write instructions."
         },
         "noPrompts": "No prompts available",
         "selectPrompt": "Select a prompt",
@@ -699,8 +708,8 @@
         "promptLabel": "Prompt Label",
         "promptLabelPlaceholder": "Enter prompt name",
         "promptInstructions": "Prompt Instructions",
-        "promptInstructionsPlaceholder": "Write the instructions to run after transcription. Example: Improve grammar and clarity for the following text: ${output}",
-        "promptTip": "Tip: Use <code>${output}</code> to insert the transcribed text in your prompt.",
+        "promptInstructionsPlaceholder": "Write instructions for cleaning up the transcript. Example: Fix grammar and punctuation, then rewrite it as a polished, professional message.",
+        "promptTip": "Tip: Your transcribed text is sent to the model automatically — just write instructions. (Older prompts that use <code>${output}</code> still work.)",
         "updatePrompt": "Update Prompt",
         "deletePrompt": "Delete Prompt",
         "createPrompt": "Create Prompt",
