@@ -26,4 +26,11 @@ pub struct CliArgs {
     /// Enable debug mode with verbose logging
     #[arg(long)]
     pub debug: bool,
+
+    /// List the transcribe.cpp compute devices (and backend availability) then
+    /// exit, without launching the app. Used to verify a packaged build's
+    /// bundled ggml backend libraries load and register a device on a machine
+    /// with no dev toolchain / no Vulkan SDK (the Session 7 clean-machine gate).
+    #[arg(long)]
+    pub list_devices: bool,
 }

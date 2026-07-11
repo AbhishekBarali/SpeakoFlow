@@ -76,6 +76,43 @@
   transition: width 220ms cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
+/* ---- Live transcription: a compact single-line ticker of the latest words -
+ * Shown in place of the waveform once streaming text arrives (opt-in). The box
+ * pins its content to the trailing edge and clips the overflow, so the most
+ * recent words stay visible as the transcript grows — a small live caption
+ * that stays within the fixed pill/window bounds. */
+.stream-text-box {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  overflow: hidden;
+  max-width: 104px;
+  height: 20px;
+}
+
+.stream-text {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  font-size: 12px;
+  line-height: 1;
+  color: #f5f5f4;
+}
+
+/* The volatile, not-yet-committed tail (native streaming). Dimmed so it reads
+ * as "still being decided" next to the solid committed prefix, and eased so a
+ * word settling from tentative to committed doesn't flicker. */
+.stream-text-tentative {
+  color: #f5f5f4;
+  opacity: 0.45;
+  transition: opacity 160ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stream-text-tentative {
+    transition: none;
+  }
+}
+
 /* Push-to-talk hold: keep the live wave compact and subtle. It grows on lock
  * (see .overlay-pill.locked below). The height eases so the hold -> lock switch
  * reads as one smooth motion. */
@@ -272,5 +309,171 @@
   }
   .load-spinner {
     animation: none;
+  }
+}
+
+
+/* ---- Live-transcription window: the enlarged card (opt-in) ----------------
+ * When the user turns on the live-transcription window, the overlay window is
+ * resized to 400×120 (see overlay.rs OVERLAY_STREAM_WIDTH/HEIGHT) and this card
+ * replaces the compact pill. It speaks the same editorial language — warm
+ * near-black surface, off-white ink, hairline edge — but gives the running
+ * transcript room to breathe: a header (live indicator + state label + the same
+ * cancel/done controls) over a scrollable transcript that keeps the newest
+ * words in view. The committed prefix renders solid; the tentative tail dimmed.
+ */
+.overlay-card {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: rgba(24, 22, 20, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 0 0 0.5px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  /* Reveal: fade + a small settle, driven by the root .fade-in toggle. */
+  opacity: 0;
+  transform: scale(0.96) translateY(4px);
+  transform-origin: center;
+  transition:
+    opacity 240ms ease-out,
+    transform 260ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  font-family:
+    "Inter Variable",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+}
+
+.overlay-root.fade-in .overlay-card {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.card-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.card-wave {
+  width: 66px;
+}
+
+.card-label {
+  font-size: 12px;
+  line-height: 1;
+  color: rgba(245, 245, 244, 0.7);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.card-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.card-btn {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(40, 36, 33, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition:
+    background-color 140ms ease-out,
+    transform 120ms ease-out;
+}
+
+.card-cancel:hover {
+  background: rgba(220, 38, 38, 0.32);
+}
+
+.card-confirm:hover {
+  background: rgba(34, 160, 94, 0.4);
+}
+
+.card-btn:active {
+  transform: scale(0.9);
+}
+
+/* The transcript area: grows to fill the card, scrolls its overflow, and is
+ * kept pinned to the newest words by RecordingOverlay's auto-scroll effect. */
+.card-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  /* Thin, unobtrusive scrollbar to match the dark surface. */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+
+.card-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.card-body::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 3px;
+}
+
+.card-text {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.4;
+  color: #f5f5f4;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.card-placeholder {
+  color: rgba(245, 245, 244, 0.5);
+}
+
+.card-committed {
+  color: #f5f5f4;
+}
+
+/* The volatile, not-yet-committed tail (native streaming). Dimmed so it reads
+ * as "still being decided" next to the solid committed prefix. */
+.card-tentative {
+  color: #f5f5f4;
+  opacity: 0.5;
+  transition: opacity 160ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overlay-card {
+    transition: none;
+  }
+  .card-btn,
+  .card-tentative {
+    transition: none;
   }
 }

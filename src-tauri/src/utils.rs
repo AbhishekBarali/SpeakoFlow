@@ -48,6 +48,9 @@ pub fn cancel_current_operation(app: &AppHandle) {
 
     // Unload model if immediate unload is enabled
     let tm = app.state::<Arc<TranscriptionManager>>();
+    // Cancel any active live/streaming transcription worker so it releases the
+    // leased model engine. No-op when live transcription isn't active.
+    tm.cancel_stream();
     tm.maybe_unload_immediately("cancellation");
 
     // Notify coordinator so it can keep lifecycle state coherent.

@@ -62,6 +62,10 @@ graphify-out/*
 # Internal marketing/testing website — kept out of the app repo
 speakoflow-website/
 
+# Internal launch & competitive-strategy playbook — kept out of the public repo
+# (self-declared internal; contains launch tactics + competitor analysis).
+LAUNCH_PLAN.md
+
 # Demo / marketing capture tooling (not shipped, regenerable, dev-only).
 # The capture harness, its config, the demo-only entry points, and the
 # generated screenshots are all kept out of the public repo.

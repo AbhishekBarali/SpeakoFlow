@@ -1272,6 +1272,34 @@ pub fn change_lazy_stream_close_setting(app: AppHandle, enabled: bool) -> Result
 
 #[tauri::command]
 #[specta::specta]
+pub fn change_live_transcription_enabled_setting(
+    app: AppHandle,
+    enabled: bool,
+) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    settings.live_transcription_enabled = enabled;
+    settings::write_settings(&app, settings);
+    Ok(())
+}
+
+/// Toggle the opt-in live-transcription window: when on (and live transcription
+/// is enabled), the recording overlay grows into a readable card showing the
+/// running committed + tentative transcript; when off, the overlay stays the
+/// compact pill. Off by default.
+#[tauri::command]
+#[specta::specta]
+pub fn change_live_transcription_window_enabled_setting(
+    app: AppHandle,
+    enabled: bool,
+) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    settings.live_transcription_window_enabled = enabled;
+    settings::write_settings(&app, settings);
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
 pub fn change_app_language_setting(app: AppHandle, language: String) -> Result<(), String> {
     let mut settings = settings::get_settings(&app);
     settings.app_language = language.clone();

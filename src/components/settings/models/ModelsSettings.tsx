@@ -237,12 +237,29 @@ export const ModelsSettings: React.FC = () => {
     const activeIdForCategory =
       categoryFilter === "llm" ? activeLlmId : currentModel;
 
-    // Sort: active model first, then non-custom, then custom at the bottom
+    // Recommendation order key: ranked-recommended first (by rank, 1 = top),
+    // then recommended-without-rank, then everything else. Mirrors Handy's
+    // catalog ordering so the new streaming models lead the list.
+    const rankOf = (m: ModelInfo): number =>
+      m.is_recommended ? (m.recommended_rank ?? 1_000) : 10_000;
+
+    // Sort: active model first, then by recommendation order, then non-custom
+    // before custom, with accuracy as the final tie-breaker.
     downloaded.sort((a, b) => {
       if (a.id === activeIdForCategory) return -1;
       if (b.id === activeIdForCategory) return 1;
       if (a.is_custom !== b.is_custom) return a.is_custom ? 1 : -1;
-      return 0;
+      const rankDiff = rankOf(a) - rankOf(b);
+      if (rankDiff !== 0) return rankDiff;
+      return b.accuracy_score - a.accuracy_score;
+    });
+
+    // Available (not-yet-downloaded) models: same recommendation order so the
+    // recommended set surfaces at the top, then most-accurate first.
+    available.sort((a, b) => {
+      const rankDiff = rankOf(a) - rankOf(b);
+      if (rankDiff !== 0) return rankDiff;
+      return b.accuracy_score - a.accuracy_score;
     });
 
     return {

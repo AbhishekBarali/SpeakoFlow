@@ -206,7 +206,10 @@
       "multiLanguage": "Multi-language",
       "languageOnly": "{{language}} Only",
       "translation": "Can translate to English",
-      "translate": "Translate to English"
+      "translate": "Translate to English",
+      "streaming": "Streaming",
+      "quantization": "Quantization",
+      "legacy": "Legacy"
     }
   },
   "settings": {
@@ -445,6 +448,14 @@
       "lazyStreamClose": {
         "label": "Keep Mic Open Between Transcriptions",
         "description": "Faster back-to-back dictation. May affect Bluetooth audio quality."
+      },
+      "liveTranscription": {
+        "label": "Live transcription",
+        "description": "Transcribe speech as you talk, instead of all at once when you stop. Experimental."
+      },
+      "liveTranscriptionWindow": {
+        "label": "Live transcription window",
+        "description": "While live transcription runs, show a larger overlay card with the running text instead of the compact pill. Requires live transcription."
       },
       "acceleration": {
         "whisper": {
@@ -1119,6 +1130,7 @@
     "recording": "Recording",
     "transcribing": "Transcribing...",
     "processing": "Processing...",
+    "listening": "Listening…",
     "locked": "Recording hands-free — press the hotkey again or done to stop",
     "cancel": "Cancel",
     "done": "Done",

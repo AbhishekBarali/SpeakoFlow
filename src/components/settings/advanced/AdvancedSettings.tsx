@@ -24,6 +24,8 @@ import { KeyboardImplementationSelector } from "../debug/KeyboardImplementationS
 import { AccelerationSelector } from "../AccelerationSelector";
 import { LazyStreamClose } from "../LazyStreamClose";
 import { AlwaysOnMicrophone } from "../AlwaysOnMicrophone";
+import { LiveTranscription } from "../LiveTranscription";
+import { LiveTranscriptionWindow } from "../LiveTranscriptionWindow";
 
 export const AdvancedSettings: React.FC = () => {
   const { t } = useTranslation();
@@ -54,6 +56,8 @@ export const AdvancedSettings: React.FC = () => {
 
       <SettingsGroup title={t("settings.advanced.groups.transcription")}>
         <AlwaysOnMicrophone descriptionMode="tooltip" grouped={true} />
+        <LiveTranscription descriptionMode="tooltip" grouped={true} />
+        <LiveTranscriptionWindow descriptionMode="tooltip" grouped={true} />
         <CustomWords descriptionMode="tooltip" grouped />
         <MoreOptions>
           <AppendTrailingSpace descriptionMode="tooltip" grouped={true} />

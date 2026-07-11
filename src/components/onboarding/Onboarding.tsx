@@ -46,11 +46,20 @@ const Onboarding: React.FC<OnboardingProps> = ({ onModelSelected }) => {
     [models],
   );
 
+  // Recommended models to feature at the top, ordered by their recommendation
+  // rank (1 = the default) so the English streaming default leads and the
+  // multilingual streaming option (Nemotron, rank 2) sits right below it.
+  // Unranked recommended models fall to the end, most-accurate first.
   const featuredModels = useMemo(
     () =>
-      sttModels.filter(
-        (m: ModelInfo) => !m.is_downloaded && m.is_recommended,
-      ),
+      sttModels
+        .filter((m: ModelInfo) => !m.is_downloaded && m.is_recommended)
+        .sort((a: ModelInfo, b: ModelInfo) => {
+          const rank = (m: ModelInfo) => m.recommended_rank ?? Number.MAX_SAFE_INTEGER;
+          const byRank = rank(a) - rank(b);
+          if (byRank !== 0) return byRank;
+          return Number(b.accuracy_score) - Number(a.accuracy_score);
+        }),
     [sttModels],
   );
 

@@ -2,15 +2,18 @@ import React from "react";
 import { useTranslation } from "react-i18next";
 import {
   Check,
+  Cpu,
   Download,
   Globe,
   HardDrive,
   Languages,
   Loader2,
+  Radio,
   Trash2,
 } from "lucide-react";
 import type { ModelInfo } from "@/bindings";
 import { formatModelSize } from "../../lib/utils/format";
+import { extractQuant } from "../../lib/utils/modelQuant";
 import {
   getTranslatedModelDescription,
   getTranslatedModelName,
@@ -110,9 +113,21 @@ const ModelCard: React.FC<ModelCardProps> = ({
   const isClickable =
     status === "available" || status === "active" || status === "downloadable";
 
+  // A "legacy" transcription model runs on the older transcribe-rs (ONNX /
+  // whisper.cpp) engine rather than the new native transcribe.cpp (GGUF) one.
+  // These stay fully listed and usable — we just label them so the new vs old
+  // engines are distinguishable (PLAN.md Session 6). LLM ("LlamaCpp") and TTS
+  // ("Kokoro") models are not transcription models, so they are never labeled.
+  const isLegacyStt =
+    model.engine_type !== "TranscribeCpp" &&
+    model.engine_type !== "LlamaCpp" &&
+    model.engine_type !== "Kokoro";
+
   // Get translated model name and description
   const displayName = getTranslatedModelName(model, t);
   const displayDescription = getTranslatedModelDescription(model, t);
+  // GGUF quantization tag (e.g. "Q8_0"); null for non-GGUF models.
+  const quant = extractQuant(model.filename);
   const showModelSize =
     status === "downloadable" || status === "available" || status === "active";
   const formattedModelSize = formatModelSize(Number(model.size_mb));
@@ -181,6 +196,17 @@ const ModelCard: React.FC<ModelCardProps> = ({
             {showRecommended && model.is_recommended && (
               <Badge variant="outline">{t("onboarding.recommended")}</Badge>
             )}
+            {model.supports_streaming && (
+              <Badge variant="success" className="gap-1">
+                <Radio className="w-3 h-3" />
+                {t("modelSelector.capabilities.streaming")}
+              </Badge>
+            )}
+            {isLegacyStt && (
+              <Badge variant="secondary">
+                {t("modelSelector.capabilities.legacy")}
+              </Badge>
+            )}
             {status === "active" && (
               <Badge variant="active">
                 <Check className="w-3 h-3 mr-1" />
@@ -236,6 +262,15 @@ const ModelCard: React.FC<ModelCardProps> = ({
           >
             <Languages className="w-3.5 h-3.5" />
             <span>{t("modelSelector.capabilities.translate")}</span>
+          </div>
+        )}
+        {quant && (
+          <div
+            className="flex items-center gap-1 text-xs text-text/50"
+            title={t("modelSelector.capabilities.quantization")}
+          >
+            <Cpu className="w-3.5 h-3.5" />
+            <span className="font-mono">{quant}</span>
           </div>
         )}
         {showModelSize && (

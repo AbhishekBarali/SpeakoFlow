@@ -77,6 +77,7 @@ pub struct AvailableAccelerators {
     pub whisper: Vec<String>,
     pub ort: Vec<String>,
     pub gpu_devices: Vec<GpuDeviceOption>,
+    pub transcribe_cpp_devices: Vec<GpuDeviceOption>,
 }
 
 /// Returns empty lists in CI mock.
@@ -85,5 +86,6 @@ pub fn get_available_accelerators() -> AvailableAccelerators {
         whisper: vec![],
         ort: vec![],
         gpu_devices: vec![],
+        transcribe_cpp_devices: vec![],
     }
 }

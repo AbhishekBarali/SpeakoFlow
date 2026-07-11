@@ -36,6 +36,11 @@ pub struct AudioRecorder {
     worker_handle: Option<std::thread::JoinHandle<()>>,
     vad: Option<Arc<Mutex<Box<dyn vad::VoiceActivityDetector>>>>,
     level_cb: Option<Arc<dyn Fn(Vec<f32>) + Send + Sync + 'static>>,
+    /// Optional raw-PCM frame callback invoked with each resampled 16 kHz mono
+    /// frame while recording, BEFORE/independent of the VAD path. Used to feed
+    /// a live/streaming transcriber (which needs the silence to detect chunk
+    /// boundaries). `None` unless a streaming consumer is wired up.
+    frame_cb: Option<Arc<dyn Fn(&[f32]) + Send + Sync + 'static>>,
     /// Becomes `true` once the microphone has delivered its first audio frame
     /// after [`AudioRecorder::start`]. Lets callers align the "start speaking"
     /// cue with a stream that is genuinely live, instead of guessing a fixed
@@ -51,6 +56,7 @@ impl AudioRecorder {
             worker_handle: None,
             vad: None,
             level_cb: None,
+            frame_cb: None,
             capture_ready: Arc::new((Mutex::new(false), Condvar::new())),
         })
     }
@@ -65,6 +71,17 @@ impl AudioRecorder {
         F: Fn(Vec<f32>) + Send + Sync + 'static,
     {
         self.level_cb = Some(Arc::new(cb));
+        self
+    }
+
+    /// Register a callback invoked with each resampled 16 kHz mono frame while
+    /// recording. Frames are delivered pre-VAD (including silence) so a
+    /// streaming transcriber can detect its own chunk boundaries.
+    pub fn with_frame_callback<F>(mut self, cb: F) -> Self
+    where
+        F: Fn(&[f32]) + Send + Sync + 'static,
+    {
+        self.frame_cb = Some(Arc::new(cb));
         self
     }
 
@@ -89,6 +106,8 @@ impl AudioRecorder {
         let vad = self.vad.clone();
         // Move the optional level callback into the worker thread
         let level_cb = self.level_cb.clone();
+        // Move the optional raw-frame callback into the worker thread (streaming)
+        let frame_cb = self.frame_cb.clone();
         let capture_ready = self.capture_ready.clone();
 
         let worker = std::thread::spawn(move || {
@@ -172,6 +191,7 @@ impl AudioRecorder {
                         sample_rx,
                         cmd_rx,
                         level_cb,
+                        frame_cb,
                         stop_flag,
                         capture_ready,
                     );
@@ -427,6 +447,7 @@ fn run_consumer(
     sample_rx: mpsc::Receiver<AudioChunk>,
     cmd_rx: mpsc::Receiver<Cmd>,
     level_cb: Option<Arc<dyn Fn(Vec<f32>) + Send + Sync + 'static>>,
+    frame_cb: Option<Arc<dyn Fn(&[f32]) + Send + Sync + 'static>>,
     stop_flag: Arc<AtomicBool>,
     capture_ready: Arc<(Mutex<bool>, Condvar)>,
 ) {
@@ -513,6 +534,15 @@ fn run_consumer(
 
         // ---------- existing pipeline ------------------------------------ //
         frame_resampler.push(&raw, &mut |frame: &[f32]| {
+            // Feed the raw, pre-VAD 16 kHz mono frame to the streaming
+            // transcription callback (when one is armed) so its own VAD can
+            // detect speech/silence boundaries. Independent of the batch VAD
+            // path below, and only while actively recording.
+            if recording {
+                if let Some(cb) = &frame_cb {
+                    cb(frame);
+                }
+            }
             handle_frame(frame, recording, &vad, &mut processed_samples)
         });
 

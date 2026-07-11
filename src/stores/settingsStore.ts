@@ -159,6 +159,10 @@ const settingUpdaters: {
     commands.changeExperimentalEnabledSetting(value as boolean),
   lazy_stream_close: (value) =>
     commands.changeLazyStreamCloseSetting(value as boolean),
+  live_transcription_enabled: (value) =>
+    commands.changeLiveTranscriptionEnabledSetting(value as boolean),
+  live_transcription_window_enabled: (value) =>
+    commands.changeLiveTranscriptionWindowEnabledSetting(value as boolean),
   show_tray_icon: (value) =>
     commands.changeShowTrayIconSetting(value as boolean),
   whisper_accelerator: (value) =>

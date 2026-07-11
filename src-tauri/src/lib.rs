@@ -4,6 +4,7 @@ mod apple_intelligence;
 mod assistant;
 mod audio_feedback;
 pub mod audio_toolkit;
+mod catalog;
 pub mod cli;
 mod clipboard;
 mod commands;
@@ -184,13 +185,18 @@ fn initialize_core_logic(app_handle: &AppHandle) {
     // on macOS before the user is ready.
 
     // Initialize the managers
+    // Shared router for the opt-in live/streaming transcription path. Created
+    // once and handed to BOTH the recorder (which feeds raw frames) and the
+    // transcription manager (which starts/finalizes streams).
+    let stream_router = Arc::new(managers::transcription::StreamRouter::new());
     let recording_manager = Arc::new(
-        AudioRecordingManager::new(app_handle).expect("Failed to initialize recording manager"),
+        AudioRecordingManager::new(app_handle, stream_router.clone())
+            .expect("Failed to initialize recording manager"),
     );
     let model_manager =
         Arc::new(ModelManager::new(app_handle).expect("Failed to initialize model manager"));
     let transcription_manager = Arc::new(
-        TranscriptionManager::new(app_handle, model_manager.clone())
+        TranscriptionManager::new(app_handle, model_manager.clone(), stream_router.clone())
             .expect("Failed to initialize transcription manager"),
     );
     let history_manager =
@@ -201,6 +207,11 @@ fn initialize_core_logic(app_handle: &AppHandle) {
         managers::local_llm::LocalLlmManager::new(app_handle)
             .expect("Failed to initialize local LLM manager"),
     );
+
+    // Initialize transcribe.cpp (logging + backend modules) once, before any
+    // transcribe.cpp model load or device enumeration. Failures are logged and
+    // swallowed so transcribe-rs engines keep working (N1). See PLAN.md S2.
+    managers::transcription::init_transcribe_cpp();
 
     // Apply accelerator preferences before any model loads
     managers::transcription::apply_accelerator_settings(app_handle);
@@ -378,9 +389,73 @@ fn show_main_window_command(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+/// Handle the `--list-devices` CLI flag: initialize the transcribe.cpp backends
+/// (loading the bundled ggml backend libraries), enumerate the compute devices,
+/// print them plus backend availability, and return so the process exits
+/// without launching the GUI.
+///
+/// This is the Session 7 clean-machine smoke test: on a packaged install with
+/// no dev toolchain and no Vulkan SDK, a successful run (exit 0, a device
+/// listed) proves the app's own bundled DLLs/.so's are sufficient for the
+/// native engine to come up. CI installs the MSI/NSIS package and runs this.
+pub fn list_transcribe_devices() {
+    // Same FMA3 guard as the in-app GPU probe (managers::transcription): ggml's
+    // Vulkan backend uses FMA3, which SIGILLs on CPUs without it. On such a CPU
+    // report CPU-only rather than risk a crash while loading the Vulkan module.
+    #[cfg(target_arch = "x86_64")]
+    let fma3 = std::arch::is_x86_feature_detected!("fma");
+    #[cfg(not(target_arch = "x86_64"))]
+    let fma3 = true;
+
+    // Bring the backends up (init_logging + init_backends_default). Failures are
+    // logged, not fatal — mirrors the in-app path.
+    managers::transcription::init_transcribe_cpp();
+
+    if !fma3 {
+        println!("transcribe.cpp: CPU lacks FMA3 — GPU backends skipped (CPU-only).");
+    }
+
+    let devices = if fma3 {
+        transcribe_cpp::devices()
+    } else {
+        Vec::new()
+    };
+
+    println!("transcribe.cpp compute devices: {}", devices.len());
+    for d in &devices {
+        let idx = d
+            .index
+            .map(|i| i.to_string())
+            .unwrap_or_else(|| "-".to_string());
+        let label = if d.description.is_empty() {
+            d.name.as_str()
+        } else {
+            d.description.as_str()
+        };
+        let mem_mb = d.memory_total / (1024 * 1024);
+        println!(
+            "  [{idx}] {name} — {label} (kind={kind}, {mem_mb} MiB)",
+            name = d.name,
+            kind = d.kind,
+        );
+    }
+
+    // Report which backends this build can actually use at runtime (compiled in
+    // AND their module loaded), so the audit sees e.g. "Vulkan: true" on x64.
+    for backend in [
+        transcribe_cpp::Backend::Vulkan,
+        transcribe_cpp::Backend::Metal,
+        transcribe_cpp::Backend::Cpu,
+    ] {
+        println!(
+            "  backend {backend:?} available: {}",
+            transcribe_cpp::backend_available(backend)
+        );
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
-pub fn run(cli_args: CliArgs) {
-    // Detect portable mode before anything else
+pub fn run(cli_args: CliArgs) {    // Detect portable mode before anything else
     portable::init();
 
     // Allow the assistant panel to play TTS audio without a user gesture
@@ -464,6 +539,8 @@ pub fn run(cli_args: CliArgs) {
             shortcut::change_mute_while_recording_setting,
             shortcut::change_append_trailing_space_setting,
             shortcut::change_lazy_stream_close_setting,
+            shortcut::change_live_transcription_enabled_setting,
+            shortcut::change_live_transcription_window_enabled_setting,
             shortcut::change_app_language_setting,
             shortcut::change_update_checks_setting,
             shortcut::change_keyboard_implementation_setting,

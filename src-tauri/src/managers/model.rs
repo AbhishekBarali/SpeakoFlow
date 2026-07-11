@@ -51,6 +51,10 @@ pub enum EngineType {
     GigaAM,
     Canary,
     Cohere,
+    /// Native transcribe.cpp (ggml/GGUF) engine, added side-by-side with
+    /// transcribe-rs for the new single-file GGUF models (batch in Session 2,
+    /// real streaming in Session 4). This IS a transcription engine.
+    TranscribeCpp,
     /// Local large-language-model engine (GGUF served via the bundled
     /// llama.cpp sidecar). Not a transcription engine.
     LlamaCpp,
@@ -67,6 +71,23 @@ impl EngineType {
         !matches!(self, EngineType::LlamaCpp | EngineType::Kokoro)
     }
 }
+
+/// The recommended default speech-to-text model for new users: Handy's native
+/// transcribe.cpp streaming English model (PLAN.md §4, rank 1). This is what a
+/// fresh onboarding features first and what `default_model()` seeds a brand-new
+/// install with. Crucially, [`ModelManager::auto_select_model_if_needed`] falls
+/// back to any *other* downloaded transcription model when this isn't on disk
+/// yet, so the app is never left without a working model (PLAN.md Session 6 / N1).
+pub const RECOMMENDED_MODEL_ID: &str = "parakeet-unified-en-0.6b-gguf";
+
+/// The recommended multilingual streaming model (28 languages), offered
+/// alongside the English default for multilingual users (PLAN.md §4, rank 2).
+/// Surfaced by the same catalog `recommended`/`recommended_rank` metadata that
+/// drives ordering, so onboarding lists it right after the English default.
+/// Referenced by tests and kept here as the canonical id for future sessions
+/// (e.g. S7 FOLLOW_HANDY); the live wiring is the catalog rank, not this const.
+#[allow(dead_code)]
+pub const RECOMMENDED_MULTILINGUAL_MODEL_ID: &str = "nemotron-3.5-asr-streaming-0.6b-gguf";
 
 /// For vision (multimodal) LLM models, the companion multimodal projector that
 /// llama.cpp's server needs (passed via `--mmproj`). Returns the local filename
@@ -106,7 +127,11 @@ pub struct ModelInfo {
     pub accuracy_score: f32,        // 0.0 to 1.0, higher is more accurate
     pub speed_score: f32,           // 0.0 to 1.0, higher is faster
     pub supports_translation: bool, // Whether the model supports translating to English
+    pub supports_streaming: bool,   // Whether the model supports native live-streaming transcription
     pub is_recommended: bool,       // Whether this is the recommended model for new users
+    /// Overall recommendation rank (1 = top); `None` when unranked. Mirrors the
+    /// GGUF catalog `recommended_rank` and drives the model-list ordering.
+    pub recommended_rank: Option<u32>,
     pub supported_languages: Vec<String>, // Languages this model can transcribe
     pub supports_language_selection: bool, // Whether the user can explicitly pick a language
     pub is_custom: bool,            // Whether this is a user-provided custom model
@@ -232,7 +257,9 @@ impl ModelManager {
                 accuracy_score: 0.60,
                 speed_score: 0.85,
                 supports_translation: true,
+                supports_streaming: false,
                 is_recommended: false,
+                recommended_rank: None,
                 supported_languages: whisper_languages.clone(),
                 supports_language_selection: true,
                 is_custom: false,
@@ -260,7 +287,9 @@ impl ModelManager {
                 accuracy_score: 0.75,
                 speed_score: 0.60,
                 supports_translation: true,
+                supports_streaming: false,
                 is_recommended: false,
+                recommended_rank: None,
                 supported_languages: whisper_languages.clone(),
                 supports_language_selection: true,
                 is_custom: false,
@@ -287,7 +316,9 @@ impl ModelManager {
                 accuracy_score: 0.80,
                 speed_score: 0.40,
                 supports_translation: false, // Turbo doesn't support translation
+                supports_streaming: false,
                 is_recommended: false,
+                recommended_rank: None,
                 supported_languages: whisper_languages.clone(),
                 supports_language_selection: true,
                 is_custom: false,
@@ -314,7 +345,9 @@ impl ModelManager {
                 accuracy_score: 0.85,
                 speed_score: 0.30,
                 supports_translation: true,
+                supports_streaming: false,
                 is_recommended: false,
+                recommended_rank: None,
                 supported_languages: whisper_languages.clone(),
                 supports_language_selection: true,
                 is_custom: false,
@@ -342,7 +375,9 @@ impl ModelManager {
                 accuracy_score: 0.85,
                 speed_score: 0.35,
                 supports_translation: false,
+                supports_streaming: false,
                 is_recommended: false,
+                recommended_rank: None,
                 supported_languages: whisper_languages,
                 supports_language_selection: true,
                 is_custom: false,
@@ -370,7 +405,9 @@ impl ModelManager {
                 accuracy_score: 0.85,
                 speed_score: 0.85,
                 supports_translation: false,
+                supports_streaming: false,
                 is_recommended: false,
+                recommended_rank: None,
                 supported_languages: vec!["en".to_string()],
                 supports_language_selection: false,
                 is_custom: false,
@@ -407,7 +444,14 @@ impl ModelManager {
                 accuracy_score: 0.80,
                 speed_score: 0.85,
                 supports_translation: false,
-                is_recommended: true,
+                supports_streaming: false,
+                // Superseded as the recommended default by the native
+                // transcribe.cpp streaming set (parakeet-unified-en-0.6b-gguf,
+                // #1). Kept listed and fully usable via transcribe-rs — legacy
+                // models are never removed or downgraded (N2) — just no longer
+                // the default suggestion for new users (PLAN.md Session 6).
+                is_recommended: false,
+                recommended_rank: None,
                 supported_languages: parakeet_v3_languages,
                 supports_language_selection: false,
                 is_custom: false,
@@ -434,7 +478,9 @@ impl ModelManager {
                 accuracy_score: 0.70,
                 speed_score: 0.90,
                 supports_translation: false,
+                supports_streaming: false,
                 is_recommended: false,
+                recommended_rank: None,
                 supported_languages: vec!["en".to_string()],
                 supports_language_selection: false,
                 is_custom: false,
@@ -463,7 +509,9 @@ impl ModelManager {
                 accuracy_score: 0.55,
                 speed_score: 0.95,
                 supports_translation: false,
+                supports_streaming: true,
                 is_recommended: false,
+                recommended_rank: None,
                 supported_languages: vec!["en".to_string()],
                 supports_language_selection: false,
                 is_custom: false,
@@ -492,7 +540,9 @@ impl ModelManager {
                 accuracy_score: 0.65,
                 speed_score: 0.90,
                 supports_translation: false,
+                supports_streaming: true,
                 is_recommended: false,
+                recommended_rank: None,
                 supported_languages: vec!["en".to_string()],
                 supports_language_selection: false,
                 is_custom: false,
@@ -521,7 +571,9 @@ impl ModelManager {
                 accuracy_score: 0.75,
                 speed_score: 0.80,
                 supports_translation: false,
+                supports_streaming: true,
                 is_recommended: false,
+                recommended_rank: None,
                 supported_languages: vec!["en".to_string()],
                 supports_language_selection: false,
                 is_custom: false,
@@ -556,7 +608,9 @@ impl ModelManager {
                 accuracy_score: 0.65,
                 speed_score: 0.95,
                 supports_translation: false,
+                supports_streaming: false,
                 is_recommended: false,
+                recommended_rank: None,
                 supported_languages: sense_voice_languages,
                 supports_language_selection: true,
                 is_custom: false,
@@ -586,7 +640,9 @@ impl ModelManager {
                 accuracy_score: 0.85,
                 speed_score: 0.75,
                 supports_translation: false,
+                supports_streaming: false,
                 is_recommended: false,
+                recommended_rank: None,
                 supported_languages: gigaam_languages,
                 supports_language_selection: false,
                 is_custom: false,
@@ -620,7 +676,9 @@ impl ModelManager {
                 accuracy_score: 0.75,
                 speed_score: 0.85,
                 supports_translation: true,
+                supports_streaming: false,
                 is_recommended: false,
+                recommended_rank: None,
                 supported_languages: canary_flash_languages,
                 supports_language_selection: true,
                 is_custom: false,
@@ -657,7 +715,9 @@ impl ModelManager {
                 accuracy_score: 0.85,
                 speed_score: 0.70,
                 supports_translation: true,
+                supports_streaming: false,
                 is_recommended: false,
+                recommended_rank: None,
                 supported_languages: canary_1b_languages,
                 supports_language_selection: true,
                 is_custom: false,
@@ -692,12 +752,25 @@ impl ModelManager {
                 accuracy_score: 0.90,
                 speed_score: 0.60,
                 supports_translation: false,
+                supports_streaming: false,
                 is_recommended: false,
+                recommended_rank: None,
                 supported_languages: cohere_languages,
                 supports_language_selection: true,
                 is_custom: false,
             },
         );
+
+        // ---------------------------------------------------------------
+        // transcribe.cpp (ggml/GGUF) engine models — the new recommended set,
+        // loaded from the bundled catalog (`src/catalog/catalog.json`, embedded
+        // via include_str!). Bundling the whole catalog plus a loader (rather
+        // than hardcoding each model here) makes pulling a future Handy model
+        // release a one-file copy — see `crate::catalog` and PLAN.md §4 /
+        // Session 3 & 7. Single GGUF files reuse the existing resume-capable
+        // download pipeline (no `.tar.gz`, `is_directory = false`).
+        // ---------------------------------------------------------------
+        Self::insert_catalog_models(&mut available_models);
 
         // ---------------------------------------------------------------
         // Local Large Language Models (GGUF), served by the bundled
@@ -739,7 +812,9 @@ impl ModelManager {
                 accuracy_score: 0.45,
                 speed_score: 0.97,
                 supports_translation: false,
+                supports_streaming: false,
                 is_recommended: false,
+                recommended_rank: None,
                 supported_languages: llm_languages.clone(),
                 supports_language_selection: false,
                 is_custom: false,
@@ -768,7 +843,9 @@ impl ModelManager {
                 accuracy_score: 0.58,
                 speed_score: 0.82,
                 supports_translation: false,
+                supports_streaming: false,
                 is_recommended: false,
+                recommended_rank: None,
                 supported_languages: llm_languages.clone(),
                 supports_language_selection: false,
                 is_custom: false,
@@ -798,7 +875,9 @@ impl ModelManager {
                 accuracy_score: 0.74,
                 speed_score: 0.62,
                 supports_translation: false,
+                supports_streaming: false,
                 is_recommended: true,
+                recommended_rank: None,
                 supported_languages: llm_languages.clone(),
                 supports_language_selection: false,
                 is_custom: false,
@@ -828,7 +907,9 @@ impl ModelManager {
                 accuracy_score: 0.70,
                 speed_score: 0.60,
                 supports_translation: false,
+                supports_streaming: false,
                 is_recommended: false,
+                recommended_rank: None,
                 supported_languages: llm_languages,
                 supports_language_selection: false,
                 is_custom: false,
@@ -861,7 +942,9 @@ impl ModelManager {
                 accuracy_score: 0.0,
                 speed_score: 0.0,
                 supports_translation: false,
+                supports_streaming: false,
                 is_recommended: true,
+                recommended_rank: None,
                 supported_languages: vec!["en".to_string()],
                 supports_language_selection: false,
                 is_custom: false,
@@ -899,6 +982,11 @@ impl ModelManager {
         // Check which models are already downloaded
         manager.update_download_status()?;
 
+        // Session 3: apply GGUF-header capability hints to any already-downloaded
+        // transcribe.cpp models so the UI reflects their real capabilities before
+        // the first load. Never guesses (Some-only); safe no-op otherwise.
+        manager.reconcile_downloaded_cpp_headers();
+
         // Auto-select a model if none is currently selected
         manager.auto_select_model_if_needed()?;
 
@@ -913,6 +1001,172 @@ impl ModelManager {
     pub fn get_model_info(&self, model_id: &str) -> Option<ModelInfo> {
         let models = self.available_models.lock().unwrap();
         models.get(model_id).cloned()
+    }
+
+    /// Insert the transcribe.cpp GGUF models from the bundled catalog
+    /// (`crate::catalog`). Only `recommended` entries are surfaced today — the
+    /// five ranked models from PLAN.md §4 (flipping to show the whole catalog
+    /// is a one-line change: drop the `.filter(|m| m.recommended)`). Each maps
+    /// to a single-file `.gguf` `ModelInfo` on the `TranscribeCpp` engine that
+    /// reuses the existing resume-capable download pipeline.
+    ///
+    /// Internal ids are `"<slug>-gguf"` (matching the Hugging Face repo suffix),
+    /// which keeps them distinct from the legacy transcribe-rs ids that share a
+    /// slug (e.g. `canary-180m-flash`) so neither shadows the other (N2).
+    fn insert_catalog_models(available_models: &mut HashMap<String, ModelInfo>) {
+        for model in crate::catalog::catalog()
+            .models
+            .iter()
+            .filter(|m| m.recommended)
+        {
+            let Some(file) = model.default_file() else {
+                warn!(
+                    "Catalog model {} has no downloadable file; skipping",
+                    model.slug
+                );
+                continue;
+            };
+            let id = format!("{}-gguf", model.slug);
+            // Never shadow an existing entry (legacy transcribe-rs or custom).
+            if available_models.contains_key(&id) {
+                warn!("Catalog model id '{}' already present; skipping", id);
+                continue;
+            }
+            let url = model.download_url(file);
+            let size_mb = file.size_bytes / (1024 * 1024);
+            // Catalog scores are 0–100; the UI meters use 0.0–1.0.
+            let accuracy_score = (model.accuracy_score as f32 / 100.0).clamp(0.0, 1.0);
+            let speed_score = (model.speed_score as f32 / 100.0).clamp(0.0, 1.0);
+            available_models.insert(
+                id.clone(),
+                ModelInfo {
+                    id,
+                    name: model.name.clone(),
+                    description: model.description.clone(),
+                    filename: file.filename.clone(),
+                    url: Some(url),
+                    sha256: None, // catalog carries no per-file hash; verification skipped
+                    size_mb,
+                    is_downloaded: false,
+                    is_downloading: false,
+                    partial_size: 0,
+                    is_directory: false,
+                    engine_type: EngineType::TranscribeCpp,
+                    accuracy_score,
+                    speed_score,
+                    supports_translation: model.capabilities.translate,
+                    supports_streaming: model.capabilities.streaming,
+                    is_recommended: model.recommended,
+                    recommended_rank: model.recommended_rank,
+                    supported_languages: model.languages.clone(),
+                    // A language can be explicitly chosen only on multilingual models.
+                    supports_language_selection: model.language_count > 1,
+                    is_custom: false,
+                },
+            );
+        }
+    }
+
+    /// Reconcile a model's registry entry against the *loaded* model's real
+    /// capabilities. transcribe.cpp reads these from the GGUF at load time
+    /// (ground truth), so the transcription manager calls this post-load with
+    /// `session.model().capabilities()`. Unlike the pre-load header probe (which
+    /// leaves parakeet streaming unknown rather than guess), the loaded value is
+    /// authoritative. No-op when nothing changed; the load path's existing
+    /// `model-state-changed` completion event refreshes the UI list.
+    pub fn set_runtime_capabilities(
+        &self,
+        model_id: &str,
+        supports_streaming: bool,
+        supports_translation: bool,
+        languages: &[String],
+    ) {
+        let mut models = self.available_models.lock().unwrap();
+        let Some(model) = models.get_mut(model_id) else {
+            return;
+        };
+        let mut changed = false;
+        if model.supports_streaming != supports_streaming {
+            model.supports_streaming = supports_streaming;
+            changed = true;
+        }
+        if model.supports_translation != supports_translation {
+            model.supports_translation = supports_translation;
+            changed = true;
+        }
+        // An empty language list from the engine means "unknown", not "none".
+        if !languages.is_empty() && model.supported_languages != languages {
+            model.supported_languages = languages.to_vec();
+            changed = true;
+        }
+        if changed {
+            info!(
+                "Reconciled runtime capabilities for model {} (streaming={}, translate={}, langs={})",
+                model_id,
+                supports_streaming,
+                supports_translation,
+                model.supported_languages.len()
+            );
+        }
+    }
+
+    /// Apply capability hints read from a downloaded GGUF's header to its
+    /// registry entry (TranscribeCpp models only). Uses the dependency-free
+    /// [`crate::managers::model_capabilities::GgufHeaderProber`]; only fields the
+    /// header explicitly declares are applied — parakeet streaming, which the
+    /// header does not carry, is left at the catalog value and settled by a real
+    /// load's [`Self::set_runtime_capabilities`] (never guesses). Safe no-op if
+    /// the file is missing, not a GGUF, or the model isn't transcribe.cpp.
+    fn apply_gguf_header_hints(&self, model_id: &str) {
+        use crate::managers::model_capabilities::{CapabilityProber, GgufHeaderProber};
+
+        let filename = {
+            let models = self.available_models.lock().unwrap();
+            match models.get(model_id) {
+                Some(m)
+                    if matches!(m.engine_type, EngineType::TranscribeCpp) && m.is_downloaded =>
+                {
+                    m.filename.clone()
+                }
+                _ => return,
+            }
+        };
+        let path = self.models_dir.join(&filename);
+        if !path.exists() {
+            return;
+        }
+        let probe = GgufHeaderProber.probe_file(&path);
+        let mut models = self.available_models.lock().unwrap();
+        if let Some(model) = models.get_mut(model_id) {
+            if let Some(streaming) = probe.supports_streaming {
+                model.supports_streaming = streaming;
+            }
+            if let Some(translate) = probe.supports_translation {
+                model.supports_translation = translate;
+            }
+            if let Some(langs) = probe.languages {
+                if !langs.is_empty() {
+                    model.supported_languages = langs;
+                }
+            }
+        }
+    }
+
+    /// Apply GGUF-header capability hints to every already-downloaded
+    /// transcribe.cpp model. Called once at startup so the UI shows their real
+    /// capabilities before the first load.
+    fn reconcile_downloaded_cpp_headers(&self) {
+        let ids: Vec<String> = {
+            let models = self.available_models.lock().unwrap();
+            models
+                .values()
+                .filter(|m| matches!(m.engine_type, EngineType::TranscribeCpp) && m.is_downloaded)
+                .map(|m| m.id.clone())
+                .collect()
+        };
+        for id in ids {
+            self.apply_gguf_header_hints(&id);
+        }
     }
 
     fn migrate_bundled_models(&self) -> Result<()> {
@@ -1049,12 +1303,14 @@ impl ModelManager {
     fn auto_select_model_if_needed(&self) -> Result<()> {
         let mut settings = get_settings(&self.app_handle);
 
-        // Clear stale selection: selected model is set but doesn't exist
-        // in available_models (e.g. deleted custom model file)
+        // Clear a stale selection: set but no longer present in the catalog
+        // (e.g. a deleted custom model whose file is gone). This lets the
+        // picker below choose a fresh default instead of leaving a dangling id.
         if !settings.selected_model.is_empty() {
-            let models = self.available_models.lock().unwrap();
-            let exists = models.contains_key(&settings.selected_model);
-            drop(models);
+            let exists = {
+                let models = self.available_models.lock().unwrap();
+                models.contains_key(&settings.selected_model)
+            };
 
             if !exists {
                 info!(
@@ -1066,31 +1322,76 @@ impl ModelManager {
             }
         }
 
-        // If no model is selected, pick the first downloaded one
-        if settings.selected_model.is_empty() {
-            // Find the first available (downloaded) transcription model. LLM and
-            // TTS models live in the same catalog but must never be auto-selected
-            // as the active transcription model.
+        // Whether the current selection can actually transcribe right now — a
+        // downloaded transcription model. This is false for an empty selection,
+        // for an LLM/TTS id, and (importantly) for the recommended default GGUF
+        // model before it has been downloaded.
+        let selection_usable = {
             let models = self.available_models.lock().unwrap();
-            if let Some(available_model) = models
-                .values()
-                .find(|model| model.is_downloaded && model.engine_type.is_transcription())
-            {
+            models
+                .get(&settings.selected_model)
+                .map(|m| m.is_downloaded && m.engine_type.is_transcription())
+                .unwrap_or(false)
+        };
+
+        // If the current selection can't transcribe, fall back to the best
+        // *downloaded* transcription model. This is what keeps the existing
+        // default working when the new recommended streaming model isn't
+        // downloaded yet (PLAN.md Session 6 / N1): an upgrading user who already
+        // has a legacy model keeps using it, while a fresh user is simply left
+        // on the recommended id for onboarding to fetch (nothing downloaded →
+        // `None`, so we leave the selection untouched). A valid, downloaded
+        // selection is never overridden, so a user's explicit choice is kept.
+        if !selection_usable {
+            let best = {
+                let models = self.available_models.lock().unwrap();
+                Self::pick_default_transcription_model(&models)
+            };
+
+            if let Some(model_id) = best {
                 info!(
-                    "Auto-selecting model: {} ({})",
-                    available_model.id, available_model.name
+                    "Auto-selecting transcription model: {} (previous selection '{}' unavailable)",
+                    model_id, settings.selected_model
                 );
-
-                // Update settings with the selected model
-                let mut updated_settings = settings;
-                updated_settings.selected_model = available_model.id.clone();
-                write_settings(&self.app_handle, updated_settings);
-
-                info!("Successfully auto-selected model: {}", available_model.id);
+                settings.selected_model = model_id;
+                write_settings(&self.app_handle, settings);
             }
         }
 
         Ok(())
+    }
+
+    /// Pick the best *downloaded* transcription model to activate as the
+    /// default, or `None` when none is downloaded yet (a fresh install, before
+    /// onboarding). Preference order: recommended rank (1 = top), then the
+    /// recommended flag, then higher accuracy, with the id as a stable
+    /// tie-breaker (so the choice is deterministic despite the backing
+    /// `HashMap`'s arbitrary iteration order). This makes the recommended
+    /// streaming model the active default once it's on disk, but any other
+    /// downloaded transcription model (legacy ONNX/whisper included) is a valid
+    /// fallback — never LLM or TTS models.
+    fn pick_default_transcription_model(
+        models: &HashMap<String, ModelInfo>,
+    ) -> Option<String> {
+        models
+            .values()
+            .filter(|m| m.is_downloaded && m.engine_type.is_transcription())
+            .min_by(|a, b| {
+                let rank = |m: &ModelInfo| m.recommended_rank.unwrap_or(u32::MAX);
+                rank(a)
+                    .cmp(&rank(b))
+                    // recommended before not-recommended (true sorts first)
+                    .then_with(|| b.is_recommended.cmp(&a.is_recommended))
+                    // higher accuracy first
+                    .then_with(|| {
+                        b.accuracy_score
+                            .partial_cmp(&a.accuracy_score)
+                            .unwrap_or(std::cmp::Ordering::Equal)
+                    })
+                    // stable, deterministic final tie-break
+                    .then_with(|| a.id.cmp(&b.id))
+            })
+            .map(|m| m.id.clone())
     }
 
     /// Discover custom Whisper models (.bin files) in the models directory.
@@ -1203,7 +1504,9 @@ impl ModelManager {
                     accuracy_score: 0.0, // Sentinel: UI hides score bars when both are 0
                     speed_score: 0.0,
                     supports_translation: false,
+                    supports_streaming: false,
                     is_recommended: false,
+                    recommended_rank: None,
                     supported_languages: vec![],
                     supports_language_selection: true,
                     is_custom: true,
@@ -1267,7 +1570,9 @@ impl ModelManager {
             accuracy_score: 0.0, // Sentinel: UI hides score bars when both are 0
             speed_score: 0.0,
             supports_translation: false,
+            supports_streaming: false,
             is_recommended: false,
+            recommended_rank: None,
             supported_languages: Self::default_llm_languages(),
             supports_language_selection: false,
             is_custom: true,
@@ -2002,6 +2307,11 @@ impl ModelManager {
         }
         self.cancel_flags.lock().unwrap().remove(model_id);
 
+        // Session 3: for transcribe.cpp GGUF models, read the freshly-downloaded
+        // file's header and apply its declared capability hints (no-op for other
+        // engines / non-GGUF). The authoritative reconcile still happens on load.
+        self.apply_gguf_header_hints(model_id);
+
         // Emit completion event
         let _ = self.app_handle.emit("model-download-complete", model_id);
 
@@ -2195,6 +2505,227 @@ mod tests {
     use tempfile::TempDir;
 
     #[test]
+    fn catalog_models_are_inserted_as_transcribe_cpp() {
+        let mut models = HashMap::new();
+        ModelManager::insert_catalog_models(&mut models);
+
+        // The 5 ranked recommended models from PLAN.md §4.
+        for slug in [
+            "parakeet-unified-en-0.6b",
+            "nemotron-3.5-asr-streaming-0.6b",
+            "canary-180m-flash",
+            "cohere-transcribe-03-2026",
+            "whisper-medium",
+        ] {
+            let id = format!("{}-gguf", slug);
+            let m = models
+                .get(&id)
+                .unwrap_or_else(|| panic!("recommended model {} missing", id));
+            assert_eq!(m.engine_type, EngineType::TranscribeCpp);
+            assert!(m.is_recommended, "{} should be recommended", id);
+            assert!(m.recommended_rank.is_some(), "{} should have a rank", id);
+            assert!(!m.is_directory, "{} is a single-file GGUF", id);
+            assert!(m.filename.ends_with(".gguf"), "{} filename", id);
+            assert!(
+                m.url
+                    .as_ref()
+                    .is_some_and(|u| u.starts_with("https://huggingface.co/handy-computer/")
+                        && u.ends_with(".gguf")),
+                "{} url",
+                id
+            );
+            assert!(m.size_mb > 0, "{} size", id);
+        }
+
+        // Parakeet Unified EN is the streaming rank-1 English model.
+        let parakeet = models.get("parakeet-unified-en-0.6b-gguf").unwrap();
+        assert!(parakeet.supports_streaming);
+        assert_eq!(parakeet.recommended_rank, Some(1));
+        assert_eq!(parakeet.supported_languages, vec!["en".to_string()]);
+        assert_eq!(parakeet.size_mb, 731_357_568 / (1024 * 1024));
+
+        // The GGUF canary id must be namespaced so it can't shadow the legacy
+        // transcribe-rs `canary-180m-flash` entry (N2, side-by-side).
+        assert!(models.contains_key("canary-180m-flash-gguf"));
+        assert!(!models.contains_key("canary-180m-flash"));
+
+        // A batch-only model reports no streaming.
+        assert!(!models.get("whisper-medium-gguf").unwrap().supports_streaming);
+    }
+
+    /// Both recommended-default ids must resolve to real, streaming catalog
+    /// models — the guarantee behind "fresh onboarding recommends the streaming
+    /// model" (PLAN.md Session 6).
+    #[test]
+    fn recommended_default_ids_resolve_to_streaming_catalog_models() {
+        let mut models = HashMap::new();
+        ModelManager::insert_catalog_models(&mut models);
+
+        let english = models
+            .get(RECOMMENDED_MODEL_ID)
+            .expect("recommended English default must be a catalog model");
+        assert_eq!(english.engine_type, EngineType::TranscribeCpp);
+        assert!(english.is_recommended);
+        assert_eq!(english.recommended_rank, Some(1));
+        assert!(english.supports_streaming);
+        assert_eq!(english.supported_languages, vec!["en".to_string()]);
+
+        let multilingual = models
+            .get(RECOMMENDED_MULTILINGUAL_MODEL_ID)
+            .expect("recommended multilingual model must be a catalog model");
+        assert_eq!(multilingual.engine_type, EngineType::TranscribeCpp);
+        assert!(multilingual.is_recommended);
+        assert_eq!(multilingual.recommended_rank, Some(2));
+        assert!(multilingual.supports_streaming);
+        assert!(
+            multilingual.supported_languages.len() > 1,
+            "the multilingual option must support many languages"
+        );
+    }
+
+    /// Minimal transcription `ModelInfo` for the picker tests.
+    fn make_stt(
+        id: &str,
+        is_downloaded: bool,
+        is_recommended: bool,
+        recommended_rank: Option<u32>,
+        accuracy_score: f32,
+        engine_type: EngineType,
+    ) -> ModelInfo {
+        ModelInfo {
+            id: id.to_string(),
+            name: id.to_string(),
+            description: String::new(),
+            filename: format!("{id}.bin"),
+            url: None,
+            sha256: None,
+            size_mb: 100,
+            is_downloaded,
+            is_downloading: false,
+            partial_size: 0,
+            is_directory: false,
+            engine_type,
+            accuracy_score,
+            speed_score: 0.5,
+            supports_translation: false,
+            supports_streaming: false,
+            is_recommended,
+            recommended_rank,
+            supported_languages: vec!["en".to_string()],
+            supports_language_selection: false,
+            is_custom: false,
+        }
+    }
+
+    #[test]
+    fn pick_default_prefers_recommended_rank_and_skips_non_transcription() {
+        let mut models = HashMap::new();
+        // A very accurate legacy model, the recommended rank-1 GGUF, and a
+        // downloaded LLM that must never be chosen as the transcription default.
+        models.insert(
+            "small".to_string(),
+            make_stt("small", true, false, None, 0.95, EngineType::Whisper),
+        );
+        models.insert(
+            RECOMMENDED_MODEL_ID.to_string(),
+            make_stt(
+                RECOMMENDED_MODEL_ID,
+                true,
+                true,
+                Some(1),
+                0.70,
+                EngineType::TranscribeCpp,
+            ),
+        );
+        models.insert(
+            "gemma-3-1b".to_string(),
+            make_stt("gemma-3-1b", true, true, Some(1), 1.0, EngineType::LlamaCpp),
+        );
+
+        assert_eq!(
+            ModelManager::pick_default_transcription_model(&models).as_deref(),
+            Some(RECOMMENDED_MODEL_ID),
+            "the recommended rank-1 transcription model wins over a more-accurate legacy one, and LLMs are ignored"
+        );
+    }
+
+    #[test]
+    fn pick_default_falls_back_to_downloaded_when_recommended_absent() {
+        // The recommended GGUF exists in the catalog but isn't downloaded; the
+        // only downloaded transcription model is a legacy one. The existing
+        // default must keep working (PLAN.md Session 6 / N1).
+        let mut models = HashMap::new();
+        models.insert(
+            "parakeet-tdt-0.6b-v3".to_string(),
+            make_stt(
+                "parakeet-tdt-0.6b-v3",
+                true,
+                false,
+                None,
+                0.80,
+                EngineType::Parakeet,
+            ),
+        );
+        models.insert(
+            RECOMMENDED_MODEL_ID.to_string(),
+            make_stt(
+                RECOMMENDED_MODEL_ID,
+                false, // not downloaded
+                true,
+                Some(1),
+                0.90,
+                EngineType::TranscribeCpp,
+            ),
+        );
+
+        assert_eq!(
+            ModelManager::pick_default_transcription_model(&models).as_deref(),
+            Some("parakeet-tdt-0.6b-v3"),
+        );
+    }
+
+    #[test]
+    fn pick_default_is_none_when_nothing_downloaded() {
+        // Fresh install: the recommended model is known but not on disk, so the
+        // picker returns None and the selection is left for onboarding.
+        let mut models = HashMap::new();
+        models.insert(
+            RECOMMENDED_MODEL_ID.to_string(),
+            make_stt(
+                RECOMMENDED_MODEL_ID,
+                false,
+                true,
+                Some(1),
+                0.90,
+                EngineType::TranscribeCpp,
+            ),
+        );
+        assert_eq!(
+            ModelManager::pick_default_transcription_model(&models),
+            None
+        );
+    }
+
+    #[test]
+    fn legacy_parakeet_v3_is_no_longer_recommended() {
+        // Guards the Session 6 flip. The catalog GGUF set is the recommended
+        // set now; verify that among the catalog-inserted models the recommended
+        // ones are all TranscribeCpp (GGUF), i.e. no legacy transcribe-rs engine
+        // is marked recommended by the catalog path. (The legacy Parakeet V3's
+        // hardcoded `is_recommended: false` is compiled in `ModelManager::new`.)
+        let mut models = HashMap::new();
+        ModelManager::insert_catalog_models(&mut models);
+        for m in models.values().filter(|m| m.is_recommended) {
+            assert_eq!(
+                m.engine_type,
+                EngineType::TranscribeCpp,
+                "recommended catalog model {} must be a GGUF transcribe.cpp model",
+                m.id
+            );
+        }
+    }
+
+    #[test]
     fn test_discover_custom_whisper_models() {
         let temp_dir = TempDir::new().unwrap();
         let models_dir = temp_dir.path().to_path_buf();
@@ -2232,7 +2763,9 @@ mod tests {
                 accuracy_score: 0.5,
                 speed_score: 0.5,
                 supports_translation: true,
+                supports_streaming: false,
                 is_recommended: false,
+                recommended_rank: None,
                 supported_languages: vec!["en".to_string()],
                 supports_language_selection: true,
                 is_custom: false,

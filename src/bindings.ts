@@ -435,6 +435,28 @@ async changeLazyStreamCloseSetting(enabled: boolean) : Promise<Result<null, stri
     else return { status: "error", error: e  as any };
 }
 },
+async changeLiveTranscriptionEnabledSetting(enabled: boolean) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("change_live_transcription_enabled_setting", { enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Toggle the opt-in live-transcription window: when on (and live transcription
+ * is enabled), the recording overlay grows into a readable card showing the
+ * running committed + tentative transcript; when off, the overlay stays the
+ * compact pill. Off by default.
+ */
+async changeLiveTranscriptionWindowEnabledSetting(enabled: boolean) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("change_live_transcription_window_enabled_setting", { enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async changeAppLanguageSetting(language: string) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("change_app_language_setting", { language }) };
@@ -1945,7 +1967,23 @@ tap_to_lock_key?: string;
  * shortcut is ctrl+alt+space) is ignored, since the held key would instantly
  * lock the recording. Clear it (empty) to disable.
  */
-assistant_tap_to_lock_key?: string; audio_feedback: boolean; audio_feedback_volume?: number; sound_theme?: SoundTheme; start_hidden?: boolean; autostart_enabled?: boolean; update_checks_enabled?: boolean; selected_model?: string; always_on_microphone?: boolean; selected_microphone?: string | null; clamshell_microphone?: string | null; selected_output_device?: string | null; translate_to_english?: boolean; selected_language?: string; overlay_position?: OverlayPosition; debug_mode?: boolean; log_level?: LogLevel; custom_words?: string[]; 
+assistant_tap_to_lock_key?: string; audio_feedback: boolean; audio_feedback_volume?: number; sound_theme?: SoundTheme; start_hidden?: boolean; autostart_enabled?: boolean; update_checks_enabled?: boolean; selected_model?: string; always_on_microphone?: boolean; 
+/**
+ * Opt-in live/streaming transcription: while recording, feed audio into a
+ * streaming transcriber and paste the merged running result at the end
+ * (with the batch `transcribe()` path as the fallback). Off by default —
+ * when off, dictation behaves exactly as before.
+ */
+live_transcription_enabled?: boolean; 
+/**
+ * Opt-in live-transcription window: while streaming dictation is running,
+ * enlarge the recording overlay into a readable card that shows the
+ * running committed + tentative transcript, instead of the compact pill.
+ * Off by default. Only takes effect when `live_transcription_enabled` is
+ * also on (there's no live text to show otherwise); when off, the overlay
+ * stays the compact pill exactly as before.
+ */
+live_transcription_window_enabled?: boolean; selected_microphone?: string | null; clamshell_microphone?: string | null; selected_output_device?: string | null; translate_to_english?: boolean; selected_language?: string; overlay_position?: OverlayPosition; debug_mode?: boolean; log_level?: LogLevel; custom_words?: string[]; 
 /**
  * Master switch for the deterministic text-replacements pass.
  */
@@ -2221,7 +2259,14 @@ export type AssistantSearchDepth =
 "high"
 export type AudioDevice = { index: string; name: string; is_default: boolean }
 export type AutoSubmitKey = "enter" | "ctrl_enter" | "cmd_enter"
-export type AvailableAccelerators = { whisper: string[]; ort: string[]; gpu_devices: GpuDeviceOption[] }
+export type AvailableAccelerators = { whisper: string[]; ort: string[]; gpu_devices: GpuDeviceOption[]; 
+/**
+ * transcribe.cpp compute devices (`transcribe_cpp::devices()`), added in
+ * Session 2. Informational for now (proves the GPU is visible to the new
+ * engine); the transcribe.cpp backend reuses the existing whisper
+ * GPU-device dial, so there is no separate device setting.
+ */
+transcribe_cpp_devices: GpuDeviceOption[] }
 /**
  * A neural voice returned by the Azure Speech `voices/list` endpoint.
  */
@@ -2276,6 +2321,12 @@ images?: string[] }
 export type ClipboardHandling = "dont_modify" | "copy_to_clipboard"
 export type CustomSounds = { start: boolean; stop: boolean }
 export type EngineType = "Whisper" | "Parakeet" | "Moonshine" | "MoonshineStreaming" | "SenseVoice" | "GigaAM" | "Canary" | "Cohere" | 
+/**
+ * Native transcribe.cpp (ggml/GGUF) engine, added side-by-side with
+ * transcribe-rs for the new single-file GGUF models (batch in Session 2,
+ * real streaming in Session 4). This IS a transcription engine.
+ */
+"TranscribeCpp" | 
 /**
  * Local large-language-model engine (GGUF served via the bundled
  * llama.cpp sidecar). Not a transcription engine.
@@ -2422,7 +2473,12 @@ confidence?: MemoryConfidence;
  * `"auto"` (distilled from a conversation). Purely informational.
  */
 source?: string }
-export type ModelInfo = { id: string; name: string; description: string; filename: string; url: string | null; sha256: string | null; size_mb: number; is_downloaded: boolean; is_downloading: boolean; partial_size: number; is_directory: boolean; engine_type: EngineType; accuracy_score: number; speed_score: number; supports_translation: boolean; is_recommended: boolean; supported_languages: string[]; supports_language_selection: boolean; is_custom: boolean }
+export type ModelInfo = { id: string; name: string; description: string; filename: string; url: string | null; sha256: string | null; size_mb: number; is_downloaded: boolean; is_downloading: boolean; partial_size: number; is_directory: boolean; engine_type: EngineType; accuracy_score: number; speed_score: number; supports_translation: boolean; supports_streaming: boolean; is_recommended: boolean; 
+/**
+ * Overall recommendation rank (1 = top); `None` when unranked. Mirrors the
+ * GGUF catalog `recommended_rank` and drives the model-list ordering.
+ */
+recommended_rank: number | null; supported_languages: string[]; supports_language_selection: boolean; is_custom: boolean }
 export type ModelLoadStatus = { is_loaded: boolean; current_model: string | null }
 export type ModelUnloadTimeout = "never" | "immediately" | "min_2" | "min_5" | "min_10" | "min_15" | "hour_1" | "sec_15"
 export type OrtAcceleratorSetting = "auto" | "cpu" | "cuda" | "directml" | "rocm"

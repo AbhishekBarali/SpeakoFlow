@@ -16,7 +16,11 @@
  */
 
 .audio-waveform {
-  --wave-bar: linear-gradient(to top, #cdbfa8, #fafaf9 75%);
+  /* Warm vertical gradient: champagne/bronze at the base glowing to a warm
+   * ivory at the tips. Three stops with a clear luminance spread so the warmth
+   * actually reads on the thin (~2px) bars — a straight two-stop fade to
+   * near-white washed out to a flat off-white at this size. */
+  --wave-bar: linear-gradient(to top, #b0885a 0%, #e3cda3 50%, #fbf3e2 100%);
 
   position: relative;
   display: flex;
@@ -42,7 +46,7 @@
  * the light card. Scoped to data-theme="light" so the always-dark recording
  * overlay (which never sets that attribute) keeps its off-white bars. */
 :root[data-theme="light"] .audio-waveform {
-  --wave-bar: linear-gradient(to top, #9c8c75, #c4b59d 72%);
+  --wave-bar: linear-gradient(to top, #7d6242 0%, #a08560 50%, #c6ad86 100%);
 }
 
 .wave-bars {

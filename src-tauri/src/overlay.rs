@@ -39,6 +39,25 @@ tauri_panel! {
 const OVERLAY_WIDTH: f64 = 128.0;
 const OVERLAY_HEIGHT: f64 = 40.0;
 
+// The opt-in live-transcription window (see `live_transcription_window_enabled`)
+// reuses this same overlay window, resized into a larger card so the running
+// committed + tentative transcript is readable during dictation. Mirrors
+// Handy's 400×120 streaming overlay. When the window setting is off the overlay
+// stays the compact pill above.
+const OVERLAY_STREAM_WIDTH: f64 = 400.0;
+const OVERLAY_STREAM_HEIGHT: f64 = 120.0;
+
+/// Payload of the "show-overlay" event. Carries the visual `state`
+/// (recording / transcribing / processing) plus whether the larger
+/// live-transcription card should be rendered (`streaming_window`). Serialized
+/// camelCase so the overlay reads `event.payload.streamingWindow`.
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ShowOverlayPayload {
+    state: String,
+    streaming_window: bool,
+}
+
 #[cfg(target_os = "macos")]
 const OVERLAY_TOP_OFFSET: f64 = 46.0;
 #[cfg(any(target_os = "windows", target_os = "linux"))]
@@ -199,7 +218,8 @@ fn is_mouse_within_monitor(
         && mouse_y < (monitor_y + monitor_height as i32)
 }
 
-/// Returns overlay position in logical coordinates (points on macOS).
+/// Returns overlay position in logical coordinates (points on macOS) for a
+/// window of the given logical `width`/`height`.
 ///
 /// Uses monitor position/size directly rather than work_area(), which can
 /// return incorrect coordinates on macOS for monitors with negative positions.
@@ -209,7 +229,15 @@ fn is_mouse_within_monitor(
 /// We must use LogicalPosition (not PhysicalPosition) because Tauri/tao
 /// converts PhysicalPosition using the scale factor of the monitor the window
 /// is *currently* on, which is wrong when moving cross-monitor.
-fn calculate_overlay_position(app_handle: &AppHandle) -> Option<(f64, f64)> {
+///
+/// Parameterized by size so the same monitor-under-cursor placement works for
+/// both the compact pill and the larger live-transcription card (which must be
+/// centered on its own width, not the pill's).
+fn calculate_overlay_position_sized(
+    app_handle: &AppHandle,
+    width: f64,
+    height: f64,
+) -> Option<(f64, f64)> {
     let monitor = get_monitor_with_cursor(app_handle)?;
     let scale = monitor.scale_factor();
     let monitor_x = monitor.position().x as f64 / scale;
@@ -219,15 +247,33 @@ fn calculate_overlay_position(app_handle: &AppHandle) -> Option<(f64, f64)> {
 
     let settings = settings::get_settings(app_handle);
 
-    let x = monitor_x + (monitor_width - OVERLAY_WIDTH) / 2.0;
+    let x = monitor_x + (monitor_width - width) / 2.0;
     let y = match settings.overlay_position {
         OverlayPosition::Top => monitor_y + OVERLAY_TOP_OFFSET,
         OverlayPosition::Bottom | OverlayPosition::None => {
-            monitor_y + monitor_height - OVERLAY_HEIGHT - OVERLAY_BOTTOM_OFFSET
+            monitor_y + monitor_height - height - OVERLAY_BOTTOM_OFFSET
         }
     };
 
     Some((x, y))
+}
+
+/// Convenience wrapper: position for the compact pill (the default size).
+fn calculate_overlay_position(app_handle: &AppHandle) -> Option<(f64, f64)> {
+    calculate_overlay_position_sized(app_handle, OVERLAY_WIDTH, OVERLAY_HEIGHT)
+}
+
+/// The overlay window's current size in logical pixels, or the compact pill
+/// size as a fallback. Lets `update_overlay_position` re-center correctly
+/// regardless of whether the overlay is currently the pill or the larger card.
+fn current_overlay_logical_size(window: &tauri::webview::WebviewWindow) -> (f64, f64) {
+    let scale = window.scale_factor().unwrap_or(1.0);
+    match window.inner_size() {
+        Ok(size) if size.width > 0 && size.height > 0 => {
+            (size.width as f64 / scale, size.height as f64 / scale)
+        }
+        _ => (OVERLAY_WIDTH, OVERLAY_HEIGHT),
+    }
 }
 
 /// Creates the recording overlay window and keeps it hidden by default
@@ -335,7 +381,28 @@ fn show_overlay_state(app_handle: &AppHandle, state: &str) {
         return;
     }
 
-    update_overlay_position(app_handle);
+    // The larger live-transcription card is opt-in (default off) and only
+    // meaningful while streaming is actually producing text, so gate it on BOTH
+    // the window toggle and live transcription being enabled. Otherwise the
+    // overlay stays the compact pill — unchanged behavior for every existing
+    // state (recording / transcribing / processing).
+    let streaming_window =
+        settings.live_transcription_window_enabled && settings.live_transcription_enabled;
+
+    let (width, height) = if streaming_window {
+        (OVERLAY_STREAM_WIDTH, OVERLAY_STREAM_HEIGHT)
+    } else {
+        (OVERLAY_WIDTH, OVERLAY_HEIGHT)
+    };
+
+    // Size the overlay for the current mode, then re-center for that exact
+    // size, BEFORE showing it — so it never flashes at the wrong size/position.
+    // Reuses the same monitor-under-cursor placement for both sizes.
+    if let Some(overlay_window) = app_handle.get_webview_window("recording_overlay") {
+        let _ =
+            overlay_window.set_size(tauri::Size::Logical(tauri::LogicalSize { width, height }));
+    }
+    update_overlay_position_sized(app_handle, width, height);
 
     if let Some(overlay_window) = app_handle.get_webview_window("recording_overlay") {
         let _ = overlay_window.show();
@@ -344,7 +411,13 @@ fn show_overlay_state(app_handle: &AppHandle, state: &str) {
         #[cfg(target_os = "windows")]
         force_overlay_topmost(&overlay_window);
 
-        let _ = overlay_window.emit("show-overlay", state);
+        let _ = overlay_window.emit(
+            "show-overlay",
+            ShowOverlayPayload {
+                state: state.to_string(),
+                streaming_window,
+            },
+        );
     }
 }
 
@@ -363,15 +436,27 @@ pub fn show_processing_overlay(app_handle: &AppHandle) {
     show_overlay_state(app_handle, "processing");
 }
 
-/// Updates the overlay window position based on current settings
+/// Updates the overlay window position based on current settings, re-centering
+/// for the overlay's current size (compact pill or larger live card).
 pub fn update_overlay_position(app_handle: &AppHandle) {
+    let (width, height) = app_handle
+        .get_webview_window("recording_overlay")
+        .map(|w| current_overlay_logical_size(&w))
+        .unwrap_or((OVERLAY_WIDTH, OVERLAY_HEIGHT));
+    update_overlay_position_sized(app_handle, width, height);
+}
+
+/// Positions the overlay window centered for a window of the given logical
+/// size. Shared by the compact pill and the larger live-transcription card so
+/// both re-center correctly on the monitor under the cursor.
+fn update_overlay_position_sized(app_handle: &AppHandle, width: f64, height: f64) {
     if let Some(overlay_window) = app_handle.get_webview_window("recording_overlay") {
         #[cfg(target_os = "linux")]
         {
             update_gtk_layer_shell_anchors(&overlay_window);
         }
 
-        if let Some((x, y)) = calculate_overlay_position(app_handle) {
+        if let Some((x, y)) = calculate_overlay_position_sized(app_handle, width, height) {
             let _ = overlay_window
                 .set_position(tauri::Position::Logical(tauri::LogicalPosition { x, y }));
         }

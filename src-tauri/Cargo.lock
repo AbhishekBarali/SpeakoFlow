@@ -6709,6 +6709,7 @@ dependencies = [
  "tauri-specta",
  "tempfile",
  "tokio",
+ "transcribe-cpp",
  "transcribe-rs",
  "vad-rs",
  "windows 0.61.3",
@@ -8054,6 +8055,27 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "db97caf9d906fbde555dd62fa95ddba9eecfd14cb388e4f491a66d74cd5fb79a"
 dependencies = [
  "once_cell",
+]
+
+[[package]]
+name = "transcribe-cpp"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2d77cafeaa8818547b7d52755e061aee75fff6d2b118085e0bf52802ec88f333"
+dependencies = [
+ "log",
+ "thiserror 2.0.18",
+ "transcribe-cpp-sys",
+]
+
+[[package]]
+name = "transcribe-cpp-sys"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4df6436154f7b8c5212b959dda97af90b60100388bab4cb378acf7a8ca560211"
+dependencies = [
+ "cmake",
+ "serde_json",
 ]
 
 [[package]]

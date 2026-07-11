@@ -1,5 +1,6 @@
 use crate::audio_toolkit::{list_input_devices, vad::SmoothedVad, AudioRecorder, SileroVad};
 use crate::helpers::clamshell;
+use crate::managers::transcription::StreamRouter;
 use crate::settings::{get_settings, AppSettings};
 use crate::utils;
 use log::{debug, error, info};
@@ -120,13 +121,15 @@ pub enum MicrophoneMode {
 fn create_audio_recorder(
     vad_path: &str,
     app_handle: &tauri::AppHandle,
+    stream_router: Arc<StreamRouter>,
 ) -> Result<AudioRecorder, anyhow::Error> {
     let silero = SileroVad::new(vad_path, 0.3)
         .map_err(|e| anyhow::anyhow!("Failed to create SileroVad: {}", e))?;
     let smoothed_vad = SmoothedVad::new(Box::new(silero), 15, 15, 2);
 
     // Recorder with VAD plus a spectrum-level callback that forwards updates to
-    // the frontend.
+    // the frontend, and a raw-frame callback that feeds the live-transcription
+    // router (a cheap no-op unless a stream is active).
     let recorder = AudioRecorder::new()
         .map_err(|e| anyhow::anyhow!("Failed to create AudioRecorder: {}", e))?
         .with_vad(Box::new(smoothed_vad))
@@ -135,6 +138,10 @@ fn create_audio_recorder(
             move |levels| {
                 utils::emit_levels(&app_handle, &levels);
             }
+        })
+        .with_frame_callback({
+            let stream_router = stream_router.clone();
+            move |frame| stream_router.feed(frame)
         });
 
     Ok(recorder)
@@ -153,12 +160,18 @@ pub struct AudioRecordingManager {
     is_recording: Arc<Mutex<bool>>,
     did_mute: Arc<Mutex<bool>>,
     close_generation: Arc<AtomicU64>,
+    /// Shared with the `TranscriptionManager`; the recorder's frame callback
+    /// feeds raw frames into it while a live-transcription stream is active.
+    stream_router: Arc<StreamRouter>,
 }
 
 impl AudioRecordingManager {
     /* ---------- construction ------------------------------------------------ */
 
-    pub fn new(app: &tauri::AppHandle) -> Result<Self, anyhow::Error> {
+    pub fn new(
+        app: &tauri::AppHandle,
+        stream_router: Arc<StreamRouter>,
+    ) -> Result<Self, anyhow::Error> {
         let settings = get_settings(app);
         let mode = if settings.always_on_microphone {
             MicrophoneMode::AlwaysOn
@@ -176,6 +189,7 @@ impl AudioRecordingManager {
             is_recording: Arc::new(Mutex::new(false)),
             did_mute: Arc::new(Mutex::new(false)),
             close_generation: Arc::new(AtomicU64::new(0)),
+            stream_router,
         };
 
         // Always-on?  Open immediately.
@@ -277,6 +291,7 @@ impl AudioRecordingManager {
             *recorder_opt = Some(create_audio_recorder(
                 vad_path.to_str().unwrap(),
                 &self.app_handle,
+                self.stream_router.clone(),
             )?);
         }
         Ok(())

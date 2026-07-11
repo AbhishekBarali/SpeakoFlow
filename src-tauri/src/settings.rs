@@ -726,6 +726,20 @@ pub struct AppSettings {
     pub selected_model: String,
     #[serde(default = "default_always_on_microphone")]
     pub always_on_microphone: bool,
+    /// Opt-in live/streaming transcription: while recording, feed audio into a
+    /// streaming transcriber and paste the merged running result at the end
+    /// (with the batch `transcribe()` path as the fallback). Off by default —
+    /// when off, dictation behaves exactly as before.
+    #[serde(default = "default_live_transcription_enabled")]
+    pub live_transcription_enabled: bool,
+    /// Opt-in live-transcription window: while streaming dictation is running,
+    /// enlarge the recording overlay into a readable card that shows the
+    /// running committed + tentative transcript, instead of the compact pill.
+    /// Off by default. Only takes effect when `live_transcription_enabled` is
+    /// also on (there's no live text to show otherwise); when off, the overlay
+    /// stays the compact pill exactly as before.
+    #[serde(default = "default_live_transcription_window_enabled")]
+    pub live_transcription_window_enabled: bool,
     #[serde(default)]
     pub selected_microphone: Option<String>,
     #[serde(default)]
@@ -986,10 +1000,24 @@ pub struct AppSettings {
 }
 
 fn default_model() -> String {
-    "".to_string()
+    // Seed a brand-new install with the recommended default: Handy's native
+    // transcribe.cpp streaming English model. serde only calls this when the
+    // `selected_model` field is absent (a fresh store), so existing users are
+    // unaffected. If it isn't downloaded yet, `auto_select_model_if_needed`
+    // falls back to any other downloaded transcription model, so the app is
+    // never stranded without a working model (PLAN.md Session 6, N1).
+    crate::managers::model::RECOMMENDED_MODEL_ID.to_string()
 }
 
 fn default_always_on_microphone() -> bool {
+    false
+}
+
+fn default_live_transcription_enabled() -> bool {
+    false
+}
+
+fn default_live_transcription_window_enabled() -> bool {
     false
 }
 
@@ -1904,6 +1932,8 @@ pub fn get_default_settings() -> AppSettings {
         update_checks_enabled: default_update_checks_enabled(),
         selected_model: "".to_string(),
         always_on_microphone: false,
+        live_transcription_enabled: false,
+        live_transcription_window_enabled: false,
         selected_microphone: None,
         clamshell_microphone: None,
         selected_output_device: None,

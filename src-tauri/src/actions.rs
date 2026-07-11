@@ -42,6 +42,20 @@ impl Drop for FinishGuard {
         if let Some(c) = self.0.try_state::<TranscriptionCoordinator>() {
             c.notify_processing_finished();
         }
+        // Catch-all release of any live-transcription streaming worker. The
+        // early-exit paths in TranscribeAction::stop (empty samples, no samples
+        // returned, or a transcription error) never call finalize_stream(),
+        // which would otherwise orphan the worker — leaking its thread and the
+        // leased model and leaving the router stuck open, breaking streaming for
+        // later recordings until restart. cancel_stream() is a guaranteed no-op
+        // when no stream is active, and finalize_stream() already take()s the
+        // router on the success path, so this only ever releases a worker that
+        // was never finalized. Harmless for AssistantAction, which never starts
+        // a stream. The guard drops after finalize_stream()/paste, so a
+        // still-wanted stream is never cancelled.
+        if let Some(tm) = self.0.try_state::<Arc<TranscriptionManager>>() {
+            tm.cancel_stream();
+        }
     }
 }
 
@@ -531,6 +545,16 @@ impl ShortcutAction for TranscribeAction {
 
         // Load ASR model and VAD model in parallel
         tm.initiate_model_load();
+
+        // Live/streaming transcription (opt-in, off by default). Start the
+        // streaming worker now so it waits for the model load and begins
+        // consuming frames as soon as recording starts. The batch transcribe()
+        // path stays the fallback (see stop()); when this setting is off, none
+        // of the streaming machinery runs and behavior is unchanged.
+        if get_settings(app).live_transcription_enabled {
+            tm.start_stream();
+        }
+
         let rm_clone = Arc::clone(&rm);
         std::thread::spawn(move || {
             if let Err(e) = rm_clone.preload_vad() {
@@ -696,9 +720,25 @@ impl ShortcutAction for TranscribeAction {
                         crate::audio_toolkit::save_wav_file(&wav_path, &samples_for_wav)
                     });
 
-                    // Transcribe concurrently with WAV save
+                    // Transcribe concurrently with WAV save.
+                    // Live transcription: finalize the streaming worker for the
+                    // merged result. finalize_stream() is a no-op returning
+                    // Ok(None) when no stream is active (the default), so the
+                    // batch transcribe() path is used exactly as before. It also
+                    // falls back to batch when the stream produced nothing or
+                    // errored/timed out, so the user never loses their words.
                     let transcription_time = Instant::now();
-                    let transcription_result = tm.transcribe(samples);
+                    let transcription_result = match tm.finalize_stream() {
+                        Ok(Some(text)) => Ok(text),
+                        Ok(None) => tm.transcribe(samples),
+                        Err(e) => {
+                            warn!(
+                                "Live transcription finalize failed ({}); using batch transcription",
+                                e
+                            );
+                            tm.transcribe(samples)
+                        }
+                    };
 
                     // Await WAV save and verify
                     let wav_saved = match wav_handle.await {

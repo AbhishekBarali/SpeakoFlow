@@ -71,6 +71,12 @@ flate2 = "1.0"
 zip = "2"
 sha2 = "0.10"
 transcribe-rs = { version = "0.3.11", features = ["whisper-cpp", "onnx"] }
+# transcribe.cpp (ggml/GGUF) engine — added side-by-side with transcribe-rs
+# (N2: additive; transcribe-rs 0.3.11 + its features stay untouched). This base
+# declaration is backend-less: default-features=false drops the macOS "metal"
+# default, so per-platform GPU backends are opted-in only in the target sections
+# below. Pinned exactly (pre-1.0 ABI). See docs/engine-migration/PLAN.md Session 1.
+transcribe-cpp = { version = "0.1.2", default-features = false }
 handy-keys = "0.2.4"
 ferrous-opencc = "0.2.3"
 clap = { version = "4", features = ["derive"] }
@@ -105,9 +111,45 @@ windows = { version = "0.61.3", features = [
 ] }
 winreg = "0.55"
 
+# transcribe.cpp Windows x86_64 backends: dynamic (loadable) backend DLLs +
+# Vulkan GPU acceleration. Build-time prereqs: cmake, Vulkan SDK, and
+# SPIRV-Headers (the Vulkan SDK bundles SPIRV-HeadersConfig.cmake; point
+# CMAKE_PREFIX_PATH at the SDK). Windows aarch64 uses the static CPU-only
+# table just below. See docs/engine-migration/PLAN.md Session 7.
+[target.'cfg(all(windows, target_arch = "x86_64"))'.dependencies]
+transcribe-cpp = { version = "0.1.2", default-features = false, features = [
+  "dynamic-backends",
+  "vulkan",
+] }
+
+# transcribe.cpp Windows aarch64 (Windows-on-ARM): STATIC, CPU-only (no
+# features → the single portable ggml CPU backend is compiled into
+# speakoflow.exe, zero DLLs shipped). Rationale (mirrors Handy):
+#   * Adreno Vulkan drivers on WoA are immature, and ggml-vulkan's shader
+#     generator (vulkan-shaders-gen) does not build under the clang-cl/lld
+#     toolchain that ggml's ARM CPU backend requires — so `vulkan` is out.
+#   * `dynamic-backends` buys nothing on ARM: GGML_CPU_ALL_VARIANTS is an x86
+#     concept, so a DL build there is just one portable CPU module shipped as a
+#     DLL. Linking statically ships zero DLLs and sidesteps the installer's
+#     per-DLL signtool verify entirely.
+# CI pins `-DGGML_NATIVE=OFF -DGGML_OPENMP=OFF` via TRANSCRIBE_CMAKE_ARGS (see
+# .github/workflows/build.yml): GGML_NATIVE=OFF targets a portable ARM baseline
+# instead of the build runner's CPU, and GGML_OPENMP=OFF avoids clang-cl's
+# unresolved LLVM-OMP externals in the static link. This entry is explicit (even
+# though it equals the backend-less base `[dependencies]` declaration) to
+# document the WoA posture and keep it from silently drifting.
+[target.'cfg(all(windows, target_arch = "aarch64"))'.dependencies]
+transcribe-cpp = { version = "0.1.2", default-features = false }
+
 [target.'cfg(target_os = "macos")'.dependencies]
 tauri-nspanel = { git = "https://github.com/ahkohd/tauri-nspanel", branch = "v2.1" }
 transcribe-rs = { version = "0.3.11", features = ["whisper-metal"] }
+# transcribe.cpp macOS: STATIC with the Metal GPU backend compiled in (Apple's
+# default posture). `metal` does NOT imply `shared`, so there are no runtime
+# libs to ship — build.rs staging is a no-op on macOS and nothing is bundled.
+transcribe-cpp = { version = "0.1.2", default-features = false, features = [
+  "metal",
+] }
 # Secure API-key storage via the macOS Keychain. `apple-native` uses the
 # system Security framework (no extra C/system build dependency).
 keyring = { version = "3", features = ["apple-native"] }
@@ -116,6 +158,16 @@ keyring = { version = "3", features = ["apple-native"] }
 gtk-layer-shell = { version = "0.8", features = ["v0_6"] }
 gtk = "0.18"
 transcribe-rs = { version = "0.3.11", features = ["whisper-vulkan"] }
+# transcribe.cpp Linux: dynamic (loadable) backend .so modules + Vulkan GPU
+# acceleration (the `dynamic-backends` posture, same as Windows x86_64). Ships a
+# shared libtranscribe.so + loadable ggml backend modules; build.rs bakes a
+# `$ORIGIN/../lib` rpath into the binary and CI (scripts/ci/stage-transcribe-libs.sh)
+# co-locates the modules under /usr/lib so init_backends_default() finds them.
+# Build-time prereqs: cmake + Vulkan SDK + libvulkan-dev.
+transcribe-cpp = { version = "0.1.2", default-features = false, features = [
+  "dynamic-backends",
+  "vulkan",
+] }
 # Secure API-key storage via the Secret Service (GNOME Keyring / KWallet).
 # `async-secret-service` + `crypto-rust` use the pure-Rust zbus + RustCrypto
 # stack, so the Linux build needs NO libdbus/OpenSSL system headers (keeps the
