@@ -776,7 +776,13 @@
 
 .assistant-messages {
   flex: 1;
+  /* min-height:0 lets this flex child shrink below its content height so it
+   * actually scrolls (and never pushes the input row off the panel) when the
+   * conversation is taller than the panel. overscroll-containment stops a
+   * bottomed-out scroll from chaining to / nudging the borderless window. */
+  min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 14px 14px 10px;
   display: flex;
   flex-direction: column;
@@ -801,6 +807,9 @@
 .assistant-message {
   position: relative;
   max-width: 88%;
+  /* Let the bubble shrink below the intrinsic width of a long token so wrapping
+   * (below) can kick in instead of the bubble blowing past its max-width. */
+  min-width: 0;
   font-size: var(--as-msg-font, 13.5px);
   line-height: 1.55;
   animation: as-bubble-in 0.18s ease-out;
@@ -907,7 +916,12 @@
 }
 
 .assistant-message-content {
+  min-width: 0;
   white-space: pre-wrap;
+  /* Break anywhere as a last resort so a long URL, hash, or unbroken token
+   * can never overflow the panel edge (word-break kept as an older-engine
+   * fallback for the same intent). */
+  overflow-wrap: anywhere;
   word-break: break-word;
 }
 
@@ -955,6 +969,10 @@
   border: 1px solid var(--as-hairline);
   border-radius: 5px;
   padding: 1px 5px;
+  /* Wrap a long inline-code token (e.g. a long path/hash in backticks). Inside
+   * a <pre> block white-space:pre disables wrapping, so code blocks keep their
+   * single-line layout and scroll horizontally via `pre { overflow-x: auto }`. */
+  overflow-wrap: anywhere;
 }
 
 .assistant-message-content pre {
@@ -963,7 +981,9 @@
   border-radius: 10px;
   padding: 10px 12px;
   margin: 6px 0 8px;
+  max-width: 100%;
   overflow-x: auto;
+  overscroll-behavior-x: contain;
 }
 
 .assistant-message-content pre code {

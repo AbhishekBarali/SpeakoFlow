@@ -409,6 +409,18 @@ const AssistantPanel: React.FC = () => {
   const [dropActive, setDropActive] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
   const sendingRef = useRef(false);
+  // Streaming is smoothed: raw tokens accumulate in a buffer and are flushed to
+  // React state at most once per animation frame. A fast provider can burst
+  // many tokens between paints, and each flush re-parses the whole growing
+  // markdown reply, so coalescing per-frame keeps the answer readable instead
+  // of janky — readability over raw speed. Reset whenever the stream clears.
+  const streamBufferRef = useRef("");
+  const streamRafRef = useRef<number | null>(null);
+  // Auto-scroll follows new content only while the user is already near the
+  // bottom, so a streaming reply never yanks them down while they scroll up to
+  // read. A brand-new message (their own) always scrolls into view.
+  const stickToBottomRef = useRef(true);
+  const prevHistoryLenRef = useRef(0);
   // Remembers the last pipeline state so we can tell a brand-new turn (idle →
   // active) from a mid-turn transition — used to clear a stale notice only at
   // the start of the next turn, never mid-turn.
@@ -452,6 +464,18 @@ const AssistantPanel: React.FC = () => {
     }
   }, []);
 
+  // Clear the in-flight stream and cancel any pending frame flush. Used on a
+  // new conversation snapshot, an error, and when the chat is cleared, so no
+  // buffered tokens leak from a finished turn into the next.
+  const resetStream = useCallback(() => {
+    if (streamRafRef.current !== null) {
+      cancelAnimationFrame(streamRafRef.current);
+      streamRafRef.current = null;
+    }
+    streamBufferRef.current = "";
+    setStream("");
+  }, []);
+
   const selectCharacter = useCallback(
     async (id: string) => {
       setCharacterMenuOpen(false);
@@ -492,13 +516,27 @@ const AssistantPanel: React.FC = () => {
     );
   }, [settings]);
 
-  // Auto-scroll to bottom on new content
+  // Auto-scroll: follow new content while the user sits near the bottom, but
+  // don't fight them if they've scrolled up to read an earlier message. A
+  // freshly-added message (their own typed/spoken one) always scrolls in.
   useEffect(() => {
     const el = listRef.current;
-    if (el) {
-      el.scrollTop = el.scrollHeight;
-    }
+    if (!el) return;
+    const grew = history.length > prevHistoryLenRef.current;
+    const lastIsUser = history[history.length - 1]?.role === "user";
+    prevHistoryLenRef.current = history.length;
+    if (grew && lastIsUser) stickToBottomRef.current = true;
+    if (stickToBottomRef.current) el.scrollTop = el.scrollHeight;
   }, [history, stream, state, error, notice]);
+
+  // Track whether the message list is scrolled to (near) the bottom, so the
+  // auto-scroll effect knows whether to keep following the reply as it streams.
+  const handleMessagesScroll = useCallback(() => {
+    const el = listRef.current;
+    if (!el) return;
+    stickToBottomRef.current =
+      el.scrollHeight - el.scrollTop - el.clientHeight < 64;
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -601,14 +639,24 @@ const AssistantPanel: React.FC = () => {
           "assistant-conversation",
           (e) => {
             setHistory(e.payload.map(toDisplay));
-            setStream("");
+            resetStream();
           },
         ),
       );
 
       track(
         await listen<string>("assistant-token", (e) => {
-          setStream((prev) => prev + e.payload);
+          // Coalesce tokens into the next animation frame rather than
+          // re-rendering (and re-parsing the whole markdown reply) per token.
+          streamBufferRef.current += e.payload;
+          if (streamRafRef.current === null) {
+            streamRafRef.current = window.requestAnimationFrame(() => {
+              streamRafRef.current = null;
+              const buffered = streamBufferRef.current;
+              streamBufferRef.current = "";
+              if (buffered) setStream((prev) => prev + buffered);
+            });
+          }
         }),
       );
 
@@ -617,7 +665,7 @@ const AssistantPanel: React.FC = () => {
           "assistant-error",
           (e) => {
             setError({ code: e.payload.code, detail: e.payload.detail });
-            setStream("");
+            resetStream();
           },
         ),
       );
@@ -689,8 +737,12 @@ const AssistantPanel: React.FC = () => {
       cancelled = true;
       unlisteners.forEach((fn) => fn());
       unlisteners.length = 0;
+      if (streamRafRef.current !== null) {
+        cancelAnimationFrame(streamRafRef.current);
+        streamRafRef.current = null;
+      }
     };
-  }, [refreshSettings]);
+  }, [refreshSettings, resetStream]);
 
   // Every error self-clears so the always-on-top pill can never get stuck
   // showing a stale error forever (the bug where e.g. "Model can't see images"
@@ -967,9 +1019,9 @@ const AssistantPanel: React.FC = () => {
     tts.stop();
     setError(null);
     setNotice(null);
-    setStream("");
+    resetStream();
     await commands.assistantClearConversation();
-  }, [tts]);
+  }, [tts, resetStream]);
 
   const stopTurn = useCallback(async () => {
     // Block any reply that was just emitted, then stop local + remote TTS.
@@ -1145,43 +1197,6 @@ const AssistantPanel: React.FC = () => {
                 <X size={13} strokeWidth={2.5} />
               </button>
             </>
-          ) : isListening && locked ? (
-            // Hands-free lock: inline Cancel · wave · Done, like the STT
-            // overlay's locked layout. The ✓ finishes and sends. This pill is
-            // told apart from the STT overlay's locked pill by its soft accent
-            // ring (.apill.listening) + rounded-rect shape — a quiet cue rather
-            // than an extra leading glyph that would lengthen the chip.
-            // onMouseDown stops the drag-region from swallowing the click (the
-            // whole pill is a drag surface), so ✗/✓ reliably register.
-            <>
-              <button
-                className="apill-btn danger"
-                onClick={cancelVoice}
-                onMouseDown={(e) => e.stopPropagation()}
-                title={t("assistant.pill.cancel")}
-                aria-label={t("assistant.pill.cancel")}
-              >
-                <X size={13} strokeWidth={2.5} />
-              </button>
-              <div className="apill-wave" data-tauri-drag-region>
-                <AudioWaveform
-                  levels={micLevels}
-                  size="sm"
-                  barCount={12}
-                  mode="reactive"
-                  active
-                />
-              </div>
-              <button
-                className="apill-btn apill-done"
-                onClick={finishVoice}
-                onMouseDown={(e) => e.stopPropagation()}
-                title={t("assistant.finish")}
-                aria-label={t("assistant.finish")}
-              >
-                <Check size={13} strokeWidth={2.75} />
-              </button>
-            </>
           ) : pillBusy || isListening ? (
             // Busy phases: one living waveform, a small side glyph for the
             // phases worth calling out. Hovering reveals expand + cancel — the
@@ -1249,17 +1264,6 @@ const AssistantPanel: React.FC = () => {
                     aria-label={t("assistant.stop")}
                   >
                     <Square size={11} strokeWidth={2.75} />
-                  </button>
-                )}
-                {(isListening || state === "transcribing") && (
-                  <button
-                    className="apill-btn danger"
-                    onClick={cancelVoice}
-                    onMouseDown={stopDrag}
-                    title={t("assistant.pill.cancelTurn")}
-                    aria-label={t("assistant.pill.cancelTurn")}
-                  >
-                    <X size={12} strokeWidth={2.5} />
                   </button>
                 )}
               </div>
@@ -1450,7 +1454,11 @@ const AssistantPanel: React.FC = () => {
           </div>
         </div>
 
-        <div className="assistant-messages" ref={listRef}>
+        <div
+          className="assistant-messages"
+          ref={listRef}
+          onScroll={handleMessagesScroll}
+        >
           {history.length === 0 && state === "idle" && !error && (
             <div className="assistant-empty">
               <p>

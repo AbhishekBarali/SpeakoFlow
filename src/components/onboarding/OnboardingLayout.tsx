@@ -1,6 +1,7 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
 import Wordmark from "../Wordmark";
+import DownloadProgress from "./DownloadProgress";
 
 interface OnboardingLayoutProps {
   /** 1-based index of the current step among the guided model steps. */
@@ -84,6 +85,11 @@ const OnboardingLayout: React.FC<OnboardingLayoutProps> = ({
       <div className="flex-1 min-h-0 w-full max-w-[600px] overflow-y-auto">
         <div className="flex flex-col gap-3 pb-2">{children}</div>
       </div>
+
+      {/* Background download tracker — a single, consistent, non-blocking place
+          that shows any in-flight model download (name + size + percent +
+          speed) on every onboarding step. */}
+      <DownloadProgress />
 
       {/* Sticky footer actions */}
       {footer && (

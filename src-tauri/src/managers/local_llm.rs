@@ -658,7 +658,14 @@ impl LocalLlmManager {
 
     /// Stop the engine if running. Safe to call when already stopped.
     pub fn stop(&self) {
-        let mut st = self.state.lock().unwrap();
+        // Called from `Drop` on app quit, so recover from a poisoned mutex
+        // instead of panicking — a panic inside Drop calls abort() (extends the
+        // intent of Handy #1354 to this SpeakoFlow-added manager). Recovering
+        // the guard still lets us kill the child process during shutdown.
+        let mut st = match self.state.lock() {
+            Ok(g) => g,
+            Err(e) => e.into_inner(),
+        };
         if let Some(mut child) = st.child.take() {
             debug!("Stopping built-in LLM engine");
             let _ = child.kill();

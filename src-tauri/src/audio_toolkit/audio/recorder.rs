@@ -46,6 +46,12 @@ pub struct AudioRecorder {
     /// cue with a stream that is genuinely live, instead of guessing a fixed
     /// warm-up delay (which clips the first words on slow-to-wake devices).
     capture_ready: Arc<(Mutex<bool>, Condvar)>,
+    /// Cached preferred input config, keyed by device name. Enumerating a
+    /// device's supported configs is a slow syscall on some platforms and, in
+    /// on-demand microphone mode, `open()` runs on every recording start.
+    /// Reusing the resolved config for the same device removes that cost from
+    /// the hot path. Backport of Handy PR #1582 (faster mic initialization).
+    config_cache: Option<(String, cpal::SupportedStreamConfig)>,
 }
 
 impl AudioRecorder {
@@ -58,6 +64,7 @@ impl AudioRecorder {
             level_cb: None,
             frame_cb: None,
             capture_ready: Arc::new((Mutex::new(false), Condvar::new())),
+            config_cache: None,
         })
     }
 
@@ -102,6 +109,38 @@ impl AudioRecorder {
                 .ok_or_else(|| Error::new(std::io::ErrorKind::NotFound, "No input device found"))?,
         };
 
+        // Resolve the preferred input config once, reusing the cached value for
+        // the same device. In on-demand mode `open()` runs on every recording
+        // start, and enumerating supported configs is a slow syscall on some
+        // platforms — Handy PR #1582 measured mic-init being dominated by it.
+        // `build_stream`/`play()` still run per open (they aren't cacheable),
+        // but the enumeration drops to ~0 on repeat recordings of one device.
+        let device_name = device.name().unwrap_or_default();
+        // Reuse the cached config if it matches this device; the clone releases
+        // the borrow on `self.config_cache` before we may reassign it below.
+        let cached_config = match self.config_cache.as_ref() {
+            Some((cached_name, cached_cfg)) if *cached_name == device_name => {
+                Some(cached_cfg.clone())
+            }
+            _ => None,
+        };
+        let config = match cached_config {
+            Some(cfg) => {
+                log::debug!("Reusing cached input config for '{device_name}'");
+                cfg
+            }
+            None => {
+                let cfg = AudioRecorder::get_preferred_config(&device).map_err(|e| {
+                    Error::new(
+                        std::io::ErrorKind::Other,
+                        format!("Failed to fetch preferred config: {e}"),
+                    )
+                })?;
+                self.config_cache = Some((device_name, cfg.clone()));
+                cfg
+            }
+        };
+
         let thread_device = device.clone();
         let vad = self.vad.clone();
         // Move the optional level callback into the worker thread
@@ -114,9 +153,9 @@ impl AudioRecorder {
             let stop_flag = Arc::new(AtomicBool::new(false));
             let stop_flag_for_stream = stop_flag.clone();
             let init_result = (|| -> Result<(cpal::Stream, u32), String> {
-                let config = AudioRecorder::get_preferred_config(&thread_device)
-                    .map_err(|e| format!("Failed to fetch preferred config: {e}"))?;
-
+                // `config` was resolved (and cached) in `open()` before this
+                // worker was spawned, so we don't re-enumerate the device here.
+                // Backport of Handy PR #1582 (faster mic initialization).
                 let sample_rate = config.sample_rate().0;
                 let channels = config.channels() as usize;
 
@@ -552,6 +591,12 @@ fn run_consumer(
                 Cmd::Start => {
                     stop_flag.store(false, Ordering::Relaxed);
                     processed_samples.clear();
+                    // Clear resampler state left over from any previous
+                    // recording (partial input chunk, pending output frame, and
+                    // the rubato FFT overlap buffers) so stale samples can't
+                    // bleed into — and corrupt the first ~30ms of — this one.
+                    // Backport of Handy PR #1344 (audio crosstalk).
+                    frame_resampler.reset();
                     recording = true;
                     awaiting_first_frame = true;
                     visualizer.reset();

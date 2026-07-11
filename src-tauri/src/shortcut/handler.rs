@@ -46,17 +46,13 @@ pub fn handle_shortcut_event(
     // lock key on top converts a hold to hands-free mid-recording.
     if is_transcribe_binding(base_id) {
         if let Some(coordinator) = app.try_state::<TranscriptionCoordinator>() {
-            // The assistant always starts as push-to-talk (hold): press and
-            // hold to record, release to send. It only goes hands-free
-            // (press-again-to-stop) when the user presses the lock shortcut
-            // (Shift by default) mid-recording — so it never opens in a
-            // "locked" state on its own. Dictation still follows the global
-            // push-to-talk setting.
-            let mode = if base_id == "assistant" && !is_lock_variant {
-                crate::transcription_coordinator::RecordingMode::Hold
-            } else {
-                recording_mode(get_settings(app).push_to_talk, is_lock_variant)
-            };
+            // Every recording shortcut — dictation, dictation + post-processing,
+            // and the assistant — follows the single Push-to-talk setting:
+            //   • Push-to-talk ON  → hold the shortcut to record, release to stop.
+            //   • Push-to-talk OFF → tap once to start, tap again to stop.
+            // Escape cancels. There is no separate tap-to-lock; this is the
+            // simple Handy-style model.
+            let mode = recording_mode(get_settings(app).push_to_talk, is_lock_variant);
             coordinator.send_input(base_id, hotkey_string, is_pressed, mode);
         } else {
             warn!("TranscriptionCoordinator is not initialized");

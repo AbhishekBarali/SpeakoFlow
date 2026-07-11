@@ -21,7 +21,7 @@ import {
 } from "@/components/ui";
 import { Input } from "../../ui/Input";
 import { ShortcutInput } from "../ShortcutInput";
-import { TapToLock } from "../TapToLock";
+import { PushToTalk } from "../PushToTalk";
 import { useSettings } from "../../../hooks/useSettings";
 import { useKokoroTts } from "../../../assistant/useKokoroTts";
 import { FONT_SIZES } from "../../../assistant/appearance";
@@ -732,15 +732,7 @@ export const AssistantSettings: React.FC = () => {
       <SettingsGroup title={t("settings.assistant.shortcuts.title")}>
         <ShortcutInput shortcutId="assistant" grouped={true} />
         <ShortcutInput shortcutId="assistant_panel_toggle" grouped={true} />
-        <TapToLock
-          grouped={true}
-          settingKey="assistant_tap_to_lock_key"
-          fallback="shift"
-          labelKey="settings.assistant.tapToLock.label"
-          infoKey="settings.assistant.tapToLock.info"
-          offKey="settings.assistant.tapToLock.off"
-          clearKey="settings.assistant.tapToLock.clear"
-        />
+        <PushToTalk grouped={true} />
       </SettingsGroup>
 
       <SettingsGroup title={t("settings.assistant.provider.title")}>

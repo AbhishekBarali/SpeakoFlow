@@ -4,6 +4,7 @@ use crate::managers::transcription::TranscriptionManager;
 use crate::settings;
 use crate::tray_i18n::get_tray_translations;
 use log::{error, info, warn};
+use std::path::PathBuf;
 use std::sync::Arc;
 use tauri::image::Image;
 use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu};
@@ -186,17 +187,28 @@ pub fn change_tray_icon(app: &AppHandle, icon: TrayIconState) {
 
     let icon_path = get_icon_path(theme, icon.clone());
 
-    let _ = tray.set_icon(Some(
-        Image::from_path(
-            app.path()
-                .resolve(icon_path, tauri::path::BaseDirectory::Resource)
-                .expect("failed to resolve"),
-        )
-        .expect("failed to set icon"),
-    ));
+    // Log tray-icon failures instead of panicking (backport of Handy #1355):
+    // a `.expect()` here would abort the whole app just because an icon asset
+    // couldn't be resolved or decoded. Instead the tray keeps its old icon.
+    if let Err(err) = load_tray_icon(
+        app.path()
+            .resolve(icon_path, tauri::path::BaseDirectory::Resource),
+    )
+    .and_then(|image| tray.set_icon(Some(image)))
+    {
+        error!("Failed to update tray icon '{}': {}", icon_path, err);
+    }
 
     // Update menu based on state
     update_tray_menu(app, &icon, None);
+}
+
+/// Load a tray icon from a resolved resource path, returning any error instead
+/// of panicking. Split out so it can be unit-tested and so `change_tray_icon`
+/// can log-and-continue rather than abort the app (backport of Handy #1355).
+fn load_tray_icon(resolved_icon_path: tauri::Result<PathBuf>) -> tauri::Result<Image<'static>> {
+    let resolved_icon_path = resolved_icon_path?;
+    Image::from_path(&resolved_icon_path).map(Image::to_owned)
 }
 
 pub fn tray_tooltip() -> String {
@@ -388,7 +400,7 @@ pub fn copy_last_transcript(app: &AppHandle) {
 
 #[cfg(test)]
 mod tests {
-    use super::last_transcript_text;
+    use super::{last_transcript_text, load_tray_icon};
     use crate::managers::history::HistoryEntry;
 
     fn build_entry(transcription: &str, post_processed: Option<&str>) -> HistoryEntry {
@@ -415,5 +427,13 @@ mod tests {
     fn falls_back_to_raw_transcription() {
         let entry = build_entry("raw", None);
         assert_eq!(last_transcript_text(&entry), "raw");
+    }
+
+    #[test]
+    fn tray_icon_returns_err_when_file_does_not_exist() {
+        // A missing/undecodable icon must surface as an Err (which
+        // change_tray_icon logs), never a panic that would abort the app.
+        let missing = std::path::PathBuf::from("speakoflow_nonexistent_tray_icon_xyz.png");
+        assert!(load_tray_icon(Ok(missing)).is_err());
     }
 }

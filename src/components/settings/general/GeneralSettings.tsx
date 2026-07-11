@@ -23,7 +23,7 @@ import { AudioFeedback } from "../AudioFeedback";
 import { SoundPicker } from "../SoundPicker";
 import { AppearanceSelector } from "../AppearanceSelector";
 import { TextSizeSelector } from "../TextSizeSelector";
-import { TapToLock } from "../TapToLock";
+import { PushToTalk } from "../PushToTalk";
 import { useSettings } from "../../../hooks/useSettings";
 import { VolumeSlider } from "../VolumeSlider";
 import { MuteWhileRecording } from "../MuteWhileRecording";
@@ -54,12 +54,7 @@ export const GeneralSettings: React.FC = () => {
             tone="rose"
           />
         )}
-        <TapToLock
-          descriptionMode="tooltip"
-          grouped={true}
-          icon={Lock}
-          tone="violet"
-        />
+        <PushToTalk descriptionMode="tooltip" grouped={true} />
       </SettingsGroup>
       <SettingsGroup title={t("appearance.title")} icon={Palette}>
         <AppearanceSelector

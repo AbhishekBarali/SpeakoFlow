@@ -1,7 +1,6 @@
 use crate::actions::ACTION_MAP;
 use crate::lock_watch::LockWatch;
 use crate::managers::audio::AudioRecordingManager;
-use crate::settings::get_settings;
 use log::{debug, error, warn};
 use std::sync::mpsc::{self, Sender};
 use std::sync::Arc;
@@ -41,30 +40,6 @@ pub fn recording_mode(push_to_talk_default: bool, is_lock_variant: bool) -> Reco
     } else {
         RecordingMode::Lock
     }
-}
-
-/// Whether the tap-to-lock `lock_key` is entirely contained in the active record
-/// `shortcut`. When it is, the lock key is already held to record, so arming
-/// tap-to-lock would fire immediately off that held key's auto-repeat and wrongly
-/// lock the recording — callers skip arming in that case. Tokens are lowercased
-/// and modifier aliases unified so "alt"/"option" and "cmd"/"super" still match.
-fn tap_lock_within_shortcut(lock_key: &str, shortcut: &str) -> bool {
-    fn norm(token: &str) -> String {
-        match token.trim().to_ascii_lowercase().as_str() {
-            "control" => "ctrl".to_string(),
-            "option" | "opt" => "alt".to_string(),
-            "cmd" | "command" | "meta" | "win" | "windows" => "super".to_string(),
-            other => other.to_string(),
-        }
-    }
-    fn tokens(s: &str) -> std::collections::HashSet<String> {
-        s.split('+').map(norm).filter(|t| !t.is_empty()).collect()
-    }
-    let lock = tokens(lock_key);
-    if lock.is_empty() {
-        return false;
-    }
-    lock.is_subset(&tokens(shortcut))
 }
 
 /// Commands processed sequentially by the coordinator thread.
@@ -140,48 +115,18 @@ impl TranscriptionCoordinator {
                                         start(&app, &mut stage, &binding_id, &hotkey_string, mode);
                                         if matches!(stage, Stage::Recording { .. }) {
                                             match mode {
-                                                // Hands-free from the start shows
-                                                // the "press again / click done"
-                                                // controls right away.
+                                                // Hands-free (Push-to-talk OFF): a
+                                                // tap-to-toggle recording. Tell the
+                                                // overlay/pill so it shows the quiet
+                                                // "locked / tap again to stop" cue.
                                                 RecordingMode::Lock => {
                                                     use tauri::Emitter;
                                                     let _ = app.emit("recording-locked", true);
                                                 }
-                                                // Push-to-talk: arm tap-to-lock so a
-                                                // tap of the lock shortcut can convert
-                                                // this hold to hands-free mid-recording.
-                                                // Both dictation and the assistant
-                                                // support this, each with its own
-                                                // configured shortcut (the assistant's
-                                                // defaults to Shift) so they can differ.
-                                                // An empty shortcut means off.
-                                                RecordingMode::Hold => {
-                                                    let settings = get_settings(&app);
-                                                    let shortcut = if binding_id == "assistant" {
-                                                        settings.assistant_tap_to_lock_key.trim()
-                                                    } else {
-                                                        settings.tap_to_lock_key.trim()
-                                                    };
-                                                    // Skip arming when the lock key is itself part
-                                                    // of the record shortcut being held (e.g. lock
-                                                    // "space" while holding "ctrl+alt+space"): the
-                                                    // held key auto-repeats key-down events, which
-                                                    // would fire the watcher and instantly (and
-                                                    // wrongly) lock the recording. The lock key must
-                                                    // live outside the record shortcut to work.
-                                                    if !shortcut.is_empty()
-                                                        && !tap_lock_within_shortcut(
-                                                            shortcut,
-                                                            &hotkey_string,
-                                                        )
-                                                    {
-                                                        if let Some(lw) =
-                                                            app.try_state::<LockWatch>()
-                                                        {
-                                                            lw.arm(shortcut);
-                                                        }
-                                                    }
-                                                }
+                                                // Push-to-talk (hold): nothing extra
+                                                // to arm — tap-to-lock was removed in
+                                                // favour of the simple hold/tap model.
+                                                RecordingMode::Hold => {}
                                             }
                                         }
                                     }

@@ -163,7 +163,12 @@ pub struct LoadingGuard {
 
 impl Drop for LoadingGuard {
     fn drop(&mut self) {
-        let mut is_loading = self.is_loading.lock().unwrap();
+        // Recover from a poisoned mutex instead of panicking — a panic inside
+        // Drop calls abort(), which would kill the app on quit (Handy #1354).
+        let mut is_loading = match self.is_loading.lock() {
+            Ok(g) => g,
+            Err(e) => e.into_inner(),
+        };
         *is_loading = false;
         self.loading_condvar.notify_all();
     }
@@ -1716,8 +1721,14 @@ impl Drop for TranscriptionManager {
         // Signal the watcher thread to shutdown
         self.shutdown_signal.store(true, Ordering::Relaxed);
 
-        // Wait for the thread to finish gracefully
-        if let Some(handle) = self.watcher_handle.lock().unwrap().take() {
+        // Wait for the thread to finish gracefully. Use match instead of
+        // unwrap to avoid panicking if the mutex is poisoned — a panic inside
+        // Drop calls abort() (Handy #1354).
+        let mut guard = match self.watcher_handle.lock() {
+            Ok(g) => g,
+            Err(e) => e.into_inner(),
+        };
+        if let Some(handle) = guard.take() {
             if let Err(e) = handle.join() {
                 warn!("Failed to join idle watcher thread: {:?}", e);
             } else {

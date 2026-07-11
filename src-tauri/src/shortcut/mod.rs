@@ -1298,6 +1298,48 @@ pub fn change_live_transcription_window_enabled_setting(
     Ok(())
 }
 
+fn parse_overlay_style(s: &str) -> settings::OverlayStyle {
+    match s {
+        "none" => settings::OverlayStyle::None,
+        "minimal" => settings::OverlayStyle::Minimal,
+        "live" => settings::OverlayStyle::Live,
+        _ => settings::OverlayStyle::Auto,
+    }
+}
+
+/// Set the recording (dictation) overlay style: none / minimal / live (or auto
+/// to follow the model). Picking Live also enables streaming transcription so
+/// the running transcript can actually appear; Minimal/None turn it back off.
+/// `auto` leaves the streaming toggle alone (the show path resolves per model).
+#[tauri::command]
+#[specta::specta]
+pub fn change_overlay_style_setting(app: AppHandle, style: String) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    let parsed = parse_overlay_style(&style);
+    settings.overlay_style = parsed;
+    match parsed {
+        settings::OverlayStyle::Live => settings.live_transcription_enabled = true,
+        settings::OverlayStyle::Minimal | settings::OverlayStyle::None => {
+            settings.live_transcription_enabled = false
+        }
+        settings::OverlayStyle::Auto => {}
+    }
+    settings::write_settings(&app, settings);
+    Ok(())
+}
+
+/// Set the assistant overlay style: none / minimal / live (or auto). Controls
+/// how the assistant surfaces a voice turn — Minimal is the pill, Live shows the
+/// transcript + streamed reply as readable text. Independent of dictation.
+#[tauri::command]
+#[specta::specta]
+pub fn change_assistant_overlay_style_setting(app: AppHandle, style: String) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    settings.assistant_overlay_style = parse_overlay_style(&style);
+    settings::write_settings(&app, settings);
+    Ok(())
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn change_app_language_setting(app: AppHandle, language: String) -> Result<(), String> {

@@ -1,10 +1,9 @@
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import React, { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Loader2, X, Check } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { AudioWaveform } from "../components/shared";
 import "./RecordingOverlay.css";
-import { commands } from "@/bindings";
 import i18n, { syncLanguageFromSettings } from "@/i18n";
 import { getLanguageDirection } from "@/lib/utils/rtl";
 
@@ -180,13 +179,29 @@ const RecordingOverlay: React.FC = () => {
   );
 
   // Accessible label for the current state — the visible chip is intentionally
-  // terse (an icon or just the waveform), so the full phrasing lives here.
+  // terse (an icon, a state word, or just the waveform), so the full phrasing —
+  // including the hands-free "press the hotkey again to stop" hint — lives here
+  // on the aria-label for screen-reader users.
   const ariaLabel = isRecording
     ? locked
       ? t("overlay.locked")
       : micLive
         ? t("overlay.recording", "Recording")
         : t("overlay.preparing")
+    : state === "transcribing"
+      ? t("overlay.transcribing")
+      : t("overlay.processing");
+
+  // Terse label shown on the visible card chip. It never carries the verbose
+  // hands-free hint (that lives only on `ariaLabel` above) — hands-free is now
+  // ended by the hotkey, so the chip just needs the calm state word. For the
+  // non-streaming (batch) case this is what surfaces a clear "Transcribing…" /
+  // "Processing…" state so a batch model doesn't look frozen after you stop
+  // talking (backport of Handy #1597).
+  const visibleLabel = isRecording
+    ? micLive
+      ? t("overlay.recording", "Recording")
+      : t("overlay.preparing")
     : state === "transcribing"
       ? t("overlay.transcribing")
       : t("overlay.processing");
@@ -225,33 +240,7 @@ const RecordingOverlay: React.FC = () => {
                   color={ICON_COLOR}
                 />
               )}
-              <span className="card-label">{ariaLabel}</span>
-            </div>
-            <div className="card-actions">
-              {isRecording && (
-                <button
-                  type="button"
-                  className="card-btn card-cancel"
-                  aria-label={t("overlay.cancel", "Cancel")}
-                  onClick={() => {
-                    commands.cancelOperation();
-                  }}
-                >
-                  <X size={13} strokeWidth={2.5} color={ICON_COLOR} />
-                </button>
-              )}
-              {isRecording && locked && (
-                <button
-                  type="button"
-                  className="card-btn card-confirm"
-                  aria-label={t("overlay.done", "Done")}
-                  onClick={() => {
-                    commands.commitRecording();
-                  }}
-                >
-                  <Check size={13} strokeWidth={2.5} color={ICON_COLOR} />
-                </button>
-              )}
+              <span className="card-label">{visibleLabel}</span>
             </div>
           </div>
           <div className="card-body" ref={cardBodyRef}>
@@ -262,10 +251,17 @@ const RecordingOverlay: React.FC = () => {
                   <span className="card-tentative">{stream.tentative}</span>
                 ) : null}
               </p>
-            ) : (
+            ) : isRecording ? (
               <p className="card-text card-placeholder">
                 {t("overlay.listening", "Listening…")}
               </p>
+            ) : (
+              /* Non-streaming (batch) model: no live text ever arrives, so once
+                 recording stops we drop the stale "Listening…" placeholder and
+                 let the header's spinner + "Transcribing…" / "Processing…"
+                 label carry the state — the card reads as busy, not frozen
+                 (backport of Handy #1597). */
+              <p className="card-text card-placeholder">{visibleLabel}</p>
             )}
           </div>
         </div>
@@ -278,9 +274,10 @@ const RecordingOverlay: React.FC = () => {
         {/* Live recording — the waveform carries the whole state. Before the
             first audio frame lands it simply rests as a calm row of dots, so
             the chip eases straight into motion the moment you speak instead of
-            flashing a microphone glyph. Hands-free (locked) mode is signalled
-            by the "done" tick easing in (see below), so the chip needs no extra
-            badge and stays compact. */}
+            flashing a microphone glyph. Hands-free (locked) recording is ended
+            by pressing the hotkey again (not a button), so the chip needs no
+            extra badge and stays compact — just a slightly larger, calmer wave
+            (see .overlay-pill.locked). */}
         {isRecording && (
           <div className="pill-wave">
             {hasLiveText ? (
@@ -325,35 +322,7 @@ const RecordingOverlay: React.FC = () => {
           </div>
         )}
 
-        {/* Cancel stays out of the way until you reach for it. */}
-        {isRecording && (
-          <button
-            type="button"
-            className="pill-cancel"
-            aria-label={t("overlay.cancel", "Cancel")}
-            onClick={() => {
-              commands.cancelOperation();
-            }}
-          >
-            <X size={13} strokeWidth={2.5} color={ICON_COLOR} />
-          </button>
-        )}
-
-        {/* Hands-free (locked) recording isn't ended by releasing a key, so it
-            gets a persistent "done" tick to finish and transcribe — alongside
-            re-pressing the hotkey. Hidden during a push-to-talk hold. */}
-        {isRecording && locked && (
-          <button
-            type="button"
-            className="pill-confirm"
-            aria-label={t("overlay.done", "Done")}
-            onClick={() => {
-              commands.commitRecording();
-            }}
-          >
-            <Check size={13} strokeWidth={2.5} color={ICON_COLOR} />
-          </button>
-        )}
+        {/* No cancel button — press Escape to cancel a recording. */}
       </div>
       )}
     </div>

@@ -546,13 +546,24 @@ impl ShortcutAction for TranscribeAction {
         // Load ASR model and VAD model in parallel
         tm.initiate_model_load();
 
-        // Live/streaming transcription (opt-in, off by default). Start the
-        // streaming worker now so it waits for the model load and begins
-        // consuming frames as soon as recording starts. The batch transcribe()
-        // path stays the fallback (see stop()); when this setting is off, none
-        // of the streaming machinery runs and behavior is unchanged.
-        if get_settings(app).live_transcription_enabled {
-            tm.start_stream();
+        // Live/streaming transcription. Start the streaming worker now so it
+        // waits for the model load and begins consuming frames as soon as
+        // recording starts. The batch transcribe() path stays the fallback
+        // (see stop()). It runs when the user has streaming explicitly enabled,
+        // OR when the resolved recording-overlay style is Live (which needs the
+        // running transcript) — for a streaming-capable model that's the
+        // capability-aware default. When neither holds, none of the streaming
+        // machinery runs and behavior is unchanged.
+        {
+            let s = get_settings(app);
+            let want_stream = s.live_transcription_enabled
+                || crate::settings::resolve_overlay_style(
+                    s.overlay_style,
+                    crate::overlay::selected_model_supports_live(app),
+                ) == crate::settings::OverlayStyle::Live;
+            if want_stream {
+                tm.start_stream();
+            }
         }
 
         let rm_clone = Arc::clone(&rm);
@@ -606,12 +617,16 @@ impl ShortcutAction for TranscribeAction {
                 recording_error = Some(e);
             }
         } else {
-            // On-demand mode: open the mic + start capture, then immediately
-            // cue the user and apply mute. Playing the start sound the moment
-            // recording starts — rather than waiting a variable amount of time
-            // for the mic to warm up — keeps the feedback timing consistent and
-            // snappy. The cue's own duration naturally covers device warm-up
-            // before the user begins speaking, so first words aren't clipped.
+            // On-demand mode: open the mic + start capture, then cue the user
+            // and apply mute. The cue is played only once the microphone is
+            // genuinely delivering audio (via `wait_for_capture_ready`), so a
+            // slow-to-wake device (Bluetooth/USB, or a cold-started stream)
+            // can't swallow the user's first words — the cue itself is the
+            // "you can speak now" signal. Backport of Handy PR #1582 / #1283
+            // (mic-init delay clips the first word), reconciled with
+            // SpeakoFlow's capture-ready signal rather than a fixed warm-up
+            // guess. Faster mic init (config caching) keeps this snappy: the
+            // wait returns as soon as the first real frame arrives.
             debug!("On-demand mode: starting recording, then audio feedback");
             let recording_start_time = Instant::now();
             match rm.try_start_recording(&binding_id) {
@@ -623,6 +638,10 @@ impl ShortcutAction for TranscribeAction {
                     // is disabled, so we always reuse this thread to keep mute
                     // sequenced right after the (possible) cue.
                     std::thread::spawn(move || {
+                        // Bounded so a device that never reports readiness can't
+                        // hang the cue; in practice this returns within one
+                        // buffer period of the mic going live.
+                        rm_clone.wait_for_capture_ready(std::time::Duration::from_millis(1500));
                         play_feedback_sound_blocking(&app_clone, SoundType::Start);
                         rm_clone.apply_mute();
                     });

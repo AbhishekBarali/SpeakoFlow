@@ -457,6 +457,33 @@ async changeLiveTranscriptionWindowEnabledSetting(enabled: boolean) : Promise<Re
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * Set the recording (dictation) overlay style: none / minimal / live (or auto
+ * to follow the model). Picking Live also enables streaming transcription so
+ * the running transcript can actually appear; Minimal/None turn it back off.
+ * `auto` leaves the streaming toggle alone (the show path resolves per model).
+ */
+async changeOverlayStyleSetting(style: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("change_overlay_style_setting", { style }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Set the assistant overlay style: none / minimal / live (or auto). Controls
+ * how the assistant surfaces a voice turn — Minimal is the pill, Live shows the
+ * transcript + streamed reply as readable text. Independent of dictation.
+ */
+async changeAssistantOverlayStyleSetting(style: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("change_assistant_overlay_style_setting", { style }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async changeAppLanguageSetting(language: string) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("change_app_language_setting", { language }) };
@@ -1940,6 +1967,16 @@ historyUpdatePayload: "history-update-payload"
 
 /** user-defined types **/
 
+/**
+ * The container-level `#[serde(default)]` (backed by the `Default` impl below,
+ * which returns `get_default_settings()`) guarantees every field — including
+ * ones added in the future — falls back to its default value when missing from
+ * a stored settings object, so a partial store can never fail the whole load.
+ * Field-level `#[serde(default = "...")]` attributes still take precedence
+ * where present. Together with `salvage_settings`, this means one missing or
+ * broken field can never reset the rest of the user's configuration
+ * (backport of Handy #1631).
+ */
 export type AppSettings = { bindings: Partial<{ [key in string]: ShortcutBinding }>; push_to_talk: boolean; 
 /**
  * While a push-to-talk (hold) recording is active, a quick tap of the
@@ -1983,7 +2020,17 @@ live_transcription_enabled?: boolean;
  * also on (there's no live text to show otherwise); when off, the overlay
  * stays the compact pill exactly as before.
  */
-live_transcription_window_enabled?: boolean; selected_microphone?: string | null; clamshell_microphone?: string | null; selected_output_device?: string | null; translate_to_english?: boolean; selected_language?: string; overlay_position?: OverlayPosition; debug_mode?: boolean; log_level?: LogLevel; custom_words?: string[]; 
+live_transcription_window_enabled?: boolean; selected_microphone?: string | null; clamshell_microphone?: string | null; selected_output_device?: string | null; translate_to_english?: boolean; selected_language?: string; overlay_position?: OverlayPosition; 
+/**
+ * Recording (dictation) overlay style: Auto/None/Minimal/Live. Auto follows
+ * the model's live-streaming support (Live if supported, else Minimal).
+ */
+overlay_style?: OverlayStyle; 
+/**
+ * Assistant overlay style: Auto/None/Minimal/Live. Live shows the running
+ * transcript plus the streamed reply as readable text; Minimal is the pill.
+ */
+assistant_overlay_style?: OverlayStyle; debug_mode?: boolean; log_level?: LogLevel; custom_words?: string[]; 
 /**
  * Master switch for the deterministic text-replacements pass.
  */
@@ -2483,6 +2530,15 @@ export type ModelLoadStatus = { is_loaded: boolean; current_model: string | null
 export type ModelUnloadTimeout = "never" | "immediately" | "min_2" | "min_5" | "min_10" | "min_15" | "hour_1" | "sec_15"
 export type OrtAcceleratorSetting = "auto" | "cpu" | "cuda" | "directml" | "rocm"
 export type OverlayPosition = "none" | "top" | "bottom"
+/**
+ * How the recording / assistant overlay presents itself while active.
+ * `Auto` follows the model: Live when the selected model supports live
+ * streaming transcription, otherwise Minimal — the user can override to a
+ * concrete choice. `None` shows nothing, `Minimal` is the compact pill, and
+ * `Live` is the enlarged readable card (running transcript + — for the
+ * assistant — the streamed reply).
+ */
+export type OverlayStyle = "auto" | "none" | "minimal" | "live"
 export type PaginatedAssistantHistory = { entries: AssistantHistoryEntry[]; has_more: boolean }
 export type PaginatedHistory = { entries: HistoryEntry[]; has_more: boolean }
 export type PasteMethod = "ctrl_v" | "direct" | "none" | "shift_insert" | "ctrl_shift_v" | "external_script"

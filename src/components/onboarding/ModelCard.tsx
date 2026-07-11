@@ -36,6 +36,18 @@ const getLanguageDisplayText = (
   return t("modelSelector.capabilities.multiLanguage");
 };
 
+/**
+ * A "legacy" transcription model runs on the older transcribe-rs (ONNX /
+ * whisper.cpp) engine rather than the native transcribe.cpp (GGUF) engine.
+ * LLM ("LlamaCpp") and TTS ("Kokoro") models are never "legacy". Exported so
+ * the Models settings page can group these under a quiet "Older models"
+ * section (PLAN.md Session 6) without duplicating the rule.
+ */
+export const isLegacyModel = (model: ModelInfo): boolean =>
+  model.engine_type !== "TranscribeCpp" &&
+  model.engine_type !== "LlamaCpp" &&
+  model.engine_type !== "Kokoro";
+
 export type ModelCardStatus =
   | "downloadable"
   | "downloading"
@@ -61,23 +73,28 @@ interface ModelCardProps {
   /** Show the accuracy/speed meters. Off in the first-run onboarding to keep
    *  the cards clean and focused on the description. */
   showScores?: boolean;
+  /** Show the card's own download/verify/extract progress block. Off in the
+   *  first-run onboarding, where the shared DownloadProgress strip is the single
+   *  consistent place for progress (avoids a duplicate bar on the same screen). */
+  showInlineProgress?: boolean;
 }
 
-/** Accuracy / speed as a slim aligned bar. Label sits in its own fixed
- *  column (so "ACCURACY" never crams against the track), both rows line up,
- *  and the track is visible enough to read the fill against. */
+/** Accuracy / speed as a slim, quiet aligned bar — deliberately secondary to
+ *  the model name + plain-language description (PLAN.md Session 6). The label
+ *  sits in its own fixed column so both rows line up, and the fill is a muted
+ *  neutral (not the brand accent) so the meters read as a supporting detail. */
 const ScoreMeter: React.FC<{ label: string; score: number }> = ({
   label,
   score,
 }) => {
   const pct = Math.max(0, Math.min(100, Math.round(score * 100)));
   return (
-    <div className="flex items-center gap-3">
-      <span className="w-[4.75rem] shrink-0 text-end text-[10px] font-medium uppercase tracking-[0.06em] text-text/55">
+    <div className="flex items-center gap-2">
+      <span className="w-14 shrink-0 text-end text-[9px] font-medium uppercase tracking-[0.06em] text-text/45">
         {label}
       </span>
       <div
-        className="h-1.5 w-20 shrink-0 overflow-hidden rounded-full bg-ink/15"
+        className="h-1 w-12 shrink-0 overflow-hidden rounded-full bg-ink/10"
         role="meter"
         aria-label={label}
         aria-valuenow={pct}
@@ -85,7 +102,7 @@ const ScoreMeter: React.FC<{ label: string; score: number }> = ({
         aria-valuemax={100}
       >
         <div
-          className="h-full rounded-full bg-logo-primary"
+          className="h-full rounded-full bg-ink/35"
           style={{ width: `${pct}%` }}
         />
       </div>
@@ -107,6 +124,7 @@ const ModelCard: React.FC<ModelCardProps> = ({
   downloadSpeed,
   showRecommended = true,
   showScores = true,
+  showInlineProgress = true,
 }) => {
   const { t } = useTranslation();
   const isFeatured = variant === "featured";
@@ -115,13 +133,10 @@ const ModelCard: React.FC<ModelCardProps> = ({
 
   // A "legacy" transcription model runs on the older transcribe-rs (ONNX /
   // whisper.cpp) engine rather than the new native transcribe.cpp (GGUF) one.
-  // These stay fully listed and usable — we just label them so the new vs old
-  // engines are distinguishable (PLAN.md Session 6). LLM ("LlamaCpp") and TTS
-  // ("Kokoro") models are not transcription models, so they are never labeled.
-  const isLegacyStt =
-    model.engine_type !== "TranscribeCpp" &&
-    model.engine_type !== "LlamaCpp" &&
-    model.engine_type !== "Kokoro";
+  // These stay fully listed and usable — the Models page groups them under a
+  // quiet "Older models" section and the card only carries a low-contrast tag
+  // (PLAN.md Session 6), so a first-timer isn't hit with a loud badge.
+  const isLegacyStt = isLegacyModel(model);
 
   // Get translated model name and description
   const displayName = getTranslatedModelName(model, t);
@@ -203,9 +218,9 @@ const ModelCard: React.FC<ModelCardProps> = ({
               </Badge>
             )}
             {isLegacyStt && (
-              <Badge variant="secondary">
+              <span className="text-[10px] font-medium uppercase tracking-[0.06em] text-muted-soft">
                 {t("modelSelector.capabilities.legacy")}
-              </Badge>
+              </span>
             )}
             {status === "active" && (
               <Badge variant="active">
@@ -298,47 +313,49 @@ const ModelCard: React.FC<ModelCardProps> = ({
       </div>
 
       {/* Download/extract progress */}
-      {status === "downloading" && downloadProgress !== undefined && (
-        <div className="w-full mt-3">
-          <div className="w-full h-1.5 bg-mid-gray/20 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-logo-primary rounded-full transition-all duration-300"
-              style={{ width: `${downloadProgress}%` }}
-            />
-          </div>
-          <div className="flex items-center justify-between text-xs mt-1">
-            <span className="text-text/50">
-              {t("modelSelector.downloading", {
-                percentage: Math.round(downloadProgress),
-              })}
-            </span>
-            <div className="flex items-center gap-2">
-              {downloadSpeed !== undefined && downloadSpeed > 0 && (
-                <span className="tabular-nums text-text/50">
-                  {t("modelSelector.downloadSpeed", {
-                    speed: downloadSpeed.toFixed(1),
-                  })}
-                </span>
-              )}
-              {onCancel && (
-                <Button
-                  variant="danger-ghost"
-                  size="sm"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    onCancel(model.id);
-                  }}
-                  aria-label={t("modelSelector.cancelDownload")}
-                >
-                  {t("modelSelector.cancel")}
-                </Button>
-              )}
+      {showInlineProgress &&
+        status === "downloading" &&
+        downloadProgress !== undefined && (
+          <div className="w-full mt-3">
+            <div className="w-full h-1.5 bg-mid-gray/20 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-logo-primary rounded-full transition-all duration-300"
+                style={{ width: `${downloadProgress}%` }}
+              />
+            </div>
+            <div className="flex items-center justify-between text-xs mt-1">
+              <span className="text-text/50">
+                {t("modelSelector.downloading", {
+                  percentage: Math.round(downloadProgress),
+                })}
+              </span>
+              <div className="flex items-center gap-2">
+                {downloadSpeed !== undefined && downloadSpeed > 0 && (
+                  <span className="tabular-nums text-text/50">
+                    {t("modelSelector.downloadSpeed", {
+                      speed: downloadSpeed.toFixed(1),
+                    })}
+                  </span>
+                )}
+                {onCancel && (
+                  <Button
+                    variant="danger-ghost"
+                    size="sm"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      onCancel(model.id);
+                    }}
+                    aria-label={t("modelSelector.cancelDownload")}
+                  >
+                    {t("modelSelector.cancel")}
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
-      {status === "verifying" && (
+        )}
+      {showInlineProgress && status === "verifying" && (
         <div className="w-full mt-3">
           <div className="w-full h-1.5 bg-mid-gray/20 rounded-full overflow-hidden">
             <div className="h-full bg-logo-primary rounded-full animate-pulse w-full" />
@@ -348,7 +365,7 @@ const ModelCard: React.FC<ModelCardProps> = ({
           </p>
         </div>
       )}
-      {status === "extracting" && (
+      {showInlineProgress && status === "extracting" && (
         <div className="w-full mt-3">
           <div className="w-full h-1.5 bg-mid-gray/20 rounded-full overflow-hidden">
             <div className="h-full bg-logo-primary rounded-full animate-pulse w-full" />

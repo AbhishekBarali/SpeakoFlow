@@ -4,6 +4,7 @@ import { produce } from "immer";
 import { listen } from "@tauri-apps/api/event";
 import { commands, type ModelInfo } from "@/bindings";
 import { toast } from "sonner";
+import i18n from "@/i18n";
 
 interface DownloadProgress {
   model_id: string;
@@ -33,6 +34,13 @@ interface ModelsStore {
   hasAnyModels: boolean;
   isFirstRun: boolean;
   initialized: boolean;
+  /**
+   * Transcription model the user picked during onboarding whose download is
+   * still in flight. Once the download completes, the store selects it (makes
+   * it the active recording model) — even if the user has already moved past
+   * the speech-to-text step — so the Step-1 download can be fully non-blocking.
+   */
+  pendingSttSelection: string | null;
 
   // Actions
   initialize: () => Promise<void>;
@@ -48,6 +56,16 @@ interface ModelsStore {
   isModelVerifying: (modelId: string) => boolean;
   isModelExtracting: (modelId: string) => boolean;
   getDownloadProgress: (modelId: string) => DownloadProgress | undefined;
+  /** Record (or clear) the onboarding STT model awaiting a background download. */
+  setPendingSttSelection: (modelId: string | null) => void;
+  /**
+   * Select a freshly-downloaded onboarding STT model, retrying a few times to
+   * absorb the transient post-download load race (`set_active_model` can
+   * momentarily fail with "Model load already in progress"). Only surfaces an
+   * error toast after the retries are exhausted, so a select that will succeed
+   * doesn't spam the user.
+   */
+  finalizePendingSttSelection: (modelId: string) => Promise<void>;
 
   // Internal setters
   setModels: (models: ModelInfo[]) => void;
@@ -70,12 +88,68 @@ export const useModelStore = create<ModelsStore>()(
     hasAnyModels: false,
     isFirstRun: false,
     initialized: false,
+    pendingSttSelection: null,
 
     // Internal setters
     setModels: (models) => set({ models }),
     setCurrentModel: (currentModel) => set({ currentModel }),
     setError: (error) => set({ error }),
     setLoading: (loading) => set({ loading }),
+
+    setPendingSttSelection: (pendingSttSelection) =>
+      set({ pendingSttSelection }),
+
+    finalizePendingSttSelection: async (modelId: string) => {
+      // Retry a few times with a short backoff. The only failure worth retrying
+      // right after a fresh download is the transient race in
+      // switch_active_model: try_start_loading() returns None → "Model load
+      // already in progress". That path returns BEFORE load_model and emits no
+      // event, so retrying it is silent and a moment later it succeeds.
+      //
+      // A GENUINE load failure (corrupt/incompatible weights) instead emits
+      // `model-state-changed: loading_failed`, which App.tsx already surfaces as
+      // a clear toast with the real error. Retrying that would only spam that
+      // toast, so we stop immediately and let the single App.tsx toast stand.
+      const maxAttempts = 4;
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        // Bail out if the pending selection was superseded/cancelled meanwhile.
+        if (get().pendingSttSelection !== modelId) return;
+
+        const ok = await get().selectModel(modelId);
+        if (ok) {
+          if (get().pendingSttSelection === modelId) {
+            set({ pendingSttSelection: null });
+          }
+          return;
+        }
+
+        const isTransient = (get().error ?? "")
+          .toLowerCase()
+          .includes("already in progress");
+        if (!isTransient) {
+          // Genuine failure — already surfaced by App.tsx's loading_failed
+          // toast. Drop the pending selection and stop (no second toast).
+          if (get().pendingSttSelection === modelId) {
+            set({ pendingSttSelection: null });
+          }
+          return;
+        }
+
+        // Backoff: 250ms, 500ms, 750ms between the four attempts.
+        await new Promise((resolve) => setTimeout(resolve, 250 * (attempt + 1)));
+      }
+
+      // Persistent transient failure (rare) — surface a clear, resolved message.
+      if (get().pendingSttSelection === modelId) {
+        set({ pendingSttSelection: null });
+        toast.error(
+          i18n.t("onboarding.errors.selectModel", {
+            defaultValue: "Couldn't select that model. Please try again.",
+          }),
+          { id: "onboarding-select-model" },
+        );
+      }
+    },
 
     loadModels: async () => {
       try {
@@ -335,6 +409,15 @@ export const useModelStore = create<ModelsStore>()(
           }),
         );
         get().loadModels();
+
+        // If the user picked this transcription model during onboarding, select
+        // it now that the weights are on disk. This runs from the store (which
+        // lives for the whole session), so it works even if the user already
+        // clicked "Continue" past the speech-to-text step — making the Step-1
+        // download fully non-blocking.
+        if (get().pendingSttSelection === modelId) {
+          void get().finalizePendingSttSelection(modelId);
+        }
       });
 
       listen<{ model_id: string; error: string }>(
@@ -348,9 +431,25 @@ export const useModelStore = create<ModelsStore>()(
               delete state.downloadProgress[modelId];
               delete state.downloadStats[modelId];
               state.error = error;
+              // A failed download can never be selected — drop any pending
+              // onboarding selection so we don't try to activate it.
+              if (state.pendingSttSelection === modelId) {
+                state.pendingSttSelection = null;
+              }
             }),
           );
-          toast.error(error);
+          // Backport of Handy #1522: surface the *real* download error (e.g. a
+          // blocked/unreachable host) instead of failing silently. SpeakoFlow
+          // already mounts <Toaster /> during onboarding (App.tsx renders it
+          // before the onboarding body), so this shows on the wizard too. The
+          // friendly title gives context; the raw error rides along as the
+          // description so it stays diagnosable rather than a generic message.
+          toast.error(
+            i18n.t("errors.downloadFailedTitle", {
+              defaultValue: "Download failed",
+            }),
+            { description: error },
+          );
         },
       );
 
@@ -398,8 +497,22 @@ export const useModelStore = create<ModelsStore>()(
           set(
             produce((state) => {
               delete state.extractingModels[modelId];
+              delete state.downloadingModels[modelId];
+              delete state.downloadProgress[modelId];
+              delete state.downloadStats[modelId];
               state.error = `Failed to extract model: ${event.payload.error}`;
+              if (state.pendingSttSelection === modelId) {
+                state.pendingSttSelection = null;
+              }
             }),
+          );
+          // Like a failed download, a failed extraction must not fail silently
+          // during onboarding — surface the real error (Handy #1522 intent).
+          toast.error(
+            i18n.t("errors.downloadFailedTitle", {
+              defaultValue: "Download failed",
+            }),
+            { description: event.payload.error },
           );
         },
       );
@@ -412,6 +525,9 @@ export const useModelStore = create<ModelsStore>()(
             delete state.verifyingModels[modelId];
             delete state.downloadProgress[modelId];
             delete state.downloadStats[modelId];
+            if (state.pendingSttSelection === modelId) {
+              state.pendingSttSelection = null;
+            }
           }),
         );
       });

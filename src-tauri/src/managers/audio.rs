@@ -4,6 +4,7 @@ use crate::managers::transcription::StreamRouter;
 use crate::settings::{get_settings, AppSettings};
 use crate::utils;
 use log::{debug, error, info};
+use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -119,7 +120,7 @@ pub enum MicrophoneMode {
 /* ──────────────────────────────────────────────────────────────── */
 
 fn create_audio_recorder(
-    vad_path: &str,
+    vad_path: &Path,
     app_handle: &tauri::AppHandle,
     stream_router: Arc<StreamRouter>,
 ) -> Result<AudioRecorder, anyhow::Error> {
@@ -289,7 +290,7 @@ impl AudioRecordingManager {
                 )
                 .map_err(|e| anyhow::anyhow!("Failed to resolve VAD path: {}", e))?;
             *recorder_opt = Some(create_audio_recorder(
-                vad_path.to_str().unwrap(),
+                &vad_path,
                 &self.app_handle,
                 self.stream_router.clone(),
             )?);

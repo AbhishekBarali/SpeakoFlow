@@ -374,20 +374,36 @@ pub fn create_recording_overlay(app_handle: &AppHandle) {
     }
 }
 
+/// Whether the currently selected transcription model supports native
+/// live-streaming. Read-only capability lookup (via the model catalog) used to
+/// resolve `OverlayStyle::Auto` into Live vs Minimal, for both the recording
+/// overlay and the assistant. Returns false if the model info isn't available.
+pub fn selected_model_supports_live(app: &AppHandle) -> bool {
+    let selected = settings::get_settings(app).selected_model;
+    app.try_state::<std::sync::Arc<crate::managers::model::ModelManager>>()
+        .and_then(|mm| mm.get_model_info(&selected))
+        .map(|info| info.supports_streaming)
+        .unwrap_or(false)
+}
+
 fn show_overlay_state(app_handle: &AppHandle, state: &str) {
     // Check if overlay should be shown based on position setting
     let settings = settings::get_settings(app_handle);
-    if settings.overlay_position == OverlayPosition::None {
+
+    // Resolve the chosen overlay style (Auto follows the model: Live when the
+    // selected model supports live streaming, else Minimal). `None` — from the
+    // style OR the legacy position setting — means "show nothing".
+    let supports_live = selected_model_supports_live(app_handle);
+    let style = settings::resolve_overlay_style(settings.overlay_style, supports_live);
+    if style == settings::OverlayStyle::None || settings.overlay_position == OverlayPosition::None {
         return;
     }
 
-    // The larger live-transcription card is opt-in (default off) and only
-    // meaningful while streaming is actually producing text, so gate it on BOTH
-    // the window toggle and live transcription being enabled. Otherwise the
-    // overlay stays the compact pill — unchanged behavior for every existing
-    // state (recording / transcribing / processing).
-    let streaming_window =
-        settings.live_transcription_window_enabled && settings.live_transcription_enabled;
+    // Live → the enlarged readable card (running committed + tentative
+    // transcript); Minimal → the compact pill. The card is only meaningful
+    // while streaming actually produces text, but it degrades gracefully to a
+    // waveform + state label for batch models, so it's safe to show on Live.
+    let streaming_window = style == settings::OverlayStyle::Live;
 
     let (width, height) = if streaming_window {
         (OVERLAY_STREAM_WIDTH, OVERLAY_STREAM_HEIGHT)

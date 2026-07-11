@@ -126,6 +126,7 @@ const LlmOnboarding: React.FC<LlmOnboardingProps> = ({ onComplete }) => {
       downloadProgress={getModelDownloadProgress(model.id)}
       downloadSpeed={getModelDownloadSpeed(model.id)}
       showScores={false}
+      showInlineProgress={false}
     />
   );
 

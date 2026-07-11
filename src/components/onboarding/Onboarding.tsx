@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import type { ModelInfo } from "@/bindings";
@@ -17,28 +17,30 @@ interface OnboardingProps {
  * Step 1 of the first-run flow: choose a speech-to-text (transcription) model.
  * Only transcription engines are shown here — the AI/LLM models live in their
  * own step (see LlmOnboarding) so the two are never mixed into one flat list.
+ *
+ * The download is NON-BLOCKING (mirrors the AI-model step): picking a model
+ * kicks off a background download, shows progress in the shared DownloadProgress
+ * strip, and lets the user press Continue right away. The store selects the
+ * model (makes it the active recording model) once its weights land on disk —
+ * even if the user has already moved on — retrying to absorb the brief
+ * post-download engine-load race instead of spamming an error toast.
  */
 const Onboarding: React.FC<OnboardingProps> = ({ onModelSelected }) => {
   const { t } = useTranslation();
   const {
     models,
     downloadModel,
-    selectModel,
     downloadingModels,
     verifyingModels,
     extractingModels,
     downloadProgress,
     downloadStats,
+    setPendingSttSelection,
+    finalizePendingSttSelection,
   } = useModelStore();
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
-  // Guards against firing `selectModel` more than once for the same model. The
-  // watcher effect below re-runs on every store change (models, download maps,
-  // …), and because `selectModel` is async those re-runs could otherwise kick
-  // off several concurrent selects for one model — which is what produced a
-  // stack of duplicate error toasts when one call raced ahead of the others.
-  const attemptedSelectRef = useRef<string | null>(null);
 
-  const isDownloading = selectedModelId !== null;
+  const hasChosen = selectedModelId !== null;
 
   // Only speech-to-text (transcription) models belong in this step.
   const sttModels = useMemo(
@@ -55,7 +57,8 @@ const Onboarding: React.FC<OnboardingProps> = ({ onModelSelected }) => {
       sttModels
         .filter((m: ModelInfo) => !m.is_downloaded && m.is_recommended)
         .sort((a: ModelInfo, b: ModelInfo) => {
-          const rank = (m: ModelInfo) => m.recommended_rank ?? Number.MAX_SAFE_INTEGER;
+          const rank = (m: ModelInfo) =>
+            m.recommended_rank ?? Number.MAX_SAFE_INTEGER;
           const byRank = rank(a) - rank(b);
           if (byRank !== 0) return byRank;
           return Number(b.accuracy_score) - Number(a.accuracy_score);
@@ -81,71 +84,29 @@ const Onboarding: React.FC<OnboardingProps> = ({ onModelSelected }) => {
     [sttModels],
   );
 
+  // Use a model that's already on disk: select it (robustly, via the store) and
+  // continue immediately — the selection finishes in the background.
   const handleUseInstalled = () => {
     if (!installedModel) return;
-    selectModel(installedModel.id).then((success) => {
-      if (success) {
-        onModelSelected();
-      } else {
-        toast.error(t("onboarding.errors.selectModel"), {
-          id: "onboarding-select-model",
-        });
-      }
-    });
+    setPendingSttSelection(installedModel.id);
+    void finalizePendingSttSelection(installedModel.id);
+    onModelSelected();
   };
-
-  // Watch for the selected model to finish downloading + verifying + extracting
-  useEffect(() => {
-    if (!selectedModelId) return;
-
-    const model = models.find((m) => m.id === selectedModelId);
-    const stillDownloading = selectedModelId in downloadingModels;
-    const stillVerifying = selectedModelId in verifyingModels;
-    const stillExtracting = selectedModelId in extractingModels;
-
-    if (
-      model?.is_downloaded &&
-      !stillDownloading &&
-      !stillVerifying &&
-      !stillExtracting
-    ) {
-      // Only attempt the select once per model, even if the effect re-runs
-      // while the async call is still in flight.
-      if (attemptedSelectRef.current === selectedModelId) return;
-      attemptedSelectRef.current = selectedModelId;
-
-      // Model is ready — select it and transition
-      selectModel(selectedModelId).then((success) => {
-        if (success) {
-          onModelSelected();
-        } else {
-          toast.error(t("onboarding.errors.selectModel"), {
-            id: "onboarding-select-model",
-          });
-          setSelectedModelId(null);
-          attemptedSelectRef.current = null;
-        }
-      });
-    }
-  }, [
-    selectedModelId,
-    models,
-    downloadingModels,
-    verifyingModels,
-    extractingModels,
-    selectModel,
-    onModelSelected,
-    t,
-  ]);
 
   const handleDownloadModel = async (modelId: string) => {
     setSelectedModelId(modelId);
+    // Remember this as the STT model to activate once the download finishes.
+    // The store owns the completion → select flow, so it survives the user
+    // pressing Continue and leaving this step.
+    setPendingSttSelection(modelId);
 
-    // Error toast is handled centrally by the model-download-failed event listener
-    // in modelStore — no toast here to avoid duplicates.
+    // Kick off the background download. Real download errors surface centrally
+    // via the model-download-failed listener in the store (Handy #1522), so no
+    // toast here. On an immediate failure, reset so the user can pick again.
     const success = await downloadModel(modelId);
     if (!success) {
       setSelectedModelId(null);
+      setPendingSttSelection(null);
     }
   };
 
@@ -164,29 +125,43 @@ const Onboarding: React.FC<OnboardingProps> = ({ onModelSelected }) => {
     return downloadStats[modelId]?.speed;
   };
 
+  // Footer mirrors the AI-model step: once a model is chosen the download runs
+  // in the background and the user can Continue; otherwise they can jump in with
+  // an already-installed model. Never blocks.
+  const footer = hasChosen ? (
+    <>
+      <p className="text-xs text-muted-soft max-w-[60%]">
+        {t("onboarding.speechToText.downloadingHint")}
+      </p>
+      <Button
+        variant="primary"
+        size="lg"
+        onClick={() => {
+          toast.success(t("onboarding.speechToText.downloadStarted"));
+          onModelSelected();
+        }}
+      >
+        {t("onboarding.speechToText.continue")}
+      </Button>
+    </>
+  ) : installedModel ? (
+    <>
+      <p className="text-xs text-muted-soft max-w-[60%]">
+        {t("onboarding.speechToText.installedHint")}
+      </p>
+      <Button variant="secondary" size="lg" onClick={handleUseInstalled}>
+        {t("onboarding.speechToText.useInstalled")}
+      </Button>
+    </>
+  ) : undefined;
+
   return (
     <OnboardingLayout
       step={1}
       totalSteps={2}
       title={t("onboarding.speechToText.title")}
       subtitle={t("onboarding.speechToText.subtitle")}
-      footer={
-        installedModel ? (
-          <>
-            <p className="text-xs text-muted-soft max-w-[60%]">
-              {t("onboarding.speechToText.installedHint")}
-            </p>
-            <Button
-              variant="secondary"
-              size="lg"
-              onClick={handleUseInstalled}
-              disabled={isDownloading}
-            >
-              {t("onboarding.speechToText.useInstalled")}
-            </Button>
-          </>
-        ) : undefined
-      }
+      footer={footer}
     >
       {featuredModels.map((model: ModelInfo) => (
         <ModelCard
@@ -194,12 +169,13 @@ const Onboarding: React.FC<OnboardingProps> = ({ onModelSelected }) => {
           model={model}
           variant="featured"
           status={getModelStatus(model.id)}
-          disabled={isDownloading}
+          disabled={hasChosen && selectedModelId !== model.id}
           onSelect={handleDownloadModel}
           onDownload={handleDownloadModel}
           downloadProgress={getModelDownloadProgress(model.id)}
           downloadSpeed={getModelDownloadSpeed(model.id)}
           showScores={false}
+          showInlineProgress={false}
         />
       ))}
 
@@ -208,12 +184,13 @@ const Onboarding: React.FC<OnboardingProps> = ({ onModelSelected }) => {
           key={model.id}
           model={model}
           status={getModelStatus(model.id)}
-          disabled={isDownloading}
+          disabled={hasChosen && selectedModelId !== model.id}
           onSelect={handleDownloadModel}
           onDownload={handleDownloadModel}
           downloadProgress={getModelDownloadProgress(model.id)}
           downloadSpeed={getModelDownloadSpeed(model.id)}
           showScores={false}
+          showInlineProgress={false}
         />
       ))}
     </OnboardingLayout>
