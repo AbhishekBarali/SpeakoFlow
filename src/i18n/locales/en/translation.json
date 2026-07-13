@@ -1148,6 +1148,7 @@
         "engines": {
           "kokoro": "Kokoro (local, free)",
           "openai": "OpenAI-compatible",
+          "openrouter": "OpenRouter",
           "elevenlabs": "ElevenLabs",
           "azure": "Azure AI Speech"
         },

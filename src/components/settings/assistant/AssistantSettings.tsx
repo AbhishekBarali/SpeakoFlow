@@ -1064,6 +1064,10 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
                     label: t("settings.assistant.tts.engines.openai"),
                   },
                   {
+                    value: "openrouter",
+                    label: t("settings.assistant.tts.engines.openrouter"),
+                  },
+                  {
                     value: "elevenlabs",
                     label: t("settings.assistant.tts.engines.elevenlabs"),
                   },
@@ -1073,9 +1077,20 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
                   },
                 ]}
                 selectedValue={settings?.assistant_tts_engine ?? "kokoro"}
-                onSelect={(engine) =>
-                  setAndRefresh(commands.setAssistantTtsEngine(engine))
-                }
+                onSelect={async (engine) => {
+                  // Pre-fill OpenRouter's base URL the first time it's picked so
+                  // the OpenAI-compatible path targets the right endpoint. Never
+                  // clobbers a base URL the user has already set.
+                  if (
+                    engine === "openrouter" &&
+                    !(settings?.assistant_tts_base_url ?? "").trim()
+                  ) {
+                    const url = "https://openrouter.ai/api/v1";
+                    setTtsBaseUrl(url);
+                    await setAndRefresh(commands.setAssistantTtsBaseUrl(url));
+                  }
+                  await setAndRefresh(commands.setAssistantTtsEngine(engine));
+                }}
                 disabled={!settings?.assistant_tts_enabled}
                 className="min-w-[340px]"
               />
@@ -1099,7 +1114,8 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
               </SettingContainer>
             )}
 
-            {settings?.assistant_tts_engine === "openai" && (
+            {(settings?.assistant_tts_engine === "openai" ||
+              settings?.assistant_tts_engine === "openrouter") && (
               <>
                 <SettingContainer
                   title={t("settings.assistant.tts.baseUrlLabel")}

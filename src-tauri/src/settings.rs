@@ -1805,7 +1805,11 @@ fn ensure_assistant_defaults(settings: &mut AppSettings) -> bool {
             settings.assistant_tts_remote_voices.remove(engine);
             changed = true;
         }
-        if settings.assistant_tts_models.get(engine).map(String::as_str) == Some("gpt-4o-mini-tts")
+        if settings
+            .assistant_tts_models
+            .get(engine)
+            .map(String::as_str)
+            == Some("gpt-4o-mini-tts")
         {
             settings.assistant_tts_models.remove(engine);
             changed = true;
@@ -2811,7 +2815,10 @@ mod tests {
         assert_eq!(settings.assistant_tts_models.get("elevenlabs"), None);
         assert_eq!(settings.assistant_tts_remote_voices.get("azure"), None);
         assert_eq!(
-            settings.assistant_tts_models.get("azure").map(String::as_str),
+            settings
+                .assistant_tts_models
+                .get("azure")
+                .map(String::as_str),
             Some("eleven_flash_v2_5")
         );
 

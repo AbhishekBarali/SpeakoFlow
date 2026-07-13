@@ -104,7 +104,7 @@ pub async fn speak_remote_epoch(app: &AppHandle, settings: &AppSettings, text: S
     }
 
     let result = match settings.assistant_tts_engine.as_str() {
-        "openai" => fetch_openai_speech(settings, &text).await,
+        "openai" | "openrouter" => fetch_openai_speech(settings, &text).await,
         "elevenlabs" => fetch_elevenlabs_speech(settings, &text).await,
         "azure" => fetch_azure_speech(settings, &text).await,
         other => Err(format!("Unknown TTS engine: {}", other)),
@@ -215,24 +215,40 @@ async fn send_tts_with_retries(
     }
 }
 
-/// POST {base}/audio/speech — OpenAI-compatible shape.
-///
-/// If the configured base URL already contains `/audio/speech`, it is used
-/// verbatim (matching SillyTavern's "Provider Endpoint" behaviour). This lets
-/// users paste a full Azure endpoint such as
-/// `https://{res}.cognitiveservices.azure.com/openai/deployments/{dep}/audio/speech?api-version=2025-03-01-preview`,
-/// including the `?api-version=` query string, which a base-plus-suffix scheme
-/// cannot express.
-async fn fetch_openai_speech(settings: &AppSettings, text: &str) -> Result<Vec<u8>, String> {
-    let raw = settings.assistant_tts_base_url.trim();
-    let url = if raw.contains("/audio/speech") {
-        raw.to_string()
-    } else {
-        format!("{}/audio/speech", raw.trim_end_matches('/'))
-    };
+/// Default PCM parameters for OpenAI-compatible `pcm` output. Both OpenAI's TTS
+/// and Gemini TTS (via OpenRouter) emit signed 16-bit little-endian mono at
+/// 24 kHz, so these are safe defaults when the response omits an explicit rate.
+const PCM_DEFAULT_SAMPLE_RATE: u32 = 24_000;
+const PCM_DEFAULT_CHANNELS: u16 = 1;
+const PCM_BITS_PER_SAMPLE: u16 = 16;
 
+/// Outcome of a single `/audio/speech` attempt: either the audio (with its
+/// reported `Content-Type`) or a non-success HTTP status plus body. HTTP errors
+/// are kept separate from transport errors so the caller can inspect the body
+/// and decide whether to retry with a different `response_format`.
+enum SpeechAttempt {
+    Ok {
+        content_type: String,
+        bytes: Vec<u8>,
+    },
+    HttpError {
+        status: reqwest::StatusCode,
+        body: String,
+    },
+}
+
+/// Perform one `/audio/speech` POST for a specific `response_format`. Transport
+/// failures return `Err`; a non-2xx response returns `Ok(SpeechAttempt::HttpError)`
+/// so the caller can look at the body (e.g. to detect a pcm-only model).
+async fn openai_speech_attempt(
+    settings: &AppSettings,
+    text: &str,
+    url: &str,
+    response_format: &str,
+) -> Result<SpeechAttempt, String> {
     let client = tts_client()?;
     // OpenAI-compatible `speed` (0.25x–4x). Pitch is preserved by the service.
+    // Providers that don't support it (e.g. Gemini via OpenRouter) ignore it.
     let speed = settings.assistant_tts_speed.clamp(0.25, 4.0);
     // The model/voice fields start empty (they're loadable pickers). Fall back to
     // OpenAI's defaults when left blank so synthesis still works out of the box
@@ -254,35 +270,165 @@ async fn fetch_openai_speech(settings: &AppSettings, text: &str) -> Result<Vec<u
             v
         }
     };
-    let mut request = client.post(&url).json(&serde_json::json!({
+    let mut request = client.post(url).json(&serde_json::json!({
         "model": model,
         "input": text,
         "voice": voice,
-        "response_format": "mp3",
+        "response_format": response_format,
         "speed": speed,
     }));
 
     let api_key = settings.assistant_tts_api_key.0.trim();
     if !api_key.is_empty() {
-        // Bearer covers OpenAI, Groq, and Azure's v1 API; the `api-key` header
-        // covers classic Azure OpenAI deployment endpoints. Sending both is
-        // harmless — endpoints ignore the header they don't use.
+        // Bearer covers OpenAI, Groq, OpenRouter, and Azure's v1 API; the
+        // `api-key` header covers classic Azure OpenAI deployment endpoints.
+        // Sending both is harmless — endpoints ignore the header they don't use.
         request = request.bearer_auth(api_key).header("api-key", api_key);
     }
 
     let response = send_tts_with_retries(request).await?;
-
     let status = response.status();
     if !status.is_success() {
         let body = response.text().await.unwrap_or_default();
-        return Err(format!("{}: {}", status, truncate(&body, 300)));
+        return Ok(SpeechAttempt::HttpError { status, body });
     }
 
-    response
+    let content_type = response
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("")
+        .to_string();
+    let bytes = response
         .bytes()
         .await
         .map(|b| b.to_vec())
-        .map_err(|e| format!("Failed to read audio: {}", e))
+        .map_err(|e| format!("Failed to read audio: {}", e))?;
+    Ok(SpeechAttempt::Ok {
+        content_type,
+        bytes,
+    })
+}
+
+/// POST {base}/audio/speech — OpenAI-compatible shape.
+///
+/// If the configured base URL already contains `/audio/speech`, it is used
+/// verbatim (matching SillyTavern's "Provider Endpoint" behaviour). This lets
+/// users paste a full Azure endpoint such as
+/// `https://{res}.cognitiveservices.azure.com/openai/deployments/{dep}/audio/speech?api-version=2025-03-01-preview`,
+/// including the `?api-version=` query string, which a base-plus-suffix scheme
+/// cannot express.
+///
+/// Requests `mp3` first (compressed, and rodio decodes it directly). Some models
+/// are pcm-only — notably Gemini TTS via OpenRouter, which rejects mp3 with a
+/// 400 — so on that specific error we transparently retry as `pcm` and wrap the
+/// raw samples in a WAV container (see [`pcm_to_wav`]) so playback still works.
+/// This self-heals for any pcm-only model without a hardcoded model list.
+async fn fetch_openai_speech(settings: &AppSettings, text: &str) -> Result<Vec<u8>, String> {
+    let raw = settings.assistant_tts_base_url.trim();
+    let url = if raw.contains("/audio/speech") {
+        raw.to_string()
+    } else {
+        format!("{}/audio/speech", raw.trim_end_matches('/'))
+    };
+
+    match openai_speech_attempt(settings, text, &url, "mp3").await? {
+        SpeechAttempt::Ok {
+            content_type,
+            bytes,
+        } => Ok(maybe_wrap_pcm(&content_type, bytes)),
+        SpeechAttempt::HttpError { status, body } => {
+            // Only retry as pcm for the specific "this model needs pcm" 400 so
+            // unrelated 4xx/5xx errors (bad key, missing model, gateway) still
+            // surface to the user immediately instead of doubling the latency.
+            let pcm_only =
+                status == reqwest::StatusCode::BAD_REQUEST && body.to_lowercase().contains("pcm");
+            if !pcm_only {
+                return Err(format!("{}: {}", status, truncate(&body, 300)));
+            }
+            debug!("TTS model rejected mp3 (pcm-only); retrying as pcm and wrapping to WAV");
+            match openai_speech_attempt(settings, text, &url, "pcm").await? {
+                SpeechAttempt::Ok {
+                    content_type,
+                    bytes,
+                } => {
+                    // We explicitly asked for pcm, so wrap unconditionally: the
+                    // bytes are raw PCM even if the endpoint omits a Content-Type.
+                    let sample_rate =
+                        parse_pcm_rate(&content_type).unwrap_or(PCM_DEFAULT_SAMPLE_RATE);
+                    Ok(pcm_to_wav(
+                        &bytes,
+                        sample_rate,
+                        PCM_DEFAULT_CHANNELS,
+                        PCM_BITS_PER_SAMPLE,
+                    ))
+                }
+                SpeechAttempt::HttpError { status, body } => {
+                    Err(format!("{}: {}", status, truncate(&body, 300)))
+                }
+            }
+        }
+    }
+}
+
+/// Wrap raw PCM in a WAV container when the audio has no decodable header;
+/// otherwise pass it through unchanged. rodio decodes container formats
+/// (mp3/wav/ogg/flac) but not headerless PCM, so any `audio/pcm` / `audio/L16`
+/// response is wrapped while mp3 and everything else is returned as-is.
+fn maybe_wrap_pcm(content_type: &str, bytes: Vec<u8>) -> Vec<u8> {
+    let ct = content_type.to_ascii_lowercase();
+    let is_pcm = ct.contains("audio/pcm") || ct.contains("audio/l16") || ct.contains("codec=pcm");
+    if !is_pcm {
+        return bytes;
+    }
+    let sample_rate = parse_pcm_rate(&ct).unwrap_or(PCM_DEFAULT_SAMPLE_RATE);
+    pcm_to_wav(
+        &bytes,
+        sample_rate,
+        PCM_DEFAULT_CHANNELS,
+        PCM_BITS_PER_SAMPLE,
+    )
+}
+
+/// Parse a sample rate from a PCM `Content-Type` such as `audio/L16;rate=24000`
+/// or `audio/pcm;rate=16000`. Returns `None` when no `rate=` parameter present.
+fn parse_pcm_rate(content_type: &str) -> Option<u32> {
+    let lower = content_type.to_ascii_lowercase();
+    lower
+        .split(';')
+        .map(|part| part.trim())
+        .find_map(|part| part.strip_prefix("rate="))
+        .and_then(|r| r.trim().parse::<u32>().ok())
+}
+
+/// Wrap raw little-endian PCM samples in a canonical 44-byte WAV header so a
+/// container-based decoder (rodio) can play them. Assumes `bits_per_sample` is
+/// a multiple of 8 (16 for all current OpenAI-compatible pcm output).
+fn pcm_to_wav(pcm: &[u8], sample_rate: u32, channels: u16, bits_per_sample: u16) -> Vec<u8> {
+    let bytes_per_sample = (bits_per_sample / 8) as u32;
+    let byte_rate = sample_rate * channels as u32 * bytes_per_sample;
+    let block_align = channels * (bits_per_sample / 8);
+    let data_len = pcm.len() as u32;
+    let riff_len = 36u32.saturating_add(data_len);
+
+    let mut out = Vec::with_capacity(44 + pcm.len());
+    out.extend_from_slice(b"RIFF");
+    out.extend_from_slice(&riff_len.to_le_bytes());
+    out.extend_from_slice(b"WAVE");
+    // "fmt " subchunk (PCM).
+    out.extend_from_slice(b"fmt ");
+    out.extend_from_slice(&16u32.to_le_bytes()); // subchunk size for PCM
+    out.extend_from_slice(&1u16.to_le_bytes()); // audio format = 1 (PCM)
+    out.extend_from_slice(&channels.to_le_bytes());
+    out.extend_from_slice(&sample_rate.to_le_bytes());
+    out.extend_from_slice(&byte_rate.to_le_bytes());
+    out.extend_from_slice(&block_align.to_le_bytes());
+    out.extend_from_slice(&bits_per_sample.to_le_bytes());
+    // "data" subchunk.
+    out.extend_from_slice(b"data");
+    out.extend_from_slice(&data_len.to_le_bytes());
+    out.extend_from_slice(pcm);
+    out
 }
 
 /// POST https://api.elevenlabs.io/v1/text-to-speech/{voice_id}
@@ -472,7 +618,7 @@ pub async fn list_azure_voices(settings: &AppSettings) -> Result<Vec<AzureVoice>
 /// voice picker. Errors are returned for inline display.
 pub async fn list_tts_voices(settings: &AppSettings) -> Result<Vec<TtsVoice>, String> {
     match settings.assistant_tts_engine.as_str() {
-        "openai" => list_openai_tts_voices(settings).await,
+        "openai" | "openrouter" => list_openai_tts_voices(settings).await,
         "elevenlabs" => list_elevenlabs_voices(settings).await,
         "azure" => {
             let voices = list_azure_voices(settings).await?;
@@ -637,7 +783,7 @@ async fn list_elevenlabs_voices(settings: &AppSettings) -> Result<Vec<TtsVoice>,
 /// model list; Azure/Kokoro return an error the UI surfaces as "not supported".
 pub async fn list_tts_models(settings: &AppSettings) -> Result<Vec<String>, String> {
     match settings.assistant_tts_engine.as_str() {
-        "openai" => list_openai_tts_models(settings).await,
+        "openai" | "openrouter" => list_openai_tts_models(settings).await,
         "elevenlabs" => list_elevenlabs_models(settings).await,
         other => Err(format!(
             "Model listing isn't supported for engine: {}",
@@ -659,6 +805,14 @@ async fn list_openai_tts_models(settings: &AppSettings) -> Result<Vec<String>, S
         }
     };
     let url = format!("{}/models", base);
+    // OpenRouter's /models returns thousands of chat models; ask it for only
+    // speech-capable ones so the TTS model picker is actually usable. Harmless
+    // for other providers (this arm only runs for the openai/openrouter path).
+    let url = if base.contains("openrouter.ai") {
+        format!("{}?output_modalities=speech", url)
+    } else {
+        url
+    };
 
     let client = tts_client()?;
     let mut req = client.get(&url);
@@ -834,7 +988,7 @@ async fn fetch_azure_speech(settings: &AppSettings, text: &str) -> Result<Vec<u8
 pub async fn test_remote(settings: &AppSettings, text: String) -> Result<(), String> {
     let epoch = current_epoch();
     let audio_bytes = match settings.assistant_tts_engine.as_str() {
-        "openai" => fetch_openai_speech(settings, &text).await?,
+        "openai" | "openrouter" => fetch_openai_speech(settings, &text).await?,
         "elevenlabs" => fetch_elevenlabs_speech(settings, &text).await?,
         "azure" => fetch_azure_speech(settings, &text).await?,
         other => return Err(format!("Unknown TTS engine: {}", other)),
@@ -1094,5 +1248,64 @@ mod tests {
             azure_voices_url("https://myres.cognitiveservices.azure.com/"),
             "https://myres.cognitiveservices.azure.com/tts/cognitiveservices/voices/list"
         );
+    }
+
+    #[test]
+    fn pcm_to_wav_writes_canonical_header() {
+        use super::pcm_to_wav;
+        // 4 bytes of PCM = two 16-bit mono samples.
+        let pcm = [0x01u8, 0x00, 0xff, 0x7f];
+        let wav = pcm_to_wav(&pcm, 24_000, 1, 16);
+
+        // 44-byte header + data.
+        assert_eq!(wav.len(), 44 + pcm.len());
+        assert_eq!(&wav[0..4], b"RIFF");
+        assert_eq!(&wav[8..12], b"WAVE");
+        assert_eq!(&wav[12..16], b"fmt ");
+        // RIFF chunk size = 36 + data_len.
+        assert_eq!(u32::from_le_bytes([wav[4], wav[5], wav[6], wav[7]]), 40);
+        // fmt subchunk size = 16, audio format = 1 (PCM).
+        assert_eq!(u32::from_le_bytes([wav[16], wav[17], wav[18], wav[19]]), 16);
+        assert_eq!(u16::from_le_bytes([wav[20], wav[21]]), 1);
+        // channels = 1, sample rate = 24000.
+        assert_eq!(u16::from_le_bytes([wav[22], wav[23]]), 1);
+        assert_eq!(
+            u32::from_le_bytes([wav[24], wav[25], wav[26], wav[27]]),
+            24_000
+        );
+        // byte rate = 24000 * 1 * 2, block align = 2, bits = 16.
+        assert_eq!(
+            u32::from_le_bytes([wav[28], wav[29], wav[30], wav[31]]),
+            48_000
+        );
+        assert_eq!(u16::from_le_bytes([wav[32], wav[33]]), 2);
+        assert_eq!(u16::from_le_bytes([wav[34], wav[35]]), 16);
+        // data subchunk header + payload preserved verbatim.
+        assert_eq!(&wav[36..40], b"data");
+        assert_eq!(u32::from_le_bytes([wav[40], wav[41], wav[42], wav[43]]), 4);
+        assert_eq!(&wav[44..], &pcm);
+    }
+
+    #[test]
+    fn parse_pcm_rate_reads_rate_param() {
+        use super::parse_pcm_rate;
+        assert_eq!(parse_pcm_rate("audio/L16;rate=24000"), Some(24_000));
+        assert_eq!(parse_pcm_rate("audio/pcm; rate=16000"), Some(16_000));
+        assert_eq!(parse_pcm_rate("AUDIO/L16;RATE=8000"), Some(8_000));
+        assert_eq!(parse_pcm_rate("audio/pcm"), None);
+        assert_eq!(parse_pcm_rate("audio/mpeg"), None);
+    }
+
+    #[test]
+    fn maybe_wrap_pcm_wraps_only_raw_pcm() {
+        use super::maybe_wrap_pcm;
+        // mp3 (or any container) passes through untouched.
+        let mp3 = vec![0xff, 0xfb, 0x90, 0x00];
+        assert_eq!(maybe_wrap_pcm("audio/mpeg", mp3.clone()), mp3);
+        // Raw pcm gets a WAV header prepended.
+        let pcm = vec![0x00u8, 0x00, 0x00, 0x00];
+        let wrapped = maybe_wrap_pcm("audio/pcm", pcm.clone());
+        assert_eq!(&wrapped[0..4], b"RIFF");
+        assert_eq!(wrapped.len(), 44 + pcm.len());
     }
 }
