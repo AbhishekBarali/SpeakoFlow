@@ -31,9 +31,13 @@ import {
 
 type OnboardingStep = "accessibility" | "model" | "llm" | "ready" | "done";
 
-// DEV ONLY: force the full onboarding flow on every launch so it can be
-// tested repeatedly. Remove (set to false) before release.
-const FORCE_ONBOARDING = true;
+// Force the full onboarding flow on every launch so it can be tested
+// repeatedly. This is intentionally gated to dev builds only
+// (`import.meta.env.DEV`): during `tauri dev` the wizard shows every launch
+// for easy iteration, while compiled/release builds fall back to the real
+// first-run detection in `checkOnboardingStatus` (show onboarding only when
+// no model is installed yet).
+const FORCE_ONBOARDING = import.meta.env.DEV;
 
 const renderSettingsContent = (section: SidebarSection) => {
   const ActiveComponent =
@@ -73,11 +77,24 @@ function App() {
   // Apply the appearance preference (light / dark / system) to <html>. The
   // CSS reacts to the resolved data-theme attribute. While the preference is
   // "system", watchSystemTheme keeps it aligned with live OS theme changes.
-  const themePreference = (settings?.theme ?? "system") as ThemePreference;
+  //
+  // Exception: the first-run / onboarding flow always uses the dark theme
+  // regardless of the (light-by-default) preference, so it keeps its rich,
+  // branded gradient-black look; the real preference is restored once
+  // onboarding is done.
+  const themePreference = (settings?.theme ?? "light") as ThemePreference;
+  const inOnboarding = onboardingStep !== null && onboardingStep !== "done";
   useEffect(() => {
-    applyThemePreference(themePreference);
-  }, [themePreference]);
-  useEffect(() => watchSystemTheme(() => themePreference), [themePreference]);
+    if (inOnboarding) {
+      document.documentElement.dataset.theme = "dark";
+    } else {
+      applyThemePreference(themePreference);
+    }
+  }, [inOnboarding, themePreference]);
+  useEffect(
+    () => watchSystemTheme(() => (inOnboarding ? "dark" : themePreference)),
+    [inOnboarding, themePreference],
+  );
 
   // Initialize Enigo, shortcuts, and refresh audio devices when main app loads
   useEffect(() => {

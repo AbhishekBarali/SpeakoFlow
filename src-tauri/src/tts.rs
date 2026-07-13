@@ -234,10 +234,30 @@ async fn fetch_openai_speech(settings: &AppSettings, text: &str) -> Result<Vec<u
     let client = tts_client()?;
     // OpenAI-compatible `speed` (0.25x–4x). Pitch is preserved by the service.
     let speed = settings.assistant_tts_speed.clamp(0.25, 4.0);
+    // The model/voice fields start empty (they're loadable pickers). Fall back to
+    // OpenAI's defaults when left blank so synthesis still works out of the box
+    // without forcing a pre-filled value into the settings UI (mirrors the
+    // ElevenLabs model fallback below).
+    let model = {
+        let m = settings.assistant_tts_model.trim();
+        if m.is_empty() {
+            "gpt-4o-mini-tts"
+        } else {
+            m
+        }
+    };
+    let voice = {
+        let v = settings.assistant_tts_remote_voice.trim();
+        if v.is_empty() {
+            "alloy"
+        } else {
+            v
+        }
+    };
     let mut request = client.post(&url).json(&serde_json::json!({
-        "model": settings.assistant_tts_model,
+        "model": model,
         "input": text,
-        "voice": settings.assistant_tts_remote_voice,
+        "voice": voice,
         "response_format": "mp3",
         "speed": speed,
     }));

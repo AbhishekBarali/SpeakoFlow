@@ -135,6 +135,16 @@ impl StreamRouter {
         self.open.load(Ordering::Relaxed)
     }
 
+    /// Frames discarded due to backpressure during the current (or most-recent)
+    /// session — non-zero only when inference couldn't keep up with real-time
+    /// and the bounded queue hit its cap. Reset on each [`open`](Self::open). A
+    /// non-zero count means the live transcript is missing audio, so
+    /// [`finalize_stream`](TranscriptionManager::finalize_stream) prefers the
+    /// complete batch result instead of the truncated streamed one.
+    pub fn dropped_frames(&self) -> u64 {
+        self.dropped.load(Ordering::Relaxed)
+    }
+
     /// Feed one raw 16 kHz mono frame. Returns immediately (relaxed atomic
     /// load, no allocation, no lock) when no stream is active.
     ///
@@ -1433,6 +1443,12 @@ impl TranscriptionManager {
             Some(tx) => tx,
             None => return Ok(None),
         };
+        // How many frames the live path had to discard because inference
+        // couldn't keep up. take() has already closed the router to new feeds
+        // (and the recorder's stop-drain has already run), so this count is
+        // final for the session.
+        let dropped = self.stream_router.dropped_frames();
+
         let (reply_tx, reply_rx) = mpsc::channel();
         if tx.send(StreamCmd::Finalize(reply_tx)).is_err() {
             // Worker already gone — fall back to batch.
@@ -1441,7 +1457,25 @@ impl TranscriptionManager {
         drop(tx); // no further commands for this session
 
         let raw = match reply_rx.recv_timeout(Duration::from_secs(30)) {
-            Ok(Some(text)) => text,
+            Ok(Some(text)) => {
+                if dropped > 0 {
+                    // The machine couldn't keep up with real-time streaming and
+                    // discarded audio, so the streamed transcript is missing
+                    // words. Prefer completeness over speed here: return None so
+                    // the caller re-transcribes the full recording in batch (a
+                    // short extra wait) rather than pasting a truncated result.
+                    // The worker has already returned the leased engine before
+                    // replying, so the batch path finds the model available.
+                    warn!(
+                        "Live transcription dropped {} frame(s) under load; using the complete \
+                         batch transcription of the full recording instead of the truncated \
+                         live result (a short extra wait, but nothing is cut off).",
+                        dropped
+                    );
+                    return Ok(None);
+                }
+                text
+            }
             Ok(None) => return Ok(None),
             Err(_) => return Err(anyhow::anyhow!("Live transcription finalize timed out")),
         };

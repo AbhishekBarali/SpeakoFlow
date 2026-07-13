@@ -135,35 +135,39 @@
   font-optical-sizing: auto;
 }
 
-/* === Dark inversion — warm near-black surfaces, off-white ink. ===
- * Applied when the user explicitly chooses Dark. The identical token set is
- * mirrored in the media query below for the brief moment before JS resolves
- * the stored preference (so a system-dark user never flashes light). */
+/* === Dark inversion — neutral, cool near-black with a soft "gradient black"
+ * backdrop and clean, satisfying near-white ink. ===
+ * Applied when the user chooses Dark and while the (light-by-default)
+ * onboarding is showing. No warm tint: the old warm brown-black + warm-grey
+ * text read as "dull grey", so surfaces are a faintly cool neutral and text is
+ * a crisp cool white — bright enough to read as white, a step under harsh
+ * pure #fff. A soft top-lit radial gives depth so large open areas (the
+ * onboarding) read as a rich gradient black instead of a flat slab. */
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --color-canvas: #1d1a16;
-  --color-canvas-soft: #161410;
-  --color-surface: #2c2823;
-  --color-surface-strong: #3b362e;
+  --color-canvas: #121317; /* content pane floor (neutral cool near-black) */
+  --color-canvas-soft: #0d0e11; /* chrome: title bar / sidebar / footer */
+  --color-surface: #1b1d22; /* cards — lifted a step off the canvas */
+  --color-surface-strong: #262931; /* badges, plates, hover fills */
 
-  --color-ink: #ece8dd;
-  --color-ink-soft: #ddd8cb;
-  /* Text ramp: bright enough to read without squinting, but a step below
-   * pure off-white — full-brightness text on the warm near-black surfaces
-   * reads harsh/glarey. Body ≈ 9:1, muted ≈ 5:1 on surface. */
-  --color-body: #d5cfc3;
-  --color-muted: #a29a8d;
-  --color-muted-soft: #756e61;
+  /* Clean, satisfying near-white text — cool neutral, not warm/grey. Reads as
+   * white without the glare of pure #fff. Muted stays a clean cool grey so
+   * hierarchy survives (headings > body > captions). */
+  --color-ink: #f6f7f9; /* display + primary text */
+  --color-ink-soft: #eceef2; /* emphasis */
+  --color-body: #e2e5ea; /* running text — reads white, high contrast */
+  --color-muted: #a7adb8; /* sub-titles, captions — clean cool grey */
+  --color-muted-soft: #71767f; /* disabled, hints */
 
-  --color-hairline: #35312a;
-  --color-hairline-strong: #48423a;
+  --color-hairline: #262830;
+  --color-hairline-strong: #343740;
 
-  /* Accent lifts to a luminous teal so it reads as color, not glare, on the
+  /* Accent stays a luminous teal so it reads as color, not glare, on the
    * near-black surfaces; on-color text flips to a deep teal-black. */
   --color-accent: #3dd6c3;
   --color-accent-strong: #63e0d0;
 
-  --color-on-primary: #053b34;
+  --color-on-primary: #04302b;
 
   --color-toggle-track-on: var(--color-accent);
   --color-toggle-knob-on: #ffffff;
@@ -173,8 +177,21 @@
   --color-text: var(--color-ink);
   --color-background-ui: var(--color-accent);
   --color-logo-primary: var(--color-accent);
-  --color-logo-stroke: #ddd8cb;
-  --color-mid-gray: #a29a8d;
+  --color-logo-stroke: #eceef2;
+  --color-mid-gray: #a7adb8;
+
+  /* Gradient black — a soft, neutral top-lit dome (no color tint). Most
+   * visible in open areas like the onboarding; covered by the chrome + pane
+   * in the settings view, which stays a clean flat neutral. Fixed so it stays
+   * put while content scrolls. */
+  background-color: var(--color-canvas);
+  background-image: radial-gradient(
+    145% 115% at 50% -12%,
+    #1e2128 0%,
+    #141519 44%,
+    #0c0d10 100%
+  );
+  background-attachment: fixed;
 }
 
 /* Pre-JS fallback: honor the OS preference only until the data-theme attribute

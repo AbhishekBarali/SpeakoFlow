@@ -612,10 +612,25 @@ fn run_consumer(
                     // The cpal callback sees the stop flag, sends EndOfStream, and goes
                     // silent — guaranteeing every captured sample is in the channel
                     // ahead of the sentinel.
+                    //
+                    // Feed this tail into the live-transcription callback too (not
+                    // just the batch buffer): otherwise the audio captured between
+                    // the last steady-state loop iteration and this Stop — plus the
+                    // resampler's flushed remainder — never reaches the streaming
+                    // worker, so the last words go missing from the live transcript.
+                    // The stream router is still open here (finalize_stream() only
+                    // closes it after stop_recording() returns), so these frames are
+                    // enqueued ahead of the terminal Finalize. Most visible on a
+                    // push-to-talk (hold) release, where the user stops the instant
+                    // they finish the final word. feed() is a cheap no-op when no
+                    // live stream is active.
                     loop {
                         match sample_rx.recv_timeout(Duration::from_secs(2)) {
                             Ok(AudioChunk::Samples(remaining)) => {
                                 frame_resampler.push(&remaining, &mut |frame: &[f32]| {
+                                    if let Some(cb) = &frame_cb {
+                                        cb(frame);
+                                    }
                                     handle_frame(frame, true, &vad, &mut processed_samples)
                                 });
                             }
@@ -628,6 +643,9 @@ fn run_consumer(
                     }
 
                     frame_resampler.finish(&mut |frame: &[f32]| {
+                        if let Some(cb) = &frame_cb {
+                            cb(frame);
+                        }
                         handle_frame(frame, true, &vad, &mut processed_samples)
                     });
 

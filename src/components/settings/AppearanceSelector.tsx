@@ -18,7 +18,7 @@ export const AppearanceSelector: React.FC<AppearanceSelectorProps> = React.memo(
     const { t } = useTranslation();
     const { settings, updateSetting } = useSettings();
 
-    const current = (settings?.theme ?? "system") as ThemePreference;
+    const current = (settings?.theme ?? "light") as ThemePreference;
 
     const options = [
       { value: "system", label: t("appearance.system") },

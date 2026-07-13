@@ -32,15 +32,15 @@ const prefersDark = (): boolean => {
 export const resolveTheme = (preference: ThemePreference): ResolvedTheme =>
   preference === "system" ? (prefersDark() ? "dark" : "light") : preference;
 
-/** Read the cached preference (defaults to "system"). */
+/** Read the cached preference (defaults to "light"). */
 export const getCachedPreference = (): ThemePreference => {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (isValidPreference(stored)) return stored;
   } catch {
-    // localStorage unavailable — fall back to system.
+    // localStorage unavailable — fall back to light.
   }
-  return "system";
+  return "light";
 };
 
 const setResolvedAttribute = (resolved: ResolvedTheme): void => {

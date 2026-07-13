@@ -44,17 +44,6 @@ const OnboardingLayout: React.FC<OnboardingLayoutProps> = ({
 
   return (
     <div className="relative h-full w-full flex flex-col items-center px-6 pt-10 pb-4 gap-6 overflow-hidden">
-      {/* Ambient brand glows so the screen has warmth and depth instead of
-          flat gray: a strong teal wash from the top, a soft violet answer
-          from the corner. */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 -top-24 h-96 bg-[radial-gradient(55%_100%_at_50%_0%,rgba(20,184,166,0.22),transparent_70%)]"
-      />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -bottom-20 -end-20 h-80 w-96 bg-[radial-gradient(50%_50%_at_50%_50%,rgba(139,92,246,0.1),transparent_70%)]"
-      />
       {/* Brand + step progress */}
       <div className="flex flex-col items-center gap-4 shrink-0 w-full max-w-[640px]">
         <Wordmark className="text-3xl" />

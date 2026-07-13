@@ -599,7 +599,11 @@ pub enum Theme {
 
 impl Default for Theme {
     fn default() -> Self {
-        Theme::System
+        // Open in light mode by default: the light palette is the tuned,
+        // higher-contrast "native settings" look, whereas system-dark can land
+        // on a duller read for some users. Dark and System remain one click
+        // away in Settings → General → Appearance.
+        Theme::Light
     }
 }
 
@@ -1547,31 +1551,38 @@ pub fn default_tts_base_url_for_engine(engine: &str) -> String {
     }
 }
 
-/// Sensible default TTS model for a given engine.
-pub fn default_tts_model_for_engine(engine: &str) -> String {
-    match engine {
-        "openai" => "gpt-4o-mini-tts".to_string(),
-        "elevenlabs" => "eleven_flash_v2_5".to_string(),
-        _ => String::new(),
-    }
+/// Default TTS model for a given engine.
+///
+/// Intentionally empty for every engine: the model field is a "loadable" picker
+/// (it has a reload button that fetches the engine's real model list). Starting
+/// empty means the user sees the field's placeholder and presses reload to pick
+/// a real model, instead of inheriting a value they never chose — in particular
+/// OpenAI's `gpt-4o-mini-tts`, which used to leak onto ElevenLabs/Azure. The
+/// synthesis paths in `tts.rs` still fall back to a working model when empty.
+pub fn default_tts_model_for_engine(_engine: &str) -> String {
+    String::new()
 }
 
-/// Sensible default remote voice for a given engine.
-pub fn default_tts_remote_voice_for_engine(engine: &str) -> String {
-    match engine {
-        "openai" => "alloy".to_string(),
-        // Azure falls back to en-US-JennyNeural when empty; ElevenLabs needs a
-        // user-provided voice id.
-        _ => String::new(),
-    }
+/// Default remote voice for a given engine.
+///
+/// Intentionally empty for every engine, for the same reason as
+/// [`default_tts_model_for_engine`]: the voice field is a loadable picker, so it
+/// starts empty and the user presses reload to fetch and choose a real voice.
+/// This is what stops OpenAI's `alloy` from being pre-filled under ElevenLabs
+/// (where it 404s as `voice_not_found`). Azure still falls back to
+/// `en-US-JennyNeural` at synthesis time when left empty.
+pub fn default_tts_remote_voice_for_engine(_engine: &str) -> String {
+    String::new()
 }
 
 fn default_assistant_tts_model() -> String {
-    "gpt-4o-mini-tts".to_string()
+    // Empty by default (loadable field — see default_tts_model_for_engine).
+    String::new()
 }
 
 fn default_assistant_tts_remote_voice() -> String {
-    "alloy".to_string()
+    // Empty by default (loadable field — see default_tts_remote_voice_for_engine).
+    String::new()
 }
 
 fn default_assistant_tts_kokoro_dtype() -> String {
@@ -1733,14 +1744,15 @@ fn ensure_assistant_defaults(settings: &mut AppSettings) -> bool {
         settings.assistant_tts_base_url = default_assistant_tts_base_url();
         changed = true;
     }
-    if settings.assistant_tts_model.trim().is_empty() {
-        settings.assistant_tts_model = default_assistant_tts_model();
-        changed = true;
-    }
-    if settings.assistant_tts_remote_voice.trim().is_empty() {
-        settings.assistant_tts_remote_voice = default_assistant_tts_remote_voice();
-        changed = true;
-    }
+    // NOTE: the flat `assistant_tts_model` / `assistant_tts_remote_voice` fields
+    // are deliberately NOT forced to a default here. They are loadable picker
+    // fields that start empty (see `default_tts_model_for_engine` /
+    // `default_tts_remote_voice_for_engine`) and are only a mirror of the active
+    // engine's per-engine map, rebuilt by `sync_active_tts_fields`. Forcing them
+    // to OpenAI's `gpt-4o-mini-tts` / `alloy` is exactly what used to leak those
+    // values onto ElevenLabs/Azure (via the migration block below), so the user
+    // saw an `alloy` voice that 404s (`voice_not_found`) under ElevenLabs.
+
     // Migrate the legacy single-slot TTS config into the per-engine maps. Older
     // builds stored one base URL / model / voice shared by every engine (and
     // reset them on every engine switch). Seed the ACTIVE engine's slot from the
@@ -1773,6 +1785,29 @@ fn ensure_assistant_defaults(settings: &mut AppSettings) -> bool {
             settings
                 .assistant_tts_remote_voices
                 .insert(engine.clone(), settings.assistant_tts_remote_voice.clone());
+            changed = true;
+        }
+    }
+    // One-time cleanup for stores polluted by the old leak: the OpenAI voice
+    // (`alloy`) and model (`gpt-4o-mini-tts`) used to get stamped into whatever
+    // engine was active, so ElevenLabs/Azure could end up with an `alloy` voice
+    // that 404s. Those values are invalid for any non-OpenAI engine, so drop them
+    // and let the field fall back to empty — the user then loads + picks a real
+    // voice/model. Runs AFTER the migration block above so a leaked value that
+    // just got re-stamped from the flat mirror is also removed.
+    for engine in ["elevenlabs", "azure"] {
+        if settings
+            .assistant_tts_remote_voices
+            .get(engine)
+            .map(String::as_str)
+            == Some("alloy")
+        {
+            settings.assistant_tts_remote_voices.remove(engine);
+            changed = true;
+        }
+        if settings.assistant_tts_models.get(engine).map(String::as_str) == Some("gpt-4o-mini-tts")
+        {
+            settings.assistant_tts_models.remove(engine);
             changed = true;
         }
     }
@@ -2732,6 +2767,59 @@ mod tests {
 
     fn default_settings_json() -> serde_json::Value {
         serde_json::to_value(get_default_settings()).unwrap()
+    }
+
+    /// Loadable TTS fields start empty for every engine so the user presses the
+    /// reload button and picks, instead of inheriting OpenAI's `alloy` /
+    /// `gpt-4o-mini-tts` (which 404 under ElevenLabs/Azure).
+    #[test]
+    fn tts_voice_and_model_defaults_are_empty_for_all_engines() {
+        for engine in ["openai", "elevenlabs", "azure", "kokoro"] {
+            assert_eq!(default_tts_remote_voice_for_engine(engine), "");
+            assert_eq!(default_tts_model_for_engine(engine), "");
+        }
+        assert_eq!(default_assistant_tts_remote_voice(), "");
+        assert_eq!(default_assistant_tts_model(), "");
+    }
+
+    /// A store polluted by the old leak (OpenAI's `alloy` voice /
+    /// `gpt-4o-mini-tts` model stamped into a non-OpenAI engine slot) is healed:
+    /// `ensure_assistant_defaults` strips those bogus values so the field falls
+    /// back to empty, while a legitimate value (a real ElevenLabs voice id, or
+    /// the correct `eleven_flash_v2_5` model) is left untouched.
+    #[test]
+    fn ensure_assistant_defaults_strips_leaked_openai_tts_values() {
+        let mut settings = get_default_settings();
+        settings.assistant_tts_engine = "elevenlabs".to_string();
+        settings
+            .assistant_tts_remote_voices
+            .insert("elevenlabs".to_string(), "alloy".to_string());
+        settings
+            .assistant_tts_models
+            .insert("elevenlabs".to_string(), "gpt-4o-mini-tts".to_string());
+        settings
+            .assistant_tts_remote_voices
+            .insert("azure".to_string(), "alloy".to_string());
+        // A legitimate value must survive the cleanup.
+        settings
+            .assistant_tts_models
+            .insert("azure".to_string(), "eleven_flash_v2_5".to_string());
+
+        ensure_assistant_defaults(&mut settings);
+
+        assert_eq!(settings.assistant_tts_remote_voices.get("elevenlabs"), None);
+        assert_eq!(settings.assistant_tts_models.get("elevenlabs"), None);
+        assert_eq!(settings.assistant_tts_remote_voices.get("azure"), None);
+        assert_eq!(
+            settings.assistant_tts_models.get("azure").map(String::as_str),
+            Some("eleven_flash_v2_5")
+        );
+
+        // After the flat mirror is rebuilt, the active ElevenLabs engine shows
+        // an empty voice/model (placeholder), not a leaked `alloy`.
+        settings.sync_active_tts_fields();
+        assert_eq!(settings.assistant_tts_remote_voice, "");
+        assert_eq!(settings.assistant_tts_model, "");
     }
 
     /// The enlarged "Live" overlay is only for models that natively support
