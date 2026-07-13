@@ -9,7 +9,7 @@ import { useSettings } from "../../hooks/useSettings";
 
 interface SoundPickerProps {
   label: string;
-  description: string;
+  description?: string;
 }
 
 export const SoundPicker: React.FC<SoundPickerProps> = ({

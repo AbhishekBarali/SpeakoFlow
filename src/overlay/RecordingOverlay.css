@@ -257,7 +257,6 @@
   }
 }
 
-
 /* ---- Live-transcription window: the enlarged card (opt-in) ----------------
  * When the user turns on the live-transcription window, the overlay window is
  * resized to 400×120 (see overlay.rs OVERLAY_STREAM_WIDTH/HEIGHT) and this card

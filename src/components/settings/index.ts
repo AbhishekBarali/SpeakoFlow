@@ -1,12 +1,12 @@
 // Settings section components
 export { GeneralSettings } from "./general/GeneralSettings";
-export { AdvancedSettings } from "./advanced/AdvancedSettings";
 export { DebugSettings } from "./debug/DebugSettings";
 export { HistorySettings } from "./history/HistorySettings";
 export { AboutSettings } from "./about/AboutSettings";
-export { PostProcessingSettings } from "./post-processing/PostProcessingSettings";
 export { ModelsSettings } from "./models/ModelsSettings";
+export { DictationSettings } from "./dictation/DictationSettings";
 export { AssistantSettings } from "./assistant/AssistantSettings";
+export { AssistantSection } from "./assistant/AssistantSection";
 export { CharactersSettings } from "./assistant/CharactersSettings";
 export { MemorySettings } from "./assistant/MemorySettings";
 
@@ -25,7 +25,6 @@ export { ShortcutInput } from "./ShortcutInput";
 export { TranslateToEnglish } from "./TranslateToEnglish";
 export { CustomWords } from "./CustomWords";
 export { TextReplacements } from "./TextReplacements";
-export { PostProcessingToggle } from "./PostProcessingToggle";
 export { PostProcessingSettingsApi } from "./PostProcessingSettingsApi";
 export { PostProcessingSettingsPrompts } from "./PostProcessingSettingsPrompts";
 export { AppDataDirectory } from "./AppDataDirectory";

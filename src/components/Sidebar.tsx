@@ -2,30 +2,22 @@ import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   SlidersHorizontal,
-  Box,
-  Wrench,
+  Mic,
   FlaskConical,
   History,
   Info,
-  Sparkles,
   MessageCircle,
-  Users,
-  Notebook,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
 import { useSettings } from "../hooks/useSettings";
 import {
   GeneralSettings,
-  AdvancedSettings,
+  DictationSettings,
   HistorySettings,
   DebugSettings,
   AboutSettings,
-  PostProcessingSettings,
-  ModelsSettings,
-  AssistantSettings,
-  CharactersSettings,
-  MemorySettings,
+  AssistantSection,
 } from "./settings";
 
 export type SidebarSection = keyof typeof SECTIONS_CONFIG;
@@ -45,6 +37,12 @@ interface SectionConfig {
   enabled: (settings: any) => boolean;
 }
 
+// Five top-level sections (+ a debug section gated by debug_mode). The old
+// Models / Advanced / Post Process / Profiles / Memory sections were folded in:
+// Models + Post Process live inside Dictation; Profiles + Memory are sub-pages
+// of Assistant (see AssistantSection); Advanced's rows moved into General
+// (a "More options" fold) and History (retention fold). Internal keys are kept
+// minimal and stable so `t()` call sites and code don't churn.
 export const SECTIONS_CONFIG = {
   general: {
     labelKey: "sidebar.general",
@@ -52,49 +50,22 @@ export const SECTIONS_CONFIG = {
     component: GeneralSettings,
     enabled: () => true,
   },
-  models: {
-    labelKey: "sidebar.models",
-    icon: Box,
-    component: ModelsSettings,
+  dictation: {
+    labelKey: "sidebar.dictation",
+    icon: Mic,
+    component: DictationSettings,
     enabled: () => true,
   },
-  advanced: {
-    labelKey: "sidebar.advanced",
-    icon: Wrench,
-    component: AdvancedSettings,
+  assistant: {
+    labelKey: "sidebar.assistant",
+    icon: MessageCircle,
+    component: AssistantSection,
     enabled: () => true,
   },
   history: {
     labelKey: "sidebar.history",
     icon: History,
     component: HistorySettings,
-    enabled: () => true,
-  },
-  postprocessing: {
-    labelKey: "sidebar.postProcessing",
-    icon: Sparkles,
-    component: PostProcessingSettings,
-    // AI Correction is a first-class feature now (no longer gated behind
-    // Experimental). The section is always visible; the feature itself is
-    // toggled on/off from the enable switch at the top of the page.
-    enabled: () => true,
-  },
-  assistant: {
-    labelKey: "sidebar.assistant",
-    icon: MessageCircle,
-    component: AssistantSettings,
-    enabled: () => true,
-  },
-  characters: {
-    labelKey: "sidebar.characters",
-    icon: Users,
-    component: CharactersSettings,
-    enabled: () => true,
-  },
-  memory: {
-    labelKey: "sidebar.memory",
-    icon: Notebook,
-    component: MemorySettings,
     enabled: () => true,
   },
   debug: {

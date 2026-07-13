@@ -19,22 +19,18 @@ import { Dropdown } from "../../ui/Dropdown";
 import { ToggleSwitch } from "../../ui/ToggleSwitch";
 import { useSettings } from "../../../hooks/useSettings";
 
-/** Small uppercase section label, matching the other settings sections. */
-const SectionLabel: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <h2 className="px-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted">
-    {children}
-  </h2>
-);
-
 /** A card whose body is hidden until you click the header — keeps the page
- *  short and makes edits deliberate (content is read-first, not sitting open). */
+ *  short and makes edits deliberate (content is read-first, not sitting open).
+ *  Title + a one-line caption sit on the left; an optional meta hint (preview /
+ *  count) and the chevron sit on the right. */
 const CollapsibleSection: React.FC<{
   title: string;
+  caption: string;
   meta?: string;
   open: boolean;
   onToggle: () => void;
   children: React.ReactNode;
-}> = ({ title, meta, open, onToggle, children }) => (
+}> = ({ title, caption, meta, open, onToggle, children }) => (
   <div className="rounded-xl border border-hairline bg-surface">
     <button
       type="button"
@@ -42,15 +38,20 @@ const CollapsibleSection: React.FC<{
       aria-expanded={open}
       className="flex w-full items-center gap-3 px-4 py-3 text-start cursor-pointer"
     >
-      <span className="shrink-0 text-[13px] font-medium text-ink">{title}</span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[13px] font-medium text-ink">{title}</span>
+        <span className="mt-0.5 block text-xs text-muted leading-snug">
+          {caption}
+        </span>
+      </span>
       {meta && (
-        <span className="min-w-0 flex-1 truncate text-end text-xs text-muted">
+        <span className="ms-auto max-w-[38%] shrink-0 truncate text-xs text-muted">
           {meta}
         </span>
       )}
       <ChevronDown
         size={16}
-        className={`ms-auto shrink-0 text-muted transition-transform duration-200 ${
+        className={`shrink-0 text-muted transition-transform duration-200 ${
           open ? "rotate-180" : ""
         }`}
       />
@@ -62,7 +63,7 @@ const CollapsibleSection: React.FC<{
 );
 
 /**
- * Personal memory ("About You") — its own settings section. A local-first,
+ * Personal memory ("About You") — the Memory sub-page. A local-first,
  * user-owned profile the assistant can draw on: an always-on summary plus a
  * list of durable notes. Everything here is inspectable, editable, exportable,
  * and off by default. Distillation (learning from a chat) runs on the backend;
@@ -74,7 +75,8 @@ export const MemorySettings: React.FC = () => {
 
   const enabled = settings?.assistant_memory_enabled ?? false;
   const incognito = settings?.assistant_memory_incognito ?? false;
-  const detail = (settings?.assistant_memory_detail ?? "balanced") as MemoryDetail;
+  const detail = (settings?.assistant_memory_detail ??
+    "balanced") as MemoryDetail;
   const memory = settings?.assistant_memory;
   const notes = memory?.notes ?? [];
 
@@ -231,9 +233,9 @@ export const MemorySettings: React.FC = () => {
   };
 
   return (
-    <div className="max-w-2xl w-full mx-auto space-y-8">
-      {/* Master toggles -------------------------------------------------- */}
-      <section className="space-y-3">
+    <div className="max-w-3xl w-full mx-auto space-y-8">
+      {/* Hero toggles ---------------------------------------------------- */}
+      <section>
         <div className="rounded-xl border border-hairline bg-surface divide-y divide-hairline">
           <ToggleSwitch
             checked={enabled}
@@ -249,42 +251,13 @@ export const MemorySettings: React.FC = () => {
             description={t("settings.personalMemory.incognito.description")}
             grouped
           />
-          <div className="flex items-center gap-3 px-4 py-3">
-            <div className="min-w-0 flex-1">
-              <h3 className="text-[13px] font-normal leading-snug text-ink">
-                {t("settings.personalMemory.detail.label")}
-              </h3>
-              <p className="mt-0.5 text-xs leading-snug text-muted max-w-md">
-                {t("settings.personalMemory.detail.description")}
-              </p>
-            </div>
-            <div className="relative shrink-0">
-              <Dropdown
-                options={[
-                  {
-                    value: "light",
-                    label: t("settings.personalMemory.detail.options.light"),
-                  },
-                  {
-                    value: "balanced",
-                    label: t("settings.personalMemory.detail.options.balanced"),
-                  },
-                  {
-                    value: "detailed",
-                    label: t("settings.personalMemory.detail.options.detailed"),
-                  },
-                ]}
-                selectedValue={detail}
-                onSelect={changeDetail}
-              />
-            </div>
-          </div>
         </div>
       </section>
 
       {/* About You (collapsible, read-first) ----------------------------- */}
       <CollapsibleSection
         title={t("settings.personalMemory.aboutYou.label")}
+        caption={t("settings.personalMemory.aboutYou.caption")}
         meta={summaryOpen ? undefined : summaryPreview}
         open={summaryOpen}
         onToggle={() => setSummaryOpen((v) => !v)}
@@ -340,6 +313,7 @@ export const MemorySettings: React.FC = () => {
       {/* Notes (collapsible, scrollable) --------------------------------- */}
       <CollapsibleSection
         title={t("settings.personalMemory.notes.label")}
+        caption={t("settings.personalMemory.notes.caption")}
         meta={notes.length > 0 ? String(notes.length) : undefined}
         open={notesOpen}
         onToggle={() => setNotesOpen((v) => !v)}
@@ -408,12 +382,42 @@ export const MemorySettings: React.FC = () => {
         </div>
       </CollapsibleSection>
 
-      {/* Actions --------------------------------------------------------- */}
+      {/* Detail + update now + export + import ---------------------------- */}
       <section className="space-y-3">
-        <SectionLabel>{t("settings.personalMemory.actions.label")}</SectionLabel>
-        <div className="rounded-xl border border-hairline bg-surface p-5 space-y-4">
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
+        <div className="rounded-xl border border-hairline bg-surface divide-y divide-hairline">
+          <div className="flex items-center gap-3 px-4 py-3">
+            <div className="min-w-0 flex-1">
+              <h3 className="text-[13px] font-normal leading-snug text-ink">
+                {t("settings.personalMemory.detail.label")}
+              </h3>
+              <p className="mt-0.5 text-xs leading-snug text-muted max-w-md">
+                {t("settings.personalMemory.detail.description")}
+              </p>
+            </div>
+            <div className="relative shrink-0">
+              <Dropdown
+                options={[
+                  {
+                    value: "light",
+                    label: t("settings.personalMemory.detail.options.light"),
+                  },
+                  {
+                    value: "balanced",
+                    label: t("settings.personalMemory.detail.options.balanced"),
+                  },
+                  {
+                    value: "detailed",
+                    label: t("settings.personalMemory.detail.options.detailed"),
+                  },
+                ]}
+                selectedValue={detail}
+                onSelect={changeDetail}
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between gap-3 px-4 py-3">
+            <div className="min-w-0 flex-1">
               <h3 className="text-[13px] font-normal leading-snug text-ink">
                 {t("settings.personalMemory.distill.label")}
               </h3>
@@ -435,21 +439,29 @@ export const MemorySettings: React.FC = () => {
               {t("settings.personalMemory.distill.button")}
             </Button>
           </div>
+        </div>
 
-          <div className="flex flex-wrap items-center gap-2 border-t border-hairline pt-4">
-            <Button variant="secondary" size="sm" onClick={exportMemory}>
-              <Download size={14} />
-              {t("settings.personalMemory.export")}
-            </Button>
-            <Button variant="secondary" size="sm" onClick={importMemory}>
-              <Upload size={14} />
-              {t("settings.personalMemory.import")}
-            </Button>
-            {confirmWipe ? (
-              <div className="ml-auto flex items-center gap-2">
-                <span className="text-xs text-muted">
-                  {t("settings.personalMemory.wipe.confirm")}
-                </span>
+        <div className="flex flex-wrap items-center gap-2 px-0.5">
+          <Button variant="secondary" size="sm" onClick={exportMemory}>
+            <Download size={14} />
+            {t("settings.personalMemory.export")}
+          </Button>
+          <Button variant="secondary" size="sm" onClick={importMemory}>
+            <Upload size={14} />
+            {t("settings.personalMemory.import")}
+          </Button>
+        </div>
+      </section>
+
+      {/* Destructive wipe row -------------------------------------------- */}
+      <section className="space-y-2">
+        <div className="rounded-xl border border-hairline bg-surface px-4 py-3">
+          {confirmWipe ? (
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-xs text-muted">
+                {t("settings.personalMemory.wipe.confirm")}
+              </span>
+              <div className="flex items-center gap-2">
                 <Button variant="danger-ghost" size="sm" onClick={wipe}>
                   {t("settings.personalMemory.wipe.yes")}
                 </Button>
@@ -461,21 +473,19 @@ export const MemorySettings: React.FC = () => {
                   {t("settings.personalMemory.wipe.cancel")}
                 </Button>
               </div>
-            ) : (
-              <Button
-                variant="danger-ghost"
-                size="sm"
-                className="ml-auto"
-                onClick={() => setConfirmWipe(true)}
-              >
-                <Trash2 size={14} />
-                {t("settings.personalMemory.wipe.button")}
-              </Button>
-            )}
-          </div>
-
-          {error && <p className="text-xs text-error">{error}</p>}
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setConfirmWipe(true)}
+              className="flex w-full items-center gap-2 text-[13px] font-medium text-error hover:opacity-80 transition-opacity cursor-pointer"
+            >
+              <Trash2 size={14} />
+              {t("settings.personalMemory.wipe.button")}
+            </button>
+          )}
         </div>
+        {error && <p className="text-xs text-error px-0.5">{error}</p>}
       </section>
     </div>
   );

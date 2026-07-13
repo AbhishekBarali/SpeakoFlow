@@ -1,9 +1,10 @@
 export { Dropdown } from "./Dropdown";
-export { MoreOptions } from "./MoreOptions";
+export { SectionHeader } from "./SectionHeader";
 export { Slider } from "./Slider";
 export { ToggleSwitch } from "./ToggleSwitch";
 export { SettingContainer } from "./SettingContainer";
 export { SettingsGroup } from "./SettingsGroup";
+export { SubPage } from "./SubPage";
 export { TextDisplay } from "./TextDisplay";
 export { Textarea } from "./Textarea";
 export { Tooltip } from "./Tooltip";

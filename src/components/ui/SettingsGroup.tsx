@@ -4,9 +4,7 @@ import type { SettingIcon } from "./tones";
 interface SettingsGroupProps {
   title?: string;
   description?: string;
-  /** Optional accent icon shown before the title. When provided, the header
-   * switches to the brand-accent style (icon + colored title); without it the
-   * quiet uppercase label is kept so other pages stay unchanged. */
+  /** Optional accent icon shown in the header tile before the title. */
   icon?: SettingIcon;
   children: React.ReactNode;
 }
@@ -19,26 +17,23 @@ export const SettingsGroup: React.FC<SettingsGroupProps> = ({
 }) => {
   return (
     <div className="space-y-2.5">
-      {title &&
-        (Icon ? (
-          <div className="px-1">
-            <h2 className="text-[15px] font-semibold tracking-tight text-accent">
-              {title}
-            </h2>
-            {description && (
-              <p className="text-xs text-muted mt-1">{description}</p>
-            )}
-          </div>
-        ) : (
-          <div className="px-1">
-            <h2 className="text-xs font-semibold uppercase tracking-[0.08em] text-muted">
+      {title && (
+        <div className="flex items-start gap-2 px-1">
+          {Icon && (
+            <span className="mt-px flex h-5 w-5 shrink-0 items-center justify-center text-accent">
+              <Icon size={15} />
+            </span>
+          )}
+          <div>
+            <h2 className="text-[13.5px] font-semibold tracking-tight text-ink">
               {title}
             </h2>
             {description && (
               <p className="text-xs text-muted mt-0.5">{description}</p>
             )}
           </div>
-        ))}
+        </div>
+      )}
       <div className="bg-surface rounded-2xl overflow-visible border border-hairline elev-card">
         <div className="divide-y divide-hairline">{children}</div>
       </div>

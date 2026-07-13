@@ -271,59 +271,59 @@ const RecordingOverlay: React.FC = () => {
           role="status"
           aria-label={ariaLabel}
         >
-        {/* Live recording — the waveform carries the whole state. Before the
+          {/* Live recording — the waveform carries the whole state. Before the
             first audio frame lands it simply rests as a calm row of dots, so
             the chip eases straight into motion the moment you speak instead of
             flashing a microphone glyph. Hands-free (locked) recording is ended
             by pressing the hotkey again (not a button), so the chip needs no
             extra badge and stays compact — just a slightly larger, calmer wave
             (see .overlay-pill.locked). */}
-        {isRecording && (
-          <div className="pill-wave">
-            {hasLiveText ? (
-              streamTextBox
-            ) : (
-              <div className="wave-box">
-                <AudioWaveform
-                  levels={micLive ? levels : []}
-                  size="sm"
-                  barCount={14}
-                  active={micLive}
-                />
-              </div>
-            )}
-          </div>
-        )}
+          {isRecording && (
+            <div className="pill-wave">
+              {hasLiveText ? (
+                streamTextBox
+              ) : (
+                <div className="wave-box">
+                  <AudioWaveform
+                    levels={micLive ? levels : []}
+                    size="sm"
+                    barCount={14}
+                    active={micLive}
+                  />
+                </div>
+              )}
+            </div>
+          )}
 
-        {/* Working (transcribing / post-processing) — keep the audio identity
+          {/* Working (transcribing / post-processing) — keep the audio identity
             but settle the bars and tuck a quiet spinner alongside, instead of a
             word. The waveform freezing + spinner reads as "done capturing, now
             thinking". */}
-        {(state === "transcribing" || state === "processing") && (
-          <div className="pill-wave">
-            <Loader2
-              className="load-spinner"
-              size={13}
-              strokeWidth={2.5}
-              color={ICON_COLOR}
-            />
-            {hasLiveText ? (
-              streamTextBox
-            ) : (
-              <div className="wave-box">
-                <AudioWaveform
-                  levels={[]}
-                  size="sm"
-                  barCount={14}
-                  active={false}
-                />
-              </div>
-            )}
-          </div>
-        )}
+          {(state === "transcribing" || state === "processing") && (
+            <div className="pill-wave">
+              <Loader2
+                className="load-spinner"
+                size={13}
+                strokeWidth={2.5}
+                color={ICON_COLOR}
+              />
+              {hasLiveText ? (
+                streamTextBox
+              ) : (
+                <div className="wave-box">
+                  <AudioWaveform
+                    levels={[]}
+                    size="sm"
+                    barCount={14}
+                    active={false}
+                  />
+                </div>
+              )}
+            </div>
+          )}
 
-        {/* No cancel button — press Escape to cancel a recording. */}
-      </div>
+          {/* No cancel button — press Escape to cancel a recording. */}
+        </div>
       )}
     </div>
   );

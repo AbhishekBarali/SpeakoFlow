@@ -136,7 +136,9 @@ export const useModelStore = create<ModelsStore>()(
         }
 
         // Backoff: 250ms, 500ms, 750ms between the four attempts.
-        await new Promise((resolve) => setTimeout(resolve, 250 * (attempt + 1)));
+        await new Promise((resolve) =>
+          setTimeout(resolve, 250 * (attempt + 1)),
+        );
       }
 
       // Persistent transient failure (rare) — surface a clear, resolved message.

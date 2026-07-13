@@ -5,6 +5,7 @@ import { LogLevelSelector } from "./LogLevelSelector";
 import { PasteDelay } from "./PasteDelay";
 import { RecordingBuffer } from "./RecordingBuffer";
 import { SettingsGroup } from "../../ui/SettingsGroup";
+import { SectionHeader } from "../../ui/SectionHeader";
 import { SoundPicker } from "../SoundPicker";
 import { ClamshellMicrophoneSelector } from "../ClamshellMicrophoneSelector";
 import { UpdateChecksToggle } from "../UpdateChecksToggle";
@@ -13,7 +14,11 @@ export const DebugSettings: React.FC = () => {
   const { t } = useTranslation();
 
   return (
-    <div className="max-w-2xl w-full mx-auto space-y-6">
+    <div className="max-w-3xl w-full mx-auto space-y-6">
+      <SectionHeader
+        title={t("sidebar.debug")}
+        description={t("sectionSubtitles.debug")}
+      />
       <SettingsGroup>
         <LogLevelSelector grouped={true} />
         <UpdateChecksToggle descriptionMode="tooltip" grouped={true} />

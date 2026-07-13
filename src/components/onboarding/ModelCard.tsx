@@ -12,6 +12,7 @@ import {
   Trash2,
 } from "lucide-react";
 import type { ModelInfo } from "@/bindings";
+import { getModelBrand } from "../icons/BrandLogos";
 import { formatModelSize } from "../../lib/utils/format";
 import { extractQuant } from "../../lib/utils/modelQuant";
 import {
@@ -90,11 +91,11 @@ const ScoreMeter: React.FC<{ label: string; score: number }> = ({
   const pct = Math.max(0, Math.min(100, Math.round(score * 100)));
   return (
     <div className="flex items-center gap-2">
-      <span className="w-14 shrink-0 text-end text-[9px] font-medium uppercase tracking-[0.06em] text-text/45">
+      <span className="w-14 shrink-0 text-end text-[9px] font-medium uppercase tracking-[0.06em] text-muted">
         {label}
       </span>
       <div
-        className="h-1 w-12 shrink-0 overflow-hidden rounded-full bg-ink/10"
+        className="h-1 w-12 shrink-0 overflow-hidden rounded-full bg-ink/15"
         role="meter"
         aria-label={label}
         aria-valuenow={pct}
@@ -102,7 +103,7 @@ const ScoreMeter: React.FC<{ label: string; score: number }> = ({
         aria-valuemax={100}
       >
         <div
-          className="h-full rounded-full bg-ink/35"
+          className="h-full rounded-full bg-ink/55"
           style={{ width: `${pct}%` }}
         />
       </div>
@@ -133,22 +134,26 @@ const ModelCard: React.FC<ModelCardProps> = ({
 
   // A "legacy" transcription model runs on the older transcribe-rs (ONNX /
   // whisper.cpp) engine rather than the new native transcribe.cpp (GGUF) one.
-  // These stay fully listed and usable — the Models page groups them under a
-  // quiet "Older models" section and the card only carries a low-contrast tag
-  // (PLAN.md Session 6), so a first-timer isn't hit with a loud badge.
+  // The catalog groups these under "Older models"; the card itself carries no
+  // tag, and the Streaming badge is reserved for the modern engine's live
+  // path (Nemotron / Parakeet Unified) so it stays a meaningful signal.
   const isLegacyStt = isLegacyModel(model);
+
+  // Brand mark + tinted tile (NVIDIA / Qwen / Gemma / Whisper / fallback).
+  const brand = getModelBrand(model);
 
   // Get translated model name and description
   const displayName = getTranslatedModelName(model, t);
   const displayDescription = getTranslatedModelDescription(model, t);
-  // GGUF quantization tag (e.g. "Q8_0"); null for non-GGUF models.
-  const quant = extractQuant(model.filename);
+  // GGUF quantization tag (e.g. "Q8_0") — shown only on custom models, where
+  // it disambiguates variants; catalog models keep the row jargon-free.
+  const quant = model.is_custom ? extractQuant(model.filename) : null;
   const showModelSize =
     status === "downloadable" || status === "available" || status === "active";
   const formattedModelSize = formatModelSize(Number(model.size_mb));
 
   const baseClasses =
-    "flex flex-col rounded-xl px-4 py-3.5 gap-2.5 text-left transition-all duration-200";
+    "flex flex-col rounded-2xl px-4 py-3.5 gap-2 text-left transition-all duration-200";
 
   const getVariantClasses = () => {
     if (status === "active") {
@@ -165,7 +170,7 @@ const ModelCard: React.FC<ModelCardProps> = ({
   const getInteractiveClasses = () => {
     if (!isClickable) return "";
     if (disabled) return "opacity-50 cursor-not-allowed";
-    return "cursor-pointer hover:border-hairline-strong hover:shadow-[0_2px_8px_rgba(0,0,0,0.06)] group";
+    return "cursor-pointer hover:border-hairline-strong hover:shadow-[0_2px_8px_rgba(0,0,0,0.06)]";
   };
 
   const handleClick = () => {
@@ -191,6 +196,7 @@ const ModelCard: React.FC<ModelCardProps> = ({
       role={isClickable ? "button" : undefined}
       tabIndex={isClickable ? 0 : undefined}
       className={[
+        "group",
         baseClasses,
         getVariantClasses(),
         getInteractiveClasses(),
@@ -199,29 +205,20 @@ const ModelCard: React.FC<ModelCardProps> = ({
         .filter(Boolean)
         .join(" ")}
     >
-      {/* Top section: name/description + score bars */}
-      <div className="flex justify-between items-center w-full">
+      {/* Top section: brand tile + name/description + score bars */}
+      <div className="flex justify-between items-center w-full gap-3">
+        <span
+          className={`shrink-0 grid place-items-center w-9 h-9 rounded-[10px] ${brand.tileClass}`}
+        >
+          {brand.icon}
+        </span>
         <div className="flex flex-col items-start flex-1 min-w-0">
-          <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap">
             <h3
               className={`text-sm font-semibold text-text ${isClickable ? "group-hover:text-accent" : ""} transition-colors`}
             >
               {displayName}
             </h3>
-            {showRecommended && model.is_recommended && (
-              <Badge variant="outline">{t("onboarding.recommended")}</Badge>
-            )}
-            {model.supports_streaming && (
-              <Badge variant="success" className="gap-1">
-                <Radio className="w-3 h-3" />
-                {t("modelSelector.capabilities.streaming")}
-              </Badge>
-            )}
-            {isLegacyStt && (
-              <span className="text-[10px] font-medium uppercase tracking-[0.06em] text-muted-soft">
-                {t("modelSelector.capabilities.legacy")}
-              </span>
-            )}
             {status === "active" && (
               <Badge variant="active">
                 <Check className="w-3 h-3 mr-1" />
@@ -234,13 +231,22 @@ const ModelCard: React.FC<ModelCardProps> = ({
                 {t("modelSelector.switching")}
               </Badge>
             )}
+            {model.supports_streaming && !isLegacyStt && (
+              <Badge variant="success" className="gap-1">
+                <Radio className="w-3 h-3" />
+                {t("modelSelector.capabilities.streaming")}
+              </Badge>
+            )}
+            {showRecommended && model.is_recommended && status !== "active" && (
+              <Badge variant="outline">{t("onboarding.recommended")}</Badge>
+            )}
           </div>
-          <p className="text-text/60 text-[13px] leading-relaxed">
+          <p className="text-body text-[13px] leading-relaxed">
             {displayDescription}
           </p>
         </div>
         {showScores && (model.accuracy_score > 0 || model.speed_score > 0) && (
-          <div className="hidden sm:flex flex-col gap-1.5 ms-4 shrink-0">
+          <div className="hidden sm:flex flex-col gap-1.5 ms-1 shrink-0">
             <ScoreMeter
               label={t("onboarding.modelCard.accuracy")}
               score={model.accuracy_score}
@@ -253,13 +259,13 @@ const ModelCard: React.FC<ModelCardProps> = ({
         )}
       </div>
 
-      <hr className="w-full border-hairline" />
-
-      {/* Bottom row: tags + action buttons (full width) */}
-      <div className="flex items-center gap-3 w-full -mb-0.5 mt-0.5 h-5">
+      {/* Bottom row: quiet metadata; the delete action stays hidden until the
+          row is hovered or focused so a list of installed models doesn't read
+          as a wall of destructive buttons. */}
+      <div className="flex items-center gap-3 w-full -mb-0.5 h-6 ps-12">
         {model.supported_languages.length > 0 && (
           <div
-            className="flex items-center gap-1 text-xs text-text/50"
+            className="flex items-center gap-1 text-xs text-muted"
             title={
               model.supported_languages.length === 1
                 ? t("modelSelector.capabilities.singleLanguage")
@@ -272,7 +278,7 @@ const ModelCard: React.FC<ModelCardProps> = ({
         )}
         {model.supports_translation && (
           <div
-            className="flex items-center gap-1 text-xs text-text/50"
+            className="flex items-center gap-1 text-xs text-muted"
             title={t("modelSelector.capabilities.translation")}
           >
             <Languages className="w-3.5 h-3.5" />
@@ -281,7 +287,7 @@ const ModelCard: React.FC<ModelCardProps> = ({
         )}
         {quant && (
           <div
-            className="flex items-center gap-1 text-xs text-text/50"
+            className="flex items-center gap-1 text-xs text-muted"
             title={t("modelSelector.capabilities.quantization")}
           >
             <Cpu className="w-3.5 h-3.5" />
@@ -289,7 +295,7 @@ const ModelCard: React.FC<ModelCardProps> = ({
           </div>
         )}
         {showModelSize && (
-          <span className="flex items-center gap-1.5 ms-auto text-xs text-text/50">
+          <span className="flex items-center gap-1.5 ms-auto text-xs text-muted">
             {status === "downloadable" ? (
               <Download className="w-3.5 h-3.5" />
             ) : (
@@ -304,7 +310,7 @@ const ModelCard: React.FC<ModelCardProps> = ({
             size="sm"
             onClick={handleDelete}
             title={t("modelSelector.deleteModel", { modelName: displayName })}
-            className="flex items-center gap-1.5 text-muted hover:text-error hover:bg-error/10"
+            className="flex items-center gap-1.5 text-muted hover:text-error hover:bg-error/10 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
           >
             <Trash2 className="w-3.5 h-3.5" />
             <span>{t("common.delete")}</span>
@@ -324,14 +330,14 @@ const ModelCard: React.FC<ModelCardProps> = ({
               />
             </div>
             <div className="flex items-center justify-between text-xs mt-1">
-              <span className="text-text/50">
+              <span className="text-muted">
                 {t("modelSelector.downloading", {
                   percentage: Math.round(downloadProgress),
                 })}
               </span>
               <div className="flex items-center gap-2">
                 {downloadSpeed !== undefined && downloadSpeed > 0 && (
-                  <span className="tabular-nums text-text/50">
+                  <span className="tabular-nums text-muted">
                     {t("modelSelector.downloadSpeed", {
                       speed: downloadSpeed.toFixed(1),
                     })}
@@ -360,7 +366,7 @@ const ModelCard: React.FC<ModelCardProps> = ({
           <div className="w-full h-1.5 bg-mid-gray/20 rounded-full overflow-hidden">
             <div className="h-full bg-logo-primary rounded-full animate-pulse w-full" />
           </div>
-          <p className="text-xs text-text/50 mt-1">
+          <p className="text-xs text-muted mt-1">
             {t("modelSelector.verifyingGeneric")}
           </p>
         </div>
@@ -370,7 +376,7 @@ const ModelCard: React.FC<ModelCardProps> = ({
           <div className="w-full h-1.5 bg-mid-gray/20 rounded-full overflow-hidden">
             <div className="h-full bg-logo-primary rounded-full animate-pulse w-full" />
           </div>
-          <p className="text-xs text-text/50 mt-1">
+          <p className="text-xs text-muted mt-1">
             {t("modelSelector.extractingGeneric")}
           </p>
         </div>

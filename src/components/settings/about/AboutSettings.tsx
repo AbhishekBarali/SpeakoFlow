@@ -2,13 +2,16 @@ import React, { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { getVersion } from "@tauri-apps/api/app";
+import { emit } from "@tauri-apps/api/event";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { SettingsGroup } from "../../ui/SettingsGroup";
 import { SettingContainer } from "../../ui/SettingContainer";
+import { SectionHeader } from "../../ui/SectionHeader";
 import { Button } from "../../ui/Button";
 import { AppDataDirectory } from "../AppDataDirectory";
 import { AppLanguageSelector } from "../AppLanguageSelector";
 import { LogDirectory } from "../debug";
+import { useSettings } from "../../../hooks/useSettings";
 
 /** Projects SpeakoFlow is built on. Shown one-at-a-time in a pager so the
  * About page stays uncluttered as the list grows. */
@@ -16,9 +19,15 @@ const ACKNOWLEDGMENTS = ["handy", "whisper", "llamacpp", "kokoro"] as const;
 
 export const AboutSettings: React.FC = () => {
   const { t } = useTranslation();
+  const { getSetting } = useSettings();
   const [version, setVersion] = useState("");
   const [ackIndex, setAckIndex] = useState(0);
   const currentAck = ACKNOWLEDGMENTS[ackIndex];
+
+  // The auto-check preference lives in General; here we only offer a manual
+  // "check now" that reuses the footer updater (same path as the tray item).
+  const updateChecksEnabled =
+    (getSetting("update_checks_enabled") as boolean | undefined) ?? true;
 
   useEffect(() => {
     const fetchVersion = async () => {
@@ -35,17 +44,41 @@ export const AboutSettings: React.FC = () => {
   }, []);
 
   return (
-    <div className="max-w-2xl w-full mx-auto space-y-8">
+    <div className="max-w-3xl w-full mx-auto space-y-8">
+      <SectionHeader
+        title={t("sidebar.about")}
+        description={t("sectionSubtitles.about")}
+      />
+      {/* ── Default view ─────────────────────────────────────────────────── */}
       <SettingsGroup>
-        <AppLanguageSelector descriptionMode="tooltip" grouped={true} />
         <SettingContainer
           title={t("settings.about.version.title")}
-          description={t("settings.about.version.description")}
           grouped={true}
         >
           {/* eslint-disable-next-line i18next/no-literal-string */}
           {version && <span className="text-sm font-mono">v{version}</span>}
         </SettingContainer>
+
+        <SettingContainer
+          title={t("settings.about.updates.title")}
+          description={
+            updateChecksEnabled
+              ? undefined
+              : t("settings.about.updates.disabledHint")
+          }
+          grouped={true}
+        >
+          <Button
+            variant="secondary"
+            size="md"
+            disabled={!updateChecksEnabled}
+            onClick={() => void emit("check-for-updates")}
+          >
+            {t("settings.about.updates.button")}
+          </Button>
+        </SettingContainer>
+
+        <AppLanguageSelector descriptionMode="tooltip" grouped={true} />
 
         <SettingContainer
           title={t("settings.about.sourceCode.title")}
@@ -80,9 +113,6 @@ export const AboutSettings: React.FC = () => {
             {t("settings.about.license.button")}
           </Button>
         </SettingContainer>
-
-        <AppDataDirectory descriptionMode="tooltip" grouped={true} />
-        <LogDirectory grouped={true} />
       </SettingsGroup>
 
       <SettingsGroup title={t("settings.about.acknowledgments.title")}>
@@ -138,6 +168,11 @@ export const AboutSettings: React.FC = () => {
             </div>
           )}
         </div>
+      </SettingsGroup>
+
+      <SettingsGroup title={t("settings.about.folders.title")}>
+        <AppDataDirectory descriptionMode="tooltip" grouped={true} />
+        <LogDirectory grouped={true} />
       </SettingsGroup>
     </div>
   );

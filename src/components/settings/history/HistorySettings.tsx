@@ -36,6 +36,12 @@ import { useOsType } from "@/hooks/useOsType";
 import { formatDateTime } from "@/utils/dateFormat";
 import { AudioPlayer } from "../../ui/AudioPlayer";
 import { Button } from "../../ui/Button";
+import { SettingsGroup } from "../../ui/SettingsGroup";
+import { SectionHeader } from "../../ui/SectionHeader";
+import { useSettings } from "../../../hooks/useSettings";
+// Retention rows live at the bottom of the History page, below the list.
+import { RecordingRetentionPeriodSelector } from "../RecordingRetentionPeriod";
+import { HistoryLimit } from "../HistoryLimit";
 
 /** Must match the marker constants in src-tauri/src/assistant.rs */
 const SCREENSHOT_MARKER = "[screenshot attached]";
@@ -252,6 +258,7 @@ type FeedItem =
 export const HistorySettings: React.FC = () => {
   const { t } = useTranslation();
   const osType = useOsType();
+  const { getSetting } = useSettings();
   const [entries, setEntries] = useState<HistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasMore, setHasMore] = useState(true);
@@ -588,7 +595,22 @@ export const HistorySettings: React.FC = () => {
   }
 
   return (
-    <div className="max-w-2xl w-full mx-auto space-y-8">
+    <div className="max-w-3xl w-full mx-auto space-y-8">
+      <SectionHeader
+        title={t("sidebar.history")}
+        description={t("sectionSubtitles.history")}
+      />
+      {/* Storage settings live above the feed — with a long history the list
+          scrolls forever, so anything below it is effectively unreachable. */}
+      <SettingsGroup title={t("settings.history.storage.title")}>
+        <RecordingRetentionPeriodSelector
+          descriptionMode="tooltip"
+          grouped={true}
+        />
+        {getSetting("recording_retention_period") === "preserve_limit" && (
+          <HistoryLimit descriptionMode="tooltip" grouped={true} />
+        )}
+      </SettingsGroup>
       <div className="space-y-2">
         <div className="flex items-center justify-end">
           <OpenRecordingsButton

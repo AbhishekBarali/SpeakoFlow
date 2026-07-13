@@ -16,8 +16,10 @@ interface SettingContainerProps {
   icon?: SettingIcon;
   tone?: SettingTone;
   children: React.ReactNode;
-  /** @deprecated Descriptions always render inline now; kept so existing
-   * call sites keep compiling. */
+  /** "tooltip" moves the description behind the small (i) hint so the row
+   * stays a single quiet line; "inline" renders it as a caption under the
+   * title. Prefer "tooltip" — captions are for the few rows whose behavior
+   * genuinely needs a visible one-liner. */
   descriptionMode?: "inline" | "tooltip";
   grouped?: boolean;
   layout?: "horizontal" | "stacked";
@@ -71,17 +73,29 @@ export const SettingContainer: React.FC<SettingContainerProps> = ({
   description,
   info,
   children,
+  descriptionMode = "tooltip",
   grouped = false,
   layout = "horizontal",
   disabled = false,
 }) => {
+  // Tooltip mode folds the description into the (i) hint (merged with any
+  // extra `info`) so the row reads as one line. Inline mode keeps a caption.
+  const hintText =
+    descriptionMode === "tooltip" && description
+      ? info
+        ? `${description} ${info}`
+        : description
+      : info;
+  const inlineDescription =
+    descriptionMode === "tooltip" ? undefined : description;
+
   const titleClasses = `text-[13px] font-normal leading-snug ${disabled ? "text-muted-soft" : "text-ink"}`;
   const descriptionClasses = `mt-0.5 text-xs leading-snug max-w-md ${disabled ? "text-muted-soft" : "text-muted"}`;
 
   const titleRow = (
     <div className="flex items-center gap-1.5 min-w-0">
       <h3 className={`${titleClasses} truncate`}>{title}</h3>
-      {info && <InfoHint text={info} />}
+      {hintText && <InfoHint text={hintText} />}
     </div>
   );
 
@@ -96,7 +110,9 @@ export const SettingContainer: React.FC<SettingContainerProps> = ({
       >
         <div className="mb-2.5 min-w-0">
           {titleRow}
-          {description && <p className={descriptionClasses}>{description}</p>}
+          {inlineDescription && (
+            <p className={descriptionClasses}>{inlineDescription}</p>
+          )}
         </div>
         <div className="w-full">{children}</div>
       </div>
@@ -113,7 +129,9 @@ export const SettingContainer: React.FC<SettingContainerProps> = ({
     >
       <div className="min-w-0 flex-1">
         {titleRow}
-        {description && <p className={descriptionClasses}>{description}</p>}
+        {inlineDescription && (
+          <p className={descriptionClasses}>{inlineDescription}</p>
+        )}
       </div>
       <div className="relative shrink-0">{children}</div>
     </div>

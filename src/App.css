@@ -146,11 +146,14 @@
   --color-surface: #2c2823;
   --color-surface-strong: #3b362e;
 
-  --color-ink: #f6f3ec;
-  --color-ink-soft: #e6e1d7;
-  --color-body: #d3cdc1;
-  --color-muted: #9c9488;
-  --color-muted-soft: #635d52;
+  --color-ink: #ece8dd;
+  --color-ink-soft: #ddd8cb;
+  /* Text ramp: bright enough to read without squinting, but a step below
+   * pure off-white — full-brightness text on the warm near-black surfaces
+   * reads harsh/glarey. Body ≈ 9:1, muted ≈ 5:1 on surface. */
+  --color-body: #d5cfc3;
+  --color-muted: #a29a8d;
+  --color-muted-soft: #756e61;
 
   --color-hairline: #35312a;
   --color-hairline-strong: #48423a;
@@ -170,8 +173,8 @@
   --color-text: var(--color-ink);
   --color-background-ui: var(--color-accent);
   --color-logo-primary: var(--color-accent);
-  --color-logo-stroke: #e6e1d7;
-  --color-mid-gray: #9c9488;
+  --color-logo-stroke: #ddd8cb;
+  --color-mid-gray: #a29a8d;
 }
 
 /* Pre-JS fallback: honor the OS preference only until the data-theme attribute
@@ -319,4 +322,39 @@
 }
 :root[data-theme="dark"] .glass-menu {
   background-color: var(--color-surface);
+}
+
+/* === Entrance animations (onboarding) ===
+ * A soft rise-and-fade with a springy ease, staggered via delay classes so a
+ * screen builds top-to-bottom instead of popping in at once. Respects
+ * prefers-reduced-motion. */
+@keyframes rise-fade {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.anim-rise {
+  animation: rise-fade 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.anim-delay-1 {
+  animation-delay: 0.08s;
+}
+.anim-delay-2 {
+  animation-delay: 0.18s;
+}
+.anim-delay-3 {
+  animation-delay: 0.28s;
+}
+.anim-delay-4 {
+  animation-delay: 0.38s;
+}
+@media (prefers-reduced-motion: reduce) {
+  .anim-rise {
+    animation: none;
+  }
 }

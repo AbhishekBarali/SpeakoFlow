@@ -10,10 +10,12 @@ import {
 import { ModelStateEvent, RecordingErrorEvent } from "./lib/types/events";
 import "./App.css";
 import AccessibilityPermissions from "./components/AccessibilityPermissions";
+import { DownloadStatusWidget } from "./components/DownloadStatusWidget";
 import Footer from "./components/footer";
 import Onboarding, {
   AccessibilityOnboarding,
   LlmOnboarding,
+  ReadyStep,
 } from "./components/onboarding";
 import { Sidebar, SidebarSection, SECTIONS_CONFIG } from "./components/Sidebar";
 import TitleBar from "./components/TitleBar";
@@ -27,14 +29,10 @@ import {
   type ThemePreference,
 } from "@/lib/theme";
 
-type OnboardingStep = "accessibility" | "model" | "llm" | "done";
+type OnboardingStep = "accessibility" | "model" | "llm" | "ready" | "done";
 
-// TEMP (testing only): when true, the full first-run onboarding is shown on
-// EVERY launch, regardless of whether models are already installed. This lets
-// us iterate on the onboarding + model-download flow without reinstalling.
-// Set back to `false` (or delete this constant and the guard in
-// `checkOnboardingStatus`) to restore the normal "onboard new users only"
-// behavior before shipping.
+// DEV ONLY: force the full onboarding flow on every launch so it can be
+// tested repeatedly. Remove (set to false) before release.
 const FORCE_ONBOARDING = true;
 
 const renderSettingsContent = (section: SidebarSection) => {
@@ -192,17 +190,12 @@ function App() {
   };
 
   const checkOnboardingStatus = async () => {
-    // TEMP (testing only): force the full onboarding flow on every launch so we
-    // can iterate on the first-run experience and the model-download step
-    // without reinstalling. Remove this guard (and the FORCE_ONBOARDING
-    // constant above) to restore normal behavior.
-    if (FORCE_ONBOARDING) {
-      setIsReturningUser(false);
-      setOnboardingStep("accessibility");
-      return;
-    }
-
     try {
+      if (FORCE_ONBOARDING) {
+        setIsReturningUser(false);
+        setOnboardingStep("accessibility");
+        return;
+      }
       // Check if they have any models available
       const result = await commands.hasAnyModelsAvailable();
       const hasModels = result.status === "ok" && result.data;
@@ -271,15 +264,14 @@ function App() {
   };
 
   const handleLlmComplete = () => {
-    // AI model step finished (chosen or skipped) — enter the main app.
-    setOnboardingStep("done");
+    // AI model step finished (chosen or skipped) — show the "You're ready" step.
+    setOnboardingStep("ready");
   };
 
-  // Page header: section title plus a short subtitle for context (subtitles
-  // live in `sectionSubtitles.*`; not every section has one).
-  const sectionLabelKey = SECTIONS_CONFIG[currentSection].labelKey;
-  const sectionSubtitleKey = `sectionSubtitles.${currentSection}`;
-  const hasSubtitle = i18n.exists(sectionSubtitleKey);
+  const handleReadyComplete = () => {
+    // "You're ready" step finished — enter the main app.
+    setOnboardingStep("done");
+  };
 
   // The window has no native chrome (see lib.rs), so the TitleBar renders on
   // every screen and the body swaps underneath it. This keeps the window
@@ -303,6 +295,12 @@ function App() {
         <LlmOnboarding onComplete={handleLlmComplete} />
       </div>
     );
+  } else if (onboardingStep === "ready") {
+    body = (
+      <div className="flex-1 min-h-0">
+        <ReadyStep onComplete={handleReadyComplete} />
+      </div>
+    );
   } else if (onboardingStep === "done") {
     body = (
       <>
@@ -320,16 +318,6 @@ function App() {
             <div className="flex-1 overflow-y-auto overflow-x-hidden relative">
               <div className="relative z-10 flex flex-col items-center px-8 pt-7 pb-10 gap-6">
                 <AccessibilityPermissions />
-                <header className="max-w-2xl w-full mx-auto">
-                  <h1 className="font-display text-2xl leading-tight text-ink">
-                    {t(sectionLabelKey)}
-                  </h1>
-                  {hasSubtitle && (
-                    <p className="mt-1 text-sm leading-snug text-muted max-w-xl">
-                      {t(sectionSubtitleKey)}
-                    </p>
-                  )}
-                </header>
                 {renderSettingsContent(currentSection)}
               </div>
             </div>
@@ -337,6 +325,9 @@ function App() {
         </div>
         {/* Fixed footer at bottom */}
         <Footer />
+        {/* Any model still downloading (e.g. kicked off during onboarding)
+            keeps reporting progress here, bottom-right. */}
+        <DownloadStatusWidget />
       </>
     );
   }

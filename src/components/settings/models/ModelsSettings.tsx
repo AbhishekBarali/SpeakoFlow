@@ -1,7 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ask } from "@tauri-apps/plugin-dialog";
-import { ChevronDown, ChevronRight, Globe, Plus, Search, X } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  Globe,
+  Plus,
+  Search,
+  X,
+} from "lucide-react";
 import type { ModelCardStatus } from "@/components/onboarding";
 import { isLegacyModel, ModelCard } from "@/components/onboarding";
 import { useModelStore } from "@/stores/modelStore";
@@ -23,10 +30,19 @@ const modelSupportsLanguage = (model: ModelInfo, langCode: string): boolean => {
 
 const CATEGORY_TABS: ModelCategory[] = ["stt", "llm", "tts"];
 
-export const ModelsSettings: React.FC = () => {
+interface ModelsSettingsProps {
+  /** When set, the catalog shows ONLY this category — no category tabs. Used
+   * by pages that open the catalog for one purpose (e.g. Dictation → stt). */
+  lockedCategory?: ModelCategory;
+}
+
+export const ModelsSettings: React.FC<ModelsSettingsProps> = ({
+  lockedCategory,
+}) => {
   const { t } = useTranslation();
   const [switchingModelId, setSwitchingModelId] = useState<string | null>(null);
-  const [categoryFilter, setCategoryFilter] = useState<ModelCategory>("stt");
+  const [categoryTab, setCategoryTab] = useState<ModelCategory>("stt");
+  const categoryFilter = lockedCategory ?? categoryTab;
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [nameSearch, setNameSearch] = useState("");
   const [showOlderModels, setShowOlderModels] = useState(false);
@@ -328,7 +344,7 @@ export const ModelsSettings: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="max-w-2xl w-full mx-auto">
+      <div className="max-w-3xl w-full mx-auto">
         <div className="flex items-center justify-center py-16">
           <div className="w-8 h-8 border-2 border-hairline-strong border-t-ink rounded-full animate-spin" />
         </div>
@@ -337,27 +353,32 @@ export const ModelsSettings: React.FC = () => {
   }
 
   return (
-    <div className="max-w-2xl w-full mx-auto space-y-6">
-      {/* Category switcher: Transcription / Language Model / Speech */}
-      <div className="flex items-center gap-0.5 p-0.5 bg-surface-strong rounded-lg w-fit">
-        {CATEGORY_TABS.map((cat) => (
-          <button
-            key={cat}
-            type="button"
-            onClick={() => setCategoryFilter(cat)}
-            className={`px-3.5 py-1.5 text-[13px] font-medium rounded-[7px] transition-all duration-150 cursor-pointer ${
-              categoryFilter === cat
-                ? "bg-surface text-ink shadow-[0_1px_3px_rgba(0,0,0,0.12)]"
-                : "text-muted hover:text-ink"
-            }`}
-          >
-            {t(`settings.models.categories.${cat}`)}
-          </button>
-        ))}
-      </div>
-      <p className="text-[13px] text-muted">
-        {t(`settings.models.categoryDescriptions.${categoryFilter}`)}
-      </p>
+    <div className="max-w-3xl w-full mx-auto space-y-6">
+      {/* Category switcher: Transcription / Language Model / Speech — hidden
+          when the catalog is locked to a single purpose. */}
+      {!lockedCategory && (
+        <>
+          <div className="flex items-center gap-0.5 p-0.5 bg-surface-strong rounded-lg w-fit">
+            {CATEGORY_TABS.map((cat) => (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => setCategoryTab(cat)}
+                className={`px-3.5 py-1.5 text-[13px] font-medium rounded-[7px] transition-all duration-150 cursor-pointer ${
+                  categoryFilter === cat
+                    ? "bg-surface text-ink shadow-[0_1px_3px_rgba(0,0,0,0.12)]"
+                    : "text-muted hover:text-ink"
+                }`}
+              >
+                {t(`settings.models.categories.${cat}`)}
+              </button>
+            ))}
+          </div>
+          <p className="text-[13px] text-muted">
+            {t(`settings.models.categoryDescriptions.${categoryFilter}`)}
+          </p>
+        </>
+      )}
       {categoryFilter === "llm" && (
         <p className="text-xs text-muted-soft">
           {t("settings.models.llmHint")}

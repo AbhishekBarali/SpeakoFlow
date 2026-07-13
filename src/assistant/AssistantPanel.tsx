@@ -209,7 +209,8 @@ const CopyButton: React.FC<{ content: string; title: string }> = ({
 
 /** `<pre>` renderer with a hover copy button, so each code block is
  *  individually copyable (the whole-answer copy stays too). */
-const CodeBlock: React.FC<React.HTMLAttributes<HTMLPreElement>> = ({  children,
+const CodeBlock: React.FC<React.HTMLAttributes<HTMLPreElement>> = ({
+  children,
   ...rest
 }) => {
   const { t } = useTranslation();
