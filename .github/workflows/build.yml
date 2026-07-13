@@ -437,6 +437,29 @@ jobs:
           sudo cp -vL "$LIBDIR"/libtranscribe.so* "$LIBDIR"/libggml*.so* /usr/local/lib/ 2>/dev/null || true
           sudo ldconfig
 
+      # For UNSIGNED test builds only (sign-binaries=false): the base
+      # tauri.conf.json hard-wires a Windows `signCommand` (Azure Trusted
+      # Signing) and `createUpdaterArtifacts: true` (which needs
+      # TAURI_SIGNING_PRIVATE_KEY). Neither is available without certificates, so
+      # patch them out here. Strictly gated on `!sign-binaries`, so production
+      # signed builds (which always pass sign-binaries=true) NEVER run this and
+      # are completely unaffected.
+      - name: Neutralize signing for unsigned test build
+        if: ${{ !inputs.sign-binaries }}
+        shell: bash
+        run: |
+          node -e '
+            const fs = require("fs");
+            const p = "src-tauri/tauri.conf.json";
+            const c = JSON.parse(fs.readFileSync(p, "utf8"));
+            c.bundle = c.bundle || {};
+            c.bundle.createUpdaterArtifacts = false;
+            c.bundle.windows = c.bundle.windows || {};
+            c.bundle.windows.signCommand = "cmd /c echo skip-signing %1";
+            fs.writeFileSync(p, JSON.stringify(c, null, 2));
+            console.log("Patched tauri.conf.json: signing disabled for unsigned test build");
+          '
+
       - name: Build with Tauri
         uses: tauri-apps/tauri-action@v0
         env:

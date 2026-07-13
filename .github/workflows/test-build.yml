@@ -1,0 +1,50 @@
+name: "Test Build"
+
+# Manually-triggered UNSIGNED build for testing. Reuses the production build.yml
+# but with sign-binaries: false, so it needs NO Apple/Azure signing certificates.
+# Installers are uploaded as downloadable artifacts (not a GitHub Release).
+#
+# Trigger from the CLI:  gh workflow run test-build.yml --repo <owner>/<repo>
+# or from the Actions tab -> "Test Build" -> "Run workflow".
+#
+# NOTE: this first pass covers the mainstream x86_64 desktops + Apple Silicon.
+# The Windows-on-ARM and Linux-ARM targets from release.yml are intentionally
+# omitted here (they have the most fragile toolchain setup); add them once the
+# mainstream targets are green.
+
+on: workflow_dispatch
+
+jobs:
+  test-build:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: "macos-26" # Apple Silicon (M1+)
+            args: "--target aarch64-apple-darwin"
+            target: "aarch64-apple-darwin"
+          - platform: "macos-latest" # Intel macs
+            args: "--target x86_64-apple-darwin"
+            target: "x86_64-apple-darwin"
+          - platform: "ubuntu-22.04" # .deb on 22.04 (older glibc = wider compat)
+            args: "--bundles deb"
+            target: "x86_64-unknown-linux-gnu"
+          - platform: "ubuntu-24.04" # AppImage + RPM on 24.04
+            args: "--bundles appimage,rpm"
+            target: "x86_64-unknown-linux-gnu"
+          - platform: "windows-latest" # .msi + NSIS .exe
+            args: ""
+            target: "x86_64-pc-windows-msvc"
+
+    uses: ./.github/workflows/build.yml
+    with:
+      platform: ${{ matrix.platform }}
+      target: ${{ matrix.target }}
+      build-args: ${{ matrix.args }}
+      sign-binaries: false
+      upload-artifacts: true
+      asset-prefix: "speakoflow-test"
+      no-cache: false
+    secrets: inherit
