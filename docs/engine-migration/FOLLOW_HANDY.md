@@ -17,12 +17,12 @@ SpeakoFlow runs the engine **side-by-side** with the original stack; it did **no
 Handy's shape-(a) convergence. When you diff Handy, **do not blindly copy these** — they
 are intentional differences (see `PLAN.md` §2 and Session 6):
 
-| Concern | Handy (shape-a) | SpeakoFlow (shape-b) — keep this |
-|---|---|---|
-| `transcribe-rs` | `0.3.8`, `["onnx"]` only (whisper removed) | **`0.3.11`, `["whisper-cpp","onnx"]`** kept as-is (N2) |
-| Whisper models | via `transcribe-cpp` (GGUF) | still via `transcribe-rs` **and** available as GGUF |
+| Concern              | Handy (shape-a)                                                                                                        | SpeakoFlow (shape-b) — keep this                                                                                                                       |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `transcribe-rs`      | `0.3.8`, `["onnx"]` only (whisper removed)                                                                             | **`0.3.11`, `["whisper-cpp","onnx"]`** kept as-is (N2)                                                                                                 |
+| Whisper models       | via `transcribe-cpp` (GGUF)                                                                                            | still via `transcribe-rs` **and** available as GGUF                                                                                                    |
 | Windows ONNX Runtime | baseline ORT linked **dynamically** (`ORT_LIB_LOCATION` / `ORT_PREFER_DYNAMIC_LINK`), `onnxruntime.dll` staged/bundled | ORT **statically linked** by `transcribe-rs`; `ort-directml` **kept**. No ORT dynamic-link, no `onnxruntime.dll` staging, no `stage_onnxruntime_dll()` |
-| macOS/Linux ORT | ORT dylib/.so bundled via CI `jq` into `frameworks`/`deb.files` | not needed (static ORT) — those CI steps are **omitted** |
+| macOS/Linux ORT      | ORT dylib/.so bundled via CI `jq` into `frameworks`/`deb.files`                                                        | not needed (static ORT) — those CI steps are **omitted**                                                                                               |
 
 So `src-tauri/build.rs` has **`stage_transcribe_runtime_libs()` + `stage_vc_runtime_dlls()`
 only** (no `stage_onnxruntime_dll`), the CI workflow has **no** "Install ONNX Runtime" steps,
@@ -53,12 +53,12 @@ transcribe-cpp = { version = "=0.1.2", default-features = false }        # base 
 
 The per-platform feature matrix is fixed and should not change on a routine pull:
 
-| Target | `transcribe-cpp` features | Posture |
-|---|---|---|
-| `cfg(all(windows, target_arch="x86_64"))` | `["dynamic-backends","vulkan"]` | shared libs + Vulkan GPU |
-| `cfg(all(windows, target_arch="aarch64"))` | *(none)* `default-features=false` | **static CPU-only** |
-| `cfg(target_os="macos")` | `["metal"]` | static, Metal GPU compiled in |
-| `cfg(target_os="linux")` | `["dynamic-backends","vulkan"]` | shared .so + Vulkan GPU |
+| Target                                     | `transcribe-cpp` features         | Posture                       |
+| ------------------------------------------ | --------------------------------- | ----------------------------- |
+| `cfg(all(windows, target_arch="x86_64"))`  | `["dynamic-backends","vulkan"]`   | shared libs + Vulkan GPU      |
+| `cfg(all(windows, target_arch="aarch64"))` | _(none)_ `default-features=false` | **static CPU-only**           |
+| `cfg(target_os="macos")`                   | `["metal"]`                       | static, Metal GPU compiled in |
+| `cfg(target_os="linux")`                   | `["dynamic-backends","vulkan"]`   | shared .so + Vulkan GPU       |
 
 ---
 
@@ -86,13 +86,13 @@ These are the files that trace to Handy's engine. Diff Handy's version against o
 schema bumps). Ours carry SpeakoFlow-specific glue (settings dials, post-processing reuse,
 the `LoadedEngine`/`EngineType` enums) — keep that glue, take their engine logic.
 
-| Ours | Handy upstream | What to watch for |
-|---|---|---|
-| `src-tauri/src/catalog/catalog.json` | `src-tauri/src/catalog/catalog.json` | **verbatim copy** — see step 4 |
-| `src-tauri/src/catalog/mod.rs` | (loader is SpeakoFlow's; Handy embeds differently) | keep ours; only touch if the catalog **schema** (`catalog_version`) bumps |
-| `src-tauri/src/managers/gguf_meta.rs` | `src-tauri/src/managers/gguf_meta.rs` | new GGUF value types / version support; keep it dep-free |
-| `src-tauri/src/managers/model_capabilities.rs` | `src-tauri/src/managers/model_capabilities.rs` | new `stt.capability.*` keys; the **"never guess"** rule (absent key ⇒ `None`, reconcile at load) |
-| `src-tauri/src/managers/transcription.rs` | `src-tauri/src/managers/transcription.rs` | new `RunOptions`/`StreamOptions` fields, `CommitPolicy`, family extensions, `Capabilities` fields. Port into `transcribe_cpp_run_plan` / `run_stream_worker`, **not** the transcribe-rs arms |
+| Ours                                           | Handy upstream                                     | What to watch for                                                                                                                                                                            |
+| ---------------------------------------------- | -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src-tauri/src/catalog/catalog.json`           | `src-tauri/src/catalog/catalog.json`               | **verbatim copy** — see step 4                                                                                                                                                               |
+| `src-tauri/src/catalog/mod.rs`                 | (loader is SpeakoFlow's; Handy embeds differently) | keep ours; only touch if the catalog **schema** (`catalog_version`) bumps                                                                                                                    |
+| `src-tauri/src/managers/gguf_meta.rs`          | `src-tauri/src/managers/gguf_meta.rs`              | new GGUF value types / version support; keep it dep-free                                                                                                                                     |
+| `src-tauri/src/managers/model_capabilities.rs` | `src-tauri/src/managers/model_capabilities.rs`     | new `stt.capability.*` keys; the **"never guess"** rule (absent key ⇒ `None`, reconcile at load)                                                                                             |
+| `src-tauri/src/managers/transcription.rs`      | `src-tauri/src/managers/transcription.rs`          | new `RunOptions`/`StreamOptions` fields, `CommitPolicy`, family extensions, `Capabilities` fields. Port into `transcribe_cpp_run_plan` / `run_stream_worker`, **not** the transcribe-rs arms |
 
 **Diff commands** (pin Handy to a tag/commit you trust, not always `main`):
 
@@ -104,6 +104,7 @@ done
 ```
 
 Reconcile carefully:
+
 - **`EngineType`/`LoadedEngine`** are SpeakoFlow enums (Handy's are shaped differently). Keep
   `EngineType::TranscribeCpp` + `LoadedEngine::TranscribeCpp(Session)`.
 - **Whisper-arch custom-words caveat** (`PLAN.md` S2 notes): the `apply_custom_words` gate keys on
@@ -124,6 +125,7 @@ curl -fsSL \
 ```
 
 Then:
+
 - `crate::catalog::catalog()` parses it (cached `OnceLock`; malformed ⇒ empty + warn, never panics).
 - `ModelManager::insert_catalog_models` surfaces the `recommended` entries as
   `EngineType::TranscribeCpp` single-file `.gguf` downloads (internal id `"<slug>-gguf"`).
@@ -140,6 +142,7 @@ The `transcribe-cpp-sys` native build needs **cmake + a Vulkan SDK** (Windows/Li
 `SPIRV-Headers` findable via `CMAKE_PREFIX_PATH`.
 
 **Local Windows x86_64** (as verified this repo, Session 1 Evidence):
+
 - VS 2022 (MSVC + Windows SDK), `cmake`, **Vulkan SDK** (the SDK ships
   `Lib\cmake\SPIRV-Headers\SPIRV-HeadersConfig.cmake`, so no vcpkg needed locally).
 - `CMAKE_PREFIX_PATH=<VulkanSDK dir>` and `CARGO_TARGET_DIR=<short path, e.g. C:\t>` (the
@@ -215,6 +218,7 @@ and `scripts/ci/stage-transcribe-libs.sh`. On a routine engine pull the only thi
   Azure Trusted Signing secrets when `sign-binaries: true` (release.yml).
 
 ### Known follow-up (shape-(b) only, pre-existing — not GGUF scope)
+
 Because we keep `ort-directml`, the DirectML EP loads a runtime `DirectML.dll` (present next to the
 build artifacts, **not** currently staged/bundled). On a clean machine the legacy transcribe-rs
 **ONNX-on-GPU (DirectML)** path would fall back to CPU-ORT. The GGUF path and CPU-ORT path are

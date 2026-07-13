@@ -21,14 +21,14 @@ Each session is a **complete, independently-verifiable milestone** sized for one
 work (e.g. adding the engine enum + its load path + its transcribe call) is kept **together on
 purpose**, because a capable model does better carrying those decisions forward in one session than
 re-deriving them across many. The old per-step detail lives inside each session as a **Sub-steps**
-checklist, so you get fewer hand-offs *and* full guidance.
+checklist, so you get fewer hand-offs _and_ full guidance.
 
 ## The loop (what you do)
 
 1. Open `PLAN.md`, find the next unchecked session (start at **Session 1**).
 2. Open `PROMPTS.md`, copy the **Shared preamble** + that session's prompt.
 3. Paste into a fresh AI session; let it do the whole session.
-4. The AI implements all Sub-steps, runs the session's *Acceptance Criteria* verification, then updates
+4. The AI implements all Sub-steps, runs the session's _Acceptance Criteria_ verification, then updates
    `PLAN.md`: session + Sub-step boxes → `[x]`, Status → `done (date)`, **Evidence** + **Downstream
    Notes**, and the **Progress Log** row.
 5. You sanity-check (build runs? dictation works?), then move on.
@@ -42,13 +42,14 @@ checklist, so you get fewer hand-offs *and* full guidance.
 ## Do the spike first
 
 **Session 1 is the make-or-break step** — it proves `transcribe.cpp` compiles on your Windows/Vulkan
-machine and transcribes one GGUF model *in isolation* (batch + streaming), before any app code
+machine and transcribes one GGUF model _in isolation_ (batch + streaming), before any app code
 changes. If anything's going to be hard, it surfaces here, cheaply. Don't skip ahead.
 
 ## Parallel options (optional, to save time)
 
 Most sessions are sequential by design (each builds on the last, one agent carrying context). The
 only splits worth doing:
+
 - **Session 3** → **3a backend** (catalog + GGUF capability probe) ∥ **3b frontend** (model-selector
   UI). Run them as two sessions, then do a combined build check.
 - **Session 7** build config can be **drafted alongside Sessions 3–5** and validated last.

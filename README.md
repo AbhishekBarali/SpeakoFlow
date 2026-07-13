@@ -81,34 +81,34 @@ SpeakoFlow started as a fork of the excellent [Handy](https://github.com/cjpais/
 
 ## What's different from Handy?
 
-|                                          | Handy | SpeakoFlow                                                           |
-| ---------------------------------------- | ----- | -------------------------------------------------------------------- |
-| Local dictation                          | ✅    | ✅ (unchanged core)                                                  |
-| AI assistant chat panel                  | —     | ✅ floating glass panel, streaming                                   |
-| Screen vision (screen sent to the model) | —     | ✅ hotkey, voice intent, or camera button; multi-monitor; capture timing |
-| Inline image thumbnails (chat + history) | —     | ✅ click-to-enlarge, persisted with each message                     |
-| Web search                               | —     | ✅ Serper / SerpAPI / Brave / Tavily / Exa (bring your own key)      |
-| Spoken answers (TTS)                     | —     | ✅ Kokoro local / OpenAI-compatible / ElevenLabs / Azure             |
-| Assistant profiles (task personas)       | —     | ✅ profile gallery, per-profile length, LLM-generated, import/export |
-| Personal memory (local "About You" + notes) | —  | ✅ two-tier, offline distillation, incognito, export/import          |
-| Hands-free dictation toggle              | —     | ✅ dedicated F9 binding                                              |
-| Built-in offline LLM (llama.cpp)         | —     | ✅ runs a downloaded model, no server                                |
-| Local LLM preset (Ollama / LM Studio)    | —     | ✅                                                                   |
-| Panel customization + pill mode          | —     | ✅                                                                   |
+|                                             | Handy | SpeakoFlow                                                               |
+| ------------------------------------------- | ----- | ------------------------------------------------------------------------ |
+| Local dictation                             | ✅    | ✅ (unchanged core)                                                      |
+| AI assistant chat panel                     | —     | ✅ floating glass panel, streaming                                       |
+| Screen vision (screen sent to the model)    | —     | ✅ hotkey, voice intent, or camera button; multi-monitor; capture timing |
+| Inline image thumbnails (chat + history)    | —     | ✅ click-to-enlarge, persisted with each message                         |
+| Web search                                  | —     | ✅ Serper / SerpAPI / Brave / Tavily / Exa (bring your own key)          |
+| Spoken answers (TTS)                        | —     | ✅ Kokoro local / OpenAI-compatible / ElevenLabs / Azure                 |
+| Assistant profiles (task personas)          | —     | ✅ profile gallery, per-profile length, LLM-generated, import/export     |
+| Personal memory (local "About You" + notes) | —     | ✅ two-tier, offline distillation, incognito, export/import              |
+| Hands-free dictation toggle                 | —     | ✅ dedicated F9 binding                                                  |
+| Built-in offline LLM (llama.cpp)            | —     | ✅ runs a downloaded model, no server                                    |
+| Local LLM preset (Ollama / LM Studio)       | —     | ✅                                                                       |
+| Panel customization + pill mode             | —     | ✅                                                                       |
 
 Everything is wired through the same provider system, so one API key works for assistant answers, dictation post-processing, and remote TTS.
 
 ## Default hotkeys
 
-| Action                          | Shortcut                     |
-| ------------------------------- | ---------------------------- |
-| Dictate (hold)                  | `Ctrl + Space`               |
-| Hands-free dictation (toggle)   | `F9`                         |
-| Dictate with AI post-processing (AI Correction) | `Ctrl + Shift + Space` |
-| Ask the assistant               | `Ctrl + Alt + Space`         |
-| Ask about your screen           | `Ctrl + Alt + Shift + Space` |
-| Show / hide the panel           | `Ctrl + Alt + A`             |
-| Cancel the recording or a streaming reply | `Esc`              |
+| Action                                          | Shortcut                     |
+| ----------------------------------------------- | ---------------------------- |
+| Dictate (hold)                                  | `Ctrl + Space`               |
+| Hands-free dictation (toggle)                   | `F9`                         |
+| Dictate with AI post-processing (AI Correction) | `Ctrl + Shift + Space`       |
+| Ask the assistant                               | `Ctrl + Alt + Space`         |
+| Ask about your screen                           | `Ctrl + Alt + Shift + Space` |
+| Show / hide the panel                           | `Ctrl + Alt + A`             |
+| Cancel the recording or a streaming reply       | `Esc`                        |
 
 On macOS the modifier defaults to `Option` in place of `Ctrl`/`Alt` (e.g. `Option + Space` to dictate). Every shortcut is rebindable in settings.
 

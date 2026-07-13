@@ -10,12 +10,15 @@ flipping test-only flags, signing. Check each box as you complete it.
 
 ## 1. Revert the testing-only onboarding override
 
-- [ ] In `src/App.tsx`, set `FORCE_ONBOARDING = false` (or delete the constant
+- [x] In `src/App.tsx`, set `FORCE_ONBOARDING = false` (or delete the constant
       and the guard at the top of `checkOnboardingStatus`).
 
-It currently forces the **full onboarding on every launch** so we can test the
-first-run flow repeatedly. This must be off for real users, or returning users
-will be re-onboarded every time they open the app.
+**Resolved by the Simplicity Overhaul (S1), verified by S6 on 2026-07-13.** The
+`FORCE_ONBOARDING` constant and its guard were **deleted entirely** from
+`src/App.tsx` — `grep FORCE_ONBOARDING src/` now returns 0 matches. Onboarding
+shows only for genuinely new users (no models installed) or returning users
+missing permissions, via the normal `hasAnyModelsAvailable()` path. Nothing to
+flip before release.
 
 ---
 
@@ -68,12 +71,12 @@ it.
 
 Values pulled from `src-tauri/src/managers/model.rs` (confirm before uploading):
 
-| Model id | Name | File (`filename`) | Size | Fits GitHub 2 GB? | Vision projector (extra file) | Mirror uploaded? |
-|---|---|---|---|---|---|---|
-| `gemma-3-1b` | Gemma 3 1B | `gemma-3-1b-it-Q4_K_M.gguf` | 806 MB | ✅ yes | none (text only) | [ ] |
-| `qwen3.5-2b` | Qwen3.5 2B (Vision) | `Qwen_Qwen3.5-2B-Q4_K_M.gguf` | ~2.35 GB | ❌ over 2 GB | `mmproj-Qwen_Qwen3.5-2B-f16.gguf` | [ ] |
-| `qwen3.5-4b` | Qwen3.5 4B (Vision) — **default** | `Qwen_Qwen3.5-4B-Q4_K_M.gguf` | ~3.9 GB | ❌ over 2 GB | `mmproj-Qwen_Qwen3.5-4B-f16.gguf` | [ ] |
-| `gemma-3-4b` | Gemma 3 4B (Vision) | `gemma-3-4b-it-Q4_K_M.gguf` | ~3.35 GB | ❌ over 2 GB | `mmproj-model-f16.gguf` | [ ] |
+| Model id     | Name                              | File (`filename`)             | Size     | Fits GitHub 2 GB? | Vision projector (extra file)     | Mirror uploaded? |
+| ------------ | --------------------------------- | ----------------------------- | -------- | ----------------- | --------------------------------- | ---------------- |
+| `gemma-3-1b` | Gemma 3 1B                        | `gemma-3-1b-it-Q4_K_M.gguf`   | 806 MB   | ✅ yes            | none (text only)                  | [ ]              |
+| `qwen3.5-2b` | Qwen3.5 2B (Vision)               | `Qwen_Qwen3.5-2B-Q4_K_M.gguf` | ~2.35 GB | ❌ over 2 GB      | `mmproj-Qwen_Qwen3.5-2B-f16.gguf` | [ ]              |
+| `qwen3.5-4b` | Qwen3.5 4B (Vision) — **default** | `Qwen_Qwen3.5-4B-Q4_K_M.gguf` | ~3.9 GB  | ❌ over 2 GB      | `mmproj-Qwen_Qwen3.5-4B-f16.gguf` | [ ]              |
+| `gemma-3-4b` | Gemma 3 4B (Vision)               | `gemma-3-4b-it-Q4_K_M.gguf`   | ~3.35 GB | ❌ over 2 GB      | `mmproj-model-f16.gguf`           | [ ]              |
 
 > Practically: **Gemma 3 1B** is the only one that fits GitHub Releases today.
 > For the 2–4 GB vision models, either use a non-GitHub host or rely on the

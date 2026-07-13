@@ -5,6 +5,7 @@
 > then ticks it off in `PLAN.md`. Come back, confirm, paste the next one.
 >
 > There are **6 sessions**. Read **§2 of PLAN.md first** for the precondition + order:
+>
 > - **Sessions 1 & 2** are independent of the engine migration — run them **now** (Session 1 fixes a
 >   live accuracy bug).
 > - **Sessions 3–6** need the engine migration merged first. **3 and 4 can run in parallel.**
@@ -49,7 +50,8 @@ DO THE WHOLE SESSION BELOW (all its Sub-steps, in this one context). When finish
 
 ---
 
-## Session 1 — Audio & accuracy fixes (backport #1344, #1582)  [RUN NOW]
+## Session 1 — Audio & accuracy fixes (backport #1344, #1582) [RUN NOW]
+
 ```
 Execute Session 1 from PLAN.md (all Sub-steps). This fixes a live transcription-accuracy bug, so do
 it carefully. Read Handy PR #1344 (reset resampler state between recordings). In
@@ -64,7 +66,8 @@ cargo build is clean and the reset is provable, then update PLAN.md. NOTE in Evi
 maintainer must confirm the real-world accuracy improvement on repeated recordings.
 ```
 
-## Session 2 — Robustness backports  [RUN NOW]
+## Session 2 — Robustness backports [RUN NOW]
+
 ```
 Execute Session 2 from PLAN.md (all Sub-steps). Port these Handy v0.9.1 fixes to SpeakoFlow's diverged
 code, reading each PR first and noting whether it was already present:
@@ -81,7 +84,8 @@ Verify cargo build + cargo test --lib clean and the corrupt-store test keeps val
 update PLAN.md (record which PRs were already present vs newly ported in Downstream Notes).
 ```
 
-## Session 3 — Recording overlay cleanup (backport #1597)  [after migration merged]
+## Session 3 — Recording overlay cleanup (backport #1597) [after migration merged]
+
 ```
 Execute Session 3 from PLAN.md (all Sub-steps). In src/overlay/RecordingOverlay.tsx (+ .css), clean up
 the recording overlay to match SpeakoFlow's minimalist look, for BOTH the compact pill and the
@@ -97,7 +101,8 @@ Verify bun x tsc --noEmit + bun x eslint on the changed files are clean, then up
 Evidence that the maintainer should eyeball the overlay.
 ```
 
-## Session 4 — Assistant panel conversation polish  [after migration merged; parallel with S3]
+## Session 4 — Assistant panel conversation polish [after migration merged; parallel with S3]
+
 ```
 Execute Session 4 from PLAN.md (all Sub-steps). This is a FRONTEND rendering/UX pass on
 src/assistant/AssistantPanel.tsx (+ .css) — do NOT touch assistant.rs / run_assistant_turn.
@@ -115,7 +120,8 @@ Verify bun x tsc --noEmit + eslint clean, then update PLAN.md. Note the screens 
 confirm (a voice turn + a long/code reply).
 ```
 
-## Session 5 — Onboarding: non-blocking downloads + fix the error (backport #1522)  [after migration; before S6]
+## Session 5 — Onboarding: non-blocking downloads + fix the error (backport #1522) [after migration; before S6]
+
 ```
 Execute Session 5 from PLAN.md (all Sub-steps). Fix the onboarding download experience:
 - Make the Step-1 (STT) model download NON-BLOCKING, like Step-2 (LLM) already is: start the download,
@@ -133,7 +139,8 @@ Verify bun x tsc --noEmit + eslint clean, then update PLAN.md. Record the root c
 failure in Downstream Notes; note the onboarding walkthrough the maintainer should confirm.
 ```
 
-## Session 6 — Models settings redesign  [after migration + after S5]
+## Session 6 — Models settings redesign [after migration + after S5]
+
 ```
 Execute Session 6 from PLAN.md (all Sub-steps). Redesign the Models settings page to be clean, calm and
 obvious, matching SpeakoFlow's minimalist look (reference the minimalist-ui / impeccable design skills).

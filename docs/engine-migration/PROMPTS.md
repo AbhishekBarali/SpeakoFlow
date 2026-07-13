@@ -43,6 +43,7 @@ split them into separate runs). When finished:
 ---
 
 ## Session 1 — Native engine spike & isolation proof (GO/NO-GO)
+
 ```
 Execute Session 1 from PLAN.md (all Sub-steps). Create branch feat/transcribe-cpp-migration; confirm
 the app builds + dictates and record a baseline. Add transcribe-cpp 0.1.2 (default-features=false;
@@ -56,6 +57,7 @@ Update PLAN.md.
 ```
 
 ## Session 2 — Batch engine integration (side-by-side)
+
 ```
 Execute Session 2 from PLAN.md (all Sub-steps). Add EngineType::TranscribeCpp (is_transcription()=true)
 and LoadedEngine::TranscribeCpp(...); regenerate bindings.ts; confirm getModelCategory default→"stt".
@@ -71,6 +73,7 @@ Record the LoadedEngine shape + run_plan signature in Downstream Notes. Update P
 ```
 
 ## Session 3 — GGUF catalog, capability probing & model UI
+
 ```
 Execute Session 3 from PLAN.md (all Sub-steps). (3a) Fetch the live catalog.json from
 raw.githubusercontent.com/cjpais/Handy/main/src-tauri/src/catalog/catalog.json; add ModelInfo entries
@@ -87,6 +90,7 @@ Update PLAN.md.
 ```
 
 ## Session 4 — Real native streaming (the payoff)
+
 ```
 Execute Session 4 from PLAN.md (all Sub-steps). Add a native streaming worker for
 LoadedEngine::TranscribeCpp when caps.supports_streaming: session.stream(&run_opts,&StreamOptions{
@@ -103,6 +107,7 @@ clean. Record commit policy + feed cadence in Downstream Notes. Update PLAN.md.
 ```
 
 ## Session 5 — Optional live-transcription window
+
 ```
 Execute Session 5 from PLAN.md (all Sub-steps). Add the boolean setting
 live_transcription_window_enabled (default false) via the full 7-point toggle template (PLAN.md §7).
@@ -116,6 +121,7 @@ Update PLAN.md.
 ```
 
 ## Session 6 — Recommended defaults, onboarding & legacy (+ optional convergence)
+
 ```
 Execute Session 6 from PLAN.md (all Sub-steps). Make parakeet-unified-en-0.6b the recommended default
 (offer nemotron-3.5-asr-streaming-0.6b for multilingual users), keeping the existing default working if
@@ -128,6 +134,7 @@ and (if converged) the app still builds + dictates. Update PLAN.md.
 ```
 
 ## Session 7 — Build, installer, CI, signing & FOLLOW_HANDY.md
+
 ```
 Execute Session 7 from PLAN.md (all Sub-steps). Finalize per-platform Cargo target tables (Win x86_64
 ["dynamic-backends","vulkan"]; Win aarch64 default-off static CPU-only with -DGGML_NATIVE=OFF
