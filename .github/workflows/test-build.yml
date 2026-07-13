@@ -25,9 +25,10 @@ jobs:
           - platform: "macos-26" # Apple Silicon (M1+)
             args: "--target aarch64-apple-darwin"
             target: "aarch64-apple-darwin"
-          - platform: "ubuntu-24.04" # deb + AppImage + RPM. 24.04's PipeWire is
-            # new enough for xcap's libspa; 22.04's is too old (libspa won't compile).
-            args: "--bundles deb,appimage,rpm"
+          - platform: "ubuntu-24.04" # AppImage only: it's self-contained (the CI
+            # stages libtranscribe.so + ggml backends into it). deb/rpm need extra
+            # engine-lib staging that isn't wired up yet, so they fail the audit.
+            args: "--bundles appimage"
             target: "x86_64-unknown-linux-gnu"
           - platform: "windows-latest" # .msi + NSIS .exe
             args: ""
