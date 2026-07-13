@@ -1220,8 +1220,6 @@ pub static ACTION_MAP: Lazy<HashMap<String, Arc<dyn ShortcutAction>>> = Lazy::ne
     map
 });
 
-
-
 #[cfg(test)]
 mod tests {
     use super::{append_tone_directive, build_system_prompt, sanitize_post_process_output};
@@ -1294,7 +1292,10 @@ mod tests {
         let fenced = "```\nCleaned text here.\n```";
         assert_eq!(sanitize_post_process_output(fenced), "Cleaned text here.");
         let fenced_lang = "```text\nCleaned text here.\n```";
-        assert_eq!(sanitize_post_process_output(fenced_lang), "Cleaned text here.");
+        assert_eq!(
+            sanitize_post_process_output(fenced_lang),
+            "Cleaned text here."
+        );
     }
 
     #[test]

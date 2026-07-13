@@ -173,8 +173,7 @@ mod tests {
             assert!(file.size_bytes > 0, "{} default file has no size", m.slug);
             let url = m.download_url(file);
             assert!(
-                url.starts_with("https://huggingface.co/handy-computer/")
-                    && url.ends_with(".gguf"),
+                url.starts_with("https://huggingface.co/handy-computer/") && url.ends_with(".gguf"),
                 "unexpected url for {}: {}",
                 m.slug,
                 url

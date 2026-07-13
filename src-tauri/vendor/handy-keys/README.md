@@ -68,13 +68,13 @@ Uses [rdev](https://crates.io/crates/rdev). On Wayland, hotkey blocking may not 
 
 ## Modifiers
 
-| Modifier | Aliases |
-|----------|---------|
-| `CMD` | `command`, `meta`, `super`, `win` |
-| `CTRL` | `control` |
-| `OPT` | `option`, `alt` |
-| `SHIFT` | |
-| `FN` | `function` (macOS only) |
+| Modifier | Aliases                           |
+| -------- | --------------------------------- |
+| `CMD`    | `command`, `meta`, `super`, `win` |
+| `CTRL`   | `control`                         |
+| `OPT`    | `option`, `alt`                   |
+| `SHIFT`  |                                   |
+| `FN`     | `function` (macOS only)           |
 
 ## Recording Hotkeys
 

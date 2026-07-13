@@ -10,6 +10,34 @@ use tauri::{AppHandle, Manager};
 
 const DEBOUNCE: Duration = Duration::from_millis(30);
 
+/// Hard safety cap on how long a single recording may run before it is
+/// automatically finalized (stopped → saved → transcribed), even if the user
+/// never releases the key or taps stop.
+///
+/// Why this exists: a recording's audio is only ever persisted *after* it
+/// stops, and — for a streaming-capable model (the default) — the ASR engine
+/// runs continuous GPU inference for the entire recording. An unbounded
+/// recording (a stuck/held key, a forgotten hands-free session, or a genuine
+/// runaway) therefore risks both losing every captured second of audio if the
+/// app or system falls over mid-session, and pinning the GPU under sustained
+/// load indefinitely. Auto-finalizing at the cap guarantees the audio is
+/// written to disk and bounds worst-case resource use. Deliberately generous so
+/// ordinary long-form dictation is never cut short.
+const MAX_RECORDING_DURATION: Duration = Duration::from_secs(30 * 60);
+
+/// Whether a fired max-duration timer should actually finalize the recording.
+/// Only when its generation still matches the currently-active recording (no
+/// newer recording has started since the timer was armed) *and* something is
+/// still recording — so a stale timer can never stop a later, unrelated
+/// recording or fire while idle/processing.
+fn max_duration_should_stop(
+    timer_generation: u64,
+    current_generation: u64,
+    is_recording: bool,
+) -> bool {
+    is_recording && timer_generation == current_generation
+}
+
 /// Suffix marking the auto-derived "Shift" variant of a recording binding — the
 /// hands-free counterpart of a hold shortcut (e.g. `transcribe` → `transcribe.lock`).
 pub const LOCK_SUFFIX: &str = ".lock";
@@ -60,6 +88,12 @@ enum Command {
     Cancel {
         recording_was_active: bool,
     },
+    /// Fired by a per-recording timer when [`MAX_RECORDING_DURATION`] elapses.
+    /// Auto-finalizes the recording iff `generation` still matches the active
+    /// recording (see [`max_duration_should_stop`]). No-op otherwise.
+    MaxDuration {
+        generation: u64,
+    },
     ProcessingFinished,
 }
 
@@ -88,10 +122,20 @@ impl TranscriptionCoordinator {
     pub fn new(app: AppHandle) -> Self {
         let (tx, rx) = mpsc::channel();
 
+        // A clone of the command sender handed to per-recording max-duration
+        // timers so they can post a `MaxDuration` command back to this same
+        // single-threaded loop (keeping all lifecycle transitions serialized).
+        let timer_tx = tx.clone();
+
         thread::spawn(move || {
             let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 let mut stage = Stage::Idle;
                 let mut last_press: Option<Instant> = None;
+                // Monotonic id for the active recording, bumped on every start.
+                // A max-duration timer captures the value at arm time and only
+                // fires if it still matches — so it can never stop a newer
+                // recording (see `max_duration_should_stop`).
+                let mut generation: u64 = 0;
 
                 while let Ok(cmd) = rx.recv() {
                     match cmd {
@@ -114,6 +158,18 @@ impl TranscriptionCoordinator {
                                     Stage::Idle => {
                                         start(&app, &mut stage, &binding_id, &hotkey_string, mode);
                                         if matches!(stage, Stage::Recording { .. }) {
+                                            // Arm the max-duration safety timer
+                                            // for this recording. Tagged with a
+                                            // fresh generation so it only ever
+                                            // finalizes THIS recording.
+                                            generation = generation.wrapping_add(1);
+                                            let g = generation;
+                                            let ttx = timer_tx.clone();
+                                            thread::spawn(move || {
+                                                thread::sleep(MAX_RECORDING_DURATION);
+                                                let _ = ttx
+                                                    .send(Command::MaxDuration { generation: g });
+                                            });
                                             match mode {
                                                 // Hands-free (Push-to-talk OFF): a
                                                 // tap-to-toggle recording. Tell the
@@ -203,6 +259,32 @@ impl TranscriptionCoordinator {
                                     || matches!(stage, Stage::Recording { .. }))
                             {
                                 stage = Stage::Idle;
+                            }
+                        }
+                        Command::MaxDuration { generation: g } => {
+                            let is_recording = matches!(stage, Stage::Recording { .. });
+                            if max_duration_should_stop(g, generation, is_recording) {
+                                if let Stage::Recording { binding_id, .. } = &stage {
+                                    let minutes = MAX_RECORDING_DURATION.as_secs() / 60;
+                                    warn!(
+                                        "Recording reached the {minutes}-minute safety cap; \
+                                         auto-finalizing to save the audio and stop runaway \
+                                         streaming/GPU load"
+                                    );
+                                    let id = binding_id.clone();
+                                    // Let the UI explain why recording stopped
+                                    // on its own (the transcript is still saved).
+                                    {
+                                        use tauri::Emitter;
+                                        let _ = app.emit("recording-auto-stopped", minutes);
+                                    }
+                                    stop(&app, &mut stage, &id, "max-duration");
+                                }
+                            } else {
+                                debug!(
+                                    "Ignoring stale max-duration timer (gen {g} vs {generation}, \
+                                     recording={is_recording})"
+                                );
                             }
                         }
                         Command::ProcessingFinished => {
@@ -316,4 +398,32 @@ fn stop(app: &AppHandle, stage: &mut Stage, binding_id: &str, hotkey_string: &st
     };
     action.stop(app, binding_id, hotkey_string);
     *stage = Stage::Processing;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn max_duration_stops_only_matching_active_recording() {
+        // Same generation, still recording → finalize.
+        assert!(max_duration_should_stop(1, 1, true));
+        // Same generation but no longer recording (already stopped / idle /
+        // processing) → no-op.
+        assert!(!max_duration_should_stop(1, 1, false));
+        // A newer recording has started since the timer was armed → the stale
+        // timer must never stop it.
+        assert!(!max_duration_should_stop(1, 2, true));
+        // Stale timer while idle → no-op.
+        assert!(!max_duration_should_stop(1, 2, false));
+    }
+
+    #[test]
+    fn max_duration_cap_is_generous_but_bounded() {
+        // Long enough that ordinary long-form dictation is never cut short,
+        // but finite so a runaway recording can't run forever.
+        let secs = MAX_RECORDING_DURATION.as_secs();
+        assert!(secs >= 10 * 60, "cap should not cut short normal dictation");
+        assert!(secs <= 60 * 60, "cap must bound a runaway recording");
+    }
 }

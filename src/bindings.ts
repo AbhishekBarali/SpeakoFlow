@@ -659,6 +659,15 @@ async getDefaultSettings() : Promise<Result<AppSettings, string>> {
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * Best-effort total physical system memory, in whole gibibytes (rounded to
+ * the nearest). Used by onboarding to suggest a local assistant model that
+ * comfortably fits the machine. Returns 0 when the amount can't be determined
+ * so the caller can fall back to a safe default.
+ */
+async getSystemMemoryGb() : Promise<number> {
+    return await TAURI_INVOKE("get_system_memory_gb");
+},
 async getLogDirPath() : Promise<Result<string, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("get_log_dir_path") };

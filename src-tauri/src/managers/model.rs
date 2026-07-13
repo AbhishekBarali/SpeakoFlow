@@ -127,14 +127,14 @@ pub struct ModelInfo {
     pub accuracy_score: f32,        // 0.0 to 1.0, higher is more accurate
     pub speed_score: f32,           // 0.0 to 1.0, higher is faster
     pub supports_translation: bool, // Whether the model supports translating to English
-    pub supports_streaming: bool,   // Whether the model supports native live-streaming transcription
-    pub is_recommended: bool,       // Whether this is the recommended model for new users
+    pub supports_streaming: bool, // Whether the model supports native live-streaming transcription
+    pub is_recommended: bool,     // Whether this is the recommended model for new users
     /// Overall recommendation rank (1 = top); `None` when unranked. Mirrors the
     /// GGUF catalog `recommended_rank` and drives the model-list ordering.
     pub recommended_rank: Option<u32>,
     pub supported_languages: Vec<String>, // Languages this model can transcribe
     pub supports_language_selection: bool, // Whether the user can explicitly pick a language
-    pub is_custom: bool,            // Whether this is a user-provided custom model
+    pub is_custom: bool,                  // Whether this is a user-provided custom model
 }
 
 /// Persisted metadata for a user-added custom GGUF language model.
@@ -1370,9 +1370,7 @@ impl ModelManager {
     /// streaming model the active default once it's on disk, but any other
     /// downloaded transcription model (legacy ONNX/whisper included) is a valid
     /// fallback — never LLM or TTS models.
-    fn pick_default_transcription_model(
-        models: &HashMap<String, ModelInfo>,
-    ) -> Option<String> {
+    fn pick_default_transcription_model(models: &HashMap<String, ModelInfo>) -> Option<String> {
         models
             .values()
             .filter(|m| m.is_downloaded && m.engine_type.is_transcription())
@@ -2550,7 +2548,12 @@ mod tests {
         assert!(!models.contains_key("canary-180m-flash"));
 
         // A batch-only model reports no streaming.
-        assert!(!models.get("whisper-medium-gguf").unwrap().supports_streaming);
+        assert!(
+            !models
+                .get("whisper-medium-gguf")
+                .unwrap()
+                .supports_streaming
+        );
     }
 
     /// Both recommended-default ids must resolve to real, streaming catalog

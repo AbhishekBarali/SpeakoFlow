@@ -462,8 +462,7 @@ mod tests {
 
     #[test]
     fn stops_after_wanted_keys_without_reading_later_large_arrays() {
-        let mut data =
-            build_gguf(&[("general.architecture", GgufValue::String("whisper".into()))]);
+        let mut data = build_gguf(&[("general.architecture", GgufValue::String("whisper".into()))]);
         // Patch kv_count from 1 to 2 and append an enormous, intentionally
         // truncated array. The parser should stop after the wanted first key.
         data[16..24].copy_from_slice(&2u64.to_le_bytes());

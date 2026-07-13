@@ -455,7 +455,8 @@ pub fn list_transcribe_devices() {
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
-pub fn run(cli_args: CliArgs) {    // Detect portable mode before anything else
+pub fn run(cli_args: CliArgs) {
+    // Detect portable mode before anything else
     portable::init();
 
     // Allow the assistant panel to play TTS audio without a user gesture
@@ -563,6 +564,7 @@ pub fn run(cli_args: CliArgs) {    // Detect portable mode before anything else
             commands::get_app_dir_path,
             commands::get_app_settings,
             commands::get_default_settings,
+            settings::get_system_memory_gb,
             commands::get_log_dir_path,
             commands::set_log_level,
             commands::open_recordings_folder,

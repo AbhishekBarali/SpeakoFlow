@@ -2452,7 +2452,10 @@ fn salvage_settings(stored: &serde_json::Value) -> AppSettings {
             .insert(key.clone(), value.clone());
         if serde_json::from_value::<AppSettings>(merged.clone()).is_err() {
             // Log only the key: values may hold secrets (e.g. API keys).
-            warn!("Dropping invalid settings field '{}', keeping its default", key);
+            warn!(
+                "Dropping invalid settings field '{}', keeping its default",
+                key
+            );
             let map = merged
                 .as_object_mut()
                 .expect("merged settings stay an object");
@@ -2585,6 +2588,57 @@ pub fn load_or_create_app_settings(app: &AppHandle) -> AppSettings {
     hydrate_secrets(&mut settings);
 
     settings
+}
+
+/// Best-effort total physical system memory, in whole gibibytes (rounded to
+/// the nearest). Used by onboarding to suggest a local assistant model that
+/// comfortably fits the machine. Returns 0 when the amount can't be determined
+/// so the caller can fall back to a safe default.
+#[tauri::command]
+#[specta::specta]
+pub fn get_system_memory_gb() -> u32 {
+    total_physical_memory_bytes()
+        .map(|bytes| (bytes as f64 / (1024.0 * 1024.0 * 1024.0)).round() as u32)
+        .unwrap_or(0)
+}
+
+#[cfg(target_os = "windows")]
+fn total_physical_memory_bytes() -> Option<u64> {
+    use windows::Win32::System::SystemInformation::{GlobalMemoryStatusEx, MEMORYSTATUSEX};
+
+    let mut status = MEMORYSTATUSEX {
+        dwLength: std::mem::size_of::<MEMORYSTATUSEX>() as u32,
+        ..Default::default()
+    };
+    // SAFETY: `status` is a valid, properly sized MEMORYSTATUSEX with dwLength
+    // set as the API requires; GlobalMemoryStatusEx only writes into it.
+    unsafe { GlobalMemoryStatusEx(&mut status).ok()? };
+    Some(status.ullTotalPhys)
+}
+
+#[cfg(target_os = "linux")]
+fn total_physical_memory_bytes() -> Option<u64> {
+    let meminfo = std::fs::read_to_string("/proc/meminfo").ok()?;
+    for line in meminfo.lines() {
+        if let Some(rest) = line.strip_prefix("MemTotal:") {
+            let kb: u64 = rest.trim().trim_end_matches("kB").trim().parse().ok()?;
+            return Some(kb * 1024);
+        }
+    }
+    None
+}
+
+#[cfg(target_os = "macos")]
+fn total_physical_memory_bytes() -> Option<u64> {
+    let output = std::process::Command::new("sysctl")
+        .args(["-n", "hw.memsize"])
+        .output()
+        .ok()?;
+    String::from_utf8(output.stdout)
+        .ok()?
+        .trim()
+        .parse::<u64>()
+        .ok()
 }
 
 pub fn get_settings(app: &AppHandle) -> AppSettings {

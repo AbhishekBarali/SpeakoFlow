@@ -89,8 +89,7 @@ fn stage_transcribe_runtime_libs() {
         dirs.insert(PathBuf::from(module_dir));
     }
 
-    let dest =
-        PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap()).join("transcribe-libs");
+    let dest = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap()).join("transcribe-libs");
     // Recreate clean so a renamed or dropped ggml module can never linger in the
     // package from a previous build.
     let _ = std::fs::remove_dir_all(&dest);
@@ -154,8 +153,7 @@ fn stage_vc_runtime_dlls() {
         return;
     }
 
-    let dest =
-        PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap()).join("transcribe-libs");
+    let dest = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap()).join("transcribe-libs");
     std::fs::create_dir_all(&dest).expect("create transcribe-libs staging dir");
 
     let mut copied: Vec<String> = Vec::new();

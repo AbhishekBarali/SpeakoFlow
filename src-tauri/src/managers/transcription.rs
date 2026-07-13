@@ -9,7 +9,7 @@ use log::{debug, error, info, warn};
 use serde::Serialize;
 use specta::Type;
 use std::panic::{catch_unwind, AssertUnwindSafe};
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{mpsc, Arc, Condvar, Mutex, MutexGuard, OnceLock};
 use std::thread;
 use std::time::{Duration, SystemTime};
@@ -93,9 +93,31 @@ enum StreamCmd {
 /// startup and shared (via `Arc`) by both the `TranscriptionManager` (which
 /// starts/finalizes streams) and the `AudioRecordingManager` (whose recorder
 /// feeds frames).
+/// Hard cap on the number of un-consumed `Feed` frames allowed to sit in the
+/// live-transcription channel at once. The recorder feeds ~30 ms frames, so
+/// ~33/sec; 1000 frames ≈ 30 seconds of backlog.
+///
+/// The channel is FIFO and fed from the real-time audio callback. If inference
+/// can't keep up with real-time (a slow/overloaded GPU, a stalled or hung
+/// engine, or a runaway multi-minute recording), an *unbounded* channel would
+/// grow without limit for as long as recording continues — a memory leak that
+/// scales with recording length and starves the very inference that's already
+/// behind. Once the worker is >~30 s behind, the live transcript is already
+/// unusable, so we drop new frames (the batch `transcribe()` fallback still has
+/// the complete audio) rather than let the queue grow without bound.
+const MAX_QUEUED_FEED_FRAMES: usize = 1000;
+
 pub struct StreamRouter {
     open: Arc<AtomicBool>,
     tx: Mutex<Option<mpsc::Sender<StreamCmd>>>,
+    /// Number of `Feed` frames enqueued but not yet consumed by the worker.
+    /// Gates `feed()` so the channel can never grow past
+    /// [`MAX_QUEUED_FEED_FRAMES`]. Reset to 0 on each [`open`](Self::open).
+    queued: AtomicUsize,
+    /// Cumulative frames dropped because the worker fell behind. Surfaced in a
+    /// periodic warning so a chronically-overloaded stream is visible instead
+    /// of silently discarding audio. Reset on each [`open`](Self::open).
+    dropped: AtomicU64,
 }
 
 impl StreamRouter {
@@ -103,6 +125,8 @@ impl StreamRouter {
         Self {
             open: Arc::new(AtomicBool::new(false)),
             tx: Mutex::new(None),
+            queued: AtomicUsize::new(0),
+            dropped: AtomicU64::new(0),
         }
     }
 
@@ -113,21 +137,62 @@ impl StreamRouter {
 
     /// Feed one raw 16 kHz mono frame. Returns immediately (relaxed atomic
     /// load, no allocation, no lock) when no stream is active.
+    ///
+    /// Never blocks the audio hot path: if the worker has fallen more than
+    /// [`MAX_QUEUED_FEED_FRAMES`] behind, the frame is dropped (and counted)
+    /// instead of enqueued, so the channel is strictly bounded regardless of
+    /// how long recording runs or how slow inference is.
     pub fn feed(&self, frame: &[f32]) {
         if !self.open.load(Ordering::Relaxed) {
             return;
         }
+        // Backpressure: bound the in-flight queue. Dropping when the worker is
+        // this far behind is the correct degradation — a >30 s-late live
+        // transcript is worthless anyway, and the batch fallback keeps the full
+        // audio — versus an unbounded queue that leaks memory for the whole
+        // recording and can never catch up.
+        if self.queued.load(Ordering::Relaxed) >= MAX_QUEUED_FEED_FRAMES {
+            let n = self.dropped.fetch_add(1, Ordering::Relaxed) + 1;
+            // Log on the first drop and then sparsely (~every 6 s of drops) so a
+            // struggling stream is visible without flooding the log.
+            if n == 1 || n % 200 == 0 {
+                warn!(
+                    "Live transcription can't keep up with real-time; dropping frames \
+                     (backlog cap {} frames hit, {} dropped so far). The final transcript \
+                     falls back to batch, so no audio is lost.",
+                    MAX_QUEUED_FEED_FRAMES, n
+                );
+            }
+            return;
+        }
         if let Ok(guard) = self.tx.lock() {
             if let Some(tx) = guard.as_ref() {
-                let _ = tx.send(StreamCmd::Feed(frame.to_vec()));
+                // Reserve the slot before sending so a concurrent feed sees the
+                // updated backlog; roll back if the worker is already gone.
+                self.queued.fetch_add(1, Ordering::Relaxed);
+                if tx.send(StreamCmd::Feed(frame.to_vec())).is_err() {
+                    self.queued.fetch_sub(1, Ordering::Relaxed);
+                }
             }
         }
     }
 
+    /// Account for one `Feed` frame consumed by the worker, freeing a slot in
+    /// the bounded queue. Saturating so a stale frame drained after a reset can
+    /// never underflow the counter.
+    fn note_feed_consumed(&self) {
+        let _ = self
+            .queued
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |q| q.checked_sub(1));
+    }
+
     /// Install a fresh FIFO command channel and mark the router open, returning
-    /// the receiver for the worker thread.
+    /// the receiver for the worker thread. Resets the backlog/drop counters so
+    /// each session starts clean.
     fn open(&self) -> mpsc::Receiver<StreamCmd> {
         let (tx, rx) = mpsc::channel();
+        self.queued.store(0, Ordering::Relaxed);
+        self.dropped.store(0, Ordering::Relaxed);
         *self.tx.lock().unwrap() = Some(tx);
         self.open.store(true, Ordering::Relaxed);
         rx
@@ -1032,7 +1097,7 @@ impl TranscriptionManager {
             } else {
                 warn!("Live transcription: no model loaded; falling back to batch");
             }
-            Self::drain_stream_no_model(rx);
+            self.drain_stream_no_model(rx);
             self.stream_router.clear();
             return;
         }
@@ -1081,6 +1146,7 @@ impl TranscriptionManager {
                         while let Ok(cmd) = rx.recv() {
                             match cmd {
                                 StreamCmd::Feed(pcm) => {
+                                    self.stream_router.note_feed_consumed();
                                     acc.extend_from_slice(&pcm);
                                     while acc.len() >= FEED_SAMPLES {
                                         let chunk: Vec<f32> = acc.drain(..FEED_SAMPLES).collect();
@@ -1133,10 +1199,7 @@ impl TranscriptionManager {
                                             final_text = Some(text.display());
                                         }
                                         Err(e) => {
-                                            warn!(
-                                                "Live transcription (cpp) finalize error: {}",
-                                                e
-                                            );
+                                            warn!("Live transcription (cpp) finalize error: {}", e);
                                             // Best-effort: keep whatever text was
                                             // committed so the user never loses it.
                                             final_text = Some(stream.text().display());
@@ -1253,31 +1316,34 @@ impl TranscriptionManager {
 
                 while let Ok(cmd) = rx.recv() {
                     match cmd {
-                        StreamCmd::Feed(pcm) => match transcriber.feed(&mut *model, &pcm) {
-                            Ok(results) => {
-                                let had_new = !results.is_empty();
-                                for r in results {
-                                    let t = r.text.trim();
-                                    if t.is_empty() {
-                                        continue;
+                        StreamCmd::Feed(pcm) => {
+                            self.stream_router.note_feed_consumed();
+                            match transcriber.feed(&mut *model, &pcm) {
+                                Ok(results) => {
+                                    let had_new = !results.is_empty();
+                                    for r in results {
+                                        let t = r.text.trim();
+                                        if t.is_empty() {
+                                            continue;
+                                        }
+                                        if !committed.is_empty() {
+                                            committed.push_str(separator);
+                                        }
+                                        committed.push_str(t);
                                     }
-                                    if !committed.is_empty() {
-                                        committed.push_str(separator);
+                                    if had_new {
+                                        let _ = self.app_handle.emit(
+                                            "stream-text",
+                                            StreamTextPayload {
+                                                committed: committed.clone(),
+                                                tentative: String::new(),
+                                            },
+                                        );
                                     }
-                                    committed.push_str(t);
                                 }
-                                if had_new {
-                                    let _ = self.app_handle.emit(
-                                        "stream-text",
-                                        StreamTextPayload {
-                                            committed: committed.clone(),
-                                            tentative: String::new(),
-                                        },
-                                    );
-                                }
+                                Err(e) => warn!("Live transcription feed error: {}", e),
                             }
-                            Err(e) => warn!("Live transcription feed error: {}", e),
-                        },
+                        }
                         StreamCmd::Finalize(reply) => {
                             match transcriber.finish(&mut *model) {
                                 Ok(res) => {
@@ -1315,7 +1381,7 @@ impl TranscriptionManager {
                     *guard = leased.take();
                 }
             }
-            Self::drain_stream_no_model(rx);
+            self.drain_stream_no_model(rx);
             self.stream_router.clear();
             return;
         }
@@ -1343,10 +1409,10 @@ impl TranscriptionManager {
 
     /// Drain the command channel when no model could be leased, replying `None`
     /// to any Finalize so the caller uses the batch path.
-    fn drain_stream_no_model(rx: mpsc::Receiver<StreamCmd>) {
+    fn drain_stream_no_model(&self, rx: mpsc::Receiver<StreamCmd>) {
         while let Ok(cmd) = rx.recv() {
             match cmd {
-                StreamCmd::Feed(_) => {}
+                StreamCmd::Feed(_) => self.stream_router.note_feed_consumed(),
                 StreamCmd::Finalize(reply) => {
                     let _ = reply.send(None);
                     break;
@@ -1743,6 +1809,61 @@ mod tests {
     use super::*;
     use transcribe_cpp::{Capabilities, Task, TimestampKind};
 
+    /// A stalled/behind worker (the receiver is held, nothing is consumed) must
+    /// never let the live-transcription feed queue grow past the cap: excess
+    /// frames are dropped and counted, and a freed slot lets feed() enqueue
+    /// again. This is the guard against unbounded memory growth on a long
+    /// recording when inference can't keep up with real-time.
+    #[test]
+    fn stream_router_bounds_backlog_when_worker_stalls() {
+        let router = StreamRouter::new();
+
+        // Closed router: feed is a no-op and nothing is queued.
+        router.feed(&[0.0f32; 480]);
+        assert_eq!(router.queued.load(Ordering::Relaxed), 0);
+        assert!(!router.is_open());
+
+        // Open a session and deliberately keep the receiver unread so the
+        // "worker" never consumes — the worst case (a hung/overloaded engine).
+        let _rx = router.open();
+        assert!(router.is_open());
+
+        // Feed well past the cap; the in-flight queue must clamp at the cap.
+        let overshoot = 500usize;
+        for _ in 0..(MAX_QUEUED_FEED_FRAMES + overshoot) {
+            router.feed(&[0.0f32; 480]);
+        }
+        assert_eq!(
+            router.queued.load(Ordering::Relaxed),
+            MAX_QUEUED_FEED_FRAMES,
+            "queue must be bounded by the cap"
+        );
+        assert!(
+            router.dropped.load(Ordering::Relaxed) >= overshoot as u64,
+            "frames past the cap must be counted as dropped"
+        );
+
+        // Simulate the worker catching up on a few frames; freed slots must be
+        // reusable by subsequent feeds.
+        for _ in 0..10 {
+            router.note_feed_consumed();
+        }
+        assert_eq!(
+            router.queued.load(Ordering::Relaxed),
+            MAX_QUEUED_FEED_FRAMES - 10
+        );
+        router.feed(&[0.0f32; 480]);
+        assert_eq!(
+            router.queued.load(Ordering::Relaxed),
+            MAX_QUEUED_FEED_FRAMES - 9
+        );
+
+        // note_feed_consumed must saturate at zero, never underflow.
+        let router2 = StreamRouter::new();
+        router2.note_feed_consumed();
+        assert_eq!(router2.queued.load(Ordering::Relaxed), 0);
+    }
+
     /// Build a minimal `Capabilities` for run-plan tests.
     fn caps(languages: &[&str], supports_translate: bool) -> Capabilities {
         Capabilities {
@@ -1993,7 +2114,9 @@ mod tests {
                 commit_policy: CommitPolicy::Auto,
                 ..Default::default()
             };
-            let mut stream = session.stream(&run_opts, &stream_opts).expect("stream begin");
+            let mut stream = session
+                .stream(&run_opts, &stream_opts)
+                .expect("stream begin");
 
             const FRAME: usize = 480; // 30 ms @ 16 kHz (recorder frame size)
             const FEED_SAMPLES: usize = 1280; // ~80 ms accumulate-then-feed cadence
@@ -2027,7 +2150,10 @@ mod tests {
             updates1, committed1, tentative1
         );
         eprintln!("TRANSCRIBE_CPP_STREAM_DISPLAY: {}", display1);
-        assert!(updates1 > 0, "expected incremental committed/tentative updates");
+        assert!(
+            updates1 > 0,
+            "expected incremental committed/tentative updates"
+        );
         assert!(
             display1.to_lowercase().contains("country"),
             "unexpected streamed transcript: {}",
@@ -2059,7 +2185,9 @@ mod tests {
                 commit_policy: CommitPolicy::Auto,
                 ..Default::default()
             };
-            let mut stream = session.stream(&run_opts, &stream_opts).expect("stream begin p3");
+            let mut stream = session
+                .stream(&run_opts, &stream_opts)
+                .expect("stream begin p3");
             let _ = stream.feed(&pcm[..pcm.len().min(1280)]).expect("feed p3");
             stream.reset(); // Cancel path
         }

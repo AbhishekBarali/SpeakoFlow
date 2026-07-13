@@ -1417,10 +1417,8 @@ pub async fn run_assistant_turn(
     // `:online` only applies to non-visual turns (its server-side search can't
     // pair with an inline image); a visual OpenRouter turn uses the tool path
     // like everyone else.
-    let web_via_online = web_wanted
-        && is_openrouter
-        && !has_visual
-        && settings.assistant_prefer_provider_web_search;
+    let web_via_online =
+        web_wanted && is_openrouter && !has_visual && settings.assistant_prefer_provider_web_search;
     let web_via_tools = web_wanted && !web_via_online;
     // OpenRouter's `:online` model suffix turns on its built-in web search
     // server-side; every other path uses the model name unchanged.
@@ -1691,7 +1689,11 @@ pub async fn run_assistant_turn(
                 // Reflect tool use in the panel: "searching" only when the
                 // model actually called web_search (a get_current_datetime call
                 // stays in "thinking").
-                if round_out.tool_calls.iter().any(|tc| tc.name == "web_search") {
+                if round_out
+                    .tool_calls
+                    .iter()
+                    .any(|tc| tc.name == "web_search")
+                {
                     emit_state(&app_state, "searching");
                 }
                 let tool_calls_json: Vec<Value> = round_out

@@ -105,6 +105,7 @@ keyring = { version = "3", features = ["windows-native"] }
 windows = { version = "0.61.3", features = [
   "Win32_Media_Audio_Endpoints",
   "Win32_System_Com_StructuredStorage",
+  "Win32_System_SystemInformation",
   "Win32_System_Variant",
   "Win32_Foundation",
   "Win32_UI_WindowsAndMessaging",

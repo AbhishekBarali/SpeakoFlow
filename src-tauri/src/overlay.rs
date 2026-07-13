@@ -415,8 +415,7 @@ fn show_overlay_state(app_handle: &AppHandle, state: &str) {
     // size, BEFORE showing it — so it never flashes at the wrong size/position.
     // Reuses the same monitor-under-cursor placement for both sizes.
     if let Some(overlay_window) = app_handle.get_webview_window("recording_overlay") {
-        let _ =
-            overlay_window.set_size(tauri::Size::Logical(tauri::LogicalSize { width, height }));
+        let _ = overlay_window.set_size(tauri::Size::Logical(tauri::LogicalSize { width, height }));
     }
     update_overlay_position_sized(app_handle, width, height);
 
