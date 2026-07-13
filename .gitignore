@@ -15,6 +15,10 @@ dist-ssr
 *.local
 *.local.*
 
+# Local Tauri build override (per-machine; skips code signing / updater
+# artifacts for local `tauri build` runs). Not for the shipped/CI build.
+tauri.local-build.json
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
