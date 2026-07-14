@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { useSettings } from "../../hooks/useSettings";
@@ -17,19 +17,26 @@ export const HistoryLimit: React.FC<HistoryLimitProps> = ({
   const { t } = useTranslation();
   const { getSetting, updateSetting, isUpdating } = useSettings();
 
-  const historyLimit = getSetting("history_limit") ?? 5;
+  const persistedLimit = getSetting("history_limit") ?? 20;
+  const [inputValue, setInputValue] = useState(String(persistedLimit));
 
-  const handleChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const value = parseInt(event.target.value, 10);
-    if (!isNaN(value) && value >= 0) {
-      updateSetting("history_limit", value);
+  useEffect(() => {
+    setInputValue(String(persistedLimit));
+  }, [persistedLimit]);
+
+  const handleBlur = async () => {
+    const parsed = Number.parseInt(inputValue, 10);
+    if (!Number.isFinite(parsed)) {
+      setInputValue(String(persistedLimit));
+      return;
     }
-  };
 
-  // The new limit is applied on the next app start, not instantly. Confirm on
-  // blur (rather than per keystroke) so the user gets one clear signal.
-  const handleBlur = () => {
-    toast.success(t("settings.debug.recordingRetention.savedToast"));
+    const next = Math.max(0, Math.min(1000, parsed));
+    setInputValue(String(next));
+    if (next === persistedLimit) return;
+
+    await updateSetting("history_limit", next);
+    toast.success(t("settings.debug.recordingRetention.appliedToast"));
   };
 
   return (
@@ -45,8 +52,8 @@ export const HistoryLimit: React.FC<HistoryLimitProps> = ({
           type="number"
           min="0"
           max="1000"
-          value={historyLimit}
-          onChange={handleChange}
+          value={inputValue}
+          onChange={(event) => setInputValue(event.target.value)}
           onBlur={handleBlur}
           disabled={isUpdating("history_limit")}
           className="w-20"

@@ -1,4 +1,17 @@
 {
+  "appearance": {
+    "title": "Appearance",
+    "description": "Choose a light, dark, or system-matched theme for the app and assistant panel.",
+    "system": "System",
+    "light": "Light",
+    "dark": "Dark",
+    "textSize": "Text size",
+    "textSizeDescription": "Scale the size of text and controls across the app.",
+    "textSizeSmall": "Small",
+    "textSizeDefault": "Default",
+    "textSizeLarge": "Large",
+    "textSizeExtraLarge": "Extra large"
+  },
   "tray": {
     "home": "홈",
     "checkUpdates": "업데이트 확인...",
@@ -10,34 +23,106 @@
   },
   "sidebar": {
     "general": "일반",
-    "models": "모델",
-    "advanced": "고급",
-    "postProcessing": "후처리",
+    "dictation": "Dictation",
+    "assistant": "Assistant",
     "history": "히스토리",
+    "about": "정보",
     "debug": "디버그",
-    "about": "정보"
+    "characters": "Profiles",
+    "memory": "Memory",
+    "collapse": "Collapse sidebar",
+    "expand": "Expand sidebar"
+  },
+  "window": {
+    "minimize": "Minimize",
+    "maximize": "Maximize",
+    "restore": "Restore",
+    "close": "Close"
+  },
+  "sectionSubtitles": {
+    "general": "Shortcuts, your microphone, and how the app looks.",
+    "dictation": "The model that turns your voice into text, and how it's cleaned up.",
+    "assistant": "Set up the assistant, then tune its voice, screen vision, and web search.",
+    "history": "Your recent transcriptions and assistant chats, stored on this device.",
+    "about": "Version, app language, data locations, and credits.",
+    "debug": "Diagnostics and developer tools."
   },
   "onboarding": {
+    "subtitle": "시작하려면 음성 인식 모델을 선택하세요",
     "steps": {
       "progress": "{{total}}단계 중 {{current}}단계",
       "counter": "{{total}}단계 중 {{current}}단계 · {{label}}",
       "speechToText": "음성 인식",
-      "aiModel": "AI 모델"
+      "aiModel": "AI 모델",
+      "ready": "You're ready"
     },
     "speechToText": {
       "title": "음성 인식 모델 선택",
-      "subtitle": "음성을 텍스트로 변환하기 위해 기기에서 완전히 실행됩니다. 사용 중인 컴퓨터에 맞는 모델을 선택하세요. 언제든지 변경할 수 있습니다."
+      "subtitle": "음성을 텍스트로 변환하기 위해 기기에서 완전히 실행됩니다. 사용 중인 컴퓨터에 맞는 모델을 선택하세요. 언제든지 변경할 수 있습니다.",
+      "cards": {
+        "fast": {
+          "description": "Blazingly fast, streams as you speak. English only."
+        },
+        "multilingual": {
+          "description": "Real-time in 28 languages."
+        }
+      },
+      "downloadAndContinue": "Download and continue",
+      "seeAllModels": "See all models",
+      "hideAllModels": "Show fewer models",
+      "installedHint": "Already set up. You can grab any other model later in Settings.",
+      "useInstalled": "Use installed model",
+      "continue": "Continue",
+      "downloadingHint": "It downloads in the background. Any other model is one click away in Settings.",
+      "downloadStarted": "Downloading your model in the background."
     },
     "aiModel": {
       "title": "로컬 AI 모델 추가",
       "subtitle": "어시스턴트, 화면 인식, 전사 정리 기능을 구동하며 기기에서 완전히 오프라인으로 실행됩니다. 선택 사항이며, 나중에 클라우드 제공업체를 연결할 수도 있습니다.",
+      "tiers": {
+        "small": {
+          "description": "Runs on any machine. Great for tidying up your writing."
+        },
+        "mid": {
+          "description": "A quick all-rounder that can also answer questions."
+        },
+        "capable": {
+          "description": "The sharpest answers, and it can see your screen."
+        }
+      },
+      "seesScreen": "Sees your screen",
+      "textOnly": "Text only",
+      "download": "Download model",
+      "useDownloaded": "Use downloaded model",
       "skip": "지금은 건너뛰기",
       "skipHint": "선택 사항입니다. 설정에서 언제든지 모델을 다운로드하거나 클라우드 제공업체를 연결할 수 있습니다.",
       "continue": "계속",
       "downloadingHint": "모델을 백그라운드에서 다운로드하고 있습니다. 바로 앱을 사용할 수 있습니다.",
       "downloadStarted": "AI 모델을 백그라운드에서 다운로드하고 있습니다."
     },
-    "subtitle": "시작하려면 음성 인식 모델을 선택하세요",
+    "ready": {
+      "title": "You're ready.",
+      "subtitle": "Two shortcuts are all you need. Press, talk, done.",
+      "dictateLabel": "Dictate anywhere",
+      "dictateCaption": "Hold, talk, let go. Your words type themselves.",
+      "assistantKeysLabel": "Ask the assistant",
+      "assistantKeysCaption": "Hold and ask. It can even see your screen.",
+      "changeAnytime": "You can change these anytime in Settings.",
+      "hotkeyLabel": "Your dictation keys",
+      "downloadingAssistant": "Your assistant is moving in. {{percentage}}% there.",
+      "downloadingVoice": "Your voice model is landing. {{percentage}}% there.",
+      "downloadingGeneric": "Still downloading. {{percentage}}% there.",
+      "signOff": "That's it. Go say something.",
+      "openApp": "Open SpeakoFlow"
+    },
+    "errors": {
+      "selectModel": "Couldn't select that model. Please try again.",
+      "loadModels": "사용 가능한 모델을 불러오는데 실패했습니다",
+      "downloadModel": "모델 다운로드 실패: {{error}}"
+    },
+    "downloadProgress": {
+      "sizeOf": "{{downloaded}} of {{total}} · {{percentage}}%"
+    },
     "recommended": "추천",
     "download": "다운로드",
     "downloading": "다운로드 중...",
@@ -48,6 +133,36 @@
       "speed": "속도"
     },
     "models": {
+      "parakeet-unified-en-0.6b-gguf": {
+        "description": "Blazingly fast, great for everyday dictation. English only."
+      },
+      "nemotron-3.5-asr-streaming-0.6b-gguf": {
+        "description": "Real-time transcription in 28 languages."
+      },
+      "canary-180m-flash-gguf": {
+        "description": "Tiny and instant — runs well on any machine."
+      },
+      "cohere-transcribe-03-2026-gguf": {
+        "description": "Slower, but the most accurate. 14 languages."
+      },
+      "whisper-medium-gguf": {
+        "description": "Best for many languages — nearly 100 supported."
+      },
+      "gemma-3-1b": {
+        "description": "Tiny and fast. Text only — great for cleaning up transcripts."
+      },
+      "qwen3.5-2b": {
+        "description": "Small and fast, and it can see images. Good on most laptops."
+      },
+      "qwen3.5-4b": {
+        "description": "Fast, multilingual, and sees images. Needs about 5 GB of RAM."
+      },
+      "gemma-3-4b": {
+        "description": "Google's model. Clean, reliable answers, and it sees images. Needs about 5 GB of RAM."
+      },
+      "kokoro-82m": {
+        "description": "Built-in local voice for the assistant. No download needed."
+      },
       "small": {
         "name": "Whisper Small",
         "description": "빠르고 상당히 정확합니다."
@@ -113,10 +228,6 @@
         "description": "크고 느리지만 매우 정확한 다국어 모델."
       }
     },
-    "errors": {
-      "loadModels": "사용 가능한 모델을 불러오는데 실패했습니다",
-      "downloadModel": "모델 다운로드 실패: {{error}}"
-    },
     "permissions": {
       "title": "권한 필요",
       "description": "SpeakoFlow가 제대로 작동하려면 몇 가지 권한이 필요합니다.",
@@ -156,26 +267,104 @@
     "modelError": "모델 오류",
     "modelUnloaded": "모델 언로드됨",
     "noModelDownloadRequired": "모델 없음 - 다운로드 필요",
+    "llmSelectModel": "Select assistant model",
+    "llmModelTitle": "Assistant model: {{model}}",
     "deleteModel": "{{modelName}} 삭제",
     "downloadSpeed": "{{speed}} MB/s",
     "cancel": "취소",
     "cancelDownload": "다운로드 취소",
+    "download": "Download",
+    "useModel": "Use model",
     "capabilities": {
       "languageSelection": "여러 입력 언어를 지원합니다",
       "singleLanguage": "이 언어만 지원합니다",
       "multiLanguage": "다국어",
       "languageOnly": "{{language}} 전용",
       "translation": "영어로 번역 가능",
-      "translate": "영어로 번역"
+      "translate": "영어로 번역",
+      "streaming": "Streaming",
+      "quantization": "Quantization",
+      "legacy": "Older"
     }
   },
   "settings": {
+    "personalMemory": {
+      "enable": {
+        "label": "Remember me",
+        "description": "Let the assistant keep and use a personal memory. Off by default."
+      },
+      "incognito": {
+        "label": "Incognito chat",
+        "description": "For this conversation, don't use memory and don't learn anything new."
+      },
+      "detail": {
+        "label": "Memory detail",
+        "description": "How much memory to add to each reply. More detail is richer but a little slower.",
+        "options": {
+          "light": "Light",
+          "balanced": "Balanced",
+          "detailed": "Detailed"
+        }
+      },
+      "aboutYou": {
+        "label": "About you",
+        "caption": "A short, always-on summary the assistant keeps in mind.",
+        "fieldLabel": "Summary",
+        "placeholder": "e.g. Prefers short, direct answers. Works in Rust and TypeScript. Building a desktop voice assistant.",
+        "hint": "Always included when memory is on. Keep it to a few sentences — this is the assistant's at-a-glance picture of you.",
+        "edit": "Edit",
+        "done": "Done",
+        "empty": "Nothing saved yet — the assistant fills this in as it learns, or click Edit to write your own.",
+        "collapsedEmpty": "Nothing saved yet"
+      },
+      "notes": {
+        "label": "Notes",
+        "caption": "Specific things worth remembering — learned or added by you.",
+        "empty": "No notes yet. Add one below, or let the assistant learn them from your chats.",
+        "add": "Add",
+        "addPlaceholder": "Add something to remember…",
+        "delete": "Delete note",
+        "learned": "learned",
+        "added": "added by you"
+      },
+      "confidence": {
+        "high": "High confidence",
+        "medium": "Medium confidence",
+        "low": "Low confidence"
+      },
+      "actions": {
+        "label": "Manage"
+      },
+      "distill": {
+        "label": "Learn from this chat now",
+        "description": "Pull durable facts from your current conversation into memory, right now.",
+        "button": "Update memory"
+      },
+      "export": "Export",
+      "import": "Import",
+      "wipe": {
+        "button": "Wipe memory",
+        "confirm": "Delete everything the assistant remembers?",
+        "yes": "Delete all",
+        "cancel": "Cancel"
+      }
+    },
     "modelSettings": {
       "title": "{{model}} 설정",
       "noSettingsNeeded": "이 모델은 별도의 설정 없이 자동으로 작동합니다."
     },
     "general": {
       "title": "일반",
+      "recording": {
+        "title": "Recording"
+      },
+      "groups": {
+        "sounds": "Sounds",
+        "startup": "Startup and tray",
+        "overlay": "Overlay",
+        "updates": "Updates",
+        "system": "System"
+      },
       "shortcut": {
         "title": "SpeakoFlow 단축키",
         "description": "음성-텍스트 녹음을 시작하는 키보드 단축키를 설정하세요",
@@ -188,6 +377,10 @@
             "name": "음성 텍스트 변환 단축키",
             "description": "음성을 녹음하고 테스트로 변환하는 키보드 단축키입니다."
           },
+          "transcribe_toggle": {
+            "name": "Hands-free dictation",
+            "description": "Press once to start, again to stop — no holding needed."
+          },
           "cancel": {
             "name": "취소 단축키",
             "description": "현재 녹음을 취소하는 키보드 단축키입니다."
@@ -195,6 +388,18 @@
           "transcribe_with_post_process": {
             "name": "후처리 단축키",
             "description": "선택 사항: 항상 AI 후처리를 적용하는 전용 단축키입니다."
+          },
+          "assistant": {
+            "name": "Ask assistant",
+            "description": "Ask the assistant by voice; the answer streams into the floating panel."
+          },
+          "assistant_vision": {
+            "name": "Ask with screen",
+            "description": "Ask by voice with your screen attached so it can see what you're looking at."
+          },
+          "assistant_panel_toggle": {
+            "name": "Show or hide panel",
+            "description": "Shows or hides the floating assistant panel."
           }
         },
         "errors": {
@@ -213,7 +418,80 @@
       },
       "pushToTalk": {
         "label": "녹음 중 단축키 홀딩",
-        "description": "누르고 있으면 녹음, 놓으면 정지"
+        "description": "누르고 있으면 녹음, 놓으면 정지",
+        "hold": "Hold to record",
+        "tap": "Tap to start and stop"
+      },
+      "tapToLock": {
+        "label": "Tap to lock",
+        "info": "While holding your record shortcut, tap this to lock hands-free recording so you can let go and keep talking. Pick any key that isn't part of your record shortcut, or clear it to turn this off.",
+        "off": "Off",
+        "clear": "Clear"
+      }
+    },
+    "models": {
+      "title": "음성 인식 모델",
+      "description": "음성 인식 모델을 선택하거나 추가 모델을 다운로드하세요. 모델마다 정확도와 속도가 다릅니다.",
+      "yourModels": "다운로드된 모델",
+      "availableModels": "다운로드 가능",
+      "downloaded": "다운로드됨",
+      "available": "다운로드 가능",
+      "deleteConfirm": "{{modelName}}을(를) 삭제하시겠습니까? 다시 사용하려면 다운로드해야 합니다.",
+      "deleteActiveConfirm": "{{modelName}}은(는) 현재 활성 모델입니다. 삭제하면 새 모델을 선택할 때까지 전사가 중지됩니다. 정말 삭제하시겠습니까?",
+      "deleteTitle": "모델 삭제",
+      "categories": {
+        "stt": "Transcription",
+        "llm": "Assistant",
+        "tts": "Speech"
+      },
+      "categoryDescriptions": {
+        "stt": "Models trade accuracy for speed — pick one that fits your machine.",
+        "llm": "Local models for the built-in assistant and AI cleanup.",
+        "tts": "Voices for the assistant's spoken replies. Kokoro runs on your machine."
+      },
+      "llmHint": "After downloading, pick this model in the Assistant section under the built-in (local) provider.",
+      "ttsHint": "Speech models run on your machine and need no download.",
+      "filters": {
+        "all": "전체",
+        "multiLanguage": "다국어",
+        "translation": "번역",
+        "allLanguages": "모든 언어"
+      },
+      "noModelsMatch": "이 필터에 맞는 모델이 없습니다.",
+      "searchPlaceholder": "Search models by name…",
+      "clearSearch": "Clear search",
+      "noSearchResults": "No models named “{{query}}”.",
+      "olderModels": "Older models",
+      "olderModelsHint": "Run on the previous engine. Still fully supported — most people won't need these.",
+      "customModel": {
+        "addButton": "Search Hugging Face",
+        "searchTitle": "Need a different model?",
+        "searchDescription": "Search Hugging Face for a GGUF model. This is an advanced option, so hardware needs and compatibility can vary.",
+        "searchButton": "Search Hugging Face",
+        "title": "Search Hugging Face",
+        "subtitle": "Find a GGUF model to download and run on this machine.",
+        "searchPlaceholder": "Search models on Hugging Face…",
+        "popularTitle": "Popular GGUF models",
+        "resultsTitle": "Search results",
+        "resultCount_one": "{{count}} model",
+        "resultCount_other": "{{count}} models",
+        "searching": "Searching Hugging Face…",
+        "searchError": "Search failed. Check your connection and try again.",
+        "tryAgain": "Try again",
+        "noResults": "No models found. Try a different search.",
+        "downloads": "{{value}} downloads",
+        "visionBadge": "Vision",
+        "back": "Back to results",
+        "loadingFiles": "Loading available files…",
+        "repoFilesError": "Couldn't load files for this model.",
+        "noGgufFiles": "This repository has no downloadable .gguf files.",
+        "selectQuant": "Choose a download",
+        "selectQuantHint": "Not sure? Q4_K_M is usually the best balance of quality, speed, and memory use.",
+        "enableVision": "Include screen vision",
+        "enableVisionHint": "Downloads an extra file so the model can understand images.",
+        "add": "Download",
+        "adding": "Starting…",
+        "addError": "Couldn't add this model. Please try again."
       }
     },
     "sound": {
@@ -228,6 +506,12 @@
         "label": "오디오 피드백",
         "description": "녹음 시작 및 정지 시 소리 재생"
       },
+      "soundTheme": {
+        "label": "Feedback sound",
+        "description": "Choose the start/stop cue played during dictation",
+        "default": "Default",
+        "preview": "Preview sound (plays start then stop)"
+      },
       "outputDevice": {
         "title": "출력 장치",
         "description": "피드백 사운드를 위한 오디오 출력 장치를 선택하세요",
@@ -239,32 +523,26 @@
         "description": "오디오 피드백 사운드의 볼륨 조절"
       }
     },
-    "models": {
-      "title": "음성 인식 모델",
-      "description": "음성 인식 모델을 선택하거나 추가 모델을 다운로드하세요. 모델마다 정확도와 속도가 다릅니다.",
-      "yourModels": "다운로드된 모델",
-      "availableModels": "다운로드 가능",
-      "downloaded": "다운로드됨",
-      "available": "다운로드 가능",
-      "deleteConfirm": "{{modelName}}을(를) 삭제하시겠습니까? 다시 사용하려면 다운로드해야 합니다.",
-      "deleteActiveConfirm": "{{modelName}}은(는) 현재 활성 모델입니다. 삭제하면 새 모델을 선택할 때까지 전사가 중지됩니다. 정말 삭제하시겠습니까?",
-      "deleteTitle": "모델 삭제",
-      "filters": {
-        "all": "전체",
-        "multiLanguage": "다국어",
-        "translation": "번역",
-        "allLanguages": "모든 언어"
-      },
-      "noModelsMatch": "이 필터에 맞는 모델이 없습니다."
-    },
     "advanced": {
       "title": "고급",
       "groups": {
         "app": "앱",
         "output": "출력",
         "transcription": "전사",
+        "textReplacements": "Text replacements",
         "history": "히스토리",
+        "aiCorrection": "AI cleanup",
         "experimental": "실험적"
+      },
+      "aiCorrection": {
+        "label": "AI cleanup (in development)",
+        "description": "Experimental: clean up your dictation with AI. Rough and unpolished — off by default.",
+        "info": "Runs a language model over your dictation to fix punctuation, remove filler words, and optionally adjust the tone. Applies to dictation only (not the assistant chat) and runs on its own shortcut. It adds a delay since the model runs after transcription; if it fails or times out, your raw text is pasted instead. Uses your assistant's model by default. This feature is still in development — you can't yet pick a built-in local model from its own list, and it needs more tuning before it's a main feature."
+      },
+      "postProcessTimeout": {
+        "title": "AI cleanup timeout",
+        "description": "How long to wait for the model before giving up and pasting your raw transcription instead. On the built-in local model, allow enough time for it to load on first use.",
+        "seconds": "{{seconds}} seconds"
       },
       "experimentalToggle": {
         "label": "실험적 기능",
@@ -273,6 +551,14 @@
       "lazyStreamClose": {
         "label": "전사 사이에 마이크 열어 두기",
         "description": "녹음 중지 후 30초 동안 마이크 스트림을 열어 두어 연속 전사 시 지연을 줄입니다. 활성화 중 블루투스 오디오 품질이 저하될 수 있습니다."
+      },
+      "liveTranscription": {
+        "label": "Live transcription",
+        "description": "Transcribe speech as you talk, instead of all at once when you stop. Experimental."
+      },
+      "liveTranscriptionWindow": {
+        "label": "Live transcription window",
+        "description": "While live transcription runs, show a larger overlay card with the running text instead of the compact pill. Requires live transcription."
       },
       "acceleration": {
         "whisper": {
@@ -300,6 +586,15 @@
       "showTrayIcon": {
         "label": "트레이 아이콘 표시",
         "description": "시스템 트레이에 SpeakoFlow 아이콘을 표시합니다."
+      },
+      "overlayStyle": {
+        "title": "Overlay",
+        "description": "How the recording overlay looks while you dictate. None hides it, Minimal is the compact pill, and Live shows a readable card with your words as you speak (for models that support it).",
+        "options": {
+          "none": "None",
+          "minimal": "Minimal",
+          "live": "Live"
+        }
       },
       "overlay": {
         "title": "오버레이 위치",
@@ -371,16 +666,67 @@
       "customWords": {
         "title": "사용자 정의 단어",
         "description": "녹음 중 자주 잘못 들리거나 철자가 틀리는 단어를 추가하세요. 시스템이 유사한 소리의 단어를 목록과 일치하도록 자동으로 수정합니다.",
+        "info": "Example: add “Kokoro” if SpeakoFlow writes “Coco row.”",
         "placeholder": "단어 추가",
         "add": "추가",
+        "empty": "No custom words yet.",
         "remove": "{{word}} 제거",
         "duplicate": "\"{{word}}\"이(가) 이미 존재합니다"
+      },
+      "textReplacements": {
+        "title": "Text replacements",
+        "description": "Replace a phrase in your transcript with text you use often. Example: “my email” becomes “alex@example.com”.",
+        "rulesTitle": "Replacement rules",
+        "rulesHint": "Choose what SpeakoFlow hears and what it should insert.",
+        "empty": "Create a rule for a phrase you say often.",
+        "addFirst": "Create first rule",
+        "addRule": "Add replacement",
+        "manageRules": "Replacements ({{count}})",
+        "searchLabel": "Spoken phrase",
+        "searchPlaceholder": "my email",
+        "replaceLabel": "Insert this text",
+        "replacePlaceholder": "alex@example.com",
+        "advanced": "Advanced options",
+        "regex": "Regex",
+        "trimBefore": "Trim before",
+        "trimAfter": "Trim after",
+        "enabledLabel": "Enabled",
+        "remove": "Remove rule",
+        "import": "Import",
+        "export": "Export",
+        "importSuccess": "Imported {{count}} replacement rules",
+        "importError": "Could not import: the file is not a valid replacements list",
+        "exportSuccess": "Replacements exported",
+        "exportError": "Could not export replacements",
+        "magicHint": "Use [date], [time], [uppercase], [lowercase], [capitalize], or [nospace] in the inserted text.",
+        "capitalization": {
+          "label": "Caps",
+          "none": "None",
+          "uppercase": "UPPERCASE",
+          "lowercase": "lowercase",
+          "capitalize": "Capitalize"
+        }
       }
     },
     "postProcessing": {
       "title": "후처리",
+      "enable": {
+        "title": "AI cleanup"
+      },
       "hotkey": {
         "title": "단축키"
+      },
+      "tone": {
+        "title": "Tone",
+        "description": "Optionally rewrite your cleaned-up dictation in a chosen tone. \"None\" just tidies the text without changing the wording.",
+        "options": {
+          "none": "None (cleanup only)",
+          "formal": "Formal",
+          "casual": "Casual",
+          "professional": "Professional",
+          "friendly": "Friendly",
+          "concise": "Concise"
+        }
       },
       "api": {
         "title": "API (OpenAI 호환)",
@@ -404,6 +750,12 @@
           "description": "선택한 제공자의 API 키입니다.",
           "placeholder": "sk-..."
         },
+        "builtin": {
+          "modelDescription": "Pick a model you've downloaded. It runs on your machine with no API key or setup.",
+          "modelPlaceholder": "Select a downloaded model",
+          "noModels": "No local models yet. Download one from the model catalog.",
+          "ready": "Runs fully on your machine. No API key, no setup."
+        },
         "model": {
           "title": "모델",
           "descriptionApple": "선택적 숫자 토큰 제한을 제공하거나 기본 기기 내 프리셋을 유지하세요.",
@@ -424,6 +776,8 @@
         "noPrompts": "사용 가능한 프롬프트 없음",
         "selectPrompt": "프롬프트 선택",
         "createNew": "새 프롬프트 만들기",
+        "edit": "Edit",
+        "closeEditor": "Close",
         "promptLabel": "프롬프트 레이블",
         "promptLabelPlaceholder": "프롬프트 이름 입력",
         "promptInstructions": "프롬프트 지시사항",
@@ -437,11 +791,52 @@
         "createFirst": "첫 번째 후처리 프롬프트를 만들려면 위의 '새 프롬프트 만들기'를 클릭하세요."
       }
     },
+    "dictation": {
+      "hero": {
+        "eyebrow": "Now listening with",
+        "loading": "Loading your model…",
+        "noModelTitle": "No model yet",
+        "noModelCaption": "Pick a model so your voice becomes text.",
+        "chooseModel": "Choose a model",
+        "changeModel": "Change model",
+        "streams": "Streams live",
+        "accuracy": "Accuracy",
+        "speed": "Speed"
+      },
+      "catalog": {
+        "title": "Choose your model",
+        "description": "Every model runs on your machine — trade accuracy for speed and pick the one that fits."
+      },
+      "aiCleanup": {
+        "groupTitle": "AI cleanup",
+        "modelGroupTitle": "Cleanup model",
+        "promptGroupTitle": "Cleanup prompt",
+        "title": "Fix up my dictation with AI",
+        "caption": "Experimental — tidies punctuation and filler after you dictate.",
+        "info": "Runs a language model over your dictation to fix punctuation, remove filler words, and optionally adjust the tone. Applies to dictation only, on its own shortcut. It adds a short delay after you speak; if the model fails or times out, your raw text is used instead. Still in development."
+      },
+      "output": {
+        "title": "Output options"
+      }
+    },
     "history": {
       "title": "히스토리",
+      "storage": {
+        "title": "Recording storage",
+        "description": "These controls affect recordings only. Starred recordings are always kept. Assistant chats have separate storage."
+      },
+      "filters": {
+        "label": "History type",
+        "all": "All",
+        "recordings": "Recordings",
+        "assistant": "Assistant chats"
+      },
       "openFolder": "녹음 폴더 열기",
       "loading": "히스토리 로딩 중...",
       "empty": "아직 변환된 내용이 없습니다. 녹음을 시작하여 히스토리를 만드세요!",
+      "emptyRecordings": "No recordings yet.",
+      "emptyAssistant": "No assistant chats yet.",
+      "recordingLabel": "Recording",
       "copyToClipboard": "녹음 내용을 클립보드에 복사",
       "save": "변환된 텍스트 저장",
       "unsave": "저장에서 제거",
@@ -450,7 +845,18 @@
       "retranscribe": "다시 전사",
       "retranscribeError": "다시 전사에 실패했습니다. 다시 시도해주세요.",
       "transcribing": "전사 중...",
-      "transcriptionFailed": "전사에 실패했습니다. 재시도 아이콘을 사용하여 다시 전사할 수 있습니다."
+      "transcriptionFailed": "전사에 실패했습니다. 재시도 아이콘을 사용하여 다시 전사할 수 있습니다.",
+      "assistantLabel": "Assistant chat",
+      "copyConversation": "Copy conversation",
+      "resumeConversation": "Continue this conversation in the assistant",
+      "showConversation": "Show conversation",
+      "hideConversation": "Hide conversation",
+      "roleUser": "You",
+      "roleAssistant": "Assistant",
+      "screenshotAttached": "Vision",
+      "messageCount_one": "{{count}} message",
+      "messageCount_other": "{{count}} messages",
+      "deleteAssistantError": "Couldn't delete the conversation. Please try again."
     },
     "debug": {
       "title": "디버그",
@@ -487,7 +893,9 @@
         "days3": "3일 후",
         "weeks2": "2주 후",
         "months3": "3개월 후",
-        "placeholder": "보관 기간 선택..."
+        "placeholder": "보관 기간 선택...",
+        "savedToast": "Retention saved.",
+        "appliedToast": "Recording retention applied"
       },
       "alwaysOnMicrophone": {
         "label": "항상 켜진 마이크",
@@ -514,6 +922,11 @@
         "description": "키보드 단축키 백엔드를 선택하세요.",
         "bindingsReset": "키보드 단축키가 호환되지 않아 기본값으로 재설정되었습니다"
       },
+      "paths": {
+        "appData": "앱 데이터:",
+        "models": "모델:",
+        "settings": "설정:"
+      },
       "pasteDelay": {
         "title": "붙여넣기 지연",
         "description": "붙여넣기 키 입력을 보내기 전 지연 시간(밀리초). 잘못된 텍스트가 붙여넣어지면 늘리세요."
@@ -521,11 +934,6 @@
       "recordingBuffer": {
         "title": "추가 녹음 버퍼",
         "description": "키를 놓은 후 추가로 녹음을 계속하는 시간(밀리초). 후행 오디오를 캡처하기 위함. 0 = 추가 버퍼 없음."
-      },
-      "paths": {
-        "appData": "앱 데이터:",
-        "models": "모델:",
-        "settings": "설정:"
       }
     },
     "about": {
@@ -533,6 +941,14 @@
       "version": {
         "title": "버전",
         "description": "SpeakoFlow의 현재 버전"
+      },
+      "updates": {
+        "title": "Updates",
+        "button": "Check for updates",
+        "disabledHint": "Automatic update checks are off. Turn them on in General."
+      },
+      "folders": {
+        "title": "Folders"
       },
       "appDataDirectory": {
         "title": "앱 데이터 디렉토리",
@@ -543,6 +959,11 @@
         "description": "소스 코드 보기 및 기여",
         "button": "GitHub에서 보기"
       },
+      "license": {
+        "title": "License",
+        "description": "SpeakoFlow is open source under the MIT License, building on Handy (also MIT) by CJ Pais.",
+        "button": "View license"
+      },
       "supportDevelopment": {
         "title": "개발 지원",
         "description": "SpeakoFlow 개발을 계속할 수 있도록 도와주세요",
@@ -550,11 +971,306 @@
       },
       "acknowledgments": {
         "title": "감사의 말",
+        "handy": {
+          "title": "Handy",
+          "description": "The open-source app SpeakoFlow is built on",
+          "details": "SpeakoFlow began as a fork of Handy by CJ Pais. Huge thanks to the original project and its contributors for the foundation."
+        },
         "whisper": {
           "title": "Whisper.cpp",
           "description": "OpenAI의 Whisper 자동 음성 인식 모델의 고성능 추론",
           "details": "SpeakoFlow는 빠르고 로컬 음성-텍스트 처리를 위해 Whisper.cpp를 사용합니다. Georgi Gerganov와 기여자들의 놀라운 작업에 감사드립니다."
+        },
+        "llamacpp": {
+          "title": "llama.cpp",
+          "description": "The engine powering the built-in local language model",
+          "details": "SpeakoFlow runs local LLMs with llama.cpp. Thanks to Georgi Gerganov and the ggml community for making fast, on-device inference possible."
+        },
+        "kokoro": {
+          "title": "Kokoro",
+          "description": "The local text-to-speech voice for the assistant",
+          "details": "SpeakoFlow speaks replies using the Kokoro TTS model, running entirely on your device. Thanks to the Kokoro project and its contributors."
+        },
+        "previous": "Previous",
+        "next": "Next"
+      }
+    },
+    "assistant": {
+      "shortcuts": {
+        "title": "Shortcuts"
+      },
+      "brain": {
+        "title": "Assistant brain",
+        "description": "Choose whether your assistant runs privately on this device or through a cloud provider.",
+        "whereLabel": "Where it runs",
+        "onDevice": "On my device",
+        "cloud": "Cloud provider",
+        "downloadModel": "Browse and download models",
+        "downloadModelDescription": "Pick a recommended model or search Hugging Face.",
+        "downloadModelAction": "Browse models",
+        "catalogTitle": "Download an on-device model",
+        "catalogDescription": "Choose a model to download. It stays on this machine and needs no API key.",
+        "currentModelTitle": "Current model",
+        "currentModelDescription": "Selected for the built-in assistant on this device.",
+        "recommendedTitle": "Recommended models",
+        "recommendedDescription": "Curated options for different memory and screen-vision needs.",
+        "finderSectionTitle": "More on-device models",
+        "finderSectionDescription": "Search Hugging Face when you need a different model size or capability.",
+        "finderTitle": "Browse Hugging Face",
+        "finderDescription": "Search thousands of GGUF models and download one directly to SpeakoFlow.",
+        "finderAction": "Find a model",
+        "huggingFaceTitle": "From Hugging Face",
+        "huggingFaceDescription": "Models you added yourself. Compatibility and performance can vary.",
+        "catalogEmpty": "No recommended local models are available right now."
+      },
+      "subpages": {
+        "profilesCaption": "Switch the assistant's name, role, and personality.",
+        "memoryCaption": "What the assistant remembers about you between chats."
+      },
+      "tapToLock": {
+        "label": "Tap to lock",
+        "info": "While holding the assistant shortcut, tap this to lock hands-free so you can let go and keep talking. Pick a key that isn't part of your assistant shortcut (one that overlaps is ignored), or clear it to turn this off.",
+        "off": "Off",
+        "clear": "Clear"
+      },
+      "provider": {
+        "title": "Assistant provider",
+        "providerLabel": "Provider",
+        "providerDescription": "The provider that answers assistant questions.",
+        "baseUrlLabel": "Base URL",
+        "baseUrlDescription": "OpenAI-compatible base URL. Azure URLs are normalized automatically.",
+        "apiKeyLabel": "API key",
+        "apiKeyDescription": "Shared with AI cleanup.",
+        "apiKeyPlaceholder": "Enter API key…",
+        "modelLabel": "Model",
+        "modelDescription": "Model or deployment name to use for assistant answers.",
+        "modelPlaceholder": "e.g. gpt-4o-mini",
+        "modelSearchPlaceholder": "Search or type a model…",
+        "modelUse": "Use \"{{model}}\"",
+        "loadModels": "Load models",
+        "loadingModels": "Loading…",
+        "noModelsFound": "No models returned. Type the model name instead.",
+        "builtinModelDescription": "Pick a downloaded local model. It runs on your machine with no API key.",
+        "builtinModelPlaceholder": "Select a downloaded model",
+        "builtinNoModels": "No models on your machine yet — download one below.",
+        "builtinReady": "Runs fully on your machine. No API key, no setup.",
+        "builtinEngineMissing": "First use downloads a small local engine automatically (one time), then runs fully offline. No setup needed.",
+        "contextSizeLabel": "Context window",
+        "contextSizeDescription": "How much the local model can keep in mind at once — the system instructions, your chat history, any screenshot (a single image can eat a big chunk), and its reply. Bigger holds more and keeps screen vision and web search reliable, but uses more memory. The default is 8192; 16384 is a good step up if your machine has the RAM to spare. You can lower it later to save memory.",
+        "unloadTimeoutLabel": "Unload from memory after",
+        "unloadTimeoutDescription": "Free up memory by unloading the local model after it has been idle this long. It reloads automatically on next use."
+      },
+      "systemPrompt": {
+        "title": "System prompt",
+        "label": "Assistant system prompt",
+        "description": "Sets the assistant's behavior."
+      },
+      "characters": {
+        "title": "Profiles",
+        "description": "Task-focused profiles you can switch between. The active profile sets the assistant's name, role, and instructions — and how long its replies run. Switch anytime from the panel header.",
+        "galleryLabel": "Your profiles",
+        "editSection": "Edit profile",
+        "avatarLabel": "Avatar",
+        "active": "Active",
+        "meowsOnly": "Meows only",
+        "builtin": "Built-in",
+        "custom": "Custom",
+        "new": "New",
+        "newName": "New profile",
+        "copyName": "{{name}} copy",
+        "createAi": "Create with AI",
+        "import": "Import",
+        "aiTitle": "Describe your profile",
+        "aiClose": "Close",
+        "aiPlaceholder": "e.g. a concise release-notes writer, or a patient tutor who explains every step",
+        "aiDictate": "Dictate the description",
+        "aiDictateStop": "Stop dictation",
+        "generate": "Generate",
+        "avatarUpload": "Upload image",
+        "avatarRemove": "Remove",
+        "nameLabel": "Name",
+        "roleLabel": "Role",
+        "rolePlaceholder": "Short description shown on the card (optional)",
+        "promptLabel": "Instructions (system prompt)",
+        "responseLength": {
+          "label": "Response length",
+          "hint": "How long this profile's replies run. \"Inherit\" follows your global Assistant setting.",
+          "options": {
+            "inherit": "Inherit global",
+            "short": "Short",
+            "medium": "Medium",
+            "long": "Long"
+          }
+        },
+        "greetingLabel": "Greeting (optional)",
+        "greetingPlaceholder": "Optional opening line shown in an empty chat",
+        "catNote": "The Cat ignores the AI entirely — it just meows. Nothing to configure here.",
+        "duplicate": "Duplicate",
+        "export": "Export",
+        "restoreDefault": "Restore default",
+        "restoreBuiltins": "Restore built-ins",
+        "moreActions": "More actions",
+        "expand": "Expand",
+        "collapse": "Collapse",
+        "delete": "Delete",
+        "deleteConfirm": "Delete this profile? This can't be undone.",
+        "emptyState": "No profiles yet. Create your first one to give the assistant a personality."
+      },
+      "behavior": {
+        "title": "Behavior"
+      },
+      "memory": {
+        "label": "Conversation memory",
+        "description": "How many recent messages are sent as context each turn. 0 disables memory."
+      },
+      "responseLength": {
+        "label": "Response length",
+        "description": "Preferred reply length. \"No effect\" leaves your prompt untouched.",
+        "options": {
+          "default": "No effect",
+          "short": "Short",
+          "medium": "Medium",
+          "long": "Long"
         }
+      },
+      "vision": {
+        "title": "Screen vision",
+        "enableLabel": "Allow screen vision",
+        "enableDescription": "Let the assistant see your screen when you ask about it. Requires a vision-capable model.",
+        "timing": {
+          "label": "When to capture",
+          "description": "For voice questions: capture the moment you start asking, or wait until the message is sent. Typed messages always capture on send.",
+          "options": {
+            "immediate": "When I ask",
+            "on_send": "When the message sends"
+          }
+        }
+      },
+      "webSearch": {
+        "title": "Web search",
+        "enableLabel": "Allow web search",
+        "enableDescription": "Let the assistant search the web when a question needs current information.",
+        "openRouterNativeLabel": "Use OpenRouter's built-in search",
+        "openRouterNativeDescription": "When on, OpenRouter runs the search itself (its :online mode) using your OpenRouter credits. When off, the app searches with your search provider below.",
+        "providerLabel": "Search provider",
+        "providerDescription": "Serper is a good default. Every provider has a free tier.",
+        "providers": {
+          "serper": "Serper (Google, fast)",
+          "brave": "Brave Search",
+          "tavily": "Tavily (AI search)",
+          "exa": "Exa (neural)",
+          "serpapi": "SerpAPI (Google)"
+        },
+        "apiKeyLabel": "API key",
+        "apiKeyDescription": "Key for the selected search provider.",
+        "apiKeyPlaceholder": "Enter API key…",
+        "fetchContentLabel": "Read full pages (best quality)",
+        "fetchContentDescription": "Read the full text of each result instead of snippets. Better answers, but slower.",
+        "maxResultsLabel": "Sources to use",
+        "maxResultsDescription": "How many results to read (1–10).",
+        "depthLabel": "Search depth",
+        "depthDescription": "Quick for simple facts, Standard for most questions, Deep for hard ones.",
+        "depthOptions": {
+          "low": "Quick",
+          "medium": "Standard",
+          "high": "Deep"
+        },
+        "localSmartLabel": "Smart search decisions (local model)",
+        "localSmartDescription": "Let the local model decide when to search. Off uses a fast keyword check instead.",
+        "creditBudgetLabel": "Daily Firecrawl credit limit",
+        "creditBudgetDescription": "Daily cap on Firecrawl credits before search pauses. 0 = no limit.",
+        "testLabel": "Test search",
+        "testDescription": "Run a sample search with the current provider and key.",
+        "testButton": "Test search",
+        "testing": "Searching…",
+        "testResult": "Got {{count}} results."
+      },
+      "tts": {
+        "title": "Voice output",
+        "enableLabel": "Speak responses aloud",
+        "enableDescription": "Read the assistant's replies out loud.",
+        "stopOnDictationLabel": "Stop speech when dictation starts",
+        "stopOnDictationDescription": "Stop any reply that's still playing when you start dictating.",
+        "engineLabel": "Engine",
+        "engineDescription": "Kokoro runs locally for free. The other engines use your API key.",
+        "kokoroSetupLabel": "Kokoro voice model",
+        "kokoroSetupDescription": "Download it once, then spoken replies run privately on this device.",
+        "kokoroDownload": "Download Kokoro",
+        "kokoroDownloading": "Downloading Kokoro",
+        "kokoroReady": "Ready on this device",
+        "kokoroRetry": "Try download again",
+        "engines": {
+          "kokoro": "Kokoro (local, free)",
+          "openai": "OpenAI-compatible",
+          "openrouter": "OpenRouter",
+          "elevenlabs": "ElevenLabs",
+          "azure": "Azure AI Speech"
+        },
+        "voiceLabel": "Voice",
+        "voiceDescription": "Kokoro voice for spoken replies.",
+        "dtypeLabel": "Kokoro precision",
+        "dtypeDescription": "fp32 is highest quality; q8 is faster on CPU. Changing this reloads the model.",
+        "speedLabel": "Playback speed",
+        "speedDescription": "1× is normal. ElevenLabs supports 0.7×–1.2× only.",
+        "speedValue": "{{value}}×",
+        "speedCustomLabel": "Custom playback speed",
+        "testLabel": "Test voice",
+        "testDescription": "Play a short sample with the current settings.",
+        "testButton": "Test voice",
+        "testing": "Testing…",
+        "testOk": "Played ✓",
+        "testPhrase": "Hi! This is a test of SpeakoFlow's voice output.",
+        "downloadStart": "Downloading Kokoro voice…",
+        "downloadProgress": "Downloading Kokoro voice… {{progress}}%",
+        "downloadReady": "Kokoro voice ready ✓",
+        "downloadError": "Couldn't download the Kokoro voice model",
+        "baseUrlLabel": "Base URL",
+        "baseUrlDescription": "OpenAI-compatible TTS URL. A base URL or a full /audio/speech URL both work.",
+        "azureBaseUrlLabel": "Speech URL",
+        "azureBaseUrlDescription": "Your Azure Speech URL from the portal, e.g. https://eastus2.tts.speech.microsoft.com.",
+        "apiKeyLabel": "API key",
+        "apiKeyDescription": "Separate from the assistant's key.",
+        "modelLabel": "Model",
+        "modelDescription": "Model or deployment name, e.g. gpt-4o-mini-tts (OpenAI/Azure) or eleven_flash_v2_5 (ElevenLabs).",
+        "remoteVoiceLabel": "Voice name",
+        "remoteVoiceDescription": "Voice for OpenAI-compatible TTS, e.g. alloy, echo, nova, shimmer.",
+        "azureVoiceLabel": "Voice name",
+        "azureVoiceDescription": "Azure voice name, e.g. en-US-JennyNeural. Click Load voices to browse.",
+        "loadVoices": "Load voices",
+        "voicesLoading": "Loading…",
+        "voicesPick": "Pick from {{count}} voices…",
+        "loadModels": "Load models",
+        "modelsLoading": "Loading…",
+        "modelsPick": "Pick from {{count}} models…",
+        "modelsUse": "Use \"{{model}}\"",
+        "voicesUse": "Use \"{{voice}}\"",
+        "elevenVoiceLabel": "Voice ID",
+        "elevenVoiceDescription": "ElevenLabs voice ID (from the Voices tab in their dashboard).",
+        "promptLabel": "Summary Prompt",
+        "promptDescription": "Instructions for generating the brief spoken summary of each answer."
+      },
+      "appearance": {
+        "title": "Panel appearance",
+        "previewLabel": "Preview",
+        "previewDescription": "Live preview of the panel with your text size and opacity.",
+        "previewUser": "Hey, what can you do?",
+        "previewAssistant": "Lots! Ask me anything — I can even look at your screen.",
+        "fontSizeLabel": "Text size",
+        "fontSizeDescription": "Size of the chat text in the assistant panel.",
+        "fontSizes": {
+          "small": "Small",
+          "medium": "Medium",
+          "large": "Large"
+        },
+        "panelSizeLabel": "Panel size",
+        "panelSizeDescription": "Overall size of the floating assistant panel. You can also drag its edges to resize.",
+        "panelSizes": {
+          "compact": "Compact",
+          "standard": "Standard",
+          "large": "Large"
+        },
+        "opacityLabel": "Panel opacity",
+        "opacityDescription": "How opaque the floating panel is. 100% is fully solid; lower values let the desktop blur through."
       }
     }
   },
@@ -571,6 +1287,9 @@
     "installing": "설치 중...",
     "preparing": "준비 중...",
     "checkForUpdates": "업데이트 확인",
+    "checkFailed": "Update check failed",
+    "updateFailed": "Update failed",
+    "clickToRetry": "Click to try again",
     "portableUpdateTitle": "Manual update required",
     "portableUpdateMessage": "Portable installs cannot be updated automatically. To update: download the latest NSIS installer from GitHub Releases, install it to the same folder, then copy your Data/ folder (settings, models, recordings) from the old version to the new one.",
     "portableUpdateButton": "Open GitHub Releases"
@@ -596,6 +1315,7 @@
     "yes": "예",
     "no": "아니오",
     "noOptionsFound": "옵션을 찾을 수 없습니다",
+    "back": "Back",
     "showAdvanced": "추가 옵션",
     "showLess": "간략히 보기"
   },
@@ -619,6 +1339,7 @@
     "recordingFailed": "녹음을 시작하지 못했습니다: {{error}}",
     "modelLoadFailed": "모델을 불러오지 못했습니다: {{model}}",
     "modelLoadFailedUnknown": "알 수 없는 모델",
+    "downloadFailedTitle": "Download failed",
     "pasteFailedTitle": "텍스트 붙여넣기 실패",
     "pasteFailed": "활성 애플리케이션에 텍스트를 붙여넣을 수 없습니다."
   },
@@ -627,7 +1348,117 @@
     "description": "SpeakoFlow 인터페이스의 언어를 변경하세요"
   },
   "overlay": {
+    "preparing": "Getting mic ready…",
+    "recording": "Recording",
     "transcribing": "텍스트로 변환 중...",
-    "processing": "처리 중..."
+    "processing": "처리 중...",
+    "listening": "Listening…",
+    "locked": "Recording hands-free — press the hotkey again to stop",
+    "cancel": "Cancel",
+    "done": "Done",
+    "askAssistant": "Ask the assistant instead of typing this"
+  },
+  "assistant": {
+    "title": "Assistant",
+    "character": {
+      "switch": "Switch persona"
+    },
+    "empty": "Ask by voice with your assistant shortcut,\nor type below.",
+    "inputPlaceholder": "Message…",
+    "inputPlaceholderScreen": "Ask about your screen…",
+    "send": "Send",
+    "stop": "Stop",
+    "finish": "Finish & send",
+    "clear": "Clear conversation",
+    "hide": "Hide panel",
+    "copy": "Copy",
+    "copyCode": "Copy code",
+    "regenerate": "Regenerate answer (the old one stays in History)",
+    "screenAttached": "Screen",
+    "attachScreen": "Screen vision — attach your screen to each message until turned off",
+    "detachScreen": "Turn off screen vision",
+    "attach": {
+      "file": "Attach an image or file",
+      "snip": "Snip a region of the screen",
+      "image": "Image",
+      "imageCount": "{{count}} image",
+      "imageCount_other": "{{count}} images",
+      "remove": "Remove attachment",
+      "dropHint": "Drop to attach"
+    },
+    "snip": {
+      "hint": "Drag to snip a region — Esc to cancel"
+    },
+    "webSearch": {
+      "enable": "Enable web search",
+      "disable": "Disable web search"
+    },
+    "tts": {
+      "enable": "Enable voice summaries",
+      "disable": "Disable voice summaries",
+      "loading": "Loading Kokoro voice model...",
+      "loadingShort": "Voice model {{progress}}%"
+    },
+    "pill": {
+      "talk": "Click to talk",
+      "stop": "Stop and send",
+      "idle": "Assistant",
+      "expand": "Expand panel",
+      "collapse": "Collapse to pill",
+      "close": "Close assistant",
+      "cancel": "Cancel without sending",
+      "cancelTurn": "Cancel",
+      "dismiss": "Dismiss",
+      "disarmScreen": "Screen vision is on — click to turn it off",
+      "armScreen": "Screen vision is off — click to turn it on"
+    },
+    "status": {
+      "listening": "Listening…",
+      "locked": "Listening",
+      "transcribing": "Transcribing…",
+      "searching": "Searching the web...",
+      "thinking": "Thinking...",
+      "speaking": "Speaking..."
+    },
+    "errors": {
+      "generic": "Something went wrong. Please try again.",
+      "genericShort": "Something went wrong",
+      "no_provider": "No assistant model is set up yet. Pick a provider in Settings → Assistant.",
+      "no_providerShort": "No model set up",
+      "no_model": "Your provider has no model selected. Choose one in Settings → Assistant.",
+      "no_modelShort": "No model selected",
+      "engine_start": "The built-in model couldn't start. Try again, or pick a different model in Settings → Assistant.",
+      "engine_startShort": "Model couldn't start",
+      "provider": "The model couldn't answer. Check your API key and connection, then try again.",
+      "providerShort": "Couldn't get an answer",
+      "vision_unsupported": "This model can't read your screen. Pick a vision-capable model in Settings → Assistant, or ask again without screen vision.",
+      "vision_unsupportedShort": "Model can't see images",
+      "screenshot_too_large": "The screen capture was too large for this provider. Please try again — it will be compressed harder.",
+      "screenshot_too_largeShort": "Screen capture too large",
+      "screen_capture": "Couldn't capture the screen. Try again, or ask without screen vision.",
+      "screen_captureShort": "Screen capture failed",
+      "transcription": "Couldn't transcribe your voice. Please try speaking again.",
+      "transcriptionShort": "Transcription failed",
+      "tts": "The spoken reply failed. Check your TTS settings, or read the answer in the panel.",
+      "ttsShort": "Voice reply failed",
+      "tts_local": "The local voice couldn't load. Check your connection or switch TTS engines in Settings.",
+      "tts_localShort": "Voice couldn't load",
+      "tts_blocked": "Your system blocked the voice from playing on its own. Click anywhere in the panel to hear the reply.",
+      "tts_blockedShort": "Tap the panel to hear it",
+      "tts_playback": "Couldn't play the voice on your output device. Check your speaker/output settings, then try again.",
+      "tts_playbackShort": "Voice playback failed",
+      "mic_denied": "Microphone access is blocked. Allow it in your system privacy settings.",
+      "mic_deniedShort": "Mic access blocked",
+      "mic_unavailable": "No microphone was found. Connect one and try again.",
+      "mic_unavailableShort": "No microphone found",
+      "mic_error": "The microphone couldn't start. It may be in use by another app.",
+      "mic_errorShort": "Mic couldn't start",
+      "file_read": "That file couldn't be attached.",
+      "file_readShort": "Couldn't attach file"
+    },
+    "notices": {
+      "web_search_failed": "Web search didn't return results — answering without them.",
+      "web_search_failedShort": "No web results"
+    }
   }
 }

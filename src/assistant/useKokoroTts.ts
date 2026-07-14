@@ -51,6 +51,7 @@ export function useKokoroTts(
   voice: string,
   dtype: string = "fp32",
   speed: number = 1,
+  preload: boolean = true,
 ) {
   const modelRef = useRef<KokoroModel | null>(null);
   const loadingRef = useRef<Promise<KokoroModel> | null>(null);
@@ -74,6 +75,7 @@ export function useKokoroTts(
   const ensureLoaded = useCallback(async (): Promise<KokoroModel> => {
     if (modelRef.current) return modelRef.current;
     if (!loadingRef.current) {
+      setError(null);
       setStatus("loading");
       setProgress(0);
       loadingRef.current = (async () => {
@@ -137,15 +139,17 @@ export function useKokoroTts(
     return loadingRef.current;
   }, []);
 
-  // Preload as soon as TTS is switched on so the first answer speaks fast.
+  // Callers choose whether passive mounting should prepare the model. Settings
+  // disables this and exposes an explicit setup action; the live assistant keeps
+  // it enabled so an actual spoken reply can start promptly.
   useEffect(() => {
-    if (enabled) {
+    if (enabled && preload) {
       ensureLoaded().catch(() => {});
-    } else {
+    } else if (!enabled) {
       setError(null);
       setStatus((s) => (s === "speaking" || s === "ready" ? "off" : s));
     }
-  }, [enabled, ensureLoaded]);
+  }, [enabled, preload, ensureLoaded]);
 
   const stop = useCallback(() => {
     generationRef.current += 1; // invalidate in-flight generation
@@ -168,10 +172,10 @@ export function useKokoroTts(
     modelRef.current = null;
     loadingRef.current = null;
     setStatus("off");
-    if (enabled) {
+    if (enabled && preload) {
       ensureLoaded().catch(() => {});
     }
-  }, [dtype, enabled, ensureLoaded, stop]);
+  }, [dtype, enabled, preload, ensureLoaded, stop]);
 
   /** Play queued blobs back-to-back; exits when queue drains. */
   const pump = useCallback((generation: number) => {
@@ -283,5 +287,13 @@ export function useKokoroTts(
     [enabled, voice, ensureLoaded, stop, pump],
   );
 
-  return { status, progress, error, speak, stop, retry };
+  return {
+    status,
+    progress,
+    error,
+    prepare: ensureLoaded,
+    speak,
+    stop,
+    retry,
+  };
 }

@@ -417,33 +417,45 @@ impl HistoryManager {
         Ok(deleted_count)
     }
 
-    fn cleanup_by_count(&self, limit: usize) -> Result<()> {
-        let conn = self.get_connection()?;
-
-        // Get all entries that are not saved, ordered by timestamp desc
+    fn entries_beyond_unsaved_limit(conn: &Connection, limit: usize) -> Result<Vec<(i64, String)>> {
         let mut stmt = conn.prepare(
-            "SELECT id, file_name FROM transcription_history WHERE saved = 0 ORDER BY timestamp DESC"
+            "SELECT id, file_name
+             FROM transcription_history
+             WHERE saved = 0
+             ORDER BY timestamp DESC, id DESC",
         )?;
-
         let rows = stmt.query_map([], |row| {
             Ok((row.get::<_, i64>("id")?, row.get::<_, String>("file_name")?))
         })?;
+        let entries = rows.collect::<std::result::Result<Vec<_>, _>>()?;
+        Ok(entries.into_iter().skip(limit).collect())
+    }
 
-        let mut entries: Vec<(i64, String)> = Vec::new();
-        for row in rows {
-            entries.push(row?);
-        }
+    fn cleanup_by_count(&self, limit: usize) -> Result<()> {
+        let conn = self.get_connection()?;
+        let entries_to_delete = Self::entries_beyond_unsaved_limit(&conn, limit)?;
+        let deleted_count = self.delete_entries_and_files(&entries_to_delete)?;
 
-        if entries.len() > limit {
-            let entries_to_delete = &entries[limit..];
-            let deleted_count = self.delete_entries_and_files(entries_to_delete)?;
-
-            if deleted_count > 0 {
-                debug!("Cleaned up {} old history entries by count", deleted_count);
-            }
+        if deleted_count > 0 {
+            debug!("Cleaned up {} old history entries by count", deleted_count);
         }
 
         Ok(())
+    }
+
+    fn unsaved_entries_before(
+        conn: &Connection,
+        cutoff_timestamp: i64,
+    ) -> Result<Vec<(i64, String)>> {
+        let mut stmt = conn.prepare(
+            "SELECT id, file_name
+             FROM transcription_history
+             WHERE saved = 0 AND timestamp < ?1",
+        )?;
+        let rows = stmt.query_map(params![cutoff_timestamp], |row| {
+            Ok((row.get::<_, i64>("id")?, row.get::<_, String>("file_name")?))
+        })?;
+        Ok(rows.collect::<std::result::Result<Vec<_>, _>>()?)
     }
 
     fn cleanup_by_time(
@@ -461,20 +473,7 @@ impl HistoryManager {
             _ => unreachable!("Should not reach here"),
         };
 
-        // Get all unsaved entries older than the cutoff timestamp
-        let mut stmt = conn.prepare(
-            "SELECT id, file_name FROM transcription_history WHERE saved = 0 AND timestamp < ?1",
-        )?;
-
-        let rows = stmt.query_map(params![cutoff_timestamp], |row| {
-            Ok((row.get::<_, i64>("id")?, row.get::<_, String>("file_name")?))
-        })?;
-
-        let mut entries_to_delete: Vec<(i64, String)> = Vec::new();
-        for row in rows {
-            entries_to_delete.push(row?);
-        }
-
+        let entries_to_delete = Self::unsaved_entries_before(&conn, cutoff_timestamp)?;
         let deleted_count = self.delete_entries_and_files(&entries_to_delete)?;
 
         if deleted_count > 0 {
@@ -981,5 +980,49 @@ mod tests {
 
         assert_eq!(entry.timestamp, 100);
         assert_eq!(entry.transcription_text, "completed");
+    }
+
+    #[test]
+    fn count_retention_keeps_starred_recordings() {
+        let conn = setup_conn();
+        insert_entry(&conn, 100, "oldest", None);
+        insert_entry(&conn, 200, "middle", None);
+        insert_entry(&conn, 300, "newest", None);
+        insert_entry(&conn, 50, "starred oldest", None);
+        conn.execute(
+            "UPDATE transcription_history SET saved = 1 WHERE timestamp = 50",
+            [],
+        )
+        .expect("star recording");
+
+        let selected = HistoryManager::entries_beyond_unsaved_limit(&conn, 1)
+            .expect("select count-retention entries");
+        let selected_files: Vec<&str> = selected.iter().map(|(_, name)| name.as_str()).collect();
+
+        assert_eq!(
+            selected_files,
+            vec!["speakoflow-200.wav", "speakoflow-100.wav"]
+        );
+        assert!(!selected_files.contains(&"speakoflow-50.wav"));
+    }
+
+    #[test]
+    fn time_retention_keeps_starred_recordings() {
+        let conn = setup_conn();
+        insert_entry(&conn, 100, "old unsaved", None);
+        insert_entry(&conn, 50, "old starred", None);
+        insert_entry(&conn, 300, "new unsaved", None);
+        conn.execute(
+            "UPDATE transcription_history SET saved = 1 WHERE timestamp = 50",
+            [],
+        )
+        .expect("star recording");
+
+        let selected = HistoryManager::unsaved_entries_before(&conn, 200)
+            .expect("select time-retention entries");
+        let selected_files: Vec<&str> = selected.iter().map(|(_, name)| name.as_str()).collect();
+
+        assert_eq!(selected_files, vec!["speakoflow-100.wav"]);
+        assert!(!selected_files.contains(&"speakoflow-50.wav"));
     }
 }

@@ -1,6 +1,6 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
-import { Loader2 } from "lucide-react";
+import { Download, Loader2 } from "lucide-react";
 import Badge from "../ui/Badge";
 import { TONE_TILE_VIVID, type SettingTone } from "../ui/tones";
 
@@ -42,6 +42,8 @@ interface WelcomeChoiceCardProps {
   phase?: WelcomeCardPhase;
   /** 0–100 download percentage (only meaningful while `phase` is "downloading"). */
   progress?: number;
+  /** Visible whole-card action cue, such as "Download model". */
+  actionLabel?: string;
   onClick: () => void;
 }
 
@@ -65,6 +67,7 @@ const WelcomeChoiceCard: React.FC<WelcomeChoiceCardProps> = ({
   disabled = false,
   phase = "idle",
   progress,
+  actionLabel,
   onClick,
 }) => {
   const { t } = useTranslation();
@@ -160,6 +163,12 @@ const WelcomeChoiceCard: React.FC<WelcomeChoiceCardProps> = ({
             )}
             {sizeLabel && (
               <span className="ms-auto tabular-nums">{sizeLabel}</span>
+            )}
+            {actionLabel && (
+              <span className="inline-flex items-center gap-1 font-medium text-accent">
+                <Download className="h-3.5 w-3.5" aria-hidden="true" />
+                {actionLabel}
+              </span>
             )}
           </div>
         )

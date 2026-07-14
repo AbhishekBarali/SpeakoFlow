@@ -378,7 +378,7 @@ pub fn set_assistant_font_size(app: AppHandle, size: String) -> Result<(), Strin
 pub fn set_assistant_tts_engine(app: AppHandle, engine: String) -> Result<(), String> {
     if !matches!(
         engine.as_str(),
-        "kokoro" | "openai" | "elevenlabs" | "azure"
+        "kokoro" | "openai" | "openrouter" | "elevenlabs" | "azure"
     ) {
         return Err(format!("Unknown TTS engine: {}", engine));
     }

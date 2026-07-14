@@ -24,9 +24,7 @@ export const RecordingRetentionPeriodSelector: React.FC<RecordingRetentionPeriod
         "recording_retention_period",
         period as RecordingRetentionPeriod,
       );
-      // Cleanup is deferred to the next app start, so tell the user their
-      // choice was saved and won't act instantly.
-      toast.success(t("settings.debug.recordingRetention.savedToast"));
+      toast.success(t("settings.debug.recordingRetention.appliedToast"));
     };
 
     const retentionOptions = [

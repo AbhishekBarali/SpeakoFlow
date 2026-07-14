@@ -639,26 +639,56 @@ pub async fn list_tts_voices(settings: &AppSettings) -> Result<Vec<TtsVoice>, St
     }
 }
 
-/// OpenAI-compatible voices. Local servers (Kokoro-FastAPI, openai-edge-tts)
-/// expose `GET {base}/audio/voices`; OpenAI proper does not, so we fall back to
-/// the known built-in voice set. Never errors — a failed lookup degrades to the
-/// built-in list so the picker is always usable.
-async fn list_openai_tts_voices(settings: &AppSettings) -> Result<Vec<TtsVoice>, String> {
-    let builtin = || -> Vec<TtsVoice> {
-        OPENAI_TTS_VOICES
-            .iter()
-            .map(|v| TtsVoice {
-                id: v.to_string(),
-                label: v.to_string(),
-            })
-            .collect()
-    };
+/// xAI Grok Voice TTS built-in voices. Grok's `/audio/speech` route rejects
+/// OpenAI voice names, so offering `alloy`/`verse` here would only 404 — these
+/// are the five voices it actually accepts.
+const GROK_TTS_VOICES: &[&str] = &["Eve", "Ara", "Rex", "Sal", "Leo"];
 
-    let raw = settings.assistant_tts_base_url.trim();
-    if raw.is_empty() || raw.contains("api.openai.com") {
-        return Ok(builtin());
+/// Turn a slice of voice tokens into pickable [`TtsVoice`]s (id == label).
+fn voices_from(names: &[&str]) -> Vec<TtsVoice> {
+    names
+        .iter()
+        .map(|v| TtsVoice {
+            id: v.to_string(),
+            label: v.to_string(),
+        })
+        .collect()
+}
+
+/// Best-effort curated voice set for hosted OpenAI-compatible providers that
+/// don't publish a `/audio/voices` listing, chosen by the selected MODEL rather
+/// than a blanket OpenAI default.
+///
+/// This is what stops the picker from always showing OpenAI's `alloy…verse` for
+/// every model: those names are only valid on OpenAI speech models and 404 on a
+/// non-OpenAI model (Grok, Gemini, MAI-Voice, …). Returns `None` when the
+/// model/provider isn't recognized so the caller can guide the user to type the
+/// model's own voice instead of guessing.
+fn curated_tts_voices(model: &str, base_url: &str) -> Option<Vec<TtsVoice>> {
+    let m = model.to_ascii_lowercase();
+    let url = base_url.to_ascii_lowercase();
+
+    // xAI Grok Voice TTS — five named voices (e.g. `x-ai/grok-voice-tts-1.0`).
+    if m.contains("grok") {
+        return Some(voices_from(GROK_TTS_VOICES));
     }
+    // OpenAI speech models (`openai/gpt-4o-mini-tts…`, bare `gpt-4o-mini-tts`,
+    // `tts-1`, `tts-1-hd`) or OpenAI's own endpoint use the standard voice set.
+    let is_openai_model = m.starts_with("openai/")
+        || m.starts_with("gpt-")
+        || m.starts_with("tts-1")
+        || (m.contains("gpt") && m.contains("tts"));
+    if is_openai_model || url.contains("api.openai.com") {
+        return Some(voices_from(OPENAI_TTS_VOICES));
+    }
+    None
+}
 
+/// GET `{base}/audio/voices` for local OpenAI-compatible servers (Kokoro-FastAPI,
+/// openai-edge-tts) that expose a real voice list. Returns the parsed voices, or
+/// `None` when the endpoint has no such route / the request fails (the caller
+/// then falls back to a curated set).
+async fn fetch_openai_audio_voices(settings: &AppSettings, raw: &str) -> Option<Vec<TtsVoice>> {
     // Derive an `/audio/voices` URL from the configured base (which may already
     // point straight at `/audio/speech`, possibly with a query string).
     let base = raw.trim_end_matches('/');
@@ -667,7 +697,7 @@ async fn list_openai_tts_voices(settings: &AppSettings) -> Result<Vec<TtsVoice>,
         None => format!("{}/audio/voices", base),
     };
 
-    let client = tts_client()?;
+    let client = tts_client().ok()?;
     let mut req = client.get(&voices_url);
     let api_key = settings.assistant_tts_api_key.0.trim();
     if !api_key.is_empty() {
@@ -676,12 +706,9 @@ async fn list_openai_tts_voices(settings: &AppSettings) -> Result<Vec<TtsVoice>,
 
     let resp = match req.send().await {
         Ok(r) if r.status().is_success() => r,
-        _ => return Ok(builtin()),
+        _ => return None,
     };
-    let value: serde_json::Value = match resp.json().await {
-        Ok(v) => v,
-        Err(_) => return Ok(builtin()),
-    };
+    let value: serde_json::Value = resp.json().await.ok()?;
 
     // Accept several shapes: {voices:[...]} / {data:[...]} / top-level array,
     // where each item is a bare string or an object with an id/name.
@@ -717,11 +744,47 @@ async fn list_openai_tts_voices(settings: &AppSettings) -> Result<Vec<TtsVoice>,
             }
         }
     }
+    Some(voices)
+}
 
-    if voices.is_empty() {
-        return Ok(builtin());
+/// Voices for the OpenAI-compatible / OpenRouter engine, chosen by the selected
+/// MODEL so the picker never misleads with OpenAI's voices under a non-OpenAI
+/// model (the root of "the voice name is the same for every model").
+///
+/// Order of preference:
+/// 1. A local server's own `GET {base}/audio/voices` list, when present.
+/// 2. A curated set keyed by the selected model / provider (OpenAI, Grok).
+/// 3. An informative error so the user types the model's own voice — the field
+///    is free-text, so an unrecognized model is never a dead end.
+async fn list_openai_tts_voices(settings: &AppSettings) -> Result<Vec<TtsVoice>, String> {
+    let raw = settings.assistant_tts_base_url.trim();
+    let model = settings.assistant_tts_model.trim();
+
+    // Hosted providers (OpenAI, OpenRouter) don't expose `/audio/voices`, so
+    // skip the probe and go straight to a model-aware curated set. Only local /
+    // custom OpenAI-compatible servers are probed for their real list.
+    let is_hosted =
+        raw.is_empty() || raw.contains("api.openai.com") || raw.contains("openrouter.ai");
+
+    if !is_hosted {
+        if let Some(voices) = fetch_openai_audio_voices(settings, raw).await {
+            if !voices.is_empty() {
+                return Ok(voices);
+            }
+        }
     }
-    Ok(voices)
+
+    if let Some(voices) = curated_tts_voices(model, raw) {
+        return Ok(voices);
+    }
+
+    Err(
+        "Voices vary by model, and this provider doesn't publish a list. \
+         Type the voice from the model's page — e.g. Grok TTS uses \
+         Eve/Ara/Rex/Sal/Leo, OpenAI models use alloy/echo/nova/…, and Gemini \
+         and MAI-Voice models each have their own set."
+            .to_string(),
+    )
 }
 
 /// ElevenLabs voices via `GET /v2/voices` (auth `xi-api-key`).
@@ -1284,6 +1347,43 @@ mod tests {
         assert_eq!(&wav[36..40], b"data");
         assert_eq!(u32::from_le_bytes([wav[40], wav[41], wav[42], wav[43]]), 4);
         assert_eq!(&wav[44..], &pcm);
+    }
+
+    #[test]
+    fn curated_tts_voices_are_model_aware() {
+        use super::curated_tts_voices;
+        let ids = |v: Vec<super::TtsVoice>| v.into_iter().map(|x| x.id).collect::<Vec<_>>();
+
+        // Grok model → Grok's own voices, never OpenAI's.
+        let grok = ids(curated_tts_voices(
+            "x-ai/grok-voice-tts-1.0",
+            "https://openrouter.ai/api/v1",
+        )
+        .unwrap());
+        assert!(grok.contains(&"Eve".to_string()));
+        assert!(!grok.contains(&"alloy".to_string()));
+
+        // OpenAI model on OpenRouter → OpenAI voice set.
+        let oai = ids(curated_tts_voices(
+            "openai/gpt-4o-mini-tts-2025-12-15",
+            "https://openrouter.ai/api/v1",
+        )
+        .unwrap());
+        assert!(oai.contains(&"alloy".to_string()));
+
+        // OpenAI's own endpoint, no model set → OpenAI voice set.
+        assert!(
+            ids(curated_tts_voices("", "https://api.openai.com/v1").unwrap())
+                .contains(&"alloy".to_string())
+        );
+
+        // Unknown model/provider (Gemini) → None, so the caller guides the user
+        // instead of dumping a wrong OpenAI list.
+        assert!(curated_tts_voices(
+            "google/gemini-3.1-flash-tts-preview",
+            "https://openrouter.ai/api/v1"
+        )
+        .is_none());
     }
 
     #[test]

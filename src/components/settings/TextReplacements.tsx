@@ -2,7 +2,14 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { save, open } from "@tauri-apps/plugin-dialog";
-import { Plus, Trash2, ChevronDown, Upload, Download } from "lucide-react";
+import {
+  ArrowRight,
+  Plus,
+  Trash2,
+  ChevronDown,
+  Upload,
+  Download,
+} from "lucide-react";
 import { commands } from "@/bindings";
 import type { Capitalization, Replacement } from "@/bindings";
 import { useSettings } from "../../hooks/useSettings";
@@ -62,7 +69,7 @@ const sanitizeRule = (raw: unknown): Replacement => {
 };
 
 export const TextReplacements: React.FC<TextReplacementsProps> = React.memo(
-  ({ descriptionMode = "tooltip", grouped = false }) => {
+  ({ descriptionMode = "inline", grouped = false }) => {
     const { t } = useTranslation();
     const { getSetting, updateSetting, isUpdating } = useSettings();
 
@@ -71,9 +78,6 @@ export const TextReplacements: React.FC<TextReplacementsProps> = React.memo(
 
     const [rows, setRows] = useState<Row[]>([]);
     const [openRows, setOpenRows] = useState<Record<string, boolean>>({});
-    // The editor (rule list + import/export) collapses by default so enabling
-    // replacements doesn't leave the whole editor sprawled open on the page.
-    const [editorOpen, setEditorOpen] = useState(false);
     const initialized = useRef(false);
     const persistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -144,6 +148,10 @@ export const TextReplacements: React.FC<TextReplacementsProps> = React.memo(
       setOpenRows((prev) => ({ ...prev, [key]: !prev[key] }));
     };
 
+    const handleEnabledChange = (value: boolean) => {
+      void updateSetting("replacements_enabled", value);
+    };
+
     const handleExport = async () => {
       try {
         // Native "save as" dialog so the user picks where the file goes.
@@ -206,78 +214,99 @@ export const TextReplacements: React.FC<TextReplacementsProps> = React.memo(
       <>
         <ToggleSwitch
           checked={enabled}
-          onChange={(value) => updateSetting("replacements_enabled", value)}
+          onChange={handleEnabledChange}
           isUpdating={isUpdating("replacements_enabled")}
           label={t("settings.advanced.textReplacements.title")}
           description={t("settings.advanced.textReplacements.description")}
-          descriptionMode={descriptionMode}
+          info={t("settings.advanced.textReplacements.magicHint")}
+          descriptionMode={grouped ? "tooltip" : descriptionMode}
           grouped={grouped}
         />
 
         {enabled && (
-          <div className="px-4 pb-3">
-            <button
-              type="button"
-              onClick={() => setEditorOpen((o) => !o)}
-              aria-expanded={editorOpen}
-              className="flex w-full items-center justify-between gap-2 py-1.5 text-sm text-muted hover:text-ink transition-colors cursor-pointer"
-            >
-              <span>
-                {t("settings.advanced.textReplacements.manageRules", {
-                  count: rows.length,
-                })}
-              </span>
-              <ChevronDown
-                className={`w-4 h-4 transition-transform duration-200 ${editorOpen ? "rotate-180" : ""}`}
-              />
-            </button>
-            {editorOpen && (
-              <div className="space-y-2 pt-1">
-                {rows.length === 0 && (
-                  <p className="text-sm text-muted py-2">
-                    {t("settings.advanced.textReplacements.empty")}
-                  </p>
-                )}
+          <section
+            aria-label={t("settings.advanced.textReplacements.rulesTitle")}
+            className="px-4 py-3"
+          >
+            <div className="flex items-center gap-1.5">
+              <Button
+                variant="primary-soft"
+                size="sm"
+                onClick={addRow}
+                disabled={isUpdating("text_replacements")}
+              >
+                <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+                {t("settings.advanced.textReplacements.addRule")}
+              </Button>
+              <div className="ms-auto flex items-center gap-0.5">
+                <Button variant="ghost" size="sm" onClick={handleImport}>
+                  <Upload className="h-3.5 w-3.5" aria-hidden="true" />
+                  {t("settings.advanced.textReplacements.import")}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleExport}
+                  disabled={rows.length === 0}
+                >
+                  <Download className="h-3.5 w-3.5" aria-hidden="true" />
+                  {t("settings.advanced.textReplacements.export")}
+                </Button>
+              </div>
+            </div>
 
+            {rows.length > 0 && (
+              <div className="mt-2.5 space-y-2">
                 {rows.map((row, index) => {
                   const open = openRows[row._key] ?? false;
                   return (
                     <div
                       key={row._key}
-                      className={`rounded-xl border border-hairline bg-surface ${row.enabled ? "" : "opacity-60"}`}
+                      className={`overflow-hidden rounded-xl bg-surface-strong ring-1 ring-inset ring-hairline ${row.enabled ? "" : "opacity-60"}`}
                     >
-                      <div className="flex items-center gap-2 p-2">
-                        <Input
-                          type="text"
-                          variant="compact"
-                          className="flex-1 min-w-0"
-                          value={row.search}
-                          onChange={(e) =>
-                            updateRow(index, { search: e.target.value })
-                          }
-                          placeholder={t(
-                            "settings.advanced.textReplacements.searchPlaceholder",
-                          )}
-                          aria-label={t(
-                            "settings.advanced.textReplacements.searchPlaceholder",
-                          )}
+                      <div className="flex items-end gap-2 p-2.5">
+                        <label className="min-w-0 flex-1 space-y-1">
+                          <span className="block text-[11px] font-medium leading-none text-muted">
+                            {t(
+                              "settings.advanced.textReplacements.searchLabel",
+                            )}
+                          </span>
+                          <Input
+                            type="text"
+                            variant="compact"
+                            className="w-full"
+                            value={row.search}
+                            onChange={(e) =>
+                              updateRow(index, { search: e.target.value })
+                            }
+                            placeholder={t(
+                              "settings.advanced.textReplacements.searchPlaceholder",
+                            )}
+                          />
+                        </label>
+                        <ArrowRight
+                          className="mb-2 h-4 w-4 shrink-0 text-muted-soft"
+                          aria-hidden="true"
                         />
-                        <span className="text-muted-soft shrink-0">→</span>
-                        <Input
-                          type="text"
-                          variant="compact"
-                          className="flex-1 min-w-0"
-                          value={row.replace}
-                          onChange={(e) =>
-                            updateRow(index, { replace: e.target.value })
-                          }
-                          placeholder={t(
-                            "settings.advanced.textReplacements.replacePlaceholder",
-                          )}
-                          aria-label={t(
-                            "settings.advanced.textReplacements.replacePlaceholder",
-                          )}
-                        />
+                        <label className="min-w-0 flex-1 space-y-1">
+                          <span className="block text-[11px] font-medium leading-none text-muted">
+                            {t(
+                              "settings.advanced.textReplacements.replaceLabel",
+                            )}
+                          </span>
+                          <Input
+                            type="text"
+                            variant="compact"
+                            className="w-full"
+                            value={row.replace}
+                            onChange={(e) =>
+                              updateRow(index, { replace: e.target.value })
+                            }
+                            placeholder={t(
+                              "settings.advanced.textReplacements.replacePlaceholder",
+                            )}
+                          />
+                        </label>
                         <button
                           type="button"
                           aria-expanded={open}
@@ -285,10 +314,10 @@ export const TextReplacements: React.FC<TextReplacementsProps> = React.memo(
                             "settings.advanced.textReplacements.advanced",
                           )}
                           onClick={() => toggleAdvanced(row._key)}
-                          className="shrink-0 p-1.5 text-muted hover:text-ink transition-colors cursor-pointer"
+                          className="mb-0.5 shrink-0 cursor-pointer rounded-md p-1.5 text-muted transition-colors hover:bg-ink/5 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
                         >
                           <ChevronDown
-                            className={`w-4 h-4 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+                            className={`h-4 w-4 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
                           />
                         </button>
                         <button
@@ -297,15 +326,15 @@ export const TextReplacements: React.FC<TextReplacementsProps> = React.memo(
                             "settings.advanced.textReplacements.remove",
                           )}
                           onClick={() => removeRow(index)}
-                          className="shrink-0 p-1.5 text-muted hover:text-error transition-colors cursor-pointer"
+                          className="mb-0.5 shrink-0 cursor-pointer rounded-md p-1.5 text-muted transition-colors hover:bg-error/10 hover:text-error focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error/60"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Trash2 className="h-4 w-4" />
                         </button>
                       </div>
 
                       {open && (
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-3 pb-3 pt-1 border-t border-hairline text-sm text-muted">
-                          <label className="inline-flex items-center gap-1.5 cursor-pointer">
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-hairline px-3 py-2.5 text-xs text-muted">
+                          <label className="inline-flex cursor-pointer items-center gap-1.5">
                             <input
                               type="checkbox"
                               className={checkboxClass}
@@ -320,7 +349,7 @@ export const TextReplacements: React.FC<TextReplacementsProps> = React.memo(
                             />
                             {t("settings.advanced.textReplacements.regex")}
                           </label>
-                          <label className="inline-flex items-center gap-1.5 cursor-pointer">
+                          <label className="inline-flex cursor-pointer items-center gap-1.5">
                             <input
                               type="checkbox"
                               className={checkboxClass}
@@ -335,7 +364,7 @@ export const TextReplacements: React.FC<TextReplacementsProps> = React.memo(
                             />
                             {t("settings.advanced.textReplacements.trimBefore")}
                           </label>
-                          <label className="inline-flex items-center gap-1.5 cursor-pointer">
+                          <label className="inline-flex cursor-pointer items-center gap-1.5">
                             <input
                               type="checkbox"
                               className={checkboxClass}
@@ -357,7 +386,7 @@ export const TextReplacements: React.FC<TextReplacementsProps> = React.memo(
                               )}
                             </span>
                             <select
-                              className="text-sm bg-surface border border-hairline-strong rounded-lg px-2 py-1 text-ink focus:outline-none focus:border-ink cursor-pointer"
+                              className="cursor-pointer rounded-lg border border-hairline-strong bg-surface px-2 py-1 text-xs text-ink focus:border-accent focus:outline-none"
                               value={row.capitalization ?? "none"}
                               onChange={(e) =>
                                 updateRow(
@@ -379,7 +408,7 @@ export const TextReplacements: React.FC<TextReplacementsProps> = React.memo(
                               ))}
                             </select>
                           </label>
-                          <label className="inline-flex items-center gap-1.5 cursor-pointer ml-auto">
+                          <label className="ms-auto inline-flex cursor-pointer items-center gap-1.5">
                             <input
                               type="checkbox"
                               className={checkboxClass}
@@ -401,35 +430,9 @@ export const TextReplacements: React.FC<TextReplacementsProps> = React.memo(
                     </div>
                   );
                 })}
-
-                <p className="text-xs text-muted-soft pt-1">
-                  {t("settings.advanced.textReplacements.magicHint")}
-                </p>
-
-                <div className="flex items-center gap-2 pt-1">
-                  <Button variant="secondary" size="sm" onClick={addRow}>
-                    <Plus className="w-3.5 h-3.5" />
-                    {t("settings.advanced.textReplacements.addRule")}
-                  </Button>
-                  <div className="ml-auto flex items-center gap-2">
-                    <Button variant="ghost" size="sm" onClick={handleImport}>
-                      <Upload className="w-3.5 h-3.5" />
-                      {t("settings.advanced.textReplacements.import")}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleExport}
-                      disabled={rows.length === 0}
-                    >
-                      <Download className="w-3.5 h-3.5" />
-                      {t("settings.advanced.textReplacements.export")}
-                    </Button>
-                  </div>
-                </div>
               </div>
             )}
-          </div>
+          </section>
         )}
       </>
     );

@@ -215,6 +215,11 @@ const LlmOnboarding: React.FC<LlmOnboardingProps> = ({ onComplete }) => {
             disabled={hasChosen && chosenId !== model.id}
             phase={phaseFor(model.id)}
             progress={downloadProgress[model.id]?.percentage}
+            actionLabel={
+              model.is_downloaded
+                ? t("onboarding.aiModel.useDownloaded")
+                : t("onboarding.aiModel.download")
+            }
             onClick={() => {
               if (!hasChosen) void handleChoose(model.id);
             }}

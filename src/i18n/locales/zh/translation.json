@@ -1,4 +1,17 @@
 {
+  "appearance": {
+    "title": "Appearance",
+    "description": "Choose a light, dark, or system-matched theme for the app and assistant panel.",
+    "system": "System",
+    "light": "Light",
+    "dark": "Dark",
+    "textSize": "Text size",
+    "textSizeDescription": "Scale the size of text and controls across the app.",
+    "textSizeSmall": "Small",
+    "textSizeDefault": "Default",
+    "textSizeLarge": "Large",
+    "textSizeExtraLarge": "Extra large"
+  },
   "tray": {
     "home": "主页",
     "checkUpdates": "检查更新...",
@@ -10,34 +23,106 @@
   },
   "sidebar": {
     "general": "通用",
-    "models": "模型",
-    "advanced": "高级",
-    "postProcessing": "后处理",
+    "dictation": "Dictation",
+    "assistant": "Assistant",
     "history": "历史记录",
+    "about": "关于",
     "debug": "调试",
-    "about": "关于"
+    "characters": "Profiles",
+    "memory": "Memory",
+    "collapse": "Collapse sidebar",
+    "expand": "Expand sidebar"
+  },
+  "window": {
+    "minimize": "Minimize",
+    "maximize": "Maximize",
+    "restore": "Restore",
+    "close": "Close"
+  },
+  "sectionSubtitles": {
+    "general": "Shortcuts, your microphone, and how the app looks.",
+    "dictation": "The model that turns your voice into text, and how it's cleaned up.",
+    "assistant": "Set up the assistant, then tune its voice, screen vision, and web search.",
+    "history": "Your recent transcriptions and assistant chats, stored on this device.",
+    "about": "Version, app language, data locations, and credits.",
+    "debug": "Diagnostics and developer tools."
   },
   "onboarding": {
+    "subtitle": "请选择一个转录模型以开始使用",
     "steps": {
       "progress": "第 {{current}} 步，共 {{total}} 步",
       "counter": "第 {{current}} 步，共 {{total}} 步 · {{label}}",
       "speechToText": "语音转文字",
-      "aiModel": "AI 模型"
+      "aiModel": "AI 模型",
+      "ready": "You're ready"
     },
     "speechToText": {
       "title": "选择语音转文字模型",
-      "subtitle": "该功能完全在您的设备上运行，将语音转换为文字。请选择适合您电脑的模型——随时可以更改。"
+      "subtitle": "该功能完全在您的设备上运行，将语音转换为文字。请选择适合您电脑的模型——随时可以更改。",
+      "cards": {
+        "fast": {
+          "description": "Blazingly fast, streams as you speak. English only."
+        },
+        "multilingual": {
+          "description": "Real-time in 28 languages."
+        }
+      },
+      "downloadAndContinue": "Download and continue",
+      "seeAllModels": "See all models",
+      "hideAllModels": "Show fewer models",
+      "installedHint": "Already set up. You can grab any other model later in Settings.",
+      "useInstalled": "Use installed model",
+      "continue": "Continue",
+      "downloadingHint": "It downloads in the background. Any other model is one click away in Settings.",
+      "downloadStarted": "Downloading your model in the background."
     },
     "aiModel": {
       "title": "添加本地 AI 模型",
       "subtitle": "为助手、屏幕视觉和转录清理提供支持——完全在您的设备上离线运行。此为可选项；您也可以稍后连接云服务提供商。",
+      "tiers": {
+        "small": {
+          "description": "Runs on any machine. Great for tidying up your writing."
+        },
+        "mid": {
+          "description": "A quick all-rounder that can also answer questions."
+        },
+        "capable": {
+          "description": "The sharpest answers, and it can see your screen."
+        }
+      },
+      "seesScreen": "Sees your screen",
+      "textOnly": "Text only",
+      "download": "Download model",
+      "useDownloaded": "Use downloaded model",
       "skip": "暂时跳过",
       "skipHint": "可选。您可以随时在“设置”中下载模型或连接云服务提供商。",
       "continue": "继续",
       "downloadingHint": "您的模型正在后台下载——您可以立即开始使用应用。",
       "downloadStarted": "正在后台下载您的 AI 模型。"
     },
-    "subtitle": "请选择一个转录模型以开始使用",
+    "ready": {
+      "title": "You're ready.",
+      "subtitle": "Two shortcuts are all you need. Press, talk, done.",
+      "dictateLabel": "Dictate anywhere",
+      "dictateCaption": "Hold, talk, let go. Your words type themselves.",
+      "assistantKeysLabel": "Ask the assistant",
+      "assistantKeysCaption": "Hold and ask. It can even see your screen.",
+      "changeAnytime": "You can change these anytime in Settings.",
+      "hotkeyLabel": "Your dictation keys",
+      "downloadingAssistant": "Your assistant is moving in. {{percentage}}% there.",
+      "downloadingVoice": "Your voice model is landing. {{percentage}}% there.",
+      "downloadingGeneric": "Still downloading. {{percentage}}% there.",
+      "signOff": "That's it. Go say something.",
+      "openApp": "Open SpeakoFlow"
+    },
+    "errors": {
+      "selectModel": "Couldn't select that model. Please try again.",
+      "loadModels": "无法加载可用模型",
+      "downloadModel": "模型下载失败: {{error}}"
+    },
+    "downloadProgress": {
+      "sizeOf": "{{downloaded}} of {{total}} · {{percentage}}%"
+    },
     "recommended": "推荐",
     "download": "下载",
     "downloading": "下载中...",
@@ -48,6 +133,36 @@
       "speed": "速度"
     },
     "models": {
+      "parakeet-unified-en-0.6b-gguf": {
+        "description": "Blazingly fast, great for everyday dictation. English only."
+      },
+      "nemotron-3.5-asr-streaming-0.6b-gguf": {
+        "description": "Real-time transcription in 28 languages."
+      },
+      "canary-180m-flash-gguf": {
+        "description": "Tiny and instant — runs well on any machine."
+      },
+      "cohere-transcribe-03-2026-gguf": {
+        "description": "Slower, but the most accurate. 14 languages."
+      },
+      "whisper-medium-gguf": {
+        "description": "Best for many languages — nearly 100 supported."
+      },
+      "gemma-3-1b": {
+        "description": "Tiny and fast. Text only — great for cleaning up transcripts."
+      },
+      "qwen3.5-2b": {
+        "description": "Small and fast, and it can see images. Good on most laptops."
+      },
+      "qwen3.5-4b": {
+        "description": "Fast, multilingual, and sees images. Needs about 5 GB of RAM."
+      },
+      "gemma-3-4b": {
+        "description": "Google's model. Clean, reliable answers, and it sees images. Needs about 5 GB of RAM."
+      },
+      "kokoro-82m": {
+        "description": "Built-in local voice for the assistant. No download needed."
+      },
       "small": {
         "name": "Whisper Small",
         "description": "快速且相当准确。"
@@ -113,10 +228,6 @@
         "description": "大型模型，速度较慢，但多语言识别非常准确。"
       }
     },
-    "errors": {
-      "loadModels": "无法加载可用模型",
-      "downloadModel": "模型下载失败: {{error}}"
-    },
     "permissions": {
       "title": "需要权限",
       "description": "SpeakoFlow 需要一些权限才能正常工作。",
@@ -156,44 +267,104 @@
     "modelError": "模型错误",
     "modelUnloaded": "模型已卸载",
     "noModelDownloadRequired": "无模型 - 需要下载",
+    "llmSelectModel": "Select assistant model",
+    "llmModelTitle": "Assistant model: {{model}}",
     "deleteModel": "删除 {{modelName}}",
     "downloadSpeed": "{{speed}} MB/s",
+    "cancel": "取消",
+    "cancelDownload": "取消下载",
+    "download": "Download",
+    "useModel": "Use model",
     "capabilities": {
       "languageSelection": "支持多种输入语言",
+      "singleLanguage": "仅支持此语言",
       "multiLanguage": "多语言",
+      "languageOnly": "仅 {{language}}",
       "translation": "可翻译为英语",
       "translate": "翻译为英语",
-      "singleLanguage": "仅支持此语言",
-      "languageOnly": "仅 {{language}}"
-    },
-    "cancel": "取消",
-    "cancelDownload": "取消下载"
+      "streaming": "Streaming",
+      "quantization": "Quantization",
+      "legacy": "Older"
+    }
   },
   "settings": {
+    "personalMemory": {
+      "enable": {
+        "label": "Remember me",
+        "description": "Let the assistant keep and use a personal memory. Off by default."
+      },
+      "incognito": {
+        "label": "Incognito chat",
+        "description": "For this conversation, don't use memory and don't learn anything new."
+      },
+      "detail": {
+        "label": "Memory detail",
+        "description": "How much memory to add to each reply. More detail is richer but a little slower.",
+        "options": {
+          "light": "Light",
+          "balanced": "Balanced",
+          "detailed": "Detailed"
+        }
+      },
+      "aboutYou": {
+        "label": "About you",
+        "caption": "A short, always-on summary the assistant keeps in mind.",
+        "fieldLabel": "Summary",
+        "placeholder": "e.g. Prefers short, direct answers. Works in Rust and TypeScript. Building a desktop voice assistant.",
+        "hint": "Always included when memory is on. Keep it to a few sentences — this is the assistant's at-a-glance picture of you.",
+        "edit": "Edit",
+        "done": "Done",
+        "empty": "Nothing saved yet — the assistant fills this in as it learns, or click Edit to write your own.",
+        "collapsedEmpty": "Nothing saved yet"
+      },
+      "notes": {
+        "label": "Notes",
+        "caption": "Specific things worth remembering — learned or added by you.",
+        "empty": "No notes yet. Add one below, or let the assistant learn them from your chats.",
+        "add": "Add",
+        "addPlaceholder": "Add something to remember…",
+        "delete": "Delete note",
+        "learned": "learned",
+        "added": "added by you"
+      },
+      "confidence": {
+        "high": "High confidence",
+        "medium": "Medium confidence",
+        "low": "Low confidence"
+      },
+      "actions": {
+        "label": "Manage"
+      },
+      "distill": {
+        "label": "Learn from this chat now",
+        "description": "Pull durable facts from your current conversation into memory, right now.",
+        "button": "Update memory"
+      },
+      "export": "Export",
+      "import": "Import",
+      "wipe": {
+        "button": "Wipe memory",
+        "confirm": "Delete everything the assistant remembers?",
+        "yes": "Delete all",
+        "cancel": "Cancel"
+      }
+    },
     "modelSettings": {
       "title": "{{model}} 设置",
       "noSettingsNeeded": "此模型自动运行，无需配置。"
     },
-    "models": {
-      "title": "转录模型",
-      "description": "选择转录模型或下载其他模型。不同模型提供不同的准确度和速度。",
-      "downloaded": "已下载",
-      "available": "可下载",
-      "deleteConfirm": "确定要删除 {{modelName}} 吗？您需要重新下载才能使用。",
-      "deleteActiveConfirm": "{{modelName}} 是您当前使用的模型。删除后将停止转录，直到您选择新的模型。确定要删除吗？",
-      "deleteTitle": "删除模型",
-      "filters": {
-        "all": "全部",
-        "multiLanguage": "多语言",
-        "translation": "翻译",
-        "allLanguages": "所有语言"
-      },
-      "noModelsMatch": "没有符合此筛选条件的模型。",
-      "yourModels": "已下载的模型",
-      "availableModels": "可供下载"
-    },
     "general": {
       "title": "通用",
+      "recording": {
+        "title": "Recording"
+      },
+      "groups": {
+        "sounds": "Sounds",
+        "startup": "Startup and tray",
+        "overlay": "Overlay",
+        "updates": "Updates",
+        "system": "System"
+      },
       "shortcut": {
         "title": "SpeakoFlow 快捷键",
         "description": "配置启动语音转文字录制的键盘快捷键",
@@ -206,6 +377,10 @@
             "name": "转录快捷键",
             "description": "用于录制和转录语音的键盘快捷键。"
           },
+          "transcribe_toggle": {
+            "name": "Hands-free dictation",
+            "description": "Press once to start, again to stop — no holding needed."
+          },
           "cancel": {
             "name": "取消快捷键",
             "description": "用于取消当前录制的键盘快捷键。"
@@ -213,6 +388,18 @@
           "transcribe_with_post_process": {
             "name": "后处理快捷键",
             "description": "可选：一个专用快捷键，始终对您的转录应用 AI 后处理。"
+          },
+          "assistant": {
+            "name": "Ask assistant",
+            "description": "Ask the assistant by voice; the answer streams into the floating panel."
+          },
+          "assistant_vision": {
+            "name": "Ask with screen",
+            "description": "Ask by voice with your screen attached so it can see what you're looking at."
+          },
+          "assistant_panel_toggle": {
+            "name": "Show or hide panel",
+            "description": "Shows or hides the floating assistant panel."
           }
         },
         "errors": {
@@ -231,7 +418,80 @@
       },
       "pushToTalk": {
         "label": "按住说话",
-        "description": "按住录制，松开停止"
+        "description": "按住录制，松开停止",
+        "hold": "Hold to record",
+        "tap": "Tap to start and stop"
+      },
+      "tapToLock": {
+        "label": "Tap to lock",
+        "info": "While holding your record shortcut, tap this to lock hands-free recording so you can let go and keep talking. Pick any key that isn't part of your record shortcut, or clear it to turn this off.",
+        "off": "Off",
+        "clear": "Clear"
+      }
+    },
+    "models": {
+      "title": "转录模型",
+      "description": "选择转录模型或下载其他模型。不同模型提供不同的准确度和速度。",
+      "yourModels": "已下载的模型",
+      "availableModels": "可供下载",
+      "downloaded": "已下载",
+      "available": "可下载",
+      "deleteConfirm": "确定要删除 {{modelName}} 吗？您需要重新下载才能使用。",
+      "deleteActiveConfirm": "{{modelName}} 是您当前使用的模型。删除后将停止转录，直到您选择新的模型。确定要删除吗？",
+      "deleteTitle": "删除模型",
+      "categories": {
+        "stt": "Transcription",
+        "llm": "Assistant",
+        "tts": "Speech"
+      },
+      "categoryDescriptions": {
+        "stt": "Models trade accuracy for speed — pick one that fits your machine.",
+        "llm": "Local models for the built-in assistant and AI cleanup.",
+        "tts": "Voices for the assistant's spoken replies. Kokoro runs on your machine."
+      },
+      "llmHint": "After downloading, pick this model in the Assistant section under the built-in (local) provider.",
+      "ttsHint": "Speech models run on your machine and need no download.",
+      "filters": {
+        "all": "全部",
+        "multiLanguage": "多语言",
+        "translation": "翻译",
+        "allLanguages": "所有语言"
+      },
+      "noModelsMatch": "没有符合此筛选条件的模型。",
+      "searchPlaceholder": "Search models by name…",
+      "clearSearch": "Clear search",
+      "noSearchResults": "No models named “{{query}}”.",
+      "olderModels": "Older models",
+      "olderModelsHint": "Run on the previous engine. Still fully supported — most people won't need these.",
+      "customModel": {
+        "addButton": "Search Hugging Face",
+        "searchTitle": "Need a different model?",
+        "searchDescription": "Search Hugging Face for a GGUF model. This is an advanced option, so hardware needs and compatibility can vary.",
+        "searchButton": "Search Hugging Face",
+        "title": "Search Hugging Face",
+        "subtitle": "Find a GGUF model to download and run on this machine.",
+        "searchPlaceholder": "Search models on Hugging Face…",
+        "popularTitle": "Popular GGUF models",
+        "resultsTitle": "Search results",
+        "resultCount_one": "{{count}} model",
+        "resultCount_other": "{{count}} models",
+        "searching": "Searching Hugging Face…",
+        "searchError": "Search failed. Check your connection and try again.",
+        "tryAgain": "Try again",
+        "noResults": "No models found. Try a different search.",
+        "downloads": "{{value}} downloads",
+        "visionBadge": "Vision",
+        "back": "Back to results",
+        "loadingFiles": "Loading available files…",
+        "repoFilesError": "Couldn't load files for this model.",
+        "noGgufFiles": "This repository has no downloadable .gguf files.",
+        "selectQuant": "Choose a download",
+        "selectQuantHint": "Not sure? Q4_K_M is usually the best balance of quality, speed, and memory use.",
+        "enableVision": "Include screen vision",
+        "enableVisionHint": "Downloads an extra file so the model can understand images.",
+        "add": "Download",
+        "adding": "Starting…",
+        "addError": "Couldn't add this model. Please try again."
       }
     },
     "sound": {
@@ -245,6 +505,12 @@
       "audioFeedback": {
         "label": "音频反馈",
         "description": "录制开始和停止时播放声音"
+      },
+      "soundTheme": {
+        "label": "Feedback sound",
+        "description": "Choose the start/stop cue played during dictation",
+        "default": "Default",
+        "preview": "Preview sound (plays start then stop)"
       },
       "outputDevice": {
         "title": "输出设备",
@@ -263,8 +529,20 @@
         "app": "应用",
         "output": "输出",
         "transcription": "转录",
+        "textReplacements": "Text replacements",
         "history": "历史",
+        "aiCorrection": "AI cleanup",
         "experimental": "实验性"
+      },
+      "aiCorrection": {
+        "label": "AI cleanup (in development)",
+        "description": "Experimental: clean up your dictation with AI. Rough and unpolished — off by default.",
+        "info": "Runs a language model over your dictation to fix punctuation, remove filler words, and optionally adjust the tone. Applies to dictation only (not the assistant chat) and runs on its own shortcut. It adds a delay since the model runs after transcription; if it fails or times out, your raw text is pasted instead. Uses your assistant's model by default. This feature is still in development — you can't yet pick a built-in local model from its own list, and it needs more tuning before it's a main feature."
+      },
+      "postProcessTimeout": {
+        "title": "AI cleanup timeout",
+        "description": "How long to wait for the model before giving up and pasting your raw transcription instead. On the built-in local model, allow enough time for it to load on first use.",
+        "seconds": "{{seconds}} seconds"
       },
       "experimentalToggle": {
         "label": "实验性功能",
@@ -273,6 +551,14 @@
       "lazyStreamClose": {
         "label": "在转录之间保持麦克风开启",
         "description": "录音停止后保持麦克风流开启30秒，减少连续转录时的延迟。激活时可能会降低蓝牙音频质量。"
+      },
+      "liveTranscription": {
+        "label": "Live transcription",
+        "description": "Transcribe speech as you talk, instead of all at once when you stop. Experimental."
+      },
+      "liveTranscriptionWindow": {
+        "label": "Live transcription window",
+        "description": "While live transcription runs, show a larger overlay card with the running text instead of the compact pill. Requires live transcription."
       },
       "acceleration": {
         "whisper": {
@@ -300,6 +586,15 @@
       "showTrayIcon": {
         "label": "显示托盘图标",
         "description": "在系统托盘中显示 SpeakoFlow 图标。"
+      },
+      "overlayStyle": {
+        "title": "Overlay",
+        "description": "How the recording overlay looks while you dictate. None hides it, Minimal is the compact pill, and Live shows a readable card with your words as you speak (for models that support it).",
+        "options": {
+          "none": "None",
+          "minimal": "Minimal",
+          "live": "Live"
+        }
       },
       "overlay": {
         "title": "悬浮窗位置",
@@ -371,16 +666,67 @@
       "customWords": {
         "title": "自定义词汇",
         "description": "添加经常被误听或拼写错误的词汇。系统将自动将发音相似的词汇修正为您列表中的词汇。",
+        "info": "Example: add “Kokoro” if SpeakoFlow writes “Coco row.”",
         "placeholder": "添加词汇",
         "add": "添加",
+        "empty": "No custom words yet.",
         "remove": "删除 {{word}}",
         "duplicate": "\"{{word}}\" 已存在"
+      },
+      "textReplacements": {
+        "title": "Text replacements",
+        "description": "Replace a phrase in your transcript with text you use often. Example: “my email” becomes “alex@example.com”.",
+        "rulesTitle": "Replacement rules",
+        "rulesHint": "Choose what SpeakoFlow hears and what it should insert.",
+        "empty": "Create a rule for a phrase you say often.",
+        "addFirst": "Create first rule",
+        "addRule": "Add replacement",
+        "manageRules": "Replacements ({{count}})",
+        "searchLabel": "Spoken phrase",
+        "searchPlaceholder": "my email",
+        "replaceLabel": "Insert this text",
+        "replacePlaceholder": "alex@example.com",
+        "advanced": "Advanced options",
+        "regex": "Regex",
+        "trimBefore": "Trim before",
+        "trimAfter": "Trim after",
+        "enabledLabel": "Enabled",
+        "remove": "Remove rule",
+        "import": "Import",
+        "export": "Export",
+        "importSuccess": "Imported {{count}} replacement rules",
+        "importError": "Could not import: the file is not a valid replacements list",
+        "exportSuccess": "Replacements exported",
+        "exportError": "Could not export replacements",
+        "magicHint": "Use [date], [time], [uppercase], [lowercase], [capitalize], or [nospace] in the inserted text.",
+        "capitalization": {
+          "label": "Caps",
+          "none": "None",
+          "uppercase": "UPPERCASE",
+          "lowercase": "lowercase",
+          "capitalize": "Capitalize"
+        }
       }
     },
     "postProcessing": {
       "title": "后处理",
+      "enable": {
+        "title": "AI cleanup"
+      },
       "hotkey": {
         "title": "快捷键"
+      },
+      "tone": {
+        "title": "Tone",
+        "description": "Optionally rewrite your cleaned-up dictation in a chosen tone. \"None\" just tidies the text without changing the wording.",
+        "options": {
+          "none": "None (cleanup only)",
+          "formal": "Formal",
+          "casual": "Casual",
+          "professional": "Professional",
+          "friendly": "Friendly",
+          "concise": "Concise"
+        }
       },
       "api": {
         "title": "API（兼容 OpenAI）",
@@ -404,6 +750,12 @@
           "description": "所选提供商的 API 密钥。",
           "placeholder": "sk-..."
         },
+        "builtin": {
+          "modelDescription": "Pick a model you've downloaded. It runs on your machine with no API key or setup.",
+          "modelPlaceholder": "Select a downloaded model",
+          "noModels": "No local models yet. Download one from the model catalog.",
+          "ready": "Runs fully on your machine. No API key, no setup."
+        },
         "model": {
           "title": "模型",
           "descriptionApple": "提供可选的数字令牌限制或保持默认的设备预设。",
@@ -424,6 +776,8 @@
         "noPrompts": "没有可用的提示词",
         "selectPrompt": "选择提示词",
         "createNew": "创建新提示词",
+        "edit": "Edit",
+        "closeEditor": "Close",
         "promptLabel": "提示词名称",
         "promptLabelPlaceholder": "输入提示词名称",
         "promptInstructions": "提示词指令",
@@ -437,11 +791,52 @@
         "createFirst": "点击上方的「创建新提示词」来创建您的第一个后处理提示词。"
       }
     },
+    "dictation": {
+      "hero": {
+        "eyebrow": "Now listening with",
+        "loading": "Loading your model…",
+        "noModelTitle": "No model yet",
+        "noModelCaption": "Pick a model so your voice becomes text.",
+        "chooseModel": "Choose a model",
+        "changeModel": "Change model",
+        "streams": "Streams live",
+        "accuracy": "Accuracy",
+        "speed": "Speed"
+      },
+      "catalog": {
+        "title": "Choose your model",
+        "description": "Every model runs on your machine — trade accuracy for speed and pick the one that fits."
+      },
+      "aiCleanup": {
+        "groupTitle": "AI cleanup",
+        "modelGroupTitle": "Cleanup model",
+        "promptGroupTitle": "Cleanup prompt",
+        "title": "Fix up my dictation with AI",
+        "caption": "Experimental — tidies punctuation and filler after you dictate.",
+        "info": "Runs a language model over your dictation to fix punctuation, remove filler words, and optionally adjust the tone. Applies to dictation only, on its own shortcut. It adds a short delay after you speak; if the model fails or times out, your raw text is used instead. Still in development."
+      },
+      "output": {
+        "title": "Output options"
+      }
+    },
     "history": {
       "title": "历史记录",
+      "storage": {
+        "title": "Recording storage",
+        "description": "These controls affect recordings only. Starred recordings are always kept. Assistant chats have separate storage."
+      },
+      "filters": {
+        "label": "History type",
+        "all": "All",
+        "recordings": "Recordings",
+        "assistant": "Assistant chats"
+      },
       "openFolder": "打开录音文件夹",
       "loading": "加载历史记录中...",
       "empty": "还没有转录记录。开始录制以建立您的历史记录！",
+      "emptyRecordings": "No recordings yet.",
+      "emptyAssistant": "No assistant chats yet.",
+      "recordingLabel": "Recording",
       "copyToClipboard": "复制转录到剪贴板",
       "save": "保存转录",
       "unsave": "从已保存中移除",
@@ -450,7 +845,18 @@
       "retranscribe": "重新转录",
       "retranscribeError": "重新转录失败。请重试。",
       "transcribing": "转录中...",
-      "transcriptionFailed": "转录失败。您可以使用重试图标重新转录。"
+      "transcriptionFailed": "转录失败。您可以使用重试图标重新转录。",
+      "assistantLabel": "Assistant chat",
+      "copyConversation": "Copy conversation",
+      "resumeConversation": "Continue this conversation in the assistant",
+      "showConversation": "Show conversation",
+      "hideConversation": "Hide conversation",
+      "roleUser": "You",
+      "roleAssistant": "Assistant",
+      "screenshotAttached": "Vision",
+      "messageCount_one": "{{count}} message",
+      "messageCount_other": "{{count}} messages",
+      "deleteAssistantError": "Couldn't delete the conversation. Please try again."
     },
     "debug": {
       "title": "调试",
@@ -487,7 +893,9 @@
         "days3": "3 天后",
         "weeks2": "2 周后",
         "months3": "3 个月后",
-        "placeholder": "选择保留期限..."
+        "placeholder": "选择保留期限...",
+        "savedToast": "Retention saved.",
+        "appliedToast": "Recording retention applied"
       },
       "alwaysOnMicrophone": {
         "label": "麦克风常开",
@@ -534,6 +942,14 @@
         "title": "版本",
         "description": "SpeakoFlow 的当前版本"
       },
+      "updates": {
+        "title": "Updates",
+        "button": "Check for updates",
+        "disabledHint": "Automatic update checks are off. Turn them on in General."
+      },
+      "folders": {
+        "title": "Folders"
+      },
       "appDataDirectory": {
         "title": "应用数据目录",
         "description": "SpeakoFlow 存储数据的位置"
@@ -543,6 +959,11 @@
         "description": "查看源代码并贡献",
         "button": "在 GitHub 上查看"
       },
+      "license": {
+        "title": "License",
+        "description": "SpeakoFlow is open source under the MIT License, building on Handy (also MIT) by CJ Pais.",
+        "button": "View license"
+      },
       "supportDevelopment": {
         "title": "支持开发",
         "description": "帮助我们继续开发 SpeakoFlow",
@@ -550,11 +971,306 @@
       },
       "acknowledgments": {
         "title": "致谢",
+        "handy": {
+          "title": "Handy",
+          "description": "The open-source app SpeakoFlow is built on",
+          "details": "SpeakoFlow began as a fork of Handy by CJ Pais. Huge thanks to the original project and its contributors for the foundation."
+        },
         "whisper": {
           "title": "Whisper.cpp",
           "description": "OpenAI Whisper 自动语音识别模型的高性能推理",
           "details": "SpeakoFlow 使用 Whisper.cpp 进行快速的本地语音转文字处理。感谢 Georgi Gerganov 和贡献者们的出色工作。"
+        },
+        "llamacpp": {
+          "title": "llama.cpp",
+          "description": "The engine powering the built-in local language model",
+          "details": "SpeakoFlow runs local LLMs with llama.cpp. Thanks to Georgi Gerganov and the ggml community for making fast, on-device inference possible."
+        },
+        "kokoro": {
+          "title": "Kokoro",
+          "description": "The local text-to-speech voice for the assistant",
+          "details": "SpeakoFlow speaks replies using the Kokoro TTS model, running entirely on your device. Thanks to the Kokoro project and its contributors."
+        },
+        "previous": "Previous",
+        "next": "Next"
+      }
+    },
+    "assistant": {
+      "shortcuts": {
+        "title": "Shortcuts"
+      },
+      "brain": {
+        "title": "Assistant brain",
+        "description": "Choose whether your assistant runs privately on this device or through a cloud provider.",
+        "whereLabel": "Where it runs",
+        "onDevice": "On my device",
+        "cloud": "Cloud provider",
+        "downloadModel": "Browse and download models",
+        "downloadModelDescription": "Pick a recommended model or search Hugging Face.",
+        "downloadModelAction": "Browse models",
+        "catalogTitle": "Download an on-device model",
+        "catalogDescription": "Choose a model to download. It stays on this machine and needs no API key.",
+        "currentModelTitle": "Current model",
+        "currentModelDescription": "Selected for the built-in assistant on this device.",
+        "recommendedTitle": "Recommended models",
+        "recommendedDescription": "Curated options for different memory and screen-vision needs.",
+        "finderSectionTitle": "More on-device models",
+        "finderSectionDescription": "Search Hugging Face when you need a different model size or capability.",
+        "finderTitle": "Browse Hugging Face",
+        "finderDescription": "Search thousands of GGUF models and download one directly to SpeakoFlow.",
+        "finderAction": "Find a model",
+        "huggingFaceTitle": "From Hugging Face",
+        "huggingFaceDescription": "Models you added yourself. Compatibility and performance can vary.",
+        "catalogEmpty": "No recommended local models are available right now."
+      },
+      "subpages": {
+        "profilesCaption": "Switch the assistant's name, role, and personality.",
+        "memoryCaption": "What the assistant remembers about you between chats."
+      },
+      "tapToLock": {
+        "label": "Tap to lock",
+        "info": "While holding the assistant shortcut, tap this to lock hands-free so you can let go and keep talking. Pick a key that isn't part of your assistant shortcut (one that overlaps is ignored), or clear it to turn this off.",
+        "off": "Off",
+        "clear": "Clear"
+      },
+      "provider": {
+        "title": "Assistant provider",
+        "providerLabel": "Provider",
+        "providerDescription": "The provider that answers assistant questions.",
+        "baseUrlLabel": "Base URL",
+        "baseUrlDescription": "OpenAI-compatible base URL. Azure URLs are normalized automatically.",
+        "apiKeyLabel": "API key",
+        "apiKeyDescription": "Shared with AI cleanup.",
+        "apiKeyPlaceholder": "Enter API key…",
+        "modelLabel": "Model",
+        "modelDescription": "Model or deployment name to use for assistant answers.",
+        "modelPlaceholder": "e.g. gpt-4o-mini",
+        "modelSearchPlaceholder": "Search or type a model…",
+        "modelUse": "Use \"{{model}}\"",
+        "loadModels": "Load models",
+        "loadingModels": "Loading…",
+        "noModelsFound": "No models returned. Type the model name instead.",
+        "builtinModelDescription": "Pick a downloaded local model. It runs on your machine with no API key.",
+        "builtinModelPlaceholder": "Select a downloaded model",
+        "builtinNoModels": "No models on your machine yet — download one below.",
+        "builtinReady": "Runs fully on your machine. No API key, no setup.",
+        "builtinEngineMissing": "First use downloads a small local engine automatically (one time), then runs fully offline. No setup needed.",
+        "contextSizeLabel": "Context window",
+        "contextSizeDescription": "How much the local model can keep in mind at once — the system instructions, your chat history, any screenshot (a single image can eat a big chunk), and its reply. Bigger holds more and keeps screen vision and web search reliable, but uses more memory. The default is 8192; 16384 is a good step up if your machine has the RAM to spare. You can lower it later to save memory.",
+        "unloadTimeoutLabel": "Unload from memory after",
+        "unloadTimeoutDescription": "Free up memory by unloading the local model after it has been idle this long. It reloads automatically on next use."
+      },
+      "systemPrompt": {
+        "title": "System prompt",
+        "label": "Assistant system prompt",
+        "description": "Sets the assistant's behavior."
+      },
+      "characters": {
+        "title": "Profiles",
+        "description": "Task-focused profiles you can switch between. The active profile sets the assistant's name, role, and instructions — and how long its replies run. Switch anytime from the panel header.",
+        "galleryLabel": "Your profiles",
+        "editSection": "Edit profile",
+        "avatarLabel": "Avatar",
+        "active": "Active",
+        "meowsOnly": "Meows only",
+        "builtin": "Built-in",
+        "custom": "Custom",
+        "new": "New",
+        "newName": "New profile",
+        "copyName": "{{name}} copy",
+        "createAi": "Create with AI",
+        "import": "Import",
+        "aiTitle": "Describe your profile",
+        "aiClose": "Close",
+        "aiPlaceholder": "e.g. a concise release-notes writer, or a patient tutor who explains every step",
+        "aiDictate": "Dictate the description",
+        "aiDictateStop": "Stop dictation",
+        "generate": "Generate",
+        "avatarUpload": "Upload image",
+        "avatarRemove": "Remove",
+        "nameLabel": "Name",
+        "roleLabel": "Role",
+        "rolePlaceholder": "Short description shown on the card (optional)",
+        "promptLabel": "Instructions (system prompt)",
+        "responseLength": {
+          "label": "Response length",
+          "hint": "How long this profile's replies run. \"Inherit\" follows your global Assistant setting.",
+          "options": {
+            "inherit": "Inherit global",
+            "short": "Short",
+            "medium": "Medium",
+            "long": "Long"
+          }
+        },
+        "greetingLabel": "Greeting (optional)",
+        "greetingPlaceholder": "Optional opening line shown in an empty chat",
+        "catNote": "The Cat ignores the AI entirely — it just meows. Nothing to configure here.",
+        "duplicate": "Duplicate",
+        "export": "Export",
+        "restoreDefault": "Restore default",
+        "restoreBuiltins": "Restore built-ins",
+        "moreActions": "More actions",
+        "expand": "Expand",
+        "collapse": "Collapse",
+        "delete": "Delete",
+        "deleteConfirm": "Delete this profile? This can't be undone.",
+        "emptyState": "No profiles yet. Create your first one to give the assistant a personality."
+      },
+      "behavior": {
+        "title": "Behavior"
+      },
+      "memory": {
+        "label": "Conversation memory",
+        "description": "How many recent messages are sent as context each turn. 0 disables memory."
+      },
+      "responseLength": {
+        "label": "Response length",
+        "description": "Preferred reply length. \"No effect\" leaves your prompt untouched.",
+        "options": {
+          "default": "No effect",
+          "short": "Short",
+          "medium": "Medium",
+          "long": "Long"
         }
+      },
+      "vision": {
+        "title": "Screen vision",
+        "enableLabel": "Allow screen vision",
+        "enableDescription": "Let the assistant see your screen when you ask about it. Requires a vision-capable model.",
+        "timing": {
+          "label": "When to capture",
+          "description": "For voice questions: capture the moment you start asking, or wait until the message is sent. Typed messages always capture on send.",
+          "options": {
+            "immediate": "When I ask",
+            "on_send": "When the message sends"
+          }
+        }
+      },
+      "webSearch": {
+        "title": "Web search",
+        "enableLabel": "Allow web search",
+        "enableDescription": "Let the assistant search the web when a question needs current information.",
+        "openRouterNativeLabel": "Use OpenRouter's built-in search",
+        "openRouterNativeDescription": "When on, OpenRouter runs the search itself (its :online mode) using your OpenRouter credits. When off, the app searches with your search provider below.",
+        "providerLabel": "Search provider",
+        "providerDescription": "Serper is a good default. Every provider has a free tier.",
+        "providers": {
+          "serper": "Serper (Google, fast)",
+          "brave": "Brave Search",
+          "tavily": "Tavily (AI search)",
+          "exa": "Exa (neural)",
+          "serpapi": "SerpAPI (Google)"
+        },
+        "apiKeyLabel": "API key",
+        "apiKeyDescription": "Key for the selected search provider.",
+        "apiKeyPlaceholder": "Enter API key…",
+        "fetchContentLabel": "Read full pages (best quality)",
+        "fetchContentDescription": "Read the full text of each result instead of snippets. Better answers, but slower.",
+        "maxResultsLabel": "Sources to use",
+        "maxResultsDescription": "How many results to read (1–10).",
+        "depthLabel": "Search depth",
+        "depthDescription": "Quick for simple facts, Standard for most questions, Deep for hard ones.",
+        "depthOptions": {
+          "low": "Quick",
+          "medium": "Standard",
+          "high": "Deep"
+        },
+        "localSmartLabel": "Smart search decisions (local model)",
+        "localSmartDescription": "Let the local model decide when to search. Off uses a fast keyword check instead.",
+        "creditBudgetLabel": "Daily Firecrawl credit limit",
+        "creditBudgetDescription": "Daily cap on Firecrawl credits before search pauses. 0 = no limit.",
+        "testLabel": "Test search",
+        "testDescription": "Run a sample search with the current provider and key.",
+        "testButton": "Test search",
+        "testing": "Searching…",
+        "testResult": "Got {{count}} results."
+      },
+      "tts": {
+        "title": "Voice output",
+        "enableLabel": "Speak responses aloud",
+        "enableDescription": "Read the assistant's replies out loud.",
+        "stopOnDictationLabel": "Stop speech when dictation starts",
+        "stopOnDictationDescription": "Stop any reply that's still playing when you start dictating.",
+        "engineLabel": "Engine",
+        "engineDescription": "Kokoro runs locally for free. The other engines use your API key.",
+        "kokoroSetupLabel": "Kokoro voice model",
+        "kokoroSetupDescription": "Download it once, then spoken replies run privately on this device.",
+        "kokoroDownload": "Download Kokoro",
+        "kokoroDownloading": "Downloading Kokoro",
+        "kokoroReady": "Ready on this device",
+        "kokoroRetry": "Try download again",
+        "engines": {
+          "kokoro": "Kokoro (local, free)",
+          "openai": "OpenAI-compatible",
+          "openrouter": "OpenRouter",
+          "elevenlabs": "ElevenLabs",
+          "azure": "Azure AI Speech"
+        },
+        "voiceLabel": "Voice",
+        "voiceDescription": "Kokoro voice for spoken replies.",
+        "dtypeLabel": "Kokoro precision",
+        "dtypeDescription": "fp32 is highest quality; q8 is faster on CPU. Changing this reloads the model.",
+        "speedLabel": "Playback speed",
+        "speedDescription": "1× is normal. ElevenLabs supports 0.7×–1.2× only.",
+        "speedValue": "{{value}}×",
+        "speedCustomLabel": "Custom playback speed",
+        "testLabel": "Test voice",
+        "testDescription": "Play a short sample with the current settings.",
+        "testButton": "Test voice",
+        "testing": "Testing…",
+        "testOk": "Played ✓",
+        "testPhrase": "Hi! This is a test of SpeakoFlow's voice output.",
+        "downloadStart": "Downloading Kokoro voice…",
+        "downloadProgress": "Downloading Kokoro voice… {{progress}}%",
+        "downloadReady": "Kokoro voice ready ✓",
+        "downloadError": "Couldn't download the Kokoro voice model",
+        "baseUrlLabel": "Base URL",
+        "baseUrlDescription": "OpenAI-compatible TTS URL. A base URL or a full /audio/speech URL both work.",
+        "azureBaseUrlLabel": "Speech URL",
+        "azureBaseUrlDescription": "Your Azure Speech URL from the portal, e.g. https://eastus2.tts.speech.microsoft.com.",
+        "apiKeyLabel": "API key",
+        "apiKeyDescription": "Separate from the assistant's key.",
+        "modelLabel": "Model",
+        "modelDescription": "Model or deployment name, e.g. gpt-4o-mini-tts (OpenAI/Azure) or eleven_flash_v2_5 (ElevenLabs).",
+        "remoteVoiceLabel": "Voice name",
+        "remoteVoiceDescription": "Voice for OpenAI-compatible TTS, e.g. alloy, echo, nova, shimmer.",
+        "azureVoiceLabel": "Voice name",
+        "azureVoiceDescription": "Azure voice name, e.g. en-US-JennyNeural. Click Load voices to browse.",
+        "loadVoices": "Load voices",
+        "voicesLoading": "Loading…",
+        "voicesPick": "Pick from {{count}} voices…",
+        "loadModels": "Load models",
+        "modelsLoading": "Loading…",
+        "modelsPick": "Pick from {{count}} models…",
+        "modelsUse": "Use \"{{model}}\"",
+        "voicesUse": "Use \"{{voice}}\"",
+        "elevenVoiceLabel": "Voice ID",
+        "elevenVoiceDescription": "ElevenLabs voice ID (from the Voices tab in their dashboard).",
+        "promptLabel": "Summary Prompt",
+        "promptDescription": "Instructions for generating the brief spoken summary of each answer."
+      },
+      "appearance": {
+        "title": "Panel appearance",
+        "previewLabel": "Preview",
+        "previewDescription": "Live preview of the panel with your text size and opacity.",
+        "previewUser": "Hey, what can you do?",
+        "previewAssistant": "Lots! Ask me anything — I can even look at your screen.",
+        "fontSizeLabel": "Text size",
+        "fontSizeDescription": "Size of the chat text in the assistant panel.",
+        "fontSizes": {
+          "small": "Small",
+          "medium": "Medium",
+          "large": "Large"
+        },
+        "panelSizeLabel": "Panel size",
+        "panelSizeDescription": "Overall size of the floating assistant panel. You can also drag its edges to resize.",
+        "panelSizes": {
+          "compact": "Compact",
+          "standard": "Standard",
+          "large": "Large"
+        },
+        "opacityLabel": "Panel opacity",
+        "opacityDescription": "How opaque the floating panel is. 100% is fully solid; lower values let the desktop blur through."
       }
     }
   },
@@ -571,6 +1287,9 @@
     "installing": "安装中...",
     "preparing": "准备中...",
     "checkForUpdates": "检查更新",
+    "checkFailed": "Update check failed",
+    "updateFailed": "Update failed",
+    "clickToRetry": "Click to try again",
     "portableUpdateTitle": "Manual update required",
     "portableUpdateMessage": "Portable installs cannot be updated automatically. To update: download the latest NSIS installer from GitHub Releases, install it to the same folder, then copy your Data/ folder (settings, models, recordings) from the old version to the new one.",
     "portableUpdateButton": "Open GitHub Releases"
@@ -596,6 +1315,7 @@
     "yes": "是",
     "no": "否",
     "noOptionsFound": "未找到选项",
+    "back": "Back",
     "showAdvanced": "更多选项",
     "showLess": "收起"
   },
@@ -619,6 +1339,7 @@
     "recordingFailed": "录音启动失败: {{error}}",
     "modelLoadFailed": "加载模型失败: {{model}}",
     "modelLoadFailedUnknown": "未知模型",
+    "downloadFailedTitle": "Download failed",
     "pasteFailedTitle": "粘贴文本失败",
     "pasteFailed": "无法将文本粘贴到当前活动的应用程序中。"
   },
@@ -627,7 +1348,117 @@
     "description": "更改 SpeakoFlow 界面的语言"
   },
   "overlay": {
+    "preparing": "Getting mic ready…",
+    "recording": "Recording",
     "transcribing": "正在转录...",
-    "processing": "处理中..."
+    "processing": "处理中...",
+    "listening": "Listening…",
+    "locked": "Recording hands-free — press the hotkey again to stop",
+    "cancel": "Cancel",
+    "done": "Done",
+    "askAssistant": "Ask the assistant instead of typing this"
+  },
+  "assistant": {
+    "title": "Assistant",
+    "character": {
+      "switch": "Switch persona"
+    },
+    "empty": "Ask by voice with your assistant shortcut,\nor type below.",
+    "inputPlaceholder": "Message…",
+    "inputPlaceholderScreen": "Ask about your screen…",
+    "send": "Send",
+    "stop": "Stop",
+    "finish": "Finish & send",
+    "clear": "Clear conversation",
+    "hide": "Hide panel",
+    "copy": "Copy",
+    "copyCode": "Copy code",
+    "regenerate": "Regenerate answer (the old one stays in History)",
+    "screenAttached": "Screen",
+    "attachScreen": "Screen vision — attach your screen to each message until turned off",
+    "detachScreen": "Turn off screen vision",
+    "attach": {
+      "file": "Attach an image or file",
+      "snip": "Snip a region of the screen",
+      "image": "Image",
+      "imageCount": "{{count}} image",
+      "imageCount_other": "{{count}} images",
+      "remove": "Remove attachment",
+      "dropHint": "Drop to attach"
+    },
+    "snip": {
+      "hint": "Drag to snip a region — Esc to cancel"
+    },
+    "webSearch": {
+      "enable": "Enable web search",
+      "disable": "Disable web search"
+    },
+    "tts": {
+      "enable": "Enable voice summaries",
+      "disable": "Disable voice summaries",
+      "loading": "Loading Kokoro voice model...",
+      "loadingShort": "Voice model {{progress}}%"
+    },
+    "pill": {
+      "talk": "Click to talk",
+      "stop": "Stop and send",
+      "idle": "Assistant",
+      "expand": "Expand panel",
+      "collapse": "Collapse to pill",
+      "close": "Close assistant",
+      "cancel": "Cancel without sending",
+      "cancelTurn": "Cancel",
+      "dismiss": "Dismiss",
+      "disarmScreen": "Screen vision is on — click to turn it off",
+      "armScreen": "Screen vision is off — click to turn it on"
+    },
+    "status": {
+      "listening": "Listening…",
+      "locked": "Listening",
+      "transcribing": "Transcribing…",
+      "searching": "Searching the web...",
+      "thinking": "Thinking...",
+      "speaking": "Speaking..."
+    },
+    "errors": {
+      "generic": "Something went wrong. Please try again.",
+      "genericShort": "Something went wrong",
+      "no_provider": "No assistant model is set up yet. Pick a provider in Settings → Assistant.",
+      "no_providerShort": "No model set up",
+      "no_model": "Your provider has no model selected. Choose one in Settings → Assistant.",
+      "no_modelShort": "No model selected",
+      "engine_start": "The built-in model couldn't start. Try again, or pick a different model in Settings → Assistant.",
+      "engine_startShort": "Model couldn't start",
+      "provider": "The model couldn't answer. Check your API key and connection, then try again.",
+      "providerShort": "Couldn't get an answer",
+      "vision_unsupported": "This model can't read your screen. Pick a vision-capable model in Settings → Assistant, or ask again without screen vision.",
+      "vision_unsupportedShort": "Model can't see images",
+      "screenshot_too_large": "The screen capture was too large for this provider. Please try again — it will be compressed harder.",
+      "screenshot_too_largeShort": "Screen capture too large",
+      "screen_capture": "Couldn't capture the screen. Try again, or ask without screen vision.",
+      "screen_captureShort": "Screen capture failed",
+      "transcription": "Couldn't transcribe your voice. Please try speaking again.",
+      "transcriptionShort": "Transcription failed",
+      "tts": "The spoken reply failed. Check your TTS settings, or read the answer in the panel.",
+      "ttsShort": "Voice reply failed",
+      "tts_local": "The local voice couldn't load. Check your connection or switch TTS engines in Settings.",
+      "tts_localShort": "Voice couldn't load",
+      "tts_blocked": "Your system blocked the voice from playing on its own. Click anywhere in the panel to hear the reply.",
+      "tts_blockedShort": "Tap the panel to hear it",
+      "tts_playback": "Couldn't play the voice on your output device. Check your speaker/output settings, then try again.",
+      "tts_playbackShort": "Voice playback failed",
+      "mic_denied": "Microphone access is blocked. Allow it in your system privacy settings.",
+      "mic_deniedShort": "Mic access blocked",
+      "mic_unavailable": "No microphone was found. Connect one and try again.",
+      "mic_unavailableShort": "No microphone found",
+      "mic_error": "The microphone couldn't start. It may be in use by another app.",
+      "mic_errorShort": "Mic couldn't start",
+      "file_read": "That file couldn't be attached.",
+      "file_readShort": "Couldn't attach file"
+    },
+    "notices": {
+      "web_search_failed": "Web search didn't return results — answering without them.",
+      "web_search_failedShort": "No web results"
+    }
   }
 }

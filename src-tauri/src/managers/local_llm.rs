@@ -424,6 +424,16 @@ impl LocalLlmManager {
             st.model_id = None;
         }
 
+        // The engine listens on a single fixed port. A just-killed engine's
+        // listening socket lingers for a short window (and a crashed previous
+        // run can leave an orphan still holding it); spawning the replacement
+        // before the port is free makes the new llama-server fail to bind and
+        // exit — the root cause of rapid model switches "not switching". Wait
+        // for the port to clear first (returns immediately when it's already
+        // free) so the new engine binds reliably, and so a later /health 200
+        // can only come from the newly started model.
+        self.wait_for_port_release().await;
+
         // Ensure the engine binary exists, downloading the official llama.cpp
         // build for this platform on first use (zero manual setup).
         let engine = self.ensure_engine_installed().await.map_err(|e| {
@@ -588,6 +598,42 @@ impl LocalLlmManager {
         }
 
         cmd.spawn()
+    }
+
+    /// True if something is currently accepting TCP connections on the engine
+    /// port (our engine, or a just-killed one whose socket the OS hasn't freed
+    /// yet).
+    fn port_in_use(&self) -> bool {
+        let addr = SocketAddr::from(([127, 0, 0, 1], self.port));
+        TcpStream::connect_timeout(&addr, Duration::from_millis(200)).is_ok()
+    }
+
+    /// Wait (bounded) for the engine port to be released after stopping a
+    /// model, before starting the replacement.
+    ///
+    /// The engine listens on a single fixed port. When switching models we kill
+    /// the running `llama-server` and immediately spawn a new one — but the OS
+    /// keeps the killed process's listening socket for a short window, so the
+    /// replacement can lose the race to `bind()` that same port, fail to start,
+    /// and exit. That is the root cause of "switching models quickly doesn't
+    /// work": slow, deliberate switches leave enough time for the socket to
+    /// free up, while rapid ones don't. Polling until the port is free both
+    /// lets the new engine bind reliably AND guarantees the next `/health` 200
+    /// can only come from the newly started model, never a half-dead
+    /// predecessor still holding the port.
+    async fn wait_for_port_release(&self) {
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while self.port_in_use() {
+            if Instant::now() >= deadline {
+                warn!(
+                    "Engine port {} still busy after stopping the previous model; \
+                     starting the new engine anyway (it may report a bind error)",
+                    self.port
+                );
+                return;
+            }
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
     }
 
     /// Probe the engine's `/health` endpoint with a minimal raw HTTP request

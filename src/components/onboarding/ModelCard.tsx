@@ -78,6 +78,9 @@ interface ModelCardProps {
    *  first-run onboarding, where the shared DownloadProgress strip is the single
    *  consistent place for progress (avoids a duplicate bar on the same screen). */
   showInlineProgress?: boolean;
+  /** Show an explicit primary action instead of making the whole card the only
+   * download/select affordance. Used where first-time discoverability matters. */
+  showPrimaryAction?: boolean;
 }
 
 /** Accuracy / speed as a slim, quiet aligned bar — deliberately secondary to
@@ -126,11 +129,13 @@ const ModelCard: React.FC<ModelCardProps> = ({
   showRecommended = true,
   showScores = true,
   showInlineProgress = true,
+  showPrimaryAction = false,
 }) => {
   const { t } = useTranslation();
   const isFeatured = variant === "featured";
   const isClickable =
     status === "available" || status === "active" || status === "downloadable";
+  const cardIsClickable = isClickable && !showPrimaryAction;
 
   // A "legacy" transcription model runs on the older transcribe-rs (ONNX /
   // whisper.cpp) engine rather than the new native transcribe.cpp (GGUF) one.
@@ -168,13 +173,13 @@ const ModelCard: React.FC<ModelCardProps> = ({
   };
 
   const getInteractiveClasses = () => {
-    if (!isClickable) return "";
+    if (!cardIsClickable) return "";
     if (disabled) return "opacity-50 cursor-not-allowed";
     return "cursor-pointer hover:border-hairline-strong hover:shadow-[0_2px_8px_rgba(0,0,0,0.06)]";
   };
 
   const handleClick = () => {
-    if (!isClickable || disabled) return;
+    if (!cardIsClickable || disabled) return;
     if (status === "downloadable" && onDownload) {
       onDownload(model.id);
     } else {
@@ -191,10 +196,10 @@ const ModelCard: React.FC<ModelCardProps> = ({
     <div
       onClick={handleClick}
       onKeyDown={(e) => {
-        if (e.key === "Enter" && isClickable) handleClick();
+        if (e.key === "Enter" && cardIsClickable) handleClick();
       }}
-      role={isClickable ? "button" : undefined}
-      tabIndex={isClickable ? 0 : undefined}
+      role={cardIsClickable ? "button" : undefined}
+      tabIndex={cardIsClickable ? 0 : undefined}
       className={[
         "group",
         baseClasses,
@@ -295,7 +300,7 @@ const ModelCard: React.FC<ModelCardProps> = ({
           </div>
         )}
         {showModelSize && (
-          <span className="flex items-center gap-1.5 ms-auto text-xs text-muted">
+          <span className="ms-auto flex items-center gap-1.5 text-xs text-muted">
             {status === "downloadable" ? (
               <Download className="w-3.5 h-3.5" />
             ) : (
@@ -304,6 +309,30 @@ const ModelCard: React.FC<ModelCardProps> = ({
             <span>{formattedModelSize}</span>
           </span>
         )}
+        {showPrimaryAction &&
+          (status === "downloadable" || status === "available") && (
+            <Button
+              variant={status === "downloadable" ? "primary" : "secondary"}
+              size="sm"
+              disabled={disabled}
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                if (status === "downloadable") {
+                  onDownload?.(model.id);
+                } else {
+                  onSelect(model.id);
+                }
+              }}
+            >
+              {status === "downloadable" && (
+                <Download className="h-3.5 w-3.5" />
+              )}
+              {status === "downloadable"
+                ? t("modelSelector.download")
+                : t("modelSelector.useModel")}
+            </Button>
+          )}
         {onDelete && (status === "available" || status === "active") && (
           <Button
             variant="ghost"

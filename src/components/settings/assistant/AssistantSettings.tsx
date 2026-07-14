@@ -1,8 +1,9 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { toast } from "sonner";
 import {
   RefreshCw,
+  Check,
+  Loader2,
   Volume2,
   ArrowUp,
   Globe,
@@ -30,6 +31,7 @@ import {
   ToggleSwitch,
 } from "@/components/ui";
 import { Input } from "../../ui/Input";
+import { Button } from "../../ui/Button";
 import { TONE_TILE } from "../../ui/tones";
 import { ShortcutInput } from "../ShortcutInput";
 import { PushToTalk } from "../PushToTalk";
@@ -446,85 +448,42 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
   const ttsVoice = settings?.assistant_tts_voice ?? "af_heart";
   const ttsDtype = settings?.assistant_tts_kokoro_dtype ?? "fp32";
   const ttsSpeed = settings?.assistant_tts_speed ?? 1;
-  // Preload the local Kokoro voice as soon as it's the selected engine (and TTS
-  // is on), so its ~80 MB of weights are downloaded and cached here — before
-  // the user ever opens the assistant — instead of stalling the first spoken
-  // reply. The same instance still backs the Test button, which force-speaks
-  // regardless of `enabled`, so a test reuses the already-loaded model.
-  const preloadKokoro = ttsEnabled && ttsEngine === "kokoro";
-  const kokoroTest = useKokoroTts(preloadKokoro, ttsVoice, ttsDtype, ttsSpeed);
-
-  // Small "downloading voice… → ready" toast so the background download isn't
-  // invisible. A cache hit resolves well under the delay below, so no toast
-  // flashes on every visit once the model is already downloaded.
+  const kokoroEnabled = ttsEnabled && ttsEngine === "kokoro";
+  // Settings must never download Kokoro just because this page mounted. The
+  // live assistant still loads on an actual spoken reply; here, only Setup or
+  // Test voice may call prepare/speak.
+  const kokoroTest = useKokoroTts(
+    kokoroEnabled,
+    ttsVoice,
+    ttsDtype,
+    ttsSpeed,
+    false,
+  );
   const {
     status: kokoroStatus,
     progress: kokoroProgress,
     error: kokoroError,
   } = kokoroTest;
-  const kokoroToastIdRef = useRef<string | number | null>(null);
-  const kokoroToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null,
-  );
+  const kokoroReadyKey = `speakoflow.kokoro.ready.${ttsDtype}`;
+  const [kokoroPrepared, setKokoroPrepared] = useState(false);
 
   useEffect(() => {
-    const TOAST_ID = "kokoro-voice-download";
+    setKokoroPrepared(window.localStorage.getItem(kokoroReadyKey) === "true");
+  }, [kokoroReadyKey]);
 
-    if (kokoroStatus === "loading") {
-      if (kokoroToastIdRef.current != null) {
-        // Already showing — keep the percentage fresh as it climbs.
-        toast.loading(
-          t("settings.assistant.tts.downloadProgress", {
-            progress: kokoroProgress,
-          }),
-          { id: TOAST_ID },
-        );
-      } else if (kokoroToastTimerRef.current == null) {
-        // Defer surfacing the toast so a fast cache hit never flashes one.
-        kokoroToastTimerRef.current = setTimeout(() => {
-          kokoroToastTimerRef.current = null;
-          kokoroToastIdRef.current = toast.loading(
-            t("settings.assistant.tts.downloadStart"),
-            { id: TOAST_ID },
-          );
-        }, 600);
-      }
-      return;
-    }
+  const rememberKokoroReady = () => {
+    window.localStorage.setItem(kokoroReadyKey, "true");
+    setKokoroPrepared(true);
+  };
 
-    // Left the loading state: cancel a still-pending (fast download) timer.
-    if (kokoroToastTimerRef.current != null) {
-      clearTimeout(kokoroToastTimerRef.current);
-      kokoroToastTimerRef.current = null;
+  const handlePrepareKokoro = async () => {
+    try {
+      await kokoroTest.prepare();
+      rememberKokoroReady();
+    } catch {
+      // The hook exposes a precise error state in the setup row.
     }
-    // Only report an outcome if we actually surfaced a download in progress.
-    if (kokoroToastIdRef.current != null) {
-      if (kokoroStatus === "error" || kokoroError?.reason === "load") {
-        toast.error(t("settings.assistant.tts.downloadError"), {
-          id: TOAST_ID,
-        });
-      } else {
-        toast.success(t("settings.assistant.tts.downloadReady"), {
-          id: TOAST_ID,
-        });
-      }
-      kokoroToastIdRef.current = null;
-    }
-  }, [kokoroStatus, kokoroProgress, kokoroError, t]);
-
-  // Tidy up a pending timer / lingering toast if the user leaves this page
-  // mid-download.
-  useEffect(
-    () => () => {
-      if (kokoroToastTimerRef.current != null) {
-        clearTimeout(kokoroToastTimerRef.current);
-      }
-      if (kokoroToastIdRef.current != null) {
-        toast.dismiss(kokoroToastIdRef.current);
-      }
-    },
-    [],
-  );
+  };
 
   const handleTestTts = async () => {
     setTestState("testing");
@@ -532,6 +491,8 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
     const phrase = randomTestPhrase();
     try {
       if (ttsEngine === "kokoro") {
+        await kokoroTest.prepare();
+        rememberKokoroReady();
         await kokoroTest.speak(phrase, true);
       } else {
         const res = await commands.assistantTestTts(phrase);
@@ -936,25 +897,35 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
         </div>
       </SettingContainer>
 
-      <button
-        type="button"
-        onClick={onOpenLlmCatalog}
-        className="flex w-full items-center gap-3 px-4 py-3 text-start transition-colors hover:bg-ink/4 cursor-pointer"
-      >
-        <span
-          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${TONE_TILE.teal}`}
+      <div className="px-4 py-3">
+        <button
+          type="button"
+          onClick={onOpenLlmCatalog}
+          className={`flex w-full items-center gap-3 rounded-xl border px-3.5 py-3 text-start transition-colors cursor-pointer ${
+            llmModels.length === 0
+              ? "border-accent/35 bg-accent/8 hover:bg-accent/12"
+              : "border-hairline bg-surface-strong/55 hover:border-hairline-strong hover:bg-surface-strong"
+          }`}
         >
-          <Download size={15} />
-        </span>
-        <span className="min-w-0 flex-1 truncate text-[13px] text-ink">
-          {t("settings.assistant.brain.downloadModel")}
-        </span>
-        <ChevronRight
-          width={16}
-          height={16}
-          className="shrink-0 text-muted-soft"
-        />
-      </button>
+          <span
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${TONE_TILE.teal}`}
+          >
+            <Download size={17} />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[13px] font-medium text-ink">
+              {t("settings.assistant.brain.downloadModel")}
+            </span>
+            <span className="mt-0.5 block text-xs text-muted">
+              {t("settings.assistant.brain.downloadModelDescription")}
+            </span>
+          </span>
+          <span className="flex shrink-0 items-center gap-1 text-xs font-medium text-accent">
+            {t("settings.assistant.brain.downloadModelAction")}
+            <ChevronRight width={15} height={15} />
+          </span>
+        </button>
+      </div>
 
       <SettingContainer
         title={t("settings.assistant.provider.contextSizeLabel")}
@@ -1097,21 +1068,80 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
             </SettingContainer>
 
             {(settings?.assistant_tts_engine ?? "kokoro") === "kokoro" && (
-              <SettingContainer
-                title={t("settings.assistant.tts.voiceLabel")}
-                layout="horizontal"
-                grouped={true}
-              >
-                <Dropdown
-                  options={KOKORO_VOICES}
-                  selectedValue={settings?.assistant_tts_voice ?? "af_heart"}
-                  onSelect={(voice) =>
-                    setAndRefresh(commands.setAssistantTtsVoice(voice))
-                  }
-                  disabled={!settings?.assistant_tts_enabled}
-                  className="min-w-[340px]"
-                />
-              </SettingContainer>
+              <>
+                <SettingContainer
+                  title={t("settings.assistant.tts.kokoroSetupLabel")}
+                  description={t(
+                    "settings.assistant.tts.kokoroSetupDescription",
+                  )}
+                  descriptionMode="inline"
+                  layout="horizontal"
+                  grouped={true}
+                >
+                  <div className="flex min-w-[340px] justify-end">
+                    {kokoroStatus === "loading" ? (
+                      <div className="w-full max-w-[260px] space-y-1.5">
+                        <div className="flex items-center justify-between gap-3 text-xs text-muted">
+                          <span className="inline-flex items-center gap-1.5">
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            {t("settings.assistant.tts.kokoroDownloading")}
+                          </span>
+                          <span className="tabular-nums">
+                            {kokoroProgress}%
+                          </span>
+                        </div>
+                        <div className="h-1.5 overflow-hidden rounded-full bg-hairline-strong">
+                          <div
+                            className="h-full rounded-full bg-accent transition-[width] duration-200"
+                            style={{ width: `${kokoroProgress}%` }}
+                          />
+                        </div>
+                      </div>
+                    ) : kokoroPrepared ||
+                      kokoroStatus === "ready" ||
+                      kokoroStatus === "speaking" ? (
+                      <span className="inline-flex items-center gap-1.5 text-[13px] font-medium text-accent">
+                        <Check className="h-4 w-4" />
+                        {t("settings.assistant.tts.kokoroReady")}
+                      </span>
+                    ) : (
+                      <div className="flex flex-col items-end gap-1.5">
+                        <Button
+                          variant={kokoroError ? "secondary" : "primary-soft"}
+                          size="sm"
+                          onClick={() => void handlePrepareKokoro()}
+                        >
+                          <Download className="h-3.5 w-3.5" />
+                          {kokoroError
+                            ? t("settings.assistant.tts.kokoroRetry")
+                            : t("settings.assistant.tts.kokoroDownload")}
+                        </Button>
+                        {kokoroError && (
+                          <span className="text-xs text-error">
+                            {t("settings.assistant.tts.downloadError")}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </SettingContainer>
+
+                <SettingContainer
+                  title={t("settings.assistant.tts.voiceLabel")}
+                  layout="horizontal"
+                  grouped={true}
+                >
+                  <Dropdown
+                    options={KOKORO_VOICES}
+                    selectedValue={settings?.assistant_tts_voice ?? "af_heart"}
+                    onSelect={(voice) =>
+                      setAndRefresh(commands.setAssistantTtsVoice(voice))
+                    }
+                    disabled={!settings?.assistant_tts_enabled}
+                    className="min-w-[340px]"
+                  />
+                </SettingContainer>
+              </>
             )}
 
             {(settings?.assistant_tts_engine === "openai" ||

@@ -1137,7 +1137,7 @@ fn default_auto_submit() -> bool {
 }
 
 fn default_history_limit() -> usize {
-    5
+    20
 }
 
 fn default_recording_retention_period() -> RecordingRetentionPeriod {
@@ -1544,6 +1544,9 @@ fn default_assistant_tts_base_url() -> String {
 pub fn default_tts_base_url_for_engine(engine: &str) -> String {
     match engine {
         "openai" => "https://api.openai.com/v1".to_string(),
+        // OpenRouter is the OpenAI-compatible engine pointed at OpenRouter's
+        // hosted `/audio/speech` endpoint, so it gets its own default base URL.
+        "openrouter" => "https://openrouter.ai/api/v1".to_string(),
         // Azure Speech / ElevenLabs / Kokoro don't reuse the OpenAI base URL; an
         // empty value shows the field's placeholder so the user enters the right
         // endpoint (or needs none, for ElevenLabs/Kokoro).
@@ -1735,7 +1738,7 @@ fn ensure_assistant_defaults(settings: &mut AppSettings) -> bool {
     }
     if !matches!(
         settings.assistant_tts_engine.as_str(),
-        "kokoro" | "openai" | "elevenlabs" | "azure"
+        "kokoro" | "openai" | "openrouter" | "elevenlabs" | "azure"
     ) {
         settings.assistant_tts_engine = default_assistant_tts_engine();
         changed = true;
@@ -2973,6 +2976,12 @@ mod tests {
                 default_settings_json()
             );
         }
+    }
+
+    #[test]
+    fn default_settings_keep_twenty_recordings() {
+        assert_eq!(default_history_limit(), 20);
+        assert_eq!(get_default_settings().history_limit, 20);
     }
 
     #[test]

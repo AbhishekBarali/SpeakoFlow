@@ -18,6 +18,7 @@ import {
   FileText,
   MessageCircle,
   MessageSquarePlus,
+  Mic,
   RotateCcw,
   Star,
   Trash2,
@@ -255,12 +256,15 @@ type FeedItem =
   | { kind: "transcription"; sortTime: number; entry: HistoryEntry }
   | { kind: "assistant"; sortTime: number; session: AssistantHistoryEntry };
 
+type HistoryFilter = "all" | "recordings" | "assistant";
+
 export const HistorySettings: React.FC = () => {
   const { t } = useTranslation();
   const osType = useOsType();
   const { getSetting } = useSettings();
   const [entries, setEntries] = useState<HistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<HistoryFilter>("all");
   const [hasMore, setHasMore] = useState(true);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const entriesRef = useRef<HistoryEntry[]>([]);
@@ -385,6 +389,17 @@ export const HistorySettings: React.FC = () => {
       unlisten.then((fn) => fn());
     };
   }, [loadAssistantSessions]);
+
+  // Retention commands now clean recordings immediately. Refetch the first
+  // page after cleanup so deleted rows disappear without an app restart.
+  useEffect(() => {
+    const unlisten = listen("history-retention-applied", () => {
+      void loadPage();
+    });
+    return () => {
+      unlisten.then((fn) => fn());
+    };
+  }, [loadPage]);
 
   const toggleSaved = async (id: number) => {
     // Optimistic update
@@ -544,6 +559,16 @@ export const HistorySettings: React.FC = () => {
     return items;
   }, [entries, assistantSessions]);
 
+  const filteredFeed = useMemo(
+    () =>
+      feed.filter((item) => {
+        if (filter === "recordings") return item.kind === "transcription";
+        if (filter === "assistant") return item.kind === "assistant";
+        return true;
+      }),
+    [feed, filter],
+  );
+
   let content: React.ReactNode;
 
   if (loading || !assistantLoaded) {
@@ -552,17 +577,23 @@ export const HistorySettings: React.FC = () => {
         {t("settings.history.loading")}
       </div>
     );
-  } else if (feed.length === 0) {
+  } else if (filteredFeed.length === 0) {
+    const emptyKey =
+      filter === "recordings"
+        ? "settings.history.emptyRecordings"
+        : filter === "assistant"
+          ? "settings.history.emptyAssistant"
+          : "settings.history.empty";
     content = (
-      <div className="px-4 py-3 text-center text-text/60">
-        {t("settings.history.empty")}
+      <div className="px-4 py-8 text-center text-sm text-muted">
+        {t(emptyKey)}
       </div>
     );
   } else {
     content = (
       <>
         <div className="divide-y divide-hairline">
-          {feed.map((item) =>
+          {filteredFeed.map((item) =>
             item.kind === "transcription" ? (
               <HistoryEntryComponent
                 key={`t-${item.entry.id}`}
@@ -588,8 +619,8 @@ export const HistorySettings: React.FC = () => {
             ),
           )}
         </div>
-        {/* Sentinel for infinite scroll */}
-        <div ref={sentinelRef} className="h-1" />
+        {/* Pagination belongs to recordings; assistant sessions are loaded in one page. */}
+        {filter !== "assistant" && <div ref={sentinelRef} className="h-1" />}
       </>
     );
   }
@@ -602,7 +633,10 @@ export const HistorySettings: React.FC = () => {
       />
       {/* Storage settings live above the feed — with a long history the list
           scrolls forever, so anything below it is effectively unreachable. */}
-      <SettingsGroup title={t("settings.history.storage.title")}>
+      <SettingsGroup
+        title={t("settings.history.storage.title")}
+        description={t("settings.history.storage.description")}
+      >
         <RecordingRetentionPeriodSelector
           descriptionMode="tooltip"
           grouped={true}
@@ -612,7 +646,34 @@ export const HistorySettings: React.FC = () => {
         )}
       </SettingsGroup>
       <div className="space-y-2">
-        <div className="flex items-center justify-end">
+        <div className="flex items-center justify-between gap-3">
+          <div
+            className="inline-flex items-center rounded-lg bg-surface-strong p-0.5"
+            role="group"
+            aria-label={t("settings.history.filters.label")}
+          >
+            {(
+              [
+                ["all", "settings.history.filters.all"],
+                ["recordings", "settings.history.filters.recordings"],
+                ["assistant", "settings.history.filters.assistant"],
+              ] as const
+            ).map(([value, labelKey]) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={filter === value}
+                onClick={() => setFilter(value)}
+                className={`rounded-[7px] px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${
+                  filter === value
+                    ? "bg-surface text-ink shadow-sm"
+                    : "text-muted hover:text-ink"
+                }`}
+              >
+                {t(labelKey)}
+              </button>
+            ))}
+          </div>
           <OpenRecordingsButton
             onClick={openRecordingsFolder}
             label={t("settings.history.openFolder")}
@@ -721,7 +782,16 @@ const HistoryEntryComponent: React.FC<HistoryEntryProps> = ({
 
       {/* Meta row — quiet caption on the left, actions surface on hover. */}
       <div className="flex items-center justify-between gap-3">
-        <span className="text-xs text-muted shrink-0">{formattedDate}</span>
+        <span className="inline-flex shrink-0 items-center gap-1.5 text-xs text-muted">
+          <span className="inline-flex items-center gap-1 font-medium text-ink/75">
+            <Mic width={11} height={11} />
+            {t("settings.history.recordingLabel")}
+          </span>
+          <span aria-hidden="true" className="text-muted-soft">
+            ·
+          </span>
+          {formattedDate}
+        </span>
         <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-150">
           <IconButton
             onClick={handleCopyText}
@@ -856,13 +926,19 @@ const AssistantHistoryEntryComponent: React.FC<AssistantHistoryEntryProps> = ({
 
       {/* Meta row — quiet caption on the left, actions surface on hover. */}
       <div className="flex items-center justify-between gap-3 ps-[19px]">
-        <span className="text-xs text-muted shrink-0 inline-flex items-center gap-1.5">
+        <span className="inline-flex shrink-0 items-center gap-1.5 text-xs text-muted">
+          <span className="inline-flex items-center gap-1 font-medium text-ink/75">
+            <MessageCircle width={11} height={11} />
+            {t("settings.history.assistantLabel")}
+          </span>
+          <span aria-hidden="true" className="text-muted-soft">
+            ·
+          </span>
           {formattedDate}
           <span aria-hidden="true" className="text-muted-soft">
             ·
           </span>
           <span className="inline-flex items-center gap-1">
-            <MessageCircle width={11} height={11} />
             {t("settings.history.messageCount", {
               count: session.messages.length,
             })}

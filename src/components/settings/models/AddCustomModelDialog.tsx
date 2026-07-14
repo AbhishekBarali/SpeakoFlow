@@ -1,11 +1,14 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
+  Box,
   ChevronLeft,
+  ChevronRight,
   Download,
   Eye,
   Heart,
   Loader2,
+  RefreshCw,
   Search,
   X,
 } from "lucide-react";
@@ -34,6 +37,9 @@ const formatCount = (value: number): string => {
 
 const bytesToMb = (bytes: number): number =>
   Math.max(1, Math.round(bytes / (1024 * 1024)));
+
+const isRecommendedQuant = (file: HfGgufFile): boolean =>
+  (file.quant || file.filename).toUpperCase().includes("Q4_K_M");
 
 export const AddCustomModelDialog: React.FC<AddCustomModelDialogProps> = ({
   open,
@@ -171,229 +177,368 @@ export const AddCustomModelDialog: React.FC<AddCustomModelDialogProps> = ({
 
   if (!open) return null;
 
+  const hasQuery = query.trim().length > 0;
+
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-[2px]"
       onClick={onClose}
       role="presentation"
     >
       <div
-        className="bg-surface border border-hairline rounded-xl shadow-xl w-full max-w-xl max-h-[80vh] flex flex-col overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
+        className="flex max-h-[86vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-hairline-strong bg-surface shadow-[0_24px_80px_-24px_rgba(0,0,0,0.55)]"
+        onClick={(event) => event.stopPropagation()}
         role="dialog"
         aria-modal="true"
-        aria-label={t("settings.models.customModel.title")}
+        aria-labelledby="hugging-face-dialog-title"
       >
-        {/* Header */}
-        <div className="flex items-start justify-between gap-4 px-5 pt-4 pb-3 border-b border-hairline">
-          <div className="flex flex-col gap-0.5">
-            <h2 className="text-base font-semibold text-ink">
-              {t("settings.models.customModel.title")}
-            </h2>
-            <p className="text-xs text-muted">
-              {t("settings.models.customModel.subtitle")}
-            </p>
+        <div className="flex items-start justify-between gap-4 border-b border-hairline px-6 py-5">
+          <div className="flex min-w-0 items-start gap-3">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-accent/12 text-accent">
+              <Search className="h-[18px] w-[18px]" aria-hidden="true" />
+            </span>
+            <div className="min-w-0">
+              <h2
+                id="hugging-face-dialog-title"
+                className="text-base font-semibold tracking-tight text-ink"
+              >
+                {t("settings.models.customModel.title")}
+              </h2>
+              <p className="mt-0.5 max-w-[60ch] text-xs leading-relaxed text-muted">
+                {t("settings.models.customModel.subtitle")}
+              </p>
+            </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="text-muted hover:text-ink transition-colors rounded-full p-1 -mr-1"
+            className="-me-1 grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-transparent text-muted transition-colors hover:border-hairline hover:bg-surface-strong hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 cursor-pointer"
             aria-label={t("common.close")}
           >
-            <X className="w-4 h-4" />
+            <X className="h-4 w-4" aria-hidden="true" />
           </button>
         </div>
 
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto px-5 py-4">
+        <div className="flex-1 overflow-y-auto px-6 py-5">
           {selectedRepo ? (
-            // ── Quantization picker for the selected repo ──────────────
-            <div className="space-y-3">
+            <div className="space-y-5">
               <button
                 type="button"
                 onClick={handleBack}
-                className="flex items-center gap-1 text-sm text-muted hover:text-ink transition-colors"
+                className="group -ms-1.5 flex items-center gap-1 rounded-lg px-1.5 py-1 text-[13px] text-muted transition-colors hover:bg-surface-strong hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 cursor-pointer"
               >
-                <ChevronLeft className="w-4 h-4" />
+                <ChevronLeft
+                  className="h-4 w-4 transition-transform group-hover:-translate-x-0.5 motion-reduce:transition-none"
+                  aria-hidden="true"
+                />
                 {t("settings.models.customModel.back")}
               </button>
 
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-sm font-medium text-ink break-all">
-                  {selectedRepo.id}
+              <div className="flex items-center gap-3 rounded-2xl border border-hairline bg-surface-strong/55 p-4">
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-surface text-accent elev-chip">
+                  <Box className="h-[18px] w-[18px]" aria-hidden="true" />
                 </span>
-                {selectedRepo.is_vision && (
-                  <span className="flex items-center gap-1 text-xs text-muted">
-                    <Eye className="w-3.5 h-3.5" />
-                    {t("settings.models.customModel.visionBadge")}
-                  </span>
-                )}
+                <div className="min-w-0 flex-1">
+                  <p className="break-all text-sm font-semibold text-ink">
+                    {selectedRepo.id}
+                  </p>
+                  <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
+                    <span className="flex items-center gap-1">
+                      <Download className="h-3.5 w-3.5" aria-hidden="true" />
+                      {t("settings.models.customModel.downloads", {
+                        value: formatCount(selectedRepo.downloads),
+                      })}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Heart className="h-3.5 w-3.5" aria-hidden="true" />
+                      {formatCount(selectedRepo.likes)}
+                    </span>
+                    {selectedRepo.is_vision && (
+                      <span className="flex items-center gap-1 text-accent">
+                        <Eye className="h-3.5 w-3.5" aria-hidden="true" />
+                        {t("settings.models.customModel.visionBadge")}
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
 
               {loadingFiles && (
-                <div className="flex items-center justify-center gap-2 py-10 text-muted">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span className="text-sm">
-                    {t("settings.models.customModel.loadingFiles")}
-                  </span>
+                <div
+                  className="space-y-2"
+                  role="status"
+                  aria-label={t("settings.models.customModel.loadingFiles")}
+                >
+                  {[0, 1, 2].map((item) => (
+                    <div
+                      key={item}
+                      className="flex items-center gap-3 rounded-xl border border-hairline p-3"
+                      aria-hidden="true"
+                    >
+                      <div className="min-w-0 flex-1 space-y-2">
+                        <div className="h-3 w-24 animate-pulse rounded bg-surface-strong motion-reduce:animate-none" />
+                        <div className="h-2.5 w-3/4 animate-pulse rounded bg-surface-strong motion-reduce:animate-none" />
+                      </div>
+                      <div className="h-8 w-24 animate-pulse rounded-lg bg-surface-strong motion-reduce:animate-none" />
+                    </div>
+                  ))}
                 </div>
               )}
 
               {filesError && !loadingFiles && (
-                <p className="text-sm text-error py-6 text-center">
-                  {t("settings.models.customModel.repoFilesError")}
-                </p>
+                <div className="rounded-2xl border border-error/25 bg-error/[0.06] px-4 py-5 text-center">
+                  <p className="text-sm text-error">
+                    {t("settings.models.customModel.repoFilesError")}
+                  </p>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="mt-3"
+                    onClick={() => handleSelectRepo(selectedRepo)}
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+                    {t("settings.models.customModel.tryAgain")}
+                  </Button>
+                </div>
               )}
 
               {!loadingFiles &&
                 !filesError &&
                 repoFiles &&
                 repoFiles.gguf_files.length === 0 && (
-                  <p className="text-sm text-muted py-6 text-center">
-                    {t("settings.models.customModel.noGgufFiles")}
-                  </p>
+                  <div className="rounded-2xl border border-dashed border-hairline-strong px-4 py-6 text-center">
+                    <p className="text-sm text-muted">
+                      {t("settings.models.customModel.noGgufFiles")}
+                    </p>
+                  </div>
                 )}
 
               {!loadingFiles &&
                 !filesError &&
                 repoFiles &&
                 repoFiles.gguf_files.length > 0 && (
-                  <>
+                  <div className="space-y-4">
                     {repoFiles.mmproj_files.length > 0 && (
-                      <label className="flex items-start gap-2 p-2.5 rounded-lg bg-surface-strong cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={enableVision}
-                          onChange={(e) => setEnableVision(e.target.checked)}
-                          className="mt-0.5 accent-accent"
-                        />
-                        <span className="flex flex-col">
-                          <span className="text-sm text-ink">
+                      <label className="flex items-center gap-3 rounded-2xl border border-hairline bg-surface-strong/45 p-3.5 cursor-pointer">
+                        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-surface text-accent">
+                          <Eye className="h-4 w-4" aria-hidden="true" />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-sm font-medium text-ink">
                             {t("settings.models.customModel.enableVision")}
                           </span>
-                          <span className="text-xs text-muted">
+                          <span className="mt-0.5 block text-xs leading-relaxed text-muted">
                             {t("settings.models.customModel.enableVisionHint")}
                           </span>
                         </span>
+                        <input
+                          type="checkbox"
+                          checked={enableVision}
+                          onChange={(event) =>
+                            setEnableVision(event.target.checked)
+                          }
+                          className="h-4 w-4 shrink-0 accent-accent"
+                        />
                       </label>
                     )}
 
-                    <p className="text-[13px] font-semibold text-ink pt-1">
-                      {t("settings.models.customModel.selectQuant")}
-                    </p>
+                    <div>
+                      <h3 className="text-sm font-semibold text-ink">
+                        {t("settings.models.customModel.selectQuant")}
+                      </h3>
+                      <p className="mt-0.5 max-w-[62ch] text-xs leading-relaxed text-muted">
+                        {t("settings.models.customModel.selectQuantHint")}
+                      </p>
+                    </div>
 
-                    <div className="space-y-1.5">
+                    <div className="space-y-2">
                       {repoFiles.gguf_files.map((file) => {
                         const isAdding = addingFile === file.filename;
                         const anyAdding = addingFile !== null;
+                        const recommended = isRecommendedQuant(file);
                         return (
                           <div
                             key={file.filename}
-                            className="flex items-center gap-3 p-2.5 rounded-lg border border-hairline hover:border-ink/30 transition-colors"
+                            className={`flex flex-col gap-3 rounded-xl border p-3 transition-colors sm:flex-row sm:items-center ${
+                              recommended
+                                ? "border-accent/35 bg-accent/[0.045]"
+                                : "border-hairline hover:border-hairline-strong"
+                            }`}
                           >
-                            <div className="flex flex-col min-w-0 flex-1">
-                              <span className="text-sm font-medium text-ink truncate">
-                                {file.quant || file.filename}
-                              </span>
-                              <span className="text-xs text-muted truncate">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="text-sm font-semibold text-ink">
+                                  {file.quant || file.filename}
+                                </span>
+                                {recommended && (
+                                  <span className="rounded-md border border-accent/25 bg-accent/10 px-1.5 py-0.5 text-[11px] font-medium text-accent">
+                                    {t("onboarding.recommended")}
+                                  </span>
+                                )}
+                              </div>
+                              <span className="mt-0.5 block break-all text-xs text-muted">
                                 {file.filename}
                               </span>
                             </div>
-                            <span className="text-xs text-muted whitespace-nowrap">
-                              {formatModelSize(bytesToMb(file.size_bytes))}
-                            </span>
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              disabled={anyAdding}
-                              onClick={() => handleAdd(file)}
-                            >
-                              {isAdding ? (
-                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                              ) : (
-                                <Download className="w-3.5 h-3.5" />
-                              )}
-                              {isAdding
-                                ? t("settings.models.customModel.adding")
-                                : t("settings.models.customModel.add")}
-                            </Button>
+                            <div className="flex shrink-0 items-center justify-between gap-3 sm:justify-end">
+                              <span className="whitespace-nowrap text-xs tabular-nums text-muted">
+                                {formatModelSize(bytesToMb(file.size_bytes))}
+                              </span>
+                              <Button
+                                variant={recommended ? "primary" : "secondary"}
+                                size="sm"
+                                disabled={anyAdding}
+                                onClick={() => handleAdd(file)}
+                              >
+                                {isAdding ? (
+                                  <Loader2
+                                    className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none"
+                                    aria-hidden="true"
+                                  />
+                                ) : (
+                                  <Download
+                                    className="h-3.5 w-3.5"
+                                    aria-hidden="true"
+                                  />
+                                )}
+                                {isAdding
+                                  ? t("settings.models.customModel.adding")
+                                  : t("settings.models.customModel.add")}
+                              </Button>
+                            </div>
                           </div>
                         );
                       })}
                     </div>
-                  </>
+                  </div>
                 )}
             </div>
           ) : (
-            // ── Search + results list ──────────────────────────────────
-            <div className="space-y-3">
+            <div className="space-y-5">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-soft pointer-events-none" />
+                <Search
+                  className="pointer-events-none absolute start-4 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-muted"
+                  aria-hidden="true"
+                />
                 <input
                   ref={searchInputRef}
-                  type="text"
+                  type="search"
                   value={query}
-                  onChange={(e) => setQuery(e.target.value)}
+                  onChange={(event) => setQuery(event.target.value)}
                   placeholder={t(
                     "settings.models.customModel.searchPlaceholder",
                   )}
-                  className="w-full ps-9 pe-3 py-2 text-sm bg-surface border border-hairline-strong rounded-lg text-ink placeholder:text-muted-soft transition-colors duration-150 hover:border-ink/40 focus:outline-none focus:border-ink"
+                  className="h-12 w-full rounded-xl border border-hairline-strong bg-surface ps-11 pe-4 text-sm text-ink transition-[border-color,box-shadow,background-color] duration-150 placeholder:text-muted hover:border-ink/35 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
                 />
               </div>
 
-              {searching && (
-                <div className="flex items-center justify-center gap-2 py-10 text-muted">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span className="text-sm">
-                    {t("settings.models.customModel.searching")}
+              <div className="flex items-center justify-between gap-3 px-0.5">
+                <h3 className="text-sm font-semibold text-ink">
+                  {hasQuery
+                    ? t("settings.models.customModel.resultsTitle")
+                    : t("settings.models.customModel.popularTitle")}
+                </h3>
+                {!searching && results.length > 0 && (
+                  <span className="text-xs tabular-nums text-muted">
+                    {t("settings.models.customModel.resultCount", {
+                      count: results.length,
+                    })}
                   </span>
+                )}
+              </div>
+
+              {searching && (
+                <div
+                  className="grid grid-cols-1 gap-2 sm:grid-cols-2"
+                  role="status"
+                  aria-label={t("settings.models.customModel.searching")}
+                >
+                  {[0, 1, 2, 3].map((item) => (
+                    <div
+                      key={item}
+                      className="flex min-h-[88px] items-center gap-3 rounded-xl border border-hairline p-3.5"
+                      aria-hidden="true"
+                    >
+                      <div className="h-9 w-9 shrink-0 animate-pulse rounded-xl bg-surface-strong motion-reduce:animate-none" />
+                      <div className="min-w-0 flex-1 space-y-2">
+                        <div className="h-3 w-3/4 animate-pulse rounded bg-surface-strong motion-reduce:animate-none" />
+                        <div className="h-2.5 w-1/2 animate-pulse rounded bg-surface-strong motion-reduce:animate-none" />
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
 
               {searchError && !searching && (
-                <p className="text-sm text-error py-6 text-center">
-                  {t("settings.models.customModel.searchError")}
-                </p>
+                <div className="rounded-2xl border border-error/25 bg-error/[0.06] px-4 py-6 text-center">
+                  <p className="text-sm text-error">
+                    {t("settings.models.customModel.searchError")}
+                  </p>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="mt-3"
+                    onClick={() => runSearch(query)}
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+                    {t("settings.models.customModel.tryAgain")}
+                  </Button>
+                </div>
               )}
 
               {!searching && !searchError && results.length === 0 && (
-                <p className="text-sm text-muted py-6 text-center">
-                  {t("settings.models.customModel.noResults")}
-                </p>
+                <div className="rounded-2xl border border-dashed border-hairline-strong px-4 py-8 text-center">
+                  <span className="mx-auto grid h-10 w-10 place-items-center rounded-xl bg-surface-strong text-muted">
+                    <Search className="h-[18px] w-[18px]" aria-hidden="true" />
+                  </span>
+                  <p className="mt-3 text-sm text-muted">
+                    {t("settings.models.customModel.noResults")}
+                  </p>
+                </div>
               )}
 
               {!searching && !searchError && results.length > 0 && (
-                <div className="space-y-1.5">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   {results.map((repo) => (
                     <button
                       key={repo.id}
                       type="button"
                       onClick={() => handleSelectRepo(repo)}
-                      className="w-full flex items-center gap-3 p-2.5 rounded-lg border border-hairline hover:border-ink/30 hover:bg-surface-strong transition-colors text-left"
+                      className="group flex min-h-[88px] items-center gap-3 rounded-xl border border-hairline bg-surface p-3.5 text-start transition-[background-color,border-color,transform] duration-150 hover:border-accent/30 hover:bg-surface-strong/65 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 active:scale-[0.99] cursor-pointer"
                     >
-                      <div className="flex flex-col min-w-0 flex-1">
-                        <span className="text-sm font-medium text-ink truncate">
+                      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-surface-strong text-muted transition-colors group-hover:text-accent">
+                        <Box className="h-4 w-4" aria-hidden="true" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span
+                          className="block truncate text-sm font-semibold text-ink"
+                          title={repo.id}
+                        >
                           {repo.id}
                         </span>
-                        <span className="flex items-center gap-3 text-xs text-muted">
+                        <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
                           <span className="flex items-center gap-1">
-                            <Download className="w-3 h-3" />
+                            <Download className="h-3 w-3" aria-hidden="true" />
                             {t("settings.models.customModel.downloads", {
                               value: formatCount(repo.downloads),
                             })}
                           </span>
                           <span className="flex items-center gap-1">
-                            <Heart className="w-3 h-3" />
+                            <Heart className="h-3 w-3" aria-hidden="true" />
                             {formatCount(repo.likes)}
                           </span>
+                          {repo.is_vision && (
+                            <span className="flex items-center gap-1 text-accent">
+                              <Eye className="h-3 w-3" aria-hidden="true" />
+                              {t("settings.models.customModel.visionBadge")}
+                            </span>
+                          )}
                         </span>
-                      </div>
-                      {repo.is_vision && (
-                        <span className="flex items-center gap-1 text-xs text-muted whitespace-nowrap">
-                          <Eye className="w-3.5 h-3.5" />
-                          {t("settings.models.customModel.visionBadge")}
-                        </span>
-                      )}
+                      </span>
+                      <ChevronRight
+                        className="h-4 w-4 shrink-0 text-muted transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none"
+                        aria-hidden="true"
+                      />
                     </button>
                   ))}
                 </div>
