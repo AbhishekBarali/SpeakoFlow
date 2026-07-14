@@ -14,8 +14,6 @@
     "format:check": "prettier --check . && cd src-tauri && cargo fmt -- --check",
     "format:frontend": "prettier --write .",
     "format:backend": "cd src-tauri && cargo fmt",
-    "test:playwright": "playwright test",
-    "test:playwright:ui": "playwright test --ui",
     "check:translations": "bun scripts/check-translations.ts",
     "postinstall": "bun scripts/check-nix-deps.ts"
   },
@@ -51,7 +49,6 @@
     "zustand": "^5.0.8"
   },
   "devDependencies": {
-    "@playwright/test": "^1.58.0",
     "@tauri-apps/cli": "^2.10.0",
     "@types/node": "^24.9.1",
     "@types/react": "^18.3.26",

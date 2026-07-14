@@ -36,11 +36,6 @@ tauri.local-build.json
 recording_*
 .crush/
 
-# Playwright
-playwright-report/
-test-results/
-blob-report/
-
 .direnv
 .envrc
 
@@ -75,7 +70,6 @@ LAUNCH_PLAN.md
 # generated screenshots are all kept out of the public repo.
 demo-assets/
 demo-capture/
-playwright.capture.config.ts
 src/assistant/panel-demo.html
 src/assistant/panel-demo.tsx
 src/overlay/preview.html
