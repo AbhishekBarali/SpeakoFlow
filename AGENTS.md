@@ -2,6 +2,14 @@
 
 This file provides guidance to AI coding assistants working with code in this repository.
 
+## Graphify policy
+
+The project graph in `graphify-out/` is an optional architecture aid, not routine task machinery. Use focused `graphify query`, `graphify path`, or `graphify explain` commands for broad dependency and cross-feature questions, but read current source files before editing and stop using the graph if the first result is irrelevant.
+
+Do **not** run `graphify update .` after ordinary changes. Refresh only when the user explicitly asks, when roughly 10 or more meaningful hand-written source files changed across at least two major subsystems, when module/dependency/IPC boundaries changed, or when a dedicated architecture review needs a current snapshot. Exclude locales, generated files, build output, formatting, documentation, test-only changes, and Graphify output from the threshold. Localized features should normally skip refreshes.
+
+When justified, refresh once at the very end after validation. Never refresh more than once per task/session, never refresh for steering-only edits, and skip when uncertain. The full `/graphify` semantic rebuild requires an explicit user request.
+
 ## Development Commands
 
 **Prerequisites:**

@@ -69,6 +69,7 @@ pub fn apply_accelerator_settings(_app: &tauri::AppHandle) {}
 pub struct GpuDeviceOption {
     pub id: i32,
     pub name: String,
+    pub kind: String,
     pub total_vram_mb: usize,
 }
 
@@ -88,4 +89,9 @@ pub fn get_available_accelerators() -> AvailableAccelerators {
         gpu_devices: vec![],
         transcribe_cpp_devices: vec![],
     }
+}
+
+/// No GPU is available in the CI mock.
+pub fn preferred_gpu_device() -> Option<GpuDeviceOption> {
+    None
 }

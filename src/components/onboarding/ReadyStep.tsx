@@ -142,7 +142,7 @@ const ReadyStep: React.FC<ReadyStepProps> = ({ onComplete }) => {
 
   const footer = (
     <>
-      <p className="text-xs text-muted-soft max-w-[55%]">
+      <p className="text-xs text-muted max-w-[55%]">
         {t("onboarding.ready.signOff")}
       </p>
       <Button variant="primary" size="lg" onClick={onComplete}>
@@ -184,7 +184,7 @@ const ReadyStep: React.FC<ReadyStepProps> = ({ onComplete }) => {
               />
             </div>
           )}
-          <p className="anim-rise anim-delay-3 pt-1 text-center text-xs text-muted-soft">
+          <p className="anim-rise anim-delay-3 pt-1 text-center text-xs text-muted">
             {t("onboarding.ready.changeAnytime")}
           </p>
         </div>
@@ -209,13 +209,13 @@ const ReadyStep: React.FC<ReadyStepProps> = ({ onComplete }) => {
                   key={id}
                   className="w-full rounded-lg border border-hairline bg-surface px-3 py-2"
                 >
-                  <p className="flex items-center gap-1.5 text-xs text-text/70">
+                  <p className="flex items-center gap-1.5 text-xs text-muted">
                     <Loader2 className="w-3.5 h-3.5 animate-spin text-accent shrink-0" />
                     <span>{statusLineFor(id)}</span>
                   </p>
-                  <div className="mt-1.5 w-full h-1.5 bg-mid-gray/20 rounded-full overflow-hidden">
+                  <div className="mt-1.5 w-full h-1.5 bg-hairline-strong rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-logo-primary rounded-full transition-all duration-300"
+                      className="h-full bg-accent rounded-full transition-all duration-300"
                       style={{ width: `${pct}%` }}
                     />
                   </div>

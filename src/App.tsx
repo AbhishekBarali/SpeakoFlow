@@ -76,25 +76,13 @@ function App() {
 
   // Apply the appearance preference (light / dark / system) to <html>. The
   // CSS reacts to the resolved data-theme attribute. While the preference is
-  // "system", watchSystemTheme keeps it aligned with live OS theme changes.
-  //
-  // Exception: the first-run / onboarding flow always uses the dark theme
-  // regardless of the (light-by-default) preference, so it keeps its rich,
-  // branded gradient-black look; the real preference is restored once
-  // onboarding is done.
+  // "system", watchSystemTheme keeps every main-window surface — including
+  // onboarding and its loading states — aligned with live OS theme changes.
   const themePreference = (settings?.theme ?? "light") as ThemePreference;
-  const inOnboarding = onboardingStep !== null && onboardingStep !== "done";
   useEffect(() => {
-    if (inOnboarding) {
-      document.documentElement.dataset.theme = "dark";
-    } else {
-      applyThemePreference(themePreference);
-    }
-  }, [inOnboarding, themePreference]);
-  useEffect(
-    () => watchSystemTheme(() => (inOnboarding ? "dark" : themePreference)),
-    [inOnboarding, themePreference],
-  );
+    applyThemePreference(themePreference);
+  }, [themePreference]);
+  useEffect(() => watchSystemTheme(() => themePreference), [themePreference]);
 
   // Initialize Enigo, shortcuts, and refresh audio devices when main app loads
   useEffect(() => {

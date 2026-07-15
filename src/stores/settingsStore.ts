@@ -4,11 +4,51 @@ import { listen } from "@tauri-apps/api/event";
 import type {
   AppSettings as Settings,
   AudioDevice,
+  PostProcessReadiness,
   Replacement,
   WhisperAcceleratorSetting,
   OrtAcceleratorSetting,
 } from "@/bindings";
 import { commands } from "@/bindings";
+import { toast } from "sonner";
+import i18n from "@/i18n";
+
+let settingsRefreshGeneration = 0;
+let readinessRefreshGeneration = 0;
+const mutationGenerations = new Map<string, number>();
+const modelFetchGenerations = new Map<string, number>();
+let initializePromise: Promise<void> | null = null;
+
+const nextGeneration = (generations: Map<string, number>, key: string) => {
+  const next = (generations.get(key) ?? 0) + 1;
+  generations.set(key, next);
+  return next;
+};
+
+const commandSucceeded = (result: unknown): void => {
+  if (
+    typeof result === "object" &&
+    result !== null &&
+    "status" in result &&
+    result.status === "error"
+  ) {
+    const error = "error" in result ? String(result.error) : "Command failed";
+    throw new Error(error);
+  }
+};
+
+const isCleanupSetting = (key: keyof Settings): boolean =>
+  key === "post_process_enabled" ||
+  key === "post_process_selected_prompt_id" ||
+  key === "post_process_tone" ||
+  key === "post_process_timeout_secs";
+
+const showCleanupSaveError = () =>
+  toast.error(
+    i18n.t("settings.postProcessing.errors.saveFailed", {
+      defaultValue: "Couldn’t save the AI cleanup setting.",
+    }),
+  );
 
 interface SettingsStore {
   settings: Settings | null;
@@ -19,6 +59,9 @@ interface SettingsStore {
   outputDevices: AudioDevice[];
   customSounds: { start: boolean; stop: boolean };
   postProcessModelOptions: Record<string, string[]>;
+  postProcessReadiness: PostProcessReadiness | null;
+  isPostProcessReadinessLoading: boolean;
+  postProcessReadinessError: boolean;
 
   // Actions
   initialize: () => Promise<void>;
@@ -26,9 +69,10 @@ interface SettingsStore {
   updateSetting: <K extends keyof Settings>(
     key: K,
     value: Settings[K],
-  ) => Promise<void>;
+  ) => Promise<boolean>;
   resetSetting: (key: keyof Settings) => Promise<void>;
   refreshSettings: () => Promise<void>;
+  refreshPostProcessReadiness: () => Promise<void>;
   refreshAudioDevices: () => Promise<void>;
   refreshOutputDevices: () => Promise<void>;
   updateBinding: (id: string, binding: string) => Promise<void>;
@@ -37,22 +81,25 @@ interface SettingsStore {
   isUpdatingKey: (key: string) => boolean;
   playTestSound: (soundType: "start" | "stop") => Promise<void>;
   checkCustomSounds: () => Promise<void>;
-  setPostProcessProvider: (providerId: string) => Promise<void>;
+  setPostProcessProvider: (providerId: string) => Promise<boolean>;
   updatePostProcessSetting: (
     settingType: "base_url" | "api_key" | "model",
     providerId: string,
     value: string,
-  ) => Promise<void>;
+  ) => Promise<boolean>;
   updatePostProcessBaseUrl: (
     providerId: string,
     baseUrl: string,
-  ) => Promise<void>;
+  ) => Promise<boolean>;
   updatePostProcessApiKey: (
     providerId: string,
     apiKey: string,
-  ) => Promise<void>;
-  updatePostProcessModel: (providerId: string, model: string) => Promise<void>;
-  fetchPostProcessModels: (providerId: string) => Promise<string[]>;
+  ) => Promise<boolean>;
+  updatePostProcessModel: (
+    providerId: string,
+    model: string,
+  ) => Promise<boolean>;
+  fetchPostProcessModels: (providerId: string) => Promise<string[] | null>;
   setPostProcessModelOptions: (providerId: string, models: string[]) => void;
 
   // Internal state setters
@@ -126,6 +173,8 @@ const settingUpdaters: {
     commands.changeAssistantOverlayStyleSetting(value as string),
   debug_mode: (value) => commands.changeDebugModeSetting(value as boolean),
   custom_words: (value) => commands.updateCustomWords(value as string[]),
+  spoken_emojis_enabled: (value) =>
+    commands.changeSpokenEmojisEnabledSetting(value as boolean),
   replacements_enabled: (value) =>
     commands.changeReplacementsEnabledSetting(value as boolean),
   text_replacements: (value) =>
@@ -190,6 +239,9 @@ export const useSettingsStore = create<SettingsStore>()(
     outputDevices: [],
     customSounds: { start: false, stop: false },
     postProcessModelOptions: {},
+    postProcessReadiness: null,
+    isPostProcessReadinessLoading: false,
+    postProcessReadinessError: false,
 
     // Internal setters
     setSettings: (settings) => set({ settings }),
@@ -209,8 +261,12 @@ export const useSettingsStore = create<SettingsStore>()(
 
     // Load settings from store
     refreshSettings: async () => {
+      const generation = ++settingsRefreshGeneration;
       try {
         const result = await commands.getAppSettings();
+        // A newer mutation/refresh started while this read was in flight; drop
+        // this stale response so it can't overwrite a fresher optimistic value.
+        if (generation !== settingsRefreshGeneration) return;
         if (result.status === "ok") {
           const settings = result.data;
           const normalizedSettings: Settings = {
@@ -228,7 +284,34 @@ export const useSettingsStore = create<SettingsStore>()(
         }
       } catch (error) {
         console.error("Failed to load settings:", error);
-        set({ isLoading: false });
+        if (generation === settingsRefreshGeneration) set({ isLoading: false });
+      }
+    },
+
+    // Read the backend's single cleanup readiness resolver so the UI never
+    // recomputes "ready" rules in TypeScript.
+    refreshPostProcessReadiness: async () => {
+      const generation = ++readinessRefreshGeneration;
+      set({
+        isPostProcessReadinessLoading: true,
+        postProcessReadinessError: false,
+      });
+      try {
+        const readiness = await commands.getPostProcessReadiness();
+        if (generation !== readinessRefreshGeneration) return;
+        set({
+          postProcessReadiness: readiness,
+          isPostProcessReadinessLoading: false,
+          postProcessReadinessError: false,
+        });
+      } catch (error) {
+        console.error("Failed to load AI cleanup readiness:", error);
+        if (generation === readinessRefreshGeneration) {
+          set({
+            isPostProcessReadinessLoading: false,
+            postProcessReadinessError: true,
+          });
+        }
       }
     },
 
@@ -300,6 +383,10 @@ export const useSettingsStore = create<SettingsStore>()(
       const { settings, setUpdating } = get();
       const updateKey = String(key);
       const originalValue = settings?.[key];
+      const cleanup = isCleanupSetting(key);
+      const generation = cleanup
+        ? nextGeneration(mutationGenerations, updateKey)
+        : 0;
 
       setUpdating(updateKey, true);
 
@@ -310,17 +397,38 @@ export const useSettingsStore = create<SettingsStore>()(
 
         const updater = settingUpdaters[key];
         if (updater) {
-          await updater(value);
+          // Generated commands resolve `{status:"error"}` for non-Error
+          // rejections instead of throwing, so inspect the discriminant too.
+          commandSucceeded(await updater(value));
         } else if (key !== "bindings" && key !== "selected_model") {
           console.warn(`No handler for setting: ${String(key)}`);
         }
+
+        if (cleanup) {
+          void get().refreshPostProcessReadiness();
+        }
+        return true;
       } catch (error) {
         console.error(`Failed to update setting ${String(key)}:`, error);
-        if (settings) {
-          set({ settings: { ...settings, [key]: originalValue } });
+        // Roll back only this field on the CURRENT state, and only if a newer
+        // mutation for the same key hasn't superseded this one.
+        if (!cleanup || generation === mutationGenerations.get(updateKey)) {
+          set((state) =>
+            state.settings
+              ? { settings: { ...state.settings, [key]: originalValue } }
+              : { settings: state.settings },
+          );
         }
+        if (cleanup) {
+          showCleanupSaveError();
+          void get().refreshSettings();
+          void get().refreshPostProcessReadiness();
+        }
+        return false;
       } finally {
-        setUpdating(updateKey, false);
+        if (!cleanup || generation === mutationGenerations.get(updateKey)) {
+          setUpdating(updateKey, false);
+        }
       }
     },
 
@@ -425,6 +533,7 @@ export const useSettingsStore = create<SettingsStore>()(
       } = get();
       const updateKey = "post_process_provider_id";
       const previousId = settings?.post_process_provider_id ?? null;
+      const fetchGeneration = nextGeneration(modelFetchGenerations, providerId);
 
       setUpdating(updateKey, true);
 
@@ -441,8 +550,12 @@ export const useSettingsStore = create<SettingsStore>()(
       setPostProcessModelOptions(providerId, []);
 
       try {
-        await commands.setPostProcessProvider(providerId);
+        commandSucceeded(await commands.setPostProcessProvider(providerId));
         await refreshSettings();
+        void get().refreshPostProcessReadiness();
+        // Preserve latest-wins semantics for any concurrent model fetch.
+        void fetchGeneration;
+        return true;
       } catch (error) {
         console.error("Failed to set post-process provider:", error);
         if (previousId !== null) {
@@ -452,6 +565,10 @@ export const useSettingsStore = create<SettingsStore>()(
               : null,
           }));
         }
+        showCleanupSaveError();
+        void refreshSettings();
+        void get().refreshPostProcessReadiness();
+        return false;
       } finally {
         setUpdating(updateKey, false);
       }
@@ -470,18 +587,30 @@ export const useSettingsStore = create<SettingsStore>()(
 
       try {
         if (settingType === "base_url") {
-          await commands.changePostProcessBaseUrlSetting(providerId, value);
+          commandSucceeded(
+            await commands.changePostProcessBaseUrlSetting(providerId, value),
+          );
         } else if (settingType === "api_key") {
-          await commands.changePostProcessApiKeySetting(providerId, value);
+          commandSucceeded(
+            await commands.changePostProcessApiKeySetting(providerId, value),
+          );
         } else if (settingType === "model") {
-          await commands.changePostProcessModelSetting(providerId, value);
+          commandSucceeded(
+            await commands.changePostProcessModelSetting(providerId, value),
+          );
         }
         await refreshSettings();
+        void get().refreshPostProcessReadiness();
+        return true;
       } catch (error) {
         console.error(
           `Failed to update post-process ${settingType.replace("_", " ")}:`,
           error,
         );
+        showCleanupSaveError();
+        void refreshSettings();
+        void get().refreshPostProcessReadiness();
+        return false;
       } finally {
         setUpdating(updateKey, false);
       }
@@ -490,44 +619,46 @@ export const useSettingsStore = create<SettingsStore>()(
     updatePostProcessBaseUrl: async (providerId, baseUrl) => {
       const { setUpdating, refreshSettings } = get();
       const updateKey = `post_process_base_url:${providerId}`;
+      // A new endpoint invalidates any in-flight model list for this provider.
+      const fetchGeneration = nextGeneration(modelFetchGenerations, providerId);
 
       setUpdating(updateKey, true);
 
+      // Optimistically clear the provider's model + cached options and mark
+      // readiness as checking so a stale "Ready" state disappears at once.
+      set((state) => ({
+        settings: state.settings
+          ? {
+              ...state.settings,
+              post_process_models: {
+                ...state.settings.post_process_models,
+                [providerId]: "",
+              },
+            }
+          : state.settings,
+        postProcessModelOptions: {
+          ...state.postProcessModelOptions,
+          [providerId]: [],
+        },
+        isPostProcessReadinessLoading: true,
+      }));
+
       try {
-        // Persist the new base URL first.
-        const urlResult = await commands.changePostProcessBaseUrlSetting(
-          providerId,
-          baseUrl,
+        // The backend now clears the provider's cleanup model in the SAME
+        // write as the base URL, so this is a single atomic mutation.
+        commandSucceeded(
+          await commands.changePostProcessBaseUrlSetting(providerId, baseUrl),
         );
-        if (urlResult.status === "error") {
-          console.error("Failed to persist base URL:", urlResult.error);
-          return;
-        }
-
-        // Reset the stored model since the previous value is almost certainly
-        // invalid for the new endpoint (e.g. switching Custom from Groq to
-        // Cerebras). Only proceed if the reset succeeds.
-        const modelResult = await commands.changePostProcessModelSetting(
-          providerId,
-          "",
-        );
-        if (modelResult.status === "error") {
-          console.error("Failed to reset model setting:", modelResult.error);
-          return;
-        }
-
-        // Clear cached model options only after both backend writes succeed.
-        set((state) => ({
-          postProcessModelOptions: {
-            ...state.postProcessModelOptions,
-            [providerId]: [],
-          },
-        }));
-
-        // Single refresh after both backend writes.
         await refreshSettings();
+        void get().refreshPostProcessReadiness();
+        void fetchGeneration;
+        return true;
       } catch (error) {
         console.error("Failed to update post-process base URL:", error);
+        showCleanupSaveError();
+        void refreshSettings();
+        void get().refreshPostProcessReadiness();
+        return false;
       } finally {
         setUpdating(updateKey, false);
       }
@@ -535,6 +666,7 @@ export const useSettingsStore = create<SettingsStore>()(
 
     updatePostProcessApiKey: async (providerId, apiKey) => {
       // Clear cached models when API key changes - user should click refresh after
+      nextGeneration(modelFetchGenerations, providerId);
       set((state) => ({
         postProcessModelOptions: {
           ...state.postProcessModelOptions,
@@ -551,25 +683,32 @@ export const useSettingsStore = create<SettingsStore>()(
     fetchPostProcessModels: async (providerId) => {
       const updateKey = `post_process_models_fetch:${providerId}`;
       const { setUpdating, setPostProcessModelOptions } = get();
+      const generation = nextGeneration(modelFetchGenerations, providerId);
 
       setUpdating(updateKey, true);
 
       try {
-        // Call Tauri backend command instead of fetch
         const result = await commands.fetchPostProcessModels(providerId);
+        // A newer endpoint/key change (or provider switch) superseded this
+        // fetch; drop the stale list so old options can't repopulate.
+        if (generation !== modelFetchGenerations.get(providerId)) {
+          return null;
+        }
         if (result.status === "ok") {
           setPostProcessModelOptions(providerId, result.data);
           return result.data;
         } else {
           console.error("Failed to fetch models:", result.error);
-          return [];
+          return null;
         }
       } catch (error) {
         console.error("Failed to fetch models:", error);
-        // Don't cache empty array on error - let user retry
-        return [];
+        // Distinguish failure (null) from a legitimate empty list.
+        return null;
       } finally {
-        setUpdating(updateKey, false);
+        if (generation === modelFetchGenerations.get(providerId)) {
+          setUpdating(updateKey, false);
+        }
       }
     },
 
@@ -597,23 +736,33 @@ export const useSettingsStore = create<SettingsStore>()(
 
     // Initialize everything
     initialize: async () => {
-      const { refreshSettings, checkCustomSounds, loadDefaultSettings } = get();
+      // Many components call useSettings(); guard so multiple mounts can't
+      // start duplicate initialization/listeners while isLoading is still true.
+      if (initializePromise) return initializePromise;
 
-      // Note: Audio devices are NOT refreshed here. The frontend (App.tsx)
-      // is responsible for calling refreshAudioDevices/refreshOutputDevices
-      // after onboarding completes. This avoids triggering permission dialogs
-      // on macOS before the user is ready.
-      await Promise.all([
-        loadDefaultSettings(),
-        refreshSettings(),
-        checkCustomSounds(),
-      ]);
+      const run = async () => {
+        const { refreshSettings, checkCustomSounds, loadDefaultSettings } =
+          get();
 
-      // Re-fetch settings when the backend changes them (e.g. language
-      // reset during model switch). The backend is the source of truth.
-      listen("model-state-changed", () => {
-        get().refreshSettings();
-      });
+        // Note: Audio devices are NOT refreshed here. The frontend (App.tsx)
+        // is responsible for calling refreshAudioDevices/refreshOutputDevices
+        // after onboarding completes. This avoids triggering permission dialogs
+        // on macOS before the user is ready.
+        await Promise.all([
+          loadDefaultSettings(),
+          refreshSettings(),
+          checkCustomSounds(),
+        ]);
+
+        // Re-fetch settings when the backend changes them (e.g. language
+        // reset during model switch). The backend is the source of truth.
+        listen("model-state-changed", () => {
+          get().refreshSettings();
+        });
+      };
+
+      initializePromise = run();
+      return initializePromise;
     },
   })),
 );

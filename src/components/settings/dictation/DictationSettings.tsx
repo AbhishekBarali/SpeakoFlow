@@ -6,6 +6,7 @@ import { SectionHeader } from "@/components/ui/SectionHeader";
 import { ModelsSettings } from "../models/ModelsSettings";
 import { DictationModelCard } from "./DictationModelCard";
 import { AiCleanupGroup } from "./AiCleanupGroup";
+import { SpokenEmojiToggle } from "./SpokenEmojiToggle";
 import { ModelSettingsCard } from "../general/ModelSettingsCard";
 // Dictation-output rows: how transcribed text lands in the active app.
 import { PasteMethodSetting } from "../PasteMethod";
@@ -60,6 +61,7 @@ export const DictationSettings: React.FC = () => {
       <AiCleanupGroup />
 
       <SettingsGroup title={t("settings.dictation.output.title")}>
+        <SpokenEmojiToggle grouped={true} />
         <PasteMethodSetting grouped={true} />
         <TypingToolSetting grouped={true} />
         <ClipboardHandlingSetting grouped={true} />

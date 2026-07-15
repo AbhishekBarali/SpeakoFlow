@@ -105,20 +105,20 @@ const DownloadProgress: React.FC = () => {
                 <Loader2 className="w-3.5 h-3.5 animate-spin text-accent shrink-0" />
                 <span className="truncate">{name}</span>
               </span>
-              <span className="tabular-nums text-text/60 shrink-0">
+              <span className="tabular-nums text-muted shrink-0">
                 {statusLabel}
               </span>
             </div>
-            <div className="mt-1.5 w-full h-1.5 bg-mid-gray/20 rounded-full overflow-hidden">
+            <div className="mt-1.5 w-full h-1.5 bg-hairline-strong rounded-full overflow-hidden">
               <div
-                className={`h-full bg-logo-primary rounded-full transition-all duration-300 ${
+                className={`h-full bg-accent rounded-full transition-all duration-300 ${
                   indeterminate ? "animate-pulse w-full" : ""
                 }`}
                 style={indeterminate ? undefined : { width: `${pct}%` }}
               />
             </div>
             {!indeterminate && stats && stats.speed > 0 && (
-              <div className="mt-1 text-[11px] text-text/50 tabular-nums">
+              <div className="mt-1 text-[11px] text-muted tabular-nums">
                 {t("modelSelector.downloadSpeed", {
                   speed: stats.speed.toFixed(1),
                 })}

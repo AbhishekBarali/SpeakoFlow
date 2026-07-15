@@ -1,5 +1,6 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
 import {
   RefreshCw,
   Check,
@@ -17,6 +18,7 @@ import {
 import {
   commands,
   type TtsVoice,
+  type Result,
   type LocalLlmStatus,
   type AssistantResponseLength,
   type AssistantSearchDepth,
@@ -33,6 +35,7 @@ import {
 import { Input } from "../../ui/Input";
 import { Button } from "../../ui/Button";
 import { TONE_TILE } from "../../ui/tones";
+import { ProviderModeToggle } from "../PostProcessingSettingsApi/ProviderModeToggle";
 import { ShortcutInput } from "../ShortcutInput";
 import { PushToTalk } from "../PushToTalk";
 import { useSettings } from "../../../hooks/useSettings";
@@ -85,41 +88,6 @@ const TEST_PHRASES = [
 /** Pick a random sample line for the voice test. */
 const randomTestPhrase = (): string =>
   TEST_PHRASES[Math.floor(Math.random() * TEST_PHRASES.length)];
-
-/** Segmented "where the assistant brain runs" choice: on-device (built-in local
- *  engine) vs a cloud provider. Module-scope so it isn't recreated per render. */
-const BrainModeToggle: React.FC<{
-  mode: "device" | "cloud";
-  onChange: (mode: "device" | "cloud") => void;
-}> = ({ mode, onChange }) => {
-  const { t } = useTranslation();
-  const options: { value: "device" | "cloud"; label: string }[] = [
-    { value: "device", label: t("settings.assistant.brain.onDevice") },
-    { value: "cloud", label: t("settings.assistant.brain.cloud") },
-  ];
-  return (
-    <div className="inline-flex rounded-lg border border-hairline bg-surface-strong p-0.5">
-      {options.map((o) => {
-        const active = o.value === mode;
-        return (
-          <button
-            key={o.value}
-            type="button"
-            aria-pressed={active}
-            onClick={() => onChange(o.value)}
-            className={`rounded-md px-3.5 py-1.5 text-[13px] font-medium transition-colors cursor-pointer ${
-              active
-                ? "bg-surface text-ink shadow-sm"
-                : "text-muted hover:text-ink"
-            }`}
-          >
-            {o.label}
-          </button>
-        );
-      })}
-    </div>
-  );
-};
 
 /** An editable text field with type-to-search suggestions (native `<datalist>`)
  *  paired with a "Load" (refresh) button and an inline error line. Used for the
@@ -286,7 +254,12 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
   onOpenLlmCatalog,
 }) => {
   const { t } = useTranslation();
-  const { settings, refreshSettings, updatePostProcessApiKey } = useSettings();
+  const {
+    settings,
+    refreshSettings,
+    updatePostProcessApiKey,
+    updatePostProcessBaseUrl,
+  } = useSettings();
 
   const providers = settings?.post_process_providers || [];
   const selectedProviderId = settings?.assistant_provider_id || "custom";
@@ -331,13 +304,15 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
   // picker back to "Cloud provider" restores the user's choice instead of
   // resetting to a default.
   const [lastCloudProviderId, setLastCloudProviderId] = useState<string>(
-    selectedProviderId !== BUILTIN_PROVIDER_ID ? selectedProviderId : "custom",
+    selectedProvider &&
+      selectedProvider.id !== BUILTIN_PROVIDER_ID &&
+      selectedProvider.id !== "apple_intelligence"
+      ? selectedProvider.id
+      : "custom",
   );
-  useEffect(() => {
-    if (selectedProviderId !== BUILTIN_PROVIDER_ID) {
-      setLastCloudProviderId(selectedProviderId);
-    }
-  }, [selectedProviderId]);
+  const providerSwitchSequence = useRef(0);
+  const providerSwitchQueue = useRef<Promise<void>>(Promise.resolve());
+  const [isProviderSwitching, setIsProviderSwitching] = useState(false);
 
   // Web search section state.
   const [webSearchApiKey, setWebSearchApiKey] = useState("");
@@ -371,6 +346,76 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
   const [ttsModelsLoading, setTtsModelsLoading] = useState(false);
   const [ttsModelsError, setTtsModelsError] = useState<string | null>(null);
 
+  const ttsEngine = settings?.assistant_tts_engine ?? "kokoro";
+  const ttsEnabled = settings?.assistant_tts_enabled ?? false;
+  const ttsVoice = settings?.assistant_tts_voice ?? "af_heart";
+  const ttsDtype = settings?.assistant_tts_kokoro_dtype ?? "fp32";
+  const ttsSpeed = settings?.assistant_tts_speed ?? 1;
+
+  // TTS fields save on blur. Serialize those saves with actions such as Load
+  // and Test so a click can never overtake the blur that contains a newly typed
+  // API key/model/voice (the previous race sent OpenRouter an unauthenticated
+  // request even while the password field visibly contained a key).
+  const ttsTaskQueue = useRef<Promise<void>>(Promise.resolve());
+  const queueTtsTask = (task: () => Promise<void>): Promise<void> => {
+    const next = ttsTaskQueue.current.catch(() => undefined).then(task);
+    ttsTaskQueue.current = next;
+    return next;
+  };
+
+  const runTtsCommand = async (command: Promise<Result<null, string>>) => {
+    const result = await command;
+    if (result.status === "error") throw new Error(result.error);
+  };
+
+  /** Persist every visible remote-TTS draft before an action consumes it. */
+  const persistRemoteTtsDraft = async () => {
+    let changed = false;
+    if (
+      (ttsEngine === "openai" || ttsEngine === "azure") &&
+      ttsBaseUrl !== (settings?.assistant_tts_base_url ?? "")
+    ) {
+      await runTtsCommand(commands.setAssistantTtsBaseUrl(ttsBaseUrl));
+      changed = true;
+    }
+    if (
+      ttsEngine !== "kokoro" &&
+      ttsApiKey !== (settings?.assistant_tts_api_key ?? "")
+    ) {
+      await runTtsCommand(commands.setAssistantTtsApiKey(ttsApiKey));
+      changed = true;
+    }
+    if (
+      (ttsEngine === "openai" ||
+        ttsEngine === "openrouter" ||
+        ttsEngine === "elevenlabs") &&
+      ttsModel.trim() !== (settings?.assistant_tts_model ?? "").trim()
+    ) {
+      await runTtsCommand(commands.setAssistantTtsModel(ttsModel.trim()));
+      changed = true;
+    }
+    if (
+      ttsEngine !== "kokoro" &&
+      ttsRemoteVoice.trim() !==
+        (settings?.assistant_tts_remote_voice ?? "").trim()
+    ) {
+      await runTtsCommand(
+        commands.setAssistantTtsRemoteVoice(ttsRemoteVoice.trim()),
+      );
+      changed = true;
+    }
+
+    const parsedSpeed = Number.parseFloat(ttsSpeedInput);
+    if (Number.isFinite(parsedSpeed)) {
+      const clampedSpeed = Math.min(4, Math.max(0.25, parsedSpeed));
+      if (clampedSpeed !== ttsSpeed) {
+        await runTtsCommand(commands.setAssistantTtsSpeed(clampedSpeed));
+        changed = true;
+      }
+    }
+    if (changed) await refreshSettings();
+  };
+
   // Fetch the model list for the selected assistant provider from its /models
   // endpoint (shares the post-processing command since providers + keys are
   // shared). Errors surface inline; the field stays a free-text search so a
@@ -403,12 +448,13 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
     await refreshSettings();
   };
 
-  // Load selectable voices / models for the current remote TTS engine
-  // (OpenAI-compatible or ElevenLabs; Azure has its own loader above).
+  // Load selectable voices / models for the current remote TTS engine.
+  // Await pending field saves first so discovery uses the value on screen.
   const handleLoadTtsVoices = async () => {
     setTtsVoicesLoading(true);
     setTtsVoicesError(null);
     try {
+      await queueTtsTask(persistRemoteTtsDraft);
       const res = await commands.assistantListTtsVoices();
       if (res.status === "error") {
         setTtsVoicesError(res.error);
@@ -428,6 +474,7 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
     setTtsModelsLoading(true);
     setTtsModelsError(null);
     try {
+      await queueTtsTask(persistRemoteTtsDraft);
       const res = await commands.assistantListTtsModels();
       if (res.status === "error") {
         setTtsModelsError(res.error);
@@ -442,12 +489,6 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
       setTtsModelsLoading(false);
     }
   };
-
-  const ttsEngine = settings?.assistant_tts_engine ?? "kokoro";
-  const ttsEnabled = settings?.assistant_tts_enabled ?? false;
-  const ttsVoice = settings?.assistant_tts_voice ?? "af_heart";
-  const ttsDtype = settings?.assistant_tts_kokoro_dtype ?? "fp32";
-  const ttsSpeed = settings?.assistant_tts_speed ?? 1;
   const kokoroEnabled = ttsEnabled && ttsEngine === "kokoro";
   // Settings must never download Kokoro just because this page mounted. The
   // live assistant still loads on an actual spoken reply; here, only Setup or
@@ -495,6 +536,7 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
         rememberKokoroReady();
         await kokoroTest.speak(phrase, true);
       } else {
+        await queueTtsTask(persistRemoteTtsDraft);
         const res = await commands.assistantTestTts(phrase);
         if (res.status === "error") {
           setTestState("error");
@@ -614,24 +656,36 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
     setTtsModelsError(null);
   }, [settings?.assistant_tts_engine]);
 
-  const providerOptions = providers
-    .filter((p) => p.id !== "apple_intelligence")
-    .map((p) => ({ value: p.id, label: p.label }))
-    // Keep the built-in local model pinned to the top — it's the zero-setup,
-    // no-API-key option most users should reach for first.
-    .sort((a, b) =>
-      a.value === BUILTIN_PROVIDER_ID
-        ? -1
-        : b.value === BUILTIN_PROVIDER_ID
-          ? 1
-          : 0,
-    );
+  const providerOptions = useMemo(
+    () =>
+      providers
+        .filter((provider) => provider.id !== "apple_intelligence")
+        .map((provider) => ({ value: provider.id, label: provider.label }))
+        // Keep the built-in local model pinned to the top — it's the zero-setup,
+        // no-API-key option most users should reach for first.
+        .sort((a, b) =>
+          a.value === BUILTIN_PROVIDER_ID
+            ? -1
+            : b.value === BUILTIN_PROVIDER_ID
+              ? 1
+              : 0,
+        ),
+    [providers],
+  );
 
   // Cloud (non-built-in) providers only, for the "Cloud provider" brain mode.
   const cloudProviderOptions = useMemo(
     () => providerOptions.filter((p) => p.value !== BUILTIN_PROVIDER_ID),
     [providerOptions],
   );
+
+  useEffect(() => {
+    if (
+      cloudProviderOptions.some((option) => option.value === selectedProviderId)
+    ) {
+      setLastCloudProviderId(selectedProviderId);
+    }
+  }, [cloudProviderOptions, selectedProviderId]);
 
   // Options for the searchable assistant-model picker: loaded models for the
   // current provider plus the currently-set model (so a hand-typed value still
@@ -678,21 +732,69 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
     return opts;
   }, [ttsModelList, ttsModel]);
 
-  const handleProviderSelect = async (providerId: string) => {
-    await commands.setAssistantProvider(providerId);
-    await refreshSettings();
+  const showProviderSwitchError = () => {
+    toast.error(
+      t("settings.assistant.provider.saveFailed", {
+        defaultValue: "Couldn’t switch the Assistant provider.",
+      }),
+    );
+  };
+
+  const handleProviderSelect = (providerId: string) => {
+    const isValidTarget =
+      providerId === BUILTIN_PROVIDER_ID ||
+      cloudProviderOptions.some((option) => option.value === providerId);
+    if (!isValidTarget) {
+      showProviderSwitchError();
+      return;
+    }
+
+    const sequence = ++providerSwitchSequence.current;
+    setIsProviderSwitching(true);
+    const run = providerSwitchQueue.current
+      .catch(() => undefined)
+      .then(async () => {
+        // Skip a queued choice that was superseded before its write began.
+        if (sequence !== providerSwitchSequence.current) return;
+        try {
+          const result = await commands.setAssistantProvider(providerId);
+          if (sequence !== providerSwitchSequence.current) return;
+          if (result.status !== "ok") {
+            showProviderSwitchError();
+            return;
+          }
+          await refreshSettings();
+        } catch (error) {
+          console.error("Failed to switch Assistant provider:", error);
+          if (sequence === providerSwitchSequence.current) {
+            showProviderSwitchError();
+          }
+        }
+      });
+    providerSwitchQueue.current = run.finally(() => {
+      if (sequence === providerSwitchSequence.current) {
+        setIsProviderSwitching(false);
+      }
+    });
   };
 
   // Segmented brain picker: "On my device" is the built-in provider; "Cloud
-  // provider" is any other provider. Switching restores the user's last cloud
-  // choice rather than forcing a default.
+  // provider" is any other supported provider. Switching restores the user's
+  // last valid cloud choice rather than a hidden/stale provider.
   const brainMode: "device" | "cloud" = isBuiltin ? "device" : "cloud";
   const handleBrainModeChange = (mode: "device" | "cloud") => {
     if (mode === "device") {
-      if (!isBuiltin) void handleProviderSelect(BUILTIN_PROVIDER_ID);
-    } else if (isBuiltin) {
-      void handleProviderSelect(lastCloudProviderId);
+      if (!isBuiltin) handleProviderSelect(BUILTIN_PROVIDER_ID);
+      return;
     }
+    if (!isBuiltin) return;
+
+    const target = cloudProviderOptions.some(
+      (option) => option.value === lastCloudProviderId,
+    )
+      ? lastCloudProviderId
+      : cloudProviderOptions[0]?.value;
+    if (target) handleProviderSelect(target);
   };
 
   const handleApiKeyBlur = async () => {
@@ -700,8 +802,10 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
   };
 
   const handleBaseUrlBlur = async () => {
-    await commands.changePostProcessBaseUrlSetting(selectedProviderId, baseUrl);
-    await refreshSettings();
+    // Base URLs are shared with AI cleanup, so use the hardened store action:
+    // it checks Result.status, clears the now-invalid model, refreshes
+    // readiness, and reports failures — instead of a silent bypass write.
+    await updatePostProcessBaseUrl(selectedProviderId, baseUrl);
   };
 
   const setAndRefresh = async (promise: Promise<unknown>) => {
@@ -721,7 +825,7 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
   const handleTtsSpeedBlur = () => {
     const parsed = parseFloat(ttsSpeedInput);
     if (Number.isFinite(parsed)) {
-      void commitTtsSpeed(parsed);
+      void queueTtsTask(() => commitTtsSpeed(parsed));
     } else {
       // Revert an unparseable entry to the persisted value.
       setTtsSpeedInput(String(currentTtsSpeed));
@@ -793,6 +897,7 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
           options={cloudProviderOptions}
           selectedValue={selectedProviderId}
           onSelect={handleProviderSelect}
+          disabled={isProviderSwitching}
         />
       </SettingContainer>
 
@@ -1000,7 +1105,11 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
           layout="stacked"
           grouped={true}
         >
-          <BrainModeToggle mode={brainMode} onChange={handleBrainModeChange} />
+          <ProviderModeToggle
+            mode={brainMode}
+            onChange={handleBrainModeChange}
+            disabled={isProviderSwitching}
+          />
         </SettingContainer>
         {brainMode === "device" ? deviceProviderForm : cloudProviderForm}
       </SettingsGroup>
@@ -1048,19 +1157,10 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
                   },
                 ]}
                 selectedValue={settings?.assistant_tts_engine ?? "kokoro"}
-                onSelect={async (engine) => {
-                  // Pre-fill OpenRouter's base URL the first time it's picked so
-                  // the OpenAI-compatible path targets the right endpoint. Never
-                  // clobbers a base URL the user has already set.
-                  if (
-                    engine === "openrouter" &&
-                    !(settings?.assistant_tts_base_url ?? "").trim()
-                  ) {
-                    const url = "https://openrouter.ai/api/v1";
-                    setTtsBaseUrl(url);
-                    await setAndRefresh(commands.setAssistantTtsBaseUrl(url));
-                  }
-                  await setAndRefresh(commands.setAssistantTtsEngine(engine));
+                onSelect={(engine) => {
+                  void queueTtsTask(async () => {
+                    await setAndRefresh(commands.setAssistantTtsEngine(engine));
+                  });
                 }}
                 disabled={!settings?.assistant_tts_enabled}
                 className="min-w-[340px]"
@@ -1147,23 +1247,29 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
             {(settings?.assistant_tts_engine === "openai" ||
               settings?.assistant_tts_engine === "openrouter") && (
               <>
-                <SettingContainer
-                  title={t("settings.assistant.tts.baseUrlLabel")}
-                  info={t("settings.assistant.tts.baseUrlDescription")}
-                  layout="horizontal"
-                  grouped={true}
-                >
-                  <Input
-                    type="text"
-                    value={ttsBaseUrl}
-                    onChange={(e) => setTtsBaseUrl(e.target.value)}
-                    onBlur={() =>
-                      setAndRefresh(commands.setAssistantTtsBaseUrl(ttsBaseUrl))
-                    }
-                    placeholder="https://my-resource.openai.azure.com/openai/v1/audio/speech?api-version=2025-03-01-preview"
-                    className="w-[340px]"
-                  />
-                </SettingContainer>
+                {settings?.assistant_tts_engine === "openai" && (
+                  <SettingContainer
+                    title={t("settings.assistant.tts.baseUrlLabel")}
+                    info={t("settings.assistant.tts.baseUrlDescription")}
+                    layout="horizontal"
+                    grouped={true}
+                  >
+                    <Input
+                      type="text"
+                      value={ttsBaseUrl}
+                      onChange={(e) => setTtsBaseUrl(e.target.value)}
+                      onBlur={() => {
+                        void queueTtsTask(async () => {
+                          await setAndRefresh(
+                            commands.setAssistantTtsBaseUrl(ttsBaseUrl),
+                          );
+                        });
+                      }}
+                      placeholder="https://my-resource.openai.azure.com/openai/v1/audio/speech?api-version=2025-03-01-preview"
+                      className="w-[340px]"
+                    />
+                  </SettingContainer>
+                )}
                 <SettingContainer
                   title={t("settings.assistant.tts.apiKeyLabel")}
                   info={t("settings.assistant.tts.apiKeyDescription")}
@@ -1174,9 +1280,13 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
                     type="password"
                     value={ttsApiKey}
                     onChange={(e) => setTtsApiKey(e.target.value)}
-                    onBlur={() =>
-                      setAndRefresh(commands.setAssistantTtsApiKey(ttsApiKey))
-                    }
+                    onBlur={() => {
+                      void queueTtsTask(async () => {
+                        await setAndRefresh(
+                          commands.setAssistantTtsApiKey(ttsApiKey),
+                        );
+                      });
+                    }}
                     className="w-[340px]"
                   />
                 </SettingContainer>
@@ -1190,7 +1300,9 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
                     options={ttsModelOptions}
                     onCommit={(v) => {
                       setTtsModel(v);
-                      void setAndRefresh(commands.setAssistantTtsModel(v));
+                      void queueTtsTask(async () => {
+                        await setAndRefresh(commands.setAssistantTtsModel(v));
+                      });
                     }}
                     onLoad={handleLoadTtsModels}
                     loading={ttsModelsLoading}
@@ -1213,14 +1325,21 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
                     options={ttsVoiceOptions}
                     onCommit={(v) => {
                       setTtsRemoteVoice(v);
-                      void setAndRefresh(
-                        commands.setAssistantTtsRemoteVoice(v),
-                      );
+                      void queueTtsTask(async () => {
+                        await setAndRefresh(
+                          commands.setAssistantTtsRemoteVoice(v),
+                        );
+                      });
                     }}
                     onLoad={handleLoadTtsVoices}
                     loading={ttsVoicesLoading}
                     error={ttsVoicesError}
-                    placeholder="alloy"
+                    placeholder={
+                      ttsModel.toLowerCase().includes("gemini") &&
+                      ttsModel.toLowerCase().includes("tts")
+                        ? "Puck"
+                        : "alloy"
+                    }
                     loadLabel={t("settings.assistant.tts.loadVoices")}
                     formatCreateLabel={(input) =>
                       t("settings.assistant.tts.voicesUse", { voice: input })
@@ -1242,9 +1361,13 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
                     type="password"
                     value={ttsApiKey}
                     onChange={(e) => setTtsApiKey(e.target.value)}
-                    onBlur={() =>
-                      setAndRefresh(commands.setAssistantTtsApiKey(ttsApiKey))
-                    }
+                    onBlur={() => {
+                      void queueTtsTask(async () => {
+                        await setAndRefresh(
+                          commands.setAssistantTtsApiKey(ttsApiKey),
+                        );
+                      });
+                    }}
                     className="w-[340px]"
                   />
                 </SettingContainer>
@@ -1259,9 +1382,11 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
                     options={ttsVoiceOptions}
                     onCommit={(v) => {
                       setTtsRemoteVoice(v);
-                      void setAndRefresh(
-                        commands.setAssistantTtsRemoteVoice(v),
-                      );
+                      void queueTtsTask(async () => {
+                        await setAndRefresh(
+                          commands.setAssistantTtsRemoteVoice(v),
+                        );
+                      });
                     }}
                     onLoad={handleLoadTtsVoices}
                     loading={ttsVoicesLoading}
@@ -1285,7 +1410,9 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
                     options={ttsModelOptions}
                     onCommit={(v) => {
                       setTtsModel(v);
-                      void setAndRefresh(commands.setAssistantTtsModel(v));
+                      void queueTtsTask(async () => {
+                        await setAndRefresh(commands.setAssistantTtsModel(v));
+                      });
                     }}
                     onLoad={handleLoadTtsModels}
                     loading={ttsModelsLoading}
@@ -1312,9 +1439,13 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
                     type="text"
                     value={ttsBaseUrl}
                     onChange={(e) => setTtsBaseUrl(e.target.value)}
-                    onBlur={() =>
-                      setAndRefresh(commands.setAssistantTtsBaseUrl(ttsBaseUrl))
-                    }
+                    onBlur={() => {
+                      void queueTtsTask(async () => {
+                        await setAndRefresh(
+                          commands.setAssistantTtsBaseUrl(ttsBaseUrl),
+                        );
+                      });
+                    }}
                     placeholder="https://eastus2.tts.speech.microsoft.com"
                     className="w-[340px]"
                   />
@@ -1329,9 +1460,13 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
                     type="password"
                     value={ttsApiKey}
                     onChange={(e) => setTtsApiKey(e.target.value)}
-                    onBlur={() =>
-                      setAndRefresh(commands.setAssistantTtsApiKey(ttsApiKey))
-                    }
+                    onBlur={() => {
+                      void queueTtsTask(async () => {
+                        await setAndRefresh(
+                          commands.setAssistantTtsApiKey(ttsApiKey),
+                        );
+                      });
+                    }}
                     className="w-[340px]"
                   />
                 </SettingContainer>
@@ -1346,9 +1481,11 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
                     options={ttsVoiceOptions}
                     onCommit={(v) => {
                       setTtsRemoteVoice(v);
-                      void setAndRefresh(
-                        commands.setAssistantTtsRemoteVoice(v),
-                      );
+                      void queueTtsTask(async () => {
+                        await setAndRefresh(
+                          commands.setAssistantTtsRemoteVoice(v),
+                        );
+                      });
                     }}
                     onLoad={handleLoadTtsVoices}
                     loading={ttsVoicesLoading}
@@ -1376,7 +1513,9 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
                     <button
                       key={preset}
                       type="button"
-                      onClick={() => commitTtsSpeed(preset)}
+                      onClick={() => {
+                        void queueTtsTask(() => commitTtsSpeed(preset));
+                      }}
                       disabled={!settings?.assistant_tts_enabled}
                       className={`px-2.5 py-1 text-[13px] font-medium rounded-md transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
                         active

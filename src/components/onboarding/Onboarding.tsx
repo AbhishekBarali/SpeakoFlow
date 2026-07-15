@@ -150,7 +150,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ onModelSelected }) => {
 
   const footer = (
     <>
-      <p className="text-xs text-muted-soft max-w-[55%]">
+      <p className="text-xs text-muted max-w-[55%]">
         {installedModel
           ? t("onboarding.speechToText.installedHint")
           : t("onboarding.speechToText.downloadingHint")}

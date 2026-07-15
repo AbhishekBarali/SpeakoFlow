@@ -1,5 +1,5 @@
 use crate::huggingface::{self, HfModelSummary, HfRepoFiles};
-use crate::managers::model::{ModelInfo, ModelManager};
+use crate::managers::model::{ModelInfo, ModelManager, DOWNLOAD_CANCELLED_ERROR};
 use crate::managers::transcription::{ModelStateEvent, TranscriptionManager};
 use crate::settings::{get_settings, write_settings, ModelUnloadTimeout};
 use std::sync::Arc;
@@ -29,19 +29,18 @@ pub async fn download_model(
     model_manager: State<'_, Arc<ModelManager>>,
     model_id: String,
 ) -> Result<(), String> {
-    let result = model_manager
-        .download_model(&model_id)
-        .await
-        .map_err(|e| e.to_string());
+    let result = model_manager.download_model(&model_id).await;
 
     if let Err(ref error) = result {
-        let _ = app_handle.emit(
-            "model-download-failed",
-            serde_json::json!({ "model_id": &model_id, "error": error }),
-        );
+        if error.to_string() != DOWNLOAD_CANCELLED_ERROR {
+            let _ = app_handle.emit(
+                "model-download-failed",
+                serde_json::json!({ "model_id": &model_id, "error": error.to_string() }),
+            );
+        }
     }
 
-    result
+    result.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -52,8 +51,21 @@ pub async fn delete_model(
     transcription_manager: State<'_, Arc<TranscriptionManager>>,
     model_id: String,
 ) -> Result<(), String> {
-    // If deleting the active model, unload it and clear the setting
+    // Never leave the built-in assistant pointing at a deleted local model.
+    // Users must switch its selection first; this also protects custom models
+    // whose catalog record would otherwise disappear entirely.
     let settings = get_settings(&app_handle);
+    if settings
+        .assistant_models
+        .get("builtin")
+        .is_some_and(|active_id| active_id == &model_id)
+    {
+        return Err(
+            "Switch the built-in assistant to another model before deleting this one.".to_string(),
+        );
+    }
+
+    // If deleting the active transcription model, unload it and clear the setting.
     if settings.selected_model == model_id {
         transcription_manager
             .unload_model()

@@ -22,9 +22,10 @@ use tauri_plugin_autostart::ManagerExt;
 #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
 use crate::settings::APPLE_INTELLIGENCE_DEFAULT_MODEL_ID;
 use crate::settings::{
-    self, get_settings, AutoSubmitKey, ClipboardHandling, KeyboardImplementation, LLMPrompt,
-    OverlayPosition, PasteMethod, ShortcutBinding, SoundTheme, Theme, TypingTool, UiTextSize,
-    APPLE_INTELLIGENCE_PROVIDER_ID,
+    self, get_settings, AutoSubmitKey, ClipboardHandling, CustomPostProcessTone,
+    KeyboardImplementation, LLMPrompt, OverlayPosition, PasteMethod, PostProcessTone,
+    ShortcutBinding, SoundTheme, Theme, TypingTool, UiTextSize, APPLE_INTELLIGENCE_PROVIDER_ID,
+    DEFAULT_POST_PROCESS_TONE_ID,
 };
 use crate::tray;
 
@@ -764,6 +765,15 @@ pub fn update_custom_words(app: AppHandle, words: Vec<String>) -> Result<(), Str
 
 #[tauri::command]
 #[specta::specta]
+pub fn change_spoken_emojis_enabled_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    settings.spoken_emojis_enabled = enabled;
+    settings::write_settings(&app, settings);
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
 pub fn change_replacements_enabled_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
     let mut settings = settings::get_settings(&app);
     settings.replacements_enabled = enabled;
@@ -946,6 +956,13 @@ pub fn change_auto_submit_key_setting(app: AppHandle, key: String) -> Result<(),
 
 #[tauri::command]
 #[specta::specta]
+pub fn get_post_process_readiness(app: AppHandle) -> settings::PostProcessReadiness {
+    let current = settings::get_settings(&app);
+    settings::post_process_readiness(&current)
+}
+
+#[tauri::command]
+#[specta::specta]
 pub fn change_post_process_enabled_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
     let mut settings = settings::get_settings(&app);
     settings.post_process_enabled = enabled;
@@ -972,18 +989,104 @@ pub fn change_post_process_enabled_setting(app: AppHandle, enabled: bool) -> Res
 #[specta::specta]
 pub fn change_post_process_tone_setting(app: AppHandle, tone: String) -> Result<(), String> {
     let mut settings = settings::get_settings(&app);
-    settings.post_process_tone = match tone.as_str() {
-        "none" => crate::settings::PostProcessTone::None,
-        "formal" => crate::settings::PostProcessTone::Formal,
-        "casual" => crate::settings::PostProcessTone::Casual,
-        "professional" => crate::settings::PostProcessTone::Professional,
-        "friendly" => crate::settings::PostProcessTone::Friendly,
-        "concise" => crate::settings::PostProcessTone::Concise,
-        other => {
-            warn!("Invalid post-process tone '{}', defaulting to none", other);
-            crate::settings::PostProcessTone::None
-        }
+    let tone_id = tone.trim();
+
+    if let Some(builtin) = PostProcessTone::from_id(tone_id) {
+        settings.post_process_tone = builtin;
+        settings.post_process_selected_tone_id = Some(builtin.id().to_string());
+    } else if settings
+        .post_process_custom_tones
+        .iter()
+        .any(|custom| custom.id == tone_id && custom.is_valid())
+    {
+        // Keep the legacy field neutral; the new ID is authoritative and lets
+        // old builds degrade to cleanup-only instead of a misleading style.
+        settings.post_process_tone = PostProcessTone::None;
+        settings.post_process_selected_tone_id = Some(tone_id.to_string());
+    } else {
+        return Err(format!("Writing style '{}' not found", tone_id));
+    }
+
+    settings::write_settings(&app, settings);
+    Ok(())
+}
+
+fn validate_custom_tone_fields(name: &str, instruction: &str) -> Result<(), String> {
+    if name.trim().is_empty() {
+        return Err("Writing style name cannot be empty".to_string());
+    }
+    if instruction.trim().is_empty() {
+        return Err("Writing style instructions cannot be empty".to_string());
+    }
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn add_post_process_custom_tone(
+    app: AppHandle,
+    name: String,
+    instruction: String,
+) -> Result<CustomPostProcessTone, String> {
+    validate_custom_tone_fields(&name, &instruction)?;
+    let mut settings = settings::get_settings(&app);
+    let id = format!("tone_{}", chrono::Utc::now().timestamp_micros());
+    let tone = CustomPostProcessTone {
+        id,
+        name: name.trim().to_string(),
+        instruction: instruction.trim().to_string(),
     };
+    settings.post_process_custom_tones.push(tone.clone());
+    settings::write_settings(&app, settings);
+    Ok(tone)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn update_post_process_custom_tone(
+    app: AppHandle,
+    id: String,
+    name: String,
+    instruction: String,
+) -> Result<(), String> {
+    validate_custom_tone_fields(&name, &instruction)?;
+    if PostProcessTone::from_id(id.trim()).is_some() {
+        return Err("Built-in writing styles cannot be edited".to_string());
+    }
+
+    let mut settings = settings::get_settings(&app);
+    let tone = settings
+        .post_process_custom_tones
+        .iter_mut()
+        .find(|tone| tone.id == id)
+        .ok_or_else(|| format!("Writing style '{}' not found", id))?;
+    tone.name = name.trim().to_string();
+    tone.instruction = instruction.trim().to_string();
+    settings::write_settings(&app, settings);
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn delete_post_process_custom_tone(app: AppHandle, id: String) -> Result<(), String> {
+    if PostProcessTone::from_id(id.trim()).is_some() {
+        return Err("Built-in writing styles cannot be deleted".to_string());
+    }
+
+    let mut settings = settings::get_settings(&app);
+    let original_len = settings.post_process_custom_tones.len();
+    settings
+        .post_process_custom_tones
+        .retain(|tone| tone.id != id);
+    if settings.post_process_custom_tones.len() == original_len {
+        return Err(format!("Writing style '{}' not found", id));
+    }
+
+    if settings.post_process_selected_tone_id.as_deref() == Some(id.as_str()) {
+        settings.post_process_selected_tone_id = Some(DEFAULT_POST_PROCESS_TONE_ID.to_string());
+        settings.post_process_tone = PostProcessTone::None;
+    }
+
     settings::write_settings(&app, settings);
     Ok(())
 }
@@ -1038,6 +1141,12 @@ pub fn change_post_process_base_url_setting(
     }
 
     provider.base_url = base_url;
+    // A deployment/model name belongs to the old endpoint. Clear it in the
+    // same persisted write so the frontend never has to coordinate a partial
+    // URL-save/model-reset transaction.
+    settings
+        .post_process_models
+        .insert(provider_id, String::new());
     settings::write_settings(&app, settings);
     Ok(())
 }
@@ -1161,10 +1270,11 @@ pub fn delete_post_process_prompt(app: AppHandle, id: String) -> Result<(), Stri
         return Err(format!("Prompt with id '{}' not found", id));
     }
 
-    // If the deleted prompt was selected, select the first one or None
+    // If the deleted prompt was selected, return to the stable bundled prompt.
+    // `get_settings`/migration guarantees that prompt exists and is non-empty.
     if settings.post_process_selected_prompt_id.as_ref() == Some(&id) {
         settings.post_process_selected_prompt_id =
-            settings.post_process_prompts.first().map(|p| p.id.clone());
+            Some(settings::DEFAULT_POST_PROCESS_PROMPT_ID.to_string());
     }
 
     settings::write_settings(&app, settings);
@@ -1205,8 +1315,9 @@ pub async fn fetch_post_process_models(
         .cloned()
         .unwrap_or_default();
 
-    // Skip fetching if no API key for providers that typically need one
-    if api_key.trim().is_empty() && provider.id != "custom" {
+    // Fixed hosted providers need a key; local, built-in, custom, Apple, and
+    // unknown compatible endpoints may intentionally be keyless.
+    if api_key.trim().is_empty() && settings::post_process_provider_requires_api_key(&provider.id) {
         return Err(format!(
             "API key is required for {}. Please add an API key to list available models.",
             provider.label
@@ -1221,9 +1332,14 @@ pub async fn fetch_post_process_models(
 pub fn set_post_process_selected_prompt(app: AppHandle, id: String) -> Result<(), String> {
     let mut settings = settings::get_settings(&app);
 
-    // Verify the prompt exists
-    if !settings.post_process_prompts.iter().any(|p| p.id == id) {
-        return Err(format!("Prompt with id '{}' not found", id));
+    // Verify the prompt exists and is usable.
+    let selected = settings
+        .post_process_prompts
+        .iter()
+        .find(|prompt| prompt.id == id)
+        .ok_or_else(|| format!("Prompt with id '{}' not found", id))?;
+    if selected.prompt.trim().is_empty() {
+        return Err("Cannot select an empty cleanup prompt".to_string());
     }
 
     settings.post_process_selected_prompt_id = Some(id);

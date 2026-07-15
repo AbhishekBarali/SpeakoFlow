@@ -110,7 +110,7 @@ What unsigned builds DO change (distribution only — so don't ship them to real
 users):
 
 - **Windows:** SmartScreen shows "Windows protected your PC — unknown
-  publisher". Users must click *More info → Run anyway*. Not broken, just scary.
+  publisher". Users must click _More info → Run anyway_. Not broken, just scary.
 - **macOS:** Gatekeeper is stricter — "app can't be opened / unidentified
   developer" (or "damaged"). Users must right-click → Open, or run
   `xattr -cr /Applications/SpeakoFlow.app`.

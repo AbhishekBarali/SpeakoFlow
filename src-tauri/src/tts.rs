@@ -17,7 +17,7 @@
 //! The "kokoro" engine runs fully locally in the panel webview
 //! (kokoro-js, WebGPU) and never reaches this module.
 
-use crate::settings::AppSettings;
+use crate::settings::{AppSettings, OPENROUTER_TTS_BASE_URL};
 use log::{debug, error};
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -324,8 +324,22 @@ async fn openai_speech_attempt(
 /// 400 — so on that specific error we transparently retry as `pcm` and wrap the
 /// raw samples in a WAV container (see [`pcm_to_wav`]) so playback still works.
 /// This self-heals for any pcm-only model without a hardcoded model list.
+fn openai_tts_base_url(settings: &AppSettings) -> &str {
+    if settings.assistant_tts_engine == "openrouter" {
+        OPENROUTER_TTS_BASE_URL
+    } else {
+        settings.assistant_tts_base_url.trim()
+    }
+}
+
 async fn fetch_openai_speech(settings: &AppSettings, text: &str) -> Result<Vec<u8>, String> {
-    let raw = settings.assistant_tts_base_url.trim();
+    if settings.assistant_tts_engine == "openrouter"
+        && settings.assistant_tts_api_key.0.trim().is_empty()
+    {
+        return Err("OpenRouter API key is required for voice output".to_string());
+    }
+
+    let raw = openai_tts_base_url(settings);
     let url = if raw.contains("/audio/speech") {
         raw.to_string()
     } else {
@@ -644,6 +658,41 @@ pub async fn list_tts_voices(settings: &AppSettings) -> Result<Vec<TtsVoice>, St
 /// are the five voices it actually accepts.
 const GROK_TTS_VOICES: &[&str] = &["Eve", "Ara", "Rex", "Sal", "Leo"];
 
+/// Gemini TTS voices and Google's documented style labels. Shared by Gemini
+/// 3.1 Flash TTS Preview and Gemini 2.5 Flash/Pro Preview TTS.
+const GEMINI_TTS_VOICES: &[(&str, &str)] = &[
+    ("Zephyr", "Bright"),
+    ("Puck", "Upbeat"),
+    ("Charon", "Informative"),
+    ("Kore", "Firm"),
+    ("Fenrir", "Excitable"),
+    ("Leda", "Youthful"),
+    ("Orus", "Firm"),
+    ("Aoede", "Breezy"),
+    ("Callirrhoe", "Easy-going"),
+    ("Autonoe", "Bright"),
+    ("Enceladus", "Breathy"),
+    ("Iapetus", "Clear"),
+    ("Umbriel", "Easy-going"),
+    ("Algieba", "Smooth"),
+    ("Despina", "Smooth"),
+    ("Erinome", "Clear"),
+    ("Algenib", "Gravelly"),
+    ("Rasalgethi", "Informative"),
+    ("Laomedeia", "Upbeat"),
+    ("Achernar", "Soft"),
+    ("Alnilam", "Firm"),
+    ("Schedar", "Even"),
+    ("Gacrux", "Mature"),
+    ("Pulcherrima", "Forward"),
+    ("Achird", "Friendly"),
+    ("Zubenelgenubi", "Casual"),
+    ("Vindemiatrix", "Gentle"),
+    ("Sadachbia", "Lively"),
+    ("Sadaltager", "Knowledgeable"),
+    ("Sulafat", "Warm"),
+];
+
 /// Turn a slice of voice tokens into pickable [`TtsVoice`]s (id == label).
 fn voices_from(names: &[&str]) -> Vec<TtsVoice> {
     names
@@ -651,6 +700,16 @@ fn voices_from(names: &[&str]) -> Vec<TtsVoice> {
         .map(|v| TtsVoice {
             id: v.to_string(),
             label: v.to_string(),
+        })
+        .collect()
+}
+
+fn labeled_voices_from(voices: &[(&str, &str)]) -> Vec<TtsVoice> {
+    voices
+        .iter()
+        .map(|(name, style)| TtsVoice {
+            id: name.to_string(),
+            label: format!("{} · {}", name, style),
         })
         .collect()
 }
@@ -671,6 +730,10 @@ fn curated_tts_voices(model: &str, base_url: &str) -> Option<Vec<TtsVoice>> {
     // xAI Grok Voice TTS — five named voices (e.g. `x-ai/grok-voice-tts-1.0`).
     if m.contains("grok") {
         return Some(voices_from(GROK_TTS_VOICES));
+    }
+    // Gemini 3.1/2.5 TTS models all use Google's shared named voice set.
+    if m.contains("gemini") && m.contains("tts") {
+        return Some(labeled_voices_from(GEMINI_TTS_VOICES));
     }
     // OpenAI speech models (`openai/gpt-4o-mini-tts…`, bare `gpt-4o-mini-tts`,
     // `tts-1`, `tts-1-hd`) or OpenAI's own endpoint use the standard voice set.
@@ -757,7 +820,7 @@ async fn fetch_openai_audio_voices(settings: &AppSettings, raw: &str) -> Option<
 /// 3. An informative error so the user types the model's own voice — the field
 ///    is free-text, so an unrecognized model is never a dead end.
 async fn list_openai_tts_voices(settings: &AppSettings) -> Result<Vec<TtsVoice>, String> {
-    let raw = settings.assistant_tts_base_url.trim();
+    let raw = openai_tts_base_url(settings);
     let model = settings.assistant_tts_model.trim();
 
     // Hosted providers (OpenAI, OpenRouter) don't expose `/audio/voices`, so
@@ -781,8 +844,8 @@ async fn list_openai_tts_voices(settings: &AppSettings) -> Result<Vec<TtsVoice>,
     Err(
         "Voices vary by model, and this provider doesn't publish a list. \
          Type the voice from the model's page — e.g. Grok TTS uses \
-         Eve/Ara/Rex/Sal/Leo, OpenAI models use alloy/echo/nova/…, and Gemini \
-         and MAI-Voice models each have their own set."
+         Eve/Ara/Rex/Sal/Leo, OpenAI models use alloy/echo/nova/…, and \
+         unrecognized models use the names from their own model page."
             .to_string(),
     )
 }
@@ -857,7 +920,7 @@ pub async fn list_tts_models(settings: &AppSettings) -> Result<Vec<String>, Stri
 
 /// OpenAI-compatible models via `GET {base}/models`.
 async fn list_openai_tts_models(settings: &AppSettings) -> Result<Vec<String>, String> {
-    let raw = settings.assistant_tts_base_url.trim();
+    let raw = openai_tts_base_url(settings);
     let base = if raw.is_empty() {
         "https://api.openai.com/v1".to_string()
     } else {
@@ -1377,13 +1440,27 @@ mod tests {
                 .contains(&"alloy".to_string())
         );
 
-        // Unknown model/provider (Gemini) → None, so the caller guides the user
-        // instead of dumping a wrong OpenAI list.
-        assert!(curated_tts_voices(
+        // Gemini TTS → Google's complete shared voice set with style labels.
+        let gemini = curated_tts_voices(
             "google/gemini-3.1-flash-tts-preview",
-            "https://openrouter.ai/api/v1"
+            "https://openrouter.ai/api/v1",
         )
-        .is_none());
+        .unwrap();
+        assert_eq!(gemini.len(), 30);
+        assert!(gemini
+            .iter()
+            .any(|voice| voice.id == "Puck" && voice.label == "Puck · Upbeat"));
+        assert!(!gemini.iter().any(|voice| voice.id == "alloy"));
+    }
+
+    #[test]
+    fn openrouter_tts_uses_its_fixed_endpoint() {
+        use super::{openai_tts_base_url, OPENROUTER_TTS_BASE_URL};
+
+        let mut settings = crate::settings::get_default_settings();
+        settings.assistant_tts_engine = "openrouter".to_string();
+        settings.assistant_tts_base_url = "https://wrong.example/v1".to_string();
+        assert_eq!(openai_tts_base_url(&settings), OPENROUTER_TTS_BASE_URL);
     }
 
     #[test]

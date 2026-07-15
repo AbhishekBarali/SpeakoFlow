@@ -89,6 +89,11 @@ pub const RECOMMENDED_MODEL_ID: &str = "parakeet-unified-en-0.6b-gguf";
 #[allow(dead_code)]
 pub const RECOMMENDED_MULTILINGUAL_MODEL_ID: &str = "nemotron-3.5-asr-streaming-0.6b-gguf";
 
+/// Internal sentinel returned when the user intentionally cancels a download.
+/// The command layer maps it to a failed result for awaiting callers but does
+/// not emit the normal download-failed toast.
+pub const DOWNLOAD_CANCELLED_ERROR: &str = "Download cancelled";
+
 /// For vision (multimodal) LLM models, the companion multimodal projector that
 /// llama.cpp's server needs (passed via `--mmproj`). Returns the local filename
 /// to save it as and the download URL, or `None` for text-only models.
@@ -101,6 +106,26 @@ pub fn mmproj_for(model_id: &str) -> Option<(&'static str, &'static str)> {
         "qwen3.5-4b" => Some((
             "mmproj-Qwen_Qwen3.5-4B-f16.gguf",
             "https://huggingface.co/bartowski/Qwen_Qwen3.5-4B-GGUF/resolve/main/mmproj-Qwen_Qwen3.5-4B-f16.gguf",
+        )),
+        "qwen3.5-9b" => Some((
+            "mmproj-Qwen3.5-9B-F16.gguf",
+            "https://huggingface.co/unsloth/Qwen3.5-9B-GGUF/resolve/main/mmproj-F16.gguf",
+        )),
+        "qwen3.5-27b" => Some((
+            "mmproj-Qwen3.5-27B-F16.gguf",
+            "https://huggingface.co/unsloth/Qwen3.5-27B-GGUF/resolve/main/mmproj-F16.gguf",
+        )),
+        "gemma-4-e2b" => Some((
+            "gemma-4-E2B-it-mmproj.gguf",
+            "https://huggingface.co/google/gemma-4-E2B-it-qat-q4_0-gguf/resolve/main/gemma-4-E2B-it-mmproj.gguf",
+        )),
+        "gemma-4-e4b" => Some((
+            "gemma-4-E4B-it-mmproj.gguf",
+            "https://huggingface.co/google/gemma-4-E4B-it-qat-q4_0-gguf/resolve/main/gemma-4-E4B-it-mmproj.gguf",
+        )),
+        "gemma-4-12b" => Some((
+            "mmproj-gemma-4-12b-it-qat-q4_0.gguf",
+            "https://huggingface.co/google/gemma-4-12B-it-qat-q4_0-gguf/resolve/main/mmproj-gemma-4-12b-it-qat-q4_0.gguf",
         )),
         "gemma-3-4b" => Some((
             "mmproj-gemma-3-4b-it-f16.gguf",
@@ -789,13 +814,13 @@ impl ModelManager {
         .map(String::from)
         .collect();
 
-        // Gemma 3 1B — text only, tiny, runs on virtually any machine.
+        // Gemma 3 1B - text only, tiny, and suitable for low-memory systems.
         available_models.insert(
             "gemma-3-1b".to_string(),
             ModelInfo {
                 id: "gemma-3-1b".to_string(),
                 name: "Gemma 3 1B".to_string(),
-                description: "Tiny and fast. Text only. Great for cleaning up transcripts."
+                description: "The lightest option for simple chat and writing help. Text only."
                     .to_string(),
                 filename: "gemma-3-1b-it-Q4_K_M.gguf".to_string(),
                 url: Some(
@@ -852,21 +877,21 @@ impl ModelManager {
             },
         );
 
-        // Qwen3.5 4B — newest, strongest small multimodal model. Default.
+        // Qwen3.5 4B - the everyday multimodal recommendation.
         available_models.insert(
             "qwen3.5-4b".to_string(),
             ModelInfo {
                 id: "qwen3.5-4b".to_string(),
                 name: "Qwen3.5 4B (Vision)".to_string(),
-                description: "Recommended. Fast, multilingual, and sees images. ~5 GB RAM."
-                    .to_string(),
+                description: "A quick everyday assistant with screen vision.".to_string(),
                 filename: "Qwen_Qwen3.5-4B-Q4_K_M.gguf".to_string(),
                 url: Some(
                     "https://huggingface.co/bartowski/Qwen_Qwen3.5-4B-GGUF/resolve/main/Qwen_Qwen3.5-4B-Q4_K_M.gguf"
                         .to_string(),
                 ),
                 sha256: None,
-                size_mb: 3900,
+                // Main Q4_K_M weights plus the automatically downloaded F16 projector.
+                size_mb: 3515,
                 is_downloaded: false,
                 is_downloading: false,
                 partial_size: 0,
@@ -876,8 +901,173 @@ impl ModelManager {
                 speed_score: 0.62,
                 supports_translation: false,
                 supports_streaming: false,
-                is_recommended: true,
+                is_recommended: false,
                 recommended_rank: None,
+                supported_languages: llm_languages.clone(),
+                supports_language_selection: false,
+                is_custom: false,
+            },
+        );
+
+        // Qwen3.5 9B - stronger answers for higher-memory desktops.
+        available_models.insert(
+            "qwen3.5-9b".to_string(),
+            ModelInfo {
+                id: "qwen3.5-9b".to_string(),
+                name: "Qwen3.5 9B (Vision)".to_string(),
+                description: "Stronger answers and screen vision for powerful computers."
+                    .to_string(),
+                filename: "Qwen3.5-9B-Q4_K_M.gguf".to_string(),
+                url: Some(
+                    "https://huggingface.co/unsloth/Qwen3.5-9B-GGUF/resolve/main/Qwen3.5-9B-Q4_K_M.gguf"
+                        .to_string(),
+                ),
+                sha256: None,
+                // Verified Q4_K_M weights plus the automatically downloaded F16 projector.
+                size_mb: 6293,
+                is_downloaded: false,
+                is_downloading: false,
+                partial_size: 0,
+                is_directory: false,
+                engine_type: EngineType::LlamaCpp,
+                accuracy_score: 0.84,
+                speed_score: 0.44,
+                supports_translation: false,
+                supports_streaming: false,
+                is_recommended: false,
+                recommended_rank: None,
+                supported_languages: llm_languages.clone(),
+                supports_language_selection: false,
+                is_custom: false,
+            },
+        );
+
+        // Qwen3.5 27B - highest-quality curated option for workstations.
+        available_models.insert(
+            "qwen3.5-27b".to_string(),
+            ModelInfo {
+                id: "qwen3.5-27b".to_string(),
+                name: "Qwen3.5 27B (Vision)".to_string(),
+                description: "The best local quality for high-memory desktops and workstations."
+                    .to_string(),
+                filename: "Qwen3.5-27B-Q4_K_M.gguf".to_string(),
+                url: Some(
+                    "https://huggingface.co/unsloth/Qwen3.5-27B-GGUF/resolve/main/Qwen3.5-27B-Q4_K_M.gguf"
+                        .to_string(),
+                ),
+                sha256: None,
+                // Verified Q4_K_M weights plus the automatically downloaded F16 projector.
+                size_mb: 16850,
+                is_downloaded: false,
+                is_downloading: false,
+                partial_size: 0,
+                is_directory: false,
+                engine_type: EngineType::LlamaCpp,
+                accuracy_score: 0.93,
+                speed_score: 0.20,
+                supports_translation: false,
+                supports_streaming: false,
+                is_recommended: false,
+                recommended_rank: None,
+                supported_languages: llm_languages.clone(),
+                supports_language_selection: false,
+                is_custom: false,
+            },
+        );
+
+        // Gemma 4 E2B — current on-device model, optimized for responsiveness.
+        available_models.insert(
+            "gemma-4-e2b".to_string(),
+            ModelInfo {
+                id: "gemma-4-e2b".to_string(),
+                name: "Gemma 4 E2B (Vision)".to_string(),
+                description: "The quickest current Gemma for everyday conversation. Less capable on complex requests."
+                    .to_string(),
+                filename: "gemma-4-E2B_q4_0-it.gguf".to_string(),
+                url: Some(
+                    "https://huggingface.co/google/gemma-4-E2B-it-qat-q4_0-gguf/resolve/main/gemma-4-E2B_q4_0-it.gguf"
+                        .to_string(),
+                ),
+                sha256: None,
+                // Official QAT Q4_0 weights plus the automatically downloaded projector.
+                size_mb: 4135,
+                is_downloaded: false,
+                is_downloading: false,
+                partial_size: 0,
+                is_directory: false,
+                engine_type: EngineType::LlamaCpp,
+                accuracy_score: 0.66,
+                speed_score: 0.86,
+                supports_translation: false,
+                supports_streaming: false,
+                is_recommended: true,
+                recommended_rank: Some(2),
+                supported_languages: llm_languages.clone(),
+                supports_language_selection: false,
+                is_custom: false,
+            },
+        );
+
+        // Gemma 4 E4B — default conversational balance, with thinking opt-in.
+        available_models.insert(
+            "gemma-4-e4b".to_string(),
+            ModelInfo {
+                id: "gemma-4-e4b".to_string(),
+                name: "Gemma 4 E4B (Vision)".to_string(),
+                description: "Recommended for conversation: a stronger quality-and-speed balance without default thinking."
+                    .to_string(),
+                filename: "gemma-4-E4B_q4_0-it.gguf".to_string(),
+                url: Some(
+                    "https://huggingface.co/google/gemma-4-E4B-it-qat-q4_0-gguf/resolve/main/gemma-4-E4B_q4_0-it.gguf"
+                        .to_string(),
+                ),
+                sha256: None,
+                // Official QAT Q4_0 weights plus the automatically downloaded projector.
+                size_mb: 5862,
+                is_downloaded: false,
+                is_downloading: false,
+                partial_size: 0,
+                is_directory: false,
+                engine_type: EngineType::LlamaCpp,
+                accuracy_score: 0.80,
+                speed_score: 0.68,
+                supports_translation: false,
+                supports_streaming: false,
+                is_recommended: true,
+                recommended_rank: Some(1),
+                supported_languages: llm_languages.clone(),
+                supports_language_selection: false,
+                is_custom: false,
+            },
+        );
+
+        // Gemma 4 12B — stronger answers, with a clear latency tradeoff.
+        available_models.insert(
+            "gemma-4-12b".to_string(),
+            ModelInfo {
+                id: "gemma-4-12b".to_string(),
+                name: "Gemma 4 12B (Vision)".to_string(),
+                description: "More capable for nuanced questions, but noticeably slower and best with a strong GPU."
+                    .to_string(),
+                filename: "gemma-4-12b-it-qat-q4_0.gguf".to_string(),
+                url: Some(
+                    "https://huggingface.co/google/gemma-4-12B-it-qat-q4_0-gguf/resolve/main/gemma-4-12b-it-qat-q4_0.gguf"
+                        .to_string(),
+                ),
+                sha256: None,
+                // Official QAT Q4_0 weights plus the automatically downloaded projector.
+                size_mb: 6821,
+                is_downloaded: false,
+                is_downloading: false,
+                partial_size: 0,
+                is_directory: false,
+                engine_type: EngineType::LlamaCpp,
+                accuracy_score: 0.91,
+                speed_score: 0.38,
+                supports_translation: false,
+                supports_streaming: false,
+                is_recommended: true,
+                recommended_rank: Some(3),
                 supported_languages: llm_languages.clone(),
                 supports_language_selection: false,
                 is_custom: false,
@@ -890,7 +1080,7 @@ impl ModelManager {
             ModelInfo {
                 id: "gemma-3-4b".to_string(),
                 name: "Gemma 3 4B (Vision)".to_string(),
-                description: "Google's multimodal model. Clean, reliable answers. ~5 GB RAM."
+                description: "Google's multimodal model. Clean, reliable answers and fast responses."
                     .to_string(),
                 filename: "gemma-3-4b-it-Q4_K_M.gguf".to_string(),
                 url: Some(
@@ -1241,6 +1431,30 @@ impl ModelManager {
     }
 
     fn update_download_status(&self) -> Result<()> {
+        // Custom-model projector metadata lives outside `available_models`.
+        // Snapshot it before taking the model lock so vision completeness can
+        // be checked without nested locks.
+        let custom_projectors: HashMap<String, String> = {
+            let customs = self.custom_models.lock().unwrap();
+            customs
+                .iter()
+                .filter_map(|(id, record)| {
+                    record
+                        .mmproj_filename
+                        .as_ref()
+                        .map(|filename| (id.clone(), filename.clone()))
+                })
+                .collect()
+        };
+        let projector_ready = |model_id: &str| {
+            let filename = mmproj_for(model_id)
+                .map(|(filename, _)| filename.to_string())
+                .or_else(|| custom_projectors.get(model_id).cloned());
+            filename
+                .map(|filename| self.models_dir.join(filename).exists())
+                .unwrap_or(true)
+        };
+
         let mut models = self.available_models.lock().unwrap();
 
         for model in models.values_mut() {
@@ -1271,7 +1485,8 @@ impl ModelManager {
                     let _ = fs::remove_dir_all(&extracting_path);
                 }
 
-                model.is_downloaded = model_path.exists() && model_path.is_dir();
+                model.is_downloaded =
+                    model_path.exists() && model_path.is_dir() && projector_ready(&model.id);
                 model.is_downloading = false;
 
                 // Get partial file size if it exists (for the .tar.gz being downloaded)
@@ -1285,7 +1500,7 @@ impl ModelManager {
                 let model_path = self.models_dir.join(&model.filename);
                 let partial_path = self.models_dir.join(format!("{}.partial", &model.filename));
 
-                model.is_downloaded = model_path.exists();
+                model.is_downloaded = model_path.exists() && projector_ready(&model.id);
                 model.is_downloading = false;
 
                 // Get partial file size if it exists
@@ -1833,7 +2048,7 @@ impl ModelManager {
             if cancel_flag.load(Ordering::Relaxed) {
                 drop(file);
                 let _ = fs::remove_file(&tmp);
-                return Ok(());
+                return Err(anyhow::anyhow!(DOWNLOAD_CANCELLED_ERROR));
             }
             let chunk = chunk?;
             file.write_all(&chunk)?;
@@ -2047,23 +2262,50 @@ impl ModelManager {
             .models_dir
             .join(format!("{}.partial", &model_info.filename));
 
-        // Don't download if complete version already exists
+        // If the main weights already exist, repair any missing vision
+        // projector through the normal registered download lifecycle. This
+        // keeps progress, cancellation, and completion events consistent.
         if model_path.exists() {
-            // Clean up any partial file that might exist
             if partial_path.exists() {
                 let _ = fs::remove_file(&partial_path);
             }
-            // Ensure the vision projector is present for multimodal models
-            // (e.g. if a previous run downloaded the weights but not the mmproj).
+
+            let cancel_flag = Arc::new(AtomicBool::new(false));
+            {
+                let mut models = self.available_models.lock().unwrap();
+                if let Some(model) = models.get_mut(model_id) {
+                    model.is_downloading = true;
+                }
+            }
+            {
+                let mut flags = self.cancel_flags.lock().unwrap();
+                flags.insert(model_id.to_string(), cancel_flag.clone());
+            }
+            let mut cleanup = DownloadCleanup {
+                available_models: &self.available_models,
+                cancel_flags: &self.cancel_flags,
+                model_id: model_id.to_string(),
+                disarmed: false,
+            };
+
             if let Some((mmproj_name, mmproj_url)) = self.resolve_mmproj(model_id) {
                 let mmproj_path = self.models_dir.join(&mmproj_name);
                 if !mmproj_path.exists() {
-                    let flag = Arc::new(AtomicBool::new(false));
-                    self.download_companion(model_id, &mmproj_url, &mmproj_path, &flag)
+                    self.download_companion(model_id, &mmproj_url, &mmproj_path, &cancel_flag)
                         .await?;
                 }
             }
+
+            {
+                let mut flags = self.cancel_flags.lock().unwrap();
+                if cancel_flag.load(Ordering::Relaxed) {
+                    return Err(anyhow::anyhow!(DOWNLOAD_CANCELLED_ERROR));
+                }
+                flags.remove(model_id);
+            }
+            cleanup.disarmed = true;
             self.update_download_status()?;
+            let _ = self.app_handle.emit("model-download-complete", model_id);
             return Ok(());
         }
 
@@ -2112,7 +2354,7 @@ impl ModelManager {
             for attempt in 1..=MAX_ATTEMPTS_PER_URL {
                 if cancel_flag.load(Ordering::Relaxed) {
                     // Guard handles is_downloading + cancel_flags cleanup on drop.
-                    return Ok(());
+                    return Err(anyhow::anyhow!(DOWNLOAD_CANCELLED_ERROR));
                 }
 
                 match self
@@ -2125,7 +2367,7 @@ impl ModelManager {
                     }
                     Ok(AttemptOutcome::Cancelled) => {
                         // Partial kept for resume; guard cleans up state on drop.
-                        return Ok(());
+                        return Err(anyhow::anyhow!(DOWNLOAD_CANCELLED_ERROR));
                     }
                     Err(e) => {
                         // A 4xx (except 408/429) is permanent for this URL, so
@@ -2154,7 +2396,7 @@ impl ModelManager {
                             let deadline = Instant::now() + backoff;
                             while Instant::now() < deadline {
                                 if cancel_flag.load(Ordering::Relaxed) {
-                                    return Ok(());
+                                    return Err(anyhow::anyhow!(DOWNLOAD_CANCELLED_ERROR));
                                 }
                                 tokio::time::sleep(Duration::from_millis(200)).await;
                             }
@@ -2167,6 +2409,9 @@ impl ModelManager {
         if !downloaded_ok {
             return Err(last_error
                 .unwrap_or_else(|| anyhow::anyhow!("Failed to download model {}", model_id)));
+        }
+        if cancel_flag.load(Ordering::Relaxed) {
+            return Err(anyhow::anyhow!(DOWNLOAD_CANCELLED_ERROR));
         }
 
         // Verify SHA256 checksum. Runs in a blocking thread so the async executor is not
@@ -2186,6 +2431,9 @@ impl ModelManager {
         let _ = self
             .app_handle
             .emit("model-verification-completed", model_id);
+        if cancel_flag.load(Ordering::Relaxed) {
+            return Err(anyhow::anyhow!(DOWNLOAD_CANCELLED_ERROR));
+        }
 
         // Handle directory-based models (extract tar.gz) vs file-based models
         if model_info.is_directory {
@@ -2279,6 +2527,9 @@ impl ModelManager {
             // Move partial file to final location for file-based models
             fs::rename(&partial_path, &model_path)?;
         }
+        if cancel_flag.load(Ordering::Relaxed) {
+            return Err(anyhow::anyhow!(DOWNLOAD_CANCELLED_ERROR));
+        }
 
         // For vision LLMs, fetch the companion multimodal projector now that
         // the main weights are in place. Reuses the same cancel flag so the
@@ -2292,8 +2543,20 @@ impl ModelManager {
             }
         }
 
-        // Disarm the guard — success path does its own cleanup because it
-        // additionally sets is_downloaded = true.
+        // Atomically close the cancellation window. If Cancel wins the lock,
+        // its flag is observed and success is withheld. If completion wins,
+        // the flag is removed first so a late Cancel reports that the download
+        // has already finished instead of pretending it was cancelled.
+        {
+            let mut flags = self.cancel_flags.lock().unwrap();
+            if cancel_flag.load(Ordering::Relaxed) {
+                return Err(anyhow::anyhow!(DOWNLOAD_CANCELLED_ERROR));
+            }
+            flags.remove(model_id);
+        }
+
+        // Disarm the guard - success path does its own state cleanup and marks
+        // the model as downloaded.
         cleanup.disarmed = true;
         {
             let mut models = self.available_models.lock().unwrap();
@@ -2303,7 +2566,6 @@ impl ModelManager {
                 model.partial_size = 0;
             }
         }
-        self.cancel_flags.lock().unwrap().remove(model_id);
 
         // Session 3: for transcribe.cpp GGUF models, read the freshly-downloaded
         // file's header and apply its declared capability hints (no-op for other
@@ -2374,39 +2636,47 @@ impl ModelManager {
         if let Some((mmproj_name, _)) = self.resolve_mmproj(model_id) {
             let mmproj_path = self.models_dir.join(&mmproj_name);
             if mmproj_path.exists() {
-                info!("Deleting vision projector at: {:?}", mmproj_path);
-                let _ = fs::remove_file(&mmproj_path);
+                fs::remove_file(&mmproj_path)?;
+                deleted_something = true;
             }
             let mmproj_partial = self.models_dir.join(format!("{}.partial", mmproj_name));
             if mmproj_partial.exists() {
-                let _ = fs::remove_file(&mmproj_partial);
+                fs::remove_file(&mmproj_partial)?;
+                deleted_something = true;
             }
         }
 
-        if !deleted_something {
-            return Err(anyhow::anyhow!("No model files found to delete"));
-        }
-
-        // Custom models should be removed from the list entirely since they
-        // have no download URL and can't be re-downloaded
         if model_info.is_custom {
+            // A saved Hugging Face entry must be removable even when the user
+            // never downloaded its weights. Remove and persist its metadata;
+            // roll the in-memory record back if the write fails so restart
+            // behavior stays consistent with the result returned to the UI.
+            let removed_record = self.custom_models.lock().unwrap().remove(model_id);
+            if let Some(record) = removed_record {
+                if let Err(error) = self.save_custom_models() {
+                    self.custom_models
+                        .lock()
+                        .unwrap()
+                        .insert(model_id.to_string(), record);
+                    return Err(error);
+                }
+                deleted_something = true;
+            }
+
+            if !deleted_something {
+                return Err(anyhow::anyhow!(
+                    "No model files or saved entry found to delete"
+                ));
+            }
+
             let mut models = self.available_models.lock().unwrap();
             models.remove(model_id);
             debug!("ModelManager: removed custom model from available models");
-            drop(models);
-
-            // Drop the persisted custom-LLM record too (if it was one) so it
-            // doesn't reappear on the next launch.
-            let was_persisted = {
-                let mut customs = self.custom_models.lock().unwrap();
-                customs.remove(model_id).is_some()
-            };
-            if was_persisted {
-                if let Err(e) = self.save_custom_models() {
-                    warn!("Failed to persist custom model removal: {}", e);
-                }
-            }
         } else {
+            if !deleted_something {
+                return Err(anyhow::anyhow!("No model files found to delete"));
+            }
+
             // Update download status (marks predefined models as not downloaded)
             self.update_download_status()?;
             debug!("ModelManager: download status updated");
@@ -2466,18 +2736,19 @@ impl ModelManager {
     pub fn cancel_download(&self, model_id: &str) -> Result<()> {
         debug!("ModelManager: cancel_download called for: {}", model_id);
 
-        // Set the cancellation flag to stop the download loop
+        // Claim the active cancellation flag. If completion already removed it,
+        // the download is finished and the caller must not pretend cancellation
+        // succeeded or clear a subsequently valid selection.
         {
             let flags = self.cancel_flags.lock().unwrap();
-            if let Some(flag) = flags.get(model_id) {
-                flag.store(true, Ordering::Relaxed);
-                info!("Cancellation flag set for: {}", model_id);
-            } else {
-                warn!("No active download found for: {}", model_id);
-            }
+            let flag = flags
+                .get(model_id)
+                .ok_or_else(|| anyhow::anyhow!("No active download found for: {}", model_id))?;
+            flag.store(true, Ordering::Relaxed);
+            info!("Cancellation flag set for: {}", model_id);
         }
 
-        // Update state immediately for UI responsiveness
+        // Update state immediately for UI responsiveness.
         {
             let mut models = self.available_models.lock().unwrap();
             if let Some(model) = models.get_mut(model_id) {
@@ -2485,10 +2756,7 @@ impl ModelManager {
             }
         }
 
-        // Update download status to reflect current state
         self.update_download_status()?;
-
-        // Emit cancellation event so all UI components can clear their state
         let _ = self.app_handle.emit("model-download-cancelled", model_id);
 
         info!("Download cancellation initiated for: {}", model_id);
@@ -2501,6 +2769,19 @@ mod tests {
     use super::*;
     use std::io::Write;
     use tempfile::TempDir;
+
+    #[test]
+    fn gemma_4_projectors_use_official_google_artifacts() {
+        for id in ["gemma-4-e2b", "gemma-4-e4b", "gemma-4-12b"] {
+            let (filename, url) =
+                mmproj_for(id).unwrap_or_else(|| panic!("{id} must include a vision projector"));
+            assert!(filename.ends_with(".gguf"));
+            assert!(
+                url.starts_with("https://huggingface.co/google/gemma-4-"),
+                "{id} should use an official Google artifact"
+            );
+        }
+    }
 
     #[test]
     fn catalog_models_are_inserted_as_transcribe_cpp() {

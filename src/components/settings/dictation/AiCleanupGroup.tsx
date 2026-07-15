@@ -1,6 +1,6 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
-import { Sparkles } from "lucide-react";
+import { Feather, Sparkles } from "lucide-react";
 import { SettingsGroup } from "@/components/ui/SettingsGroup";
 import { ToggleSwitch } from "@/components/ui/ToggleSwitch";
 import { useSettings } from "@/hooks/useSettings";
@@ -13,11 +13,9 @@ import { PostProcessTimeout } from "../PostProcessTimeout";
 import { ShortcutInput } from "../ShortcutInput";
 
 /**
- * "AI cleanup" — the dictation post-processing feature, renamed for humans.
- *
- * Off: a single toggle row. On: three clean groups, all visible — the basics
- * (tone + its own hotkey), the model that does the cleanup, and the cleanup
- * prompt. No folds; the page just grows when the feature is on.
+ * "AI cleanup" — dedicated dictation cleanup controls with clear separation:
+ * the shortcut, how the writing should sound, where the model runs, and what
+ * cleanup instructions it follows.
  */
 export const AiCleanupGroup: React.FC = () => {
   const { t } = useTranslation();
@@ -39,7 +37,6 @@ export const AiCleanupGroup: React.FC = () => {
           description={t("settings.dictation.aiCleanup.caption")}
           grouped={true}
         />
-        {enabled && <PostProcessingTone />}
         {enabled && (
           <ShortcutInput
             shortcutId="transcribe_with_post_process"
@@ -50,6 +47,16 @@ export const AiCleanupGroup: React.FC = () => {
 
       {enabled && (
         <>
+          <SettingsGroup
+            title={t("settings.dictation.aiCleanup.styleGroupTitle")}
+            description={t(
+              "settings.dictation.aiCleanup.styleGroupDescription",
+            )}
+            icon={Feather}
+          >
+            <PostProcessingTone />
+          </SettingsGroup>
+
           <SettingsGroup
             title={t("settings.dictation.aiCleanup.modelGroupTitle")}
           >

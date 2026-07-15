@@ -1,6 +1,7 @@
 pub mod audio;
 pub mod constants;
 pub mod replacements;
+pub mod spoken_emojis;
 pub mod text;
 pub mod utils;
 pub mod vad;
@@ -11,6 +12,7 @@ pub use audio::{
     CpalDeviceInfo,
 };
 pub use replacements::apply_replacements;
+pub use spoken_emojis::expand_spoken_emojis;
 pub use text::{apply_custom_words, filter_transcription_output};
 pub use utils::get_cpal_host;
 pub use vad::{SileroVad, VoiceActivityDetector};

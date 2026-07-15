@@ -558,6 +558,18 @@ impl LocalLlmManager {
             .arg("--repeat-penalty")
             .arg("1.1");
 
+        // Keep local chat on the same dedicated-first GPU policy used by the
+        // rest of the app. This matters on hybrid Windows/Linux systems where
+        // an integrated adapter can report more shared memory than a discrete
+        // card. Metal exposes a single device, so index 0 remains a no-op there.
+        if let Some(device) = crate::managers::transcription::preferred_gpu_device() {
+            info!(
+                "Selecting llama.cpp main GPU {}: {} ({}, {} MiB)",
+                device.id, device.name, device.kind, device.total_vram_mb
+            );
+            cmd.arg("--main-gpu").arg(device.id.to_string());
+        }
+
         // Flash Attention in "auto" mode: the engine enables it only on backends
         // that support it and silently falls back to standard attention
         // otherwise — safe on CPU-only machines and every GPU type, while cutting

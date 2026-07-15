@@ -2,7 +2,9 @@
 
 use crate::assistant::{self, AssistantConversation, FileAttachment};
 use crate::llm_client::ChatMessage;
-use crate::settings::{get_settings, write_settings, AssistantCharacter};
+use crate::settings::{
+    assistant_provider_is_supported, get_settings, write_settings, AssistantCharacter,
+};
 use tauri::{AppHandle, Manager};
 
 /// Send a typed message to the assistant (keyboard alternative to voice).
@@ -254,12 +256,16 @@ pub fn hide_assistant_panel(app: AppHandle) -> Result<(), String> {
 #[specta::specta]
 pub fn set_assistant_provider(app: AppHandle, provider_id: String) -> Result<(), String> {
     let mut settings = get_settings(&app);
-    if !settings
+    let provider = settings
         .post_process_providers
         .iter()
-        .any(|p| p.id == provider_id)
-    {
-        return Err(format!("Unknown provider: {}", provider_id));
+        .find(|provider| provider.id == provider_id)
+        .ok_or_else(|| format!("Unknown provider: {}", provider_id))?;
+    if !assistant_provider_is_supported(&provider.id) {
+        return Err(format!(
+            "Provider '{}' is not supported by the Assistant",
+            provider.label
+        ));
     }
     settings.assistant_provider_id = provider_id;
     write_settings(&app, settings);

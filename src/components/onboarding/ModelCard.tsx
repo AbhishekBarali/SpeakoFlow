@@ -333,7 +333,7 @@ const ModelCard: React.FC<ModelCardProps> = ({
                 : t("modelSelector.useModel")}
             </Button>
           )}
-        {onDelete && (status === "available" || status === "active") && (
+        {onDelete && status === "available" && (
           <Button
             variant="ghost"
             size="sm"
@@ -352,9 +352,9 @@ const ModelCard: React.FC<ModelCardProps> = ({
         status === "downloading" &&
         downloadProgress !== undefined && (
           <div className="w-full mt-3">
-            <div className="w-full h-1.5 bg-mid-gray/20 rounded-full overflow-hidden">
+            <div className="w-full h-1.5 bg-hairline-strong rounded-full overflow-hidden">
               <div
-                className="h-full bg-logo-primary rounded-full transition-all duration-300"
+                className="h-full bg-accent rounded-full transition-all duration-300"
                 style={{ width: `${downloadProgress}%` }}
               />
             </div>
@@ -392,8 +392,8 @@ const ModelCard: React.FC<ModelCardProps> = ({
         )}
       {showInlineProgress && status === "verifying" && (
         <div className="w-full mt-3">
-          <div className="w-full h-1.5 bg-mid-gray/20 rounded-full overflow-hidden">
-            <div className="h-full bg-logo-primary rounded-full animate-pulse w-full" />
+          <div className="w-full h-1.5 bg-hairline-strong rounded-full overflow-hidden">
+            <div className="h-full bg-accent rounded-full animate-pulse w-full" />
           </div>
           <p className="text-xs text-muted mt-1">
             {t("modelSelector.verifyingGeneric")}
@@ -402,8 +402,8 @@ const ModelCard: React.FC<ModelCardProps> = ({
       )}
       {showInlineProgress && status === "extracting" && (
         <div className="w-full mt-3">
-          <div className="w-full h-1.5 bg-mid-gray/20 rounded-full overflow-hidden">
-            <div className="h-full bg-logo-primary rounded-full animate-pulse w-full" />
+          <div className="w-full h-1.5 bg-hairline-strong rounded-full overflow-hidden">
+            <div className="h-full bg-accent rounded-full animate-pulse w-full" />
           </div>
           <p className="text-xs text-muted mt-1">
             {t("modelSelector.extractingGeneric")}

@@ -235,6 +235,9 @@ async changeAutoSubmitKeySetting(key: string) : Promise<Result<null, string>> {
     else return { status: "error", error: e  as any };
 }
 },
+async getPostProcessReadiness() : Promise<PostProcessReadiness> {
+    return await TAURI_INVOKE("get_post_process_readiness");
+},
 async changePostProcessEnabledSetting(enabled: boolean) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("change_post_process_enabled_setting", { enabled }) };
@@ -246,6 +249,30 @@ async changePostProcessEnabledSetting(enabled: boolean) : Promise<Result<null, s
 async changePostProcessToneSetting(tone: string) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("change_post_process_tone_setting", { tone }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async addPostProcessCustomTone(name: string, instruction: string) : Promise<Result<CustomPostProcessTone, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("add_post_process_custom_tone", { name, instruction }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async updatePostProcessCustomTone(id: string, name: string, instruction: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("update_post_process_custom_tone", { id, name, instruction }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async deletePostProcessCustomTone(id: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("delete_post_process_custom_tone", { id }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -342,6 +369,14 @@ async setPostProcessSelectedPrompt(id: string) : Promise<Result<null, string>> {
 async updateCustomWords(words: string[]) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("update_custom_words", { words }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async changeSpokenEmojisEnabledSetting(enabled: boolean) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("change_spoken_emojis_enabled_setting", { enabled }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -554,7 +589,7 @@ async changeWhisperGpuDevice(device: number) : Promise<Result<null, string>> {
 },
 /**
  * Return which accelerators and GPU devices are available for this build.
- * 
+ *
  * First-call cost is dominated by enumerating GPU devices through the
  * whisper.cpp Metal/Vulkan backend, which loads dynamic libraries and
  * probes hardware. Run it on the blocking pool so the webview thread
@@ -830,7 +865,7 @@ async hasAnyModelsOrDownloads() : Promise<Result<boolean, string>> {
 },
 /**
  * Search the Hugging Face Hub for GGUF language-model repositories.
- * 
+ *
  * An empty query returns the most-downloaded GGUF repos as a default browse
  * list. Used by the "Add custom model" flow in the Models tab.
  */
@@ -904,7 +939,7 @@ async stopLocalLlm() : Promise<Result<null, string>> {
 },
 /**
  * Set the context window (in tokens) for the built-in local LLM engine.
- * 
+ *
  * The value is clamped to a safe range and only read when the engine starts,
  * so any running engine is stopped here; the next assistant or post-processing
  * turn restarts it with the new size. External providers (Ollama / LM Studio /
@@ -1986,7 +2021,7 @@ historyUpdatePayload: "history-update-payload"
  * broken field can never reset the rest of the user's configuration
  * (backport of Handy #1631).
  */
-export type AppSettings = { bindings: Partial<{ [key in string]: ShortcutBinding }>; push_to_talk: boolean; 
+export type AppSettings = { bindings: Partial<{ [key in string]: ShortcutBinding }>; push_to_talk: boolean;
 /**
  * While a push-to-talk (hold) recording is active, a quick tap of the
  * configured lock key (see `tap_to_lock_key`) converts it to hands-free
@@ -1994,7 +2029,7 @@ export type AppSettings = { bindings: Partial<{ [key in string]: ShortcutBinding
  * default; turn off if a stray tap keeps locking your recordings. Only
  * relevant while push-to-talk is on.
  */
-tap_to_lock?: boolean; 
+tap_to_lock?: boolean;
 /**
  * The key you tap (while holding a push-to-talk recording) to lock it
  * hands-free. Defaults to Shift. Pick a key that isn't part of your record
@@ -2002,7 +2037,7 @@ tap_to_lock?: boolean;
  * ("shift", "ctrl", "alt", "super"/"cmd") or a plain key name ("tab", "f8",
  * …). Only relevant while push-to-talk and Tap to Lock are on.
  */
-tap_to_lock_key?: string; 
+tap_to_lock_key?: string;
 /**
  * The key you tap while holding a push-to-talk **assistant** recording to
  * lock it hands-free, so you can release the hotkey and keep talking to the
@@ -2013,14 +2048,14 @@ tap_to_lock_key?: string;
  * shortcut is ctrl+alt+space) is ignored, since the held key would instantly
  * lock the recording. Clear it (empty) to disable.
  */
-assistant_tap_to_lock_key?: string; audio_feedback: boolean; audio_feedback_volume?: number; sound_theme?: SoundTheme; start_hidden?: boolean; autostart_enabled?: boolean; update_checks_enabled?: boolean; selected_model?: string; always_on_microphone?: boolean; 
+assistant_tap_to_lock_key?: string; audio_feedback: boolean; audio_feedback_volume?: number; sound_theme?: SoundTheme; start_hidden?: boolean; autostart_enabled?: boolean; update_checks_enabled?: boolean; selected_model?: string; always_on_microphone?: boolean;
 /**
  * Opt-in live/streaming transcription: while recording, feed audio into a
  * streaming transcriber and paste the merged running result at the end
  * (with the batch `transcribe()` path as the fallback). Off by default —
  * when off, dictation behaves exactly as before.
  */
-live_transcription_enabled?: boolean; 
+live_transcription_enabled?: boolean;
 /**
  * Opt-in live-transcription window: while streaming dictation is running,
  * enlarge the recording overlay into a readable card that shows the
@@ -2029,35 +2064,51 @@ live_transcription_enabled?: boolean;
  * also on (there's no live text to show otherwise); when off, the overlay
  * stays the compact pill exactly as before.
  */
-live_transcription_window_enabled?: boolean; selected_microphone?: string | null; clamshell_microphone?: string | null; selected_output_device?: string | null; translate_to_english?: boolean; selected_language?: string; overlay_position?: OverlayPosition; 
+live_transcription_window_enabled?: boolean; selected_microphone?: string | null; clamshell_microphone?: string | null; selected_output_device?: string | null; translate_to_english?: boolean; selected_language?: string; overlay_position?: OverlayPosition;
 /**
  * Recording (dictation) overlay style: Auto/None/Minimal/Live. Auto follows
  * the model's live-streaming support (Live if supported, else Minimal).
  */
-overlay_style?: OverlayStyle; 
+overlay_style?: OverlayStyle;
 /**
  * Assistant overlay style: Auto/None/Minimal/Live. Live shows the running
  * transcript plus the streamed reply as readable text; Minimal is the pill.
  */
-assistant_overlay_style?: OverlayStyle; debug_mode?: boolean; log_level?: LogLevel; custom_words?: string[]; 
+assistant_overlay_style?: OverlayStyle; debug_mode?: boolean; log_level?: LogLevel; custom_words?: string[];
+/**
+ * Convert explicit spoken commands such as `happy emoji` into their
+ * Unicode emoji during ordinary dictation. This pass is fully local and
+ * deterministic; it is opt-in so the same words remain literal by default.
+ */
+spoken_emojis_enabled?: boolean;
 /**
  * Master switch for the deterministic text-replacements pass.
  */
-replacements_enabled?: boolean; 
+replacements_enabled?: boolean;
 /**
  * Ordered list of find/replace rules applied after LLM post-processing.
  */
-text_replacements?: Replacement[]; model_unload_timeout?: ModelUnloadTimeout; 
+text_replacements?: Replacement[]; model_unload_timeout?: ModelUnloadTimeout;
 /**
  * Idle timeout after which the built-in local LLM engine (llama.cpp
  * sidecar) is unloaded to free RAM/VRAM. Mirrors `model_unload_timeout`
  * but applies to the LLM used for post-processing and the assistant.
  */
-local_llm_unload_timeout?: ModelUnloadTimeout; word_correction_threshold?: number; history_limit?: number; recording_retention_period?: RecordingRetentionPeriod; paste_method?: PasteMethod; clipboard_handling?: ClipboardHandling; auto_submit?: boolean; auto_submit_key?: AutoSubmitKey; post_process_enabled?: boolean; post_process_provider_id?: string; post_process_providers?: PostProcessProvider[]; post_process_api_keys?: SecretMap; post_process_models?: Partial<{ [key in string]: string }>; post_process_prompts?: LLMPrompt[]; post_process_selected_prompt_id?: string | null; post_process_tone?: PostProcessTone; post_process_timeout_secs?: number; mute_while_recording?: boolean; append_trailing_space?: boolean; app_language?: string; experimental_enabled?: boolean; lazy_stream_close?: boolean; keyboard_implementation?: KeyboardImplementation; show_tray_icon?: boolean; paste_delay_ms?: number; typing_tool?: TypingTool; external_script_path: string | null; custom_filler_words?: string[] | null; whisper_accelerator?: WhisperAcceleratorSetting; ort_accelerator?: OrtAcceleratorSetting; whisper_gpu_device?: number; extra_recording_buffer_ms?: number; assistant_provider_id?: string; assistant_models?: Partial<{ [key in string]: string }>; assistant_system_prompt?: string; assistant_screenshot_enabled?: boolean; 
+local_llm_unload_timeout?: ModelUnloadTimeout; word_correction_threshold?: number; history_limit?: number; recording_retention_period?: RecordingRetentionPeriod; paste_method?: PasteMethod; clipboard_handling?: ClipboardHandling; auto_submit?: boolean; auto_submit_key?: AutoSubmitKey; post_process_enabled?: boolean; post_process_provider_id?: string; post_process_providers?: PostProcessProvider[]; post_process_api_keys?: SecretMap; post_process_models?: Partial<{ [key in string]: string }>; post_process_prompts?: LLMPrompt[]; post_process_selected_prompt_id?: string | null; post_process_tone?: PostProcessTone;
+/**
+ * User-created writing styles. Built-ins remain code-defined/localized and
+ * are selected by their stable IDs.
+ */
+post_process_custom_tones?: CustomPostProcessTone[];
+/**
+ * Stable built-in tone ID or a `CustomPostProcessTone.id`. Optional only so
+ * old stores can migrate from `post_process_tone` without losing choice.
+ */
+post_process_selected_tone_id?: string | null; post_process_timeout_secs?: number; mute_while_recording?: boolean; append_trailing_space?: boolean; app_language?: string; experimental_enabled?: boolean; lazy_stream_close?: boolean; keyboard_implementation?: KeyboardImplementation; show_tray_icon?: boolean; paste_delay_ms?: number; typing_tool?: TypingTool; external_script_path: string | null; custom_filler_words?: string[] | null; whisper_accelerator?: WhisperAcceleratorSetting; ort_accelerator?: OrtAcceleratorSetting; whisper_gpu_device?: number; extra_recording_buffer_ms?: number; assistant_provider_id?: string; assistant_models?: Partial<{ [key in string]: string }>; assistant_system_prompt?: string; assistant_screenshot_enabled?: boolean;
 /**
  * When a screen capture is taken for a voice turn (immediate vs at-send).
  */
-assistant_vision_capture_timing?: VisionCaptureTiming; assistant_tts_enabled?: boolean; assistant_tts_engine?: string; assistant_tts_voice?: string; assistant_tts_base_url?: string; assistant_tts_api_key?: SecretString; assistant_tts_model?: string; assistant_tts_remote_voice?: string; 
+assistant_vision_capture_timing?: VisionCaptureTiming; assistant_tts_enabled?: boolean; assistant_tts_engine?: string; assistant_tts_voice?: string; assistant_tts_base_url?: string; assistant_tts_api_key?: SecretString; assistant_tts_model?: string; assistant_tts_remote_voice?: string;
 /**
  * Per-engine remote-TTS configuration. The flat `assistant_tts_base_url`,
  * `assistant_tts_model`, `assistant_tts_remote_voice`, and
@@ -2068,110 +2119,110 @@ assistant_vision_capture_timing?: VisionCaptureTiming; assistant_tts_enabled?: b
  * own endpoint, model, voice, and API key instead of sharing one slot and
  * getting wiped when the engine is switched.
  */
-assistant_tts_base_urls?: Partial<{ [key in string]: string }>; assistant_tts_models?: Partial<{ [key in string]: string }>; assistant_tts_remote_voices?: Partial<{ [key in string]: string }>; assistant_tts_api_keys?: SecretMap; assistant_tts_kokoro_dtype?: string; 
+assistant_tts_base_urls?: Partial<{ [key in string]: string }>; assistant_tts_models?: Partial<{ [key in string]: string }>; assistant_tts_remote_voices?: Partial<{ [key in string]: string }>; assistant_tts_api_keys?: SecretMap; assistant_tts_kokoro_dtype?: string;
 /**
  * Playback speed multiplier for spoken assistant summaries. 1.0 is normal;
  * 0.5 is half speed, 2.0 is double, etc. Applied locally for Kokoro (via
  * the webview audio element) and natively for remote engines where the
  * API supports it.
  */
-assistant_tts_speed?: number; assistant_max_history_messages?: number; 
+assistant_tts_speed?: number; assistant_max_history_messages?: number;
 /**
  * Context window (in tokens) the built-in local LLM engine launches with.
  * Applied when the engine starts; ignored by external providers
  * (Ollama / LM Studio / cloud), which manage their own context.
  */
-local_llm_context_size?: number; assistant_response_length?: AssistantResponseLength; 
+local_llm_context_size?: number; assistant_response_length?: AssistantResponseLength;
 /**
  * Selectable assistant personas. The active one's prompt overrides
  * `assistant_system_prompt` for LLM turns. Seeded with built-ins on first
  * run (see `default_assistant_characters`).
  */
-assistant_characters?: AssistantCharacter[]; 
+assistant_characters?: AssistantCharacter[];
 /**
  * Id of the currently active character (defaults to `"default"`).
  */
-assistant_active_character_id?: string; 
+assistant_active_character_id?: string;
 /**
  * Whether the assistant keeps a local, personal memory of the user (an
  * always-on "About You" summary plus durable notes) and injects the
  * relevant parts into each reply. Off by default; everything stays on this
  * device and is fully user-editable in Settings → Memory.
  */
-assistant_memory_enabled?: boolean; 
+assistant_memory_enabled?: boolean;
 /**
  * The user's personal memory: a short always-on summary + durable notes.
  */
-assistant_memory?: UserMemory; 
+assistant_memory?: UserMemory;
 /**
  * How much memory to inject each turn (a token-budget dial). Light keeps
  * only the summary; Balanced adds a few relevant notes; Detailed adds more.
  */
-assistant_memory_detail?: MemoryDetail; 
+assistant_memory_detail?: MemoryDetail;
 /**
  * When true, this conversation is "incognito": memory is neither injected
  * into replies nor learned from the conversation. A quick switch so a
  * private chat leaves no trace in memory.
  */
-assistant_memory_incognito?: boolean; assistant_font_size?: string; 
+assistant_memory_incognito?: boolean; assistant_font_size?: string;
 /**
  * Surface opacity of the floating assistant panel (0.5–1.0). At 1.0 the
  * panel is fully opaque; lower values let the desktop blur through.
- * 
+ *
  * Note: the old `assistant_accent`, `assistant_panel_size`, and
  * `assistant_panel_theme` customization fields were removed (the panel is
  * dark-only now) — serde silently ignores those keys in previously stored
  * settings.
  */
-assistant_panel_opacity?: number; 
+assistant_panel_opacity?: number;
 /**
  * Overall size of the expanded floating assistant panel: "compact",
  * "standard" (default), or "large". Chosen in Panel Appearance settings and
  * applied as the window's logical width/height. A manual drag-resize still
  * overrides it for the current session.
  */
-assistant_panel_size?: string; 
+assistant_panel_size?: string;
 /**
  * Whether starting a plain dictation should silence an assistant reply
  * that is still being read aloud. Off by default — earphone users often
  * want to keep listening while they dictate. (Asking the assistant a NEW
  * question always interrupts the previous answer, regardless.)
  */
-assistant_tts_stop_on_dictation?: boolean; 
+assistant_tts_stop_on_dictation?: boolean;
 /**
  * Whether the assistant may search the web. When on, an automatic
  * heuristic decides per-question whether a search is actually worthwhile
  * (factual/time-sensitive questions yes; chit-chat, code, math no), so
  * casual messages stay instant.
  */
-assistant_web_search_enabled?: boolean; 
+assistant_web_search_enabled?: boolean;
 /**
  * Which search backend to use: "serper" (default), "brave", "tavily",
  * "exa", or "serpapi". All are snippet-only and use a single API key.
  */
-assistant_web_search_provider?: string; 
+assistant_web_search_provider?: string;
 /**
  * How many results to feed the model. Kept modest to bound prompt size;
  * clamped to 1–10 at search time.
  */
-assistant_web_search_max_results?: number; 
+assistant_web_search_max_results?: number;
 /**
  * DEPRECATED / unused since web search became snippet-only (Firecrawl and
  * its page-scrape stage were removed). Kept so existing settings files and
  * generated bindings stay stable; no current provider reads it.
  */
-assistant_web_search_fetch_content?: boolean; 
+assistant_web_search_fetch_content?: boolean;
 /**
  * How thorough web search is (Low/Medium/High). Replaces the old raw
  * "max results" number as the primary control; tuned to stay fast.
  */
-assistant_search_depth?: AssistantSearchDepth; 
+assistant_search_depth?: AssistantSearchDepth;
 /**
  * DEPRECATED / unused since the Firecrawl credit guard was removed (search
  * is now snippet-only over per-request SERP APIs). Kept so existing
  * settings files and generated bindings stay stable.
  */
-assistant_web_search_daily_credit_budget?: number; 
+assistant_web_search_daily_credit_budget?: number;
 /**
  * Built-in local model ONLY: when true, decide whether to search with the
  * same LLM planner the cloud providers use (smarter, but an extra
@@ -2179,19 +2230,19 @@ assistant_web_search_daily_credit_budget?: number;
  * (default), use the instant keyword heuristic. No effect on cloud/custom
  * providers, which always use the planner.
  */
-assistant_local_search_smart?: boolean; 
+assistant_local_search_smart?: boolean;
 /**
  * When the active assistant provider has its OWN built-in web search
  * (currently OpenRouter's `:online`), prefer it over the app's own search.
  * Providers without native search always use the app's search regardless.
  * Default true, so OpenRouter uses its built-in search out of the box.
  */
-assistant_prefer_provider_web_search?: boolean; 
+assistant_prefer_provider_web_search?: boolean;
 /**
  * API keys for the keyed search providers, keyed by provider id
  * ("serper", "brave", "tavily", "exa", "serpapi").
  */
-web_search_api_keys?: SecretMap; theme?: Theme; ui_text_size?: UiTextSize; 
+web_search_api_keys?: SecretMap; theme?: Theme; ui_text_size?: UiTextSize;
 /**
  * Remembered main-window size in logical pixels, saved when the user
  * resizes/closes the window and restored (clamped to the current monitor)
@@ -2207,43 +2258,43 @@ main_window_width?: number | null; main_window_height?: number | null }
  * edit, duplicate, import, AI-generate, and delete their own (the `default`
  * character can never be deleted).
  */
-export type AssistantCharacter = { 
+export type AssistantCharacter = {
 /**
  * Stable identifier. `"default"` is reserved for the non-deletable base
  * assistant; `"cat"` for the built-in joke character.
  */
-id: string; 
+id: string;
 /**
  * Display name shown in the panel header and the picker.
  */
-name: string; 
+name: string;
 /**
  * System prompt / persona. Ignored for `Cat`.
  */
-prompt?: string; 
+prompt?: string;
 /**
  * Optional in-character opening line shown in the panel's empty state.
  */
-greeting?: string; 
+greeting?: string;
 /**
  * Optional avatar as a `data:image/...;base64,...` URL (empty → initial).
  */
-avatar?: string; 
+avatar?: string;
 /**
  * What powers this character's replies.
  */
-kind?: AssistantCharacterKind; 
+kind?: AssistantCharacterKind;
 /**
  * True for characters shipped with the app. Built-ins may be edited or
  * duplicated; only `default` is protected from deletion.
  */
-builtin?: boolean; 
+builtin?: boolean;
 /**
  * Optional one-line role/description shown as the card subtitle in the
  * persona picker (e.g. "Short, direct answers"). Purely cosmetic — it
  * never reaches the model.
  */
-description?: string; 
+description?: string;
 /**
  * Optional per-persona reply-length override. `None` inherits the global
  * `assistant_response_length`; `Some(_)` wins for this persona's turns so
@@ -2255,11 +2306,11 @@ response_length?: AssistantResponseLength | null }
  * becomes the system prompt). `Cat` is a joke character that ignores the LLM
  * entirely and just meows — see `assistant::run_cat_turn`.
  */
-export type AssistantCharacterKind = 
+export type AssistantCharacterKind =
 /**
  * Normal persona: `prompt` is used as the assistant's system prompt.
  */
-"llm" | 
+"llm" |
 /**
  * Novelty persona with no model call — replies are random "meow"s.
  */
@@ -2269,15 +2320,15 @@ export type AssistantCharacterKind =
  * ordered turn-by-turn transcript (the same `{role, content}` shape the
  * assistant panel renders).
  */
-export type AssistantHistoryEntry = { id: number; 
+export type AssistantHistoryEntry = { id: number;
 /**
  * When the conversation was first saved (seconds since epoch).
  */
-timestamp: number; 
+timestamp: number;
 /**
  * When the most recent turn was added (seconds since epoch).
  */
-updated_at: number; 
+updated_at: number;
 /**
  * Short label derived from the first user message.
  */
@@ -2287,7 +2338,7 @@ title: string; messages: ChatMessage[] }
  * system prompt at request time, so it works with the single main prompt
  * (no separate summary layer). `Default` injects nothing.
  */
-export type AssistantResponseLength = 
+export type AssistantResponseLength =
 /**
  * No length directive — use the system prompt as-is.
  */
@@ -2300,22 +2351,22 @@ export type AssistantResponseLength =
  * timeouts) — this is "answer-with-search like ChatGPT/Gemini do in seconds",
  * not minutes-long deep research.
  */
-export type AssistantSearchDepth = 
+export type AssistantSearchDepth =
 /**
  * Fastest. One query, snippets + a couple of scraped pages. Quick facts.
  */
-"low" | 
+"low" |
 /**
  * Balanced default. A few queries, rerank, scrape the top handful.
  */
-"medium" | 
+"medium" |
 /**
  * Broadest single pass. More queries/sources, scrape more winners.
  */
 "high"
 export type AudioDevice = { index: string; name: string; is_default: boolean }
 export type AutoSubmitKey = "enter" | "ctrl_enter" | "cmd_enter"
-export type AvailableAccelerators = { whisper: string[]; ort: string[]; gpu_devices: GpuDeviceOption[]; 
+export type AvailableAccelerators = { whisper: string[]; ort: string[]; gpu_devices: GpuDeviceOption[];
 /**
  * transcribe.cpp compute devices (`transcribe_cpp::devices()`), added in
  * Session 2. Informational for now (proves the GPU is visible to the new
@@ -2326,19 +2377,19 @@ transcribe_cpp_devices: GpuDeviceOption[] }
 /**
  * A neural voice returned by the Azure Speech `voices/list` endpoint.
  */
-export type AzureVoice = { 
+export type AzureVoice = {
 /**
  * e.g. "en-US-JennyNeural" — this is what goes in the Voice name field.
  */
-short_name: string; 
+short_name: string;
 /**
  * Friendly display name, e.g. "Jenny".
  */
-local_name: string; 
+local_name: string;
 /**
  * e.g. "en-US".
  */
-locale: string; 
+locale: string;
 /**
  * "Male" / "Female".
  */
@@ -2347,24 +2398,24 @@ export type BindingResponse = { success: boolean; binding: ShortcutBinding | nul
 /**
  * Case transform applied to the output of a text replacement rule.
  */
-export type Capitalization = 
+export type Capitalization =
 /**
  * Leave the replacement text as written.
  */
-"none" | 
+"none" |
 /**
  * UPPERCASE the whole replacement.
  */
-"uppercase" | 
+"uppercase" |
 /**
  * lowercase the whole replacement.
  */
-"lowercase" | 
+"lowercase" |
 /**
  * Capitalize the first character of the replacement.
  */
 "capitalize"
-export type ChatMessage = { role: string; content: string; 
+export type ChatMessage = { role: string; content: string;
 /**
  * Small JPEG **display thumbnails** (data URLs) for any images that rode
  * along with this message — a screen capture and/or user-attached pictures.
@@ -2375,19 +2426,25 @@ export type ChatMessage = { role: string; content: string;
  */
 images?: string[] }
 export type ClipboardHandling = "dont_modify" | "copy_to_clipboard"
+/**
+ * A user-created writing style for cleanup. It is deliberately separate from
+ * `LLMPrompt`: cleanup prompts define what corrections happen; tone presets
+ * define how the resulting wording should sound.
+ */
+export type CustomPostProcessTone = { id: string; name: string; instruction: string }
 export type CustomSounds = { start: boolean; stop: boolean }
-export type EngineType = "Whisper" | "Parakeet" | "Moonshine" | "MoonshineStreaming" | "SenseVoice" | "GigaAM" | "Canary" | "Cohere" | 
+export type EngineType = "Whisper" | "Parakeet" | "Moonshine" | "MoonshineStreaming" | "SenseVoice" | "GigaAM" | "Canary" | "Cohere" |
 /**
  * Native transcribe.cpp (ggml/GGUF) engine, added side-by-side with
  * transcribe-rs for the new single-file GGUF models (batch in Session 2,
  * real streaming in Session 4). This IS a transcription engine.
  */
-"TranscribeCpp" | 
+"TranscribeCpp" |
 /**
  * Local large-language-model engine (GGUF served via the bundled
  * llama.cpp sidecar). Not a transcription engine.
  */
-"LlamaCpp" | 
+"LlamaCpp" |
 /**
  * Local text-to-speech engine (Kokoro, runs in the assistant webview).
  * Not a transcription engine.
@@ -2404,19 +2461,19 @@ export type FileAttachment = { name: string; content: string }
  * `set_assistant_characters`.
  */
 export type GeneratedCharacter = { name: string; prompt: string; greeting: string }
-export type GpuDeviceOption = { id: number; name: string; total_vram_mb: number }
+export type GpuDeviceOption = { id: number; name: string; kind: string; total_vram_mb: number }
 /**
  * A single `.gguf` file inside a repo.
  */
-export type HfGgufFile = { 
+export type HfGgufFile = {
 /**
  * File name within the repo, e.g. `Qwen_Qwen3.5-4B-Q4_K_M.gguf`.
  */
-filename: string; 
+filename: string;
 /**
  * File size in bytes (from the Hub tree listing).
  */
-size_bytes: number; 
+size_bytes: number;
 /**
  * Short quantization label extracted from the filename, e.g. `Q4_K_M`.
  */
@@ -2424,19 +2481,19 @@ quant: string }
 /**
  * A single repo returned by a Hub model search.
  */
-export type HfModelSummary = { 
+export type HfModelSummary = {
 /**
  * Canonical repo id, e.g. `bartowski/Qwen_Qwen3.5-4B-GGUF`.
  */
-id: string; 
+id: string;
 /**
  * Number of likes (popularity signal shown in the UI).
  */
-likes: number; 
+likes: number;
 /**
  * Number of downloads (popularity signal shown in the UI).
  */
-downloads: number; 
+downloads: number;
 /**
  * Whether the repo looks like a multimodal/vision model (so the UI can
  * hint that a projector will be downloaded for image support).
@@ -2446,11 +2503,11 @@ is_vision: boolean }
  * The downloadable GGUF assets in a repo, split into model weights and vision
  * projectors (`mmproj-*.gguf`).
  */
-export type HfRepoFiles = { repo_id: string; 
+export type HfRepoFiles = { repo_id: string;
 /**
  * Model weight files the user can pick from (one per quantization).
  */
-gguf_files: HfGgufFile[]; 
+gguf_files: HfGgufFile[];
 /**
  * Companion vision projectors, if the repo is multimodal.
  */
@@ -2460,30 +2517,30 @@ export type HistoryUpdatePayload = { action: "added"; entry: HistoryEntry } | { 
 /**
  * Result of changing keyboard implementation
  */
-export type ImplementationChangeResult = { success: boolean; 
+export type ImplementationChangeResult = { success: boolean;
 /**
  * List of binding IDs that were reset to defaults due to incompatibility
  */
 reset_bindings: string[] }
 export type KeyboardImplementation = "tauri" | "handy_keys"
 export type LLMPrompt = { id: string; name: string; prompt: string }
-export type LocalLlmStatus = { 
+export type LocalLlmStatus = {
 /**
  * Whether the engine process is currently running.
  */
-running: boolean; 
+running: boolean;
 /**
  * The model id the engine is currently serving (if any).
  */
-model_id: string | null; 
+model_id: string | null;
 /**
  * Whether an engine binary could be located on this machine.
  */
-engine_present: boolean; 
+engine_present: boolean;
 /**
  * Loopback port the engine serves on.
  */
-port: number; 
+port: number;
 /**
  * The last start error, if the most recent start attempt failed.
  */
@@ -2506,30 +2563,30 @@ export type MemoryDetail = "light" | "balanced" | "detailed"
  * user. Notes are pulled into a turn by relevance, within a token budget —
  * never all at once — and are fully user-editable in Settings → Memory.
  */
-export type MemoryNote = { 
+export type MemoryNote = {
 /**
  * Stable identifier for edit/delete.
  */
-id: string; 
+id: string;
 /**
  * The fact itself, as a short canonical statement ("Prefers metric units").
  */
-text: string; 
+text: string;
 /**
  * ISO date (YYYY-MM-DD) the note was created or last confirmed. Drives
  * recency ordering and decay.
  */
-updated?: string; 
+updated?: string;
 /**
  * How reliable the note is.
  */
-confidence?: MemoryConfidence; 
+confidence?: MemoryConfidence;
 /**
  * Where the note came from: `"user"` (typed/dictated explicitly) or
  * `"auto"` (distilled from a conversation). Purely informational.
  */
 source?: string }
-export type ModelInfo = { id: string; name: string; description: string; filename: string; url: string | null; sha256: string | null; size_mb: number; is_downloaded: boolean; is_downloading: boolean; partial_size: number; is_directory: boolean; engine_type: EngineType; accuracy_score: number; speed_score: number; supports_translation: boolean; supports_streaming: boolean; is_recommended: boolean; 
+export type ModelInfo = { id: string; name: string; description: string; filename: string; url: string | null; sha256: string | null; size_mb: number; is_downloaded: boolean; is_downloading: boolean; partial_size: number; is_directory: boolean; engine_type: EngineType; accuracy_score: number; speed_score: number; supports_translation: boolean; supports_streaming: boolean; is_recommended: boolean;
 /**
  * Overall recommendation rank (1 = top); `None` when unranked. Mirrors the
  * GGUF catalog `recommended_rank` and drives the model-list ordering.
@@ -2552,48 +2609,53 @@ export type PaginatedAssistantHistory = { entries: AssistantHistoryEntry[]; has_
 export type PaginatedHistory = { entries: HistoryEntry[]; has_more: boolean }
 export type PasteMethod = "ctrl_v" | "direct" | "none" | "shift_insert" | "ctrl_shift_v" | "external_script"
 export type PermissionAccess = "allowed" | "denied" | "unknown"
+export type PostProcessConfigSource = "dedicated_cleanup_selection" | "assistant_fallback"
 export type PostProcessProvider = { id: string; label: string; base_url: string; allow_base_url_edit?: boolean; models_endpoint?: string | null; supports_structured_output?: boolean }
+export type PostProcessReadiness = { state: "ready"; source: PostProcessConfigSource; provider_id: string; provider_label: string; model: string } | { state: "unavailable"; reason: PostProcessUnavailableReason; source: PostProcessConfigSource | null; provider_id: string | null; provider_label: string | null }
 /**
- * Optional tone applied during dictation post-processing ("AI Correction").
- * `None` leaves wording as-is (cleanup only); the others tell the LLM to
- * rephrase the cleaned text into that register while preserving meaning.
+ * Optional built-in writing style applied during dictation cleanup.
+ *
+ * This enum remains persisted for backwards compatibility. New code selects a
+ * built-in or custom style through `post_process_selected_tone_id`; when that
+ * field is absent, migration uses this legacy value.
  */
 export type PostProcessTone = "none" | "formal" | "casual" | "professional" | "friendly" | "concise"
+export type PostProcessUnavailableReason = "no_providers" | "selected_provider_missing" | "no_model_configured" | "no_prompt_selected" | "selected_prompt_missing" | "selected_prompt_empty" | "missing_api_key"
 export type RecordingRetentionPeriod = "never" | "preserve_limit" | "days_3" | "weeks_2" | "months_3"
 /**
  * A single deterministic find/replace rule applied to the transcript.
- * 
+ *
  * Rules run as a fast, offline, deterministic pass that complements (does not
  * duplicate) the optional LLM post-processing. `search` is matched literally
  * by default; set `is_regex` to treat it as a regular expression. `replace`
  * may contain magic commands such as `[date]`, `[time]`, `[uppercase]`,
  * `[lowercase]`, `[capitalize]`, and `[nospace]`.
  */
-export type Replacement = { 
+export type Replacement = {
 /**
  * Text (or regex pattern when `is_regex` is set) to search for.
  */
-search: string; 
+search: string;
 /**
  * Replacement text. Supports the magic commands described on the struct.
  */
-replace: string; 
+replace: string;
 /**
  * Treat `search` as a regular expression instead of a literal string.
  */
-is_regex?: boolean; 
+is_regex?: boolean;
 /**
  * Whether this rule is applied. Disabled rules are kept but skipped.
  */
-enabled?: boolean; 
+enabled?: boolean;
 /**
  * Remove whitespace immediately before each match.
  */
-trim_before?: boolean; 
+trim_before?: boolean;
 /**
  * Remove whitespace immediately after each match.
  */
-trim_after?: boolean; 
+trim_after?: boolean;
 /**
  * Case transform applied to this rule's output.
  */
@@ -2603,7 +2665,7 @@ capitalization?: Capitalization }
  * (markdown) when available; `snippet` is the short description that's always
  * present. The model prefers `content` and falls back to `snippet`.
  */
-export type SearchResult = { title: string; url: string; snippet: string; 
+export type SearchResult = { title: string; url: string; snippet: string;
 /**
  * Full page content (markdown) when available; empty otherwise.
  */
@@ -2615,7 +2677,7 @@ export type ShortcutBinding = { id: string; name: string; description: string; d
  * Rectangle chosen in the snip overlay, in that window's logical pixels.
  */
 export type SnipRect = { x: number; y: number; width: number; height: number }
-export type SoundTheme = 
+export type SoundTheme =
 /**
  * SpeakoFlow's own start/stop cues — the default. Ships a matching lock
  * cue (`popo_lock.wav`) used by every theme for tap-to-lock.
@@ -2631,12 +2693,12 @@ export type Theme = "light" | "dark" | "system"
  * A voice option handed to the settings UI for any remote TTS engine, so the
  * user can pick from a loaded list instead of typing an opaque id.
  */
-export type TtsVoice = { 
+export type TtsVoice = {
 /**
  * Value written to settings (OpenAI voice name / ElevenLabs voice_id /
  * Azure short name).
  */
-id: string; 
+id: string;
 /**
  * Friendly label for the picker.
  */
@@ -2654,30 +2716,30 @@ export type UiTextSize = "small" | "default" | "large" | "extra_large"
  * injected (in part) into assistant turns only when
  * `assistant_memory_enabled` is on and the conversation isn't incognito.
  */
-export type UserMemory = { 
+export type UserMemory = {
 /**
  * The always-on summary injected into every reply (kept to a few
  * sentences). Empty until the user or a distillation pass fills it.
  */
-about_you?: string; 
+about_you?: string;
 /**
  * Durable facts, selected by relevance within the detail budget.
  */
 notes?: MemoryNote[] }
 /**
  * When a screen capture is taken for an assistant turn.
- * 
+ *
  * This only changes the timing for **voice** questions (where there's a real
  * gap between starting and finishing the question); typed messages always
  * capture at send, since the panel is already on screen either way.
  */
-export type VisionCaptureTiming = 
+export type VisionCaptureTiming =
 /**
  * Capture the moment you start asking (voice: at hotkey/mic press), so it
  * grabs what you were looking at when you began — not what's on screen
  * after you finish talking. This is the default.
  */
-"immediate" | 
+"immediate" |
 /**
  * Capture when the message is actually sent (voice: after you stop talking
  * and it transcribes). The original behaviour.

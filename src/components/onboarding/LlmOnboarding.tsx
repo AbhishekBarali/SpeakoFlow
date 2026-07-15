@@ -1,10 +1,13 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { commands, type ModelInfo } from "@/bindings";
 import { formatModelSize } from "@/lib/utils/format";
-import { getTranslatedModelName } from "@/lib/utils/modelTranslation";
+import {
+  getTranslatedModelDescription,
+  getTranslatedModelName,
+} from "@/lib/utils/modelTranslation";
 import { useSettings } from "@/hooks/useSettings";
-import { GemmaLogo, QwenLogo } from "../icons/BrandLogos";
+import { GemmaLogo } from "../icons/BrandLogos";
 import type { WelcomeCardPhase } from "./WelcomeChoiceCard";
 import WelcomeChoiceCard from "./WelcomeChoiceCard";
 import OnboardingLayout from "./OnboardingLayout";
@@ -14,53 +17,48 @@ import { useModelStore } from "../../stores/modelStore";
 /** The built-in (local) llama.cpp provider id, mirrored from the backend. */
 const BUILTIN_PROVIDER_ID = "builtin";
 
-/** Three curated local-model tiers, by catalog id. */
+/** Three current Gemma 4 choices, ordered by response/quality tradeoff. */
 const TIERS = {
-  /** Tiny, text-only — runs on any machine. */
-  small: "gemma-3-1b",
-  /** Quick all-rounder that also sees the screen. */
-  mid: "qwen3.5-2b",
-  /** Strongest small model, also sees the screen. */
-  capable: "qwen3.5-4b",
+  /** Quickest current option; lower capability on complex requests. */
+  quick: "gemma-4-e2b",
+  /** Recommended conversational quality/latency balance. */
+  balanced: "gemma-4-e4b",
+  /** More capable, but noticeably slower. */
+  capable: "gemma-4-12b",
 } as const;
 
 type Tier = keyof typeof TIERS;
 
-const TIER_ORDER: Tier[] = ["small", "mid", "capable"];
+const TIER_ORDER: Tier[] = ["quick", "balanced", "capable"];
 
-/** Real brand colors for the logo tiles — Gemma sits on Google blue, Qwen on
- *  its purple — so the marks read as the brands they are, consistently. */
-const BRAND_TILE = {
-  gemma: "bg-gradient-to-br from-[#5b9bf8] to-[#3367d6] text-white shadow-sm",
-  qwen: "bg-gradient-to-br from-[#8b7bff] to-[#5546d6] text-white shadow-sm",
-} as const;
+const GEMMA_TILE = "bg-[#4285f4] text-white shadow-sm";
 
 const TIER_META: Record<
   Tier,
   {
     icon: React.ReactNode;
     tileClassName: string;
-    descKey: string;
-    pillKey: "seesScreen" | "textOnly";
+    pillKey: "seesScreen";
+    isRecommended: boolean;
   }
 > = {
-  small: {
+  quick: {
     icon: <GemmaLogo size={19} />,
-    tileClassName: BRAND_TILE.gemma,
-    descKey: "onboarding.aiModel.tiers.small.description",
-    pillKey: "textOnly",
-  },
-  mid: {
-    icon: <QwenLogo size={19} />,
-    tileClassName: BRAND_TILE.qwen,
-    descKey: "onboarding.aiModel.tiers.mid.description",
+    tileClassName: GEMMA_TILE,
     pillKey: "seesScreen",
+    isRecommended: false,
+  },
+  balanced: {
+    icon: <GemmaLogo size={19} />,
+    tileClassName: GEMMA_TILE,
+    pillKey: "seesScreen",
+    isRecommended: true,
   },
   capable: {
-    icon: <QwenLogo size={19} />,
-    tileClassName: BRAND_TILE.qwen,
-    descKey: "onboarding.aiModel.tiers.capable.description",
+    icon: <GemmaLogo size={19} />,
+    tileClassName: GEMMA_TILE,
     pillKey: "seesScreen",
+    isRecommended: false,
   },
 };
 
@@ -72,13 +70,13 @@ interface LlmOnboardingProps {
 /**
  * Step 2 of the welcome flow: "Give it a brain (optional)."
  *
- * Three RAM-tiered local-model cards — a tiny text-only pick, a balanced pick,
- * and the most capable — with exactly one "Recommended" badge placed on the tier
- * that best fits this machine's memory (via `get_system_memory_gb`). Tapping a
- * card morphs it into a progress state in place and flips the footer to
- * "Continue" immediately: the download finishes in the background and wires the
- * built-in assistant provider to the model when it lands. "Skip for now" always
- * stays, reassuring the user they can add this later.
+ * Three current Gemma 4 cards expose the real tradeoff: E2B responds
+ * quickest, E4B is the recommended conversational balance, and 12B is more
+ * capable but slower. The badge is editorial and never inferred from RAM or
+ * VRAM. Tapping a card morphs it into a progress state in place and flips the
+ * footer to "Continue" immediately: the download finishes in the background
+ * and wires the built-in assistant provider to the model when it lands. "Skip
+ * for now" always stays, reassuring the user they can add this later.
  */
 const LlmOnboarding: React.FC<LlmOnboardingProps> = ({ onComplete }) => {
   const { t } = useTranslation();
@@ -86,29 +84,13 @@ const LlmOnboarding: React.FC<LlmOnboardingProps> = ({ onComplete }) => {
   const {
     models,
     downloadModel,
+    cancelDownload,
     downloadingModels,
     verifyingModels,
     extractingModels,
     downloadProgress,
   } = useModelStore();
   const [chosenId, setChosenId] = useState<string | null>(null);
-  const [ramGb, setRamGb] = useState<number | null>(null);
-
-  // Physical RAM (whole GiB, 0 when unknown) drives which single tier is
-  // recommended for this machine.
-  useEffect(() => {
-    commands
-      .getSystemMemoryGb()
-      .then((gb) => setRamGb(gb))
-      .catch(() => setRamGb(0));
-  }, []);
-
-  const recommendedTier: Tier = useMemo(() => {
-    const gb = ramGb ?? 0;
-    if (gb > 0 && gb <= 8) return "small";
-    if (gb >= 16) return "capable";
-    return "mid";
-  }, [ramGb]);
 
   const hasChosen = chosenId !== null;
 
@@ -163,17 +145,37 @@ const LlmOnboarding: React.FC<LlmOnboardingProps> = ({ onComplete }) => {
     }
   };
 
+  const handleCancelChosen = async () => {
+    if (!chosenId) return;
+    const cancelled = await cancelDownload(chosenId);
+    if (cancelled) setChosenId(null);
+  };
+
+  const chosenCanBeCancelled =
+    chosenId !== null && chosenId in downloadingModels;
+
   const footer = (
     <>
-      <p className="text-xs text-muted-soft max-w-[55%]">
+      <p className="text-xs text-muted max-w-[55%]">
         {hasChosen
           ? t("onboarding.aiModel.downloadingHint")
           : t("onboarding.aiModel.skipHint")}
       </p>
       {hasChosen ? (
-        <Button variant="primary" size="lg" onClick={onComplete}>
-          {t("onboarding.aiModel.continue")}
-        </Button>
+        <div className="flex items-center gap-2">
+          {chosenCanBeCancelled && (
+            <Button
+              variant="ghost"
+              size="lg"
+              onClick={() => void handleCancelChosen()}
+            >
+              {t("modelSelector.cancelDownload")}
+            </Button>
+          )}
+          <Button variant="primary" size="lg" onClick={onComplete}>
+            {t("onboarding.aiModel.continue")}
+          </Button>
+        </div>
       ) : (
         <Button variant="secondary" size="lg" onClick={onComplete}>
           {t("onboarding.aiModel.skip")}
@@ -205,14 +207,12 @@ const LlmOnboarding: React.FC<LlmOnboardingProps> = ({ onComplete }) => {
             icon={meta.icon}
             tileClassName={meta.tileClassName}
             title={cleanName}
-            description={t(meta.descKey)}
+            description={getTranslatedModelDescription(model, t)}
             sizeLabel={formatModelSize(Number(model.size_mb))}
             pill={t(`onboarding.aiModel.${meta.pillKey}`)}
-            badge={
-              tier === recommendedTier ? t("onboarding.recommended") : undefined
-            }
+            badge={meta.isRecommended ? t("onboarding.recommended") : undefined}
             selected={chosenId === model.id}
-            disabled={hasChosen && chosenId !== model.id}
+            disabled={hasChosen}
             phase={phaseFor(model.id)}
             progress={downloadProgress[model.id]?.percentage}
             actionLabel={

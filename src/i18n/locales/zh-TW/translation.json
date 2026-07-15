@@ -149,16 +149,31 @@
         "description": "Best for many languages — nearly 100 supported."
       },
       "gemma-3-1b": {
-        "description": "Tiny and fast. Text only — great for cleaning up transcripts."
+        "description": "Very small and quick, but limited for open-ended conversation. Text only."
       },
       "qwen3.5-2b": {
         "description": "Small and fast, and it can see images. Good on most laptops."
       },
       "qwen3.5-4b": {
-        "description": "Fast, multilingual, and sees images. Needs about 5 GB of RAM."
+        "description": "A legacy vision model whose optional reasoning can delay conversational replies."
+      },
+      "qwen3.5-9b": {
+        "description": "More capable, but slower for live conversation, especially when reasoning is enabled."
+      },
+      "qwen3.5-27b": {
+        "description": "A large vision model for deliberate tasks, not a low-latency assistant."
+      },
+      "gemma-4-e2b": {
+        "description": "The quickest current Gemma for everyday conversation. Less capable on complex requests."
+      },
+      "gemma-4-e4b": {
+        "description": "Recommended for conversation: a stronger quality-and-speed balance without default thinking."
+      },
+      "gemma-4-12b": {
+        "description": "More capable for nuanced questions, but noticeably slower and best with a strong GPU."
       },
       "gemma-3-4b": {
-        "description": "Google's model. Clean, reliable answers, and it sees images. Needs about 5 GB of RAM."
+        "description": "Fast, clean answers with screen vision, but less capable than current Gemma 4 models."
       },
       "kokoro-82m": {
         "description": "Built-in local voice for the assistant. No download needed."
@@ -726,7 +741,19 @@
           "professional": "Professional",
           "friendly": "Friendly",
           "concise": "Concise"
-        }
+        },
+        "edit": "Edit",
+        "closeEditor": "Close",
+        "createNew": "Create style",
+        "nameLabel": "Style name",
+        "namePlaceholder": "For example, Calm and clean",
+        "instructionsLabel": "Style instructions",
+        "instructionsPlaceholder": "Describe exactly how the wording should change. Example: Remove profanity and replace it with calm, neutral wording.",
+        "instructionsHint": "These rules shape the wording after cleanup. They stay separate from your cleanup prompt.",
+        "createTone": "Create style",
+        "updateTone": "Save changes",
+        "deleteTone": "Delete style",
+        "cancel": "Cancel"
       },
       "api": {
         "title": "API（相容 OpenAI）",
@@ -765,6 +792,10 @@
           "placeholderWithOptions": "搜尋或選擇模型",
           "placeholderNoOptions": "輸入模型名稱",
           "refreshModels": "重新整理模型"
+        },
+        "location": {
+          "title": "Where it runs",
+          "description": "Run cleanup privately with a downloaded model or use a cloud provider."
         }
       },
       "prompts": {
@@ -789,6 +820,29 @@
         "cancel": "取消",
         "selectToEdit": "選擇上方的提示詞以檢視和編輯其詳細資訊",
         "createFirst": "點選上方的「建立新提示詞」來建立您的第一個後處理提示詞"
+      },
+      "readiness": {
+        "checking": "Checking AI cleanup setup…",
+        "checkFailed": "Couldn’t check AI cleanup setup.",
+        "ready": "Ready — {{provider}}.",
+        "assistantFallback": "Ready — using your Assistant model ({{provider}}).",
+        "selectPrompt": "Select a cleanup prompt.",
+        "selectModel": "Select a model for this provider.",
+        "addApiKey": "Add an API key for this provider.",
+        "providerMissing": "The selected provider is no longer available."
+      },
+      "errors": {
+        "saveFailed": "Couldn’t save the AI cleanup setting.",
+        "modelsLoadFailed": "Couldn’t load models for this provider.",
+        "promptCreateFailed": "Couldn’t create the prompt.",
+        "promptSelectFailed": "Created the prompt, but couldn’t select it.",
+        "promptUpdateFailed": "Couldn’t update the prompt.",
+        "promptDeleteFailed": "Couldn’t delete the prompt.",
+        "toneSelectFailed": "Couldn’t select the writing style.",
+        "toneCreateFailed": "Couldn’t create the writing style.",
+        "toneSelectAfterCreateFailed": "Created the style, but couldn’t select it.",
+        "toneUpdateFailed": "Couldn’t update the writing style.",
+        "toneDeleteFailed": "Couldn’t delete the writing style."
       }
     },
     "dictation": {
@@ -813,7 +867,13 @@
         "promptGroupTitle": "Cleanup prompt",
         "title": "Fix up my dictation with AI",
         "caption": "Experimental — tidies punctuation and filler after you dictate.",
-        "info": "Runs a language model over your dictation to fix punctuation, remove filler words, and optionally adjust the tone. Applies to dictation only, on its own shortcut. It adds a short delay after you speak; if the model fails or times out, your raw text is used instead. Still in development."
+        "info": "Runs a language model over your dictation to fix punctuation, remove filler words, and optionally adjust the tone. Applies to dictation only, on its own shortcut. It adds a short delay after you speak; if the model fails or times out, your raw text is used instead. Still in development.",
+        "styleGroupTitle": "Writing style",
+        "styleGroupDescription": "Choose a built-in style or save your own rules for how cleaned dictation should sound."
+      },
+      "spokenEmoji": {
+        "title": "語音表情符號",
+        "description": "說出「happy emoji」或「thumbs up emoji」即可插入 😊 或 👍。常見別名和輕微的語音轉文字錯誤會在裝置上處理；無法辨識的名稱會保留為文字。"
       },
       "output": {
         "title": "Output options"
@@ -1013,7 +1073,18 @@
         "currentModelTitle": "Current model",
         "currentModelDescription": "Selected for the built-in assistant on this device.",
         "recommendedTitle": "Recommended models",
-        "recommendedDescription": "Curated options for different memory and screen-vision needs.",
+        "recommendedDescription": "Three conversation-first choices: quickest, recommended, and more capable but slower.",
+        "acceleratorDetected": "{{name}} · {{memory}} GB reported graphics memory",
+        "acceleratorDetectedDedicated": "{{name}} · {{memory}} GB dedicated VRAM",
+        "acceleratorDetectedIntegrated": "{{name}} · {{memory}} GB shared graphics memory",
+        "acceleratorDetectedNoMemory": "{{name}} detected · graphics memory not reported",
+        "acceleratorUnknownWithMemory": "Graphics memory unavailable · {{memory}} GB system RAM for CPU fallback",
+        "acceleratorUnknown": "Graphics memory unavailable · response speed cannot be predicted",
+        "details": "Details",
+        "switchBeforeDelete": "Switch the built-in assistant to another model before deleting this one.",
+        "deleteModelConfirm": "Delete {{modelName}}? Its downloaded files and saved entry will be removed.",
+        "deleteModelFailed": "Could not delete the model.",
+        "visionModelNote": "Screen vision downloads an additional image file automatically.",
         "finderSectionTitle": "More on-device models",
         "finderSectionDescription": "Search Hugging Face when you need a different model size or capability.",
         "finderTitle": "Browse Hugging Face",
@@ -1058,7 +1129,8 @@
         "contextSizeLabel": "Context window",
         "contextSizeDescription": "How much the local model can keep in mind at once — the system instructions, your chat history, any screenshot (a single image can eat a big chunk), and its reply. Bigger holds more and keeps screen vision and web search reliable, but uses more memory. The default is 8192; 16384 is a good step up if your machine has the RAM to spare. You can lower it later to save memory.",
         "unloadTimeoutLabel": "Unload from memory after",
-        "unloadTimeoutDescription": "Free up memory by unloading the local model after it has been idle this long. It reloads automatically on next use."
+        "unloadTimeoutDescription": "Free up memory by unloading the local model after it has been idle this long. It reloads automatically on next use.",
+        "saveFailed": "Couldn’t switch the Assistant provider."
       },
       "systemPrompt": {
         "title": "System prompt",

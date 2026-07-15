@@ -54,6 +54,9 @@ struct ChatCompletionRequest {
     reasoning_effort: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     reasoning: Option<ReasoningConfig>,
+    /// llama.cpp-specific template options. Sent only to the built-in engine.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    chat_template_kwargs: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     stream: Option<bool>,
     /// OpenAI-style tool definitions (`[{type:"function", function:{…}}]`).
@@ -63,6 +66,10 @@ struct ChatCompletionRequest {
     /// Tool choice policy ("auto" for the web-search path). Sent only with `tools`.
     #[serde(skip_serializing_if = "Option::is_none")]
     tool_choice: Option<Value>,
+}
+
+fn builtin_chat_template_kwargs(provider: &PostProcessProvider) -> Option<Value> {
+    (provider.id == "builtin").then(|| serde_json::json!({ "enable_thinking": false }))
 }
 
 #[derive(Debug, Deserialize)]
@@ -292,12 +299,28 @@ pub async fn send_chat_completion(
     .await
 }
 
-/// Send a chat completion request with structured output support
-/// When json_schema is provided, uses structured outputs mode
-/// system_prompt is used as the system message when provided
-/// reasoning_effort sets the OpenAI-style top-level field (e.g., "none", "low", "medium", "high")
-/// reasoning sets the OpenRouter-style nested object (effort + exclude)
-pub async fn send_chat_completion_with_schema(
+#[derive(Debug)]
+pub(crate) enum ChatCompletionError {
+    RequestBuild(String),
+    Transport(String),
+    HttpStatus { status: u16, detail: String },
+    ResponseDecode(String),
+}
+
+impl std::fmt::Display for ChatCompletionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::RequestBuild(detail) => write!(f, "Request setup failed: {detail}"),
+            Self::Transport(detail) => write!(f, "HTTP request failed: {detail}"),
+            Self::HttpStatus { status, detail } => {
+                write!(f, "API request failed with status {status}: {detail}")
+            }
+            Self::ResponseDecode(detail) => write!(f, "Failed to parse API response: {detail}"),
+        }
+    }
+}
+
+pub(crate) async fn send_chat_completion_with_schema_typed(
     provider: &PostProcessProvider,
     api_key: String,
     model: &str,
@@ -306,33 +329,24 @@ pub async fn send_chat_completion_with_schema(
     json_schema: Option<Value>,
     reasoning_effort: Option<String>,
     reasoning: Option<ReasoningConfig>,
-) -> Result<Option<String>, String> {
+) -> Result<Option<String>, ChatCompletionError> {
     let base_url = effective_base_url(provider);
     let url = format!("{}/chat/completions", base_url);
 
     debug!("Sending chat completion request to: {}", url);
 
-    let client = create_client(provider, &api_key)?;
+    let client = create_client(provider, &api_key).map_err(ChatCompletionError::RequestBuild)?;
 
-    // Build messages vector
     let mut messages = Vec::new();
-
-    // Add system prompt if provided
     if let Some(system) = system_prompt {
         messages.push(serde_json::json!({"role": "system", "content": system}));
     }
-
-    // Add user message
     messages.push(serde_json::json!({"role": "user", "content": user_content}));
 
-    // The built-in engine applies the model's own Jinja chat template; fold any
-    // system message into the first user turn so templates without a system
-    // role (e.g. Gemma) don't reject the request.
     if provider.id == "builtin" {
         fold_system_into_first_user(&mut messages);
     }
 
-    // Build response_format if schema is provided
     let response_format = json_schema.map(|schema| ResponseFormat {
         format_type: "json_schema".to_string(),
         json_schema: JsonSchema {
@@ -348,6 +362,7 @@ pub async fn send_chat_completion_with_schema(
         response_format,
         reasoning_effort,
         reasoning,
+        chat_template_kwargs: builtin_chat_template_kwargs(provider),
         stream: None,
         tools: None,
         tool_choice: None,
@@ -358,7 +373,7 @@ pub async fn send_chat_completion_with_schema(
         .json(&request_body)
         .send()
         .await
-        .map_err(|e| format!("HTTP request failed: {}", e))?;
+        .map_err(|error| ChatCompletionError::Transport(error.to_string()))?;
 
     let status = response.status();
     if !status.is_success() {
@@ -366,21 +381,48 @@ pub async fn send_chat_completion_with_schema(
             .text()
             .await
             .unwrap_or_else(|_| "Failed to read error response".to_string());
-        return Err(format!(
-            "API request failed with status {}: {}",
-            status, error_text
-        ));
+        return Err(ChatCompletionError::HttpStatus {
+            status: status.as_u16(),
+            detail: error_text,
+        });
     }
 
     let completion: ChatCompletionResponse = response
         .json()
         .await
-        .map_err(|e| format!("Failed to parse API response: {}", e))?;
+        .map_err(|error| ChatCompletionError::ResponseDecode(error.to_string()))?;
 
     Ok(completion
         .choices
         .first()
         .and_then(|choice| choice.message.content.clone()))
+}
+
+/// Send a chat completion request with structured output support.
+/// Existing assistant/memory callers retain the historical string error API;
+/// cleanup uses the typed inner function above for safe classification.
+pub async fn send_chat_completion_with_schema(
+    provider: &PostProcessProvider,
+    api_key: String,
+    model: &str,
+    user_content: String,
+    system_prompt: Option<String>,
+    json_schema: Option<Value>,
+    reasoning_effort: Option<String>,
+    reasoning: Option<ReasoningConfig>,
+) -> Result<Option<String>, String> {
+    send_chat_completion_with_schema_typed(
+        provider,
+        api_key,
+        model,
+        user_content,
+        system_prompt,
+        json_schema,
+        reasoning_effort,
+        reasoning,
+    )
+    .await
+    .map_err(|error| error.to_string())
 }
 
 #[derive(Debug, Deserialize)]
@@ -469,6 +511,7 @@ pub async fn send_chat_stream(
         response_format: None,
         reasoning_effort: None,
         reasoning: None,
+        chat_template_kwargs: builtin_chat_template_kwargs(provider),
         stream: Some(true),
         tools: None,
         tool_choice: None,
@@ -569,6 +612,7 @@ pub async fn send_chat_stream_with_tools(
         response_format: None,
         reasoning_effort: None,
         reasoning: None,
+        chat_template_kwargs: builtin_chat_template_kwargs(provider),
         stream: Some(true),
         tools: Some(tools),
         tool_choice: Some(tool_choice),
@@ -757,6 +801,17 @@ mod tests {
             models_endpoint: Some("/models".to_string()),
             supports_structured_output: true,
         }
+    }
+
+    #[test]
+    fn builtin_requests_disable_optional_thinking() {
+        let builtin = provider("builtin", "http://127.0.0.1:8080/v1");
+        let kwargs = builtin_chat_template_kwargs(&builtin)
+            .expect("built-in requests should carry chat template options");
+        assert_eq!(kwargs["enable_thinking"], false);
+
+        let cloud = provider("openai", "https://api.openai.com/v1");
+        assert!(builtin_chat_template_kwargs(&cloud).is_none());
     }
 
     #[test]

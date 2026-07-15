@@ -1,6 +1,10 @@
 import { useEffect } from "react";
 import { useSettingsStore } from "../stores/settingsStore";
-import type { AppSettings as Settings, AudioDevice } from "@/bindings";
+import type {
+  AppSettings as Settings,
+  AudioDevice,
+  PostProcessReadiness,
+} from "@/bindings";
 
 interface UseSettingsReturn {
   // State
@@ -11,14 +15,18 @@ interface UseSettingsReturn {
   outputDevices: AudioDevice[];
   audioFeedbackEnabled: boolean;
   postProcessModelOptions: Record<string, string[]>;
+  postProcessReadiness: PostProcessReadiness | null;
+  isPostProcessReadinessLoading: boolean;
+  postProcessReadinessError: boolean;
 
   // Actions
   updateSetting: <K extends keyof Settings>(
     key: K,
     value: Settings[K],
-  ) => Promise<void>;
+  ) => Promise<boolean>;
   resetSetting: (key: keyof Settings) => Promise<void>;
   refreshSettings: () => Promise<void>;
+  refreshPostProcessReadiness: () => Promise<void>;
   refreshAudioDevices: () => Promise<void>;
   refreshOutputDevices: () => Promise<void>;
 
@@ -30,17 +38,20 @@ interface UseSettingsReturn {
   getSetting: <K extends keyof Settings>(key: K) => Settings[K] | undefined;
 
   // Post-processing helpers
-  setPostProcessProvider: (providerId: string) => Promise<void>;
+  setPostProcessProvider: (providerId: string) => Promise<boolean>;
   updatePostProcessBaseUrl: (
     providerId: string,
     baseUrl: string,
-  ) => Promise<void>;
+  ) => Promise<boolean>;
   updatePostProcessApiKey: (
     providerId: string,
     apiKey: string,
-  ) => Promise<void>;
-  updatePostProcessModel: (providerId: string, model: string) => Promise<void>;
-  fetchPostProcessModels: (providerId: string) => Promise<string[]>;
+  ) => Promise<boolean>;
+  updatePostProcessModel: (
+    providerId: string,
+    model: string,
+  ) => Promise<boolean>;
+  fetchPostProcessModels: (providerId: string) => Promise<string[] | null>;
 }
 
 export const useSettings = (): UseSettingsReturn => {
@@ -61,9 +72,13 @@ export const useSettings = (): UseSettingsReturn => {
     outputDevices: store.outputDevices,
     audioFeedbackEnabled: store.settings?.audio_feedback || false,
     postProcessModelOptions: store.postProcessModelOptions,
+    postProcessReadiness: store.postProcessReadiness,
+    isPostProcessReadinessLoading: store.isPostProcessReadinessLoading,
+    postProcessReadinessError: store.postProcessReadinessError,
     updateSetting: store.updateSetting,
     resetSetting: store.resetSetting,
     refreshSettings: store.refreshSettings,
+    refreshPostProcessReadiness: store.refreshPostProcessReadiness,
     refreshAudioDevices: store.refreshAudioDevices,
     refreshOutputDevices: store.refreshOutputDevices,
     updateBinding: store.updateBinding,

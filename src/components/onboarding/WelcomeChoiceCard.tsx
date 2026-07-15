@@ -80,12 +80,14 @@ const WelcomeChoiceCard: React.FC<WelcomeChoiceCardProps> = ({
   };
 
   const ringClasses = selected
-    ? "border-accent/60 ring-1 ring-accent/30 bg-accent/5 shadow-[0_8px_32px_-12px_rgba(20,184,166,0.5)]"
+    ? "border-accent/60 ring-1 ring-accent/30 bg-accent/5"
     : "border-hairline-strong";
 
   const interactiveClasses = disabled
-    ? "opacity-50 cursor-not-allowed"
-    : "cursor-pointer hover:border-hairline-strong hover:shadow-[0_2px_8px_rgba(0,0,0,0.06)] group";
+    ? selected
+      ? "cursor-default"
+      : "opacity-50 cursor-not-allowed"
+    : "cursor-pointer hover:border-hairline-strong group";
 
   const pct =
     typeof progress === "number"
@@ -140,22 +142,22 @@ const WelcomeChoiceCard: React.FC<WelcomeChoiceCardProps> = ({
       {/* Bottom row — morphs into a progress bar in place while downloading. */}
       {isBusy ? (
         <div className="w-full">
-          <div className="w-full h-1.5 bg-mid-gray/20 rounded-full overflow-hidden">
+          <div className="w-full h-1.5 bg-hairline-strong rounded-full overflow-hidden">
             <div
-              className={`h-full bg-logo-primary rounded-full transition-all duration-300 ${
+              className={`h-full bg-accent rounded-full transition-all duration-300 ${
                 phase === "downloading" ? "" : "animate-pulse w-full"
               }`}
               style={phase === "downloading" ? { width: `${pct}%` } : undefined}
             />
           </div>
-          <p className="mt-1 flex items-center gap-1.5 text-xs text-text/50">
+          <p className="mt-1 flex items-center gap-1.5 text-xs text-muted">
             <Loader2 className="w-3.5 h-3.5 animate-spin text-accent" />
             <span className="tabular-nums">{statusLabel}</span>
           </p>
         </div>
       ) : (
         (pill || sizeLabel) && (
-          <div className="flex items-center gap-3 w-full h-5 text-xs text-text/50">
+          <div className="flex items-center gap-3 w-full h-5 text-xs text-muted">
             {pill && (
               <span className="inline-flex items-center rounded-md border border-hairline-strong px-2 py-0.5 text-[11px] text-muted">
                 {pill}

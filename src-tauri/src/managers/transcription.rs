@@ -1716,6 +1716,7 @@ fn resolve_auto_ort_accelerator() -> transcribe_rs::accel::OrtAccelerator {
 pub struct GpuDeviceOption {
     pub id: i32,
     pub name: String,
+    pub kind: String,
     pub total_vram_mb: usize,
 }
 
@@ -1740,10 +1741,33 @@ fn cached_gpu_devices() -> &'static [GpuDeviceOption] {
             .map(|d| GpuDeviceOption {
                 id: d.id,
                 name: d.name,
+                kind: match d.kind {
+                    transcribe_rs::whisper_cpp::gpu::GpuKind::Dedicated => "dedicated".to_string(),
+                    transcribe_rs::whisper_cpp::gpu::GpuKind::Integrated => {
+                        "integrated".to_string()
+                    }
+                },
                 total_vram_mb: d.total_vram / (1024 * 1024),
             })
             .collect()
     })
+}
+
+fn select_preferred_gpu_device(devices: &[GpuDeviceOption]) -> Option<&GpuDeviceOption> {
+    devices.iter().max_by_key(|device| {
+        let kind_priority = match device.kind.as_str() {
+            "dedicated" => 2u8,
+            "unknown" => 1,
+            _ => 0,
+        };
+        (kind_priority, device.total_vram_mb)
+    })
+}
+
+/// Best compute device for local inference. Dedicated GPUs win over integrated
+/// GPUs even when an iGPU reports a larger shared-memory budget.
+pub fn preferred_gpu_device() -> Option<GpuDeviceOption> {
+    select_preferred_gpu_device(cached_gpu_devices()).cloned()
 }
 
 #[derive(Serialize, Clone, Debug, Type)]
@@ -1781,6 +1805,7 @@ fn cached_transcribe_cpp_devices() -> &'static [GpuDeviceOption] {
                 } else {
                     d.description
                 },
+                kind: "unknown".to_string(),
                 total_vram_mb: (d.memory_total / (1024 * 1024)) as usize,
             })
             .collect()
@@ -1946,6 +1971,28 @@ mod tests {
         s.selected_language = "zh-Hant".into();
         let plan = transcribe_cpp_run_plan(&s, &caps(&["zh"], false), "whisper");
         assert_eq!(plan.language.as_deref(), Some("zh"));
+    }
+
+    #[test]
+    fn preferred_gpu_prioritizes_dedicated_over_larger_integrated_memory() {
+        let devices = vec![
+            GpuDeviceOption {
+                id: 0,
+                name: "NVIDIA GeForce RTX 4070 Ti SUPER".to_string(),
+                kind: "dedicated".to_string(),
+                total_vram_mb: 16_063,
+            },
+            GpuDeviceOption {
+                id: 1,
+                name: "AMD Radeon(TM) Graphics".to_string(),
+                kind: "integrated".to_string(),
+                total_vram_mb: 16_180,
+            },
+        ];
+
+        let selected = select_preferred_gpu_device(&devices).unwrap();
+        assert_eq!(selected.id, 0);
+        assert_eq!(selected.kind, "dedicated");
     }
 
     #[test]

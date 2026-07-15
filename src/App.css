@@ -45,8 +45,12 @@
   --color-accent: #0f766e; /* primary actions, active states */
   --color-accent-strong: #0c5f58; /* hover / pressed */
 
-  /* === Semantic === */
-  --color-success: #16a34a;
+  /* === Semantic ===
+   * `success` is used as tint + text (badges, alerts, the AI-cleanup readiness
+   * row), never as a fill behind white text, so it's tuned to pass AA as small
+   * text on the light surface (~4.9:1). `error` stays the destructive FILL
+   * color (white text sits on it), so it is left as-is. */
+  --color-success: #15803d;
   --color-error: #dc2626;
 
   /* === On-color text === */
@@ -169,6 +173,10 @@
 
   --color-on-primary: #04302b;
 
+  /* Success reads as a luminous green on the near-black surfaces (the flat
+   * `#15803d` from light mode is too dark to register here). */
+  --color-success: #4ade80;
+
   --color-toggle-track-on: var(--color-accent);
   --color-toggle-knob-on: #ffffff;
 
@@ -217,6 +225,8 @@
     --color-accent-strong: #63e0d0;
 
     --color-on-primary: #053b34;
+
+    --color-success: #4ade80;
 
     --color-toggle-track-on: var(--color-accent);
     --color-toggle-knob-on: #ffffff;

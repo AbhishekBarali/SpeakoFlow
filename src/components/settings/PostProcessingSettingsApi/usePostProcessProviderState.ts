@@ -1,4 +1,6 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
 import { useSettings } from "../../../hooks/useSettings";
 import { commands, type PostProcessProvider } from "@/bindings";
 import type { ModelOption } from "./types";
@@ -22,6 +24,7 @@ type PostProcessProviderState = {
   modelOptions: ModelOption[];
   isModelUpdating: boolean;
   isFetchingModels: boolean;
+  isProviderUpdating: boolean;
   handleProviderSelect: (providerId: string) => void;
   handleModelSelect: (value: string) => void;
   handleModelCreate: (value: string) => void;
@@ -31,6 +34,7 @@ type PostProcessProviderState = {
 const APPLE_PROVIDER_ID = "apple_intelligence";
 
 export const usePostProcessProviderState = (): PostProcessProviderState => {
+  const { t } = useTranslation();
   const {
     settings,
     isUpdating,
@@ -41,6 +45,10 @@ export const usePostProcessProviderState = (): PostProcessProviderState => {
     fetchPostProcessModels,
     postProcessModelOptions,
   } = useSettings();
+
+  // Bumped on every provider selection so a slow Apple check / provider save
+  // for an earlier click can't auto-fetch or clobber a newer selection.
+  const selectionSequence = useRef(0);
 
   // Settings are guaranteed to have providers after migration
   const providers = settings?.post_process_providers || [];
@@ -74,6 +82,7 @@ export const usePostProcessProviderState = (): PostProcessProviderState => {
 
   const handleProviderSelect = useCallback(
     async (providerId: string) => {
+      const sequence = ++selectionSequence.current;
       // Clear error state on any selection attempt (allows dismissing the error)
       setAppleIntelligenceUnavailable(false);
 
@@ -82,6 +91,7 @@ export const usePostProcessProviderState = (): PostProcessProviderState => {
       // Check Apple Intelligence availability before selecting
       if (providerId === APPLE_PROVIDER_ID) {
         const available = await commands.checkAppleIntelligenceAvailable();
+        if (sequence !== selectionSequence.current) return;
         if (!available) {
           setAppleIntelligenceUnavailable(true);
           // Don't return - still set the provider so dropdown shows the selection
@@ -89,7 +99,10 @@ export const usePostProcessProviderState = (): PostProcessProviderState => {
         }
       }
 
-      await setPostProcessProvider(providerId);
+      const saved = await setPostProcessProvider(providerId);
+      // A newer selection superseded this one, or the save failed — don't
+      // auto-fetch models against a provider we didn't actually switch to.
+      if (!saved || sequence !== selectionSequence.current) return;
 
       // Auto-fetch available models for the new provider so the model dropdown
       // reflects what's actually valid. Without this, a stale model value from
@@ -170,8 +183,16 @@ export const usePostProcessProviderState = (): PostProcessProviderState => {
 
   const handleRefreshModels = useCallback(() => {
     if (isAppleProvider) return;
-    void fetchPostProcessModels(selectedProviderId);
-  }, [fetchPostProcessModels, isAppleProvider, selectedProviderId]);
+    void fetchPostProcessModels(selectedProviderId).then((models) => {
+      if (models === null) {
+        toast.error(
+          t("settings.postProcessing.errors.modelsLoadFailed", {
+            defaultValue: "Couldn’t load models for this provider.",
+          }),
+        );
+      }
+    });
+  }, [fetchPostProcessModels, isAppleProvider, selectedProviderId, t]);
 
   const availableModelsRaw = postProcessModelOptions[selectedProviderId] || [];
 
@@ -209,6 +230,7 @@ export const usePostProcessProviderState = (): PostProcessProviderState => {
   const isFetchingModels = isUpdating(
     `post_process_models_fetch:${selectedProviderId}`,
   );
+  const isProviderUpdating = isUpdating("post_process_provider_id");
 
   const isCustomProvider = selectedProvider?.id === "custom";
 
@@ -232,6 +254,7 @@ export const usePostProcessProviderState = (): PostProcessProviderState => {
     modelOptions,
     isModelUpdating,
     isFetchingModels,
+    isProviderUpdating,
     handleProviderSelect,
     handleModelSelect,
     handleModelCreate,
