@@ -66,6 +66,19 @@
   min-width: 0;
 }
 
+/* Small text label for the labeled pill states (Flow generating / looking at
+ * the screen / a brief notice). One quiet line, ellipsized to the pill. */
+.pill-label {
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: rgba(245, 245, 244, 0.92);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+}
+
 /* A fixed box keeps the bars packed into a dense little spindle instead of
  * stretching thin across the chip. */
 .wave-box {

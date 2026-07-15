@@ -875,6 +875,16 @@
         "title": "Spoken emoji",
         "description": "Say “happy emoji” or “thumbs up emoji” to insert 😊 or 👍. Common aliases and minor speech-to-text errors are handled on your device; unknown names stay as text."
       },
+      "flow": {
+        "groupTitle": "Generate with Flow",
+        "enableLabel": "Generate with Flow",
+        "enableDescription": "Start a dictation with the activation phrase to have AI write the result for you — “Hey Flow, write a polite email asking to reschedule” pastes the finished email.",
+        "phraseLabel": "Activation phrase",
+        "phraseDescription": "Flow activates only when a dictation begins with this phrase. Anywhere else, the same words paste as normal dictation. Uses your assistant's model; leave empty to reset to “Hey Flow”.",
+        "phrasePlaceholder": "Hey Flow",
+        "screenLabel": "Allow screen access",
+        "screenDescription": "Let Flow take one screenshot when a command clearly refers to your screen, like “look at this email and draft a reply”. The model decides if it's needed. Separate from the assistant's screen access."
+      },
       "output": {
         "title": "Output options"
       }
@@ -1207,8 +1217,17 @@
       },
       "vision": {
         "title": "Screen vision",
-        "enableLabel": "Allow screen vision",
-        "enableDescription": "Let the assistant see your screen when you ask about it. Requires a vision-capable model.",
+        "modeLabel": "Screen access",
+        "modes": {
+          "off": "Off",
+          "manual": "Manual",
+          "agentDecides": "Agent decides",
+          "descriptions": {
+            "off": "Screen capture is disabled. Camera and region controls are hidden.",
+            "manual": "You choose when to attach the full screen or a region. Voice capture timing applies.",
+            "agent_decides": "The model may request a screen capture when it needs current visual context. Every screenshot sent is shown in the conversation."
+          }
+        },
         "timing": {
           "label": "When to capture",
           "description": "For voice questions: capture the moment you start asking, or wait until the message is sent. Typed messages always capture on send.",
@@ -1424,6 +1443,13 @@
     "recording": "Recording",
     "transcribing": "Transcribing…",
     "processing": "Processing…",
+    "generating": "Writing with Flow…",
+    "vision": "Looking at your screen…",
+    "notices": {
+      "flowNotConfigured": "Flow needs an assistant model — pasted as dictation",
+      "flowFailed": "Flow couldn't generate — nothing was pasted",
+      "flowEmpty": "Say a command after the activation phrase"
+    },
     "listening": "Listening…",
     "locked": "Recording hands-free — press the hotkey again to stop",
     "cancel": "Cancel",

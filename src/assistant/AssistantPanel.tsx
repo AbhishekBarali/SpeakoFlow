@@ -441,7 +441,8 @@ const AssistantPanel: React.FC = () => {
   const ttsVoice = settings?.assistant_tts_voice ?? "af_heart";
   const ttsDtype = settings?.assistant_tts_kokoro_dtype ?? "fp32";
   const ttsSpeed = settings?.assistant_tts_speed ?? 1;
-  const screenshotEnabled = settings?.assistant_screenshot_enabled ?? true;
+  const screenAccessMode = settings?.assistant_screen_access_mode ?? "manual";
+  const manualScreenAccess = screenAccessMode === "manual";
   const webSearchEnabled = settings?.assistant_web_search_enabled ?? false;
   const characters = settings?.assistant_characters ?? [];
   const activeCharacterId =
@@ -453,6 +454,12 @@ const AssistantPanel: React.FC = () => {
   speakRef.current = tts.speak;
 
   useEffect(() => setMounted(true), []);
+
+  useEffect(() => {
+    if (!manualScreenAccess) {
+      setAttachScreen(false);
+    }
+  }, [manualScreenAccess]);
 
   const refreshSettings = useCallback(async () => {
     try {
@@ -556,6 +563,13 @@ const AssistantPanel: React.FC = () => {
     const setup = async () => {
       await syncLanguageFromSettings();
       await refreshSettings();
+
+      try {
+        const armed = await commands.getAssistantScreenArmed();
+        if (!cancelled) setAttachScreen(armed);
+      } catch {
+        // bindings not ready yet; the arm event will synchronize later
+      }
 
       // Sync the pill/expanded state from the backend so a freshly (re)loaded
       // panel renders the right layout. Without this the webview defaults to
@@ -989,7 +1003,7 @@ const AssistantPanel: React.FC = () => {
       }
       return;
     }
-    const withScreen = attachScreen && screenshotEnabled;
+    const withScreen = attachScreen && manualScreenAccess;
     const images = pendingImages.map((image) => image.dataUrl);
     const files = pendingFiles.map(({ name, content }) => ({ name, content }));
     try {
@@ -1011,7 +1025,7 @@ const AssistantPanel: React.FC = () => {
     input,
     busy,
     attachScreen,
-    screenshotEnabled,
+    manualScreenAccess,
     pendingImages,
     pendingFiles,
   ]);
@@ -1124,9 +1138,8 @@ const AssistantPanel: React.FC = () => {
   const showTypingDots =
     (state === "thinking" || state === "searching") && stream === "";
 
-  // Screen-vision is active either because the user armed the camera, or
-  // because this turn came from the "Assistant + Screen" shortcut.
-  const screenActive = visionActive || attachScreen;
+  // User-controlled screen state is meaningful only in Manual mode.
+  const screenActive = manualScreenAccess && (visionActive || attachScreen);
 
   const ttsTitle =
     tts.status === "loading"
@@ -1338,7 +1351,7 @@ const AssistantPanel: React.FC = () => {
               visible in every state (so you always know capture is on); when off
               it's hidden until you hover the pill, so it's there to enable but
               never clutters. One control — click to arm, click to disarm. */}
-          {screenshotEnabled && !showError && (
+          {manualScreenAccess && !showError && (
             <button
               className={`apill-screen${screenActive ? " armed" : ""}`}
               onClick={toggleScreen}
@@ -1655,16 +1668,10 @@ const AssistantPanel: React.FC = () => {
           >
             <Globe size={15} />
           </button>
-          {screenshotEnabled && (
+          {manualScreenAccess && (
             <button
               className={`assistant-attach-button${attachScreen ? " armed" : ""}`}
-              onClick={() => {
-                const next = !attachScreen;
-                setAttachScreen(next);
-                // Sync to backend so voice turns (hotkey or pill mic) attach
-                // the screenshot too. Sticky: stays on until toggled off.
-                void commands.setAssistantScreenArmed(next);
-              }}
+              onClick={() => void toggleScreen()}
               title={
                 attachScreen
                   ? t("assistant.detachScreen")
@@ -1674,7 +1681,7 @@ const AssistantPanel: React.FC = () => {
               <Camera size={15} />
             </button>
           )}
-          {screenshotEnabled && (
+          {manualScreenAccess && (
             <button
               className="assistant-attach-button"
               onClick={beginSnip}

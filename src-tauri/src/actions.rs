@@ -73,6 +73,10 @@ struct TranscribeAction {
     post_process: bool,
 }
 
+fn uses_ai_cleanup(post_process: bool) -> bool {
+    post_process
+}
+
 /// Field name for structured output JSON schema
 const TRANSCRIPTION_FIELD: &str = "transcription";
 
@@ -697,7 +701,7 @@ pub(crate) async fn process_transcription_output(
         final_text = converted_text;
     }
 
-    if post_process {
+    if uses_ai_cleanup(post_process) {
         let started = Instant::now();
         let timeout = Duration::from_secs(settings.post_process_timeout_secs.max(1) as u64);
         let deadline = TokioInstant::now() + timeout;
@@ -1096,6 +1100,128 @@ impl ShortcutAction for TranscribeAction {
                                 return;
                             }
 
+                            // Generate with Flow: when enabled, a normal
+                            // dictation that begins with the activation phrase
+                            // becomes a one-shot AI generation command whose
+                            // finished result is pasted instead of the spoken
+                            // words. Only the plain dictation binding
+                            // participates — the AI-cleanup binding keeps its
+                            // existing behavior. All-or-nothing: any failure
+                            // pastes nothing and shows a brief overlay notice.
+                            let mut flow_notice: Option<&'static str> = None;
+                            if !post_process {
+                                let settings = crate::settings::get_settings(&ah);
+                                match crate::flow::plan_flow(&settings, &transcription) {
+                                    crate::flow::FlowPlan::NotFlow => {}
+                                    crate::flow::FlowPlan::Unconfigured => {
+                                        // No assistant model set up: behave as
+                                        // ordinary dictation, then briefly tell
+                                        // the user why nothing was generated.
+                                        debug!("Flow phrase matched but no assistant model is configured; pasting as dictation");
+                                        flow_notice = Some("flowNotConfigured");
+                                    }
+                                    crate::flow::FlowPlan::EmptyCommand => {
+                                        // Just the phrase, no command. Never
+                                        // paste the phrase itself.
+                                        if wav_saved {
+                                            if let Err(err) = hm.save_entry(
+                                                file_name,
+                                                transcription,
+                                                false,
+                                                None,
+                                                None,
+                                            ) {
+                                                error!("Failed to save history entry: {}", err);
+                                            }
+                                        }
+                                        utils::show_overlay_notice(&ah, "flowEmpty");
+                                        change_tray_icon(&ah, TrayIconState::Idle);
+                                        return;
+                                    }
+                                    crate::flow::FlowPlan::Generate { command } => {
+                                        utils::show_generating_overlay(&ah);
+                                        match crate::flow::run_flow_generation(&ah, &command).await
+                                        {
+                                            Ok(generated) => {
+                                                if wav_saved {
+                                                    if let Err(err) = hm.save_entry(
+                                                        file_name,
+                                                        transcription,
+                                                        false,
+                                                        Some(generated.clone()),
+                                                        Some("Generate with Flow".to_string()),
+                                                    ) {
+                                                        error!(
+                                                            "Failed to save history entry: {}",
+                                                            err
+                                                        );
+                                                    }
+                                                }
+                                                let ah_clone = ah.clone();
+                                                ah.run_on_main_thread(move || {
+                                                    match utils::paste_with_behavior(
+                                                        generated,
+                                                        ah_clone.clone(),
+                                                        crate::clipboard::PasteBehavior {
+                                                            allow_trailing_space: false,
+                                                            allow_auto_submit: false,
+                                                        },
+                                                    ) {
+                                                        Ok(()) => {
+                                                            debug!("Flow output pasted successfully")
+                                                        }
+                                                        Err(e) => {
+                                                            error!(
+                                                                "Failed to paste Flow output: {}",
+                                                                e
+                                                            );
+                                                            let _ =
+                                                                ah_clone.emit("paste-error", ());
+                                                        }
+                                                    }
+                                                    utils::hide_recording_overlay(&ah_clone);
+                                                    change_tray_icon(
+                                                        &ah_clone,
+                                                        TrayIconState::Idle,
+                                                    );
+                                                })
+                                                .unwrap_or_else(|e| {
+                                                    error!(
+                                                        "Failed to run Flow paste on main thread: {:?}",
+                                                        e
+                                                    );
+                                                    utils::hide_recording_overlay(&ah);
+                                                    change_tray_icon(&ah, TrayIconState::Idle);
+                                                });
+                                            }
+                                            Err(e) => {
+                                                // Paste NOTHING on failure —
+                                                // no partials, no errors, no
+                                                // raw command.
+                                                error!("Flow generation failed: {}", e);
+                                                if wav_saved {
+                                                    if let Err(err) = hm.save_entry(
+                                                        file_name,
+                                                        transcription,
+                                                        false,
+                                                        None,
+                                                        None,
+                                                    ) {
+                                                        error!(
+                                                            "Failed to save history entry: {}",
+                                                            err
+                                                        );
+                                                    }
+                                                }
+                                                utils::show_overlay_notice(&ah, "flowFailed");
+                                                change_tray_icon(&ah, TrayIconState::Idle);
+                                            }
+                                        }
+                                        return;
+                                    }
+                                }
+                            }
+
                             if post_process {
                                 show_processing_overlay(&ah);
                             }
@@ -1134,7 +1260,14 @@ impl ShortcutAction for TranscribeAction {
                                             let _ = ah_clone.emit("paste-error", ());
                                         }
                                     }
-                                    utils::hide_recording_overlay(&ah_clone);
+                                    // A Flow phrase that couldn't run (no
+                                    // assistant model) pastes as dictation and
+                                    // then briefly explains itself; otherwise
+                                    // the overlay just hides.
+                                    match flow_notice {
+                                        Some(key) => utils::show_overlay_notice(&ah_clone, key),
+                                        None => utils::hide_recording_overlay(&ah_clone),
+                                    }
                                     change_tray_icon(&ah_clone, TrayIconState::Idle);
                                 })
                                 .unwrap_or_else(|e| {
@@ -1198,29 +1331,34 @@ impl ShortcutAction for AssistantAction {
     fn start(&self, app: &AppHandle, binding_id: &str, _shortcut_str: &str) {
         debug!("AssistantAction::start called for binding: {}", binding_id);
 
-        // Vision timing: when set to Immediate and the camera is armed, grab the
-        // screen NOW — at the start of the question — so it reflects what the
-        // user was looking at when they began, not what's on screen after they
-        // stop talking. The frame is stashed and consumed by `run_voice_turn`.
-        // Always clear first so a stale/cancelled capture can never leak in.
-        crate::assistant::clear_immediate_capture();
+        // Manual Immediate timing captures at recording start. Beginning every
+        // recording advances the epoch even when no capture is allowed, so a
+        // worker from an older/cancelled recording cannot populate this turn.
         {
             let settings = get_settings(app);
-            if settings.assistant_screenshot_enabled
+            let capture_requested = settings.assistant_screen_access_mode
+                == crate::settings::AssistantScreenAccessMode::Manual
                 && settings.assistant_vision_capture_timing
                     == crate::settings::VisionCaptureTiming::Immediate
-                && crate::assistant::screen_armed()
-                && !settings.active_character_is_cat()
+                && !settings.active_character_is_cat();
+            if let Some((manual_token, immediate_epoch)) =
+                crate::assistant::begin_immediate_capture(app, capture_requested)
             {
                 let profile = settings
                     .active_assistant_provider()
                     .map(|p| crate::screenshot::CaptureProfile::for_base_url(&p.base_url))
                     .unwrap_or(crate::screenshot::CaptureProfile::Generous);
-                // Grab the monitor the mouse cursor is on right now (the screen
-                // the user is working on), falling back to the primary display.
+                let app_for_capture = app.clone();
                 std::thread::spawn(move || {
                     match crate::screenshot::capture_screen_data_url_at(None, profile) {
-                        Ok(url) => crate::assistant::stash_immediate_capture(url),
+                        Ok(url) => {
+                            crate::assistant::stash_immediate_capture(
+                                &app_for_capture,
+                                manual_token,
+                                immediate_epoch,
+                                url,
+                            );
+                        }
                         Err(e) => debug!("Immediate vision capture failed: {}", e),
                     }
                 });
@@ -1449,9 +1587,9 @@ mod tests {
     use super::{
         append_tone_directive, build_post_process_request, build_system_prompt,
         finalize_post_process_attempt, parse_structured_output, run_provider_post_process,
-        sanitize_post_process_output, transcription_allows_empty_output, validate_cleaned_output,
-        PostProcessAttemptOutcome, PostProcessFailureKind, PostProcessFallbackReason,
-        PostProcessResultEvent,
+        sanitize_post_process_output, transcription_allows_empty_output, uses_ai_cleanup,
+        validate_cleaned_output, PostProcessAttemptOutcome, PostProcessFailureKind,
+        PostProcessFallbackReason, PostProcessResultEvent,
     };
     use crate::settings::{
         PostProcessConfigSource, PostProcessProvider, PostProcessTone,
@@ -1779,6 +1917,12 @@ mod tests {
     }
 
     #[test]
+    fn plain_dictation_and_cleanup_keep_distinct_generation_paths() {
+        assert!(!uses_ai_cleanup(false));
+        assert!(uses_ai_cleanup(true));
+    }
+
+    #[test]
     fn only_filler_input_may_clean_to_empty() {
         assert!(transcription_allows_empty_output("um, uh, you know, like"));
         assert!(!transcription_allows_empty_output("I like Rust"));
@@ -1818,6 +1962,8 @@ mod tests {
         assert_eq!(body["messages"][1]["role"], "user");
         assert_eq!(body["messages"][1]["content"], "raw transcript exactly");
         assert!(body.get("response_format").is_none());
+        assert!(body.get("tools").is_none());
+        assert!(body.get("tool_choice").is_none());
     }
 
     #[test]
@@ -1854,6 +2000,10 @@ mod tests {
         assert_eq!(captured.len(), 2);
         assert!(captured[0].get("response_format").is_some());
         assert!(captured[1].get("response_format").is_none());
+        for body in captured {
+            assert!(body.get("tools").is_none());
+            assert!(body.get("tool_choice").is_none());
+        }
     }
 
     #[test]

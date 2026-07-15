@@ -44,7 +44,7 @@ const GENEROUS_LADDER: [(u32, u8); 5] =
     [(1568, 80), (1440, 74), (1280, 68), (1152, 60), (1024, 52)];
 
 /// Which size/quality budget to use, chosen from the active provider.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CaptureProfile {
     /// Strict gateways (Azure): tiny body.
     Conservative,
@@ -93,6 +93,59 @@ fn encode_jpeg(img: &DynamicImage, quality: u8) -> Result<Vec<u8>, String> {
     Ok(buf)
 }
 
+fn profile_encoding(profile: CaptureProfile) -> (&'static [(u32, u8)], usize) {
+    match profile {
+        CaptureProfile::Conservative => (&CONSERVATIVE_LADDER, CONSERVATIVE_TARGET_BYTES),
+        CaptureProfile::Local => (&LOCAL_LADDER, LOCAL_TARGET_BYTES),
+        CaptureProfile::Generous => (&GENEROUS_LADDER, GENEROUS_TARGET_BYTES),
+    }
+}
+
+fn encode_provider_data_url(
+    img: &DynamicImage,
+    profile: CaptureProfile,
+    label: &str,
+) -> Result<String, String> {
+    let (ladder, target) = profile_encoding(profile);
+    let mut chosen: Option<(Vec<u8>, u32, u8)> = None;
+    for &(max_dim, quality) in ladder {
+        let buf = encode_jpeg(&scaled(img, max_dim), quality)?;
+        // Budget the encoded base64 payload (the fixed data-URL prefix is tiny
+        // and is intentionally excluded from the provider image budget).
+        let encoded_size = buf.len().div_ceil(3) * 4;
+        chosen = Some((buf, max_dim, quality));
+        if encoded_size <= target {
+            break;
+        }
+    }
+    let (buf, max_dim, quality) =
+        chosen.ok_or_else(|| format!("{} encoding produced no output", label))?;
+    let encoded = base64::engine::general_purpose::STANDARD.encode(&buf);
+    debug!(
+        "Encoded {} -> {} KB jpeg ({}px q{}, {} KB base64)",
+        label,
+        buf.len() / 1024,
+        max_dim,
+        quality,
+        encoded.len() / 1024,
+    );
+    Ok(format!("data:image/jpeg;base64,{}", encoded))
+}
+
+/// Replaceable capture seam used by production with the real desktop capture
+/// closure and by tests with a deterministic generated image.
+pub(crate) fn capture_screen_data_url_at_with<F>(
+    point: Option<(i32, i32)>,
+    profile: CaptureProfile,
+    capture: F,
+) -> Result<String, String>
+where
+    F: FnOnce(Option<(i32, i32)>) -> Result<DynamicImage, String>,
+{
+    let image = capture(point)?;
+    encode_provider_data_url(&image, profile, "screen")
+}
+
 /// Capture a full monitor and return a `data:image/jpeg;base64,...` URL,
 /// adaptively compressed to the budget for the chosen [`CaptureProfile`].
 ///
@@ -105,47 +158,18 @@ pub fn capture_screen_data_url_at(
     profile: CaptureProfile,
 ) -> Result<String, String> {
     let start = std::time::Instant::now();
-
-    let monitor = match point {
-        Some((x, y)) => Monitor::from_point(x, y).or_else(|_| pick_monitor())?,
-        None => pick_monitor()?,
-    };
-    let rgba = monitor
-        .capture_image()
-        .map_err(|e| format!("Screen capture failed: {}", e))?;
-
-    let img = DynamicImage::ImageRgba8(rgba);
-
-    let (ladder, target): (&[(u32, u8)], usize) = match profile {
-        CaptureProfile::Conservative => (&CONSERVATIVE_LADDER, CONSERVATIVE_TARGET_BYTES),
-        CaptureProfile::Local => (&LOCAL_LADDER, LOCAL_TARGET_BYTES),
-        CaptureProfile::Generous => (&GENEROUS_LADDER, GENEROUS_TARGET_BYTES),
-    };
-
-    let mut chosen: Option<(Vec<u8>, u32, u8)> = None;
-    for &(max_dim, quality) in ladder {
-        let buf = encode_jpeg(&scaled(&img, max_dim), quality)?;
-        // Budget the *encoded* size: base64 grows the payload by 4/3.
-        let encoded_size = buf.len().div_ceil(3) * 4;
-        chosen = Some((buf, max_dim, quality));
-        if encoded_size <= target {
-            break;
-        }
-    }
-    let (buf, max_dim, quality) =
-        chosen.ok_or_else(|| "Screenshot encoding produced no output".to_string())?;
-
-    let encoded = base64::engine::general_purpose::STANDARD.encode(&buf);
-    debug!(
-        "Captured screen -> {} KB jpeg ({}px q{}, {} KB base64) in {:?}",
-        buf.len() / 1024,
-        max_dim,
-        quality,
-        encoded.len() / 1024,
-        start.elapsed()
-    );
-
-    Ok(format!("data:image/jpeg;base64,{}", encoded))
+    let result = capture_screen_data_url_at_with(point, profile, |target| {
+        let monitor = match target {
+            Some((x, y)) => Monitor::from_point(x, y).or_else(|_| pick_monitor())?,
+            None => pick_monitor()?,
+        };
+        let rgba = monitor
+            .capture_image()
+            .map_err(|e| format!("Screen capture failed: {}", e))?;
+        Ok(DynamicImage::ImageRgba8(rgba))
+    });
+    debug!("Screen capture completed in {:?}", start.elapsed());
+    result
 }
 
 /// Capture a SPECIFIC monitor — the one containing the physical point (x, y) —
@@ -179,24 +203,7 @@ pub fn encode_region_data_url(
     let w = w.clamp(1, iw - x);
     let h = h.clamp(1, ih - y);
     let crop = img.crop_imm(x, y, w, h);
-
-    let (ladder, target): (&[(u32, u8)], usize) = match profile {
-        CaptureProfile::Conservative => (&CONSERVATIVE_LADDER, CONSERVATIVE_TARGET_BYTES),
-        CaptureProfile::Local => (&LOCAL_LADDER, LOCAL_TARGET_BYTES),
-        CaptureProfile::Generous => (&GENEROUS_LADDER, GENEROUS_TARGET_BYTES),
-    };
-    let mut chosen: Option<Vec<u8>> = None;
-    for &(max_dim, quality) in ladder {
-        let buf = encode_jpeg(&scaled(&crop, max_dim), quality)?;
-        let encoded_size = buf.len().div_ceil(3) * 4;
-        chosen = Some(buf);
-        if encoded_size <= target {
-            break;
-        }
-    }
-    let buf = chosen.ok_or_else(|| "Region encoding produced no output".to_string())?;
-    let encoded = base64::engine::general_purpose::STANDARD.encode(&buf);
-    Ok(format!("data:image/jpeg;base64,{}", encoded))
+    encode_provider_data_url(&crop, profile, "region")
 }
 
 /// Load an image file from disk, downscale it to a provider-friendly size, and
@@ -257,24 +264,69 @@ pub fn data_url_to_thumbnail(data_url: &str) -> Result<String, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use image::{ImageBuffer, Rgb};
+
+    fn fixture_image() -> DynamicImage {
+        DynamicImage::ImageRgb8(ImageBuffer::from_fn(1920, 1080, |x, y| {
+            Rgb([(x % 251) as u8, (y % 241) as u8, ((x + y) % 239) as u8])
+        }))
+    }
 
     #[test]
+    fn provider_profiles_are_deterministic() {
+        assert_eq!(
+            CaptureProfile::for_base_url("https://example.openai.azure.com/openai/v1"),
+            CaptureProfile::Conservative
+        );
+        assert_eq!(
+            CaptureProfile::for_base_url("http://localhost:8080/v1"),
+            CaptureProfile::Local
+        );
+        assert_eq!(
+            CaptureProfile::for_base_url("https://api.openai.com/v1"),
+            CaptureProfile::Generous
+        );
+    }
+
+    #[test]
+    fn injected_capture_receives_target_and_never_touches_desktop() {
+        let expected = Some((321, -45));
+        let mut received = None;
+        let url =
+            capture_screen_data_url_at_with(expected, CaptureProfile::Conservative, |point| {
+                received = Some(point);
+                Ok(fixture_image())
+            })
+            .expect("generated capture encodes");
+
+        assert_eq!(received, Some(expected));
+        assert!(url.starts_with("data:image/jpeg;base64,"));
+        assert!(url.len() <= 52 * 1024, "data URL was {} bytes", url.len());
+        assert!(data_url_to_thumbnail(&url)
+            .expect("thumbnail")
+            .starts_with("data:image/jpeg;base64,"));
+    }
+
+    #[test]
+    fn injected_capture_propagates_typed_error_without_encoding() {
+        let error = capture_screen_data_url_at_with(None, CaptureProfile::Generous, |_| {
+            Err("fixture capture unavailable".to_string())
+        })
+        .expect_err("capture error must propagate");
+        assert_eq!(error, "fixture capture unavailable");
+    }
+
+    #[test]
+    #[ignore = "interactive desktop smoke test; not a CI gate"]
     fn capture_works_on_this_machine() {
-        let result = capture_screen_data_url_at(None, CaptureProfile::Conservative);
-        match result {
-            Ok(url) => {
-                assert!(url.starts_with("data:image/jpeg;base64,"));
-                // Conservative path must stay far below every observed
-                // provider cutoff, with headroom for prompt + history.
-                assert!(
-                    url.len() <= 52 * 1024,
-                    "data url too large: {} KB",
-                    url.len() / 1024
-                );
-                println!("capture OK: {} KB data url", url.len() / 1024);
-            }
-            Err(e) => panic!("capture failed: {}", e),
-        }
+        let url = capture_screen_data_url_at(None, CaptureProfile::Conservative)
+            .expect("interactive screen capture");
+        assert!(url.starts_with("data:image/jpeg;base64,"));
+        assert!(
+            url.len() <= 52 * 1024,
+            "data url too large: {} KB",
+            url.len() / 1024
+        );
     }
 }
 

@@ -588,13 +588,39 @@ fn should_send_auto_submit(auto_submit: bool, paste_method: PasteMethod) -> bool
     auto_submit && paste_method != PasteMethod::None
 }
 
+/// Per-call overrides on top of the user's paste settings. Dictation uses the
+/// defaults (settings apply as-is); Flow disables the trailing space and
+/// auto-submit so a generated artifact lands exactly as produced.
+#[derive(Debug, Clone, Copy)]
+pub struct PasteBehavior {
+    pub allow_trailing_space: bool,
+    pub allow_auto_submit: bool,
+}
+
+impl Default for PasteBehavior {
+    fn default() -> Self {
+        Self {
+            allow_trailing_space: true,
+            allow_auto_submit: true,
+        }
+    }
+}
+
 pub fn paste(text: String, app_handle: AppHandle) -> Result<(), String> {
+    paste_with_behavior(text, app_handle, PasteBehavior::default())
+}
+
+pub fn paste_with_behavior(
+    text: String,
+    app_handle: AppHandle,
+    behavior: PasteBehavior,
+) -> Result<(), String> {
     let settings = get_settings(&app_handle);
     let paste_method = settings.paste_method;
     let paste_delay_ms = settings.paste_delay_ms;
 
     // Append trailing space if setting is enabled
-    let text = if settings.append_trailing_space {
+    let text = if behavior.allow_trailing_space && settings.append_trailing_space {
         format!("{} ", text)
     } else {
         text
@@ -647,13 +673,15 @@ pub fn paste(text: String, app_handle: AppHandle) -> Result<(), String> {
     };
 
     // Auto-submit (Enter / Ctrl+Enter / Cmd+Enter) only when the paste succeeded.
-    let submit_result: Result<(), String> =
-        if paste_result.is_ok() && should_send_auto_submit(settings.auto_submit, paste_method) {
-            std::thread::sleep(Duration::from_millis(50));
-            send_return_key(&mut enigo, settings.auto_submit_key)
-        } else {
-            Ok(())
-        };
+    let submit_result: Result<(), String> = if paste_result.is_ok()
+        && behavior.allow_auto_submit
+        && should_send_auto_submit(settings.auto_submit, paste_method)
+    {
+        std::thread::sleep(Duration::from_millis(50));
+        send_return_key(&mut enigo, settings.auto_submit_key)
+    } else {
+        Ok(())
+    };
 
     // Safety net: for any method that synthesizes keystrokes, make sure we never
     // leave a modifier (Ctrl/Shift/Alt/Cmd) stuck "pressed" at the OS level if a

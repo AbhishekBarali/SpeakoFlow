@@ -68,6 +68,53 @@ struct ChatCompletionRequest {
     tool_choice: Option<Value>,
 }
 
+#[derive(Default)]
+struct ChatRequestOptions {
+    json_schema: Option<Value>,
+    reasoning_effort: Option<String>,
+    reasoning: Option<ReasoningConfig>,
+    stream: Option<bool>,
+    tools: Option<Value>,
+    tool_choice: Option<Value>,
+}
+
+/// Build an OpenAI-compatible request body without performing any I/O.
+///
+/// Keeping provider-specific message normalization and optional request fields
+/// here gives transport tests a stable seam for plain, structured-output, and
+/// tool-enabled rounds.
+fn build_chat_completion_request(
+    provider: &PostProcessProvider,
+    model: &str,
+    mut messages: Vec<Value>,
+    options: ChatRequestOptions,
+) -> ChatCompletionRequest {
+    if provider.id == "builtin" {
+        fold_system_into_first_user(&mut messages);
+    }
+
+    let response_format = options.json_schema.map(|schema| ResponseFormat {
+        format_type: "json_schema".to_string(),
+        json_schema: JsonSchema {
+            name: "transcription_output".to_string(),
+            strict: true,
+            schema,
+        },
+    });
+
+    ChatCompletionRequest {
+        model: model.to_string(),
+        messages,
+        response_format,
+        reasoning_effort: options.reasoning_effort,
+        reasoning: options.reasoning,
+        chat_template_kwargs: builtin_chat_template_kwargs(provider),
+        stream: options.stream,
+        tools: options.tools,
+        tool_choice: options.tool_choice,
+    }
+}
+
 fn builtin_chat_template_kwargs(provider: &PostProcessProvider) -> Option<Value> {
     (provider.id == "builtin").then(|| serde_json::json!({ "enable_thinking": false }))
 }
@@ -343,30 +390,17 @@ pub(crate) async fn send_chat_completion_with_schema_typed(
     }
     messages.push(serde_json::json!({"role": "user", "content": user_content}));
 
-    if provider.id == "builtin" {
-        fold_system_into_first_user(&mut messages);
-    }
-
-    let response_format = json_schema.map(|schema| ResponseFormat {
-        format_type: "json_schema".to_string(),
-        json_schema: JsonSchema {
-            name: "transcription_output".to_string(),
-            strict: true,
-            schema,
-        },
-    });
-
-    let request_body = ChatCompletionRequest {
-        model: model.to_string(),
+    let request_body = build_chat_completion_request(
+        provider,
+        model,
         messages,
-        response_format,
-        reasoning_effort,
-        reasoning,
-        chat_template_kwargs: builtin_chat_template_kwargs(provider),
-        stream: None,
-        tools: None,
-        tool_choice: None,
-    };
+        ChatRequestOptions {
+            json_schema,
+            reasoning_effort,
+            reasoning,
+            ..Default::default()
+        },
+    );
 
     let response = client
         .post(&url)
@@ -464,7 +498,7 @@ struct StreamToolCallFn {
 }
 
 /// A fully-assembled tool call the model asked us to run.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ToolCall {
     pub id: String,
     pub name: String,
@@ -475,9 +509,171 @@ pub struct ToolCall {
 /// Outcome of one streamed tool-calling round: any content the model streamed
 /// (via `on_token`) is accumulated in `text`; if the model instead asked to run
 /// tools, they're in `tool_calls` (and `text` is usually empty).
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ToolStreamOutcome {
     pub text: String,
     pub tool_calls: Vec<ToolCall>,
+}
+
+/// Transport-neutral result of one assistant chat round. This crate-visible
+/// shape can be scripted directly by later agent-loop tests without mocking an
+/// HTTP client or adding a test dependency.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) struct ChatRound {
+    pub(crate) text: String,
+    pub(crate) tool_calls: Vec<ToolCall>,
+}
+
+impl From<ChatRound> for ToolStreamOutcome {
+    fn from(round: ChatRound) -> Self {
+        Self {
+            text: round.text,
+            tool_calls: round.tool_calls,
+        }
+    }
+}
+
+/// Byte-buffered decoder and accumulator for an OpenAI-compatible SSE chat
+/// round. Complete lines are decoded only after all their bytes arrive, so a
+/// UTF-8 code point may be split across any number of network chunks safely.
+#[derive(Default)]
+struct SseChatAccumulator {
+    pending: Vec<u8>,
+    round: ChatRound,
+    tool_call_parts: Vec<(String, String, String)>,
+    done: bool,
+}
+
+impl SseChatAccumulator {
+    fn push(&mut self, chunk: &[u8], on_token: &mut dyn FnMut(&str)) {
+        if self.done {
+            return;
+        }
+
+        self.pending.extend_from_slice(chunk);
+        while !self.done {
+            let Some(newline_pos) = self.pending.iter().position(|byte| *byte == b'\n') else {
+                break;
+            };
+            let line: Vec<u8> = self.pending.drain(..=newline_pos).collect();
+            self.process_line(&line[..line.len() - 1], on_token);
+        }
+
+        if self.done {
+            self.pending.clear();
+        }
+    }
+
+    fn is_done(&self) -> bool {
+        self.done
+    }
+
+    fn finish(mut self, _on_token: &mut dyn FnMut(&str)) -> ChatRound {
+        // Preserve the wrappers' historical EOF behavior: return everything
+        // decoded from complete lines, but ignore an unterminated trailing line.
+        self.round.tool_calls = assemble_tool_calls(self.tool_call_parts);
+        self.round
+    }
+
+    fn process_line(&mut self, line: &[u8], on_token: &mut dyn FnMut(&str)) {
+        let line = trim_ascii_whitespace(line);
+        let Some(data) = line.strip_prefix(b"data:") else {
+            return; // ignore comments, event: lines, and blank keep-alives
+        };
+        let data = trim_ascii_whitespace(data);
+
+        if data == b"[DONE]" {
+            self.done = true;
+            return;
+        }
+
+        let data = match std::str::from_utf8(data) {
+            Ok(data) => data,
+            Err(error) => {
+                debug!(
+                    "Skipping unparsable SSE chunk: {} ({})",
+                    String::from_utf8_lossy(data),
+                    error
+                );
+                return;
+            }
+        };
+
+        match serde_json::from_str::<StreamChunk>(data) {
+            Ok(parsed) => self.accumulate_chunk(parsed, on_token),
+            Err(error) => {
+                // Assistant wrappers historically skip malformed provider
+                // frames and continue streaming; preserve that behavior.
+                debug!("Skipping unparsable SSE chunk: {} ({})", data, error);
+            }
+        }
+    }
+
+    fn accumulate_chunk(&mut self, parsed: StreamChunk, on_token: &mut dyn FnMut(&str)) {
+        let Some(choice) = parsed.choices.first() else {
+            return;
+        };
+
+        if let Some(token) = choice.delta.content.as_deref() {
+            if !token.is_empty() {
+                self.round.text.push_str(token);
+                on_token(token);
+            }
+        }
+
+        if let Some(tool_calls) = &choice.delta.tool_calls {
+            for tool_call in tool_calls {
+                while self.tool_call_parts.len() <= tool_call.index {
+                    self.tool_call_parts
+                        .push((String::new(), String::new(), String::new()));
+                }
+                let slot = &mut self.tool_call_parts[tool_call.index];
+                if let Some(id) = &tool_call.id {
+                    if !id.is_empty() {
+                        slot.0 = id.clone();
+                    }
+                }
+                if let Some(function) = &tool_call.function {
+                    if let Some(name) = &function.name {
+                        if !name.is_empty() {
+                            slot.1 = name.clone();
+                        }
+                    }
+                    if let Some(arguments) = &function.arguments {
+                        slot.2.push_str(arguments);
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn trim_ascii_whitespace(mut bytes: &[u8]) -> &[u8] {
+    while bytes.first().is_some_and(u8::is_ascii_whitespace) {
+        bytes = &bytes[1..];
+    }
+    while bytes.last().is_some_and(u8::is_ascii_whitespace) {
+        bytes = &bytes[..bytes.len() - 1];
+    }
+    bytes
+}
+
+async fn read_sse_round(
+    response: reqwest::Response,
+    mut on_token: impl FnMut(&str),
+) -> Result<ChatRound, String> {
+    let mut stream = response.bytes_stream();
+    let mut accumulator = SseChatAccumulator::default();
+
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk.map_err(|error| format!("Stream read failed: {}", error))?;
+        accumulator.push(&chunk, &mut on_token);
+        if accumulator.is_done() {
+            break;
+        }
+    }
+
+    Ok(accumulator.finish(&mut on_token))
 }
 
 /// Send a streaming chat completion request to an OpenAI-compatible API.
@@ -488,8 +684,8 @@ pub async fn send_chat_stream(
     provider: &PostProcessProvider,
     api_key: String,
     model: &str,
-    mut messages: Vec<Value>,
-    mut on_token: impl FnMut(&str),
+    messages: Vec<Value>,
+    on_token: impl FnMut(&str),
 ) -> Result<String, String> {
     let base_url = effective_base_url(provider);
     let url = format!("{}/chat/completions", base_url);
@@ -497,25 +693,15 @@ pub async fn send_chat_stream(
     debug!("Sending streaming chat completion request to: {}", url);
 
     let client = create_client(provider, &api_key)?;
-
-    // The built-in engine applies the model's own Jinja chat template; fold any
-    // system message into the first user turn so templates without a system
-    // role (e.g. Gemma) don't 400 with "roles must alternate user/assistant".
-    if provider.id == "builtin" {
-        fold_system_into_first_user(&mut messages);
-    }
-
-    let request_body = ChatCompletionRequest {
-        model: model.to_string(),
+    let request_body = build_chat_completion_request(
+        provider,
+        model,
         messages,
-        response_format: None,
-        reasoning_effort: None,
-        reasoning: None,
-        chat_template_kwargs: builtin_chat_template_kwargs(provider),
-        stream: Some(true),
-        tools: None,
-        tool_choice: None,
-    };
+        ChatRequestOptions {
+            stream: Some(true),
+            ..Default::default()
+        },
+    );
 
     let response = client
         .post(&url)
@@ -536,50 +722,7 @@ pub async fn send_chat_stream(
         ));
     }
 
-    let mut stream = response.bytes_stream();
-    let mut line_buf = String::new();
-    let mut full_text = String::new();
-
-    while let Some(chunk) = stream.next().await {
-        let chunk = chunk.map_err(|e| format!("Stream read failed: {}", e))?;
-        line_buf.push_str(&String::from_utf8_lossy(&chunk));
-
-        // Process complete lines; keep any partial trailing line in the buffer.
-        while let Some(newline_pos) = line_buf.find('\n') {
-            let line: String = line_buf.drain(..=newline_pos).collect();
-            let line = line.trim();
-
-            let Some(data) = line.strip_prefix("data:") else {
-                continue; // ignore comments, event: lines, blank keep-alives
-            };
-            let data = data.trim();
-
-            if data == "[DONE]" {
-                return Ok(full_text);
-            }
-
-            match serde_json::from_str::<StreamChunk>(data) {
-                Ok(parsed) => {
-                    if let Some(token) = parsed
-                        .choices
-                        .first()
-                        .and_then(|c| c.delta.content.as_deref())
-                    {
-                        if !token.is_empty() {
-                            full_text.push_str(token);
-                            on_token(token);
-                        }
-                    }
-                }
-                Err(e) => {
-                    debug!("Skipping unparsable SSE chunk: {} ({})", data, e);
-                }
-            }
-        }
-    }
-
-    // Stream ended without [DONE]; return what we have.
-    Ok(full_text)
+    Ok(read_sse_round(response, on_token).await?.text)
 }
 
 /// Streaming chat completion WITH tool support (the web-search tool-calling
@@ -593,30 +736,25 @@ pub async fn send_chat_stream_with_tools(
     provider: &PostProcessProvider,
     api_key: String,
     model: &str,
-    mut messages: Vec<Value>,
+    messages: Vec<Value>,
     tools: Value,
     tool_choice: Value,
-    mut on_token: impl FnMut(&str),
+    on_token: impl FnMut(&str),
 ) -> Result<ToolStreamOutcome, String> {
     let base_url = effective_base_url(provider);
     let url = format!("{}/chat/completions", base_url);
     let client = create_client(provider, &api_key)?;
-
-    if provider.id == "builtin" {
-        fold_system_into_first_user(&mut messages);
-    }
-
-    let request_body = ChatCompletionRequest {
-        model: model.to_string(),
+    let request_body = build_chat_completion_request(
+        provider,
+        model,
         messages,
-        response_format: None,
-        reasoning_effort: None,
-        reasoning: None,
-        chat_template_kwargs: builtin_chat_template_kwargs(provider),
-        stream: Some(true),
-        tools: Some(tools),
-        tool_choice: Some(tool_choice),
-    };
+        ChatRequestOptions {
+            stream: Some(true),
+            tools: Some(tools),
+            tool_choice: Some(tool_choice),
+            ..Default::default()
+        },
+    );
 
     let response = client
         .post(&url)
@@ -637,76 +775,7 @@ pub async fn send_chat_stream_with_tools(
         ));
     }
 
-    let mut stream = response.bytes_stream();
-    let mut line_buf = String::new();
-    let mut full_text = String::new();
-    // Accumulate tool-call fragments by index: (id, name, arguments).
-    let mut acc: Vec<(String, String, String)> = Vec::new();
-
-    while let Some(chunk) = stream.next().await {
-        let chunk = chunk.map_err(|e| format!("Stream read failed: {}", e))?;
-        line_buf.push_str(&String::from_utf8_lossy(&chunk));
-
-        while let Some(newline_pos) = line_buf.find('\n') {
-            let line: String = line_buf.drain(..=newline_pos).collect();
-            let line = line.trim();
-            let Some(data) = line.strip_prefix("data:") else {
-                continue;
-            };
-            let data = data.trim();
-            if data == "[DONE]" {
-                return Ok(ToolStreamOutcome {
-                    text: full_text,
-                    tool_calls: assemble_tool_calls(acc),
-                });
-            }
-            match serde_json::from_str::<StreamChunk>(data) {
-                Ok(parsed) => {
-                    let Some(choice) = parsed.choices.first() else {
-                        continue;
-                    };
-                    if let Some(token) = choice.delta.content.as_deref() {
-                        if !token.is_empty() {
-                            full_text.push_str(token);
-                            on_token(token);
-                        }
-                    }
-                    if let Some(tcs) = &choice.delta.tool_calls {
-                        for tc in tcs {
-                            // Grow the accumulator so `index` is addressable.
-                            while acc.len() <= tc.index {
-                                acc.push((String::new(), String::new(), String::new()));
-                            }
-                            let slot = &mut acc[tc.index];
-                            if let Some(id) = &tc.id {
-                                if !id.is_empty() {
-                                    slot.0 = id.clone();
-                                }
-                            }
-                            if let Some(f) = &tc.function {
-                                if let Some(name) = &f.name {
-                                    if !name.is_empty() {
-                                        slot.1 = name.clone();
-                                    }
-                                }
-                                if let Some(args) = &f.arguments {
-                                    slot.2.push_str(args);
-                                }
-                            }
-                        }
-                    }
-                }
-                Err(e) => {
-                    debug!("Skipping unparsable SSE chunk: {} ({})", data, e);
-                }
-            }
-        }
-    }
-
-    Ok(ToolStreamOutcome {
-        text: full_text,
-        tool_calls: assemble_tool_calls(acc),
-    })
+    Ok(read_sse_round(response, on_token).await?.into())
 }
 
 /// Turn accumulated (id, name, arguments) fragments into ToolCalls, dropping any
@@ -934,5 +1003,186 @@ mod tests {
         let before = messages.clone();
         fold_system_into_first_user(&mut messages);
         assert_eq!(messages, before);
+    }
+
+    fn decode_sse(chunks: impl IntoIterator<Item = Vec<u8>>) -> (ChatRound, Vec<String>) {
+        let mut accumulator = SseChatAccumulator::default();
+        let mut tokens = Vec::new();
+        {
+            let mut on_token = |token: &str| tokens.push(token.to_string());
+            for chunk in chunks {
+                accumulator.push(&chunk, &mut on_token);
+            }
+            let round = accumulator.finish(&mut on_token);
+            return (round, tokens);
+        }
+    }
+
+    #[test]
+    fn request_builder_omits_optional_fields_for_plain_completion() {
+        let request = build_chat_completion_request(
+            &provider("openai", "https://api.openai.com/v1"),
+            "gpt-test",
+            vec![serde_json::json!({"role": "user", "content": "hello"})],
+            ChatRequestOptions::default(),
+        );
+        let value = serde_json::to_value(request).unwrap();
+
+        assert_eq!(value["model"], "gpt-test");
+        assert_eq!(value["messages"][0]["content"], "hello");
+        for omitted in [
+            "response_format",
+            "reasoning_effort",
+            "reasoning",
+            "chat_template_kwargs",
+            "stream",
+            "tools",
+            "tool_choice",
+        ] {
+            assert!(value.get(omitted).is_none(), "{omitted} should be omitted");
+        }
+    }
+
+    #[test]
+    fn request_builder_emits_structured_output_fields() {
+        let schema = serde_json::json!({
+            "type": "object",
+            "properties": {"text": {"type": "string"}},
+            "required": ["text"],
+            "additionalProperties": false
+        });
+        let request = build_chat_completion_request(
+            &provider("openai", "https://api.openai.com/v1"),
+            "gpt-test",
+            vec![serde_json::json!({"role": "user", "content": "hello"})],
+            ChatRequestOptions {
+                json_schema: Some(schema.clone()),
+                reasoning_effort: Some("low".to_string()),
+                reasoning: Some(ReasoningConfig {
+                    effort: Some("minimal".to_string()),
+                    exclude: Some(true),
+                }),
+                ..Default::default()
+            },
+        );
+        let value = serde_json::to_value(request).unwrap();
+
+        assert_eq!(value["response_format"]["type"], "json_schema");
+        assert_eq!(
+            value["response_format"]["json_schema"]["name"],
+            "transcription_output"
+        );
+        assert_eq!(value["response_format"]["json_schema"]["strict"], true);
+        assert_eq!(value["response_format"]["json_schema"]["schema"], schema);
+        assert_eq!(value["reasoning_effort"], "low");
+        assert_eq!(value["reasoning"]["effort"], "minimal");
+        assert_eq!(value["reasoning"]["exclude"], true);
+        assert!(value.get("tools").is_none());
+    }
+
+    #[test]
+    fn request_builder_emits_tool_round_fields() {
+        let tools = serde_json::json!([{
+            "type": "function",
+            "function": {
+                "name": "web_search",
+                "parameters": {"type": "object"}
+            }
+        }]);
+        let request = build_chat_completion_request(
+            &provider("openai", "https://api.openai.com/v1"),
+            "gpt-test",
+            vec![serde_json::json!({"role": "user", "content": "latest news"})],
+            ChatRequestOptions {
+                stream: Some(true),
+                tools: Some(tools.clone()),
+                tool_choice: Some(serde_json::json!("auto")),
+                ..Default::default()
+            },
+        );
+        let value = serde_json::to_value(request).unwrap();
+
+        assert_eq!(value["stream"], true);
+        assert_eq!(value["tools"], tools);
+        assert_eq!(value["tool_choice"], "auto");
+        assert!(value.get("response_format").is_none());
+    }
+
+    #[test]
+    fn sse_decoder_preserves_utf8_split_at_every_byte_and_stops_at_done() {
+        let first = serde_json::json!({
+            "choices": [{"delta": {"content": "hé"}}]
+        });
+        let second = serde_json::json!({
+            "choices": [{"delta": {"content": "llo 🌍"}}]
+        });
+        let ignored = serde_json::json!({
+            "choices": [{"delta": {"content": " ignored"}}]
+        });
+        let wire =
+            format!("data: {first}\r\n\r\ndata: {second}\n\ndata: [DONE]\n\ndata: {ignored}\n\n");
+        let chunks = wire
+            .as_bytes()
+            .iter()
+            .map(|byte| vec![*byte])
+            .collect::<Vec<_>>();
+
+        let (round, tokens) = decode_sse(chunks);
+        assert_eq!(round.text, "héllo 🌍");
+        assert_eq!(tokens, ["hé", "llo 🌍"]);
+        assert!(round.tool_calls.is_empty());
+    }
+
+    #[test]
+    fn sse_decoder_assembles_complete_tool_fragments_at_eof() {
+        let first = serde_json::json!({
+            "choices": [{"delta": {"tool_calls": [{
+                "index": 0,
+                "id": "call_screen",
+                "function": {"name": "capture_screen", "arguments": "{\"tim"}
+            }]}}]
+        });
+        let second = serde_json::json!({
+            "choices": [{"delta": {"tool_calls": [{
+                "index": 0,
+                "function": {"arguments": "ing\":\"now\"}"}
+            }]}}]
+        });
+        let unterminated = serde_json::json!({
+            "choices": [{"delta": {"content": " ignored"}}]
+        });
+        // Omit [DONE]. Complete lines must survive EOF, while the final
+        // unterminated line is discarded to match the historical wrappers.
+        let wire = format!("data: {first}\n\ndata: {second}\ndata: {unterminated}");
+        let chunks = wire
+            .as_bytes()
+            .chunks(7)
+            .map(<[u8]>::to_vec)
+            .collect::<Vec<_>>();
+
+        let (round, tokens) = decode_sse(chunks);
+        assert!(round.text.is_empty());
+        assert!(tokens.is_empty());
+        assert_eq!(
+            round.tool_calls,
+            [ToolCall {
+                id: "call_screen".to_string(),
+                name: "capture_screen".to_string(),
+                arguments: "{\"timing\":\"now\"}".to_string(),
+            }]
+        );
+    }
+
+    #[test]
+    fn sse_decoder_skips_malformed_frames_and_keeps_following_content() {
+        let valid = serde_json::json!({
+            "choices": [{"delta": {"content": "still works"}}]
+        });
+        let mut wire = b"data: {not json}\n\ndata: \xff\n\n".to_vec();
+        wire.extend_from_slice(format!("data: {valid}\n").as_bytes());
+
+        let (round, tokens) = decode_sse([wire]);
+        assert_eq!(round.text, "still works");
+        assert_eq!(tokens, ["still works"]);
     }
 }

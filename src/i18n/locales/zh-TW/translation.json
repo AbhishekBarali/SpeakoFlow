@@ -1207,8 +1207,17 @@
       },
       "vision": {
         "title": "Screen vision",
-        "enableLabel": "Allow screen vision",
-        "enableDescription": "Let the assistant see your screen when you ask about it. Requires a vision-capable model.",
+        "modeLabel": "Screen access",
+        "modes": {
+          "off": "Off",
+          "manual": "Manual",
+          "agentDecides": "Agent decides",
+          "descriptions": {
+            "off": "Screen capture is disabled. Camera and region controls are hidden.",
+            "manual": "You choose when to attach the full screen or a region. Voice capture timing applies.",
+            "agent_decides": "The model may request a screen capture when it needs current visual context. Every screenshot sent is shown in the conversation."
+          }
+        },
         "timing": {
           "label": "When to capture",
           "description": "For voice questions: capture the moment you start asking, or wait until the message is sent. Typed messages always capture on send.",

@@ -6,12 +6,12 @@
 //! system prompt first, then append-only history, newest user message last.
 
 use crate::llm_client::{self, ChatMessage};
-use crate::settings::get_settings;
+use crate::settings::{get_settings, write_settings, AssistantScreenAccessMode};
 use crate::web_search;
 use log::{debug, error, warn};
 use serde::Serialize;
 use serde_json::{json, Value};
-use std::sync::atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter, Manager, WebviewWindowBuilder};
 use tauri_plugin_store::StoreExt;
@@ -94,51 +94,292 @@ fn expanded_size(app: &AppHandle) -> (f64, f64) {
 /// expanding (or collapsing) updates it for the rest of the session.
 static PILL_MODE: AtomicBool = AtomicBool::new(true);
 
+/// Authorization carried by one user-controlled screen operation. Leaving or
+/// re-entering Manual advances the shared generation, invalidating every token
+/// issued under the previous mode before it can reach an overlay or provider.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ManualScreenToken {
+    generation: u64,
+}
+
+#[derive(Debug)]
+struct ManualScreenAuthorization {
+    mode: AssistantScreenAccessMode,
+    generation: u64,
+}
+
+impl Default for ManualScreenAuthorization {
+    fn default() -> Self {
+        Self {
+            mode: AssistantScreenAccessMode::Manual,
+            generation: 0,
+        }
+    }
+}
+
+impl ManualScreenAuthorization {
+    fn transition(&mut self, mode: AssistantScreenAccessMode) {
+        if self.mode != mode {
+            self.mode = mode;
+            self.generation = self.generation.wrapping_add(1);
+        }
+    }
+
+    fn authorize(&self) -> Option<ManualScreenToken> {
+        (self.mode == AssistantScreenAccessMode::Manual).then_some(ManualScreenToken {
+            generation: self.generation,
+        })
+    }
+
+    fn token_is_current(&self, token: ManualScreenToken) -> bool {
+        self.mode == AssistantScreenAccessMode::Manual && token.generation == self.generation
+    }
+}
+
+static MANUAL_SCREEN_AUTHORIZATION: Mutex<ManualScreenAuthorization> =
+    Mutex::new(ManualScreenAuthorization {
+        mode: AssistantScreenAccessMode::Manual,
+        generation: 0,
+    });
+
 /// Sticky "attach the screen to assistant turns" flag, set by the panel's
-/// camera toggle. Persists across turns until the user turns it off (the
-/// pill/panel show a camera badge the whole time it's armed).
+/// camera toggle. It is session-only and meaningful exclusively in Manual
+/// screen-access mode.
 static SCREEN_ARMED: AtomicBool = AtomicBool::new(false);
 
-pub fn set_screen_armed(app: &AppHandle, armed: bool) {
+/// Store the sticky Manual arm under the same authorization lock used by mode
+/// transitions. Arming after Off/Agent has won the lock is rejected; arming
+/// first is subsequently cleared by that transition.
+pub fn set_screen_armed_for_current_mode(app: &AppHandle, armed: bool) -> Result<(), String> {
+    let mut authorization = MANUAL_SCREEN_AUTHORIZATION
+        .lock()
+        .map_err(|_| "Manual screen authorization lock poisoned".to_string())?;
+    synchronize_manual_authorization(app, &mut authorization);
+    if armed && authorization.authorize().is_none() {
+        return Err(
+            "Manual screen capture is unavailable in the current screen access mode".to_string(),
+        );
+    }
+
+    if !armed {
+        authorization.generation = authorization.generation.wrapping_add(1);
+    }
     SCREEN_ARMED.store(armed, Ordering::SeqCst);
+    if !armed {
+        clear_immediate_capture();
+    }
+    drop(authorization);
+    emit_screen_armed(app, armed);
+    Ok(())
+}
+
+pub fn emit_screen_armed(app: &AppHandle, armed: bool) {
     let _ = app.emit("assistant-screen-armed", armed);
 }
 
-/// Whether screen vision is currently armed. Sticky: reading does NOT clear it.
+/// Whether Manual screen vision is armed. Sticky: reading does NOT clear it.
 pub fn screen_armed() -> bool {
     SCREEN_ARMED.load(Ordering::SeqCst)
 }
 
-/// A screen capture taken *early* — at the moment a voice recording starts —
-/// when the "Vision capture timing" setting is `Immediate`. Stashed here by
-/// `AssistantAction::start` and consumed by `run_voice_turn`, so the frame
-/// reflects what the user was looking at when they *began* the question rather
-/// than whatever is on screen after they finish talking. Holds the full-res
-/// model data URL. Cleared at the start of every voice recording so a
-/// cancelled/stale capture can never leak into a later turn.
-static PENDING_IMMEDIATE_CAPTURE: Mutex<Option<String>> = Mutex::new(None);
+/// One generation of recording-start screen capture. Every recording, cancel,
+/// disarm, and departure from Manual mode advances the epoch, so a detached
+/// worker can never populate a later turn's slot.
+#[derive(Debug, Default)]
+struct PendingImmediateCapture {
+    epoch: u64,
+    captured: Option<(ManualScreenToken, String)>,
+}
 
-/// Store an immediate (recording-start) screen capture for the next voice turn.
-pub fn stash_immediate_capture(data_url: String) {
-    if let Ok(mut slot) = PENDING_IMMEDIATE_CAPTURE.lock() {
-        *slot = Some(data_url);
+impl PendingImmediateCapture {
+    fn advance(&mut self) -> u64 {
+        self.epoch = self.epoch.wrapping_add(1).max(1);
+        self.captured = None;
+        self.epoch
+    }
+
+    fn stash(&mut self, epoch: u64, token: ManualScreenToken, data_url: String) -> bool {
+        if self.epoch != epoch {
+            return false;
+        }
+        self.captured = Some((token, data_url));
+        true
+    }
+
+    fn take(&mut self) -> Option<(ManualScreenToken, String)> {
+        self.captured.take()
     }
 }
 
-/// Clear any stashed immediate capture (start of a new recording / on cancel).
+static PENDING_IMMEDIATE_CAPTURE: Mutex<PendingImmediateCapture> =
+    Mutex::new(PendingImmediateCapture {
+        epoch: 0,
+        captured: None,
+    });
+
+/// Begin a recording generation and, when requested, authorize an Immediate
+/// worker atomically with the current Manual mode and sticky arm.
+pub fn begin_immediate_capture(
+    app: &AppHandle,
+    capture_requested: bool,
+) -> Option<(ManualScreenToken, u64)> {
+    let mut authorization = MANUAL_SCREEN_AUTHORIZATION.lock().ok()?;
+    synchronize_manual_authorization(app, &mut authorization);
+    let epoch = PENDING_IMMEDIATE_CAPTURE.lock().ok()?.advance();
+    if !capture_requested || !screen_armed() {
+        return None;
+    }
+    authorization.authorize().map(|token| (token, epoch))
+}
+
+/// Store an Immediate frame only when both its recording epoch and shared
+/// Manual authorization generation remain current.
+pub fn stash_immediate_capture(
+    app: &AppHandle,
+    token: ManualScreenToken,
+    epoch: u64,
+    data_url: String,
+) -> bool {
+    let Ok(mut authorization) = MANUAL_SCREEN_AUTHORIZATION.lock() else {
+        return false;
+    };
+    synchronize_manual_authorization(app, &mut authorization);
+    if !authorization.token_is_current(token) {
+        return false;
+    }
+    PENDING_IMMEDIATE_CAPTURE
+        .lock()
+        .map(|mut pending| pending.stash(epoch, token, data_url))
+        .unwrap_or(false)
+}
+
+/// Invalidate and clear any recording-start frame.
 pub fn clear_immediate_capture() {
-    if let Ok(mut slot) = PENDING_IMMEDIATE_CAPTURE.lock() {
-        *slot = None;
+    if let Ok(mut pending) = PENDING_IMMEDIATE_CAPTURE.lock() {
+        pending.advance();
     }
 }
 
-/// Take (and clear) the stashed immediate capture, if one was taken at the
-/// start of this recording.
-fn take_immediate_capture() -> Option<String> {
+/// Consume the frame belonging to the current recording generation.
+fn take_immediate_capture() -> Option<(ManualScreenToken, String)> {
     PENDING_IMMEDIATE_CAPTURE
         .lock()
         .ok()
-        .and_then(|mut s| s.take())
+        .and_then(|mut pending| pending.take())
+}
+
+/// Whether a caller may invoke a user-controlled screen operation.
+pub fn manual_screen_access_allowed(mode: AssistantScreenAccessMode) -> bool {
+    mode == AssistantScreenAccessMode::Manual
+}
+
+fn synchronize_manual_authorization(
+    app: &AppHandle,
+    authorization: &mut ManualScreenAuthorization,
+) {
+    let mode = get_settings(app).assistant_screen_access_mode;
+    if authorization.mode == mode {
+        return;
+    }
+
+    authorization.transition(mode);
+    if mode != AssistantScreenAccessMode::Manual {
+        clear_manual_capture_state();
+        destroy_snip_overlay(app);
+    }
+}
+
+pub(crate) fn authorize_manual_screen_operation(
+    app: &AppHandle,
+) -> Result<ManualScreenToken, String> {
+    let mut authorization = MANUAL_SCREEN_AUTHORIZATION
+        .lock()
+        .map_err(|_| "Manual screen authorization lock poisoned".to_string())?;
+    synchronize_manual_authorization(app, &mut authorization);
+    authorization.authorize().ok_or_else(|| {
+        "Manual screen capture is unavailable in the current screen access mode".to_string()
+    })
+}
+
+pub(crate) fn manual_screen_token_is_current(app: &AppHandle, token: ManualScreenToken) -> bool {
+    let Ok(mut authorization) = MANUAL_SCREEN_AUTHORIZATION.lock() else {
+        return false;
+    };
+    synchronize_manual_authorization(app, &mut authorization);
+    authorization.token_is_current(token)
+}
+
+/// Linearize the privacy boundary immediately before a screenshot-bearing
+/// provider request. If a mode transition won first, dispatch is rejected; if
+/// this check wins first, the request is considered committed for this turn.
+fn commit_manual_screen_operation(app: &AppHandle, token: ManualScreenToken) -> bool {
+    manual_screen_token_is_current(app, token)
+}
+
+fn commit_manual_screen_dispatch(
+    app: &AppHandle,
+    token: ManualScreenToken,
+    conversation: &AssistantConversation,
+) -> bool {
+    let Ok(mut authorization) = MANUAL_SCREEN_AUTHORIZATION.lock() else {
+        return false;
+    };
+    synchronize_manual_authorization(app, &mut authorization);
+    !conversation.is_cancelled() && authorization.token_is_current(token)
+}
+
+#[cfg(test)]
+fn manual_screen_audit_can_publish(cancelled: bool, dispatch_committed: bool) -> bool {
+    !cancelled && dispatch_committed
+}
+
+/// Persist a mode transition while holding the same lock used to issue tokens.
+/// This makes clearing Manual state and invalidating unfinished operations one
+/// atomic ordering decision relative to arm/snip/capture commands.
+pub fn apply_screen_access_mode(
+    app: &AppHandle,
+    mode: AssistantScreenAccessMode,
+) -> Result<(), String> {
+    let mut authorization = MANUAL_SCREEN_AUTHORIZATION
+        .lock()
+        .map_err(|_| "Manual screen authorization lock poisoned".to_string())?;
+    synchronize_manual_authorization(app, &mut authorization);
+    authorization.transition(mode);
+    if mode != AssistantScreenAccessMode::Manual {
+        clear_manual_capture_state();
+    }
+
+    let mut settings = get_settings(app);
+    settings.assistant_screen_access_mode = mode;
+    write_settings(app, settings);
+
+    if mode != AssistantScreenAccessMode::Manual {
+        destroy_snip_overlay(app);
+    }
+    Ok(())
+}
+
+pub fn screen_armed_for_current_mode(app: &AppHandle) -> bool {
+    let Ok(mut authorization) = MANUAL_SCREEN_AUTHORIZATION.lock() else {
+        return false;
+    };
+    synchronize_manual_authorization(app, &mut authorization);
+    authorization.authorize().is_some() && screen_armed()
+}
+
+/// Put the screen capture before user-attached images, preserving image order
+/// and applying the caller's cap. Both thumbnail generation and model request
+/// construction use this helper so their ordering cannot drift apart.
+fn ordered_visual_inputs<'a, T>(
+    screenshot: Option<&'a T>,
+    images: &'a [T],
+    limit: usize,
+) -> Vec<&'a T> {
+    screenshot
+        .into_iter()
+        .chain(images.iter())
+        .take(limit)
+        .collect()
 }
 
 /// Build small display thumbnails (data URLs) for the visuals attached to a
@@ -153,7 +394,7 @@ async fn build_message_thumbnails(screenshot: Option<String>, images: Vec<String
     }
     tauri::async_runtime::spawn_blocking(move || {
         let mut thumbs = Vec::new();
-        for src in screenshot.iter().chain(images.iter()) {
+        for src in ordered_visual_inputs(screenshot.as_ref(), &images, usize::MAX) {
             match crate::screenshot::data_url_to_thumbnail(src) {
                 Ok(thumb) => thumbs.push(thumb),
                 Err(e) => warn!("Vision thumbnail generation failed: {}", e),
@@ -188,20 +429,24 @@ pub struct FileAttachment {
 }
 
 /// Frozen full-screen capture waiting for the user to pick a region in the
-/// snip overlay. Captured BEFORE the overlay opens, so the dimmer (and any
-/// on-screen assistant window churn) can never photobomb the crop.
-pub static PENDING_SNIP: Mutex<Option<PendingSnip>> = Mutex::new(None);
+/// snip overlay. Each worker carries the epoch that was current when it began.
+static PENDING_SNIP: Mutex<Option<PendingSnip>> = Mutex::new(None);
+static SNIP_EPOCH: AtomicU64 = AtomicU64::new(0);
 
 /// A frozen frame awaiting a region crop, bundled with the LOGICAL (CSS-pixel)
-/// size of the overlay drawn over it. The selection rectangle arrives in the
-/// overlay's CSS pixels; the finish step maps it onto the frame's real pixels
-/// using the ratio of these two sizes — which never trusts a reported scale
-/// factor (that can be wrong, or silently default to 1.0, on a high-DPI display
-/// and mis-crop), so the crop lands correctly at any display scale.
+/// size of the overlay drawn over it and its capture generation.
 pub struct PendingSnip {
+    epoch: u64,
+    manual_token: ManualScreenToken,
     pub frame: image::DynamicImage,
     pub logical_w: f64,
     pub logical_h: f64,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct SnipCaptureAuthorization {
+    epoch: u64,
+    manual_token: ManualScreenToken,
 }
 
 /// Attachments staged in the panel (chips above the input) and mirrored here
@@ -269,28 +514,48 @@ pub fn take_dictate_to_field() -> bool {
     DICTATE_TO_FIELD.swap(false, Ordering::SeqCst)
 }
 
-/// Phrases that signal the user is asking about what's on their screen.
-/// When the screenshot toggle is on, these auto-attach a capture even on the
-/// normal assistant hotkey.
-pub fn wants_screen_context(text: &str) -> bool {
-    let lower = text.to_lowercase();
-    const PATTERNS: [&str; 14] = [
-        "my screen",
-        "the screen",
-        "on screen",
-        "my display",
-        "the display",
-        "my monitor",
-        "what do you see",
-        "what are you seeing",
-        "can you see",
-        "what am i looking at",
-        "look at this",
-        "looking at",
-        "this error",
-        "this page",
-    ];
-    PATTERNS.iter().any(|p| lower.contains(p))
+/// The current Manual voice-turn screen decision. `UseImmediate` consumes the
+/// frame captured at recording start; `CaptureOnSend` takes a fresh frame after
+/// transcription. No text heuristic participates in this decision.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum VoiceScreenPlan {
+    NoCapture,
+    UseImmediate,
+    CaptureOnSend,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct VoiceScreenPlanInputs {
+    screen_access_mode: AssistantScreenAccessMode,
+    character_is_cat: bool,
+    screen_armed_for_turn: bool,
+    screen_armed_for_immediate_reuse: bool,
+    immediate_capture_available: bool,
+}
+
+fn voice_screen_plan(inputs: VoiceScreenPlanInputs) -> VoiceScreenPlan {
+    if inputs.character_is_cat
+        || !manual_screen_access_allowed(inputs.screen_access_mode)
+        || !inputs.screen_armed_for_turn
+    {
+        return VoiceScreenPlan::NoCapture;
+    }
+
+    if inputs.immediate_capture_available && inputs.screen_armed_for_immediate_reuse {
+        VoiceScreenPlan::UseImmediate
+    } else {
+        VoiceScreenPlan::CaptureOnSend
+    }
+}
+
+/// Pure predicate for the typed-composer Manual screen path. The caller's
+/// `include_screen` flag represents the sticky camera arm mirrored by React.
+pub fn manual_composed_capture_allowed(
+    include_screen: bool,
+    screen_access_mode: AssistantScreenAccessMode,
+    character_is_cat: bool,
+) -> bool {
+    include_screen && manual_screen_access_allowed(screen_access_mode) && !character_is_cat
 }
 
 /// In-memory conversation history, managed as Tauri state.
@@ -347,6 +612,10 @@ impl AssistantConversation {
     /// Cancel the current assistant turn (if any). Safe to call when idle.
     /// Sets the sticky flag *and* wakes the streaming select.
     pub fn request_cancel(&self) {
+        // Screen dispatch commitment uses the same lock. Therefore either this
+        // cancellation wins first (and the screenshot cannot commit), or the
+        // outbound screen boundary wins first and this is a post-commit Stop.
+        let _screen_dispatch_guard = MANUAL_SCREEN_AUTHORIZATION.lock().ok();
         self.cancelled.store(true, Ordering::SeqCst);
         self.cancel.notify_waiters();
     }
@@ -837,6 +1106,63 @@ pub fn apply_panel_size(app: &AppHandle, size: &str) {
 // ---------------------------------------------------------------------------
 
 pub const SNIP_LABEL: &str = "snip_overlay";
+
+fn next_snip_epoch() -> u64 {
+    SNIP_EPOCH.fetch_add(1, Ordering::SeqCst).wrapping_add(1)
+}
+
+fn snip_epoch_is_current(epoch: u64) -> bool {
+    SNIP_EPOCH.load(Ordering::SeqCst) == epoch
+}
+
+fn destroy_snip_overlay(app: &AppHandle) {
+    if let Some(window) = app.get_webview_window(SNIP_LABEL) {
+        let _ = window.destroy();
+    }
+}
+
+fn clear_pending_snip_for_epoch(epoch: u64) {
+    if let Ok(mut pending) = PENDING_SNIP.lock() {
+        if pending.as_ref().is_some_and(|snip| snip.epoch == epoch) {
+            *pending = None;
+        }
+    }
+}
+
+/// Start a new snip generation. Starting again invalidates any older capture
+/// worker and tears down its overlay before the new desktop frame is captured.
+pub(crate) fn begin_region_snip(app: &AppHandle) -> Result<SnipCaptureAuthorization, String> {
+    let mut authorization = MANUAL_SCREEN_AUTHORIZATION
+        .lock()
+        .map_err(|_| "Manual screen authorization lock poisoned".to_string())?;
+    synchronize_manual_authorization(app, &mut authorization);
+    let manual_token = authorization.authorize().ok_or_else(|| {
+        "Manual screen capture is unavailable in the current screen access mode".to_string()
+    })?;
+    let epoch = next_snip_epoch();
+    if let Ok(mut pending) = PENDING_SNIP.lock() {
+        *pending = None;
+    }
+    destroy_snip_overlay(app);
+    Ok(SnipCaptureAuthorization {
+        epoch,
+        manual_token,
+    })
+}
+
+fn invalidate_region_snip_state() {
+    next_snip_epoch();
+    if let Ok(mut pending) = PENDING_SNIP.lock() {
+        *pending = None;
+    }
+}
+
+fn clear_manual_capture_state() {
+    SCREEN_ARMED.store(false, Ordering::SeqCst);
+    clear_immediate_capture();
+    invalidate_region_snip_state();
+}
+
 /// Open the region-snip overlay for a frame that was just captured: store it
 /// in PENDING_SNIP, then cover `monitor` with a transparent selection window.
 /// Called from an async command (worker thread) — building a webview inline on
@@ -848,11 +1174,19 @@ pub const SNIP_LABEL: &str = "snip_overlay";
 /// aligned on multi-monitor setups.
 pub fn open_snip_overlay(
     app: &AppHandle,
+    authorization: SnipCaptureAuthorization,
     frame: image::DynamicImage,
     monitor: tauri::Monitor,
 ) -> Result<(), String> {
+    let SnipCaptureAuthorization {
+        epoch,
+        manual_token,
+    } = authorization;
+    if !snip_epoch_is_current(epoch) || !manual_screen_token_is_current(app, manual_token) {
+        return Ok(());
+    }
     if app.get_webview_window(SNIP_LABEL).is_some() {
-        return Ok(()); // already snipping
+        return Ok(()); // already snipping in this generation
     }
 
     // Cover the chosen monitor using LOGICAL coordinates set at BUILD time.
@@ -869,15 +1203,30 @@ pub fn open_snip_overlay(
     let logical_w = (monitor.size().width as f64 / scale).max(1.0);
     let logical_h = (monitor.size().height as f64 / scale).max(1.0);
 
-    // Stash the frozen frame together with the overlay's logical size, so the
-    // finish step can map the selection (measured in the overlay's CSS pixels)
-    // straight onto the frame's real pixels without trusting a scale factor.
+    // Stash only while this worker is still the newest generation. A second
+    // epoch check closes the small race between the first check and the mutex.
+    if !snip_epoch_is_current(epoch) || !manual_screen_token_is_current(app, manual_token) {
+        return Ok(());
+    }
     if let Ok(mut pending) = PENDING_SNIP.lock() {
+        // Authorization was checked before this lock. A concurrent mode
+        // transition advances the snip epoch while holding authorization, so
+        // this local check preserves the single auth -> pending lock order.
+        if !snip_epoch_is_current(epoch) {
+            return Ok(());
+        }
         *pending = Some(PendingSnip {
+            epoch,
+            manual_token,
             frame,
             logical_w,
             logical_h,
         });
+    }
+
+    if !snip_epoch_is_current(epoch) || !manual_screen_token_is_current(app, manual_token) {
+        clear_pending_snip_for_epoch(epoch);
+        return Ok(());
     }
 
     let mut builder = WebviewWindowBuilder::new(
@@ -895,8 +1244,8 @@ pub fn open_snip_overlay(
     .skip_taskbar(true)
     .resizable(false)
     .accept_first_mouse(true)
-    .focused(true)
-    .visible(true);
+    .focused(false)
+    .visible(false);
 
     // Match the other windows' WebView2 user-data dir so portable builds don't
     // spin up a second cache (and so window creation stays consistent).
@@ -904,9 +1253,36 @@ pub fn open_snip_overlay(
         builder = builder.data_directory(data_dir.join("webview"));
     }
 
-    let window = builder
-        .build()
-        .map_err(|e| format!("Couldn't open the snip overlay: {}", e))?;
+    let window = match builder.build() {
+        Ok(window) => window,
+        Err(error) => {
+            clear_pending_snip_for_epoch(epoch);
+            return Err(format!("Couldn't open the snip overlay: {}", error));
+        }
+    };
+
+    // Publish the hidden overlay under the same lock as mode transitions.
+    // If mode-wins, this window is never shown. If show-wins, a later mode
+    // transition observes/destroys the registered window before returning.
+    let shown = {
+        let mut manual_authorization = MANUAL_SCREEN_AUTHORIZATION
+            .lock()
+            .map_err(|_| "Manual screen authorization lock poisoned".to_string())?;
+        synchronize_manual_authorization(app, &mut manual_authorization);
+        if snip_epoch_is_current(epoch) && manual_authorization.token_is_current(manual_token) {
+            window
+                .show()
+                .map_err(|error| format!("Couldn't show the snip overlay: {}", error))?;
+            true
+        } else {
+            false
+        }
+    };
+    if !shown {
+        let _ = window.destroy();
+        clear_pending_snip_for_epoch(epoch);
+        return Ok(());
+    }
 
     let _ = window.set_focus();
     #[cfg(target_os = "windows")]
@@ -921,21 +1297,23 @@ pub fn open_snip_overlay(
 /// the overlay's logical size (stored in [`PendingSnip`]) — robust to any
 /// display scaling.
 pub fn finish_region_snip(app: &AppHandle, rect: Option<(f64, f64, f64, f64)>) {
-    if let Some(window) = app.get_webview_window(SNIP_LABEL) {
-        // Destroy (not close): the app-wide `CloseRequested` handler calls
-        // `prevent_close()` + `hide()` for every window, so `close()` would only
-        // HIDE this overlay. A hidden snip window still satisfies the
-        // `get_webview_window(SNIP_LABEL).is_some()` guard in
-        // `open_snip_overlay`, so the next snip would silently no-op ("already
-        // snipping") and the overlay would never reappear. `destroy()` tears the
-        // window down for real so a fresh snip can open every time.
-        let _ = window.destroy();
-    }
-    let pending = PENDING_SNIP.lock().ok().and_then(|mut p| p.take());
+    destroy_snip_overlay(app);
+    let pending = PENDING_SNIP.lock().ok().and_then(|mut pending| {
+        let current = SNIP_EPOCH.load(Ordering::SeqCst);
+        match pending.as_ref() {
+            Some(snip) if snip.epoch == current => pending.take(),
+            _ => {
+                *pending = None;
+                None
+            }
+        }
+    });
     let Some(rect) = rect else {
         return; // cancelled
     };
     let Some(PendingSnip {
+        epoch: _,
+        manual_token,
         frame,
         logical_w,
         logical_h,
@@ -944,6 +1322,9 @@ pub fn finish_region_snip(app: &AppHandle, rect: Option<(f64, f64, f64, f64)>) {
         emit_error(app, "screen_capture", "No captured frame for snip".into());
         return;
     };
+    if !commit_manual_screen_operation(app, manual_token) {
+        return;
+    }
 
     // Map the selection from the overlay's CSS pixels onto the frame's real
     // pixels via the ratio of the two coordinate spaces. This never multiplies
@@ -994,38 +1375,58 @@ pub fn finish_region_snip(app: &AppHandle, rect: Option<(f64, f64, f64, f64)>) {
 // Assistant pipeline
 // ---------------------------------------------------------------------------
 
-/// Run a voice-initiated assistant turn on a finished transcription: decide
-/// whether to attach the screen (sticky arm or "what's on my screen" phrasing),
-/// capture it, pick up any attachments staged in the panel, and run the turn.
-/// Shared by the assistant hotkey/pill path and the STT overlay's
-/// Ask-Assistant redirect.
+/// Run a voice-initiated assistant turn on a finished transcription: attach the
+/// screen only for an explicitly armed Manual turn, pick up staged attachments,
+/// and run the conversation turn. In Agent-decides mode the model may instead
+/// request the screen itself via the `capture_screen` tool inside the turn.
 pub async fn run_voice_turn(app: AppHandle, transcription: String) {
     let settings = get_settings(&app);
-    // The Cat character never looks at the screen (it just meows), so don't
-    // capture one even if the toggle/phrasing would normally arm it.
-    let wants_screen = !settings.active_character_is_cat()
-        && (screen_armed() || wants_screen_context(&transcription));
+    let character_is_cat = settings.active_character_is_cat();
+    let manual_mode = manual_screen_access_allowed(settings.assistant_screen_access_mode);
+
+    let screen_armed_for_turn = manual_mode && !character_is_cat && screen_armed();
 
     // An immediate (recording-start) capture may already be waiting — taken
     // when the "Vision capture timing" setting is Immediate and the camera was
     // armed. Take it regardless so it never lingers into a later turn; only use
     // it when this turn actually wants the screen.
     let immediate = take_immediate_capture();
+    let immediate_capture_available = immediate.is_some();
+    // Preserve the second arm check used by the legacy implementation: if the
+    // user disarmed vision after recording started, capture fresh on send rather
+    // than reusing the early frame. Avoid the atomic read when no frame exists.
+    let screen_armed_for_immediate_reuse = immediate_capture_available && screen_armed();
 
-    let screenshot = if wants_screen && settings.assistant_screenshot_enabled {
-        // Reuse the frame grabbed when the user started speaking — but only when
-        // vision is still armed (the same arm that triggered that early
-        // capture). A turn that only wants the screen because of a "what's on my
-        // screen" phrase always captures fresh below.
-        if let Some(data_url) = immediate.filter(|_| screen_armed()) {
-            Some(data_url)
-        } else {
-            // Capture now (On-send timing, or a "what's on my screen" phrase we
-            // could only detect after transcription). Tiny body only for Azure;
-            // loopback (built-in/local engine) gets a balanced image, cloud gets
-            // the sharp one. Target the monitor the mouse cursor is on — with
-            // multiple displays that's the screen the user is actually working
-            // on (the panel rarely moves, the cursor follows attention).
+    let plan = voice_screen_plan(VoiceScreenPlanInputs {
+        screen_access_mode: settings.assistant_screen_access_mode,
+        character_is_cat,
+        screen_armed_for_turn,
+        screen_armed_for_immediate_reuse,
+        immediate_capture_available,
+    });
+
+    let (screenshot, manual_screen_token) = match plan {
+        VoiceScreenPlan::NoCapture => (None, None),
+        VoiceScreenPlan::UseImmediate => match immediate {
+            Some((token, data_url))
+                if manual_screen_token_is_current(&app, token) && screen_armed() =>
+            {
+                (Some(data_url), Some(token))
+            }
+            _ => (None, None),
+        },
+        VoiceScreenPlan::CaptureOnSend => {
+            let token = match authorize_manual_screen_operation(&app) {
+                Ok(token) => token,
+                Err(_) => {
+                    let (images, files) = take_pending_attachments(&app);
+                    run_assistant_turn(app, transcription, None, images, files, None).await;
+                    return;
+                }
+            };
+            // Capture now for Manual On-send timing, or when no valid early
+            // frame survived. Tiny body only for Azure; loopback gets a
+            // balanced image, while cloud providers get the sharper profile.
             let profile = settings
                 .active_assistant_provider()
                 .map(|p| crate::screenshot::CaptureProfile::for_base_url(&p.base_url))
@@ -1035,10 +1436,13 @@ pub async fn run_voice_turn(app: AppHandle, transcription: String) {
             })
             .await;
             match captured {
-                Ok(Ok(data_url)) => Some(data_url),
+                Ok(Ok(data_url))
+                    if manual_screen_token_is_current(&app, token) && screen_armed() =>
+                {
+                    (Some(data_url), Some(token))
+                }
+                Ok(Ok(_)) => (None, None),
                 Ok(Err(e)) => {
-                    // Don't silently send a text-only request when the user asked
-                    // about their screen.
                     error!("Screen capture failed: {}", e);
                     emit_error(&app, "screen_capture", e);
                     emit_state(&app, "idle");
@@ -1052,11 +1456,17 @@ pub async fn run_voice_turn(app: AppHandle, transcription: String) {
                 }
             }
         }
-    } else {
-        None
     };
     let (images, files) = take_pending_attachments(&app);
-    run_assistant_turn(app, transcription, screenshot, images, files).await;
+    run_assistant_turn(
+        app,
+        transcription,
+        screenshot,
+        images,
+        files,
+        manual_screen_token,
+    )
+    .await;
 }
 
 /// Resets the busy flag when a turn finishes, on every exit path.
@@ -1106,19 +1516,32 @@ fn vision_unsupported_message(provider_id: &str, model: &str) -> String {
     }
 }
 
-/// The "Tools" section of the system prompt, included only on a web-search
-/// turn. It describes BOTH tools the model may call this turn — `web_search`
-/// and `get_current_datetime` — explains when to reach for each, and (reusing
-/// the shared, TTS-aware directive) how to present web findings. Fixed text →
-/// cache-safe.
-fn tools_system_section(tts_enabled: bool) -> String {
+/// The "Tools" section of the system prompt, included whenever the turn
+/// exposes at least one tool. Describes only the tools actually available this
+/// turn — `web_search` + `get_current_datetime` when web search is on, and
+/// `capture_screen` when the screen-access mode is Agent decides — explains
+/// when to reach for each, and (reusing the shared, TTS-aware directive) how
+/// to present web findings. Fixed text per flag combination → cache-safe.
+fn tools_system_section(web: bool, screen: bool, tts_enabled: bool) -> String {
     let mut s = String::from(
         "## Tools\n\
-         You can call tools before answering; use one only when it genuinely helps, then reply normally.\n\
-         • web_search(query, freshness, news): live web results (titles + short snippets). Call it BEFORE answering any question about current, recent, or changeable facts — news, prices, sports scores, schedules, software versions, who currently holds a role or title, or recent events — because your training data has a fixed cutoff and may be out of date. For timeless things (definitions, concepts, math, coding, writing, translation, general how-to), answer directly without searching. Never claim you cannot access the internet.\n\
-         • get_current_datetime(): the user's current local date and time. Call it whenever you need the present moment — to say what day or time it is, or to turn a relative reference (today, yesterday, this week, how long until X) into a concrete date, including before building a web_search query.\n\n",
+         You can call tools before answering; use one only when it genuinely helps, then reply normally.\n",
     );
-    s.push_str(&web_search::web_search_system_directive(tts_enabled));
+    if web {
+        s.push_str(
+            "• web_search(query, freshness, news): live web results (titles + short snippets). Call it BEFORE answering any question about current, recent, or changeable facts — news, prices, sports scores, schedules, software versions, who currently holds a role or title, or recent events — because your training data has a fixed cutoff and may be out of date. For timeless things (definitions, concepts, math, coding, writing, translation, general how-to), answer directly without searching. Never claim you cannot access the internet.\n\
+             • get_current_datetime(): the user's current local date and time. Call it whenever you need the present moment — to say what day or time it is, or to turn a relative reference (today, yesterday, this week, how long until X) into a concrete date, including before building a web_search query.\n",
+        );
+    }
+    if screen {
+        s.push_str(
+            "• capture_screen(): take one screenshot of the user's current screen. The user allowed you to decide when seeing their screen helps. Call it ONLY when the message clearly refers to something on screen ('this page', 'this error', 'look at this', 'reply to this') or genuinely cannot be answered blind. Never capture for self-contained questions. At most once per message; the screenshot is shown to the user.\n",
+        );
+    }
+    if web {
+        s.push('\n');
+        s.push_str(&web_search::web_search_system_directive(tts_enabled));
+    }
     s
 }
 
@@ -1231,12 +1654,70 @@ fn run_cat_turn(
     emit_state(app, if speaking { "speaking" } else { "idle" });
 }
 
-/// The tool definitions handed to tool-capable models on a web-search turn: a
-/// live `web_search` and an on-demand `get_current_datetime`. The model decides
-/// entirely on its own whether and when to call either; when it does, we run
-/// the tool and feed the result back so it can finish its answer.
-fn assistant_tool_defs() -> Value {
-    json!([
+/// Take a screenshot for an Agent-decides `capture_screen` tool call.
+///
+/// Re-verifies the screen-access mode at dispatch time (the user may have
+/// switched it mid-turn), captures the monitor under the cursor sized for the
+/// provider, and publishes the visible audit trail — the screenshot marker and
+/// a display thumbnail on the current user message — so the panel always shows
+/// when the model looked at the screen. Returns the full-resolution data URL
+/// (sent to the model once, never stored).
+async fn agent_capture_screen(
+    app: &AppHandle,
+    provider: &crate::settings::PostProcessProvider,
+) -> Result<String, String> {
+    if get_settings(app).assistant_screen_access_mode != AssistantScreenAccessMode::AgentDecides {
+        return Err("screen access is no longer set to Agent decides".to_string());
+    }
+    let profile = crate::screenshot::CaptureProfile::for_base_url(&provider.base_url);
+    let data_url = tauri::async_runtime::spawn_blocking(move || {
+        crate::screenshot::capture_screen_data_url_at(None, profile)
+    })
+    .await
+    .map_err(|e| format!("Screen capture task failed: {}", e))??;
+
+    // Visible audit trail: marker + thumbnail on the turn's user message.
+    let thumb_src = data_url.clone();
+    let thumbnail = tauri::async_runtime::spawn_blocking(move || {
+        crate::screenshot::data_url_to_thumbnail(&thumb_src)
+    })
+    .await
+    .ok()
+    .and_then(|r| r.ok());
+    {
+        let conversation = app.state::<AssistantConversation>();
+        let mut history = conversation.messages.lock().unwrap();
+        if let Some(message) = history.iter_mut().rev().find(|m| m.role == "user") {
+            if !message.content.contains(SCREENSHOT_MARKER) {
+                message
+                    .content
+                    .push_str(&format!("\n{}", SCREENSHOT_MARKER));
+            }
+            if let Some(thumb) = thumbnail {
+                // Screenshot thumbnails lead by convention (see
+                // ordered_visual_inputs).
+                message.images.insert(0, thumb);
+            }
+        }
+    }
+    emit_conversation(app);
+    persist_assistant_session(app);
+    let _ = app.emit("assistant-screen-captured", ());
+    Ok(data_url)
+}
+
+/// Build the current local tool capability matrix. `web` exposes `web_search`
+/// followed by `get_current_datetime`; `screen` (Agent-decides screen access)
+/// appends `capture_screen`. Turns with no capability expose no tools. The
+/// order is stable because it is part of the model-facing request baseline.
+fn build_assistant_tool_capabilities(web: bool, screen: bool) -> Option<Value> {
+    if !web && !screen {
+        return None;
+    }
+
+    let mut tools: Vec<Value> = Vec::new();
+    if web {
+        tools.push(json!(
         {
             "type": "function",
             "function": {
@@ -1262,7 +1743,8 @@ fn assistant_tool_defs() -> Value {
                     "required": ["query"]
                 }
             }
-        },
+        }));
+        tools.push(json!(
         {
             "type": "function",
             "function": {
@@ -1273,8 +1755,20 @@ fn assistant_tool_defs() -> Value {
                     "properties": {}
                 }
             }
-        }
-    ])
+        }));
+    }
+    if screen {
+        tools.push(json!(
+        {
+            "type": "function",
+            "function": {
+                "name": "capture_screen",
+                "description": "Take one screenshot of the user's current screen and attach it to this conversation. Call it ONLY when the user's message clearly refers to something visible on their screen ('this page', 'the error I'm seeing', 'look at this', 'what does this mean', 'reply to this email') or when seeing the screen is genuinely necessary to answer. For self-contained questions, answer directly without capturing. May be called at most once per message.",
+                "parameters": { "type": "object", "properties": {} }
+            }
+        }));
+    }
+    Some(Value::Array(tools))
 }
 
 /// Parse the JSON arguments of a `web_search` tool call into (query, freshness,
@@ -1293,6 +1787,28 @@ fn parse_web_search_args(raw: &str) -> (String, Option<String>, bool) {
         .map(|s| s.to_string());
     let news = v.get("news").and_then(|n| n.as_bool()).unwrap_or(false);
     (query, freshness, news)
+}
+
+/// The production tool loop allows at most three model rounds. On the last
+/// round, requested tools are still executed (the existing behavior), but no
+/// fourth model request is made.
+const MAX_ASSISTANT_TOOL_ROUNDS: usize = 3;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ToolRoundPolicy {
+    FinalResponse,
+    RunToolsThenFollowUp,
+    RunToolsThenStop,
+}
+
+fn tool_round_policy(round: &llm_client::ToolStreamOutcome, round_index: usize) -> ToolRoundPolicy {
+    if round.tool_calls.is_empty() {
+        ToolRoundPolicy::FinalResponse
+    } else if round_index.saturating_add(1) < MAX_ASSISTANT_TOOL_ROUNDS {
+        ToolRoundPolicy::RunToolsThenFollowUp
+    } else {
+        ToolRoundPolicy::RunToolsThenStop
+    }
 }
 
 /// Run one assistant turn: record the user message, stream the LLM answer to
@@ -1315,7 +1831,14 @@ pub async fn run_assistant_turn(
     screenshot: Option<String>,
     images: Vec<String>,
     files: Vec<FileAttachment>,
+    manual_screen_token: Option<ManualScreenToken>,
 ) {
+    if screenshot.is_some()
+        && !manual_screen_token.is_some_and(|token| manual_screen_token_is_current(&app, token))
+    {
+        emit_state(&app, "idle");
+        return;
+    }
     let user_text = user_text.trim().to_string();
     if user_text.is_empty() {
         emit_state(&app, "idle");
@@ -1420,6 +1943,13 @@ pub async fn run_assistant_turn(
     let web_via_online =
         web_wanted && is_openrouter && !has_visual && settings.assistant_prefer_provider_web_search;
     let web_via_tools = web_wanted && !web_via_online;
+    // Agent-decides screen access: expose a `capture_screen` tool and let the
+    // model itself decide whether this turn needs to see the screen. Skipped
+    // when a screenshot already rides along (nothing left to decide).
+    let agent_screen = settings.assistant_screen_access_mode
+        == AssistantScreenAccessMode::AgentDecides
+        && screenshot.is_none();
+    let tool_capabilities = build_assistant_tool_capabilities(web_via_tools, agent_screen);
     // OpenRouter's `:online` model suffix turns on its built-in web search
     // server-side; every other path uses the model name unchanged.
     let request_model = if web_via_online {
@@ -1428,25 +1958,28 @@ pub async fn run_assistant_turn(
         model.clone()
     };
 
-    // Record the user message (text markers instead of raw image/file data)
-    // and show it in the panel immediately — before any web search runs, so the
-    // bubble appears right away while results are being fetched.
-    {
+    let mut pending_user_message = Some(ChatMessage {
+        role: "user".to_string(),
+        content: compose_stored_user_message(&user_text, &files, &images, screenshot.is_some()),
+        images: thumbnails,
+    });
+    let user_message_recorded = screenshot.is_none();
+
+    // Non-screen turns keep the existing immediate bubble/history behavior.
+    // Screen turns remain local and unpersisted until the final outbound
+    // authorization boundary, so cancellation/startup failure cannot create a
+    // false "screenshot attached" audit record.
+    if user_message_recorded {
         let conversation = app.state::<AssistantConversation>();
         let mut history = conversation.messages.lock().unwrap();
-        history.push(ChatMessage {
-            role: "user".to_string(),
-            content: compose_stored_user_message(&user_text, &files, &images, screenshot.is_some()),
-            images: thumbnails,
-        });
+        history.push(pending_user_message.take().unwrap());
+        drop(history);
+        emit_conversation(&app);
+        persist_assistant_session(&app);
     }
-    emit_conversation(&app);
-    // Save right after the user message so the question is preserved even if
-    // the model (or the search) errors out before replying.
-    persist_assistant_session(&app);
 
-    // If the user pressed Stop during the search (or anytime up to here), abort
-    // before spending a model call. The question stays in the panel/history.
+    // If the user pressed Stop up to here, abort before spending a model call.
+    // A screen turn has not yet published any marker or thumbnail.
     if app.state::<AssistantConversation>().is_cancelled() {
         debug!("Assistant turn cancelled before generation");
         crate::tts::stop_remote();
@@ -1510,14 +2043,18 @@ pub async fn run_assistant_turn(
             sections.push(block);
         }
 
-        // 4. Tools — only when web search is on. One labeled section that
-        //    explains BOTH tools the model can call this turn (web_search and
-        //    get_current_datetime), when to use each, and how to present web
-        //    findings. On the OpenRouter `:online` path the model has no local
-        //    tools (search runs server-side), so it gets a short capability
-        //    note instead.
-        if web_via_tools {
-            sections.push(tools_system_section(settings.assistant_tts_enabled));
+        // 4. Tools — included whenever this turn exposes at least one tool
+        //    (web search and/or agent-decided screen capture). One labeled
+        //    section that explains exactly the tools the model can call this
+        //    turn and when to use each. On the OpenRouter `:online` path the
+        //    model has no local tools (search runs server-side), so it gets a
+        //    short capability note instead.
+        if tool_capabilities.is_some() {
+            sections.push(tools_system_section(
+                web_via_tools,
+                agent_screen,
+                settings.assistant_tts_enabled,
+            ));
         } else if web_via_online {
             sections.push(web_search::WEB_SEARCH_CAPABILITY_NOTE.to_string());
         }
@@ -1533,9 +2070,16 @@ pub async fn run_assistant_turn(
         let history = conversation.messages.lock().unwrap();
         let mut kept: Vec<&ChatMessage> = Vec::new();
         let mut chars = 0usize;
-        // Skip the just-recorded user message (pushed above); it's appended
-        // explicitly below with the proper request content.
-        for message in history.iter().rev().skip(1).take(max_history_messages) {
+        // A non-screen user message was already pushed above and is appended
+        // explicitly below, so skip it. A deferred screen message is not in
+        // history yet and therefore skips zero prior messages.
+        let current_message_skip = usize::from(user_message_recorded);
+        for message in history
+            .iter()
+            .rev()
+            .skip(current_message_skip)
+            .take(max_history_messages)
+        {
             chars += message.content.len();
             if chars > max_history_chars && !kept.is_empty() {
                 break;
@@ -1583,16 +2127,7 @@ pub async fn run_assistant_turn(
     // Visuals: the screen capture (if any) first, then attached images, capped
     // so a pile of attachments can't produce an oversized request.
     const MAX_VISUALS: usize = 4;
-    let mut visuals: Vec<&String> = Vec::new();
-    if let Some(data_url) = &screenshot {
-        visuals.push(data_url);
-    }
-    for image in images.iter() {
-        if visuals.len() >= MAX_VISUALS {
-            break;
-        }
-        visuals.push(image);
-    }
+    let visuals = ordered_visual_inputs(screenshot.as_ref(), &images, MAX_VISUALS);
 
     if visuals.is_empty() {
         messages.push(json!({"role": "user", "content": user_content}));
@@ -1647,8 +2182,28 @@ pub async fn run_assistant_turn(
     // the `:online` suffix so the search happens server-side). Both stream
     // tokens via `assistant-token` and resolve to the final answer text, then
     // flow through the shared outcome handling below.
-    let outcome = if web_via_tools {
-        let tools = assistant_tool_defs();
+    if screenshot.is_some() {
+        let conversation = app.state::<AssistantConversation>();
+        let dispatch_committed = manual_screen_token
+            .is_some_and(|token| commit_manual_screen_dispatch(&app, token, &conversation));
+        if !dispatch_committed {
+            emit_state(&app, "idle");
+            return;
+        }
+
+        // The screen request is now committed for dispatch. Publish exactly the
+        // marker/thumbnail that corresponds to that outbound request before
+        // starting it, preserving the existing visible audit trail.
+        conversation
+            .messages
+            .lock()
+            .unwrap()
+            .push(pending_user_message.take().unwrap());
+        emit_conversation(&app);
+        persist_assistant_session(&app);
+    }
+
+    let outcome = if let Some(tools) = tool_capabilities {
         let partial_cb = partial.clone();
         let app_tokens = app.clone();
         let app_state = app.clone();
@@ -1659,9 +2214,11 @@ pub async fn run_assistant_turn(
         let loop_fut = async move {
             let mut msgs = messages;
             let mut answer = String::new();
+            // At most one agent-decided screenshot per user message.
+            let mut screen_captured = false;
             // A small round cap: one search round covers almost every question;
             // the cap just prevents a pathological tool-call loop.
-            for _ in 0..3usize {
+            for round_index in 0..MAX_ASSISTANT_TOOL_ROUNDS {
                 // The model alone decides whether to call a tool; we never
                 // force one.
                 let tool_choice = json!("auto");
@@ -1682,7 +2239,8 @@ pub async fn run_assistant_turn(
                     },
                 )
                 .await?;
-                if round_out.tool_calls.is_empty() {
+                let round_policy = tool_round_policy(&round_out, round_index);
+                if round_policy == ToolRoundPolicy::FinalResponse {
                     answer = round_out.text;
                     break;
                 }
@@ -1713,6 +2271,47 @@ pub async fn run_assistant_turn(
                     "tool_calls": tool_calls_json
                 }));
                 for tc in &round_out.tool_calls {
+                    // capture_screen returns an image, not text — handled
+                    // apart from the text-tool match: the tool message is a
+                    // short receipt and the frame rides in a follow-up user
+                    // message (image parts aren't valid in tool results on
+                    // most OpenAI-compatible providers).
+                    if tc.name == "capture_screen" {
+                        if screen_captured {
+                            msgs.push(json!({
+                                "role": "tool",
+                                "tool_call_id": tc.id,
+                                "content": "A screenshot was already captured for this message. Answer now using it."
+                            }));
+                            continue;
+                        }
+                        match agent_capture_screen(&app_state, &provider_c).await {
+                            Ok(data_url) => {
+                                screen_captured = true;
+                                msgs.push(json!({
+                                    "role": "tool",
+                                    "tool_call_id": tc.id,
+                                    "content": "Screenshot captured. It is attached in the next message."
+                                }));
+                                msgs.push(json!({
+                                    "role": "user",
+                                    "content": [
+                                        {"type": "text", "text": "[Screenshot of the user's current screen, from the capture_screen tool. Use it to answer the previous question.]"},
+                                        {"type": "image_url", "image_url": {"url": data_url}}
+                                    ]
+                                }));
+                            }
+                            Err(e) => {
+                                warn!("Agent screen capture failed: {}", e);
+                                msgs.push(json!({
+                                    "role": "tool",
+                                    "tool_call_id": tc.id,
+                                    "content": format!("Screen capture is unavailable ({}). Answer without it.", e)
+                                }));
+                            }
+                        }
+                        continue;
+                    }
                     let content = match tc.name.as_str() {
                         "web_search" => {
                             let (query, freshness, news) = parse_web_search_args(&tc.arguments);
@@ -1747,6 +2346,9 @@ pub async fn run_assistant_turn(
                 }
                 emit_state(&app_state, "thinking");
                 answer = round_out.text;
+                if round_policy == ToolRoundPolicy::RunToolsThenStop {
+                    break;
+                }
             }
             Ok::<String, String>(answer)
         };
@@ -1936,7 +2538,7 @@ pub async fn regenerate_last(app: AppHandle) {
     emit_conversation(&app);
     match text {
         Some(t) if !t.is_empty() => {
-            run_assistant_turn(app, t, None, Vec::new(), Vec::new()).await;
+            run_assistant_turn(app, t, None, Vec::new(), Vec::new(), None).await;
         }
         _ => emit_state(&app, "idle"),
     }
@@ -2088,4 +2690,351 @@ pub async fn run_summarize_turn(app: AppHandle) {
     }
 
     emit_state(&app, "idle");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::llm_client::{ChatRound, ToolCall, ToolStreamOutcome};
+
+    fn screen_inputs() -> VoiceScreenPlanInputs {
+        VoiceScreenPlanInputs {
+            screen_access_mode: AssistantScreenAccessMode::Manual,
+            character_is_cat: false,
+            screen_armed_for_turn: false,
+            screen_armed_for_immediate_reuse: false,
+            immediate_capture_available: false,
+        }
+    }
+
+    #[test]
+    fn sticky_manual_arm_applies_across_voice_turns() {
+        let mut first = screen_inputs();
+        first.screen_armed_for_turn = true;
+        first.screen_armed_for_immediate_reuse = true;
+        first.immediate_capture_available = true;
+        assert_eq!(voice_screen_plan(first), VoiceScreenPlan::UseImmediate);
+
+        // Taking the one-shot immediate frame does not consume the Manual arm.
+        let mut next = first;
+        next.immediate_capture_available = false;
+        assert_eq!(voice_screen_plan(next), VoiceScreenPlan::CaptureOnSend);
+    }
+
+    #[test]
+    fn manual_screen_phrases_do_not_capture_without_an_explicit_arm() {
+        const LEGACY_PHRASES: [&str; 14] = [
+            "my screen",
+            "the screen",
+            "on screen",
+            "my display",
+            "the display",
+            "my monitor",
+            "what do you see",
+            "what are you seeing",
+            "can you see",
+            "what am i looking at",
+            "look at this",
+            "looking at",
+            "this error",
+            "this page",
+        ];
+
+        for phrase in LEGACY_PHRASES {
+            assert_eq!(
+                voice_screen_plan(screen_inputs()),
+                VoiceScreenPlan::NoCapture,
+                "Manual must ignore hidden phrase intent while unarmed: {phrase}"
+            );
+        }
+    }
+
+    #[test]
+    fn immediate_availability_selects_immediate_or_on_send_capture() {
+        let mut inputs = screen_inputs();
+        inputs.screen_armed_for_turn = true;
+        inputs.screen_armed_for_immediate_reuse = true;
+        inputs.immediate_capture_available = true;
+        assert_eq!(voice_screen_plan(inputs), VoiceScreenPlan::UseImmediate);
+
+        inputs.immediate_capture_available = false;
+        assert_eq!(voice_screen_plan(inputs), VoiceScreenPlan::CaptureOnSend);
+
+        inputs.immediate_capture_available = true;
+        inputs.screen_armed_for_immediate_reuse = false;
+        assert_eq!(voice_screen_plan(inputs), VoiceScreenPlan::CaptureOnSend);
+    }
+
+    #[test]
+    fn cat_off_and_agent_modes_bypass_manual_screen_requests() {
+        let mut inputs = screen_inputs();
+        inputs.screen_armed_for_turn = true;
+        inputs.screen_armed_for_immediate_reuse = true;
+        inputs.immediate_capture_available = true;
+
+        inputs.character_is_cat = true;
+        assert_eq!(voice_screen_plan(inputs), VoiceScreenPlan::NoCapture);
+
+        inputs.character_is_cat = false;
+        for mode in [
+            AssistantScreenAccessMode::Off,
+            AssistantScreenAccessMode::AgentDecides,
+        ] {
+            inputs.screen_access_mode = mode;
+            assert_eq!(voice_screen_plan(inputs), VoiceScreenPlan::NoCapture);
+            assert!(!manual_screen_access_allowed(mode));
+        }
+    }
+
+    #[test]
+    fn markers_and_visual_inputs_keep_the_current_order() {
+        let files = vec![
+            FileAttachment {
+                name: "notes.txt".to_string(),
+                content: "notes".to_string(),
+            },
+            FileAttachment {
+                name: "data.csv".to_string(),
+                content: "data".to_string(),
+            },
+        ];
+        let images = vec!["image-1".to_string(), "image-2".to_string()];
+        assert_eq!(
+            compose_stored_user_message("Explain", &files, &images, true),
+            "Explain\n[file attached: notes.txt]\n[file attached: data.csv]\n[image attached]\n[image attached]\n[screenshot attached]"
+        );
+
+        let screenshot = "screen".to_string();
+        let ordered: Vec<&str> = ordered_visual_inputs(Some(&screenshot), &images, usize::MAX)
+            .into_iter()
+            .map(String::as_str)
+            .collect();
+        assert_eq!(ordered, vec!["screen", "image-1", "image-2"]);
+
+        let capped: Vec<&str> = ordered_visual_inputs(Some(&screenshot), &images, 2)
+            .into_iter()
+            .map(String::as_str)
+            .collect();
+        assert_eq!(capped, vec!["screen", "image-1"]);
+    }
+
+    #[test]
+    fn assistant_tool_capability_matrix_and_order_are_stable() {
+        assert!(build_assistant_tool_capabilities(false, false).is_none());
+
+        let tools =
+            build_assistant_tool_capabilities(true, false).expect("tools should be enabled");
+        let tools = tools
+            .as_array()
+            .expect("tool definitions should be an array");
+        let names: Vec<&str> = tools
+            .iter()
+            .map(|tool| {
+                tool["function"]["name"]
+                    .as_str()
+                    .expect("tool name should be a string")
+            })
+            .collect();
+        assert_eq!(names, vec!["web_search", "get_current_datetime"]);
+        assert_eq!(
+            tools[0]["function"]["parameters"]["required"],
+            json!(["query"])
+        );
+        assert_eq!(tools[1]["function"]["parameters"]["properties"], json!({}));
+
+        // Agent-decides screen access appends capture_screen after the web
+        // tools; screen-only turns expose just capture_screen.
+        let tools = build_assistant_tool_capabilities(true, true).expect("tools should be enabled");
+        let names: Vec<&str> = tools
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|tool| tool["function"]["name"].as_str().unwrap())
+            .collect();
+        assert_eq!(
+            names,
+            vec!["web_search", "get_current_datetime", "capture_screen"]
+        );
+
+        let tools =
+            build_assistant_tool_capabilities(false, true).expect("tools should be enabled");
+        let names: Vec<&str> = tools
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|tool| tool["function"]["name"].as_str().unwrap())
+            .collect();
+        assert_eq!(names, vec!["capture_screen"]);
+    }
+
+    #[test]
+    fn malformed_web_search_arguments_fall_back_to_empty_values() {
+        assert_eq!(
+            parse_web_search_args("{not valid json"),
+            (String::new(), None, false)
+        );
+        assert_eq!(
+            parse_web_search_args(r#"{"query":42,"freshness":[],"news":"yes"}"#),
+            (String::new(), None, false)
+        );
+        assert_eq!(
+            parse_web_search_args(
+                r#"{"query":"  rust 2026 ","freshness":"week","news":true,"extra":1}"#
+            ),
+            ("rust 2026".to_string(), Some("week".to_string()), true)
+        );
+    }
+
+    #[test]
+    fn bounded_scripted_tool_call_then_final_response_policy() {
+        let tool_round: ToolStreamOutcome = ChatRound {
+            text: String::new(),
+            tool_calls: vec![ToolCall {
+                id: "call-1".to_string(),
+                name: "get_current_datetime".to_string(),
+                arguments: "{}".to_string(),
+            }],
+        }
+        .into();
+        assert_eq!(
+            tool_round_policy(&tool_round, 0),
+            ToolRoundPolicy::RunToolsThenFollowUp
+        );
+
+        let final_round: ToolStreamOutcome = ChatRound {
+            text: "Final answer".to_string(),
+            tool_calls: Vec::new(),
+        }
+        .into();
+        assert_eq!(
+            tool_round_policy(&final_round, 1),
+            ToolRoundPolicy::FinalResponse
+        );
+
+        assert_eq!(
+            tool_round_policy(&tool_round, MAX_ASSISTANT_TOOL_ROUNDS - 1),
+            ToolRoundPolicy::RunToolsThenStop
+        );
+    }
+
+    #[test]
+    fn typed_composer_capture_requires_manual_mode_arm_and_non_cat_character() {
+        assert!(manual_composed_capture_allowed(
+            true,
+            AssistantScreenAccessMode::Manual,
+            false
+        ));
+        assert!(!manual_composed_capture_allowed(
+            false,
+            AssistantScreenAccessMode::Manual,
+            false
+        ));
+        assert!(!manual_composed_capture_allowed(
+            true,
+            AssistantScreenAccessMode::Off,
+            false
+        ));
+        assert!(!manual_composed_capture_allowed(
+            true,
+            AssistantScreenAccessMode::AgentDecides,
+            false
+        ));
+        assert!(!manual_composed_capture_allowed(
+            true,
+            AssistantScreenAccessMode::Manual,
+            true
+        ));
+    }
+
+    #[test]
+    fn capture_authorization_orders_mode_races_and_cleanup_keeps_attachments() {
+        let mut authorization = ManualScreenAuthorization::default();
+        let stale_token = authorization.authorize().unwrap();
+        assert!(authorization.token_is_current(stale_token));
+
+        // Mode-wins ordering: every operation authorized before Off/Agent is
+        // stale, and no new Manual operation can begin there.
+        authorization.transition(AssistantScreenAccessMode::Off);
+        assert!(!authorization.token_is_current(stale_token));
+        assert!(authorization.authorize().is_none());
+        authorization.transition(AssistantScreenAccessMode::AgentDecides);
+        assert!(authorization.authorize().is_none());
+
+        // Returning to Manual gets a new generation. A final validation that
+        // occurs before the next transition is the operation-wins boundary.
+        authorization.transition(AssistantScreenAccessMode::Manual);
+        let current_token = authorization.authorize().unwrap();
+        assert_ne!(current_token, stale_token);
+        assert!(authorization.token_is_current(current_token));
+        authorization.transition(AssistantScreenAccessMode::Off);
+        assert!(!authorization.token_is_current(current_token));
+        assert!(!manual_screen_audit_can_publish(false, false)); // mode-wins
+        assert!(!manual_screen_audit_can_publish(true, true)); // cancelled
+        assert!(manual_screen_audit_can_publish(false, true)); // commit-wins
+
+        let mut immediate = PendingImmediateCapture::default();
+        let stale_immediate_epoch = immediate.advance();
+        let current_immediate_epoch = immediate.advance();
+        assert!(!immediate.stash(stale_immediate_epoch, stale_token, "stale".to_string()));
+        assert!(immediate.stash(
+            current_immediate_epoch,
+            current_token,
+            "current".to_string()
+        ));
+        let (stored_token, stored_url) = immediate.take().unwrap();
+        assert_eq!(stored_token, current_token);
+        assert_eq!(stored_url, "current");
+
+        SNIP_EPOCH.store(0, Ordering::SeqCst);
+        let stale_snip_epoch = next_snip_epoch();
+        let current_snip_epoch = next_snip_epoch();
+        assert!(!snip_epoch_is_current(stale_snip_epoch));
+        assert!(snip_epoch_is_current(current_snip_epoch));
+
+        SCREEN_ARMED.store(true, Ordering::SeqCst);
+        {
+            let mut pending = PENDING_IMMEDIATE_CAPTURE.lock().unwrap();
+            let epoch = pending.advance();
+            assert!(pending.stash(
+                epoch,
+                current_token,
+                "data:image/jpeg;base64,current".to_string()
+            ));
+        }
+        *PENDING_SNIP.lock().unwrap() = Some(PendingSnip {
+            epoch: current_snip_epoch,
+            manual_token: current_token,
+            frame: image::DynamicImage::new_rgba8(8, 8),
+            logical_w: 8.0,
+            logical_h: 8.0,
+        });
+        *PENDING_ATTACHMENTS.lock().unwrap() = (
+            vec!["completed-region".to_string()],
+            vec![FileAttachment {
+                name: "notes.txt".to_string(),
+                content: "kept".to_string(),
+            }],
+        );
+
+        clear_manual_capture_state();
+
+        assert!(!screen_armed());
+        assert!(take_immediate_capture().is_none());
+        assert!(PENDING_SNIP.lock().unwrap().is_none());
+        let attachments = PENDING_ATTACHMENTS.lock().unwrap();
+        assert_eq!(attachments.0, vec!["completed-region"]);
+        assert_eq!(attachments.1[0].name, "notes.txt");
+        drop(attachments);
+        *PENDING_ATTACHMENTS.lock().unwrap() = (Vec::new(), Vec::new());
+    }
+
+    #[test]
+    fn cancellation_is_sticky_for_one_turn_and_cleared_by_the_next() {
+        let conversation = AssistantConversation::new();
+        assert!(!conversation.is_cancelled());
+        conversation.request_cancel();
+        assert!(conversation.is_cancelled());
+        conversation.begin_turn();
+        assert!(!conversation.is_cancelled());
+    }
 }

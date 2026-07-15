@@ -985,6 +985,43 @@ pub fn change_post_process_enabled_setting(app: AppHandle, enabled: bool) -> Res
     Ok(())
 }
 
+/// Toggle "Generate with Flow" (the spoken activation-phrase generation path).
+#[tauri::command]
+#[specta::specta]
+pub fn change_flow_enabled_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    settings.flow_enabled = enabled;
+    settings::write_settings(&app, settings);
+    Ok(())
+}
+
+/// Change the Flow activation phrase. An empty phrase resets to the default
+/// ("Hey Flow") so Flow can never end up in an untriggerable state.
+#[tauri::command]
+#[specta::specta]
+pub fn change_flow_phrase_setting(app: AppHandle, phrase: String) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    let trimmed = phrase.trim();
+    settings.flow_phrase = if trimmed.is_empty() {
+        "Hey Flow".to_string()
+    } else {
+        trimmed.to_string()
+    };
+    settings::write_settings(&app, settings);
+    Ok(())
+}
+
+/// Allow or forbid Flow's `capture_screen` tool (independent of the
+/// assistant's screen-access mode).
+#[tauri::command]
+#[specta::specta]
+pub fn change_flow_screen_access_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    settings.flow_screen_access = enabled;
+    settings::write_settings(&app, settings);
+    Ok(())
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn change_post_process_tone_setting(app: AppHandle, tone: String) -> Result<(), String> {

@@ -21,6 +21,7 @@ import {
   type Result,
   type LocalLlmStatus,
   type AssistantResponseLength,
+  type AssistantScreenAccessMode,
   type AssistantSearchDepth,
   type ModelUnloadTimeout,
   type VisionCaptureTiming,
@@ -882,7 +883,11 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
     }
   };
 
-  const visionEnabled = settings?.assistant_screenshot_enabled ?? true;
+  const screenAccessMode = settings?.assistant_screen_access_mode ?? "manual";
+  const manualScreenAccess = screenAccessMode === "manual";
+  const screenAccessDescription = t(
+    `settings.assistant.vision.modes.descriptions.${screenAccessMode}`,
+  );
 
   // Cloud provider form (Provider → Base URL where needed → API key → Model),
   // per the §4.0 consistency contract. Shared shape with Dictation's AI-cleanup.
@@ -1607,16 +1612,38 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
         title={t("settings.assistant.vision.title")}
         icon={Monitor}
       >
-        <ToggleSwitch
-          checked={visionEnabled}
-          onChange={(checked) =>
-            setAndRefresh(commands.setAssistantScreenshotEnabled(checked))
-          }
-          label={t("settings.assistant.vision.enableLabel")}
-          info={t("settings.assistant.vision.enableDescription")}
+        <SettingContainer
+          title={t("settings.assistant.vision.modeLabel")}
+          info={screenAccessDescription}
+          layout="horizontal"
           grouped={true}
-        />
-        {visionEnabled && (
+        >
+          <Dropdown
+            options={[
+              {
+                value: "off",
+                label: t("settings.assistant.vision.modes.off"),
+              },
+              {
+                value: "manual",
+                label: t("settings.assistant.vision.modes.manual"),
+              },
+              {
+                value: "agent_decides",
+                label: t("settings.assistant.vision.modes.agentDecides"),
+              },
+            ]}
+            selectedValue={screenAccessMode}
+            onSelect={(mode) =>
+              setAndRefresh(
+                commands.setAssistantScreenAccessMode(
+                  mode as AssistantScreenAccessMode,
+                ),
+              )
+            }
+          />
+        </SettingContainer>
+        {manualScreenAccess && (
           <SettingContainer
             title={t("settings.assistant.vision.timing.label")}
             info={t("settings.assistant.vision.timing.description")}

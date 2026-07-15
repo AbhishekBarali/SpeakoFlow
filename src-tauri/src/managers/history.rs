@@ -925,6 +925,7 @@ mod tests {
             "INSERT INTO transcription_history (
                 file_name,
                 timestamp,
+
                 saved,
                 title,
                 transcription_text,
@@ -944,6 +945,54 @@ mod tests {
             ],
         )
         .expect("insert history entry");
+    }
+
+    #[test]
+    fn legacy_history_schema_migrates_to_current_baseline() {
+        let mut conn = Connection::open_in_memory().expect("open legacy database");
+        conn.execute_batch(
+            "CREATE TABLE transcription_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                file_name TEXT NOT NULL,
+                timestamp INTEGER NOT NULL,
+                saved BOOLEAN NOT NULL DEFAULT 0,
+                title TEXT NOT NULL,
+                transcription_text TEXT NOT NULL
+            );
+            INSERT INTO transcription_history (
+                file_name, timestamp, saved, title, transcription_text
+            ) VALUES ('legacy.wav', 10, 0, 'Legacy', 'hello');
+            PRAGMA user_version = 1;",
+        )
+        .expect("create legacy schema");
+
+        Migrations::new(MIGRATIONS.to_vec())
+            .to_latest(&mut conn)
+            .expect("migrate legacy schema");
+
+        let columns: Vec<String> = conn
+            .prepare("PRAGMA table_info(transcription_history)")
+            .expect("prepare table info")
+            .query_map([], |row| row.get(1))
+            .expect("query table info")
+            .collect::<rusqlite::Result<_>>()
+            .expect("collect columns");
+        for required in [
+            "post_processed_text",
+            "post_process_prompt",
+            "post_process_requested",
+        ] {
+            assert!(columns.iter().any(|column| column == required));
+        }
+
+        let requested: bool = conn
+            .query_row(
+                "SELECT post_process_requested FROM transcription_history WHERE file_name = 'legacy.wav'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("read migrated row");
+        assert!(!requested);
     }
 
     #[test]

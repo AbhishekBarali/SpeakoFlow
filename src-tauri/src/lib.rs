@@ -8,6 +8,7 @@ mod catalog;
 pub mod cli;
 mod clipboard;
 mod commands;
+mod flow;
 mod helpers;
 mod huggingface;
 mod input;
@@ -519,6 +520,9 @@ pub fn run(cli_args: CliArgs) {
             shortcut::change_auto_submit_key_setting,
             shortcut::get_post_process_readiness,
             shortcut::change_post_process_enabled_setting,
+            shortcut::change_flow_enabled_setting,
+            shortcut::change_flow_phrase_setting,
+            shortcut::change_flow_screen_access_setting,
             shortcut::change_post_process_tone_setting,
             shortcut::add_post_process_custom_tone,
             shortcut::update_post_process_custom_tone,
@@ -648,6 +652,7 @@ pub fn run(cli_args: CliArgs) {
             commands::assistant::assistant_generate_character,
             commands::assistant::assistant_restore_builtin_character,
             commands::assistant::assistant_restore_missing_builtins,
+            commands::assistant::set_assistant_screen_access_mode,
             commands::assistant::set_assistant_screenshot_enabled,
             commands::assistant::set_assistant_vision_capture_timing,
             commands::assistant::set_assistant_tts_enabled,
@@ -669,6 +674,7 @@ pub fn run(cli_args: CliArgs) {
             commands::assistant::set_assistant_panel_collapsed,
             commands::assistant::get_assistant_panel_collapsed,
             commands::assistant::set_assistant_screen_armed,
+            commands::assistant::get_assistant_screen_armed,
             commands::assistant::assistant_toggle_voice,
             commands::assistant::assistant_speak,
             commands::assistant::assistant_test_tts,

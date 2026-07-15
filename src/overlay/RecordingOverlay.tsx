@@ -7,7 +7,13 @@ import "./RecordingOverlay.css";
 import i18n, { syncLanguageFromSettings } from "@/i18n";
 import { getLanguageDirection } from "@/lib/utils/rtl";
 
-type OverlayState = "recording" | "transcribing" | "processing";
+type OverlayState =
+  | "recording"
+  | "transcribing"
+  | "processing"
+  | "generating"
+  | "vision"
+  | "notice";
 
 /** Payload of the untyped Rust "stream-text" event (live transcription). */
 type StreamTextPayload = { committed: string; tentative: string };
@@ -15,9 +21,15 @@ type StreamTextPayload = { committed: string; tentative: string };
 /**
  * Payload of the Rust "show-overlay" event. `streamingWindow` is true when the
  * opt-in live-transcription window is active (the overlay has been enlarged to
- * the readable card); false for the compact pill (the default).
+ * the readable card); false for the compact pill (the default). `notice`
+ * carries the i18n key suffix (under overlay.notices.*) for the brief "notice"
+ * state — e.g. why a Flow command wasn't generated.
  */
-type ShowOverlayPayload = { state: OverlayState; streamingWindow: boolean };
+type ShowOverlayPayload = {
+  state: OverlayState;
+  streamingWindow: boolean;
+  notice?: string;
+};
 
 /** Warm off-white that matches the editorial ink-on-dark palette. */
 const ICON_COLOR = "#f5f5f4";
@@ -26,6 +38,8 @@ const RecordingOverlay: React.FC = () => {
   const { t } = useTranslation();
   const [isVisible, setIsVisible] = useState(false);
   const [state, setState] = useState<OverlayState>("recording");
+  // i18n key suffix for the brief "notice" state (overlay.notices.*).
+  const [notice, setNotice] = useState<string | null>(null);
   const [locked, setLocked] = useState(false);
   const [levels, setLevels] = useState<number[]>([]);
   // Whether the mic has started delivering audio for this recording. Driven by
@@ -78,6 +92,7 @@ const RecordingOverlay: React.FC = () => {
           const payload = event.payload as ShowOverlayPayload;
           const overlayState = payload.state;
           setState(overlayState);
+          setNotice(payload.notice ?? null);
           // Whether to render the enlarged live-transcription card vs the
           // compact pill (opt-in; false by default).
           setStreamingWindow(payload.streamingWindow);
@@ -182,15 +197,24 @@ const RecordingOverlay: React.FC = () => {
   // terse (an icon, a state word, or just the waveform), so the full phrasing —
   // including the hands-free "press the hotkey again to stop" hint — lives here
   // on the aria-label for screen-reader users.
+  const busyLabel =
+    state === "transcribing"
+      ? t("overlay.transcribing")
+      : state === "generating"
+        ? t("overlay.generating")
+        : state === "vision"
+          ? t("overlay.vision")
+          : state === "notice"
+            ? t(`overlay.notices.${notice ?? "flowFailed"}`)
+            : t("overlay.processing");
+
   const ariaLabel = isRecording
     ? locked
       ? t("overlay.locked")
       : micLive
         ? t("overlay.recording", "Recording")
         : t("overlay.preparing")
-    : state === "transcribing"
-      ? t("overlay.transcribing")
-      : t("overlay.processing");
+    : busyLabel;
 
   // Terse label shown on the visible card chip. It never carries the verbose
   // hands-free hint (that lives only on `ariaLabel` above) — hands-free is now
@@ -202,9 +226,7 @@ const RecordingOverlay: React.FC = () => {
     ? micLive
       ? t("overlay.recording", "Recording")
       : t("overlay.preparing")
-    : state === "transcribing"
-      ? t("overlay.transcribing")
-      : t("overlay.processing");
+    : busyLabel;
 
   return (
     <div
@@ -319,6 +341,29 @@ const RecordingOverlay: React.FC = () => {
                   />
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Flow working states — generation can take a while and "looking at
+            your screen" must be unmistakable, so these carry a small text
+            label instead of the anonymous frozen waveform. */}
+          {(state === "generating" || state === "vision") && (
+            <div className="pill-wave">
+              <Loader2
+                className="load-spinner"
+                size={13}
+                strokeWidth={2.5}
+                color={ICON_COLOR}
+              />
+              <span className="pill-label">{visibleLabel}</span>
+            </div>
+          )}
+
+          {/* Brief notice (e.g. why a Flow command wasn't generated) — text
+            only, auto-hidden by the backend shortly after. */}
+          {state === "notice" && (
+            <div className="pill-wave">
+              <span className="pill-label">{visibleLabel}</span>
             </div>
           )}
 

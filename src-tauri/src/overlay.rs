@@ -1,7 +1,12 @@
 use crate::input;
 use crate::settings;
 use crate::settings::OverlayPosition;
+use std::sync::atomic::{AtomicU64, Ordering};
 use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize};
+
+/// Bumped on every overlay state change. The delayed hide behind a brief
+/// notice only fires when nothing newer (e.g. a fresh recording) replaced it.
+static OVERLAY_EPOCH: AtomicU64 = AtomicU64::new(0);
 
 #[cfg(not(target_os = "macos"))]
 use log::debug;
@@ -39,6 +44,11 @@ tauri_panel! {
 const OVERLAY_WIDTH: f64 = 128.0;
 const OVERLAY_HEIGHT: f64 = 40.0;
 
+// Labeled pill states (Flow generating / looking at the screen / a brief
+// notice) carry a short text line, so the transparent frame is widened; the
+// pill itself still hugs its content.
+const OVERLAY_LABEL_WIDTH: f64 = 260.0;
+
 // The opt-in live-transcription window (see `live_transcription_window_enabled`)
 // reuses this same overlay window, resized into a larger card so the running
 // committed + tentative transcript is readable during dictation. Mirrors
@@ -48,14 +58,18 @@ const OVERLAY_STREAM_WIDTH: f64 = 400.0;
 const OVERLAY_STREAM_HEIGHT: f64 = 120.0;
 
 /// Payload of the "show-overlay" event. Carries the visual `state`
-/// (recording / transcribing / processing) plus whether the larger
-/// live-transcription card should be rendered (`streaming_window`). Serialized
-/// camelCase so the overlay reads `event.payload.streamingWindow`.
+/// (recording / transcribing / processing / generating / vision / notice)
+/// plus whether the larger live-transcription card should be rendered
+/// (`streaming_window`). `notice` carries an i18n key suffix for the brief
+/// `notice` state (e.g. a Flow error). Serialized camelCase so the overlay
+/// reads `event.payload.streamingWindow`.
 #[derive(Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 struct ShowOverlayPayload {
     state: String,
     streaming_window: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    notice: Option<String>,
 }
 
 #[cfg(target_os = "macos")]
@@ -387,6 +401,11 @@ pub fn selected_model_supports_live(app: &AppHandle) -> bool {
 }
 
 fn show_overlay_state(app_handle: &AppHandle, state: &str) {
+    show_overlay_state_with_notice(app_handle, state, None);
+}
+
+fn show_overlay_state_with_notice(app_handle: &AppHandle, state: &str, notice: Option<String>) {
+    OVERLAY_EPOCH.fetch_add(1, Ordering::SeqCst);
     // Check if overlay should be shown based on position setting
     let settings = settings::get_settings(app_handle);
 
@@ -407,6 +426,8 @@ fn show_overlay_state(app_handle: &AppHandle, state: &str) {
 
     let (width, height) = if streaming_window {
         (OVERLAY_STREAM_WIDTH, OVERLAY_STREAM_HEIGHT)
+    } else if matches!(state, "generating" | "vision" | "notice") {
+        (OVERLAY_LABEL_WIDTH, OVERLAY_HEIGHT)
     } else {
         (OVERLAY_WIDTH, OVERLAY_HEIGHT)
     };
@@ -431,6 +452,7 @@ fn show_overlay_state(app_handle: &AppHandle, state: &str) {
             ShowOverlayPayload {
                 state: state.to_string(),
                 streaming_window,
+                notice,
             },
         );
     }
@@ -449,6 +471,32 @@ pub fn show_transcribing_overlay(app_handle: &AppHandle) {
 /// Shows the processing overlay window
 pub fn show_processing_overlay(app_handle: &AppHandle) {
     show_overlay_state(app_handle, "processing");
+}
+
+/// Shows the overlay in the "generating" state (Flow is writing).
+pub fn show_generating_overlay(app_handle: &AppHandle) {
+    show_overlay_state(app_handle, "generating");
+}
+
+/// Shows the overlay in the "vision" state (Flow is looking at the screen).
+pub fn show_vision_overlay(app_handle: &AppHandle) {
+    show_overlay_state(app_handle, "vision");
+}
+
+/// Shows a brief text notice on the overlay (e.g. a Flow error), then hides
+/// it after a short delay. `notice_key` is the i18n suffix under
+/// `overlay.notices.*` in the webview.
+pub fn show_overlay_notice(app_handle: &AppHandle, notice_key: &str) {
+    show_overlay_state_with_notice(app_handle, "notice", Some(notice_key.to_string()));
+    let epoch = OVERLAY_EPOCH.load(Ordering::SeqCst);
+    let app = app_handle.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(2600));
+        // Only hide if no newer overlay state replaced the notice meanwhile.
+        if OVERLAY_EPOCH.load(Ordering::SeqCst) == epoch {
+            hide_recording_overlay(&app);
+        }
+    });
 }
 
 /// Updates the overlay window position based on current settings, re-centering

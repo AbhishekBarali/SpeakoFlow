@@ -814,13 +814,14 @@ impl TranscriptionManager {
                             Some(normalized)
                         };
 
+                        let recognition_hints = recognition_words(&settings);
                         let params = WhisperInferenceParams {
                             language: whisper_language,
                             translate: settings.translate_to_english,
-                            initial_prompt: if settings.custom_words.is_empty() {
+                            initial_prompt: if recognition_hints.is_empty() {
                                 None
                             } else {
-                                Some(settings.custom_words.join(", "))
+                                Some(recognition_hints.join(", "))
                             },
                             ..Default::default()
                         };
@@ -963,10 +964,11 @@ impl TranscriptionManager {
             .map(|info| matches!(info.engine_type, EngineType::Whisper))
             .unwrap_or(false);
 
-        let corrected_result = if !settings.custom_words.is_empty() && !is_whisper {
+        let recognition_hints = recognition_words(&settings);
+        let corrected_result = if !recognition_hints.is_empty() && !is_whisper {
             apply_custom_words(
                 &result,
-                &settings.custom_words,
+                &recognition_hints,
                 settings.word_correction_threshold,
             )
         } else {
@@ -1488,12 +1490,9 @@ impl TranscriptionManager {
             .map(|info| matches!(info.engine_type, EngineType::Whisper))
             .unwrap_or(false);
 
-        let corrected = if !settings.custom_words.is_empty() && !is_whisper {
-            apply_custom_words(
-                &raw,
-                &settings.custom_words,
-                settings.word_correction_threshold,
-            )
+        let recognition_hints = recognition_words(&settings);
+        let corrected = if !recognition_hints.is_empty() && !is_whisper {
+            apply_custom_words(&raw, &recognition_hints, settings.word_correction_threshold)
         } else {
             raw
         };
@@ -1566,6 +1565,24 @@ fn transcribe_cpp_backend_options(
     }
 }
 
+/// The user's custom words plus temporary, session-only recognition hints.
+///
+/// When "Generate with Flow" is enabled, speech recognition should reliably
+/// hear the activation phrase and the app name — so both are appended as
+/// hints for this run only. They are never written into the user's persisted
+/// Custom Words list.
+pub fn recognition_words(settings: &crate::settings::AppSettings) -> Vec<String> {
+    let mut words = settings.custom_words.clone();
+    if settings.flow_enabled {
+        for hint in [settings.flow_phrase.trim(), "SpeakoFlow"] {
+            if !hint.is_empty() && !words.iter().any(|w| w.eq_ignore_ascii_case(hint)) {
+                words.push(hint.to_string());
+            }
+        }
+    }
+    words
+}
+
 /// Build transcribe.cpp `RunOptions` for a batch (or, later, streaming) run from
 /// the user settings and the loaded model's capabilities + architecture.
 ///
@@ -1617,11 +1634,13 @@ pub fn transcribe_cpp_run_plan(
             (Task::Transcribe, None)
         };
 
-    // Custom words → whisper initial prompt, whisper-arch only. Non-whisper
-    // families reject the run-slot extension and use fuzzy post-correction.
-    let family = if arch == "whisper" && !settings.custom_words.is_empty() {
+    // Custom words (+ session recognition hints) → whisper initial prompt,
+    // whisper-arch only. Non-whisper families reject the run-slot extension
+    // and use fuzzy post-correction.
+    let recognition_hints = recognition_words(settings);
+    let family = if arch == "whisper" && !recognition_hints.is_empty() {
         Some(RunExtension::Whisper(WhisperRunOptions {
-            initial_prompt: Some(settings.custom_words.join(", ")),
+            initial_prompt: Some(recognition_hints.join(", ")),
             ..Default::default()
         }))
     } else {

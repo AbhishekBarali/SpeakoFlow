@@ -6,6 +6,7 @@ import { SectionHeader } from "@/components/ui/SectionHeader";
 import { ModelsSettings } from "../models/ModelsSettings";
 import { DictationModelCard } from "./DictationModelCard";
 import { AiCleanupGroup } from "./AiCleanupGroup";
+import { GenerateWithFlowGroup } from "./GenerateWithFlowGroup";
 import { SpokenEmojiToggle } from "./SpokenEmojiToggle";
 import { ModelSettingsCard } from "../general/ModelSettingsCard";
 // Dictation-output rows: how transcribed text lands in the active app.
@@ -48,7 +49,7 @@ export const DictationSettings: React.FC = () => {
   }
 
   return (
-    <div className="max-w-3xl w-full mx-auto space-y-6">
+    <div className="w-full max-w-3xl mx-auto space-y-6">
       <SectionHeader
         title={t("sidebar.dictation")}
         description={t("sectionSubtitles.dictation")}
@@ -59,6 +60,8 @@ export const DictationSettings: React.FC = () => {
       <ModelSettingsCard />
 
       <AiCleanupGroup />
+
+      <GenerateWithFlowGroup />
 
       <SettingsGroup title={t("settings.dictation.output.title")}>
         <SpokenEmojiToggle grouped={true} />

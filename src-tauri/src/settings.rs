@@ -538,6 +538,19 @@ impl AssistantResponseLength {
     }
 }
 
+/// Controls who may initiate screen capture for assistant turns.
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum AssistantScreenAccessMode {
+    /// Screen capture is disabled.
+    Off,
+    /// The user explicitly attaches or requests each capture.
+    #[default]
+    Manual,
+    /// The assistant may decide when the current turn needs a capture.
+    AgentDecides,
+}
+
 /// When a screen capture is taken for an assistant turn.
 ///
 /// This only changes the timing for **voice** questions (where there's a real
@@ -976,6 +989,20 @@ pub struct AppSettings {
     pub post_process_selected_tone_id: Option<String>,
     #[serde(default = "default_post_process_timeout_secs")]
     pub post_process_timeout_secs: u32,
+    /// "Generate with Flow": when on, a dictation that begins with the
+    /// activation phrase becomes a one-shot AI generation command whose result
+    /// is pasted instead of the spoken words. Off by default.
+    #[serde(default)]
+    pub flow_enabled: bool,
+    /// The spoken activation phrase that triggers Flow at the start of a
+    /// normal dictation (matched case- and punctuation-insensitively).
+    #[serde(default = "default_flow_phrase")]
+    pub flow_phrase: String,
+    /// Whether Flow may use the `capture_screen` tool for a command that
+    /// clearly refers to the screen. Separate from the assistant's screen
+    /// access mode on purpose — the two features are permissioned independently.
+    #[serde(default)]
+    pub flow_screen_access: bool,
     #[serde(default)]
     pub mute_while_recording: bool,
     #[serde(default)]
@@ -1011,6 +1038,12 @@ pub struct AppSettings {
     pub assistant_models: HashMap<String, String>,
     #[serde(default = "default_assistant_system_prompt")]
     pub assistant_system_prompt: String,
+    /// Controls whether screen capture is off, user-triggered, or agent-decided.
+    #[serde(default)]
+    pub assistant_screen_access_mode: AssistantScreenAccessMode,
+    /// Compatibility mirror for code that still consumes the former boolean.
+    /// Derived from `assistant_screen_access_mode` whenever settings are repaired
+    /// or written: only `Off` maps to false.
     #[serde(default = "default_assistant_screenshot_enabled")]
     pub assistant_screenshot_enabled: bool,
     /// When a screen capture is taken for a voice turn (immediate vs at-send).
@@ -1276,6 +1309,11 @@ fn default_post_process_enabled() -> bool {
 /// transcription instead. Keeps a stalled LLM from ever holding up the paste.
 fn default_post_process_timeout_secs() -> u32 {
     10
+}
+
+/// Default spoken activation phrase for "Generate with Flow".
+fn default_flow_phrase() -> String {
+    "Hey Flow".to_string()
 }
 
 fn default_app_language() -> String {
@@ -1811,8 +1849,21 @@ fn default_web_search_api_keys() -> SecretMap {
     SecretMap(map)
 }
 
+fn sync_assistant_screen_access_compat(settings: &mut AppSettings) -> bool {
+    let screenshot_enabled = !matches!(
+        settings.assistant_screen_access_mode,
+        AssistantScreenAccessMode::Off
+    );
+    if settings.assistant_screenshot_enabled == screenshot_enabled {
+        return false;
+    }
+
+    settings.assistant_screenshot_enabled = screenshot_enabled;
+    true
+}
+
 fn ensure_assistant_defaults(settings: &mut AppSettings) -> bool {
-    let mut changed = false;
+    let mut changed = sync_assistant_screen_access_compat(settings);
     for provider in default_post_process_providers() {
         if !settings.assistant_models.contains_key(&provider.id) {
             settings
@@ -2294,6 +2345,9 @@ pub fn get_default_settings() -> AppSettings {
         post_process_custom_tones: Vec::new(),
         post_process_selected_tone_id: Some(DEFAULT_POST_PROCESS_TONE_ID.to_string()),
         post_process_timeout_secs: default_post_process_timeout_secs(),
+        flow_enabled: false,
+        flow_phrase: default_flow_phrase(),
+        flow_screen_access: false,
         mute_while_recording: false,
         append_trailing_space: false,
         app_language: default_app_language(),
@@ -2318,6 +2372,7 @@ pub fn get_default_settings() -> AppSettings {
             map
         },
         assistant_system_prompt: default_assistant_system_prompt(),
+        assistant_screen_access_mode: AssistantScreenAccessMode::default(),
         assistant_screenshot_enabled: default_assistant_screenshot_enabled(),
         assistant_vision_capture_timing: VisionCaptureTiming::default(),
         assistant_tts_enabled: false,
@@ -2927,12 +2982,55 @@ fn hydrate_secrets(settings: &mut AppSettings) {
     }
 }
 
+/// Normalizes settings JSON before deserializing the complete object.
+///
+/// Stores created before `assistant_screen_access_mode` only have the legacy
+/// boolean. Preserve an explicit mode, otherwise migrate false to `Off` and
+/// true (or a missing boolean) to the default `Manual` mode. The migration is
+/// deliberately idempotent so callers can safely apply it at every boundary.
+fn normalize_settings_json(mut raw: serde_json::Value) -> (serde_json::Value, bool) {
+    let Some(settings) = raw.as_object_mut() else {
+        return (raw, false);
+    };
+    if settings.contains_key("assistant_screen_access_mode") {
+        return (raw, false);
+    }
+
+    let mode = match settings
+        .get("assistant_screenshot_enabled")
+        .and_then(serde_json::Value::as_bool)
+    {
+        Some(false) => "off",
+        Some(true) | None => "manual",
+    };
+    settings.insert(
+        "assistant_screen_access_mode".to_string(),
+        serde_json::Value::String(mode.to_string()),
+    );
+    (raw, true)
+}
+
+fn deserialize_settings_value(raw: serde_json::Value) -> (AppSettings, bool) {
+    let (normalized, changed) = normalize_settings_json(raw);
+    match serde_json::from_value::<AppSettings>(normalized.clone()) {
+        Ok(settings) => (settings, changed),
+        Err(error) => {
+            warn!(
+                "Failed to parse stored settings ({}); salvaging valid fields",
+                error
+            );
+            (salvage_settings(&normalized), true)
+        }
+    }
+}
+
 /// Rebuilds settings from a store value that failed to deserialize as a whole.
 /// Every stored field that is individually valid is kept; only broken values
 /// (e.g. an enum variant written by a newer or older version, or a wrong-typed
 /// value) fall back to their default. This means one bad field can never reset
 /// the rest of the user's configuration (backport of Handy #1631).
 fn salvage_settings(stored: &serde_json::Value) -> AppSettings {
+    let (stored, _) = normalize_settings_json(stored.clone());
     let Some(stored_map) = stored.as_object() else {
         warn!("Stored settings are not a JSON object; falling back to defaults");
         return get_default_settings();
@@ -2983,20 +3081,8 @@ pub fn load_or_create_app_settings(app: &AppHandle) -> AppSettings {
         // Parse the entire settings object. On a whole-object parse failure,
         // salvage every individually-valid field instead of wiping the store
         // (Handy #1631) — one bad field must never reset the user's config.
-        let (mut settings, mut updated) =
-            match serde_json::from_value::<AppSettings>(settings_value.clone()) {
-                Ok(settings) => {
-                    debug!("Found existing settings: {:?}", settings);
-                    (settings, false)
-                }
-                Err(e) => {
-                    warn!(
-                        "Failed to parse stored settings ({}); salvaging valid fields",
-                        e
-                    );
-                    (salvage_settings(&settings_value), true)
-                }
-            };
+        let (mut settings, mut updated) = deserialize_settings_value(settings_value.clone());
+        debug!("Found existing settings: {:?}", settings);
 
         let default_settings = get_default_settings();
 
@@ -3149,28 +3235,16 @@ pub fn get_settings(app: &AppHandle) -> AppSettings {
         .store(crate::portable::store_path(SETTINGS_STORE_PATH))
         .expect("Failed to initialize store");
 
-    let mut settings = if let Some(settings_value) = store.get("settings") {
-        match serde_json::from_value::<AppSettings>(settings_value.clone()) {
-            Ok(settings) => settings,
-            Err(e) => {
-                // Salvage every individually-valid field instead of wiping the
-                // whole store on a parse failure (Handy #1631).
-                warn!(
-                    "Failed to parse stored settings ({}); salvaging valid fields",
-                    e
-                );
-                let salvaged = salvage_settings(&settings_value);
-                store.set("settings", serde_json::to_value(&salvaged).unwrap());
-                salvaged
-            }
-        }
+    let (mut settings, mut updated) = if let Some(settings_value) = store.get("settings") {
+        deserialize_settings_value(settings_value.clone())
     } else {
-        let default_settings = get_default_settings();
-        store.set("settings", serde_json::to_value(&default_settings).unwrap());
-        default_settings
+        (get_default_settings(), true)
     };
 
     if ensure_post_process_defaults(&mut settings) | ensure_assistant_defaults(&mut settings) {
+        updated = true;
+    }
+    if updated {
         store.set("settings", serde_json::to_value(&settings).unwrap());
     }
 
@@ -3192,6 +3266,10 @@ pub fn write_settings(app: &AppHandle, mut settings: AppSettings) {
     let store = app
         .store(crate::portable::store_path(SETTINGS_STORE_PATH))
         .expect("Failed to initialize store");
+
+    // The enum is the source of truth. Keep the former boolean synchronized for
+    // compatibility with capture paths that have not migrated yet.
+    sync_assistant_screen_access_compat(&mut settings);
 
     // Keep API keys in the OS keychain, never in the on-disk store. Each key is
     // blanked from the serialized copy only after the keychain confirms it holds
@@ -3235,6 +3313,167 @@ mod tests {
 
     fn default_settings_json() -> serde_json::Value {
         serde_json::to_value(get_default_settings()).unwrap()
+    }
+
+    #[test]
+    fn screen_access_normalization_migrates_legacy_true_false_and_missing() {
+        for (raw, expected_mode, expected_enabled) in [
+            (
+                serde_json::json!({ "assistant_screenshot_enabled": false }),
+                AssistantScreenAccessMode::Off,
+                false,
+            ),
+            (
+                serde_json::json!({ "assistant_screenshot_enabled": true }),
+                AssistantScreenAccessMode::Manual,
+                true,
+            ),
+            (
+                serde_json::json!({}),
+                AssistantScreenAccessMode::Manual,
+                true,
+            ),
+        ] {
+            let (normalized, changed) = normalize_settings_json(raw);
+            assert!(changed);
+            assert_eq!(
+                normalized["assistant_screen_access_mode"],
+                serde_json::to_value(expected_mode).unwrap()
+            );
+
+            let settings: AppSettings = serde_json::from_value(normalized).unwrap();
+            assert_eq!(settings.assistant_screen_access_mode, expected_mode);
+            assert_eq!(settings.assistant_screenshot_enabled, expected_enabled);
+        }
+    }
+
+    #[test]
+    fn startup_and_defensive_get_share_screen_mode_migration_boundary() {
+        for (raw, expected) in [
+            (
+                serde_json::json!({ "assistant_screenshot_enabled": false }),
+                AssistantScreenAccessMode::Off,
+            ),
+            (
+                serde_json::json!({ "assistant_screenshot_enabled": true }),
+                AssistantScreenAccessMode::Manual,
+            ),
+            (serde_json::json!({}), AssistantScreenAccessMode::Manual),
+        ] {
+            let (settings, updated) = deserialize_settings_value(raw);
+            assert!(updated);
+            assert_eq!(settings.assistant_screen_access_mode, expected);
+        }
+
+        let (agent, updated) = deserialize_settings_value(serde_json::json!({
+            "assistant_screen_access_mode": "agent_decides",
+            "assistant_screenshot_enabled": false
+        }));
+        assert!(!updated);
+        assert_eq!(
+            agent.assistant_screen_access_mode,
+            AssistantScreenAccessMode::AgentDecides
+        );
+
+        let (salvaged, updated) = deserialize_settings_value(serde_json::json!({
+            "assistant_screenshot_enabled": false,
+            "sound_theme": "invalid-neighbor"
+        }));
+        assert!(updated);
+        assert_eq!(
+            salvaged.assistant_screen_access_mode,
+            AssistantScreenAccessMode::Off
+        );
+    }
+
+    #[test]
+    fn screen_access_normalization_preserves_existing_agent_mode() {
+        let raw = serde_json::json!({
+            "assistant_screen_access_mode": "agent_decides",
+            "assistant_screenshot_enabled": false
+        });
+        let original = raw.clone();
+
+        let (normalized, changed) = normalize_settings_json(raw);
+        assert!(!changed);
+        assert_eq!(normalized, original);
+
+        let mut settings: AppSettings = serde_json::from_value(normalized).unwrap();
+        assert_eq!(
+            settings.assistant_screen_access_mode,
+            AssistantScreenAccessMode::AgentDecides
+        );
+        assert!(sync_assistant_screen_access_compat(&mut settings));
+        assert!(settings.assistant_screenshot_enabled);
+        assert_eq!(
+            settings.assistant_screen_access_mode,
+            AssistantScreenAccessMode::AgentDecides
+        );
+    }
+
+    #[test]
+    fn screen_access_normalization_is_idempotent() {
+        let raw = serde_json::json!({ "assistant_screenshot_enabled": false });
+        let (once, first_changed) = normalize_settings_json(raw);
+        let (twice, second_changed) = normalize_settings_json(once.clone());
+
+        assert!(first_changed);
+        assert!(!second_changed);
+        assert_eq!(twice, once);
+    }
+
+    #[test]
+    fn salvage_keeps_migrated_off_mode_when_neighboring_field_is_invalid() {
+        let raw = serde_json::json!({
+            "assistant_screenshot_enabled": false,
+            "selected_model": "keep-this-model",
+            "sound_theme": "theremin"
+        });
+        let (normalized, _) = normalize_settings_json(raw.clone());
+        assert!(serde_json::from_value::<AppSettings>(normalized).is_err());
+
+        let salvaged = salvage_settings(&raw);
+        assert_eq!(
+            salvaged.assistant_screen_access_mode,
+            AssistantScreenAccessMode::Off
+        );
+        assert!(!salvaged.assistant_screenshot_enabled);
+        assert_eq!(salvaged.selected_model, "keep-this-model");
+        assert_eq!(salvaged.sound_theme, default_sound_theme());
+    }
+
+    #[test]
+    fn unrelated_write_equivalent_round_trip_preserves_screen_access_mode() {
+        for (mode, expected_enabled) in [
+            (AssistantScreenAccessMode::Off, false),
+            (AssistantScreenAccessMode::Manual, true),
+            (AssistantScreenAccessMode::AgentDecides, true),
+        ] {
+            let mut settings = get_default_settings();
+            settings.assistant_screen_access_mode = mode;
+            settings.assistant_screenshot_enabled = !expected_enabled;
+            settings.history_limit = 37;
+
+            assert!(sync_assistant_screen_access_compat(&mut settings));
+            let serialized = serde_json::to_value(settings).unwrap();
+            let (normalized, changed) = normalize_settings_json(serialized);
+            assert!(!changed);
+
+            let round_trip: AppSettings = serde_json::from_value(normalized).unwrap();
+            assert_eq!(round_trip.assistant_screen_access_mode, mode);
+            assert_eq!(round_trip.assistant_screenshot_enabled, expected_enabled);
+            assert_eq!(round_trip.history_limit, 37);
+        }
+    }
+
+    #[test]
+    fn fresh_defaults_use_manual_screen_access() {
+        let settings = get_default_settings();
+        assert_eq!(
+            settings.assistant_screen_access_mode,
+            AssistantScreenAccessMode::Manual
+        );
+        assert!(settings.assistant_screenshot_enabled);
     }
 
     fn custom_prompt(id: &str, prompt: &str) -> LLMPrompt {
