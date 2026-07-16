@@ -266,25 +266,28 @@ const RecordingOverlay: React.FC = () => {
             </div>
           </div>
           <div className="card-body" ref={cardBodyRef}>
-            {hasLiveText ? (
-              <p className="card-text">
-                <span className="card-committed">{stream.committed}</span>
-                {stream.tentative ? (
-                  <span className="card-tentative">{stream.tentative}</span>
-                ) : null}
-              </p>
-            ) : isRecording ? (
-              <p className="card-text card-placeholder">
-                {t("overlay.listening", "Listening…")}
-              </p>
-            ) : (
-              /* Non-streaming (batch) model: no live text ever arrives, so once
+            {
+              hasLiveText ? (
+                <p className="card-text">
+                  <span className="card-committed">{stream.committed}</span>
+                  {stream.tentative ? (
+                    <span className="card-tentative">{stream.tentative}</span>
+                  ) : null}
+                </p>
+              ) : isRecording ? (
+                <p className="card-text card-placeholder">
+                  {t("overlay.listening", "Listening…")}
+                </p>
+              ) : state === "transcribing" || state === "processing" ? (
+                /* Non-streaming (batch) model: no live text ever arrives, so once
                  recording stops we drop the stale "Listening…" placeholder and
                  let the header's spinner + "Transcribing…" / "Processing…"
                  label carry the state — the card reads as busy, not frozen
                  (backport of Handy #1597). */
-              <p className="card-text card-placeholder">{visibleLabel}</p>
-            )}
+                <p className="card-text card-placeholder">{visibleLabel}</p>
+              ) : null /* generating/vision/notice: the header already says it —
+                        repeating it in the body reads as a glitch. */
+            }
           </div>
         </div>
       ) : (

@@ -43,7 +43,7 @@
     "general": "Shortcuts, your microphone, and how the app looks.",
     "dictation": "The model that turns your voice into text, and how it's cleaned up.",
     "assistant": "Set up the assistant, then tune its voice, screen vision, and web search.",
-    "history": "Your recent transcriptions and assistant chats, stored on this device.",
+    "history": "Your recent dictations, Flow generations, and assistant chats, stored on this device.",
     "about": "Version, app language, data locations, and credits.",
     "debug": "Diagnostics and developer tools."
   },
@@ -869,6 +869,8 @@
         "promptGroupTitle": "Cleanup prompt",
         "title": "Fix up my dictation with AI",
         "caption": "Experimental — tidies punctuation and filler after you dictate.",
+        "fixMisheardLabel": "Fix misheard words",
+        "fixMisheardDescription": "When a word is clearly wrong for the sentence — a homophone or a near-miss pronunciation — replace it with the word you meant. Helpful for accents; the AI only corrects when the intended word is obvious.",
         "info": "Runs a language model over your dictation to fix punctuation, remove filler words, and optionally adjust the tone. Applies to dictation only, on its own shortcut. It adds a short delay after you speak; if the model fails or times out, your raw text is used instead. Still in development."
       },
       "spokenEmoji": {
@@ -893,21 +895,31 @@
       "title": "History",
       "storage": {
         "title": "Recording storage",
-        "description": "These controls affect recordings only. Starred recordings are always kept. Assistant chats have separate storage."
+        "description": "These controls affect dictation and Flow recordings. Starred recordings are always kept. Assistant chats have separate storage."
       },
       "filters": {
         "label": "History type",
         "all": "All",
-        "recordings": "Recordings",
+        "recordings": "Dictations",
+        "flow": "Flow",
         "assistant": "Assistant chats"
       },
       "openFolder": "Open recordings folder",
       "loading": "Loading history…",
-      "empty": "Nothing here yet. Your recordings and assistant chats will appear here.",
-      "emptyRecordings": "No recordings yet.",
+      "empty": "Nothing here yet. Your dictations, Flow generations, and assistant chats will appear here.",
+      "emptyRecordings": "No dictations yet.",
+      "emptyFlow": "No Flow generations yet.",
       "emptyAssistant": "No assistant chats yet.",
-      "recordingLabel": "Recording",
+      "recordingLabel": "Dictation",
+      "flowLabel": "Flow",
+      "flowTranscriptLabel": "You said",
+      "originalTranscriptionLabel": "Original transcription",
+      "flowOutputLabel": "Flow output",
+      "finalTextLabel": "Final text",
+      "flowNoOutput": "No Flow output was generated.",
       "copyToClipboard": "Copy transcription to clipboard",
+      "copyFlowOutput": "Copy Flow output",
+      "copyFinalText": "Copy final text",
       "save": "Save transcription",
       "unsave": "Remove from saved",
       "delete": "Delete entry",
@@ -952,7 +964,7 @@
       },
       "historyLimit": {
         "title": "Recording limit",
-        "description": "Maximum unstarred recordings to keep. Starred recordings are always kept, and assistant chats are not counted.",
+        "description": "Maximum unstarred dictation and Flow recordings to keep. Starred recordings are always kept, and assistant chats are not counted.",
         "entries": "recordings"
       },
       "recordingRetention": {

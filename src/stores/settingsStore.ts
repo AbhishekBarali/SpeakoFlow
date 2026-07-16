@@ -195,6 +195,8 @@ const settingUpdaters: {
   history_limit: (value) => commands.updateHistoryLimit(value as number),
   post_process_enabled: (value) =>
     commands.changePostProcessEnabledSetting(value as boolean),
+  post_process_fix_misheard: (value) =>
+    commands.changePostProcessFixMisheardSetting(value as boolean),
   flow_enabled: (value) => commands.changeFlowEnabledSetting(value as boolean),
   flow_phrase: (value) => commands.changeFlowPhraseSetting(value as string),
   flow_screen_access: (value) =>

@@ -68,15 +68,16 @@ pub fn handle_shortcut_event(
         return;
     };
 
-    // Cancel binding: fires while recording OR while the assistant is
-    // generating an answer, so Esc can stop a reply mid-stream — not only a
-    // recording. Only on key-press.
+    // Cancel binding: fires while recording, while the assistant is generating
+    // an answer, OR while Flow is starting/generating, so Esc can stop every
+    // long-running voice operation after recording ends. Only on key-press.
     if base_id == "cancel" {
         let audio_manager = app.state::<Arc<AudioRecordingManager>>();
         let assistant_busy = app
             .try_state::<crate::assistant::AssistantConversation>()
             .map_or(false, |c| c.is_busy());
-        if is_pressed && (audio_manager.is_recording() || assistant_busy) {
+        let flow_busy = crate::flow::is_generation_active();
+        if is_pressed && (audio_manager.is_recording() || assistant_busy || flow_busy) {
             action.start(app, base_id, hotkey_string);
         }
         return;

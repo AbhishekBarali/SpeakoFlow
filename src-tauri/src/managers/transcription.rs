@@ -110,6 +110,10 @@ const MAX_QUEUED_FEED_FRAMES: usize = 1000;
 pub struct StreamRouter {
     open: Arc<AtomicBool>,
     tx: Mutex<Option<mpsc::Sender<StreamCmd>>>,
+    /// Monotonic stream session identity. Opening starts a fresh generation;
+    /// finalize/cancel invalidates it immediately so queued old audio cannot
+    /// affect a later recording's Flow prewarm watcher.
+    generation: AtomicU64,
     /// Number of `Feed` frames enqueued but not yet consumed by the worker.
     /// Gates `feed()` so the channel can never grow past
     /// [`MAX_QUEUED_FEED_FRAMES`]. Reset to 0 on each [`open`](Self::open).
@@ -125,6 +129,7 @@ impl StreamRouter {
         Self {
             open: Arc::new(AtomicBool::new(false)),
             tx: Mutex::new(None),
+            generation: AtomicU64::new(0),
             queued: AtomicUsize::new(0),
             dropped: AtomicU64::new(0),
         }
@@ -197,23 +202,30 @@ impl StreamRouter {
     }
 
     /// Install a fresh FIFO command channel and mark the router open, returning
-    /// the receiver for the worker thread. Resets the backlog/drop counters so
-    /// each session starts clean.
-    fn open(&self) -> mpsc::Receiver<StreamCmd> {
+    /// the receiver and generation token for the worker thread. Resets the
+    /// backlog/drop counters so each session starts clean.
+    fn open(&self) -> (mpsc::Receiver<StreamCmd>, u64) {
         let (tx, rx) = mpsc::channel();
         self.queued.store(0, Ordering::Relaxed);
         self.dropped.store(0, Ordering::Relaxed);
         *self.tx.lock().unwrap() = Some(tx);
-        self.open.store(true, Ordering::Relaxed);
-        rx
+        let generation = self.generation.fetch_add(1, Ordering::AcqRel) + 1;
+        self.open.store(true, Ordering::Release);
+        (rx, generation)
     }
 
     /// Stop accepting new frames and take the sender so the caller can push a
     /// terminal Finalize/Cancel through the same channel (after all buffered
-    /// frames have been enqueued).
+    /// frames have been enqueued). Invalidates the worker immediately so stale
+    /// queued transcript events cannot affect the next recording.
     fn take(&self) -> Option<mpsc::Sender<StreamCmd>> {
-        self.open.store(false, Ordering::Relaxed);
+        self.open.store(false, Ordering::Release);
+        self.generation.fetch_add(1, Ordering::AcqRel);
         self.tx.lock().unwrap().take()
+    }
+
+    fn is_generation_current(&self, generation: u64) -> bool {
+        self.open.load(Ordering::Acquire) && self.generation.load(Ordering::Acquire) == generation
     }
 
     /// Mark closed and drop any channel (defensive cleanup on worker exit).
@@ -814,7 +826,7 @@ impl TranscriptionManager {
                             Some(normalized)
                         };
 
-                        let recognition_hints = recognition_words(&settings);
+                        let recognition_hints = recognition_prompt_words(&settings);
                         let params = WhisperInferenceParams {
                             language: whisper_language,
                             translate: settings.translate_to_english,
@@ -1031,10 +1043,10 @@ impl TranscriptionManager {
             warn!("Live transcription stream already open; ignoring start_stream()");
             return;
         }
-        let rx = self.stream_router.open();
+        let (rx, stream_generation) = self.stream_router.open();
         let this = self.clone();
         thread::spawn(move || {
-            this.run_stream_worker(rx);
+            this.run_stream_worker(rx, stream_generation);
         });
     }
 
@@ -1053,7 +1065,7 @@ impl TranscriptionManager {
     ///   `finalize_stream()` routes to the batch `transcribe()` path.
     ///
     /// Always returns the leased engine to the mutex before replying.
-    fn run_stream_worker(&self, rx: mpsc::Receiver<StreamCmd>) {
+    fn run_stream_worker(&self, rx: mpsc::Receiver<StreamCmd>, stream_generation: u64) {
         // Wait for any in-progress model load to finish (mirrors transcribe()).
         {
             let mut is_loading = self.is_loading.lock().unwrap();
@@ -1141,6 +1153,19 @@ impl TranscriptionManager {
                 let caps = session.model().capabilities();
                 let arch = session.model().arch();
                 let run_opts = transcribe_cpp_run_plan(&settings, &caps, &arch);
+                // Live-display correction: whisper-family already biases its
+                // decoding via the initial prompt, so only non-whisper models
+                // get the fuzzy display pass (same rule as the final text).
+                let live_hints = if arch == "whisper" {
+                    Vec::new()
+                } else {
+                    recognition_words(&settings)
+                };
+                let live_threshold = settings.word_correction_threshold;
+                let live_phrase = settings
+                    .flow_enabled
+                    .then(|| settings.flow_phrase.trim().to_string())
+                    .filter(|p| !p.is_empty());
                 let stream_opts = transcribe_cpp::StreamOptions {
                     commit_policy: transcribe_cpp::CommitPolicy::Auto,
                     ..Default::default()
@@ -1166,10 +1191,28 @@ impl TranscriptionManager {
                                             Ok(upd) => {
                                                 if upd.committed_changed || upd.tentative_changed {
                                                     let text = stream.text();
+                                                    let display = correct_live_display(
+                                                        &text.committed,
+                                                        &live_hints,
+                                                        live_threshold,
+                                                        live_phrase.as_deref(),
+                                                    );
+                                                    // Flow watches the live text
+                                                    // for its activation phrase
+                                                    // (early local-model prewarm).
+                                                    if self
+                                                        .stream_router
+                                                        .is_generation_current(stream_generation)
+                                                    {
+                                                        crate::flow::note_live_transcript(
+                                                            &self.app_handle,
+                                                            &display,
+                                                        );
+                                                    }
                                                     let _ = self.app_handle.emit(
                                                         "stream-text",
                                                         StreamTextPayload {
-                                                            committed: text.committed,
+                                                            committed: display,
                                                             tentative: text.tentative,
                                                         },
                                                     );
@@ -1204,7 +1247,12 @@ impl TranscriptionManager {
                                             let _ = self.app_handle.emit(
                                                 "stream-text",
                                                 StreamTextPayload {
-                                                    committed: text.committed.clone(),
+                                                    committed: correct_live_display(
+                                                        &text.committed,
+                                                        &live_hints,
+                                                        live_threshold,
+                                                        live_phrase.as_deref(),
+                                                    ),
                                                     tentative: text.tentative.clone(),
                                                 },
                                             );
@@ -1309,6 +1357,17 @@ impl TranscriptionManager {
                 let mut transcriber = VadChunked::new(vad, config, options);
 
                 // Resolve the leased engine variant to a &mut dyn SpeechModel.
+                // (Live-display hints computed first — `model` borrows `engine`.)
+                let live_hints = if matches!(engine, LoadedEngine::Whisper(_)) {
+                    Vec::new()
+                } else {
+                    recognition_words(&settings)
+                };
+                let live_threshold = settings.word_correction_threshold;
+                let live_phrase = settings
+                    .flow_enabled
+                    .then(|| settings.flow_phrase.trim().to_string())
+                    .filter(|p| !p.is_empty());
                 let model: &mut dyn SpeechModel = match engine {
                     LoadedEngine::Whisper(e) => e,
                     LoadedEngine::Parakeet(e) => e,
@@ -1344,10 +1403,27 @@ impl TranscriptionManager {
                                         committed.push_str(t);
                                     }
                                     if had_new {
+                                        let display = correct_live_display(
+                                            &committed,
+                                            &live_hints,
+                                            live_threshold,
+                                            live_phrase.as_deref(),
+                                        );
+                                        // Flow watches the live text for its
+                                        // activation phrase (early prewarm).
+                                        if self
+                                            .stream_router
+                                            .is_generation_current(stream_generation)
+                                        {
+                                            crate::flow::note_live_transcript(
+                                                &self.app_handle,
+                                                &display,
+                                            );
+                                        }
                                         let _ = self.app_handle.emit(
                                             "stream-text",
                                             StreamTextPayload {
-                                                committed: committed.clone(),
+                                                committed: display,
                                                 tentative: String::new(),
                                             },
                                         );
@@ -1565,22 +1641,64 @@ fn transcribe_cpp_backend_options(
     }
 }
 
-/// The user's custom words plus temporary, session-only recognition hints.
+/// The user's custom words plus safe temporary correction hints.
 ///
-/// When "Generate with Flow" is enabled, speech recognition should reliably
-/// hear the activation phrase and the app name — so both are appended as
-/// hints for this run only. They are never written into the user's persisted
-/// Custom Words list.
+/// The app name is distinctive enough for fuzzy correction. The Flow activation
+/// phrase is deliberately excluded here: correction runs over the whole
+/// transcript, so including "Hey Flow" could rewrite ordinary mid-sentence
+/// speech such as "hey flaw". Flow's leading-phrase matcher handles recognition
+/// near-misses independently.
 pub fn recognition_words(settings: &crate::settings::AppSettings) -> Vec<String> {
     let mut words = settings.custom_words.clone();
-    if settings.flow_enabled {
-        for hint in [settings.flow_phrase.trim(), "SpeakoFlow"] {
-            if !hint.is_empty() && !words.iter().any(|w| w.eq_ignore_ascii_case(hint)) {
-                words.push(hint.to_string());
-            }
-        }
+    if settings.flow_enabled
+        && !words
+            .iter()
+            .any(|word| word.eq_ignore_ascii_case("SpeakoFlow"))
+    {
+        words.push("SpeakoFlow".to_string());
     }
     words
+}
+
+/// Decoder-only prompts can safely include the full activation phrase because
+/// they bias recognition without rewriting text after the fact. Used only by
+/// Whisper-family engines that support an initial prompt.
+fn recognition_prompt_words(settings: &crate::settings::AppSettings) -> Vec<String> {
+    let mut words = recognition_words(settings);
+    let phrase = settings.flow_phrase.trim();
+    if settings.flow_enabled
+        && !phrase.is_empty()
+        && !words.iter().any(|word| word.eq_ignore_ascii_case(phrase))
+    {
+        words.push(phrase.to_string());
+    }
+    words
+}
+
+/// Cosmetic pass for the LIVE overlay text: the same safe custom-word /
+/// recognition-hint correction the final transcript receives, plus — when
+/// Flow is on — an exact rewrite of the leading activation phrase to its
+/// configured spelling ("Hey Flo," reads as "Hey Flow," while still
+/// speaking). Display-only; the final transcript is corrected independently
+/// on finalize. The phrase rewrite is surgical (byte-range replacement), so
+/// unlike fuzzy n-gram hints it can never absorb neighboring words.
+fn correct_live_display(
+    text: &str,
+    hints: &[String],
+    threshold: f64,
+    flow_phrase: Option<&str>,
+) -> String {
+    let mut out = if text.is_empty() || hints.is_empty() {
+        text.to_string()
+    } else {
+        apply_custom_words(text, hints, threshold)
+    };
+    if let Some(phrase) = flow_phrase {
+        if let Some(fixed) = crate::flow::canonicalize_leading_phrase(&out, phrase) {
+            out = fixed;
+        }
+    }
+    out
 }
 
 /// Build transcribe.cpp `RunOptions` for a batch (or, later, streaming) run from
@@ -1637,7 +1755,7 @@ pub fn transcribe_cpp_run_plan(
     // Custom words (+ session recognition hints) → whisper initial prompt,
     // whisper-arch only. Non-whisper families reject the run-slot extension
     // and use fuzzy post-correction.
-    let recognition_hints = recognition_words(settings);
+    let recognition_hints = recognition_prompt_words(settings);
     let family = if arch == "whisper" && !recognition_hints.is_empty() {
         Some(RunExtension::Whisper(WhisperRunOptions {
             initial_prompt: Some(recognition_hints.join(", ")),
@@ -1903,8 +2021,9 @@ mod tests {
 
         // Open a session and deliberately keep the receiver unread so the
         // "worker" never consumes — the worst case (a hung/overloaded engine).
-        let _rx = router.open();
+        let (_rx, generation) = router.open();
         assert!(router.is_open());
+        assert!(router.is_generation_current(generation));
 
         // Feed well past the cap; the in-flight queue must clamp at the cap.
         let overshoot = 500usize;
@@ -1935,6 +2054,9 @@ mod tests {
             router.queued.load(Ordering::Relaxed),
             MAX_QUEUED_FEED_FRAMES - 9
         );
+
+        let _tx = router.take();
+        assert!(!router.is_generation_current(generation));
 
         // note_feed_consumed must saturate at zero, never underflow.
         let router2 = StreamRouter::new();
@@ -2055,6 +2177,29 @@ mod tests {
         // non-whisper families reject it → no extension (fuzzy post-correction)
         let plan_p = transcribe_cpp_run_plan(&s, &caps(&["en"], false), "parakeet");
         assert!(plan_p.family.is_none());
+    }
+
+    #[test]
+    fn flow_recognition_hints_do_not_rewrite_ordinary_words() {
+        let mut settings = crate::settings::get_default_settings();
+        settings.flow_enabled = true;
+        settings.flow_phrase = "Hey Flow".to_string();
+
+        let correction_hints = recognition_words(&settings);
+        assert!(correction_hints.iter().any(|hint| hint == "SpeakoFlow"));
+        assert!(!correction_hints.iter().any(|hint| hint == "Hey Flow"));
+        assert!(!correction_hints.iter().any(|hint| hint == "Flow"));
+        assert_eq!(
+            apply_custom_words(
+                "I said hey flaw yesterday.",
+                &correction_hints,
+                settings.word_correction_threshold
+            ),
+            "I said hey flaw yesterday."
+        );
+
+        let decoder_hints = recognition_prompt_words(&settings);
+        assert!(decoder_hints.iter().any(|hint| hint == "Hey Flow"));
     }
 
     #[test]

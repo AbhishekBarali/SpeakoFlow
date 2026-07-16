@@ -995,6 +995,19 @@ pub fn change_flow_enabled_setting(app: AppHandle, enabled: bool) -> Result<(), 
     Ok(())
 }
 
+/// Toggle the opt-in cleanup behavior that repairs clearly misheard words.
+#[tauri::command]
+#[specta::specta]
+pub fn change_post_process_fix_misheard_setting(
+    app: AppHandle,
+    enabled: bool,
+) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    settings.post_process_fix_misheard = enabled;
+    settings::write_settings(&app, settings);
+    Ok(())
+}
+
 /// Change the Flow activation phrase. An empty phrase resets to the default
 /// ("Hey Flow") so Flow can never end up in an untriggerable state.
 #[tauri::command]

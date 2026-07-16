@@ -247,6 +247,17 @@ async changePostProcessEnabledSetting(enabled: boolean) : Promise<Result<null, s
 }
 },
 /**
+ * Toggle the opt-in cleanup behavior that repairs clearly misheard words.
+ */
+async changePostProcessFixMisheardSetting(enabled: boolean) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("change_post_process_fix_misheard_setting", { enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * Toggle "Generate with Flow" (the spoken activation-phrase generation path).
  */
 async changeFlowEnabledSetting(enabled: boolean) : Promise<Result<null, string>> {
@@ -2158,6 +2169,13 @@ post_process_custom_tones?: CustomPostProcessTone[];
  * old stores can migrate from `post_process_tone` without losing choice.
  */
 post_process_selected_tone_id?: string | null; post_process_timeout_secs?: number; 
+/**
+ * Opt-in AI-cleanup behavior: actively repair words the speech-to-text
+ * clearly misheard (homophones, near-miss pronunciations, nonsense words
+ * where a specific word obviously belongs). Off by default because it
+ * gives the model license to guess; useful for non-native speakers.
+ */
+post_process_fix_misheard?: boolean; 
 /**
  * "Generate with Flow": when on, a dictation that begins with the
  * activation phrase becomes a one-shot AI generation command whose result

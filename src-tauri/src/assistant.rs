@@ -2231,6 +2231,8 @@ pub async fn run_assistant_turn(
                     msgs.clone(),
                     tools.clone(),
                     tool_choice,
+                    None,
+                    None,
                     move |token| {
                         if let Ok(mut buf) = po.lock() {
                             buf.push_str(token);
@@ -2365,6 +2367,8 @@ pub async fn run_assistant_turn(
             api_key.clone(),
             &request_model,
             messages,
+            None,
+            None,
             move |token| {
                 if let Ok(mut buf) = partial_cb.lock() {
                     buf.push_str(token);
@@ -2645,13 +2649,20 @@ pub async fn run_summarize_turn(app: AppHandle) {
     let partial = Arc::new(Mutex::new(String::new()));
     let partial_cb = partial.clone();
     let app_for_tokens = app.clone();
-    let stream_fut =
-        llm_client::send_chat_stream(&provider, api_key, &model, messages, move |token| {
+    let stream_fut = llm_client::send_chat_stream(
+        &provider,
+        api_key,
+        &model,
+        messages,
+        None,
+        None,
+        move |token| {
             if let Ok(mut buf) = partial_cb.lock() {
                 buf.push_str(token);
             }
             let _ = app_for_tokens.emit("assistant-token", token.to_string());
-        });
+        },
+    );
     tokio::pin!(stream_fut);
 
     let outcome = tokio::select! {

@@ -869,7 +869,9 @@
         "caption": "Experimental — tidies punctuation and filler after you dictate.",
         "info": "Runs a language model over your dictation to fix punctuation, remove filler words, and optionally adjust the tone. Applies to dictation only, on its own shortcut. It adds a short delay after you speak; if the model fails or times out, your raw text is used instead. Still in development.",
         "styleGroupTitle": "Writing style",
-        "styleGroupDescription": "Choose a built-in style or save your own rules for how cleaned dictation should sound."
+        "styleGroupDescription": "Choose a built-in style or save your own rules for how cleaned dictation should sound.",
+        "fixMisheardLabel": "Fix misheard words",
+        "fixMisheardDescription": "When a word is clearly wrong for the sentence — a homophone or a near-miss pronunciation — replace it with the word you meant. Helpful for accents; the AI only corrects when the intended word is obvious."
       },
       "spokenEmoji": {
         "title": "الرموز التعبيرية المنطوقة",
@@ -877,6 +879,16 @@
       },
       "output": {
         "title": "Output options"
+      },
+      "flow": {
+        "groupTitle": "Generate with Flow",
+        "enableLabel": "Generate with Flow",
+        "enableDescription": "Start a dictation with the activation phrase to have AI write the result for you — “Hey Flow, write a polite email asking to reschedule” pastes the finished email.",
+        "phraseLabel": "Activation phrase",
+        "phraseDescription": "Flow activates only when a dictation begins with this phrase. Anywhere else, the same words paste as normal dictation. Uses your assistant's model; leave empty to reset to “Hey Flow”.",
+        "phrasePlaceholder": "Hey Flow",
+        "screenLabel": "Allow screen access",
+        "screenDescription": "Let Flow take one screenshot when a command clearly refers to your screen, like “look at this email and draft a reply”. The model decides if it's needed. Separate from the assistant's screen access."
       }
     },
     "history": {
@@ -889,14 +901,24 @@
         "label": "History type",
         "all": "All",
         "recordings": "Recordings",
+        "flow": "Flow",
         "assistant": "Assistant chats"
       },
       "openFolder": "فتح مجلد التسجيلات",
       "loading": "...جاري تحميل السجل",
       "empty": "!لا يوجد تفريغ صوتي بعد. ابدأ التسجيل لبناء سجلك",
       "emptyRecordings": "No recordings yet.",
+      "emptyFlow": "No Flow generations yet.",
       "emptyAssistant": "No assistant chats yet.",
       "recordingLabel": "Recording",
+      "flowLabel": "Flow",
+      "flowTranscriptLabel": "You said",
+      "originalTranscriptionLabel": "Original transcription",
+      "flowOutputLabel": "Flow output",
+      "finalTextLabel": "Final text",
+      "flowNoOutput": "No Flow output was generated.",
+      "copyFlowOutput": "Copy Flow output",
+      "copyFinalText": "Copy final text",
       "copyToClipboard": "نسخ التفريغ إلى الحافظة",
       "save": "حفظ التفريغ",
       "unsave": "إزالة من المحفوظات",
@@ -1437,7 +1459,14 @@
     "locked": "Recording hands-free — press the hotkey again to stop",
     "cancel": "Cancel",
     "done": "Done",
-    "askAssistant": "Ask the assistant instead of typing this"
+    "askAssistant": "Ask the assistant instead of typing this",
+    "generating": "Writing with Flow…",
+    "vision": "Looking at your screen…",
+    "notices": {
+      "flowNotConfigured": "Flow needs an assistant model — pasted as dictation",
+      "flowFailed": "Flow couldn't generate — nothing was pasted",
+      "flowEmpty": "Say a command after the activation phrase"
+    }
   },
   "assistant": {
     "title": "Assistant",

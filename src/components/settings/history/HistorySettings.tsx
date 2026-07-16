@@ -20,6 +20,7 @@ import {
   MessageSquarePlus,
   Mic,
   RotateCcw,
+  Sparkles,
   Star,
   Trash2,
 } from "lucide-react";
@@ -48,6 +49,13 @@ import { HistoryLimit } from "../HistoryLimit";
 const SCREENSHOT_MARKER = "[screenshot attached]";
 const IMAGE_MARKER = "[image attached]";
 const FILE_MARKER_PREFIX = "[file attached:";
+
+/** Stable marker written by src-tauri/src/flow.rs. Existing successful Flow
+ *  rows already carry this value, so they appear in the new filter too. */
+const FLOW_HISTORY_MARKER = "Generate with Flow";
+
+const isFlowHistoryEntry = (entry: HistoryEntry): boolean =>
+  entry.post_process_prompt === FLOW_HISTORY_MARKER;
 
 /** Strip the attachment markers the backend appends to stored user messages,
  *  returning the clean text plus what rode along (screen capture / files). */
@@ -256,7 +264,7 @@ type FeedItem =
   | { kind: "transcription"; sortTime: number; entry: HistoryEntry }
   | { kind: "assistant"; sortTime: number; session: AssistantHistoryEntry };
 
-type HistoryFilter = "all" | "recordings" | "assistant";
+type HistoryFilter = "all" | "recordings" | "flow" | "assistant";
 
 export const HistorySettings: React.FC = () => {
   const { t } = useTranslation();
@@ -562,7 +570,16 @@ export const HistorySettings: React.FC = () => {
   const filteredFeed = useMemo(
     () =>
       feed.filter((item) => {
-        if (filter === "recordings") return item.kind === "transcription";
+        if (filter === "recordings") {
+          return (
+            item.kind === "transcription" && !isFlowHistoryEntry(item.entry)
+          );
+        }
+        if (filter === "flow") {
+          return (
+            item.kind === "transcription" && isFlowHistoryEntry(item.entry)
+          );
+        }
         if (filter === "assistant") return item.kind === "assistant";
         return true;
       }),
@@ -581,9 +598,11 @@ export const HistorySettings: React.FC = () => {
     const emptyKey =
       filter === "recordings"
         ? "settings.history.emptyRecordings"
-        : filter === "assistant"
-          ? "settings.history.emptyAssistant"
-          : "settings.history.empty";
+        : filter === "flow"
+          ? "settings.history.emptyFlow"
+          : filter === "assistant"
+            ? "settings.history.emptyAssistant"
+            : "settings.history.empty";
     content = (
       <div className="px-4 py-8 text-center text-sm text-muted">
         {t(emptyKey)}
@@ -600,7 +619,11 @@ export const HistorySettings: React.FC = () => {
                 entry={item.entry}
                 onToggleSaved={() => toggleSaved(item.entry.id)}
                 onCopyText={() =>
-                  copyToClipboard(item.entry.transcription_text)
+                  copyToClipboard(
+                    item.entry.post_processed_text?.trim()
+                      ? item.entry.post_processed_text
+                      : item.entry.transcription_text,
+                  )
                 }
                 getAudioUrl={getAudioUrl}
                 deleteAudio={deleteAudioEntry}
@@ -656,6 +679,7 @@ export const HistorySettings: React.FC = () => {
               [
                 ["all", "settings.history.filters.all"],
                 ["recordings", "settings.history.filters.recordings"],
+                ["flow", "settings.history.filters.flow"],
                 ["assistant", "settings.history.filters.assistant"],
               ] as const
             ).map(([value, labelKey]) => (
@@ -709,6 +733,19 @@ const HistoryEntryComponent: React.FC<HistoryEntryProps> = ({
   const [retrying, setRetrying] = useState(false);
 
   const hasTranscription = entry.transcription_text.trim().length > 0;
+  const flowEntry = isFlowHistoryEntry(entry);
+  const processedText = entry.post_processed_text?.trim()
+    ? entry.post_processed_text
+    : null;
+  const hasDistinctProcessedText =
+    processedText !== null &&
+    processedText.trim() !== entry.transcription_text.trim();
+  const secondaryText = flowEntry
+    ? processedText
+    : hasDistinctProcessedText
+      ? processedText
+      : null;
+  const hasCopyableText = hasTranscription || secondaryText !== null;
 
   const handleLoadAudio = useCallback(
     () => getAudioUrl(entry.file_name),
@@ -716,7 +753,7 @@ const HistoryEntryComponent: React.FC<HistoryEntryProps> = ({
   );
 
   const handleCopyText = () => {
-    if (!hasTranscription) {
+    if (!hasCopyableText) {
       return;
     }
 
@@ -750,21 +787,19 @@ const HistoryEntryComponent: React.FC<HistoryEntryProps> = ({
 
   return (
     <div className="group px-4 py-3.5 flex flex-col gap-1.5">
-      {/* Transcript first — the content is the entry. */}
-      <p
-        className={`text-[13px] leading-relaxed ${
-          retrying
-            ? ""
-            : hasTranscription
-              ? "text-ink select-text cursor-text whitespace-pre-wrap break-words"
-              : "text-muted-soft"
-        }`}
-        style={
-          retrying
-            ? { animation: "transcribe-pulse 3s ease-in-out infinite" }
-            : undefined
-        }
-      >
+      {/* A Flow row is intentionally two-part: what speech recognition heard
+          first, then the exact generated text that was pasted. AI-cleaned
+          dictation uses the same pattern for original vs final text. */}
+      <div className="space-y-2.5">
+        {(flowEntry || secondaryText) && (
+          <div className="text-[11px] font-medium text-muted">
+            {t(
+              flowEntry
+                ? "settings.history.flowTranscriptLabel"
+                : "settings.history.originalTranscriptionLabel",
+            )}
+          </div>
+        )}
         {retrying && (
           <style>{`
             @keyframes transcribe-pulse {
@@ -773,19 +808,63 @@ const HistoryEntryComponent: React.FC<HistoryEntryProps> = ({
             }
           `}</style>
         )}
-        {retrying
-          ? t("settings.history.transcribing")
-          : hasTranscription
-            ? entry.transcription_text
-            : t("settings.history.transcriptionFailed")}
-      </p>
+        <p
+          className={`text-[13px] leading-relaxed ${
+            retrying
+              ? ""
+              : hasTranscription
+                ? "text-ink select-text cursor-text whitespace-pre-wrap break-words"
+                : "text-muted-soft"
+          }`}
+          style={
+            retrying
+              ? { animation: "transcribe-pulse 3s ease-in-out infinite" }
+              : undefined
+          }
+        >
+          {retrying
+            ? t("settings.history.transcribing")
+            : hasTranscription
+              ? entry.transcription_text
+              : t("settings.history.transcriptionFailed")}
+        </p>
+
+        {secondaryText ? (
+          <div className="rounded-lg border border-hairline bg-surface-strong/55 px-3 py-2.5">
+            <div className="mb-1 inline-flex items-center gap-1.5 text-[11px] font-medium text-muted">
+              <Sparkles width={11} height={11} />
+              {t(
+                flowEntry
+                  ? "settings.history.flowOutputLabel"
+                  : "settings.history.finalTextLabel",
+              )}
+            </div>
+            <p className="select-text whitespace-pre-wrap break-words text-[13px] leading-relaxed text-ink">
+              {secondaryText}
+            </p>
+          </div>
+        ) : flowEntry ? (
+          <div className="inline-flex items-center gap-1.5 rounded-lg border border-hairline bg-surface-strong/40 px-3 py-2 text-xs text-muted">
+            <Sparkles width={11} height={11} />
+            {t("settings.history.flowNoOutput")}
+          </div>
+        ) : null}
+      </div>
 
       {/* Meta row — quiet caption on the left, actions surface on hover. */}
       <div className="flex items-center justify-between gap-3">
         <span className="inline-flex shrink-0 items-center gap-1.5 text-xs text-muted">
           <span className="inline-flex items-center gap-1 font-medium text-ink/75">
-            <Mic width={11} height={11} />
-            {t("settings.history.recordingLabel")}
+            {flowEntry ? (
+              <Sparkles width={11} height={11} />
+            ) : (
+              <Mic width={11} height={11} />
+            )}
+            {t(
+              flowEntry
+                ? "settings.history.flowLabel"
+                : "settings.history.recordingLabel",
+            )}
           </span>
           <span aria-hidden="true" className="text-muted-soft">
             ·
@@ -795,8 +874,14 @@ const HistoryEntryComponent: React.FC<HistoryEntryProps> = ({
         <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-150">
           <IconButton
             onClick={handleCopyText}
-            disabled={!hasTranscription || retrying}
-            title={t("settings.history.copyToClipboard")}
+            disabled={!hasCopyableText || retrying}
+            title={t(
+              flowEntry && secondaryText
+                ? "settings.history.copyFlowOutput"
+                : secondaryText
+                  ? "settings.history.copyFinalText"
+                  : "settings.history.copyToClipboard",
+            )}
           >
             {showCopied ? (
               <Check width={14} height={14} />

@@ -679,12 +679,15 @@ async fn read_sse_round(
 /// Send a streaming chat completion request to an OpenAI-compatible API.
 /// Parses the SSE response (`data: {...}` lines, `data: [DONE]` sentinel) and
 /// invokes `on_token` for every content delta. Returns the full accumulated
-/// response text on success.
+/// response text on success. `reasoning_effort` / `reasoning` suppress or tune
+/// reasoning-model thinking (pass `None` for provider defaults).
 pub async fn send_chat_stream(
     provider: &PostProcessProvider,
     api_key: String,
     model: &str,
     messages: Vec<Value>,
+    reasoning_effort: Option<String>,
+    reasoning: Option<ReasoningConfig>,
     on_token: impl FnMut(&str),
 ) -> Result<String, String> {
     let base_url = effective_base_url(provider);
@@ -699,6 +702,8 @@ pub async fn send_chat_stream(
         messages,
         ChatRequestOptions {
             stream: Some(true),
+            reasoning_effort,
+            reasoning,
             ..Default::default()
         },
     );
@@ -739,6 +744,8 @@ pub async fn send_chat_stream_with_tools(
     messages: Vec<Value>,
     tools: Value,
     tool_choice: Value,
+    reasoning_effort: Option<String>,
+    reasoning: Option<ReasoningConfig>,
     on_token: impl FnMut(&str),
 ) -> Result<ToolStreamOutcome, String> {
     let base_url = effective_base_url(provider);
@@ -752,6 +759,8 @@ pub async fn send_chat_stream_with_tools(
             stream: Some(true),
             tools: Some(tools),
             tool_choice: Some(tool_choice),
+            reasoning_effort,
+            reasoning,
             ..Default::default()
         },
     );

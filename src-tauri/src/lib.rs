@@ -520,6 +520,7 @@ pub fn run(cli_args: CliArgs) {
             shortcut::change_auto_submit_key_setting,
             shortcut::get_post_process_readiness,
             shortcut::change_post_process_enabled_setting,
+            shortcut::change_post_process_fix_misheard_setting,
             shortcut::change_flow_enabled_setting,
             shortcut::change_flow_phrase_setting,
             shortcut::change_flow_screen_access_setting,

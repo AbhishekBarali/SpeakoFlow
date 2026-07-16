@@ -93,15 +93,24 @@ pub async fn retry_history_entry_transcription(
         return Err("Recording contains no speech".to_string());
     }
 
-    let processed =
-        process_transcription_output(&app, &transcription, entry.post_process_requested).await;
-    history_manager
-        .update_transcription(
-            id,
-            transcription,
-            processed.post_processed_text,
-            processed.post_process_prompt,
+    let is_flow_entry =
+        entry.post_process_prompt.as_deref() == Some(crate::flow::FLOW_HISTORY_MARKER);
+    let (post_processed_text, post_process_prompt) = if is_flow_entry {
+        // Re-running speech recognition should repair only the transcript. A
+        // Flow output is a completed generated artifact; keep it and its marker
+        // instead of silently converting the row into ordinary dictation.
+        (
+            entry.post_processed_text.clone(),
+            entry.post_process_prompt.clone(),
         )
+    } else {
+        let processed =
+            process_transcription_output(&app, &transcription, entry.post_process_requested).await;
+        (processed.post_processed_text, processed.post_process_prompt)
+    };
+
+    history_manager
+        .update_transcription(id, transcription, post_processed_text, post_process_prompt)
         .map(|_| ())
         .map_err(|e| e.to_string())
 }

@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use specta::Type;
 use std::fs;
 use std::path::PathBuf;
-use tauri::AppHandle;
+use tauri::{AppHandle, Emitter};
 use tauri_specta::Event;
 
 use crate::llm_client::ChatMessage;
@@ -301,19 +301,31 @@ impl HistoryManager {
         };
 
         debug!("Saved history entry with id {}", entry.id);
+        drop(conn);
 
-        // Retention cleanup is intentionally NOT run here. History is only
-        // pruned once, at app startup (see `initialize_core_logic` in lib.rs),
-        // so recordings never disappear while the user is actively using the
-        // app or editing the limit — changes take effect on the next restart.
-
-        // Emit typed event for real-time frontend updates
+        // Publish the new row immediately, then enforce retention on every
+        // insert. Previously the configured limit was only applied at startup
+        // or when the setting changed, so a running session could grow without
+        // bound and the History panel drifted away from the selected count.
         if let Err(e) = (HistoryUpdatePayload::Added {
             entry: entry.clone(),
         })
         .emit(&self.app_handle)
         {
             error!("Failed to emit history-updated event: {}", e);
+        }
+
+        match self.cleanup_old_entries() {
+            Ok(pruned) if pruned > 0 => {
+                // The frontend refetches its first page so rows removed by
+                // retention disappear immediately instead of lingering until
+                // the History section is reopened.
+                if let Err(e) = self.app_handle.emit("history-retention-applied", ()) {
+                    error!("Failed to emit retention update: {}", e);
+                }
+            }
+            Ok(_) => {}
+            Err(e) => error!("History retention cleanup failed after save: {}", e),
         }
 
         Ok(entry)
@@ -367,23 +379,18 @@ impl HistoryManager {
         Ok(entry)
     }
 
-    pub fn cleanup_old_entries(&self) -> Result<()> {
+    /// Apply the active recording-retention policy and return the number of
+    /// database rows removed. Starred rows are never included.
+    pub fn cleanup_old_entries(&self) -> Result<usize> {
         let retention_period = crate::settings::get_recording_retention_period(&self.app_handle);
 
         match retention_period {
-            crate::settings::RecordingRetentionPeriod::Never => {
-                // Don't delete anything
-                return Ok(());
-            }
+            crate::settings::RecordingRetentionPeriod::Never => Ok(0),
             crate::settings::RecordingRetentionPeriod::PreserveLimit => {
-                // Use the old count-based logic with history_limit
                 let limit = crate::settings::get_history_limit(&self.app_handle);
-                return self.cleanup_by_count(limit);
+                self.cleanup_by_count(limit)
             }
-            _ => {
-                // Use time-based logic
-                return self.cleanup_by_time(retention_period);
-            }
+            _ => self.cleanup_by_time(retention_period),
         }
     }
 
@@ -396,20 +403,32 @@ impl HistoryManager {
         let mut deleted_count = 0;
 
         for (id, file_name) in entries {
-            // Delete database entry
-            conn.execute(
+            let rows_deleted = conn.execute(
                 "DELETE FROM transcription_history WHERE id = ?1",
                 params![id],
             )?;
+            if rows_deleted == 0 {
+                continue;
+            }
+            deleted_count += rows_deleted;
 
-            // Delete WAV file
-            let file_path = self.recordings_dir.join(file_name);
-            if file_path.exists() {
-                if let Err(e) = fs::remove_file(&file_path) {
-                    error!("Failed to delete WAV file {}: {}", file_name, e);
-                } else {
-                    debug!("Deleted old WAV file: {}", file_name);
-                    deleted_count += 1;
+            // Older builds named WAVs with second-level timestamps, so two
+            // rows could reference the same file. Remove it only after the last
+            // referencing row is gone; otherwise pruning one row breaks audio
+            // playback for another row that is still visible.
+            let remaining_references: i64 = conn.query_row(
+                "SELECT COUNT(*) FROM transcription_history WHERE file_name = ?1",
+                params![file_name],
+                |row| row.get(0),
+            )?;
+            if remaining_references == 0 {
+                let file_path = self.recordings_dir.join(file_name);
+                if file_path.exists() {
+                    if let Err(e) = fs::remove_file(&file_path) {
+                        error!("Failed to delete WAV file {}: {}", file_name, e);
+                    } else {
+                        debug!("Deleted old WAV file: {}", file_name);
+                    }
                 }
             }
         }
@@ -431,7 +450,7 @@ impl HistoryManager {
         Ok(entries.into_iter().skip(limit).collect())
     }
 
-    fn cleanup_by_count(&self, limit: usize) -> Result<()> {
+    fn cleanup_by_count(&self, limit: usize) -> Result<usize> {
         let conn = self.get_connection()?;
         let entries_to_delete = Self::entries_beyond_unsaved_limit(&conn, limit)?;
         let deleted_count = self.delete_entries_and_files(&entries_to_delete)?;
@@ -440,7 +459,7 @@ impl HistoryManager {
             debug!("Cleaned up {} old history entries by count", deleted_count);
         }
 
-        Ok(())
+        Ok(deleted_count)
     }
 
     fn unsaved_entries_before(
@@ -461,7 +480,7 @@ impl HistoryManager {
     fn cleanup_by_time(
         &self,
         retention_period: crate::settings::RecordingRetentionPeriod,
-    ) -> Result<()> {
+    ) -> Result<usize> {
         let conn = self.get_connection()?;
 
         // Calculate cutoff timestamp (current time minus retention period)
@@ -483,7 +502,7 @@ impl HistoryManager {
             );
         }
 
-        Ok(())
+        Ok(deleted_count)
     }
 
     pub async fn get_history_entries(
@@ -648,28 +667,39 @@ impl HistoryManager {
 
     pub async fn delete_entry(&self, id: i64) -> Result<()> {
         let conn = self.get_connection()?;
+        let file_name = conn
+            .query_row(
+                "SELECT file_name FROM transcription_history WHERE id = ?1",
+                params![id],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()?;
 
-        // Get the entry to find the file name
-        if let Some(entry) = self.get_entry_by_id(id).await? {
-            // Delete the audio file first
-            let file_path = self.get_audio_file_path(&entry.file_name);
-            if file_path.exists() {
-                if let Err(e) = fs::remove_file(&file_path) {
-                    error!("Failed to delete audio file {}: {}", entry.file_name, e);
-                    // Continue with database deletion even if file deletion fails
-                }
-            }
-        }
-
-        // Delete from database
         conn.execute(
             "DELETE FROM transcription_history WHERE id = ?1",
             params![id],
         )?;
 
+        // Old rows may share a second-resolution filename. Keep the WAV while
+        // any other row still references it.
+        if let Some(file_name) = file_name {
+            let remaining_references: i64 = conn.query_row(
+                "SELECT COUNT(*) FROM transcription_history WHERE file_name = ?1",
+                params![&file_name],
+                |row| row.get(0),
+            )?;
+            if remaining_references == 0 {
+                let file_path = self.get_audio_file_path(&file_name);
+                if file_path.exists() {
+                    if let Err(e) = fs::remove_file(&file_path) {
+                        error!("Failed to delete audio file {}: {}", file_name, e);
+                    }
+                }
+            }
+        }
+
         debug!("Deleted history entry with id: {}", id);
 
-        // Emit history updated event
         if let Err(e) = (HistoryUpdatePayload::Deleted { id }).emit(&self.app_handle) {
             error!("Failed to emit history-updated event: {}", e);
         }

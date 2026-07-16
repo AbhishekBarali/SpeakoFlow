@@ -22,6 +22,7 @@ export const AiCleanupGroup: React.FC = () => {
   const { getSetting, updateSetting, isUpdating } = useSettings();
 
   const enabled = getSetting("post_process_enabled") ?? false;
+  const fixMisheard = getSetting("post_process_fix_misheard") ?? false;
 
   return (
     <>
@@ -38,10 +39,24 @@ export const AiCleanupGroup: React.FC = () => {
           grouped={true}
         />
         {enabled && (
-          <ShortcutInput
-            shortcutId="transcribe_with_post_process"
-            grouped={true}
-          />
+          <>
+            <ShortcutInput
+              shortcutId="transcribe_with_post_process"
+              grouped={true}
+            />
+            <ToggleSwitch
+              checked={fixMisheard}
+              onChange={(value) =>
+                updateSetting("post_process_fix_misheard", value)
+              }
+              isUpdating={isUpdating("post_process_fix_misheard")}
+              label={t("settings.dictation.aiCleanup.fixMisheardLabel")}
+              description={t(
+                "settings.dictation.aiCleanup.fixMisheardDescription",
+              )}
+              grouped={true}
+            />
+          </>
         )}
       </SettingsGroup>
 

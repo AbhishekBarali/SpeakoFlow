@@ -20,6 +20,7 @@ use ferrous_opencc::{config::BuiltinConfig, OpenCC};
 use log::{debug, error, warn};
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tauri::Manager;
@@ -40,8 +41,10 @@ impl Drop for FinishGuard {
         // The whole pipeline (recording + transcription + any assistant
         // generation) is done, so drop the cancel shortcut here rather than at
         // recording-stop. Keeping it registered through generation is what lets
-        // Esc abort a streaming assistant answer, not just a recording.
+        // Esc abort a streaming assistant answer or Flow generation, not just a
+        // recording.
         shortcut::unregister_cancel_shortcut(&self.0);
+        crate::flow::stop_prewarm_watch();
         if let Some(c) = self.0.try_state::<TranscriptionCoordinator>() {
             c.notify_processing_finished();
         }
@@ -80,6 +83,21 @@ fn uses_ai_cleanup(post_process: bool) -> bool {
 /// Field name for structured output JSON schema
 const TRANSCRIPTION_FIELD: &str = "transcription";
 
+/// A monotonic suffix prevents two rapidly completed recordings from sharing
+/// a WAV path. Millisecond timestamps alone can collide on fast back-to-back
+/// turns, which made one History row overwrite another row's audio.
+static RECORDING_FILE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
+
+fn next_recording_file_name() -> String {
+    let sequence = RECORDING_FILE_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+    format!(
+        "speakoflow-{}-{}-{}.wav",
+        chrono::Utc::now().timestamp_millis(),
+        std::process::id(),
+        sequence
+    )
+}
+
 /// Strip invisible Unicode characters that some LLMs may insert
 fn strip_invisible_chars(s: &str) -> String {
     s.replace(['\u{200B}', '\u{200C}', '\u{200D}', '\u{FEFF}'], "")
@@ -101,6 +119,24 @@ fn append_tone_directive(prompt: &mut String, instruction: Option<&str>) {
             .push_str("\n\n---\nWRITING STYLE (apply this while preserving the source message):\n");
         prompt.push_str(instruction);
     }
+}
+
+/// Opt-in directive letting cleanup repair clearly misheard words. Kept
+/// deliberately conservative: it licenses fixing obvious recognition misses
+/// (useful for non-native speakers), never free rewriting.
+fn append_misheard_directive(prompt: &mut String, enabled: bool) {
+    if !enabled {
+        return;
+    }
+    prompt.push_str(
+        "\n\n---\nMISHEARD WORDS (the user opted in):\n\
+         The speaker may mispronounce words, or the speech-to-text may mishear them. When a word or short \
+         phrase is clearly wrong in its context — a homophone, a near-miss pronunciation, or a nonsense \
+         word where one specific word obviously belongs — replace it with the word the speaker clearly \
+         intended. Correct only when the intended word is unmistakable from the surrounding context; when \
+         in doubt, keep the original wording. Never \"improve\" correct words, and never swap names or \
+         technical terms for more common ones unless the context makes the intended term certain.",
+    );
 }
 
 /// Absolute response-shape rules shared by structured and plain providers.
@@ -260,6 +296,7 @@ fn build_post_process_request(
 ) -> PostProcessRequest {
     let mut system_prompt = build_system_prompt(&config.prompt);
     append_tone_directive(&mut system_prompt, config.tone_instruction.as_deref());
+    append_misheard_directive(&mut system_prompt, config.fix_misheard);
     append_final_output_contract(&mut system_prompt);
     let (reasoning_effort, reasoning) = match config.provider.id.as_str() {
         "custom" => (Some("none".to_string()), None),
@@ -878,6 +915,16 @@ impl ShortcutAction for TranscribeAction {
             }
         }
 
+        // Arm the Flow live-transcript watcher for plain dictation: if the
+        // activation phrase is heard in the streaming text, the local model
+        // starts loading while the user is still speaking. Nothing loads on
+        // ordinary dictations — the watcher only fires on the phrase.
+        if !self.post_process && settings.flow_enabled {
+            crate::flow::reset_prewarm_watch();
+        } else {
+            crate::flow::stop_prewarm_watch();
+        }
+
         let is_always_on = settings.always_on_microphone;
         debug!("Microphone mode - always_on: {}", is_always_on);
 
@@ -968,9 +1015,6 @@ impl ShortcutAction for TranscribeAction {
     }
 
     fn stop(&self, app: &AppHandle, binding_id: &str, _shortcut_str: &str) {
-        // Unregister the cancel shortcut when transcription stops
-        shortcut::unregister_cancel_shortcut(app);
-
         let stop_time = Instant::now();
         debug!("TranscribeAction::stop called for binding: {}", binding_id);
 
@@ -990,6 +1034,7 @@ impl ShortcutAction for TranscribeAction {
 
         let binding_id = binding_id.to_string(); // Clone binding_id for the async task
         let post_process = self.post_process;
+        let flow_cancel_generation = crate::flow::cancellation_generation();
 
         tauri::async_runtime::spawn(async move {
             let _guard = FinishGuard(ah.clone());
@@ -1013,7 +1058,7 @@ impl ShortcutAction for TranscribeAction {
                 } else {
                     // Save WAV concurrently with transcription
                     let sample_count = samples.len();
-                    let file_name = format!("speakoflow-{}.wav", chrono::Utc::now().timestamp());
+                    let file_name = next_recording_file_name();
                     let wav_path = hm.recordings_dir().join(&file_name);
                     let wav_path_for_verify = wav_path.clone();
                     let samples_for_wav = samples.clone();
@@ -1122,14 +1167,15 @@ impl ShortcutAction for TranscribeAction {
                                     }
                                     crate::flow::FlowPlan::EmptyCommand => {
                                         // Just the phrase, no command. Never
-                                        // paste the phrase itself.
+                                        // paste the phrase itself, but keep its
+                                        // transcript and audio in Flow history.
                                         if wav_saved {
                                             if let Err(err) = hm.save_entry(
                                                 file_name,
                                                 transcription,
                                                 false,
                                                 None,
-                                                None,
+                                                Some(crate::flow::FLOW_HISTORY_MARKER.to_string()),
                                             ) {
                                                 error!("Failed to save history entry: {}", err);
                                             }
@@ -1140,16 +1186,28 @@ impl ShortcutAction for TranscribeAction {
                                     }
                                     crate::flow::FlowPlan::Generate { command } => {
                                         utils::show_generating_overlay(&ah);
-                                        match crate::flow::run_flow_generation(&ah, &command).await
+                                        match crate::flow::run_flow_generation(
+                                            &ah,
+                                            &command,
+                                            flow_cancel_generation,
+                                        )
+                                        .await
                                         {
                                             Ok(generated) => {
+                                                // Persist the completed Flow turn before the
+                                                // paste boundary. If Escape lands after
+                                                // generation, History still keeps what was
+                                                // said, the audio, and the finished output.
                                                 if wav_saved {
                                                     if let Err(err) = hm.save_entry(
                                                         file_name,
                                                         transcription,
                                                         false,
                                                         Some(generated.clone()),
-                                                        Some("Generate with Flow".to_string()),
+                                                        Some(
+                                                            crate::flow::FLOW_HISTORY_MARKER
+                                                                .to_string(),
+                                                        ),
                                                     ) {
                                                         error!(
                                                             "Failed to save history entry: {}",
@@ -1157,8 +1215,29 @@ impl ShortcutAction for TranscribeAction {
                                                         );
                                                     }
                                                 }
+                                                if crate::flow::is_generation_cancelled(
+                                                    flow_cancel_generation,
+                                                ) {
+                                                    debug!(
+                                                        "Flow generation cancelled before paste"
+                                                    );
+                                                    utils::hide_recording_overlay(&ah);
+                                                    change_tray_icon(&ah, TrayIconState::Idle);
+                                                    return;
+                                                }
                                                 let ah_clone = ah.clone();
                                                 ah.run_on_main_thread(move || {
+                                                    if crate::flow::is_generation_cancelled(
+                                                        flow_cancel_generation,
+                                                    ) {
+                                                        debug!("Flow paste skipped after cancellation");
+                                                        utils::hide_recording_overlay(&ah_clone);
+                                                        change_tray_icon(
+                                                            &ah_clone,
+                                                            TrayIconState::Idle,
+                                                        );
+                                                        return;
+                                                    }
                                                     match utils::paste_with_behavior(
                                                         generated,
                                                         ah_clone.clone(),
@@ -1195,17 +1274,20 @@ impl ShortcutAction for TranscribeAction {
                                                 });
                                             }
                                             Err(e) => {
-                                                // Paste NOTHING on failure —
-                                                // no partials, no errors, no
-                                                // raw command.
-                                                error!("Flow generation failed: {}", e);
+                                                // Keep every completed Flow recording in
+                                                // History, including failed or cancelled
+                                                // generations. The missing output is shown
+                                                // explicitly in the Flow view.
                                                 if wav_saved {
                                                     if let Err(err) = hm.save_entry(
                                                         file_name,
                                                         transcription,
                                                         false,
                                                         None,
-                                                        None,
+                                                        Some(
+                                                            crate::flow::FLOW_HISTORY_MARKER
+                                                                .to_string(),
+                                                        ),
                                                     ) {
                                                         error!(
                                                             "Failed to save history entry: {}",
@@ -1213,6 +1295,18 @@ impl ShortcutAction for TranscribeAction {
                                                         );
                                                     }
                                                 }
+                                                if crate::flow::is_generation_cancelled(
+                                                    flow_cancel_generation,
+                                                ) {
+                                                    debug!("Flow generation cancelled");
+                                                    utils::hide_recording_overlay(&ah);
+                                                    change_tray_icon(&ah, TrayIconState::Idle);
+                                                    return;
+                                                }
+                                                // Paste NOTHING on failure —
+                                                // no partials, no errors, no
+                                                // raw command.
+                                                error!("Flow generation failed: {}", e);
                                                 utils::show_overlay_notice(&ah, "flowFailed");
                                                 change_tray_icon(&ah, TrayIconState::Idle);
                                             }
@@ -1790,6 +1884,7 @@ mod tests {
             prompt: prompt.to_string(),
             tone_id: tone.id().to_string(),
             tone_instruction: tone.directive().map(str::to_string),
+            fix_misheard: false,
             source: PostProcessConfigSource::DedicatedCleanupSelection,
             api_key: String::new(),
         }
@@ -1864,6 +1959,26 @@ mod tests {
             assert!(system.contains("Do not use preambles such as 'Here is'"));
             assert!(prompts.insert(system), "tone {:?} must be distinct", tone);
         }
+    }
+
+    #[test]
+    fn misheard_word_repair_is_opt_in_and_precedes_the_contract() {
+        let mut config = test_config(
+            "http://127.0.0.1:1/v1".to_string(),
+            false,
+            PostProcessTone::None,
+            "Clean the transcript without changing facts.",
+        );
+
+        let disabled = build_post_process_request(&config, "raw words").system_prompt;
+        assert!(!disabled.contains("MISHEARD WORDS"));
+
+        config.fix_misheard = true;
+        let enabled = build_post_process_request(&config, "raw words").system_prompt;
+        let directive_position = enabled.find("MISHEARD WORDS").unwrap();
+        let contract_position = enabled.find("FINAL OUTPUT CONTRACT").unwrap();
+        assert!(directive_position < contract_position);
+        assert!(enabled.contains("when in doubt, keep the original wording"));
     }
 
     #[test]
