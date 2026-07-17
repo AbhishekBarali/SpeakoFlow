@@ -177,6 +177,25 @@ fn force_overlay_topmost(overlay_window: &tauri::webview::WebviewWindow) {
     });
 }
 
+/// Linux fallback for keeping the recording overlay above other windows when
+/// GTK layer shell is unavailable (e.g. GNOME/Mutter, or an X11 session). Tauri
+/// maps `always_on_top` to GTK's `keep_above`, but that hint can be dropped
+/// after a hide/show, so re-assert it — mirroring the Windows `force_overlay_topmost`
+/// re-assert. Effective on X11/Xorg (and XWayland); a harmless no-op under
+/// layer shell and under GNOME Wayland, which never honors client-set stacking.
+/// GTK calls must run on the main thread.
+#[cfg(target_os = "linux")]
+fn force_overlay_keep_above(overlay_window: &tauri::webview::WebviewWindow) {
+    use gtk::prelude::GtkWindowExt;
+
+    let overlay_clone = overlay_window.clone();
+    let _ = overlay_window.run_on_main_thread(move || {
+        if let Ok(gtk_window) = overlay_clone.gtk_window() {
+            gtk_window.set_keep_above(true);
+        }
+    });
+}
+
 /// Returns the `tauri::Monitor` currently under the mouse cursor (fallback:
 /// primary). Shared by the recording overlay and the assistant region-snip
 /// overlay so both place their windows with the same proven, multi-monitor-safe
@@ -340,6 +359,10 @@ pub fn create_recording_overlay(app_handle: &AppHandle) {
                     debug!("GTK layer shell initialized for overlay window");
                 } else {
                     debug!("GTK layer shell not available, falling back to regular window");
+                    // No layer surface is keeping us above other windows, so fall
+                    // back to the GTK keep-above hint (effective on X11/Xorg and
+                    // XWayland; ignored on GNOME Wayland). Re-asserted on each show.
+                    force_overlay_keep_above(&window);
                 }
             }
 
@@ -446,6 +469,12 @@ fn show_overlay_state_with_notice(app_handle: &AppHandle, state: &str, notice: O
         // On Windows, aggressively re-assert "topmost" in the native Z-order after showing
         #[cfg(target_os = "windows")]
         force_overlay_topmost(&overlay_window);
+
+        // On Linux, re-assert the keep-above hint after showing (for the
+        // non-layer-shell fallback on X11/Xorg). No-op under layer shell and
+        // under GNOME Wayland; cheap, and mirrors the Windows re-assert above.
+        #[cfg(target_os = "linux")]
+        force_overlay_keep_above(&overlay_window);
 
         let _ = overlay_window.emit(
             "show-overlay",

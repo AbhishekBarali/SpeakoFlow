@@ -816,6 +816,26 @@ fn force_panel_topmost(window: &tauri::webview::WebviewWindow) {
     });
 }
 
+/// Linux analog of the Win32 force-topmost above. Tauri's `always_on_top` maps
+/// to GTK's `keep_above`, but that hint can be dropped by the window manager
+/// after a hide/show or when another window asserts itself — so re-assert it
+/// explicitly each time the panel is shown, mirroring the Windows trick.
+///
+/// Effective on X11/Xorg (and XWayland). On GNOME/Wayland a client cannot force
+/// itself above other windows, so `set_keep_above` is simply ignored there —
+/// harmless, never an error. GTK calls must run on the main thread.
+#[cfg(target_os = "linux")]
+fn force_panel_topmost(window: &tauri::webview::WebviewWindow) {
+    use gtk::prelude::GtkWindowExt;
+
+    let window_clone = window.clone();
+    let _ = window.run_on_main_thread(move || {
+        if let Ok(gtk_window) = window_clone.gtk_window() {
+            gtk_window.set_keep_above(true);
+        }
+    });
+}
+
 /// Storage key for the current mode's position slot.
 fn position_key() -> &'static str {
     if PILL_MODE.load(Ordering::SeqCst) {
@@ -943,7 +963,7 @@ pub fn show_assistant_panel(app: &AppHandle) {
         let _ = app.emit("assistant-collapsed", collapsed);
 
         let _ = window.show();
-        #[cfg(target_os = "windows")]
+        #[cfg(any(target_os = "windows", target_os = "linux"))]
         force_panel_topmost(&window);
         let _ = app.emit("assistant-panel-shown", ());
     }
@@ -1285,7 +1305,7 @@ pub fn open_snip_overlay(
     }
 
     let _ = window.set_focus();
-    #[cfg(target_os = "windows")]
+    #[cfg(any(target_os = "windows", target_os = "linux"))]
     force_panel_topmost(&window);
     Ok(())
 }
