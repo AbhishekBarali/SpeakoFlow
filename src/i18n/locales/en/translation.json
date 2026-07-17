@@ -1247,6 +1247,10 @@
             "immediate": "When I ask",
             "on_send": "When the message sends"
           }
+        },
+        "screenRecording": {
+          "description": "Screen vision needs macOS Screen Recording permission. Grant it in System Settings, then restart SpeakoFlow for it to take effect.",
+          "grant": "Open System Settings"
         }
       },
       "webSearch": {

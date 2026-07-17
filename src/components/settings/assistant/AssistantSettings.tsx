@@ -45,6 +45,7 @@ import { FONT_SIZES } from "../../../assistant/appearance";
 import "../../../assistant/AssistantPanel.css";
 import { useModelStore } from "@/stores/modelStore";
 import { getModelCategory } from "@/lib/utils/modelCategory";
+import ScreenRecordingPermission from "@/components/ScreenRecordingPermission";
 
 /** The built-in (local) llama.cpp provider id, mirrored from the backend. */
 const BUILTIN_PROVIDER_ID = "builtin";
@@ -1676,6 +1677,7 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
             />
           </SettingContainer>
         )}
+        {screenAccessMode !== "off" && <ScreenRecordingPermission />}
       </SettingsGroup>
 
       {/* Web search ------------------------------------------------------- */}
