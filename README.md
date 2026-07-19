@@ -107,6 +107,8 @@ Start a normal dictation with the phrase **"Hey Flow"**, then just ask in your o
 
 Speak in whatever language comes naturally — Spanish, Hindi, French, Japanese — and it lands in **clean English** right where you're typing. Runs fully on your device.
 
+> **Requires a Whisper model.** Translation is a Whisper speech‑to‑text capability. Parakeet is English‑only, so pick a Whisper model in **Settings → Models** to translate as you speak.
+
 ### 🧹 AI cleanup
 
 Say it with all the "um"s and false starts. AI cleanup strips the filler, fixes grammar, and matches the **tone you pick** — Professional, Friendly, Concise, Formal, or your own — so it reads the way you meant it. Optional, and runs only when you turn it on (its own hotkey, or as an always‑on post‑processing pass).
@@ -172,7 +174,7 @@ SpeakoFlow keeps Handy's rock‑solid local dictation core and builds a full voi
 | --- | :---: | --- |
 | Local dictation | ✅ | ✅ (unchanged core) |
 | Generate with Flow ("Hey Flow") | — | ✅ speak a command, get finished writing pasted |
-| Speak‑any‑language → English | — | ✅ on‑device translation |
+| Speak‑any‑language → English | — | ✅ on‑device translation (Whisper models) |
 | AI cleanup (tones) | — | ✅ Professional / Friendly / Concise / custom |
 | AI assistant chat panel | — | ✅ floating glass panel, streaming |
 | Screen vision | — | ✅ voice intent, camera button, multi‑monitor |
