@@ -5,6 +5,8 @@
   <img src="Logo/final/lockup.svg" alt="SpeakoFlow" width="340" />
 </picture>
 
+### You think faster than you type.
+
 **A free, local voice assistant for your desktop. Dictation, writing, and an AI assistant, all by voice.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-2ea44f.svg)](LICENSE)
