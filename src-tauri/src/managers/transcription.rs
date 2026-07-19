@@ -507,6 +507,37 @@ impl TranscriptionManager {
             );
         };
 
+        // ONNX (transcribe-rs) accelerator selection, resolved per-load because
+        // it's a global consumed at ONNX session creation — a prior CPU pin must
+        // not leak into the next model.
+        //
+        // DirectML miscompiles some ONNX graphs on this build: Moonshine's
+        // dynamic `Slice` op errors out at inference ("The parameter is
+        // incorrect"), and SenseVoice int8 hard-crashes the process during
+        // session init. Both are tiny models, so we pin those families to CPU
+        // regardless of the user's GPU preference. Every other ONNX engine keeps
+        // the user's resolved setting.
+        match model_info.engine_type {
+            EngineType::Moonshine | EngineType::MoonshineStreaming | EngineType::SenseVoice => {
+                transcribe_rs::accel::set_ort_accelerator(
+                    transcribe_rs::accel::OrtAccelerator::CpuOnly,
+                );
+                info!(
+                    "Pinning ONNX engine '{}' to CPU (known DirectML incompatibility)",
+                    model_id
+                );
+            }
+            EngineType::Parakeet
+            | EngineType::GigaAM
+            | EngineType::Canary
+            | EngineType::Cohere => {
+                // Restore the user's resolved ORT preference in case a previous
+                // load pinned CPU for one of the families above.
+                apply_accelerator_settings(&self.app_handle);
+            }
+            _ => {}
+        }
+
         let loaded_engine = match model_info.engine_type {
             EngineType::Whisper => {
                 let engine = WhisperEngine::load(&model_path).map_err(|e| {
@@ -1338,9 +1369,21 @@ impl TranscriptionManager {
                 } else {
                     Some(validated_language.clone())
                 };
+                // Translation only rides along for models that actually support
+                // it. The batch path is per-engine (e.g. MoonshineStreaming uses
+                // TranscribeOptions::default(), no translate); mirror that here so
+                // a streaming-only model that cannot translate (e.g. Moonshine V2)
+                // is never force-fed translate=true — which yields empty/garbage
+                // output for those models when the global "Translate to English"
+                // toggle happens to be on.
+                let model_supports_translation = self
+                    .model_manager
+                    .get_model_info(&settings.selected_model)
+                    .map(|info| info.supports_translation)
+                    .unwrap_or(false);
                 let options = TranscribeOptions {
                     language,
-                    translate: settings.translate_to_english,
+                    translate: settings.translate_to_english && model_supports_translation,
                     ..Default::default()
                 };
 
@@ -1712,7 +1755,12 @@ fn correct_live_display(
 /// - **translate**: when `translate_to_english` is on, the model advertises
 ///   translation, and the source isn't already English, request
 ///   `Task::Translate` with `target_language = "en"`; otherwise `Transcribe`.
-/// - **timestamps**: `Segment` (mirrors the transcribe-rs Parakeet batch path).
+/// - **timestamps**: `Auto` — "the richest the model supports", resolved
+///   per-family by transcribe.cpp. We never consume timestamps (only `.text`),
+///   and hardcoding `Segment` made every model that declares no timestamp
+///   support (Canary, Cohere, Qwen3-ASR, Voxtral, …) fail its run with
+///   "unsupported timestamp granularity (status 12)". `Auto` transcribes on all
+///   families and still yields the same text.
 /// - **family extension**: a Whisper initial-prompt built from the user's
 ///   custom words is attached ONLY for whisper-arch models (every other family
 ///   rejects the run-slot extension); non-whisper families instead rely on the
@@ -1767,7 +1815,7 @@ pub fn transcribe_cpp_run_plan(
 
     RunOptions {
         task,
-        timestamps: TimestampKind::Segment,
+        timestamps: TimestampKind::Auto,
         language,
         target_language,
         family,
@@ -2087,7 +2135,7 @@ mod tests {
         assert_eq!(plan.language, None);
         assert_eq!(plan.task, Task::Transcribe);
         assert_eq!(plan.family, None);
-        assert_eq!(plan.timestamps, TimestampKind::Segment);
+        assert_eq!(plan.timestamps, TimestampKind::Auto);
     }
 
     #[test]
