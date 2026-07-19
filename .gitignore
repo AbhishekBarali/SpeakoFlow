@@ -58,6 +58,23 @@ graphify-out/*
 # Firecrawl MCP diagnostic scratch files (may contain API keys)
 .fc_*
 
+# Secrets / credentials — never commit real keys. The app already stores keys
+# in the OS keychain (secret_store.rs) and its working settings live under the
+# OS app-data dir, so none of this is normally in-tree; these rules are a guard
+# against accidental drops.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.keystore
+credentials.json
+secrets.json
+# Local Tauri app settings store (holds provider API keys when configured).
+settings_store.json
+
 # Internal marketing/testing website — kept out of the app repo
 speakoflow-website/
 
