@@ -1,13 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Pencil, RefreshCcw } from "lucide-react";
+import { Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { commands, type CustomPostProcessTone } from "@/bindings";
 
 import { Alert } from "../../ui/Alert";
 import { Dropdown, SettingContainer, Textarea } from "@/components/ui";
 import { Button } from "../../ui/Button";
-import { ResetButton } from "../../ui/ResetButton";
 import { Input } from "../../ui/Input";
 import { useModelStore } from "@/stores/modelStore";
 import { getModelCategory } from "@/lib/utils/modelCategory";
@@ -16,7 +15,7 @@ import { ProviderModeToggle } from "../PostProcessingSettingsApi/ProviderModeTog
 import { ProviderSelect } from "../PostProcessingSettingsApi/ProviderSelect";
 import { BaseUrlField } from "../PostProcessingSettingsApi/BaseUrlField";
 import { ApiKeyField } from "../PostProcessingSettingsApi/ApiKeyField";
-import { ModelSelect } from "../PostProcessingSettingsApi/ModelSelect";
+import { ModelCombo } from "../../ui/ModelCombo";
 import { usePostProcessProviderState } from "../PostProcessingSettingsApi/usePostProcessProviderState";
 import { useSettings } from "../../../hooks/useSettings";
 
@@ -190,37 +189,26 @@ const PostProcessingSettingsApiComponent: React.FC = () => {
             layout="stacked"
             grouped={true}
           >
-            <div className="flex items-center gap-2">
-              <ModelSelect
-                value={state.model}
-                options={state.modelOptions}
-                disabled={state.isModelUpdating}
-                isLoading={state.isFetchingModels}
-                placeholder={
-                  state.modelOptions.length > 0
-                    ? t(
-                        "settings.postProcessing.api.model.placeholderWithOptions",
-                      )
-                    : t(
-                        "settings.postProcessing.api.model.placeholderNoOptions",
-                      )
-                }
-                onSelect={state.handleModelSelect}
-                onCreate={state.handleModelCreate}
-                onBlur={() => {}}
-                className="min-w-[380px] flex-1"
-              />
-              <ResetButton
-                onClick={state.handleRefreshModels}
-                disabled={state.isFetchingModels}
-                ariaLabel={t("settings.postProcessing.api.model.refreshModels")}
-                className="flex h-10 w-10 items-center justify-center"
-              >
-                <RefreshCcw
-                  className={`h-4 w-4 ${state.isFetchingModels ? "animate-spin" : ""}`}
-                />
-              </ResetButton>
-            </div>
+            <ModelCombo
+              value={state.model}
+              options={state.modelOptions}
+              onCommit={state.handleModelChange}
+              onLoad={state.handleRefreshModels}
+              loading={state.isFetchingModels}
+              disabled={state.isModelUpdating}
+              placeholder={
+                state.modelOptions.length > 0
+                  ? t(
+                      "settings.postProcessing.api.model.placeholderWithOptions",
+                    )
+                  : t(
+                      "settings.postProcessing.api.model.placeholderNoOptions",
+                    )
+              }
+              loadLabel={t("settings.postProcessing.api.model.refreshModels")}
+              className="flex flex-col gap-1"
+              inputClassName="min-w-0 flex-1"
+            />
           </SettingContainer>
         ))}
     </>

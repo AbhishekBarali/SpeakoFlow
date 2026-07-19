@@ -1050,31 +1050,6 @@
         "title": "Entwicklung unterstützen",
         "description": "Hilf uns, SpeakoFlow weiterzuentwickeln",
         "button": "Spenden"
-      },
-      "acknowledgments": {
-        "title": "Danksagungen",
-        "handy": {
-          "title": "Handy",
-          "description": "The open-source app SpeakoFlow is built on",
-          "details": "SpeakoFlow began as a fork of Handy by CJ Pais. Huge thanks to the original project and its contributors for the foundation."
-        },
-        "whisper": {
-          "title": "Whisper.cpp",
-          "description": "Hochleistungs-Inferenz des Whisper-Spracherkennungsmodells von OpenAI",
-          "details": "SpeakoFlow verwendet Whisper.cpp für schnelle, lokale Sprach-zu-Text-Verarbeitung. Dank an Georgi Gerganov und die Mitwirkenden für ihre großartige Arbeit."
-        },
-        "llamacpp": {
-          "title": "llama.cpp",
-          "description": "The engine powering the built-in local language model",
-          "details": "SpeakoFlow runs local LLMs with llama.cpp. Thanks to Georgi Gerganov and the ggml community for making fast, on-device inference possible."
-        },
-        "kokoro": {
-          "title": "Kokoro",
-          "description": "The local text-to-speech voice for the assistant",
-          "details": "SpeakoFlow speaks replies using the Kokoro TTS model, running entirely on your device. Thanks to the Kokoro project and its contributors."
-        },
-        "previous": "Previous",
-        "next": "Next"
       }
     },
     "assistant": {

@@ -1008,6 +1008,20 @@ pub fn change_post_process_fix_misheard_setting(
     Ok(())
 }
 
+/// Set how aggressively dictation cleanup condenses the transcript
+/// (Light/Balanced/Aggressive). Separate from the writing-style tone.
+#[tauri::command]
+#[specta::specta]
+pub fn change_post_process_cleanup_strength_setting(
+    app: AppHandle,
+    strength: settings::PostProcessCleanupStrength,
+) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    settings.post_process_cleanup_strength = strength;
+    settings::write_settings(&app, settings);
+    Ok(())
+}
+
 /// Change the Flow activation phrase. An empty phrase resets to the default
 /// ("Hey Flow") so Flow can never end up in an untriggerable state.
 #[tauri::command]

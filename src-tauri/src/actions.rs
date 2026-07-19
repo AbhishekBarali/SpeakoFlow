@@ -7,8 +7,8 @@ use crate::managers::history::HistoryManager;
 use crate::managers::transcription::TranscriptionManager;
 use crate::settings::{
     get_settings, resolve_post_process_config, AppSettings, ModelUnloadTimeout,
-    PostProcessConfigSource, PostProcessResolutionError, PostProcessUnavailableReason,
-    ResolvedPostProcessConfig, APPLE_INTELLIGENCE_PROVIDER_ID,
+    PostProcessCleanupStrength, PostProcessConfigSource, PostProcessResolutionError,
+    PostProcessUnavailableReason, ResolvedPostProcessConfig, APPLE_INTELLIGENCE_PROVIDER_ID,
 };
 use crate::shortcut;
 use crate::tray::{change_tray_icon, TrayIconState};
@@ -118,6 +118,17 @@ fn append_tone_directive(prompt: &mut String, instruction: Option<&str>) {
         prompt
             .push_str("\n\n---\nWRITING STYLE (apply this while preserving the source message):\n");
         prompt.push_str(instruction);
+    }
+}
+
+/// Append the cleanup-intensity directive (Light dials the base prompt back to a
+/// near-verbatim touch-up; Aggressive pushes it toward a tight rewrite).
+/// `Balanced` appends nothing — the base cleanup prompt already describes that
+/// level — so the common case adds no extra tokens.
+fn append_cleanup_strength_directive(prompt: &mut String, strength: PostProcessCleanupStrength) {
+    if let Some(directive) = strength.directive() {
+        prompt.push_str("\n\n---\n");
+        prompt.push_str(directive);
     }
 }
 
@@ -295,6 +306,7 @@ fn build_post_process_request(
     transcription: &str,
 ) -> PostProcessRequest {
     let mut system_prompt = build_system_prompt(&config.prompt);
+    append_cleanup_strength_directive(&mut system_prompt, config.cleanup_strength);
     append_tone_directive(&mut system_prompt, config.tone_instruction.as_deref());
     append_misheard_directive(&mut system_prompt, config.fix_misheard);
     append_final_output_contract(&mut system_prompt);
@@ -1885,6 +1897,7 @@ mod tests {
             tone_id: tone.id().to_string(),
             tone_instruction: tone.directive().map(str::to_string),
             fix_misheard: false,
+            cleanup_strength: crate::settings::PostProcessCleanupStrength::Balanced,
             source: PostProcessConfigSource::DedicatedCleanupSelection,
             api_key: String::new(),
         }

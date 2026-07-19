@@ -42,6 +42,7 @@ const PANEL_HEIGHT: f64 = 500.0;
 /// monitor (see `clamp_to_monitor`) so they always fit the screen.
 fn panel_preset_size(size: &str) -> (f64, f64) {
     match size {
+        "mini" => (300.0, 380.0),
         "compact" => (340.0, 430.0),
         "large" => (470.0, 620.0),
         _ => (PANEL_WIDTH, PANEL_HEIGHT),
@@ -579,6 +580,15 @@ pub struct AssistantConversation {
     /// distillation pass. A dirty-guard so closing the panel only triggers a
     /// learn pass when the conversation has actually grown since last time.
     last_distilled_len: AtomicUsize,
+    /// Rolling summary of older turns that have been folded out of the verbatim
+    /// context window (empty until the first auto-summarization). Injected as a
+    /// context note so long conversations keep flowing instead of truncating.
+    summary: Mutex<String>,
+    /// Number of leading messages already represented by `summary`. Everything
+    /// from this index to the end is still sent to the model verbatim.
+    summarized_len: AtomicUsize,
+    /// Guards against overlapping background summarization passes.
+    summarizing: AtomicBool,
 }
 
 impl AssistantConversation {
@@ -590,6 +600,9 @@ impl AssistantConversation {
             cancelled: AtomicBool::new(false),
             session_id: Mutex::new(None),
             last_distilled_len: AtomicUsize::new(0),
+            summary: Mutex::new(String::new()),
+            summarized_len: AtomicUsize::new(0),
+            summarizing: AtomicBool::new(false),
         }
     }
 
@@ -626,6 +639,42 @@ impl AssistantConversation {
         if let Ok(mut id) = self.session_id.lock() {
             *id = None;
         }
+        self.reset_rolling_summary();
+    }
+
+    /// Snapshot the rolling summary and how many leading messages it covers.
+    pub fn rolling_summary(&self) -> (String, usize) {
+        let summary = self.summary.lock().map(|s| s.clone()).unwrap_or_default();
+        (summary, self.summarized_len.load(Ordering::SeqCst))
+    }
+
+    /// Store an updated rolling summary covering the first `upto` messages.
+    pub fn store_rolling_summary(&self, summary: String, upto: usize) {
+        if let Ok(mut current) = self.summary.lock() {
+            *current = summary;
+        }
+        self.summarized_len.store(upto, Ordering::SeqCst);
+    }
+
+    /// Try to claim the single background-summarization slot. Returns `true`
+    /// if claimed (caller must call `end_summarizing` when done), `false` if a
+    /// pass is already running.
+    pub fn begin_summarizing(&self) -> bool {
+        !self.summarizing.swap(true, Ordering::SeqCst)
+    }
+
+    /// Release the background-summarization slot.
+    pub fn end_summarizing(&self) {
+        self.summarizing.store(false, Ordering::SeqCst);
+    }
+
+    /// Forget the rolling summary (conversation cleared / new session loaded).
+    pub fn reset_rolling_summary(&self) {
+        if let Ok(mut s) = self.summary.lock() {
+            s.clear();
+        }
+        self.summarized_len.store(0, Ordering::SeqCst);
+        self.summarizing.store(false, Ordering::SeqCst);
     }
 
     /// Snapshot the conversation for distillation IF it has grown since the
@@ -667,6 +716,9 @@ impl AssistantConversation {
         if let Ok(mut session) = self.session_id.lock() {
             *session = Some(id);
         }
+        // A resumed chat has no in-memory summary yet; start fresh so the whole
+        // loaded history is treated as verbatim (and re-summarized if long).
+        self.reset_rolling_summary();
     }
 
     /// Drop the session pointer only if it matches `id` — used when a
@@ -1103,7 +1155,11 @@ pub fn apply_panel_size(app: &AppHandle, size: &str) {
         return;
     }
 
-    let _ = window.set_size(tauri::LogicalSize::new(w, h));
+    // Clamp the preset to the current monitor so a large size never overflows a
+    // small screen. The raw preset is remembered above (EXPANDED_W/H), so moving
+    // to a bigger display re-expands to the full chosen size.
+    let (cw, ch) = clamp_to_monitor(app, w, h);
+    let _ = window.set_size(tauri::LogicalSize::new(cw, ch));
 
     // Keep the newly sized panel fully on its monitor (growing can push it past
     // the right/bottom edge).
@@ -1113,8 +1169,8 @@ pub fn apply_panel_size(app: &AppHandle, size: &str) {
         let my = monitor.position().y as f64 / scale;
         let mw = monitor.size().width as f64 / scale;
         let mh = monitor.size().height as f64 / scale;
-        let x = (pos.x as f64 / scale).clamp(mx + 8.0, (mx + mw - w - 8.0).max(mx + 8.0));
-        let y = (pos.y as f64 / scale).clamp(my + 8.0, (my + mh - h - 8.0).max(my + 8.0));
+        let x = (pos.x as f64 / scale).clamp(mx + 8.0, (mx + mw - cw - 8.0).max(mx + 8.0));
+        let y = (pos.y as f64 / scale).clamp(my + 8.0, (my + mh - ch - 8.0).max(my + 8.0));
         let _ = window.set_position(tauri::LogicalPosition::new(x, y));
     }
 
@@ -2085,6 +2141,25 @@ pub async fn run_assistant_turn(
         "role": "system",
         "content": system_content,
     }));
+
+    // Rolling summary of older turns (auto-summarization). When present, inject
+    // it as a context note right after the system prompt and treat only the
+    // messages after `summarized_len` as the verbatim window — so a long chat
+    // keeps its earlier context in condensed form instead of truncating it.
+    let (rolling_summary, summarized_len) = if settings.assistant_auto_summarize {
+        app.state::<AssistantConversation>().rolling_summary()
+    } else {
+        (String::new(), 0)
+    };
+    if !rolling_summary.trim().is_empty() {
+        messages.push(json!({
+            "role": "system",
+            "content": format!(
+                "Summary of the earlier part of this conversation (older messages, condensed for context):\n{}",
+                rolling_summary.trim()
+            ),
+        }));
+    }
     {
         let conversation = app.state::<AssistantConversation>();
         let history = conversation.messages.lock().unwrap();
@@ -2094,12 +2169,15 @@ pub async fn run_assistant_turn(
         // explicitly below, so skip it. A deferred screen message is not in
         // history yet and therefore skips zero prior messages.
         let current_message_skip = usize::from(user_message_recorded);
-        for message in history
-            .iter()
-            .rev()
-            .skip(current_message_skip)
-            .take(max_history_messages)
-        {
+        // Don't re-send messages already folded into the rolling summary: cap
+        // the verbatim window to the un-summarized tail (no-op when off).
+        let summarized_len = summarized_len.min(history.len());
+        let unsummarized = history
+            .len()
+            .saturating_sub(summarized_len)
+            .saturating_sub(current_message_skip);
+        let take = max_history_messages.min(unsummarized);
+        for message in history.iter().rev().skip(current_message_skip).take(take) {
             chars += message.content.len();
             if chars > max_history_chars && !kept.is_empty() {
                 break;
@@ -2443,6 +2521,10 @@ pub async fn run_assistant_turn(
             emit_conversation(&app);
             persist_assistant_session(&app);
 
+            // Once the conversation outgrows the context window, fold older
+            // turns into a rolling summary off the hot path (auto-summarize).
+            maybe_spawn_auto_summarize(&app);
+
             // A Stop that lands in the tiny gap between the stream finishing and
             // here must still suppress the spoken reply.
             if app.state::<AssistantConversation>().is_cancelled() {
@@ -2721,6 +2803,164 @@ pub async fn run_summarize_turn(app: AppHandle) {
     }
 
     emit_state(&app, "idle");
+}
+
+/// Rolling-summary tuning. When auto-summarize is on and the number of
+/// still-verbatim messages exceeds the model's history window, the oldest of
+/// them are folded into the rolling summary, keeping the most recent
+/// `AUTO_SUMMARIZE_KEEP_RECENT` messages verbatim.
+const AUTO_SUMMARIZE_KEEP_RECENT: usize = 6;
+
+/// After a completed turn, fold older messages into the rolling summary when the
+/// conversation has outgrown the model's history window. Spawns the work so it
+/// never delays the reply; only one pass runs at a time (guarded), and it is a
+/// no-op when auto-summarize is off or the chat is still short.
+fn maybe_spawn_auto_summarize(app: &AppHandle) {
+    let settings = get_settings(app);
+    if !settings.assistant_auto_summarize {
+        return;
+    }
+    let conversation = app.state::<AssistantConversation>();
+    let max_history = (settings.assistant_max_history_messages as usize).max(4);
+    let keep_recent = AUTO_SUMMARIZE_KEEP_RECENT.min(max_history);
+
+    let (_, summarized_len) = conversation.rolling_summary();
+    let len = conversation.messages.lock().map(|h| h.len()).unwrap_or(0);
+    let summarized_len = summarized_len.min(len);
+
+    // Only fold once the un-summarized tail is larger than the window we send,
+    // so nothing is silently dropped: the overflow becomes summary instead.
+    if len.saturating_sub(summarized_len) <= max_history {
+        return;
+    }
+    let fold_upto = len.saturating_sub(keep_recent);
+    if fold_upto <= summarized_len {
+        return;
+    }
+    if !conversation.begin_summarizing() {
+        return; // a pass is already running
+    }
+
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        run_auto_summarize(app, summarized_len, fold_upto).await;
+    });
+}
+
+/// Fold `history[from..to]` into the rolling summary using the active assistant
+/// provider. Emits `assistant-summarizing` while it runs so the panel can show a
+/// subtle indicator. Best-effort: a failure leaves the summary unchanged and the
+/// next turn tries again.
+async fn run_auto_summarize(app: AppHandle, from: usize, to: usize) {
+    // Always release the summarize slot + clear the indicator, however we exit.
+    struct SummarizeGuard(AppHandle);
+    impl Drop for SummarizeGuard {
+        fn drop(&mut self) {
+            self.0.state::<AssistantConversation>().end_summarizing();
+            let _ = self.0.emit("assistant-summarizing", false);
+        }
+    }
+    let _guard = SummarizeGuard(app.clone());
+    let _ = app.emit("assistant-summarizing", true);
+
+    let settings = get_settings(&app);
+    let Some(provider) = settings.active_assistant_provider().cloned() else {
+        return;
+    };
+    let model = settings
+        .assistant_models
+        .get(&provider.id)
+        .cloned()
+        .unwrap_or_default();
+    if model.trim().is_empty() {
+        return;
+    }
+    let api_key = settings
+        .post_process_api_keys
+        .get(&provider.id)
+        .cloned()
+        .unwrap_or_default();
+
+    let (existing_summary, _) = app.state::<AssistantConversation>().rolling_summary();
+    let slice: Vec<ChatMessage> = {
+        let conversation = app.state::<AssistantConversation>();
+        let Ok(history) = conversation.messages.lock() else {
+            return;
+        };
+        if from >= to || to > history.len() {
+            return;
+        }
+        history[from..to].to_vec()
+    };
+
+    let mut excerpt = String::new();
+    for message in &slice {
+        let who = if message.role == "user" {
+            "User"
+        } else {
+            "Assistant"
+        };
+        excerpt.push_str(&format!("{}: {}\n\n", who, message.content.trim()));
+    }
+
+    let instruction = if existing_summary.trim().is_empty() {
+        format!(
+            "Summarize the following conversation excerpt into a compact, faithful brief that can stand in for it as background context. Preserve key facts, decisions, names, numbers, code worth keeping, preferences, and open questions. Be dense and neutral, and write it as notes rather than a reply. Output only the summary.\n\n---\n{}",
+            excerpt.trim()
+        )
+    } else {
+        format!(
+            "Below is a running summary of the earlier part of a conversation, followed by newer messages. Produce an updated, compact summary that merges them into one brief usable as background context. Preserve key facts, decisions, names, numbers, code worth keeping, preferences, and open questions. Be dense and neutral, and write it as notes rather than a reply. Output only the updated summary.\n\nRunning summary so far:\n{}\n\n---\nNewer messages:\n{}",
+            existing_summary.trim(),
+            excerpt.trim()
+        )
+    };
+
+    let messages = vec![
+        json!({"role": "system", "content": "You compress conversations into faithful, dense briefs used as background context for an assistant. You never answer or continue the conversation; you only produce the summary."}),
+        json!({"role": "user", "content": instruction}),
+    ];
+
+    // Built-in engine: ensure it is loaded and hold it open across the call.
+    let _llm_activity_guard = if provider.id == "builtin" {
+        let manager = app.state::<Arc<crate::managers::local_llm::LocalLlmManager>>();
+        if manager.ensure_running(&model).await.is_err() {
+            return;
+        }
+        Some(manager.begin_request())
+    } else {
+        None
+    };
+
+    match llm_client::send_chat_stream(
+        &provider,
+        api_key,
+        &model,
+        messages,
+        None,
+        None,
+        |_token: &str| {},
+    )
+    .await
+    {
+        Ok(text) => {
+            let text = text.trim().to_string();
+            if !text.is_empty() {
+                let conversation = app.state::<AssistantConversation>();
+                // History only grows; clamp defensively before recording how far
+                // the summary now covers.
+                let len = conversation.messages.lock().map(|h| h.len()).unwrap_or(to);
+                conversation.store_rolling_summary(text, to.min(len));
+                debug!(
+                    "Auto-summarize folded messages [{}..{}] into the rolling summary",
+                    from, to
+                );
+            }
+        }
+        Err(e) => {
+            debug!("Auto-summarize failed (will retry next turn): {}", e);
+        }
+    }
 }
 
 #[cfg(test)]

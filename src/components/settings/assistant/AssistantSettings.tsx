@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import {
-  RefreshCw,
   Check,
   Loader2,
   Volume2,
@@ -34,6 +33,7 @@ import {
   ToggleSwitch,
 } from "@/components/ui";
 import { Input } from "../../ui/Input";
+import { ModelCombo } from "../../ui/ModelCombo";
 import { Button } from "../../ui/Button";
 import { TONE_TILE } from "../../ui/tones";
 import { ProviderModeToggle } from "../PostProcessingSettingsApi/ProviderModeToggle";
@@ -91,97 +91,10 @@ const TEST_PHRASES = [
 const randomTestPhrase = (): string =>
   TEST_PHRASES[Math.floor(Math.random() * TEST_PHRASES.length)];
 
-/** An editable text field with type-to-search suggestions (native `<datalist>`)
- *  paired with a "Load" (refresh) button and an inline error line. Used for the
- *  remote-TTS voice/model pickers and the assistant model picker.
- *
- *  A plain editable input (not a react-select value chip) is deliberate: the
- *  value stays fully editable — cursor at the end, edit any character — which
- *  is what you want for tweaking a model name like `gpt-5.1-mini`, while the
- *  datalist still filters suggestions as you type. Module-scope so it isn't
- *  recreated on every parent render. */
-const LoadableSelect: React.FC<{
-  value: string;
-  options: { value: string; label: string }[];
-  onCommit: (value: string) => void;
-  onLoad: () => void;
-  loading: boolean;
-  error: string | null;
-  placeholder: string;
-  loadLabel: string;
-  disabled?: boolean;
-  /** Unused; kept for call-site compatibility. */
-  formatCreateLabel?: (input: string) => string;
-}> = ({
-  value,
-  options,
-  onCommit,
-  onLoad,
-  loading,
-  error,
-  placeholder,
-  loadLabel,
-  disabled,
-}) => {
-  const listId = React.useId();
-  const [local, setLocal] = React.useState(value);
-  React.useEffect(() => setLocal(value), [value]);
-
-  const commit = (next: string) => {
-    const trimmed = next.trim();
-    if (trimmed && trimmed !== value.trim()) onCommit(trimmed);
-  };
-
-  return (
-    <div className="flex flex-col items-end gap-1">
-      <div className="flex items-center gap-2">
-        <Input
-          type="text"
-          list={listId}
-          value={local}
-          onChange={(e) => {
-            const next = e.target.value;
-            setLocal(next);
-            // Picking a suggestion from the datalist matches an option exactly —
-            // commit immediately so a click doesn't require an extra blur.
-            if (options.some((o) => o.value === next)) commit(next);
-          }}
-          onBlur={() => commit(local)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") commit(local);
-          }}
-          placeholder={placeholder}
-          disabled={disabled}
-          className="w-[292px]"
-        />
-        <datalist id={listId}>
-          {options.map((o) => (
-            <option
-              key={o.value}
-              value={o.value}
-              label={o.label !== o.value ? o.label : undefined}
-            />
-          ))}
-        </datalist>
-        <button
-          type="button"
-          onClick={onLoad}
-          disabled={loading || disabled}
-          aria-label={loadLabel}
-          title={loadLabel}
-          className="flex h-10 w-10 items-center justify-center rounded-lg border border-mid-gray/30 hover:bg-mid-gray/10 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
-        </button>
-      </div>
-      {error && (
-        <span className="text-xs text-red-500 max-w-[360px] text-right break-words">
-          {error}
-        </span>
-      )}
-    </div>
-  );
-};
+/** Editable model/voice picker (input + datalist + refresh). Shared with the
+ *  dictation-cleanup model field via `@/components/ui/ModelCombo` so the two
+ *  never drift. Aliased here to keep the existing call sites unchanged. */
+const LoadableSelect = ModelCombo;
 
 /** Live preview of the assistant panel. Renders the REAL panel classes from
  *  AssistantPanel.css (dark-only, like the STT overlay), so the preview and
@@ -1902,6 +1815,10 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
           <Dropdown
             options={[
               {
+                value: "mini",
+                label: t("settings.assistant.appearance.panelSizes.mini"),
+              },
+              {
                 value: "compact",
                 label: t("settings.assistant.appearance.panelSizes.compact"),
               },
@@ -1989,6 +1906,15 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
             className="w-[120px]"
           />
         </SettingContainer>
+        <ToggleSwitch
+          checked={settings?.assistant_auto_summarize ?? true}
+          onChange={(value) =>
+            setAndRefresh(commands.setAssistantAutoSummarize(value))
+          }
+          label={t("settings.assistant.autoSummarize.label")}
+          description={t("settings.assistant.autoSummarize.description")}
+          grouped={true}
+        />
       </SettingsGroup>
     </div>
   );

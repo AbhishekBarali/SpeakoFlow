@@ -10,7 +10,6 @@ import {
 import { ModelStateEvent, RecordingErrorEvent } from "./lib/types/events";
 import "./App.css";
 import AccessibilityPermissions from "./components/AccessibilityPermissions";
-import { DownloadStatusWidget } from "./components/DownloadStatusWidget";
 import Footer from "./components/footer";
 import Onboarding, {
   AccessibilityOnboarding,
@@ -152,7 +151,7 @@ function App() {
   }, [t]);
 
   // Listen for paste failures and show a toast.
-  // The technical error detail is logged to handy.log on the Rust side
+  // The technical error detail is logged to speakoflow.log on the Rust side
   // (see actions.rs `error!("Failed to paste transcription: ...")`),
   // so we show a localized, user-friendly message here instead of the raw error.
   useEffect(() => {
@@ -330,9 +329,6 @@ function App() {
         </div>
         {/* Fixed footer at bottom */}
         <Footer />
-        {/* Any model still downloading (e.g. kicked off during onboarding)
-            keeps reporting progress here, bottom-right. */}
-        <DownloadStatusWidget />
       </>
     );
   }

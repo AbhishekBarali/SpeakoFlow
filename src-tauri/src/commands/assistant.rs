@@ -741,6 +741,18 @@ pub fn set_assistant_max_history_messages(app: AppHandle, count: u32) -> Result<
     Ok(())
 }
 
+/// Toggle automatic conversation summarization: when on, long chats fold older
+/// turns into a rolling summary instead of dropping them.
+#[tauri::command]
+#[specta::specta]
+pub fn set_assistant_auto_summarize(app: AppHandle, enabled: bool) -> Result<(), String> {
+    let mut settings = get_settings(&app);
+    settings.assistant_auto_summarize = enabled;
+    write_settings(&app, settings);
+    emit_settings_changed(&app);
+    Ok(())
+}
+
 // ---------------------------------------------------------------------------
 // Web search
 // ---------------------------------------------------------------------------

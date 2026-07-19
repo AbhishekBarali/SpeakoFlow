@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { ChevronLeft, ChevronRight } from "lucide-react";
 import { getVersion } from "@tauri-apps/api/app";
 import { emit } from "@tauri-apps/api/event";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -13,16 +12,10 @@ import { AppLanguageSelector } from "../AppLanguageSelector";
 import { LogDirectory } from "../debug";
 import { useSettings } from "../../../hooks/useSettings";
 
-/** Projects SpeakoFlow is built on. Shown one-at-a-time in a pager so the
- * About page stays uncluttered as the list grows. */
-const ACKNOWLEDGMENTS = ["handy", "whisper", "llamacpp", "kokoro"] as const;
-
 export const AboutSettings: React.FC = () => {
   const { t } = useTranslation();
   const { getSetting } = useSettings();
   const [version, setVersion] = useState("");
-  const [ackIndex, setAckIndex] = useState(0);
-  const currentAck = ACKNOWLEDGMENTS[ackIndex];
 
   // The auto-check preference lives in General; here we only offer a manual
   // "check now" that reuses the footer updater (same path as the tray item).
@@ -113,61 +106,6 @@ export const AboutSettings: React.FC = () => {
             {t("settings.about.license.button")}
           </Button>
         </SettingContainer>
-      </SettingsGroup>
-
-      <SettingsGroup title={t("settings.about.acknowledgments.title")}>
-        <div className="px-4 py-4">
-          <h3 className="text-sm font-medium text-ink">
-            {t(`settings.about.acknowledgments.${currentAck}.title`)}
-          </h3>
-          <p className="mt-0.5 text-xs text-muted">
-            {t(`settings.about.acknowledgments.${currentAck}.description`)}
-          </p>
-          <p className="mt-2 text-sm text-body leading-relaxed">
-            {t(`settings.about.acknowledgments.${currentAck}.details`)}
-          </p>
-
-          {ACKNOWLEDGMENTS.length > 1 && (
-            <div className="mt-4 flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                {ACKNOWLEDGMENTS.map((ack, i) => (
-                  <span
-                    key={ack}
-                    className={`h-1.5 rounded-full transition-all ${
-                      i === ackIndex ? "w-5 bg-ink" : "w-1.5 bg-mid-gray/40"
-                    }`}
-                  />
-                ))}
-              </div>
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setAckIndex(
-                      (i) =>
-                        (i - 1 + ACKNOWLEDGMENTS.length) %
-                        ACKNOWLEDGMENTS.length,
-                    )
-                  }
-                  className="p-1.5 rounded-lg text-muted hover:text-ink hover:bg-surface-strong transition-colors cursor-pointer"
-                  title={t("settings.about.acknowledgments.previous")}
-                >
-                  <ChevronLeft width={16} height={16} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setAckIndex((i) => (i + 1) % ACKNOWLEDGMENTS.length)
-                  }
-                  className="p-1.5 rounded-lg text-muted hover:text-ink hover:bg-surface-strong transition-colors cursor-pointer"
-                  title={t("settings.about.acknowledgments.next")}
-                >
-                  <ChevronRight width={16} height={16} />
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
       </SettingsGroup>
 
       <SettingsGroup title={t("settings.about.folders.title")}>

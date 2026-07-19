@@ -2,8 +2,11 @@ import React from "react";
 import { useTranslation } from "react-i18next";
 import { Feather, Sparkles } from "lucide-react";
 import { SettingsGroup } from "@/components/ui/SettingsGroup";
+import { SettingContainer } from "@/components/ui/SettingContainer";
+import { Dropdown } from "@/components/ui/Dropdown";
 import { ToggleSwitch } from "@/components/ui/ToggleSwitch";
 import { useSettings } from "@/hooks/useSettings";
+import { type PostProcessCleanupStrength } from "@/bindings";
 import {
   PostProcessingSettingsApi,
   PostProcessingSettingsPrompts,
@@ -23,6 +26,7 @@ export const AiCleanupGroup: React.FC = () => {
 
   const enabled = getSetting("post_process_enabled") ?? false;
   const fixMisheard = getSetting("post_process_fix_misheard") ?? false;
+  const cleanupStrength = getSetting("post_process_cleanup_strength") ?? "balanced";
 
   return (
     <>
@@ -44,6 +48,42 @@ export const AiCleanupGroup: React.FC = () => {
               shortcutId="transcribe_with_post_process"
               grouped={true}
             />
+            <SettingContainer
+              title={t("settings.dictation.aiCleanup.strengthLabel")}
+              info={t("settings.dictation.aiCleanup.strengthDescription")}
+              layout="horizontal"
+              grouped={true}
+            >
+              <Dropdown
+                options={[
+                  {
+                    value: "light",
+                    label: t("settings.dictation.aiCleanup.strengthOptions.light"),
+                  },
+                  {
+                    value: "balanced",
+                    label: t(
+                      "settings.dictation.aiCleanup.strengthOptions.balanced",
+                    ),
+                  },
+                  {
+                    value: "aggressive",
+                    label: t(
+                      "settings.dictation.aiCleanup.strengthOptions.aggressive",
+                    ),
+                  },
+                ]}
+                selectedValue={cleanupStrength}
+                onSelect={(value) =>
+                  updateSetting(
+                    "post_process_cleanup_strength",
+                    value as PostProcessCleanupStrength,
+                  )
+                }
+                disabled={isUpdating("post_process_cleanup_strength")}
+                className="min-w-[150px]"
+              />
+            </SettingContainer>
             <ToggleSwitch
               checked={fixMisheard}
               onChange={(value) =>

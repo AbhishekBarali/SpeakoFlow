@@ -390,6 +390,8 @@ const AssistantPanel: React.FC = () => {
   const [error, setError] = useState<AssistantError | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [state, setState] = useState<AssistantState>("idle");
+  // Background rolling-summary pass is running (long-chat auto-summarization).
+  const [summarizing, setSummarizing] = useState(false);
   const [input, setInput] = useState("");
   const [attachScreen, setAttachScreen] = useState(false);
   const [collapsed, setCollapsed] = useState(true);
@@ -638,6 +640,14 @@ const AssistantPanel: React.FC = () => {
       track(
         await listen<boolean>("assistant-screen-armed", (e) => {
           setAttachScreen(e.payload);
+        }),
+      );
+
+      // Background rolling-summary pass (long-chat auto-summarization) toggling
+      // on/off, so the panel can show a subtle "Summarizing…" indicator.
+      track(
+        await listen<boolean>("assistant-summarizing", (e) => {
+          setSummarizing(e.payload);
         }),
       );
 
@@ -1554,6 +1564,12 @@ const AssistantPanel: React.FC = () => {
               {t(`assistant.notices.${notice}`, {
                 defaultValue: t("assistant.notices.web_search_failed"),
               })}
+            </div>
+          )}
+          {summarizing && (
+            <div className="assistant-notice" role="status">
+              <Loader2 size={12} strokeWidth={2} className="apill-spin" />
+              {t("assistant.summarizing")}
             </div>
           )}
           {stream !== "" && (

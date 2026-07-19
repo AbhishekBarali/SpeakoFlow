@@ -8,6 +8,7 @@ import type {
   Replacement,
   WhisperAcceleratorSetting,
   OrtAcceleratorSetting,
+  PostProcessCleanupStrength,
 } from "@/bindings";
 import { commands } from "@/bindings";
 import { toast } from "sonner";
@@ -197,6 +198,10 @@ const settingUpdaters: {
     commands.changePostProcessEnabledSetting(value as boolean),
   post_process_fix_misheard: (value) =>
     commands.changePostProcessFixMisheardSetting(value as boolean),
+  post_process_cleanup_strength: (value) =>
+    commands.changePostProcessCleanupStrengthSetting(
+      value as PostProcessCleanupStrength,
+    ),
   flow_enabled: (value) => commands.changeFlowEnabledSetting(value as boolean),
   flow_phrase: (value) => commands.changeFlowPhraseSetting(value as string),
   flow_screen_access: (value) =>

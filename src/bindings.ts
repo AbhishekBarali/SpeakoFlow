@@ -258,6 +258,18 @@ async changePostProcessFixMisheardSetting(enabled: boolean) : Promise<Result<nul
 }
 },
 /**
+ * Set how aggressively dictation cleanup condenses the transcript
+ * (Light/Balanced/Aggressive). Separate from the writing-style tone.
+ */
+async changePostProcessCleanupStrengthSetting(strength: PostProcessCleanupStrength) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("change_post_process_cleanup_strength_setting", { strength }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * Toggle "Generate with Flow" (the spoken activation-phrase generation path).
  */
 async changeFlowEnabledSetting(enabled: boolean) : Promise<Result<null, string>> {
@@ -1795,6 +1807,18 @@ async setAssistantMaxHistoryMessages(count: number) : Promise<Result<null, strin
 }
 },
 /**
+ * Toggle automatic conversation summarization: when on, long chats fold older
+ * turns into a rolling summary instead of dropping them.
+ */
+async setAssistantAutoSummarize(enabled: boolean) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_assistant_auto_summarize", { enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * Enable or disable web search for the assistant. When enabled, a fast local
  * heuristic still decides per-question whether a search is actually run, so
  * casual chat stays instant.
@@ -2177,6 +2201,11 @@ post_process_selected_tone_id?: string | null; post_process_timeout_secs?: numbe
  */
 post_process_fix_misheard?: boolean; 
 /**
+ * How aggressively cleanup condenses the transcript (Light/Balanced/
+ * Aggressive). Separate from the writing-style tone; defaults to Balanced.
+ */
+post_process_cleanup_strength?: PostProcessCleanupStrength; 
+/**
  * "Generate with Flow": when on, a dictation that begins with the
  * activation phrase becomes a one-shot AI generation command whose result
  * is pasted instead of the spoken words. Off by default.
@@ -2225,6 +2254,12 @@ assistant_tts_base_urls?: Partial<{ [key in string]: string }>; assistant_tts_mo
  * API supports it.
  */
 assistant_tts_speed?: number; assistant_max_history_messages?: number; 
+/**
+ * When on, once a conversation grows past the model's context window the
+ * assistant folds older turns into a rolling summary (kept in context)
+ * instead of dropping them, so long chats keep flowing. On by default.
+ */
+assistant_auto_summarize?: boolean; 
 /**
  * Context window (in tokens) the built-in local LLM engine launches with.
  * Applied when the engine starts; ignored by external providers
@@ -2723,6 +2758,25 @@ export type PaginatedAssistantHistory = { entries: AssistantHistoryEntry[]; has_
 export type PaginatedHistory = { entries: HistoryEntry[]; has_more: boolean }
 export type PasteMethod = "ctrl_v" | "direct" | "none" | "shift_insert" | "ctrl_shift_v" | "external_script"
 export type PermissionAccess = "allowed" | "denied" | "unknown"
+/**
+ * How aggressively dictation cleanup condenses the transcript. This is
+ * deliberately separate from the writing-style tone (which changes *register*):
+ * strength controls how much of the speaker's rambling, repetition, and false
+ * starts get tidied away, from a near-verbatim touch-up to a tight rewrite.
+ */
+export type PostProcessCleanupStrength = 
+/**
+ * Fix mechanics + obvious filler only; keep the speaker's wording/structure.
+ */
+"light" | 
+/**
+ * Also collapse repetition/restatements and drop false starts (the default).
+ */
+"balanced" | 
+/**
+ * Also tighten rambling and reorder for clarity into clean, concise prose.
+ */
+"aggressive"
 export type PostProcessConfigSource = "dedicated_cleanup_selection" | "assistant_fallback"
 export type PostProcessProvider = { id: string; label: string; base_url: string; allow_base_url_edit?: boolean; models_endpoint?: string | null; supports_structured_output?: boolean }
 export type PostProcessReadiness = { state: "ready"; source: PostProcessConfigSource; provider_id: string; provider_label: string; model: string } | { state: "unavailable"; reason: PostProcessUnavailableReason; source: PostProcessConfigSource | null; provider_id: string | null; provider_label: string | null }

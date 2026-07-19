@@ -276,6 +276,8 @@
     "extractingGeneric": "Extracting…",
     "downloading": "Downloading {{percentage}}%",
     "downloadingMultiple": "Downloading {{count}} models…",
+    "downloadDetails": "Download details",
+    "downloadSize": "{{downloaded}} of {{total}}",
     "modelReady": "Model ready",
     "loading": "Loading {{modelName}}…",
     "loadingGeneric": "Loading…",
@@ -869,6 +871,13 @@
         "promptGroupTitle": "Cleanup prompt",
         "title": "Fix up my dictation with AI",
         "caption": "Experimental — tidies punctuation and filler after you dictate.",
+        "strengthLabel": "Cleanup strength",
+        "strengthDescription": "How much the AI rewrites your words. Light fixes only mistakes and filler. Balanced also trims repeated points and false starts. Aggressive tightens rambling into concise, well-structured text — always keeping your facts and meaning.",
+        "strengthOptions": {
+          "light": "Light",
+          "balanced": "Balanced",
+          "aggressive": "Aggressive"
+        },
         "fixMisheardLabel": "Fix misheard words",
         "fixMisheardDescription": "When a word is clearly wrong for the sentence — a homophone or a near-miss pronunciation — replace it with the word you meant. Helpful for accents; the AI only corrects when the intended word is obvious.",
         "info": "Runs a language model over your dictation to fix punctuation, remove filler words, and optionally adjust the tone. Applies to dictation only, on its own shortcut. It adds a short delay after you speak; if the model fails or times out, your raw text is used instead. Still in development."
@@ -1050,31 +1059,6 @@
         "title": "Support development",
         "description": "Help us keep building SpeakoFlow",
         "button": "Donate"
-      },
-      "acknowledgments": {
-        "title": "Acknowledgments",
-        "handy": {
-          "title": "Handy",
-          "description": "The open-source app SpeakoFlow is built on",
-          "details": "SpeakoFlow began as a fork of Handy by CJ Pais. Huge thanks to the original project and its contributors for the foundation."
-        },
-        "whisper": {
-          "title": "Whisper.cpp",
-          "description": "High-performance inference of OpenAI's Whisper automatic speech recognition model",
-          "details": "SpeakoFlow uses Whisper.cpp for fast, local speech-to-text processing. Thanks to the amazing work by Georgi Gerganov and contributors."
-        },
-        "llamacpp": {
-          "title": "llama.cpp",
-          "description": "The engine powering the built-in local language model",
-          "details": "SpeakoFlow runs local LLMs with llama.cpp. Thanks to Georgi Gerganov and the ggml community for making fast, on-device inference possible."
-        },
-        "kokoro": {
-          "title": "Kokoro",
-          "description": "The local text-to-speech voice for the assistant",
-          "details": "SpeakoFlow speaks replies using the Kokoro TTS model, running entirely on your device. Thanks to the Kokoro project and its contributors."
-        },
-        "previous": "Previous",
-        "next": "Next"
       }
     },
     "assistant": {
@@ -1216,6 +1200,10 @@
       "memory": {
         "label": "Conversation memory",
         "description": "How many recent messages are sent as context each turn. 0 disables memory."
+      },
+      "autoSummarize": {
+        "label": "Summarize long chats",
+        "description": "When a conversation grows past the model's context window, automatically condense older messages into a running summary so the chat keeps its context instead of forgetting the start. A subtle indicator shows while it runs."
       },
       "responseLength": {
         "label": "Response length",
@@ -1372,6 +1360,7 @@
         "panelSizeLabel": "Panel size",
         "panelSizeDescription": "Overall size of the floating assistant panel. You can also drag its edges to resize.",
         "panelSizes": {
+          "mini": "Small",
           "compact": "Compact",
           "standard": "Standard",
           "large": "Large"
@@ -1488,6 +1477,7 @@
     "copy": "Copy",
     "copyCode": "Copy code",
     "regenerate": "Regenerate answer (the old one stays in History)",
+    "summarizing": "Summarizing earlier messages…",
     "screenAttached": "Screen",
     "attachScreen": "Screen vision — attach your screen to each message until turned off",
     "detachScreen": "Turn off screen vision",
