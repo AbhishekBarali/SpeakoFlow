@@ -19,18 +19,32 @@
 
 ---
 
-Press a hotkey and talk, and your words are typed into whatever app you're using. Speech-to-text runs locally on your machine. The AI assistant runs on any model you choose, including a fully offline one, so you can keep everything on your device if you want to.
+Press a hotkey and talk, and your words are typed into whatever app you're using. Say "Hey Flow" to turn what you say into a finished reply or email, or open a floating assistant panel to chat by voice.
+
+Speech-to-text runs locally on your machine, so your voice never leaves your device. The assistant runs on any model you choose, including a fully offline one, so you can keep everything local if you want to.
 
 ## Features
 
-- **Dictation.** Talk into any app. Words appear live as you speak or all at once when you stop.
-- **Generate with Flow.** Start a dictation with "Hey Flow" and it writes the reply, email, or draft and pastes it for you.
-- **Translate.** Speak another language and get clean English (with a Whisper model).
-- **AI cleanup.** Remove filler and fix grammar in a tone you choose.
-- **Assistant panel.** A floating chat you open with a hotkey. It can talk back and read your screen when you ask.
-- **Optional extras.** Web search, spoken answers, assistant profiles, and on-device memory. All off until you turn them on.
+- **Dictation.** Press a hotkey and talk. Words type into any app, live as you speak or all at once when you stop. Transcription runs on your GPU or CPU.
+- **Generate with Flow.** Begin a dictation with "Hey Flow" and it writes the reply, email, or draft and pastes it for you. You can rename the phrase.
+- **Translate.** Speak another language and get clean English, on your device (with a Whisper model).
+- **AI cleanup.** Strip filler and fix grammar in a tone you choose: Professional, Friendly, Concise, or your own.
+- **Assistant panel.** A floating chat you open with a hotkey. Ask by voice or text, get streaming answers, and have them read back aloud.
+- **Screen vision.** Ask about what's on your screen and the assistant answers with that context. It only looks when you tell it to.
+- **Web search.** Optional. The assistant can look things up for current, factual answers.
+- **Profiles.** Switch the assistant between personas, each with its own voice and reply length.
+- **Personal memory.** Optional, on-device memory so the assistant learns how you like to work. Off until you turn it on.
 
 Everything lives in Settings, and every hotkey is rebindable.
+
+## Default hotkeys
+
+| Action | Windows | macOS | Linux |
+| --- | --- | --- | --- |
+| Dictate | `Left Ctrl + Left Super` | `Option + Space` | `Ctrl + Space` |
+| Ask the assistant | `Left Ctrl + Left Alt` | `Option + Ctrl + Space` | `Ctrl + Alt + Space` |
+
+Hold to talk, or tap `Space` while holding to keep recording hands-free. All shortcuts are configurable in Settings.
 
 ## Install
 
@@ -57,6 +71,17 @@ See [BUILD.md](BUILD.md) for platform-specific setup.
 
 Your voice is transcribed on your device and never uploaded. The assistant only contacts the model provider you choose, which can be fully local. No telemetry, no account.
 
+## Roadmap
+
+- Code signing for Windows and macOS
+- A wider model catalog and more one-click local models
+- More community translations
+- Voice-to-text tuned for agentic coding
+- Prompt-engineering help: describe what you want to build and get a solid prompt back
+- Voice commands: trigger actions and complete tasks by voice
+
+Have an idea? Open a [Discussion](https://github.com/AbhishekBarali/SpeakoFlow/discussions).
+
 ## Contributing
 
 Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md), and [CONTRIBUTING_TRANSLATIONS.md](CONTRIBUTING_TRANSLATIONS.md) to help translate the app.
@@ -67,7 +92,7 @@ Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md), and [CONTRIBU
 
 ## Credits
 
-SpeakoFlow builds on [Handy](https://github.com/cjpais/Handy) by CJ Pais, which provides the local dictation core, under the MIT license. Thanks also to [Tauri](https://tauri.app), whisper.cpp, llama.cpp, Silero VAD, and [Kokoro](https://github.com/hexgrad/kokoro).
+SpeakoFlow started as a fork of [Handy](https://github.com/cjpais/Handy) by CJ Pais, which provides the local dictation core, under the MIT license. Thanks also to [Tauri](https://tauri.app), whisper.cpp, llama.cpp, Silero VAD, and [Kokoro](https://github.com/hexgrad/kokoro).
 
 <div align="center">
 
