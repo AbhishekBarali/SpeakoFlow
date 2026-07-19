@@ -15,7 +15,7 @@
 
 [Download](https://github.com/AbhishekBarali/SpeakoFlow/releases) &nbsp;·&nbsp; [Website](https://www.speakoflow.com) &nbsp;·&nbsp; [Discussions](https://github.com/AbhishekBarali/SpeakoFlow/discussions)
 
-<img src="assets/lighto.gif" alt="SpeakoFlow live dictation demo" width="720" />
+<img src="assets/darko.gif" alt="SpeakoFlow live dictation demo" width="720" />
 
 </div>
 
