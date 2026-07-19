@@ -7,7 +7,7 @@
 
 ### You think faster than you type.
 
-**A free, local‑first voice assistant for your desktop — dictation, writing, and a real AI assistant, all by voice, all from one hotkey.**
+**A free, local‑first voice assistant for your desktop — dictation, writing, and a real AI assistant, all by voice, each a hotkey away.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-2ea44f.svg)](LICENSE)
 [![Platforms](https://img.shields.io/badge/platforms-Windows%20%7C%20macOS%20%7C%20Linux-informational)](#-getting-started)
@@ -288,10 +288,12 @@ Three windows ship from one app: the settings window, the floating assistant pan
 
 SpeakoFlow is actively developed. On the horizon:
 
-- 📚 Full documentation site (this README is the entry point for now)
 - ✍️ Code signing for Windows & macOS installers
-- 🌱 Wider model catalog and more one‑click local models
+- 🌱 A wider model catalog and more one‑click local models
 - 🌍 More community translations ([contribute here](CONTRIBUTING_TRANSLATIONS.md))
+- 💻 Voice‑to‑text tuned for **agentic coding** — a fast, hands‑free way for developers to talk to their AI coding tools
+- 🧭 **Prompt‑engineering help** — describe what you want to build and get a well‑crafted prompt back, minus the trial‑and‑error
+- 🎛️ **Voice commands** — trigger actions and complete tasks hands‑free, just by saying what you want
 
 Have an idea? Open a [Discussion](https://github.com/AbhishekBarali/SpeakoFlow/discussions) — feature proposals are welcome before a PR.
 
