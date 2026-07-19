@@ -15,7 +15,7 @@
 
 [Download](https://github.com/AbhishekBarali/SpeakoFlow/releases) &nbsp;·&nbsp; [Website](https://www.speakoflow.com) &nbsp;·&nbsp; [Discussions](https://github.com/AbhishekBarali/SpeakoFlow/discussions)
 
-<img src="assets/hero.gif" alt="SpeakoFlow live dictation demo" width="720" />
+<img src="assets/lighto.gif" alt="SpeakoFlow live dictation demo" width="720" />
 
 </div>
 
@@ -30,6 +30,7 @@
 - [Build from source](#build-from-source)
 - [Tech stack](#tech-stack)
 - [Privacy](#privacy)
+- [Troubleshooting](#troubleshooting)
 - [Roadmap](#roadmap)
 - [Contributing](#contributing)
 - [License](#license)
@@ -57,10 +58,10 @@ Everything lives in Settings, and every hotkey is rebindable.
 
 ## Default hotkeys
 
-| Action | Windows | macOS | Linux |
-| --- | --- | --- | --- |
-| Dictate | `Left Ctrl + Left Super` | `Option + Space` | `Ctrl + Space` |
-| Ask the assistant | `Left Ctrl + Left Alt` | `Option + Ctrl + Space` | `Ctrl + Alt + Space` |
+| Action            | Windows                  | macOS                   | Linux                |
+| ----------------- | ------------------------ | ----------------------- | -------------------- |
+| Dictate           | `Left Ctrl + Left Super` | `Option + Space`        | `Ctrl + Space`       |
+| Ask the assistant | `Left Ctrl + Left Alt`   | `Option + Ctrl + Space` | `Ctrl + Alt + Space` |
 
 Hold to talk, or tap `Space` while holding to keep recording hands-free. All shortcuts are configurable in Settings.
 
@@ -99,6 +100,19 @@ See [BUILD.md](BUILD.md) for platform-specific setup.
 ## Privacy
 
 Your voice is transcribed on your device and never uploaded. The assistant only contacts the model provider you choose, which can be a fully local one. There is no telemetry and no account. Optional features like web search and personal memory are off until you turn them on, and memory is stored on your device where you can view, edit, or erase it.
+
+## Troubleshooting
+
+### Linux: the recording overlay won't stay on top of other apps
+
+The recording overlay has to float above every other window. On Linux that is only possible two ways: the `wlr-layer-shell` protocol (used by wlroots compositors like Sway and Hyprland, and by KDE Plasma) or classic X11 "keep above" stacking.
+
+**A native GNOME/Wayland session supports neither** — Mutter does not implement `wlr-layer-shell`, and Wayland gives apps no way to raise themselves above others. So under native GNOME/Wayland the overlay can't stay on top.
+
+SpeakoFlow handles this automatically: when it detects GNOME on Wayland it runs under **XWayland**, where "keep above" works and the overlay floats normally. This is on by default and needs no setup. X11 sessions and KDE/wlroots Wayland already work out of the box.
+
+- Force native Wayland anyway (the overlay may not stay on top): launch with `SPEAKOFLOW_ALLOW_WAYLAND=1`.
+- If the overlay misbehaves under a layer-shell compositor, disable layer shell with `SPEAKOFLOW_NO_GTK_LAYER_SHELL=1`.
 
 ## Roadmap
 
