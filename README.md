@@ -23,7 +23,7 @@
 
 ---
 
-SpeakoFlow is a free, open-source, local-first voice assistant for your desktop — a private alternative to cloud dictation tools like Wispr&nbsp;Flow, Aqua&nbsp;Voice, and Typeless. Dictate into any app, say **"Hey Flow"** to turn speech into finished writing, and chat with an AI assistant that can talk back and see your screen — all running on models you control.
+SpeakoFlow is a free, open-source, local-first voice assistant for your desktop — a private alternative to popular dictation tools like Wispr&nbsp;Flow, superwhisper, and Aqua&nbsp;Voice. Dictate into any app, say **"Hey Flow"** to turn speech into finished writing, and chat with an AI assistant that can talk back and see your screen — all running on models you control.
 
 ## Table of contents
 
@@ -62,7 +62,7 @@ The important part: **your voice never leaves your machine.** Speech-to-text run
 
 ## Why SpeakoFlow
 
-Tools like Wispr Flow, Aqua Voice, and Typeless are polished and popular — but they're closed-source, cloud-based, and subscription-priced. SpeakoFlow takes a different approach:
+Tools like Wispr Flow, superwhisper, and Aqua Voice are polished and popular — but they're closed-source and paid. SpeakoFlow takes a different approach:
 
 - **Runs locally.** Transcription happens on your own device, never on someone else's server.
 - **Open source (MIT).** Read it, fork it, self-host it — no black box.
