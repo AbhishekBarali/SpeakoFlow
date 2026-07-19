@@ -1,0 +1,87 @@
+name: "Release (unsigned)"
+
+# Manually-triggered UNSIGNED release. Creates a DRAFT GitHub Release and builds
+# the mainstream desktop targets via the reusable build.yml with
+# sign-binaries: false — so it needs NO Apple/Azure certificates and NO Tauri
+# updater key (build.yml auto-neutralizes the signCommand + createUpdaterArtifacts
+# for unsigned builds). The installers attach to the draft release; a maintainer
+# reviews and clicks "Publish".
+#
+# Trade-offs of an unsigned release (intentional, for an early build):
+#   * Windows SmartScreen / macOS Gatekeeper will warn ("unknown publisher").
+#   * Auto-update is disabled (no signed updater artifacts).
+# Use the signed release.yml once signing secrets are configured
+# (see docs/TODO_BEFORE_RELEASE.md §3).
+#
+# Targets: the three mainstream desktops proven green by test-build.yml
+# (Apple Silicon, x86_64 Linux AppImage, x86_64 Windows). Add the remaining
+# release.yml targets (Intel mac, ARM Linux/Windows, deb/rpm) here once verified.
+
+on: workflow_dispatch
+
+jobs:
+  create-release:
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    outputs:
+      release-id: ${{ steps.create-release.outputs.result }}
+      version: ${{ steps.get-version.outputs.version }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Get version from tauri.conf.json
+        id: get-version
+        shell: bash
+        run: |
+          VERSION=$(grep -o '"version": "[^"]*"' src-tauri/tauri.conf.json | cut -d'"' -f4)
+          echo "Application version from tauri.conf.json: $VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Create Draft Release
+        id: create-release
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const { data } = await github.rest.repos.createRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: `v${{ steps.get-version.outputs.version }}`,
+              name: `v${{ steps.get-version.outputs.version }}`,
+              draft: true,
+              prerelease: false,
+              generate_release_notes: true
+            })
+            return data.id
+
+  publish:
+    permissions:
+      contents: write
+    needs: create-release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: "macos-26" # Apple Silicon (M1+)
+            args: "--target aarch64-apple-darwin"
+            target: "aarch64-apple-darwin"
+          - platform: "ubuntu-24.04" # AppImage only (self-contained engine libs)
+            args: "--bundles appimage"
+            target: "x86_64-unknown-linux-gnu"
+          - platform: "windows-latest" # .msi + NSIS .exe
+            args: ""
+            target: "x86_64-pc-windows-msvc"
+
+    uses: ./.github/workflows/build.yml
+    with:
+      platform: ${{ matrix.platform }}
+      target: ${{ matrix.target }}
+      build-args: ${{ matrix.args }}
+      sign-binaries: false
+      asset-prefix: "speakoflow"
+      upload-artifacts: false
+      release-id: ${{ needs.create-release.outputs.release-id }}
+      # Releases always build from scratch — never restore a possibly-stale cache.
+      no-cache: true
+    secrets: inherit
