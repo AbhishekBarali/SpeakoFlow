@@ -202,6 +202,12 @@ fn create_client(provider: &PostProcessProvider, api_key: &str) -> Result<reqwes
         // (Azure) on large bodies, e.g. multi-hundred-KB image payloads
         // arriving truncated ("Unterminated string" 400s).
         .http1_only()
+        // Bound connection setup so an unreachable/hung host fails fast instead
+        // of leaving a turn pending forever (which would pin the built-in
+        // engine's in-flight guard and block idle-unload). Intentionally NOT an
+        // overall `.timeout()`: that would abort long, legitimate streaming
+        // generations. Per-chunk stall detection lives in `read_sse_round`.
+        .connect_timeout(std::time::Duration::from_secs(30))
         .build()
         .map_err(|e| format!("Failed to build HTTP client: {}", e))
 }
@@ -662,14 +668,33 @@ async fn read_sse_round(
     response: reqwest::Response,
     mut on_token: impl FnMut(&str),
 ) -> Result<ChatRound, String> {
+    // Abort a stream that goes silent for too long. A stalled provider — or a
+    // wedged local llama-server (e.g. KV-cache exhaustion) — would otherwise
+    // keep this future pending indefinitely, which pins the assistant turn's
+    // in-flight guard so the built-in engine never idle-unloads and its RAM is
+    // never reclaimed. Generous enough not to trip on slow first tokens or long
+    // reasoning pauses between chunks.
+    const SSE_STALL_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(120);
+
     let mut stream = response.bytes_stream();
     let mut accumulator = SseChatAccumulator::default();
 
-    while let Some(chunk) = stream.next().await {
-        let chunk = chunk.map_err(|error| format!("Stream read failed: {}", error))?;
-        accumulator.push(&chunk, &mut on_token);
-        if accumulator.is_done() {
-            break;
+    loop {
+        match tokio::time::timeout(SSE_STALL_TIMEOUT, stream.next()).await {
+            Ok(Some(chunk)) => {
+                let chunk = chunk.map_err(|error| format!("Stream read failed: {}", error))?;
+                accumulator.push(&chunk, &mut on_token);
+                if accumulator.is_done() {
+                    break;
+                }
+            }
+            Ok(None) => break, // stream ended normally
+            Err(_) => {
+                return Err(format!(
+                    "LLM stream stalled: no data for {}s",
+                    SSE_STALL_TIMEOUT.as_secs()
+                ));
+            }
         }
     }
 

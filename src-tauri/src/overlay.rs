@@ -330,6 +330,9 @@ pub fn create_recording_overlay(app_handle: &AppHandle) {
         "recording_overlay",
         tauri::WebviewUrl::App("src/overlay/index.html".into()),
     )
+    // Must match every other window's args (see WEBVIEW2_BROWSER_ARGS).
+    // Windows/WebView2 only; no-op on macOS/Linux.
+    .additional_browser_args(crate::WEBVIEW2_BROWSER_ARGS)
     .title("Recording")
     .resizable(false)
     .inner_size(OVERLAY_WIDTH, OVERLAY_HEIGHT)
@@ -572,11 +575,34 @@ pub fn hide_recording_overlay(app_handle: &AppHandle) {
 }
 
 pub fn emit_levels(app_handle: &AppHandle, levels: &Vec<f32>) {
-    // emit levels to main app
-    let _ = app_handle.emit("mic-level", levels);
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::time::{SystemTime, UNIX_EPOCH};
 
-    // also emit to the recording overlay if it's open
-    if let Some(overlay_window) = app_handle.get_webview_window("recording_overlay") {
-        let _ = overlay_window.emit("mic-level", levels);
+    // Throttle to ~30 FPS. Ported from Handy #1279: every `emit` becomes an
+    // `evaluate_script` call in each listening WebView, and wry's
+    // `evaluate_script` has an upstream memory leak (tauri-apps/wry#1489; the
+    // WebView2/Windows equivalent is tauri#12724) that accumulates per call and
+    // is never released. The audio visualizer fired this ~94x/sec — and
+    // previously TWICE per frame via a redundant second broadcast — so over a
+    // long session WebView memory grew into the gigabytes and eventually caused
+    // swap thrashing / OOM (the "memory climbs, disk 100%, PC freezes" reports).
+    // ~30 FPS keeps the meter smooth while cutting emit volume by roughly 6x.
+    const EMIT_THROTTLE_MS: u64 = 33;
+    static LAST_EMIT_MS: AtomicU64 = AtomicU64::new(0);
+
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64;
+    if now.saturating_sub(LAST_EMIT_MS.load(Ordering::Relaxed)) < EMIT_THROTTLE_MS {
+        return;
     }
+    LAST_EMIT_MS.store(now, Ordering::Relaxed);
+
+    // A single global broadcast reaches every window that registered a
+    // `mic-level` listener (currently the recording overlay AND the assistant
+    // panel) and, thanks to Tauri's listener filtering, does not evaluate script
+    // in windows without one. This replaces the old pair of `.emit()` calls that
+    // delivered the event to the overlay twice per frame.
+    let _ = app_handle.emit("mic-level", levels);
 }

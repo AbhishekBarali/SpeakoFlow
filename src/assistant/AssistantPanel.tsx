@@ -1290,6 +1290,21 @@ const AssistantPanel: React.FC = () => {
                     <Square size={11} strokeWidth={2.75} />
                   </button>
                 )}
+                {/* Cancel during voice capture: aborts the recording/
+                    transcription without sending it (the ✗ the comment above
+                    promised). Wired to the global cancel so it stops recording,
+                    STT, and any in-flight turn. */}
+                {(isListening || state === "transcribing") && (
+                  <button
+                    className="apill-btn danger apill-stop"
+                    onClick={cancelVoice}
+                    onMouseDown={stopDrag}
+                    title={t("assistant.cancel")}
+                    aria-label={t("assistant.cancel")}
+                  >
+                    <X size={11} strokeWidth={2.75} />
+                  </button>
+                )}
               </div>
             </>
           ) : (
@@ -1734,26 +1749,40 @@ const AssistantPanel: React.FC = () => {
               }
             }}
           />
-          <button
-            className="assistant-send-button"
-            onClick={isListening ? finishVoice : showStop ? stopTurn : sendText}
-            disabled={!isListening && !showStop && !input.trim()}
-            title={
-              isListening
-                ? t("assistant.finish")
-                : showStop
-                  ? t("assistant.stop")
-                  : t("assistant.send")
-            }
-          >
-            {isListening ? (
-              <Check size={16} strokeWidth={2.75} />
-            ) : showStop ? (
-              <Square size={15} strokeWidth={2.5} />
-            ) : (
-              <ArrowUp size={16} strokeWidth={2.5} />
-            )}
-          </button>
+          {(isListening || state === "transcribing") && (
+            <button
+              className="assistant-send-button"
+              onClick={cancelVoice}
+              title={t("assistant.cancel")}
+              aria-label={t("assistant.cancel")}
+            >
+              <X size={16} strokeWidth={2.75} />
+            </button>
+          )}
+          {state !== "transcribing" && (
+            <button
+              className="assistant-send-button"
+              onClick={
+                isListening ? finishVoice : showStop ? stopTurn : sendText
+              }
+              disabled={!isListening && !showStop && !input.trim()}
+              title={
+                isListening
+                  ? t("assistant.finish")
+                  : showStop
+                    ? t("assistant.stop")
+                    : t("assistant.send")
+              }
+            >
+              {isListening ? (
+                <Check size={16} strokeWidth={2.75} />
+              ) : showStop ? (
+                <Square size={15} strokeWidth={2.5} />
+              ) : (
+                <ArrowUp size={16} strokeWidth={2.5} />
+              )}
+            </button>
+          )}
         </div>
       </div>
     </div>

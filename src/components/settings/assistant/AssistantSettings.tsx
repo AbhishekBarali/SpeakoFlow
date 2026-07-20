@@ -423,9 +423,50 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
   const kokoroReadyKey = `speakoflow.kokoro.ready.${ttsDtype}`;
   const [kokoroPrepared, setKokoroPrepared] = useState(false);
 
+  // Reflect the ACTUAL browser cache, not just a local flag. kokoro-js
+  // (transformers.js) caches model weights in the "transformers-cache" Cache
+  // Storage; if this precision's weights are already present, the model is
+  // ready and we must NOT prompt a re-download. This fixes "have to click
+  // Download every time you switch": the old flag was keyed per-precision and
+  // only set from this page, so it desynced from reality (e.g. after the live
+  // panel had already downloaded the model). Falls back to the local flag if
+  // the Cache API is unavailable, so there's no regression.
   useEffect(() => {
-    setKokoroPrepared(window.localStorage.getItem(kokoroReadyKey) === "true");
-  }, [kokoroReadyKey]);
+    let cancelled = false;
+    const dtypeSuffix: Record<string, string> = {
+      fp32: "",
+      fp16: "_fp16",
+      q8: "_quantized",
+      int8: "_int8",
+      uint8: "_uint8",
+      q4: "_q4",
+      q4f16: "_q4f16",
+      bnb4: "_bnb4",
+    };
+    const refresh = async () => {
+      let cached = false;
+      try {
+        if (typeof caches !== "undefined") {
+          const cache = await caches.open("transformers-cache");
+          const urls = (await cache.keys())
+            .map((r) => r.url)
+            .filter((u) => u.includes("Kokoro-82M"));
+          const file = `model${dtypeSuffix[ttsDtype] ?? ""}.onnx`;
+          cached =
+            urls.some((u) => u.includes(file)) ||
+            urls.some((u) => u.endsWith(".onnx"));
+        }
+      } catch {
+        cached = false;
+      }
+      const flagged = window.localStorage.getItem(kokoroReadyKey) === "true";
+      if (!cancelled) setKokoroPrepared(cached || flagged);
+    };
+    void refresh();
+    return () => {
+      cancelled = true;
+    };
+  }, [kokoroReadyKey, ttsDtype]);
 
   const rememberKokoroReady = () => {
     window.localStorage.setItem(kokoroReadyKey, "true");

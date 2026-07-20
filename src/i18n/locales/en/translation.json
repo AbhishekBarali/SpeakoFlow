@@ -1471,6 +1471,7 @@
     "inputPlaceholderScreen": "Ask about your screen…",
     "send": "Send",
     "stop": "Stop",
+    "cancel": "Cancel",
     "finish": "Finish & send",
     "clear": "Clear conversation",
     "hide": "Hide panel",

@@ -40,6 +40,30 @@ function hasWebGpu(): boolean {
   return typeof navigator !== "undefined" && "gpu" in navigator;
 }
 
+/** Best-effort release of the kokoro-js model's ONNX session + WebGPU buffers.
+ *  kokoro-js wraps a transformers.js model whose `.dispose()` frees the
+ *  onnxruntime InferenceSession(s) (hundreds of MB, plus GPU buffers). The
+ *  exact shape isn't in our minimal type, so probe the known locations and
+ *  swallow errors — nulling the ref then lets GC reclaim the rest. Without
+ *  this, changing precision / disabling TTS / closing the panel orphaned a
+ *  full model in the WebView, a major contributor to the memory growth. */
+async function disposeModel(model: KokoroModel | null): Promise<void> {
+  if (!model) return;
+  try {
+    const anyModel = model as unknown as {
+      dispose?: () => unknown;
+      model?: { dispose?: () => unknown };
+    };
+    if (typeof anyModel.dispose === "function") {
+      await anyModel.dispose();
+    } else if (typeof anyModel.model?.dispose === "function") {
+      await anyModel.model.dispose();
+    }
+  } catch {
+    // best-effort; the GC reclaims the rest once the ref is dropped
+  }
+}
+
 /**
  * Local TTS via kokoro-js. Prefers WebGPU (fp32, ~10x faster than wasm on a
  * discrete GPU) with wasm/q8 fallback. Sentences are synthesized as a stream
@@ -148,6 +172,11 @@ export function useKokoroTts(
     } else if (!enabled) {
       setError(null);
       setStatus((s) => (s === "speaking" || s === "ready" ? "off" : s));
+      // Turned off: free the model so its ONNX/WebGPU memory isn't pinned for
+      // the WebView's lifetime. It reloads on demand if re-enabled.
+      void disposeModel(modelRef.current);
+      modelRef.current = null;
+      loadingRef.current = null;
     }
   }, [enabled, preload, ensureLoaded]);
 
@@ -157,6 +186,17 @@ export function useKokoroTts(
     const el = playingRef.current;
     if (el) {
       el.pause();
+      // Revoke the in-flight clip's object URL. onended/onerror (which normally
+      // revoke) don't fire on pause(), so without this every interrupted or
+      // restarted spoken reply leaked a blob URL.
+      if (el.src) {
+        try {
+          URL.revokeObjectURL(el.src);
+        } catch {
+          // ignore
+        }
+        el.removeAttribute("src");
+      }
       playingRef.current = null;
     }
     setError(null);
@@ -169,6 +209,9 @@ export function useKokoroTts(
     if (dtypeRef.current === dtype) return;
     dtypeRef.current = dtype;
     stop();
+    // Release the old-precision session before dropping the ref, or its
+    // ONNX/WebGPU memory leaks on every precision change.
+    void disposeModel(modelRef.current);
     modelRef.current = null;
     loadingRef.current = null;
     setStatus("off");
@@ -176,6 +219,31 @@ export function useKokoroTts(
       ensureLoaded().catch(() => {});
     }
   }, [dtype, enabled, preload, ensureLoaded, stop]);
+
+  // Release the model + audio when the hook unmounts (e.g. the panel window is
+  // torn down). The ONNX session and its WebGPU buffers are hundreds of MB;
+  // without this they leak for the lifetime of the WebView.
+  useEffect(() => {
+    return () => {
+      generationRef.current += 1;
+      queueRef.current = [];
+      const el = playingRef.current;
+      if (el) {
+        el.pause();
+        if (el.src) {
+          try {
+            URL.revokeObjectURL(el.src);
+          } catch {
+            // ignore
+          }
+        }
+        playingRef.current = null;
+      }
+      void disposeModel(modelRef.current);
+      modelRef.current = null;
+      loadingRef.current = null;
+    };
+  }, []);
 
   /** Play queued blobs back-to-back; exits when queue drains. */
   const pump = useCallback((generation: number) => {

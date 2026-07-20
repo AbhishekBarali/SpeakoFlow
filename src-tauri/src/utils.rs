@@ -46,6 +46,13 @@ pub fn cancel_current_operation(app: &AppHandle) {
         use tauri::Emitter;
         let _ = app.emit("assistant-tts-stop", ());
     }
+    // Reset the assistant panel/pill to idle. The panel renders purely from
+    // `assistant-state` events, so without this an in-progress capture
+    // (listening / transcribing / thinking / speaking) stays visually stuck
+    // after a cancel even though the recording and turn have actually stopped —
+    // the "I pressed cancel and nothing happened" bug. Safe/idempotent when the
+    // panel is hidden or already idle.
+    crate::assistant::emit_state(app, "idle");
 
     // Update tray icon and hide overlay
     change_tray_icon(app, crate::tray::TrayIconState::Idle);
