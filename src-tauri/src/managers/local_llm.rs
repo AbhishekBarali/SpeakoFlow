@@ -609,7 +609,19 @@ impl LocalLlmManager {
             cmd.creation_flags(CREATE_NO_WINDOW);
         }
 
-        cmd.spawn()
+        let child = cmd.spawn()?;
+
+        // Tie the engine's lifetime to ours. On Windows we place it in a
+        // kill-on-close Job Object so it is terminated even if we crash, panic,
+        // or are force-killed by the OS during a memory-pressure freeze — the
+        // paths where `Drop` / exit handlers never run and an orphaned multi-GB
+        // `llama-server.exe` would otherwise survive and keep exhausting RAM.
+        // The graceful quit path additionally calls `stop()` via `RunEvent::Exit`
+        // in `lib.rs`.
+        #[cfg(windows)]
+        assign_child_to_kill_on_close_job(&child);
+
+        Ok(child)
     }
 
     /// True if something is currently accepting TCP connections on the engine
@@ -889,5 +901,71 @@ impl Drop for LlmActivityGuard {
 impl Drop for LocalLlmManager {
     fn drop(&mut self) {
         self.stop();
+    }
+}
+
+/// Assign a spawned engine child to a process-wide Job Object configured with
+/// `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`. The job handle is created once and kept
+/// open for the entire process lifetime (stored as a raw `isize` in a
+/// `OnceLock`), so the only event that closes the job's last handle is THIS
+/// process terminating — at which point Windows kills every process in the job,
+/// including `llama-server.exe`.
+///
+/// This is the crash / force-kill backstop for orphaned engine processes (the
+/// root cause of the "memory keeps climbing, disk hits 100%, PC freezes"
+/// reports). The normal quit path also calls `stop()` via `RunEvent::Exit`, but
+/// that — like `Drop` — never runs when the process is killed hard (panic,
+/// crash, or the OS reaping us during a low-memory freeze).
+#[cfg(windows)]
+fn assign_child_to_kill_on_close_job(child: &Child) {
+    use std::os::windows::io::AsRawHandle;
+    use std::sync::OnceLock;
+    use windows::core::PCWSTR;
+    use windows::Win32::Foundation::HANDLE;
+    use windows::Win32::System::JobObjects::{
+        AssignProcessToJobObject, CreateJobObjectW, JobObjectExtendedLimitInformation,
+        SetInformationJobObject, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
+        JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
+    };
+
+    // Raw job handle value (stored as isize so it is Send + Sync for the
+    // OnceLock). 0 means creation failed; we then skip assignment so a failure
+    // here only disables cleanup rather than breaking engine startup.
+    static JOB: OnceLock<isize> = OnceLock::new();
+
+    let job_raw = *JOB.get_or_init(|| unsafe {
+        match CreateJobObjectW(None, PCWSTR::null()) {
+            Ok(job) => {
+                let mut info = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
+                info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+                if let Err(e) = SetInformationJobObject(
+                    job,
+                    JobObjectExtendedLimitInformation,
+                    &info as *const _ as *const core::ffi::c_void,
+                    std::mem::size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32,
+                ) {
+                    warn!("Failed to configure engine Job Object (orphan cleanup disabled): {e}");
+                }
+                job.0 as isize
+            }
+            Err(e) => {
+                warn!("Failed to create engine Job Object (orphan cleanup disabled): {e}");
+                0
+            }
+        }
+    });
+
+    if job_raw == 0 {
+        return;
+    }
+
+    let job = HANDLE(job_raw as *mut core::ffi::c_void);
+    let child_handle = HANDLE(child.as_raw_handle() as *mut core::ffi::c_void);
+    // SAFETY: `job` is a valid job handle kept open for the process lifetime and
+    // `child_handle` is the live child's process handle owned by `child`.
+    unsafe {
+        if let Err(e) = AssignProcessToJobObject(job, child_handle) {
+            warn!("Failed to assign engine process to Job Object: {e}");
+        }
     }
 }

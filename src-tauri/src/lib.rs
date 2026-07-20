@@ -31,6 +31,26 @@ mod utils;
 mod web_search;
 
 pub use cli::CliArgs;
+
+/// WebView2 (Windows) browser arguments, applied IDENTICALLY to every window.
+///
+/// Why identical on every window: `wry` creates a WebView2 environment per
+/// window sharing one user-data directory, and WebView2 refuses to create a
+/// window whose browser args differ from an existing environment on the same
+/// directory. So every `WebviewWindowBuilder` in this app MUST pass exactly this
+/// string via `.additional_browser_args(crate::WEBVIEW2_BROWSER_ARGS)`.
+///
+/// - Preserves wry's defaults (`--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection`),
+///   which `additional_browser_args` would otherwise REPLACE.
+/// - `--enable-unsafe-webgpu` lets the in-panel Kokoro TTS run on the GPU (fp32)
+///   instead of the robotic wasm/q8 fallback. If the GPU/driver can't do WebGPU,
+///   kokoro-js safely falls back to wasm exactly as before (no regression).
+/// - `--autoplay-policy=no-user-gesture-required` lets a spoken reply start
+///   without a prior click (otherwise the WebView blocks TTS audio silently).
+///
+/// Has no effect on macOS (WKWebView) or Linux (WebKitGTK) — those backends
+/// ignore this attribute — so it is safe to pass unconditionally.
+pub const WEBVIEW2_BROWSER_ARGS: &str = "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --enable-unsafe-webgpu --autoplay-policy=no-user-gesture-required";
 #[cfg(debug_assertions)]
 use specta_typescript::{BigIntExportBehavior, Typescript};
 use tauri_specta::{collect_commands, collect_events, Builder};
@@ -796,6 +816,9 @@ pub fn run(cli_args: CliArgs) {
             // for portable mode (redirects WebView2 cache to portable Data dir)
             let mut win_builder =
                 tauri::WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::App("/".into()))
+                    // WebView2 args shared identically across every window (see
+                    // WEBVIEW2_BROWSER_ARGS). Windows-only effect.
+                    .additional_browser_args(crate::WEBVIEW2_BROWSER_ARGS)
                     // Empty title + a blanked caption icon (see
                     // tray::update_window_icon) keep the top of the window clear
                     // — no "SpeakoFlow" text and no logo in the title bar.
@@ -997,6 +1020,20 @@ pub fn run(cli_args: CliArgs) {
             #[cfg(target_os = "macos")]
             if let tauri::RunEvent::Reopen { .. } = &event {
                 show_main_window(app);
+            }
+            // Tear down the built-in LLM sidecar on quit. `app.exit()` calls
+            // `std::process::exit`, which skips `Drop` (and everything after
+            // `.run()`), so without this the multi-GB `llama-server` child is
+            // orphaned on every graceful quit and accumulates across relaunches
+            // until RAM is exhausted (memory climbs -> disk/swap 100% -> freeze).
+            // The Windows Job Object in `local_llm.rs` is the backstop for the
+            // crash / hard-kill paths where even this handler cannot run.
+            if let tauri::RunEvent::Exit = &event {
+                if let Some(mgr) =
+                    app.try_state::<std::sync::Arc<managers::local_llm::LocalLlmManager>>()
+                {
+                    mgr.stop();
+                }
             }
             let _ = (app, event); // suppress unused warnings on non-macOS
         });

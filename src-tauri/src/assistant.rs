@@ -967,6 +967,10 @@ pub fn create_assistant_panel(app: &AppHandle) {
         PANEL_LABEL,
         tauri::WebviewUrl::App("src/assistant/index.html".into()),
     )
+    // Enables WebGPU (fp32 Kokoro TTS instead of the robotic wasm/q8 fallback)
+    // and no-gesture autoplay for spoken replies. Must match every other
+    // window's args (see WEBVIEW2_BROWSER_ARGS). Windows/WebView2 only.
+    .additional_browser_args(crate::WEBVIEW2_BROWSER_ARGS)
     .title("Assistant")
     .inner_size(init_w, init_h)
     .min_inner_size(PILL_WIDTH, PILL_HEIGHT)
@@ -1310,6 +1314,9 @@ pub fn open_snip_overlay(
         SNIP_LABEL,
         tauri::WebviewUrl::App("src/assistant/snip.html".into()),
     )
+    // Must match every other window's args (see WEBVIEW2_BROWSER_ARGS).
+    // Windows/WebView2 only.
+    .additional_browser_args(crate::WEBVIEW2_BROWSER_ARGS)
     .title("Snip")
     .inner_size(logical_w, logical_h)
     .position(logical_x, logical_y)
@@ -2245,9 +2252,31 @@ pub async fn run_assistant_turn(
     // Built-in provider: ensure the engine is running, then hold an activity
     // guard across the streamed turn so the idle watcher won't unload it
     // mid-generation.
+    // Acquire the cancel handle up front so the pre-stream phases (model load)
+    // are cancellable too — not only the streaming phase further below.
+    let cancel = {
+        let conversation = app.state::<AssistantConversation>();
+        conversation.cancel.clone()
+    };
+
     let _llm_activity_guard = if provider.id == "builtin" {
         let manager = app.state::<Arc<crate::managers::local_llm::LocalLlmManager>>();
-        if let Err(e) = manager.ensure_running(&model).await {
+        // Race the (possibly long) model load / first-run GPU shader compile
+        // against a Stop, so the user isn't stuck on "thinking" with no way to
+        // cancel while the built-in engine spins up (up to READY_TIMEOUT).
+        let load_result = {
+            let ensure = manager.ensure_running(&model);
+            tokio::pin!(ensure);
+            tokio::select! {
+                res = &mut ensure => res,
+                _ = cancel.notified() => {
+                    debug!("Assistant turn cancelled during engine load");
+                    emit_state(&app, "idle");
+                    return;
+                }
+            }
+        };
+        if let Err(e) = load_result {
             emit_error(&app, "engine_start", e.to_string());
             emit_state(&app, "idle");
             return;
@@ -2265,11 +2294,6 @@ pub async fn run_assistant_turn(
         visuals.len(),
         files.len()
     );
-
-    let cancel = {
-        let conversation = app.state::<AssistantConversation>();
-        conversation.cancel.clone()
-    };
 
     // Accumulate streamed tokens so a cancelled turn can keep the partial reply.
     let partial = Arc::new(Mutex::new(String::new()));
@@ -2320,8 +2344,6 @@ pub async fn run_assistant_turn(
                 // The model alone decides whether to call a tool; we never
                 // force one.
                 let tool_choice = json!("auto");
-                let po = partial_cb.clone();
-                let ao = app_tokens.clone();
                 let round_out = llm_client::send_chat_stream_with_tools(
                     &provider_c,
                     api_key_c.clone(),
@@ -2331,12 +2353,7 @@ pub async fn run_assistant_turn(
                     tool_choice,
                     None,
                     None,
-                    move |token| {
-                        if let Ok(mut buf) = po.lock() {
-                            buf.push_str(token);
-                        }
-                        let _ = ao.emit("assistant-token", token.to_string());
-                    },
+                    assistant_token_sink(app_tokens.clone(), partial_cb.clone()),
                 )
                 .await?;
                 let round_policy = tool_round_policy(&round_out, round_index);
@@ -2458,8 +2475,6 @@ pub async fn run_assistant_turn(
             _ = cancel.notified() => None,
         }
     } else {
-        let partial_cb = partial.clone();
-        let app_for_tokens = app.clone();
         let stream_fut = llm_client::send_chat_stream(
             &provider,
             api_key.clone(),
@@ -2467,12 +2482,7 @@ pub async fn run_assistant_turn(
             messages,
             None,
             None,
-            move |token| {
-                if let Ok(mut buf) = partial_cb.lock() {
-                    buf.push_str(token);
-                }
-                let _ = app_for_tokens.emit("assistant-token", token.to_string());
-            },
+            assistant_token_sink(app.clone(), partial.clone()),
         );
         tokio::pin!(stream_fut);
         // Race the stream against a Stop request. notify_waiters wakes this select.
@@ -2749,8 +2759,6 @@ pub async fn run_summarize_turn(app: AppHandle) {
 
     let cancel = app.state::<AssistantConversation>().cancel.clone();
     let partial = Arc::new(Mutex::new(String::new()));
-    let partial_cb = partial.clone();
-    let app_for_tokens = app.clone();
     let stream_fut = llm_client::send_chat_stream(
         &provider,
         api_key,
@@ -2758,12 +2766,7 @@ pub async fn run_summarize_turn(app: AppHandle) {
         messages,
         None,
         None,
-        move |token| {
-            if let Ok(mut buf) = partial_cb.lock() {
-                buf.push_str(token);
-            }
-            let _ = app_for_tokens.emit("assistant-token", token.to_string());
-        },
+        assistant_token_sink(app.clone(), partial.clone()),
     );
     tokio::pin!(stream_fut);
 
@@ -3307,5 +3310,33 @@ mod tests {
         assert!(conversation.is_cancelled());
         conversation.begin_turn();
         assert!(!conversation.is_cancelled());
+    }
+}
+
+/// Build an `on_token` sink for a streamed assistant reply.
+///
+/// It (1) accumulates the full text into `partial` so a cancelled turn keeps
+/// what was generated, and (2) forwards text to the panel via `assistant-token`,
+/// COALESCED to at most one emit per ~40ms. Each emit becomes an
+/// `evaluate_script` call in the panel WebView, and wry's `evaluate_script`
+/// leaks memory per call upstream (tauri-apps/wry#1489); batching cuts that
+/// volume on fast streams. Any sub-40ms tail left unflushed is harmless: the
+/// turn ends by emitting the authoritative full conversation
+/// (`emit_conversation`), which the panel uses to replace the streamed text and
+/// reset its stream buffer.
+fn assistant_token_sink(app: tauri::AppHandle, partial: Arc<Mutex<String>>) -> impl FnMut(&str) {
+    use std::time::Instant;
+    const FLUSH_INTERVAL_MS: u128 = 40;
+    let mut pending = String::new();
+    let mut last_flush = Instant::now();
+    move |token: &str| {
+        if let Ok(mut buf) = partial.lock() {
+            buf.push_str(token);
+        }
+        pending.push_str(token);
+        if last_flush.elapsed().as_millis() >= FLUSH_INTERVAL_MS {
+            let _ = app.emit("assistant-token", std::mem::take(&mut pending));
+            last_flush = Instant::now();
+        }
     }
 }
