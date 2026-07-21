@@ -654,6 +654,26 @@ impl Default for KeyboardImplementation {
     }
 }
 
+/// What happens when the user closes the main window.
+///
+/// `MinimizeToTray` (the default) preserves the long-standing behavior: the
+/// window hides and the app keeps running in the tray/menubar so global
+/// hotkeys stay live. `Quit` fully exits the process on window close, for
+/// users who don't want a background process (see GitHub issue #6).
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum CloseBehavior {
+    MinimizeToTray,
+    Quit,
+}
+
+impl Default for CloseBehavior {
+    fn default() -> Self {
+        // Preserve the historical behavior for everyone unless they opt in.
+        CloseBehavior::MinimizeToTray
+    }
+}
+
 impl Default for ModelUnloadTimeout {
     fn default() -> Self {
         ModelUnloadTimeout::Min5
@@ -1068,6 +1088,8 @@ pub struct AppSettings {
     pub keyboard_implementation: KeyboardImplementation,
     #[serde(default = "default_show_tray_icon")]
     pub show_tray_icon: bool,
+    #[serde(default)]
+    pub close_behavior: CloseBehavior,
     #[serde(default = "default_paste_delay_ms")]
     pub paste_delay_ms: u64,
     #[serde(default = "default_typing_tool")]
@@ -2454,6 +2476,7 @@ pub fn get_default_settings() -> AppSettings {
         lazy_stream_close: false,
         keyboard_implementation: KeyboardImplementation::default(),
         show_tray_icon: default_show_tray_icon(),
+        close_behavior: CloseBehavior::default(),
         paste_delay_ms: default_paste_delay_ms(),
         typing_tool: default_typing_tool(),
         external_script_path: None,

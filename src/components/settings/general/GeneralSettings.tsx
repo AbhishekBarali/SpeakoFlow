@@ -26,6 +26,7 @@ import { MuteWhileRecording } from "../MuteWhileRecording";
 import { AutostartToggle } from "../AutostartToggle";
 import { StartHidden } from "../StartHidden";
 import { ShowTrayIcon } from "../ShowTrayIcon";
+import { QuitOnClose } from "../QuitOnClose";
 import { OverlayStyle } from "../OverlayStyle";
 import { ShowOverlay } from "../ShowOverlay";
 import { UpdateChecksToggle } from "../UpdateChecksToggle";
@@ -114,6 +115,7 @@ export const GeneralSettings: React.FC = () => {
         <AutostartToggle descriptionMode="tooltip" grouped={true} />
         <StartHidden descriptionMode="tooltip" grouped={true} />
         <ShowTrayIcon descriptionMode="tooltip" grouped={true} />
+        <QuitOnClose descriptionMode="tooltip" grouped={true} />
         <UpdateChecksToggle descriptionMode="tooltip" grouped={true} />
       </SettingsGroup>
 

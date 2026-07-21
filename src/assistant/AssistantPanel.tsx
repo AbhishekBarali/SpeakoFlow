@@ -41,6 +41,7 @@ import { syncLanguageFromSettings } from "@/i18n";
 import { AudioWaveform } from "@/components/shared";
 import { FONT_SIZES, errorKind, type AssistantError } from "./appearance";
 import { useKokoroTts } from "./useKokoroTts";
+import { useLocalLlmEngineStatus } from "@/hooks/useLocalLlmEngineStatus";
 import "./AssistantPanel.css";
 
 type AssistantState =
@@ -410,6 +411,19 @@ const AssistantPanel: React.FC = () => {
   const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
   const [dropActive, setDropActive] = useState(false);
+
+  // Built-in (llama.cpp) engine setup progress. Lets the panel show "Setting up
+  // the local engine…" during the one-time first-run download instead of a
+  // silent "Thinking…" (or, on failure, a cryptic "Model couldn't start").
+  const engine = useLocalLlmEngineStatus();
+  const engineSetupActive = engine.active;
+  const engineSetupLabel = engineSetupActive
+    ? engine.phase === "extracting"
+      ? t("assistant.engineSetup.extracting")
+      : engine.total > 0
+        ? t("assistant.engineSetup.downloading", { percent: engine.pct })
+        : t("assistant.engineSetup.preparing")
+    : "";
   const listRef = useRef<HTMLDivElement>(null);
   const sendingRef = useRef(false);
   // Streaming is smoothed: raw tokens accumulate in a buffer and are flushed to
@@ -1180,13 +1194,15 @@ const AssistantPanel: React.FC = () => {
 
     const pillStatus = showError
       ? errorShort(error)
-      : tts.status === "loading"
-        ? t("assistant.tts.loadingShort", { progress: tts.progress })
-        : busy
-          ? t(`assistant.status.${state}`)
-          : ttsActive
-            ? t("assistant.status.speaking")
-            : t("assistant.pill.idle");
+      : engineSetupActive
+        ? engineSetupLabel || t("assistant.engineSetup.short")
+        : tts.status === "loading"
+          ? t("assistant.tts.loadingShort", { progress: tts.progress })
+          : busy
+            ? t(`assistant.status.${state}`)
+            : ttsActive
+              ? t("assistant.status.speaking")
+              : t("assistant.pill.idle");
 
     const waveMode: "reactive" | "shimmer" | "flow" = isListening
       ? "reactive"
@@ -1585,6 +1601,12 @@ const AssistantPanel: React.FC = () => {
             <div className="assistant-notice" role="status">
               <Loader2 size={12} strokeWidth={2} className="apill-spin" />
               {t("assistant.summarizing")}
+            </div>
+          )}
+          {engineSetupActive && (
+            <div className="assistant-notice" role="status" aria-live="polite">
+              <Loader2 size={12} strokeWidth={2} className="apill-spin" />
+              {engineSetupLabel}
             </div>
           )}
           {stream !== "" && (

@@ -604,6 +604,10 @@
         "label": "Show tray icon",
         "description": "Keep SpeakoFlow in your system tray."
       },
+      "closeBehavior": {
+        "label": "Quit when I close the window",
+        "description": "When off, closing the window keeps SpeakoFlow running in the tray so your hotkeys still work. When on, closing the window quits the app completely."
+      },
       "overlayStyle": {
         "title": "Overlay",
         "description": "How the recording overlay looks while you dictate. None hides it, Minimal is the compact pill, and Live shows a readable card with your words as you speak (for models that support it).",
@@ -1133,6 +1137,10 @@
         "builtinNoModels": "No models on your machine yet — download one below.",
         "builtinReady": "Runs fully on your machine. No API key, no setup.",
         "builtinEngineMissing": "First use downloads a small local engine automatically (one time), then runs fully offline. No setup needed.",
+        "builtinEngineDownloading": "Downloading the local engine… {{percent}}%",
+        "builtinEnginePreparing": "Downloading the local engine…",
+        "builtinEngineExtracting": "Installing the local engine…",
+        "builtinEngineReady": "Local engine ready.",
         "contextSizeLabel": "Context window",
         "contextSizeDescription": "How much the local model can keep in mind at once — the system instructions, your chat history, any screenshot (a single image can eat a big chunk), and its reply. Bigger holds more and keeps screen vision and web search reliable, but uses more memory. The default is 8192; 16384 is a good step up if your machine has the RAM to spare. You can lower it later to save memory.",
         "unloadTimeoutLabel": "Unload from memory after",
@@ -1564,6 +1572,12 @@
     "notices": {
       "web_search_failed": "Web search didn't return results — answering without them.",
       "web_search_failedShort": "No web results"
+    },
+    "engineSetup": {
+      "downloading": "Setting up the local engine (first run)… {{percent}}%",
+      "preparing": "Setting up the local engine (first run)…",
+      "extracting": "Installing the local engine…",
+      "short": "Setting up engine…"
     }
   }
 }

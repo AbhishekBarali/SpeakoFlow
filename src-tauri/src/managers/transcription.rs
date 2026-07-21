@@ -527,10 +527,7 @@ impl TranscriptionManager {
                     model_id
                 );
             }
-            EngineType::Parakeet
-            | EngineType::GigaAM
-            | EngineType::Canary
-            | EngineType::Cohere => {
+            EngineType::Parakeet | EngineType::GigaAM | EngineType::Canary | EngineType::Cohere => {
                 // Restore the user's resolved ORT preference in case a previous
                 // load pinned CPU for one of the families above.
                 apply_accelerator_settings(&self.app_handle);
