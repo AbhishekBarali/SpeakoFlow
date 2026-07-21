@@ -31,10 +31,14 @@ tauri.local-build.json
 *.sw?
 
 .claude/
+CLAUDE.md
 
 /target/
 recording_*
 .crush/
+
+# Local cargo config (per-machine build/linker settings; not needed to build the app)
+.cargo/
 
 .direnv
 .envrc
@@ -42,13 +46,9 @@ recording_*
 # Nix build output
 result
 
-# Knowledge-graph analysis output: publish the main artifacts, ignore the
-# regenerable cache, cost ledger, and machine-specific manifest/markers.
-graphify-out/*
-!graphify-out/graph.json
-!graphify-out/GRAPH_REPORT.md
-!graphify-out/graph.html
-!graphify-out/.graphify_labels.json
+# Knowledge-graph analysis output: internal AI-tooling artifact, kept out of
+# the public repo entirely (regenerable from source).
+graphify-out/
 
 # Editor / agent tooling
 .kiro/
@@ -77,6 +77,10 @@ settings_store.json
 
 # Internal marketing/testing website — kept out of the app repo
 speakoflow-website/
+
+# Internal generated docs/reference HTML (local-only, regenerable)
+speakoflow-docs.html
+speakoflow-feature-reference.html
 
 # Internal launch & competitive-strategy playbook — kept out of the public repo
 # (self-declared internal; contains launch tactics + competitor analysis).
