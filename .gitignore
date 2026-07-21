@@ -1,3 +1,8 @@
+.cargo/
+.vscode/
+.prettier*
+.nix/
+
 # Logs
 logs
 *.log
