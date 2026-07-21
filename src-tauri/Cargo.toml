@@ -1,6 +1,6 @@
 [package]
 name = "speakoflow"
-version = "1.0.0"
+version = "1.0.1"
 description = "SpeakoFlow"
 authors = ["AbhishekBarali"]
 edition = "2021"
