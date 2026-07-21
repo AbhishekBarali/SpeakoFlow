@@ -103,7 +103,7 @@ fn build_chat_completion_request(
     });
 
     ChatCompletionRequest {
-        model: model.to_string(),
+        model: normalize_model_name(provider, model),
         messages,
         response_format,
         reasoning_effort: options.reasoning_effort,
@@ -252,6 +252,36 @@ fn effective_base_url(provider: &PostProcessProvider) -> String {
         return format!("https://{}/openai/v1", host);
     }
     raw.to_string()
+}
+
+/// True when a provider targets Google Gemini's OpenAI-compatible surface.
+fn is_gemini_provider(provider: &PostProcessProvider) -> bool {
+    provider
+        .base_url
+        .contains("generativelanguage.googleapis.com")
+}
+
+/// Normalize a model id for provider-specific quirks before it is sent.
+///
+/// Google Gemini's OpenAI-compatible `/models` endpoint returns ids with a
+/// `models/` prefix (e.g. `models/gemini-2.5-flash`), mirroring the native REST
+/// resource names — but its `/chat/completions` endpoint expects the BARE id
+/// (`gemini-2.5-flash`), exactly like every example in Google's OpenAI-compat
+/// docs. A user who picks a model from the "Load models" list therefore ends up
+/// with a `models/…` value the chat endpoint rejects (surfacing as "couldn't
+/// get an answer"), while OpenRouter and the other providers — which return
+/// bare ids — just work. Strip the prefix for Gemini so it behaves like the
+/// rest. No-op for every other provider and for values that are already bare.
+///
+/// Applies to both the Assistant and the dictation AI-cleanup path, since both
+/// share this client and the provider table.
+fn normalize_model_name(provider: &PostProcessProvider, model: &str) -> String {
+    if is_gemini_provider(provider) {
+        if let Some(bare) = model.strip_prefix("models/") {
+            return bare.to_string();
+        }
+    }
+    model.to_string()
 }
 
 /// Extract the plain-text content of a chat message whose `content` may be a
@@ -887,6 +917,14 @@ pub async fn fetch_models(
         }
     }
 
+    // Present bare model ids for Gemini (its `/models` lists `models/…` names
+    // that its chat endpoint rejects), so both the picker and the value that
+    // gets stored are the ones chat actually accepts. No-op elsewhere.
+    let models = models
+        .into_iter()
+        .map(|model| normalize_model_name(provider, &model))
+        .collect();
+
     Ok(models)
 }
 
@@ -964,6 +1002,63 @@ mod tests {
             effective_base_url(&provider("local", "http://localhost:11434/v1")),
             "http://localhost:11434/v1"
         );
+    }
+
+    #[test]
+    fn gemini_model_name_strips_leading_models_prefix() {
+        let gemini = provider(
+            "gemini",
+            "https://generativelanguage.googleapis.com/v1beta/openai",
+        );
+        // The `models/…` id returned by Gemini's /models list is reduced to the
+        // bare id its chat endpoint expects.
+        assert_eq!(
+            normalize_model_name(&gemini, "models/gemini-2.5-flash"),
+            "gemini-2.5-flash"
+        );
+        assert_eq!(
+            normalize_model_name(&gemini, "models/gemini-3.1-flash-lite"),
+            "gemini-3.1-flash-lite"
+        );
+        // An already-bare id is untouched.
+        assert_eq!(
+            normalize_model_name(&gemini, "gemini-2.5-flash"),
+            "gemini-2.5-flash"
+        );
+        // Only a single leading prefix is stripped; interior text is preserved.
+        assert_eq!(
+            normalize_model_name(&gemini, "models/tuned-models/my-model"),
+            "tuned-models/my-model"
+        );
+    }
+
+    #[test]
+    fn non_gemini_model_names_are_untouched() {
+        // OpenRouter uses `vendor/model` ids that must NOT be altered.
+        let openrouter = provider("openrouter", "https://openrouter.ai/api/v1");
+        assert_eq!(
+            normalize_model_name(&openrouter, "google/gemini-2.5-flash"),
+            "google/gemini-2.5-flash"
+        );
+        // A hypothetical `models/`-prefixed id on a non-Gemini host is left as-is.
+        let openai = provider("openai", "https://api.openai.com/v1");
+        assert_eq!(normalize_model_name(&openai, "models/foo"), "models/foo");
+    }
+
+    #[test]
+    fn request_builder_normalizes_gemini_model() {
+        let gemini = provider(
+            "gemini",
+            "https://generativelanguage.googleapis.com/v1beta/openai",
+        );
+        let request = build_chat_completion_request(
+            &gemini,
+            "models/gemini-2.5-flash",
+            vec![serde_json::json!({"role": "user", "content": "hi"})],
+            ChatRequestOptions::default(),
+        );
+        let value = serde_json::to_value(request).unwrap();
+        assert_eq!(value["model"], "gemini-2.5-flash");
     }
 
     #[test]

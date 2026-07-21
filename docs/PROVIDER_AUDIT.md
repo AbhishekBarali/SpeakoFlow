@@ -17,6 +17,76 @@ Legend for **Matches?**: ✅ matches current docs · ⚠️ works but has a cave
 
 ---
 
+## Update — 2026-07-21 (live re-audit, model-name-format focus)
+
+Re-verified **every** provider against current live docs (keyless), triggered by
+a real-world Gemini failure. This pass specifically checked the dimension the
+first audit under-weighted: **does each provider's `/models` list return IDs the
+chat endpoint actually accepts?** — the mismatch that broke Gemini.
+
+**Verdict: exactly one real bug across the whole surface — Gemini — now fixed.**
+Every other provider's base URL, auth, and endpoint paths are correct, and their
+`/models` IDs are chat-usable (either bare, or a vendor/account prefix used
+_consistently_ by both the list and the chat endpoint, so no normalization is
+needed).
+
+### LLM / model providers
+
+| Provider              | Base URL                                          | Model-name / `/models` match                                                                             | Status                                               |
+| --------------------- | ------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| OpenAI                | api.openai.com/v1                                 | bare, list == chat                                                                                       | ✅                                                   |
+| OpenRouter            | openrouter.ai/api/v1                              | `vendor/model`, consistent                                                                               | ✅                                                   |
+| Anthropic             | api.anthropic.com/v1                              | bare `claude-*`, OpenAI-compat layer, `x-api-key`                                                        | ✅                                                   |
+| Groq                  | api.groq.com/openai/v1                            | bare, consistent                                                                                         | ✅                                                   |
+| Cerebras              | api.cerebras.ai/v1                                | bare, consistent                                                                                         | ✅                                                   |
+| Z.AI                  | api.z.ai/api/paas/v4                              | bare `glm-*`, consistent                                                                                 | ✅                                                   |
+| **Google Gemini**     | generativelanguage.googleapis.com/v1beta/openai   | `/models` returns `models/…`; chat wants bare `gemini-*`                                                 | ❌→✅ **fixed** (strip leading `models/`)            |
+| xAI (Grok)            | api.x.ai/v1                                        | bare `grok-*`, consistent (`/v1/models` exists)                                                          | ✅                                                   |
+| DeepSeek              | api.deepseek.com (`/v1` alias ok)                 | bare, consistent                                                                                         | ✅ (see note)                                        |
+| Mistral               | api.mistral.ai/v1                                 | bare `*-latest`, consistent (`/v1/models`)                                                               | ✅                                                   |
+| Moonshot (Kimi)       | api.moonshot.ai/v1                                | bare `kimi-*`, consistent (`/v1/models`)                                                                 | ✅                                                   |
+| Together AI           | api.together.xyz/v1                               | `vendor/Model`, consistent                                                                               | ✅                                                   |
+| Fireworks AI          | api.fireworks.ai/inference/v1                     | `accounts/fireworks/models/…`, consistent                                                                | ✅                                                   |
+| Perplexity            | api.perplexity.ai                                 | bare `sonar*`; no `/models` list (so `models_endpoint: None` is correct); `/chat/completions` is a documented alias of `/v1/sonar` | ✅                                                   |
+| Azure OpenAI          | \*.openai.azure.com/openai/v1                      | deployment name; hosts normalized to `/openai/v1`; `Bearer` + `api-key`                                  | ✅                                                   |
+| **AWS Bedrock (Mantle)** | bedrock-mantle.{region}.api.aws/v1             | `provider.model` (e.g. `openai.gpt-oss-120b`); `Bearer` (Bedrock API key / AWS bearer token)             | ✅ **confirmed real** (corrects earlier "unverified") |
+
+**Only code change from this re-audit:** the Gemini `models/` strip in
+`llm_client.rs` (`normalize_model_name`, applied in `build_chat_completion_request`
+and `fetch_models`), with regression tests. Because the client and provider table
+are shared, this fixes both the Assistant and the dictation AI-cleanup path at
+once. No `web_search.rs` / `tts.rs` changes were needed.
+
+**AWS Bedrock (Mantle) — corrected:** confirmed real against the official AWS
+docs. Amazon Bedrock's "Project Mantle" exposes an OpenAI-compatible Chat
+Completions API at `https://bedrock-mantle.{region}.api.aws/v1/chat/completions`
+with `Authorization: Bearer` (a Bedrock API key or an AWS bearer token). The
+configured base URL and auth are correct; this supersedes the old "needs a live
+key / unverified" note below.
+
+**Note (DeepSeek):** `deepseek-chat` / `deepseek-reasoner` are documented as
+deprecating on **2026-07-24**, replaced by `deepseek-v4-pro` / `deepseek-v4-flash`.
+This is a catalog change only — the free-text model field and the live `/models`
+picker surface the new names, so no code change is required.
+
+### Web search & TTS
+
+Re-confirmed unchanged from the 2026-07-01 audit and still matching current docs:
+Serper (`google.serper.dev/search`, `X-API-KEY`), Brave
+(`api.search.brave.com/res/v1/web/search`, `X-Subscription-Token`; free tier still
+removed), Tavily (`POST api.tavily.com/search`, `Bearer`; now also offers a keyless
+tier), Exa (`api.exa.ai/search`, `x-api-key`), SerpAPI (`serpapi.com/search.json`,
+`api_key`). TTS: OpenAI-compatible `{base}/audio/speech` (`Bearer`), ElevenLabs
+`/v1/text-to-speech/{voice}` (`xi-api-key`), Azure Speech `cognitiveservices/v1`
+with voices at `/tts/cognitiveservices/voices/list` (custom domain) or
+`/cognitiveservices/voices/list` (regional) (`Ocp-Apim-Subscription-Key`), Kokoro
+(local, in-webview).
+
+> The historical tables below (2026-07-01) are kept for reference; where they
+> disagree with this section, this section wins.
+
+---
+
 ## 1. Assistant LLM providers
 
 All LLM providers use one code path: `POST {base_url}/chat/completions` with an
@@ -161,8 +231,10 @@ All other providers matched their current docs and needed **no code change**.
 - **Brave free tier removed**: Brave Search API no longer offers a free plan.
   Not a code issue, but worth surfacing in the settings hint so users aren't
   surprised.
-- **AWS Bedrock (Mantle)**: OpenAI-compat gateway; shape looks right but
-  unverified against AWS docs. Needs a live key to confirm.
+- **AWS Bedrock (Mantle)**: **confirmed real** in the 2026-07-21 re-audit (see the
+  update section at the top). Amazon Bedrock's "Project Mantle" OpenAI-compatible
+  Chat Completions endpoint (`bedrock-mantle.{region}.api.aws/v1`, `Bearer`) matches
+  the configured base URL and auth. No longer an open question.
 
 ---
 
