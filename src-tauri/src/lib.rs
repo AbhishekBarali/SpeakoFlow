@@ -580,6 +580,7 @@ pub fn run(cli_args: CliArgs) {
             shortcut::change_keyboard_implementation_setting,
             shortcut::get_keyboard_implementation,
             shortcut::change_show_tray_icon_setting,
+            shortcut::change_close_behavior_setting,
             shortcut::change_whisper_accelerator_setting,
             shortcut::change_ort_accelerator_setting,
             shortcut::change_whisper_gpu_device,
@@ -977,8 +978,24 @@ pub fn run(cli_args: CliArgs) {
         })
         .on_window_event(|window, event| match event {
             tauri::WindowEvent::CloseRequested { api, .. } => {
-                // Remember the size before hiding, so it reopens as left.
+                // Remember the size before hiding/quitting, so it reopens as left.
                 save_main_window_size(window);
+
+                // Issue #6: honor the user's close preference. The default stays
+                // "minimize to tray" (handled below); only fully quit when the
+                // user explicitly opted in.
+                if matches!(
+                    get_settings(&window.app_handle()).close_behavior,
+                    crate::settings::CloseBehavior::Quit
+                ) {
+                    // Reuse the same clean exit path as the tray "Quit" item:
+                    // `app.exit(0)` fires `RunEvent::Exit`, which tears down the
+                    // built-in LLM sidecar (the fix from issue #2). We must not
+                    // prevent the close in this branch.
+                    window.app_handle().exit(0);
+                    return;
+                }
+
                 api.prevent_close();
                 let _res = window.hide();
 

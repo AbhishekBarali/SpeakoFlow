@@ -34,6 +34,15 @@ use tauri::{AppHandle, Emitter, Manager};
 /// Ollama's default (11434) so a user's existing Ollama install is untouched.
 const ENGINE_PORT: u16 = 11435;
 
+/// Pinned llama.cpp release used as a fallback when the GitHub "latest" API is
+/// unreachable or rate-limited. Its assets are fetched directly from the
+/// release-download host, which — unlike `api.github.com` — is NOT subject to
+/// the 60-requests/hour unauthenticated rate limit that shared campus/office
+/// NAT IPs routinely exhaust (the root cause of "No assets in latest llama.cpp
+/// release"). Overridable at runtime via the `HANDY_LLAMA_RELEASE_TAG` env var
+/// so a newer/older build can be pinned without a rebuild.
+const PINNED_ENGINE_TAG: &str = "b10075";
+
 /// Default context window if the user hasn't chosen one. 8192 leaves room for
 /// the system prompt, chat history, a screenshot (vision models can spend
 /// ~1k+ tokens on one image), and the reply — a 4096 window overflows on a
@@ -199,9 +208,17 @@ impl LocalLlmManager {
         None
     }
 
-    /// Ensure an engine binary is available, downloading the official
-    /// llama.cpp release for this platform into `<models>/engine/` if none is
-    /// found anywhere. Returns the path to the binary.
+    /// Ensure an engine binary is available, downloading a llama.cpp release
+    /// for this platform into `<models>/engine/` if none is found anywhere.
+    /// Returns the path to the binary.
+    ///
+    /// Robustness: tries the current GitHub "latest" release first, then falls
+    /// back to a PINNED release whose download URLs are constructed directly.
+    /// The pinned URLs hit the release-download host rather than the
+    /// rate-limited `api.github.com`, so a throttled or offline GitHub API — the
+    /// usual cause of "No assets in latest llama.cpp release" on shared
+    /// school/office networks — no longer blocks setup. On total failure it
+    /// returns a clear, actionable message instead of a cryptic API error.
     async fn ensure_engine_installed(&self) -> Result<PathBuf, String> {
         if let Some(path) = self.resolve_engine_binary() {
             return Ok(path);
@@ -216,22 +233,97 @@ impl LocalLlmManager {
             .app_handle
             .emit("local-llm-engine-status", "downloading");
 
-        let url = self.resolve_engine_asset_url().await?;
-        let zip_path = engine_dir.join("llama-engine.zip");
-        self.download_to_file(&url, &zip_path).await?;
+        // Ordered candidate archive URLs: the live "latest" asset first (best
+        // match for this platform, when the API is reachable), then the pinned
+        // fallback URLs. Trying the pinned build means a rate-limited/offline
+        // GitHub API can't stop the built-in engine from installing.
+        let mut candidates: Vec<String> = Vec::new();
+        match self.resolve_latest_asset_url().await {
+            Ok(url) => candidates.push(url),
+            Err(e) => warn!(
+                "Could not resolve the latest llama.cpp release ({}); falling back \
+                 to the pinned build {}",
+                e, PINNED_ENGINE_TAG
+            ),
+        }
+        for url in self.pinned_asset_urls() {
+            if !candidates.contains(&url) {
+                candidates.push(url);
+            }
+        }
+
+        if candidates.is_empty() {
+            let _ = self.app_handle.emit("local-llm-engine-status", "error");
+            return Err(
+                "No compatible llama.cpp prebuilt binary is available for this platform."
+                    .to_string(),
+            );
+        }
+
+        let mut last_error = String::from("unknown error");
+        for url in candidates {
+            match self.download_and_extract_engine(&url, &engine_dir).await {
+                Ok(()) => {
+                    if let Some(resolved) = self.resolve_engine_binary() {
+                        let _ = self.app_handle.emit("local-llm-engine-status", "ready");
+                        info!("Built-in LLM engine installed at {}", resolved.display());
+                        return Ok(resolved);
+                    }
+                    last_error = "engine archive downloaded but no llama-server binary was inside"
+                        .to_string();
+                    warn!("{} (source: {})", last_error, url);
+                }
+                Err(e) => {
+                    warn!("Engine download attempt failed ({}): {}", url, e);
+                    last_error = e;
+                }
+            }
+        }
+
+        let _ = self.app_handle.emit("local-llm-engine-status", "error");
+        Err(format!(
+            "Couldn't set up the built-in engine (llama.cpp). This is usually a network \
+             problem or GitHub rate-limiting (common on shared school/office Wi-Fi). Try \
+             again in a few minutes, switch networks, or pick a cloud or local \
+             (Ollama / LM Studio) provider in Settings → Assistant. Last error: {}",
+            last_error
+        ))
+    }
+
+    /// Download one engine archive `url` into `engine_dir` and extract it.
+    /// The extractor is chosen from the URL's extension: Windows assets are
+    /// `.zip`, macOS/Linux assets are `.tar.gz`.
+    async fn download_and_extract_engine(
+        &self,
+        url: &str,
+        engine_dir: &Path,
+    ) -> Result<(), String> {
+        let lower = url.to_ascii_lowercase();
+        let is_tar_gz = lower.ends_with(".tar.gz") || lower.ends_with(".tgz");
+        let archive_name = if is_tar_gz {
+            "llama-engine.tar.gz"
+        } else {
+            "llama-engine.zip"
+        };
+        let archive_path = engine_dir.join(archive_name);
+
+        let _ = self
+            .app_handle
+            .emit("local-llm-engine-status", "downloading");
+        self.download_to_file(url, &archive_path).await?;
 
         let _ = self
             .app_handle
             .emit("local-llm-engine-status", "extracting");
-        Self::extract_zip(&zip_path, &engine_dir)?;
-        let _ = std::fs::remove_file(&zip_path);
-
-        let resolved = self.resolve_engine_binary().ok_or_else(|| {
-            "Engine downloaded but the llama-server binary was not found in the archive".to_string()
-        })?;
-        let _ = self.app_handle.emit("local-llm-engine-status", "ready");
-        info!("Built-in LLM engine installed at {}", resolved.display());
-        Ok(resolved)
+        let result = if is_tar_gz {
+            Self::extract_tar_gz(&archive_path, engine_dir)
+        } else {
+            Self::extract_zip(&archive_path, engine_dir)
+        };
+        // Always clean up the archive, success or failure, so a partial/corrupt
+        // download can't wedge the next attempt.
+        let _ = std::fs::remove_file(&archive_path);
+        result
     }
 
     /// Token sets (in priority order) used to pick the right release asset for
@@ -254,16 +346,35 @@ impl LocalLlmManager {
         }
     }
 
-    /// Query the latest llama.cpp GitHub release and return the download URL of
-    /// the best-matching prebuilt binary for this platform.
-    async fn resolve_engine_asset_url(&self) -> Result<String, String> {
+    /// Query the GitHub "latest" release for the best-matching prebuilt binary
+    /// URL for this platform.
+    ///
+    /// Crucially, this checks the HTTP status before parsing: an unauthenticated
+    /// request that is rate-limited returns HTTP 403/429 with a JSON body that
+    /// has no `assets` field, which the previous code misreported as "No assets
+    /// in latest llama.cpp release". Returning a real error here lets the caller
+    /// fall back to the pinned build instead of dead-ending.
+    async fn resolve_latest_asset_url(&self) -> Result<String, String> {
         let client = reqwest::Client::new();
-        let release: serde_json::Value = client
+        let response = client
             .get("https://api.github.com/repos/ggml-org/llama.cpp/releases/latest")
             .header("User-Agent", "speakoflow")
+            .header("Accept", "application/vnd.github+json")
             .send()
             .await
-            .map_err(|e| format!("Failed to query llama.cpp releases: {}", e))?
+            .map_err(|e| format!("Failed to query llama.cpp releases: {}", e))?;
+
+        let status = response.status();
+        if !status.is_success() {
+            let hint = if status.as_u16() == 403 || status.as_u16() == 429 {
+                " (GitHub API rate limit — common on shared networks)"
+            } else {
+                ""
+            };
+            return Err(format!("GitHub API returned HTTP {}{}", status, hint));
+        }
+
+        let release: serde_json::Value = response
             .json()
             .await
             .map_err(|e| format!("Failed to parse llama.cpp release info: {}", e))?;
@@ -271,7 +382,7 @@ impl LocalLlmManager {
         let assets = release
             .get("assets")
             .and_then(|a| a.as_array())
-            .ok_or_else(|| "No assets in latest llama.cpp release".to_string())?;
+            .ok_or_else(|| "latest release listing contained no assets".to_string())?;
 
         for tokens in Self::engine_asset_preferences() {
             for asset in assets {
@@ -283,7 +394,71 @@ impl LocalLlmManager {
                 }
             }
         }
-        Err("No compatible llama.cpp prebuilt binary found for this platform".to_string())
+        Err("no compatible prebuilt asset in the latest release".to_string())
+    }
+
+    /// Directly-constructed download URLs for the pinned llama.cpp release, in
+    /// priority order for this OS/arch. These target the release-download host
+    /// (not the rate-limited `api.github.com`), so they succeed even when the
+    /// "latest" lookup is throttled or the machine is behind a busy shared IP.
+    /// The tag is overridable via `HANDY_LLAMA_RELEASE_TAG`.
+    fn pinned_asset_urls(&self) -> Vec<String> {
+        let tag = std::env::var("HANDY_LLAMA_RELEASE_TAG")
+            .ok()
+            .map(|t| t.trim().to_string())
+            .filter(|t| !t.is_empty())
+            .unwrap_or_else(|| PINNED_ENGINE_TAG.to_string());
+        Self::pinned_asset_urls_for(&tag)
+    }
+
+    /// Build the pinned release-download URLs for `tag`. Split out from
+    /// `pinned_asset_urls` so it is unit-testable without a Tauri `AppHandle`.
+    fn pinned_asset_urls_for(tag: &str) -> Vec<String> {
+        Self::pinned_asset_names(tag)
+            .into_iter()
+            .map(|name| {
+                format!(
+                    "https://github.com/ggml-org/llama.cpp/releases/download/{}/{}",
+                    tag, name
+                )
+            })
+            .collect()
+    }
+
+    /// Prebuilt archive filenames for the pinned release, in priority order for
+    /// this OS/arch, following llama.cpp's `llama-<tag>-bin-<platform>.<ext>`
+    /// convention. Windows ships `.zip`; macOS/Linux ship `.tar.gz`. Vulkan
+    /// builds are preferred (matching the app's Whisper backend) with a CPU
+    /// build as the always-works fallback.
+    fn pinned_asset_names(tag: &str) -> Vec<String> {
+        if cfg!(target_os = "windows") {
+            if cfg!(target_arch = "aarch64") {
+                vec![format!("llama-{tag}-bin-win-cpu-arm64.zip")]
+            } else {
+                vec![
+                    format!("llama-{tag}-bin-win-vulkan-x64.zip"),
+                    format!("llama-{tag}-bin-win-cpu-x64.zip"),
+                ]
+            }
+        } else if cfg!(target_os = "macos") {
+            if cfg!(target_arch = "aarch64") {
+                vec![format!("llama-{tag}-bin-macos-arm64.tar.gz")]
+            } else {
+                vec![format!("llama-{tag}-bin-macos-x64.tar.gz")]
+            }
+        } else if cfg!(target_arch = "aarch64") {
+            // Linux arm64
+            vec![
+                format!("llama-{tag}-bin-ubuntu-vulkan-arm64.tar.gz"),
+                format!("llama-{tag}-bin-ubuntu-arm64.tar.gz"),
+            ]
+        } else {
+            // Linux x64
+            vec![
+                format!("llama-{tag}-bin-ubuntu-vulkan-x64.tar.gz"),
+                format!("llama-{tag}-bin-ubuntu-x64.tar.gz"),
+            ]
+        }
     }
 
     /// Stream a URL to a file, emitting coarse progress events.
@@ -369,6 +544,21 @@ impl LocalLlmManager {
                 }
             }
         }
+        Ok(())
+    }
+
+    /// Extract a `.tar.gz` archive into `dest`. The `tar` crate restores the
+    /// executable bit stored in the archive, so `llama-server` stays runnable.
+    /// Used for the macOS/Linux release assets (which ship as `.tar.gz`);
+    /// Windows assets are `.zip` and go through `extract_zip`.
+    fn extract_tar_gz(archive_path: &Path, dest: &Path) -> Result<(), String> {
+        let file = std::fs::File::open(archive_path)
+            .map_err(|e| format!("Failed to open archive: {}", e))?;
+        let decoder = flate2::read::GzDecoder::new(file);
+        let mut archive = tar::Archive::new(decoder);
+        archive
+            .unpack(dest)
+            .map_err(|e| format!("Failed to extract archive: {}", e))?;
         Ok(())
     }
 
@@ -966,6 +1156,58 @@ fn assign_child_to_kill_on_close_job(child: &Child) {
     unsafe {
         if let Err(e) = AssignProcessToJobObject(job, child_handle) {
             warn!("Failed to assign engine process to Job Object: {e}");
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Asset naming was verified live against the llama.cpp b10075 release:
+    // Windows ships `llama-<tag>-bin-win-*-x64.zip`, macOS/Linux ship
+    // `llama-<tag>-bin-*.tar.gz`. These guard against silent drift in the
+    // pinned-fallback filenames (which are constructed, not discovered).
+    #[test]
+    fn pinned_asset_names_match_platform_convention() {
+        let names = LocalLlmManager::pinned_asset_names("b10075");
+        assert!(
+            !names.is_empty(),
+            "the current platform must have at least one pinned asset"
+        );
+        for name in &names {
+            assert!(
+                name.starts_with("llama-b10075-bin-"),
+                "unexpected asset name: {name}"
+            );
+            if cfg!(target_os = "windows") {
+                assert!(name.ends_with(".zip"), "Windows assets are .zip: {name}");
+            } else {
+                assert!(
+                    name.ends_with(".tar.gz"),
+                    "macOS/Linux assets are .tar.gz: {name}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn pinned_asset_urls_target_release_download_host_not_api() {
+        let urls = LocalLlmManager::pinned_asset_urls_for("b10075");
+        assert!(!urls.is_empty());
+        for url in &urls {
+            assert!(
+                url.starts_with(
+                    "https://github.com/ggml-org/llama.cpp/releases/download/b10075/llama-b10075-bin-"
+                ),
+                "unexpected pinned url: {url}"
+            );
+            // The whole point of the fallback is to bypass the rate-limited API
+            // (api.github.com), so it must never appear in a fallback URL.
+            assert!(
+                !url.contains("api.github.com"),
+                "pinned fallback must not hit the rate-limited API host: {url}"
+            );
         }
     }
 }

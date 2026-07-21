@@ -23,7 +23,14 @@ const Footer: React.FC = () => {
   }, []);
 
   return (
-    <div className="w-full border-t border-hairline bg-canvas-soft">
+    // `relative z-50` gives the footer its own stacking context ABOVE the
+    // scroll area's content (which sits at `z-10` and would otherwise bubble to
+    // the root stacking context and paint over this static footer). Without it
+    // the centered download indicator — and especially its upward-opening
+    // details popover — got painted behind settings rows and "disappeared"
+    // while scrolling. The footer never scrolls (it's a fixed flex sibling), so
+    // this only fixes paint order, nothing else.
+    <div className="relative z-50 w-full border-t border-hairline bg-canvas-soft">
       {/* About and tray actions still use this controller's event listener, but
           update status no longer competes for permanent footer space. */}
       <UpdateChecker className="hidden" />

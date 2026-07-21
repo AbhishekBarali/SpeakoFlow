@@ -228,6 +228,8 @@ const settingUpdaters: {
     commands.changeLiveTranscriptionWindowEnabledSetting(value as boolean),
   show_tray_icon: (value) =>
     commands.changeShowTrayIconSetting(value as boolean),
+  close_behavior: (value) =>
+    commands.changeCloseBehaviorSetting(value as string),
   whisper_accelerator: (value) =>
     commands.changeWhisperAcceleratorSetting(
       value as WhisperAcceleratorSetting,

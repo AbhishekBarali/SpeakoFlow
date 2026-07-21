@@ -36,6 +36,11 @@ pub(crate) fn spawn(blocking_hotkeys: Option<BlockingHotkeys>) -> Result<LinuxLi
     let thread_running = Arc::clone(&running);
 
     let handle = thread::spawn(move || {
+        // Backoff + attempt tracking so a persistent grab failure (e.g. a
+        // missing `/dev/input` permission on Linux) can't spam the log every
+        // 2s forever, and so an unrecoverable permission error stops cleanly.
+        let mut attempts: u32 = 0;
+        let mut backoff = std::time::Duration::from_secs(2);
         loop {
             let cb_state = Arc::clone(&thread_state);
             let cb_running = Arc::clone(&thread_running);
@@ -145,11 +150,52 @@ pub(crate) fn spawn(blocking_hotkeys: Option<BlockingHotkeys>) -> Result<LinuxLi
             match rdev::grab(callback) {
                 Ok(()) => break,
                 Err(e) => {
-                    eprintln!("rdev grab error: {:?}, retrying in 2s", e);
+                    // Detect the common Linux case: no permission to read
+                    // `/dev/input/event*` (the user isn't in the `input` group).
+                    // We match on the Debug string rather than the GrabError
+                    // variant so this stays robust across rdev versions. errno
+                    // 13 == EACCES == PermissionDenied.
+                    let detail = format!("{:?}", e);
+                    let is_permission_denied =
+                        detail.contains("PermissionDenied") || detail.contains("code: 13");
+
+                    if is_permission_denied {
+                        // This never self-heals within the session (group
+                        // membership needs a re-login), so retrying every 2s
+                        // just spams the log — surface one actionable message
+                        // and stop the listener thread.
+                        eprintln!(
+                            "handy-keys: keyboard capture disabled on Linux — permission denied \
+                             reading /dev/input (errno 13). Global hotkeys will not work. \
+                             Fix: add your user to the 'input' group with \
+                             `sudo usermod -aG input $USER`, then log out and back in. \
+                             Alternatively, switch the keyboard engine to 'Tauri' in Settings \
+                             (it does not require the input group)."
+                        );
+                        break;
+                    }
+
+                    // Other (possibly transient) errors: keep retrying, but with
+                    // capped exponential backoff and quiet logging so a stuck
+                    // state doesn't flood stderr.
+                    attempts += 1;
+                    if attempts <= 3 {
+                        eprintln!(
+                            "rdev grab error: {:?}, retrying in {}s",
+                            e,
+                            backoff.as_secs()
+                        );
+                    } else if attempts == 4 {
+                        eprintln!(
+                            "rdev grab error persists; continuing to retry quietly with backoff."
+                        );
+                    }
+
                     if !thread_running.load(Ordering::SeqCst) {
                         break;
                     }
-                    std::thread::sleep(std::time::Duration::from_secs(2));
+                    std::thread::sleep(backoff);
+                    backoff = (backoff * 2).min(std::time::Duration::from_secs(30));
                 }
             }
         }

@@ -22,7 +22,7 @@ use tauri_plugin_autostart::ManagerExt;
 #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
 use crate::settings::APPLE_INTELLIGENCE_DEFAULT_MODEL_ID;
 use crate::settings::{
-    self, get_settings, AutoSubmitKey, ClipboardHandling, CustomPostProcessTone,
+    self, get_settings, AutoSubmitKey, ClipboardHandling, CloseBehavior, CustomPostProcessTone,
     KeyboardImplementation, LLMPrompt, OverlayPosition, PasteMethod, PostProcessTone,
     ShortcutBinding, SoundTheme, Theme, TypingTool, UiTextSize, APPLE_INTELLIGENCE_PROVIDER_ID,
     DEFAULT_POST_PROCESS_TONE_ID,
@@ -1531,6 +1531,30 @@ pub fn change_show_tray_icon_setting(app: AppHandle, enabled: bool) -> Result<()
     // Apply change immediately
     tray::set_tray_visibility(&app, enabled);
 
+    Ok(())
+}
+
+/// Set what closing the main window does: minimize to the tray (default) or
+/// fully quit the app. The `Quit` branch reuses the same `app.exit(0)` path as
+/// the tray "Quit" item (see the `CloseRequested` handler in `lib.rs`). See
+/// GitHub issue #6.
+#[tauri::command]
+#[specta::specta]
+pub fn change_close_behavior_setting(app: AppHandle, behavior: String) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    let parsed = match behavior.as_str() {
+        "minimize_to_tray" => CloseBehavior::MinimizeToTray,
+        "quit" => CloseBehavior::Quit,
+        other => {
+            warn!(
+                "Invalid close behavior '{}', defaulting to minimize_to_tray",
+                other
+            );
+            CloseBehavior::MinimizeToTray
+        }
+    };
+    settings.close_behavior = parsed;
+    settings::write_settings(&app, settings);
     Ok(())
 }
 

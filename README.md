@@ -114,6 +114,40 @@ SpeakoFlow handles this automatically: when it detects GNOME on Wayland it runs 
 - Force native Wayland anyway (the overlay may not stay on top): launch with `SPEAKOFLOW_ALLOW_WAYLAND=1`.
 - If the overlay misbehaves under a layer-shell compositor, disable layer shell with `SPEAKOFLOW_NO_GTK_LAYER_SHELL=1`.
 
+### Linux: hotkeys do nothing and the logs repeat "Permission denied"
+
+If dictation and the assistant hotkeys don't respond on Linux and you see the log
+repeating `rdev grab error: ... PermissionDenied` (errno 13), the app can't read
+your input devices. This affects the **handy-keys** keyboard engine, which reads
+`/dev/input/event*` and needs your user to be in the `input` group.
+
+Two ways to fix it:
+
+- **Grant access** — add your user to the `input` group, then log out and back in:
+
+  ```bash
+  sudo usermod -aG input $USER
+  ```
+
+- **Or switch engines** — set the keyboard engine to **Tauri** in Settings, which
+  uses the compositor's global-shortcut API and needs no special permissions.
+  (Tauri is already the default engine on Linux, so this only affects you if you
+  switched to handy-keys.)
+
+### Linux: the app crashes when you pinch-to-zoom on a touchpad
+
+On some Linux setups a trackpad pinch-to-zoom gesture crashes the window, with
+`Received invalid message: 'DrawingArea_CommitTransientZoom'` in the logs. This
+is a bug in **WebKitGTK** (the Linux web engine Tauri/wry uses), not in
+SpeakoFlow itself, and it affects many WebKitGTK-based apps. It is tracked
+upstream in [tauri#13115](https://github.com/tauri-apps/tauri/issues/13115) and
+[wry#544](https://github.com/tauri-apps/wry/issues/544).
+
+Until there's an upstream fix, avoid the pinch-to-zoom gesture inside the app
+window. Updating your system's WebKitGTK packages (`webkit2gtk-4.1`) to the
+latest version can also help, since newer releases handle the gesture more
+gracefully.
+
 ## Roadmap
 
 - Code signing for Windows and macOS
