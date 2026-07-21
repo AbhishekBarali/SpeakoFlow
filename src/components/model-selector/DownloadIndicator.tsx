@@ -143,7 +143,9 @@ const DownloadIndicator: React.FC = () => {
     const downloading = items.filter((i) => i.phase === "downloading");
     if (downloading.length === 1) {
       return {
-        label: t("modelSelector.downloading", { percentage: downloading[0].pct }),
+        label: t("modelSelector.downloading", {
+          percentage: downloading[0].pct,
+        }),
         pct: downloading[0].pct,
         showRing: true,
       };
@@ -158,7 +160,11 @@ const DownloadIndicator: React.FC = () => {
       };
     }
     if (items.some((i) => i.phase === "verifying")) {
-      return { label: t("modelSelector.verifyingGeneric"), pct: 0, showRing: false };
+      return {
+        label: t("modelSelector.verifyingGeneric"),
+        pct: 0,
+        showRing: false,
+      };
     }
     if (items.some((i) => i.phase === "extracting")) {
       return {
@@ -223,7 +229,7 @@ const DownloadIndicator: React.FC = () => {
         <div
           role="status"
           aria-live="polite"
-          className="absolute bottom-full left-1/2 mb-2 w-80 -translate-x-1/2 space-y-3 rounded-xl border border-hairline bg-surface p-3 shadow-[0_16px_40px_rgba(0,0,0,0.24)]"
+          className="absolute bottom-full left-1/2 z-50 mb-2 w-80 -translate-x-1/2 space-y-3 rounded-xl border border-hairline bg-surface p-3 shadow-[0_16px_40px_rgba(0,0,0,0.24)]"
         >
           {items.map((item) => {
             const indeterminate = item.phase !== "downloading";
@@ -250,7 +256,9 @@ const DownloadIndicator: React.FC = () => {
                         ? "w-full animate-pulse"
                         : "transition-all duration-300"
                     }`}
-                    style={indeterminate ? undefined : { width: `${item.pct}%` }}
+                    style={
+                      indeterminate ? undefined : { width: `${item.pct}%` }
+                    }
                   />
                 </div>
                 {!indeterminate && (
