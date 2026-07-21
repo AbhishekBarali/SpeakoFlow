@@ -169,24 +169,45 @@ const capitalizeKey = (key: string): string => {
 };
 
 /**
+ * Tokens that all refer to the "meta" / left-of-space command key. The stored
+ * hotkey token is always "super" (what the backend shortcut engines expect),
+ * but historical capture paths could also produce "win"/"windows"/"meta", so we
+ * recognize the whole family for display purposes.
+ */
+const META_KEY_ALIASES = new Set(["super", "win", "windows", "meta"]);
+
+/**
  * Format a single key part for display.
  * Handles _left/_right suffixes and capitalizes names.
  * e.g. "shift_left" -> "Left Shift", "option" -> "Option", "space" -> "Space"
+ *
+ * The meta key is branded per-OS for DISPLAY ONLY (the stored token stays
+ * "super", so the backend is unaffected): Windows users see "Windows" instead
+ * of the confusing "Super", while Linux keeps "Super" and macOS is unaffected
+ * (it stores "command", not "super").
  */
-const formatKeyPart = (part: string): string => {
+const formatKeyPart = (part: string, osType: OSType = "unknown"): string => {
   const trimmed = part.trim();
   if (!trimmed) return "";
 
+  let side = "";
+  let name = trimmed;
   if (trimmed.endsWith("_left")) {
-    const name = trimmed.slice(0, -5);
-    return `Left ${capitalizeKey(name)}`;
-  }
-  if (trimmed.endsWith("_right")) {
-    const name = trimmed.slice(0, -6);
-    return `Right ${capitalizeKey(name)}`;
+    side = "Left ";
+    name = trimmed.slice(0, -5);
+  } else if (trimmed.endsWith("_right")) {
+    side = "Right ";
+    name = trimmed.slice(0, -6);
   }
 
-  return capitalizeKey(trimmed);
+  // Windows: show the ⊞ key as "Windows" rather than "Super". This is purely a
+  // relabel — the underlying stored value ("super") is untouched, so the global
+  // shortcut engine still binds exactly the same key. Linux/macOS unchanged.
+  if (osType === "windows" && META_KEY_ALIASES.has(name.toLowerCase())) {
+    return `${side}Windows`;
+  }
+
+  return `${side}${capitalizeKey(name)}`;
 };
 
 /**
@@ -196,10 +217,13 @@ const formatKeyPart = (part: string): string => {
  */
 export const formatKeyCombination = (
   combination: string,
-  _osType: OSType,
+  osType: OSType = "unknown",
 ): string => {
   if (!combination) return "";
-  return combination.split("+").map(formatKeyPart).join(" + ");
+  return combination
+    .split("+")
+    .map((part) => formatKeyPart(part, osType))
+    .join(" + ");
 };
 
 /**
