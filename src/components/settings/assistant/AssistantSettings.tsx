@@ -45,6 +45,7 @@ import { FONT_SIZES } from "../../../assistant/appearance";
 import "../../../assistant/AssistantPanel.css";
 import { useModelStore } from "@/stores/modelStore";
 import { getModelCategory } from "@/lib/utils/modelCategory";
+import { useLocalLlmEngineStatus } from "@/hooks/useLocalLlmEngineStatus";
 import ScreenRecordingPermission from "@/components/ScreenRecordingPermission";
 
 /** The built-in (local) llama.cpp provider id, mirrored from the backend. */
@@ -192,6 +193,10 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
   const [localLlmStatus, setLocalLlmStatus] = useState<LocalLlmStatus | null>(
     null,
   );
+  // Live built-in engine (llama.cpp binary) setup progress, shared with the
+  // assistant panel via the same backend events, so this form can show the
+  // one-time first-run engine download instead of leaving it invisible.
+  const engineStatus = useLocalLlmEngineStatus();
   useEffect(() => {
     if (!isBuiltin) return;
     let active = true;
@@ -954,10 +959,43 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
               {t("settings.assistant.provider.builtinNoModels")}
             </span>
           )}
-          {localLlmStatus && !localLlmStatus.engine_present && (
-            <span className="text-xs text-amber-500 max-w-[360px] text-right">
-              {t("settings.assistant.provider.builtinEngineMissing")}
-            </span>
+          {engineStatus.active ? (
+            <div className="flex w-full max-w-[360px] flex-col items-end gap-1">
+              <span className="inline-flex items-center gap-1.5 text-xs text-muted">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                {engineStatus.phase === "extracting"
+                  ? t("settings.assistant.provider.builtinEngineExtracting")
+                  : engineStatus.total > 0
+                    ? t(
+                        "settings.assistant.provider.builtinEngineDownloading",
+                        {
+                          percent: engineStatus.pct,
+                        },
+                      )
+                    : t("settings.assistant.provider.builtinEnginePreparing")}
+              </span>
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-hairline-strong">
+                <div
+                  className={`h-full rounded-full bg-accent ${
+                    engineStatus.total > 0
+                      ? "transition-[width] duration-200"
+                      : "w-full animate-pulse"
+                  }`}
+                  style={
+                    engineStatus.total > 0
+                      ? { width: `${engineStatus.pct}%` }
+                      : undefined
+                  }
+                />
+              </div>
+            </div>
+          ) : (
+            localLlmStatus &&
+            !localLlmStatus.engine_present && (
+              <span className="text-xs text-amber-500 max-w-[360px] text-right">
+                {t("settings.assistant.provider.builtinEngineMissing")}
+              </span>
+            )
           )}
         </div>
       </SettingContainer>
