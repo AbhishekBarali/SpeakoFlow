@@ -523,6 +523,10 @@ struct StreamToolCall {
     id: Option<String>,
     #[serde(default)]
     function: Option<StreamToolCallFn>,
+    /// Gemini-only side channel (see `ToolCall::thought_signature`). Absent on
+    /// every other OpenAI-compatible provider.
+    #[serde(default)]
+    extra_content: Option<StreamToolCallExtra>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -533,6 +537,20 @@ struct StreamToolCallFn {
     arguments: Option<String>,
 }
 
+/// `tool_calls[].extra_content` as Gemini's OpenAI-compatibility layer emits it:
+/// `{"google": {"thought_signature": "<opaque>"}}`.
+#[derive(Debug, Deserialize)]
+struct StreamToolCallExtra {
+    #[serde(default)]
+    google: Option<StreamToolCallGoogleExtra>,
+}
+
+#[derive(Debug, Deserialize)]
+struct StreamToolCallGoogleExtra {
+    #[serde(default)]
+    thought_signature: Option<String>,
+}
+
 /// A fully-assembled tool call the model asked us to run.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ToolCall {
@@ -540,6 +558,15 @@ pub struct ToolCall {
     pub name: String,
     /// Raw JSON arguments string (parse at the call site).
     pub arguments: String,
+    /// Gemini thinking models return an opaque, encrypted `thought_signature`
+    /// alongside every function call and require it echoed back verbatim on the
+    /// follow-up request, or the next call fails with
+    /// "Function call is missing a thought_signature in functionCall parts"
+    /// (HTTP 400). It is opaque to us: capture it, carry it, hand it back
+    /// untouched (see the `extra_content` re-attach in `assistant.rs`).
+    /// `None` for every provider that does not send one, which is all of them
+    /// except Gemini — so nothing extra is ever put on the wire elsewhere.
+    pub thought_signature: Option<String>,
 }
 
 /// Outcome of one streamed tool-calling round: any content the model streamed
@@ -569,6 +596,17 @@ impl From<ChatRound> for ToolStreamOutcome {
     }
 }
 
+/// Per-index scratch space while a tool call streams in. Named fields (rather
+/// than a positional tuple) keep the merge below readable now that a fourth,
+/// provider-specific value rides along.
+#[derive(Default)]
+struct ToolCallParts {
+    id: String,
+    name: String,
+    arguments: String,
+    thought_signature: Option<String>,
+}
+
 /// Byte-buffered decoder and accumulator for an OpenAI-compatible SSE chat
 /// round. Complete lines are decoded only after all their bytes arrive, so a
 /// UTF-8 code point may be split across any number of network chunks safely.
@@ -576,7 +614,7 @@ impl From<ChatRound> for ToolStreamOutcome {
 struct SseChatAccumulator {
     pending: Vec<u8>,
     round: ChatRound,
-    tool_call_parts: Vec<(String, String, String)>,
+    tool_call_parts: Vec<ToolCallParts>,
     done: bool,
 }
 
@@ -660,23 +698,36 @@ impl SseChatAccumulator {
         if let Some(tool_calls) = &choice.delta.tool_calls {
             for tool_call in tool_calls {
                 while self.tool_call_parts.len() <= tool_call.index {
-                    self.tool_call_parts
-                        .push((String::new(), String::new(), String::new()));
+                    self.tool_call_parts.push(ToolCallParts::default());
                 }
                 let slot = &mut self.tool_call_parts[tool_call.index];
                 if let Some(id) = &tool_call.id {
                     if !id.is_empty() {
-                        slot.0 = id.clone();
+                        slot.id = id.clone();
                     }
                 }
                 if let Some(function) = &tool_call.function {
                     if let Some(name) = &function.name {
                         if !name.is_empty() {
-                            slot.1 = name.clone();
+                            slot.name = name.clone();
                         }
                     }
                     if let Some(arguments) = &function.arguments {
-                        slot.2.push_str(arguments);
+                        slot.arguments.push_str(arguments);
+                    }
+                }
+                // Gemini may deliver the signature on any chunk for this index
+                // (often a frame of its own, with no function payload), so merge
+                // it by index like everything else and never clobber a captured
+                // value with a later empty one.
+                if let Some(signature) = tool_call
+                    .extra_content
+                    .as_ref()
+                    .and_then(|extra| extra.google.as_ref())
+                    .and_then(|google| google.thought_signature.as_deref())
+                {
+                    if !signature.is_empty() {
+                        slot.thought_signature = Some(signature.to_string());
                     }
                 }
             }
@@ -842,20 +893,21 @@ pub async fn send_chat_stream_with_tools(
     Ok(read_sse_round(response, on_token).await?.into())
 }
 
-/// Turn accumulated (id, name, arguments) fragments into ToolCalls, dropping any
-/// entry without a function name (defensive against malformed streams).
-fn assemble_tool_calls(acc: Vec<(String, String, String)>) -> Vec<ToolCall> {
+/// Turn accumulated tool-call fragments into ToolCalls, dropping any entry
+/// without a function name (defensive against malformed streams).
+fn assemble_tool_calls(acc: Vec<ToolCallParts>) -> Vec<ToolCall> {
     acc.into_iter()
         .enumerate()
-        .filter(|(_, (_, name, _))| !name.is_empty())
-        .map(|(i, (id, name, arguments))| ToolCall {
-            id: if id.is_empty() {
+        .filter(|(_, parts)| !parts.name.is_empty())
+        .map(|(i, parts)| ToolCall {
+            id: if parts.id.is_empty() {
                 format!("call_{}", i)
             } else {
-                id
+                parts.id
             },
-            name,
-            arguments,
+            name: parts.name,
+            arguments: parts.arguments,
+            thought_signature: parts.thought_signature,
         })
         .collect()
 }
@@ -1298,8 +1350,60 @@ mod tests {
                 id: "call_screen".to_string(),
                 name: "capture_screen".to_string(),
                 arguments: "{\"timing\":\"now\"}".to_string(),
+                thought_signature: None,
             }]
         );
+    }
+
+    /// Gemini thinking models return an opaque `thought_signature` with every
+    /// function call and 400 the follow-up request if it is not echoed back. It
+    /// can arrive on a later frame than the call itself, so the decoder has to
+    /// merge it by index like the argument fragments.
+    #[test]
+    fn sse_decoder_captures_gemini_thought_signature_from_extra_content() {
+        let call = serde_json::json!({
+            "choices": [{"delta": {"tool_calls": [{
+                "index": 0,
+                "id": "call_search",
+                "function": {"name": "web_search", "arguments": "{\"query\":\"rust\"}"}
+            }]}}]
+        });
+        let signature = serde_json::json!({
+            "choices": [{"delta": {"tool_calls": [{
+                "index": 0,
+                "extra_content": {"google": {"thought_signature": "SIG-ABC"}}
+            }]}}]
+        });
+        let wire = format!("data: {call}\n\ndata: {signature}\n\ndata: [DONE]\n\n");
+
+        let (round, _) = decode_sse(vec![wire.into_bytes()]);
+        assert_eq!(
+            round.tool_calls,
+            [ToolCall {
+                id: "call_search".to_string(),
+                name: "web_search".to_string(),
+                arguments: "{\"query\":\"rust\"}".to_string(),
+                thought_signature: Some("SIG-ABC".to_string()),
+            }]
+        );
+    }
+
+    /// Providers that send no signature must stay at `None`, so nothing extra is
+    /// ever attached to a non-Gemini follow-up request.
+    #[test]
+    fn sse_decoder_leaves_thought_signature_unset_without_extra_content() {
+        let call = serde_json::json!({
+            "choices": [{"delta": {"tool_calls": [{
+                "index": 0,
+                "id": "call_time",
+                "function": {"name": "get_current_datetime", "arguments": "{}"}
+            }]}}]
+        });
+        let wire = format!("data: {call}\n\ndata: [DONE]\n\n");
+
+        let (round, _) = decode_sse(vec![wire.into_bytes()]);
+        assert_eq!(round.tool_calls.len(), 1);
+        assert_eq!(round.tool_calls[0].thought_signature, None);
     }
 
     #[test]
