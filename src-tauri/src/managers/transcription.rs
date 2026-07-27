@@ -1894,7 +1894,9 @@ fn resolve_auto_ort_accelerator() -> transcribe_rs::accel::OrtAccelerator {
     OrtAccelerator::Auto
 }
 
-#[derive(Serialize, Clone, Debug, Type)]
+/// One compute device. `Deserialize` is needed by the Linux out-of-process
+/// probe, which parses this back out of the child's JSON.
+#[derive(Serialize, serde::Deserialize, Clone, Debug, Type)]
 pub struct GpuDeviceOption {
     pub id: i32,
     pub name: String,
@@ -1904,34 +1906,169 @@ pub struct GpuDeviceOption {
 
 static GPU_DEVICES: OnceLock<Vec<GpuDeviceOption>> = OnceLock::new();
 
-fn cached_gpu_devices() -> &'static [GpuDeviceOption] {
+/// Both device lists, as produced by one enumeration pass. Serialized to a
+/// single JSON line so the Linux out-of-process probe can hand them back to the
+/// parent (see `probe_devices_out_of_process`).
+#[derive(Serialize, serde::Deserialize, Clone, Debug, Default)]
+pub struct DeviceProbe {
+    pub whisper: Vec<GpuDeviceOption>,
+    pub transcribe_cpp: Vec<GpuDeviceOption>,
+}
+
+/// Enumerate the whisper GPU devices in THIS process.
+///
+/// Loads ggml's Vulkan backend, which is the risky part: the statically linked
+/// whisper.cpp/ggml in `transcribe-rs` is compiled with ggml's default
+/// `GGML_NATIVE=ON` (i.e. `-march=native`), so a package built on a machine with
+/// a wider instruction set than the one running it can raise SIGILL right here —
+/// an uncatchable crash that takes the whole app down at launch. On Linux, where
+/// packages are routinely built on a different machine than they run on, callers
+/// go through `probe_devices_out_of_process` instead so a crash costs us a GPU
+/// listing rather than the app.
+fn enumerate_whisper_gpu_devices() -> Vec<GpuDeviceOption> {
     use transcribe_rs::whisper_cpp::gpu::list_gpu_devices;
 
-    GPU_DEVICES.get_or_init(|| {
-        // ggml's Vulkan backend uses FMA3 instructions internally.
-        // On older CPUs without FMA3 (e.g. Sandy Bridge Xeons) this causes
-        // a SIGILL crash that cannot be caught. Skip enumeration entirely
-        // on those CPUs — GPU-accelerated whisper won't work there anyway.
-        #[cfg(target_arch = "x86_64")]
-        if !std::arch::is_x86_feature_detected!("fma") {
-            warn!("CPU lacks FMA3 support — skipping GPU device enumeration");
-            return Vec::new();
-        }
+    // ggml's Vulkan backend uses FMA3 instructions internally.
+    // On older CPUs without FMA3 (e.g. Sandy Bridge Xeons) this causes
+    // a SIGILL crash that cannot be caught. Skip enumeration entirely
+    // on those CPUs — GPU-accelerated whisper won't work there anyway.
+    #[cfg(target_arch = "x86_64")]
+    if !std::arch::is_x86_feature_detected!("fma") {
+        warn!("CPU lacks FMA3 support — skipping GPU device enumeration");
+        return Vec::new();
+    }
 
-        list_gpu_devices()
-            .into_iter()
-            .map(|d| GpuDeviceOption {
-                id: d.id,
-                name: d.name,
-                kind: match d.kind {
-                    transcribe_rs::whisper_cpp::gpu::GpuKind::Dedicated => "dedicated".to_string(),
-                    transcribe_rs::whisper_cpp::gpu::GpuKind::Integrated => {
-                        "integrated".to_string()
-                    }
-                },
-                total_vram_mb: d.total_vram / (1024 * 1024),
-            })
-            .collect()
+    list_gpu_devices()
+        .into_iter()
+        .map(|d| GpuDeviceOption {
+            id: d.id,
+            name: d.name,
+            kind: match d.kind {
+                transcribe_rs::whisper_cpp::gpu::GpuKind::Dedicated => "dedicated".to_string(),
+                transcribe_rs::whisper_cpp::gpu::GpuKind::Integrated => "integrated".to_string(),
+            },
+            total_vram_mb: d.total_vram / (1024 * 1024),
+        })
+        .collect()
+}
+
+/// Enumerate both device lists in THIS process. Used by the non-Linux (direct)
+/// path and by the `--probe-devices` child on Linux.
+pub fn enumerate_devices_in_process() -> DeviceProbe {
+    DeviceProbe {
+        whisper: enumerate_whisper_gpu_devices(),
+        transcribe_cpp: enumerate_transcribe_cpp_devices(),
+    }
+}
+
+/// Run the whole enumeration in a short-lived CHILD process and parse its JSON.
+///
+/// The point is fault isolation, not speed: if the vendored native code raises
+/// SIGILL (see `enumerate_whisper_gpu_devices`) or wedges on a broken Vulkan
+/// driver, the child dies alone and we degrade to "no GPU listed" — the app
+/// still starts and transcribes on the CPU. Any failure is a warning, never
+/// fatal.
+///
+/// Compiled on every platform (so it stays type-checked) but only reached on
+/// Linux — see `PROBE_DEVICES_OUT_OF_PROCESS`.
+fn probe_devices_out_of_process() -> Result<DeviceProbe, String> {
+    let exe = std::env::current_exe().map_err(|e| format!("current_exe failed: {e}"))?;
+    probe_devices_via(&exe)
+}
+
+fn probe_devices_via(exe: &std::path::Path) -> Result<DeviceProbe, String> {
+    use std::io::Read;
+    use std::process::{Command, Stdio};
+    use std::time::{Duration, Instant};
+
+    // Generous: a cold Vulkan driver enumerating several devices can take a few
+    // seconds. This only bounds a hung child.
+    const PROBE_TIMEOUT: Duration = Duration::from_secs(30);
+    const POLL_INTERVAL: Duration = Duration::from_millis(50);
+
+    let mut child = Command::new(exe)
+        .arg("--probe-devices")
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .map_err(|e| format!("could not spawn the device probe: {e}"))?;
+
+    // Poll rather than block so a wedged child can be killed. The probe writes
+    // well under a pipe buffer, so leaving stdout unread until exit cannot
+    // deadlock.
+    let deadline = Instant::now() + PROBE_TIMEOUT;
+    let status = loop {
+        match child.try_wait() {
+            Ok(Some(status)) => break status,
+            Ok(None) => {
+                if Instant::now() >= deadline {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    return Err("the device probe timed out".to_string());
+                }
+                std::thread::sleep(POLL_INTERVAL);
+            }
+            Err(e) => return Err(format!("waiting for the device probe failed: {e}")),
+        }
+    };
+
+    let mut stdout = String::new();
+    if let Some(mut pipe) = child.stdout.take() {
+        let _ = pipe.read_to_string(&mut stdout);
+    }
+
+    if !status.success() {
+        // The SIGILL case lands here (no exit code, killed by signal).
+        return Err(format!("the device probe exited abnormally ({status})"));
+    }
+
+    parse_device_probe_output(&stdout)
+}
+
+/// Pick the device list out of the child's stdout.
+///
+/// Scans from the end for the last line that parses, so any logging the child
+/// emits before its JSON (a backend-init line, a driver warning) is ignored.
+fn parse_device_probe_output(stdout: &str) -> Result<DeviceProbe, String> {
+    stdout
+        .lines()
+        .rev()
+        .find_map(|line| serde_json::from_str::<DeviceProbe>(line.trim()).ok())
+        .ok_or_else(|| "the device probe produced no parsable output".to_string())
+}
+
+/// Whether device enumeration runs in a child process instead of in-process.
+///
+/// Linux only: that is where a package is routinely built on a different machine
+/// than it runs on, which is exactly when the `-march=native` ggml build can
+/// SIGILL (see `enumerate_whisper_gpu_devices`). Windows and macOS keep the
+/// historical in-process call. A `cfg!` const rather than `#[cfg]` blocks so
+/// both paths stay compiled and type-checked everywhere; the dead branch folds
+/// away at compile time.
+const PROBE_DEVICES_OUT_OF_PROCESS: bool = cfg!(target_os = "linux");
+
+/// Devices for this machine, enumerated once. Linux goes out of process (crash
+/// isolation); every other platform keeps the historical in-process call.
+fn device_probe() -> &'static DeviceProbe {
+    static DEVICE_PROBE: OnceLock<DeviceProbe> = OnceLock::new();
+
+    DEVICE_PROBE.get_or_init(|| match probe_devices_out_of_process() {
+        Ok(probe) => probe,
+        Err(error) => {
+            warn!("Out-of-process device enumeration failed ({error}) — continuing without GPU acceleration. Transcription still works on the CPU.");
+            DeviceProbe::default()
+        }
+    })
+}
+
+fn cached_gpu_devices() -> &'static [GpuDeviceOption] {
+    GPU_DEVICES.get_or_init(|| {
+        if PROBE_DEVICES_OUT_OF_PROCESS {
+            device_probe().whisper.clone()
+        } else {
+            enumerate_whisper_gpu_devices()
+        }
     })
 }
 
@@ -1970,28 +2107,38 @@ static TRANSCRIBE_CPP_DEVICES: OnceLock<Vec<GpuDeviceOption>> = OnceLock::new();
 
 fn cached_transcribe_cpp_devices() -> &'static [GpuDeviceOption] {
     TRANSCRIBE_CPP_DEVICES.get_or_init(|| {
-        // Same FMA3 guard as the whisper GPU probe: ggml's Vulkan backend uses
-        // FMA3, which SIGILLs on CPUs without it; skip enumeration there.
-        #[cfg(target_arch = "x86_64")]
-        if !std::arch::is_x86_feature_detected!("fma") {
-            warn!("CPU lacks FMA3 support — skipping transcribe.cpp device enumeration");
-            return Vec::new();
+        if PROBE_DEVICES_OUT_OF_PROCESS {
+            device_probe().transcribe_cpp.clone()
+        } else {
+            enumerate_transcribe_cpp_devices()
         }
-
-        transcribe_cpp::devices()
-            .into_iter()
-            .map(|d| GpuDeviceOption {
-                id: d.index.map(|i| i as i32).unwrap_or(-1),
-                name: if d.description.is_empty() {
-                    d.name
-                } else {
-                    d.description
-                },
-                kind: "unknown".to_string(),
-                total_vram_mb: (d.memory_total / (1024 * 1024)) as usize,
-            })
-            .collect()
     })
+}
+
+/// Enumerate the transcribe.cpp compute devices in THIS process. Requires
+/// `init_transcribe_cpp()` (backend modules) to have run first.
+fn enumerate_transcribe_cpp_devices() -> Vec<GpuDeviceOption> {
+    // Same FMA3 guard as the whisper GPU probe: ggml's Vulkan backend uses
+    // FMA3, which SIGILLs on CPUs without it; skip enumeration there.
+    #[cfg(target_arch = "x86_64")]
+    if !std::arch::is_x86_feature_detected!("fma") {
+        warn!("CPU lacks FMA3 support — skipping transcribe.cpp device enumeration");
+        return Vec::new();
+    }
+
+    transcribe_cpp::devices()
+        .into_iter()
+        .map(|d| GpuDeviceOption {
+            id: d.index.map(|i| i as i32).unwrap_or(-1),
+            name: if d.description.is_empty() {
+                d.name
+            } else {
+                d.description
+            },
+            kind: "unknown".to_string(),
+            total_vram_mb: (d.memory_total / (1024 * 1024)) as usize,
+        })
+        .collect()
 }
 
 /// Return which accelerators are compiled into this build.
@@ -2049,6 +2196,56 @@ impl Drop for TranscriptionManager {
 mod tests {
     use super::*;
     use transcribe_cpp::{Capabilities, Task, TimestampKind};
+
+    /// The child's device list must survive a round trip through stdout, and any
+    /// log noise it printed first must be ignored. This is what stands between a
+    /// crashed/chatty probe and a GPU list, so it is worth pinning.
+    #[test]
+    fn device_probe_output_parses_past_leading_log_noise() {
+        let probe = DeviceProbe {
+            whisper: vec![GpuDeviceOption {
+                id: 0,
+                name: "Test GPU".to_string(),
+                kind: "dedicated".to_string(),
+                total_vram_mb: 8192,
+            }],
+            transcribe_cpp: vec![GpuDeviceOption {
+                id: -1,
+                name: "CPU".to_string(),
+                kind: "unknown".to_string(),
+                total_vram_mb: 0,
+            }],
+        };
+        let stdout = format!(
+            "transcribe_init_backends: 1 compute device(s) registered\nsome driver warning\n{}\n",
+            serde_json::to_string(&probe).unwrap()
+        );
+
+        let parsed = parse_device_probe_output(&stdout).expect("probe output should parse");
+        assert_eq!(parsed.whisper.len(), 1);
+        assert_eq!(parsed.whisper[0].name, "Test GPU");
+        assert_eq!(parsed.whisper[0].total_vram_mb, 8192);
+        assert_eq!(parsed.transcribe_cpp.len(), 1);
+        assert_eq!(parsed.transcribe_cpp[0].name, "CPU");
+    }
+
+    /// A probe that cannot even be launched must return an error, so the caller
+    /// falls back to CPU-only instead of panicking. The whole point of the child
+    /// process is that its failure is survivable.
+    #[test]
+    fn device_probe_with_unlaunchable_binary_returns_error() {
+        let missing = std::env::temp_dir().join("speakoflow_probe_does_not_exist_xyz");
+        assert!(probe_devices_via(&missing).is_err());
+    }
+
+    /// A probe that died before printing anything (the SIGILL case) must surface
+    /// as an error so the caller degrades to CPU-only instead of hanging or
+    /// panicking.
+    #[test]
+    fn device_probe_output_without_json_is_an_error() {
+        assert!(parse_device_probe_output("").is_err());
+        assert!(parse_device_probe_output("Illegal instruction (core dumped)\n").is_err());
+    }
 
     /// A stalled/behind worker (the receiver is held, nothing is consumed) must
     /// never let the live-transcription feed queue grow past the cap: excess
