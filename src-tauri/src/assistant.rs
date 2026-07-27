@@ -2375,11 +2375,23 @@ pub async fn run_assistant_turn(
                     .tool_calls
                     .iter()
                     .map(|tc| {
-                        json!({
+                        let mut call = json!({
                             "id": tc.id,
                             "type": "function",
                             "function": { "name": tc.name, "arguments": tc.arguments }
-                        })
+                        });
+                        // Gemini thinking models reject the follow-up request
+                        // ("Function call is missing a thought_signature in
+                        // functionCall parts", HTTP 400) unless the opaque
+                        // signature that came back with the call is echoed
+                        // verbatim, in exactly this shape. Added only when the
+                        // provider actually sent one, so requests to every other
+                        // OpenAI-compatible provider stay byte-identical.
+                        if let Some(signature) = &tc.thought_signature {
+                            call["extra_content"] =
+                                json!({ "google": { "thought_signature": signature } });
+                        }
+                        call
                     })
                     .collect();
                 msgs.push(json!({
@@ -3167,6 +3179,7 @@ mod tests {
                 id: "call-1".to_string(),
                 name: "get_current_datetime".to_string(),
                 arguments: "{}".to_string(),
+                thought_signature: None,
             }],
         }
         .into();

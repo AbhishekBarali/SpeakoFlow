@@ -33,4 +33,13 @@ pub struct CliArgs {
     /// with no dev toolchain / no Vulkan SDK (the Session 7 clean-machine gate).
     #[arg(long)]
     pub list_devices: bool,
+
+    /// Internal: enumerate the compute devices, print them as one line of JSON,
+    /// and exit. The app spawns itself with this on Linux so that a SIGILL or a
+    /// hang inside the vendored ggml/Vulkan code kills only this short-lived
+    /// child instead of the app at launch (see
+    /// `managers::transcription::probe_devices_out_of_process`). Hidden because
+    /// it is an implementation detail, not a user-facing switch.
+    #[arg(long, hide = true)]
+    pub probe_devices: bool,
 }
