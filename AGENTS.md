@@ -67,7 +67,7 @@ SpeakoFlow is a cross-platform desktop voice assistant (dictation, AI chat panel
 - `managers/` - Core business logic:
   - `audio.rs` - Audio recording and device management
   - `model.rs` - Model downloading and management: resilient downloads that auto-retry with exponential backoff and resume from a `.partial` file via HTTP `Range` (`attempt_download`, `AttemptOutcome`, `HttpStatusError` sorting transient vs. permanent failures), plus an ordered source list — a reliable mirror first, the canonical Hugging Face URL as fallback (`download_candidates` / `mirror_url_for`; mirrors not yet populated, see `docs/TODO_BEFORE_RELEASE.md`)
-  - `transcription.rs` - Speech-to-text processing pipeline
+  - `transcription.rs` - Speech-to-text processing pipeline. Compute-device enumeration is crash-isolated on Linux: `PROBE_DEVICES_OUT_OF_PROCESS` (true only on Linux) sends `cached_gpu_devices` / `cached_transcribe_cpp_devices` through `probe_devices_out_of_process`, which spawns `self --probe-devices` and parses one line of JSON. The vendored, statically linked whisper.cpp/ggml in `transcribe-rs` is built with ggml's default `GGML_NATIVE=ON` (`-march=native`), so loading its Vulkan backend can raise SIGILL when a package runs on a narrower CPU than the one that built it — out of process, that costs a GPU listing instead of the whole app at launch. Windows/macOS keep the in-process call unchanged
   - `history.rs` - Transcription history storage
 - `audio_toolkit/` - Low-level audio processing:
   - `audio/` - Device enumeration, recording, resampling

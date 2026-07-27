@@ -475,6 +475,28 @@ pub fn list_transcribe_devices() {
     }
 }
 
+/// Handle the `--probe-devices` flag: enumerate the compute devices in this
+/// short-lived process and print them as a single line of JSON, then return so
+/// the process exits without launching the GUI.
+///
+/// This is the child half of the Linux crash-isolated device probe. The running
+/// app spawns itself with this flag instead of loading ggml's Vulkan backend
+/// in-process, because the vendored, statically linked whisper.cpp/ggml is built
+/// with `-march=native` and can raise SIGILL on a machine narrower than the one
+/// that built the package. If that happens the child dies here and the app just
+/// carries on without GPU acceleration.
+pub fn print_device_probe_json() {
+    // The backend modules must be loaded before transcribe.cpp can report any
+    // devices; harmless for the whisper probe.
+    managers::transcription::init_transcribe_cpp();
+
+    let probe = managers::transcription::enumerate_devices_in_process();
+    match serde_json::to_string(&probe) {
+        Ok(json) => println!("{json}"),
+        Err(error) => eprintln!("device probe serialization failed: {error}"),
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run(cli_args: CliArgs) {
     // Detect portable mode before anything else

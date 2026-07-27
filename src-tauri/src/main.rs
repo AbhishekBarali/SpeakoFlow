@@ -16,6 +16,15 @@ fn main() {
         return;
     }
 
+    // `--probe-devices` is the machine-readable sibling of `--list-devices`, and
+    // the child half of the Linux crash-isolated device probe: one JSON line on
+    // stdout, then exit. Must also stay ahead of any window/single-instance
+    // setup — the parent app is already running when this executes.
+    if cli_args.probe_devices {
+        speakoflow_app_lib::print_device_probe_json();
+        return;
+    }
+
     #[cfg(target_os = "linux")]
     {
         // DMABUF renderer causes crashes on various GPU/display server configurations
