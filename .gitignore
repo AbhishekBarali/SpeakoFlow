@@ -95,3 +95,4 @@ src/assistant/panel-demo.html
 src/assistant/panel-demo.tsx
 src/overlay/preview.html
 src/overlay/preview.tsx
+build/*.AppImage

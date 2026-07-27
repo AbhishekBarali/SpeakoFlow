@@ -69,6 +69,16 @@ Hold to talk, or tap `Space` while holding to keep recording hands-free. All sho
 
 Download the latest build for Windows, macOS, or Linux from the [Releases](https://github.com/AbhishekBarali/SpeakoFlow/releases) page. A short setup wizard helps you pick a transcription model and, optionally, a local model for the assistant.
 
+**Linux:**
+
+- **Arch Linux** — install from the AUR:
+  ```bash
+  yay -S speakoflow-appimage
+  # or
+  paru -S speakoflow-appimage
+  ```
+- **Other distributions** — download the AppImage from the [Releases](https://github.com/AbhishekBarali/SpeakoFlow/releases) page, make it executable (`chmod +x`), and run it.
+
 To use the assistant, choose a provider in Settings:
 
 - **Built-in (offline).** Download a small local model and run it fully on your machine, no key needed.
