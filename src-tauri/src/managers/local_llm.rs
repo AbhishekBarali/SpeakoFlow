@@ -180,6 +180,66 @@ impl LocalLlmManager {
         Self::find_in_path(Self::engine_filename())
     }
 
+    /// The engine version this app build expects on disk. Mirrors the tag used
+    /// to build the pinned download URLs (the `HANDY_LLAMA_RELEASE_TAG` env
+    /// override, otherwise the pinned constant). Bumping `PINNED_ENGINE_TAG`
+    /// therefore changes what "current" means, which is what lets an old cached
+    /// engine be detected as stale and refreshed automatically on next use.
+    fn expected_engine_tag() -> String {
+        std::env::var("HANDY_LLAMA_RELEASE_TAG")
+            .ok()
+            .map(|t| t.trim().to_string())
+            .filter(|t| !t.is_empty())
+            .unwrap_or_else(|| PINNED_ENGINE_TAG.to_string())
+    }
+
+    /// Path to the version stamp written alongside the auto-downloaded engine.
+    /// It records which [`Self::expected_engine_tag`] the cached engine was
+    /// installed under, so a later app that bumps the pin can invalidate a
+    /// stale binary instead of reusing it forever.
+    fn engine_stamp_path(&self) -> PathBuf {
+        self.models_dir.join("engine").join("engine.tag")
+    }
+
+    /// Record the engine version currently installed in the managed engine dir.
+    /// Best-effort: a failure here only means the next launch re-checks (and, at
+    /// worst, re-downloads once more), never that the engine won't run.
+    fn write_engine_stamp(&self) {
+        let path = self.engine_stamp_path();
+        if let Err(e) = std::fs::write(&path, Self::expected_engine_tag()) {
+            warn!(
+                "Failed to write engine version stamp {}: {}",
+                path.display(),
+                e
+            );
+        }
+    }
+
+    /// Whether `path` lives inside the app-managed engine directory — i.e. it is
+    /// the engine WE auto-downloaded, as opposed to a user-provided
+    /// `HANDY_LLAMA_SERVER` override, a bundled resource, or a binary found on
+    /// `PATH`. Only managed binaries are subject to version-stamp invalidation
+    /// and deletion; we never touch an engine the user or installer supplied.
+    fn is_managed_engine(&self, path: &Path) -> bool {
+        let engine_dir = self.models_dir.join("engine");
+        match (path.canonicalize(), engine_dir.canonicalize()) {
+            (Ok(p), Ok(dir)) => p.starts_with(&dir),
+            // If canonicalization fails, fall back to a lexical prefix check.
+            _ => path.starts_with(&engine_dir),
+        }
+    }
+
+    /// Whether the cached managed engine matches the version this app build
+    /// expects. A missing, unreadable, or mismatched stamp all count as stale,
+    /// forcing a one-time re-download so engines from older app versions (or
+    /// from before stamping existed) upgrade themselves automatically.
+    fn managed_engine_is_current(&self) -> bool {
+        match std::fs::read_to_string(self.engine_stamp_path()) {
+            Ok(stamp) => stamp.trim() == Self::expected_engine_tag(),
+            Err(_) => false,
+        }
+    }
+
     fn find_in_path(name: &str) -> Option<PathBuf> {
         let paths = std::env::var_os("PATH")?;
         std::env::split_paths(&paths)
@@ -221,7 +281,27 @@ impl LocalLlmManager {
     /// returns a clear, actionable message instead of a cryptic API error.
     async fn ensure_engine_installed(&self) -> Result<PathBuf, String> {
         if let Some(path) = self.resolve_engine_binary() {
-            return Ok(path);
+            // Reuse an existing engine — unless it's OUR auto-downloaded one and
+            // it predates the version this app build expects. An engine cached
+            // by an older app version can be too old for a newer model (e.g. a
+            // GGUF whose architecture that build doesn't know), so we refresh it
+            // once. User-provided (`HANDY_LLAMA_SERVER`), bundled, and PATH
+            // binaries are never touched — only the managed cache.
+            if !self.is_managed_engine(&path) || self.managed_engine_is_current() {
+                return Ok(path);
+            }
+            info!(
+                "Cached built-in engine is stale (expected {}); refreshing to a current build...",
+                Self::expected_engine_tag()
+            );
+            let engine_dir = self.models_dir.join("engine");
+            if let Err(e) = std::fs::remove_dir_all(&engine_dir) {
+                warn!(
+                    "Couldn't remove stale engine dir {} ({}); continuing with a fresh download",
+                    engine_dir.display(),
+                    e
+                );
+            }
         }
 
         let engine_dir = self.models_dir.join("engine");
@@ -265,6 +345,10 @@ impl LocalLlmManager {
             match self.download_and_extract_engine(&url, &engine_dir).await {
                 Ok(()) => {
                     if let Some(resolved) = self.resolve_engine_binary() {
+                        // Stamp the freshly installed engine with the version we
+                        // consider current, so future launches reuse it and only
+                        // re-download once the app bumps the expected tag.
+                        self.write_engine_stamp();
                         let _ = self.app_handle.emit("local-llm-engine-status", "ready");
                         info!("Built-in LLM engine installed at {}", resolved.display());
                         return Ok(resolved);
@@ -403,12 +487,7 @@ impl LocalLlmManager {
     /// "latest" lookup is throttled or the machine is behind a busy shared IP.
     /// The tag is overridable via `HANDY_LLAMA_RELEASE_TAG`.
     fn pinned_asset_urls(&self) -> Vec<String> {
-        let tag = std::env::var("HANDY_LLAMA_RELEASE_TAG")
-            .ok()
-            .map(|t| t.trim().to_string())
-            .filter(|t| !t.is_empty())
-            .unwrap_or_else(|| PINNED_ENGINE_TAG.to_string());
-        Self::pinned_asset_urls_for(&tag)
+        Self::pinned_asset_urls_for(&Self::expected_engine_tag())
     }
 
     /// Build the pinned release-download URLs for `tag`. Split out from
