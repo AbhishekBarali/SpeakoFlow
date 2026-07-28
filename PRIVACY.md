@@ -162,7 +162,7 @@ full history of this document is publicly visible.
 
 ## Contact
 
-Questions about privacy? Please open an issue or discussion on the
+Questions about privacy? Please open an issue on the
 [SpeakoFlow GitHub repository](https://github.com/AbhishekBarali/SpeakoFlow).
 
 ---
