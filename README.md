@@ -13,7 +13,7 @@
 [![Platforms](https://img.shields.io/badge/Windows%20%7C%20macOS%20%7C%20Linux-informational)](#install)
 [![Built with Tauri](https://img.shields.io/badge/built%20with-Tauri%202-24C8DB?logo=tauri&logoColor=white)](https://tauri.app)
 
-[Download](https://github.com/AbhishekBarali/SpeakoFlow/releases) &nbsp;·&nbsp; [Website](https://www.speakoflow.com) &nbsp;·&nbsp; [Discussions](https://github.com/AbhishekBarali/SpeakoFlow/discussions)
+[Download](https://github.com/AbhishekBarali/SpeakoFlow/releases) &nbsp;·&nbsp; [Website](https://www.speakoflow.com)
 
 <img src="assets/darko.gif" alt="SpeakoFlow live dictation demo" width="720" />
 
@@ -166,8 +166,6 @@ gracefully.
 - Voice-to-text tuned for agentic coding
 - Prompt-engineering help: describe what you want to build and get a solid prompt back
 - Voice commands: trigger actions and complete tasks by voice
-
-Have an idea? Open a [Discussion](https://github.com/AbhishekBarali/SpeakoFlow/discussions).
 
 ## Contributing
 

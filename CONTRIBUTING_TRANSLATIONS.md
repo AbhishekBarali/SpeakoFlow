@@ -147,7 +147,7 @@ Some languages have complex plural rules. For now, use a general form that works
 ## Questions?
 
 - Open an issue on GitHub
-- Join the discussion in existing translation PRs
+- Join existing translation PRs for feedback
 
 ## Currently Supported Languages
 

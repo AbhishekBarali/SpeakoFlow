@@ -89,8 +89,7 @@ For more details, see the Architecture section in [README.md](README.md) or [AGE
 ### Before Submitting a Bug Report
 
 1. **Search existing issues** at [github.com/AbhishekBarali/SpeakoFlow/issues](https://github.com/AbhishekBarali/SpeakoFlow/issues)
-2. **Check discussions** at [github.com/AbhishekBarali/SpeakoFlow/discussions](https://github.com/AbhishekBarali/SpeakoFlow/discussions)
-3. **Try the latest release** to see if the issue has been fixed
+2. **Try the latest release** to see if the issue has been fixed
 4. **Enable debug mode** (`Cmd/Ctrl+Shift+D`) to gather diagnostic information
 
 ### Submitting a Bug Report
@@ -117,18 +116,9 @@ Use the [Bug Report template](.github/ISSUE_TEMPLATE/bug_report.md) when creatin
 
 ## 💡 Suggesting Features
 
-We use GitHub Discussions for feature requests rather than issues. This keeps issues focused on bugs and actionable tasks while allowing more open-ended conversations about features.
-
-### Before Suggesting a Feature
-
-1. **Search existing discussions** at [github.com/AbhishekBarali/SpeakoFlow/discussions](https://github.com/AbhishekBarali/SpeakoFlow/discussions)
-
 ### Submitting a Feature Request
 
-1. Go to [Discussions](https://github.com/AbhishekBarali/SpeakoFlow/discussions)
-2. Click "New discussion"
-3. Choose the appropriate category (Ideas, Feature Requests, etc.)
-4. Describe your feature idea including:
+1. Open an issue describing your feature idea including:
    - The problem you're trying to solve
    - Your proposed solution
    - Any alternatives you've considered
@@ -146,14 +136,7 @@ We use GitHub Discussions for feature requests rather than issues. This keeps is
    - [Open PRs](https://github.com/AbhishekBarali/SpeakoFlow/pulls)
    - [Closed PRs](https://github.com/AbhishekBarali/SpeakoFlow/pulls?q=is%3Apr+is%3Aclosed)
 
-2. **If something was previously closed** - If you want to revisit a closed issue or PR, you need to:
-   - Provide a strong argument for why it should be reconsidered
-   - Gather community feedback first via [Discussions](https://github.com/AbhishekBarali/SpeakoFlow/discussions)
-   - Link to that discussion in your PR
-
-3. **Get community feedback for features** - PRs with demonstrated community interest are **much more likely to be merged**. Start a discussion, get feedback, and link to it in your PR. This helps ensure SpeakoFlow stays focused and useful for the most people without becoming bloated.
-
-Community feedback is essential to keeping SpeakoFlow the best it can be for everyone. It helps prioritize what matters most and prevents feature creep.
+2. **If something was previously closed** - If you want to revisit a closed issue or PR, provide a strong argument for why it should be reconsidered.
 
 ### Development Workflow
 
@@ -211,15 +194,12 @@ Community feedback is essential to keeping SpeakoFlow the best it can be for eve
    - Go to the [SpeakoFlow repository](https://github.com/AbhishekBarali/SpeakoFlow)
    - Click "New Pull Request"
    - Select your fork and branch
-   - Fill out the PR template completely, including:
-     - Clear description of changes
-     - Links to related issues or discussions
-     - **Community feedback** (especially important for features)
-     - How you tested the changes
-     - Screenshots/videos if applicable
-     - Breaking changes (if any)
-
-   **Remember:** PRs with community support are prioritized. If you haven't already, start a [discussion](https://github.com/AbhishekBarali/SpeakoFlow/discussions) to gather feedback before or alongside your PR. It is not explicitly required to gather feedback, but it certainly helps your PR get merged faster.
+    - Fill out the PR template completely, including:
+      - Clear description of changes
+      - Links to related issues
+      - How you tested the changes
+      - Screenshots/videos if applicable
+      - Breaking changes (if any)
 
 ### AI Assistance Disclosure
 
@@ -290,7 +270,7 @@ Documentation improvements are highly valued! You can contribute by:
 - **Be patient** - This is maintained by a small team, responses may take time
 - **Be constructive** - Focus on solutions and improvements
 - **Be collaborative** - Help others and share knowledge
-- **Search first** - Check existing issues/discussions before creating new ones
+- **Search first** - Check existing issues before creating new ones
 
 ## 🎯 Good First Issues
 
@@ -302,7 +282,7 @@ Look for issues labeled `good first issue` or `help wanted` if you're new to the
 
 ## 📞 Getting Help
 
-- **Discussions**: Ask questions in [GitHub Discussions](https://github.com/AbhishekBarali/SpeakoFlow/discussions)
+- **Issues**: Ask questions by opening a [GitHub issue](https://github.com/AbhishekBarali/SpeakoFlow/issues)
 
 ## 📜 License
 

@@ -237,11 +237,10 @@ See the [Troubleshooting](README.md#troubleshooting) section in README.md.
 
 ## GitHub workflow for AI coding assistants
 
-**MANDATORY. Before opening any PR, issue, or discussion in this repo: you MUST read the relevant template file and follow it strictly.** That includes sections that look "ceremonial" — checklists, AI Assistance disclosures, "Human Written Description". A generic Summary/Test-plan layout is not acceptable.
+**MANDATORY. Before opening any PR or issue in this repo: you MUST read the relevant template file and follow it strictly.** That includes sections that look "ceremonial" — checklists, AI Assistance disclosures, "Human Written Description". A generic Summary/Test-plan layout is not acceptable.
 
 - **Opening a PR:** If this repo has a `.github/PULL_REQUEST_TEMPLATE.md`, read it and follow it strictly, including sections that look "ceremonial" (checklists, AI Assistance disclosures, "Human Written Description"). If a section requires a human-written paragraph, leave a clear TODO placeholder and ask the human contributor to fill it in — do not invent their voice.
 - **Opening an issue:** If this repo has `.github/ISSUE_TEMPLATE/`, pick the right template rather than a blank issue.
-- **Proposing a feature:** Open a [Discussion](https://github.com/AbhishekBarali/SpeakoFlow/discussions) to gather feedback before opening a PR for a new feature.
 - **Translations:** Follow [CONTRIBUTING_TRANSLATIONS.md](CONTRIBUTING_TRANSLATIONS.md).
 - **Full contributor workflow:** [CONTRIBUTING.md](CONTRIBUTING.md).
 
