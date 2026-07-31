@@ -125,22 +125,23 @@ can still [build from source](#build-from-source).
   # or
   paru -S speakoflow-bin
   ```
-- **Debian, Ubuntu, Mint, Pop!\_OS, Tuxedo OS** — download the `.deb` and
-  install it. This registers the app icon and menu entry properly, which the
+- **Debian, Ubuntu 24.04+, Mint 22+, Pop!\_OS, Tuxedo OS** — download the `.deb`
+  and install it. This registers the app icon and menu entry properly, which the
   AppImage can't do on its own:
   ```bash
   sudo apt install ./SpeakoFlow_*_amd64.deb
   ```
-- **Fedora, openSUSE** — download the `.rpm`:
-  ```bash
-  sudo dnf install ./SpeakoFlow-*.rpm
-  ```
-- **Any other distribution** — download the AppImage, make it executable
-  (`chmod +x`), and run it. Note that an AppImage doesn't integrate with your
-  desktop by itself, so it won't show an icon in your file manager or app menu;
-  tools like Gear Lever or AppImageLauncher add that if you want it.
+  The `.deb` is built on Ubuntu 24.04, so it needs that era of glibc. On an
+  older release, use the AppImage instead.
+- **Any other distribution, including Fedora and openSUSE** — download the
+  AppImage, make it executable (`chmod +x`), and run it. Note that an AppImage
+  doesn't integrate with your desktop by itself, so it won't show an icon in your
+  file manager or app menu; tools like Gear Lever or AppImageLauncher add that if
+  you want it.
 
-x86_64 and ARM64 builds are available for all three Linux formats.
+The AppImage and `.deb` are both built for x86_64 and ARM64. There's no `.rpm`
+yet — the packaging doesn't bundle the speech engine correctly, and shipping one
+that installs but can't transcribe would be worse than not shipping it.
 
 To use the assistant, choose a provider in Settings:
 
