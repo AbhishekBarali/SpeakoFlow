@@ -53,27 +53,27 @@ jobs:
           - platform: "macos-26" # Arm-based macs (M1+). macOS 26 for the Apple Intelligence SDK.
             args: "--target aarch64-apple-darwin"
             target: "aarch64-apple-darwin"
-          # Intel macOS (x86_64-apple-darwin) is intentionally absent: GitHub
-          # retired the last Intel runner (macos-13) on 2025-12-04 and every
-          # remaining macOS label is arm64, so it would be a cross-compile that
-          # build.yml is not set up for (no CMAKE_OSX_ARCHITECTURES; the vendored
-          # CMake C++ would build host-arch and fail to link). It has never built
-          # green. Prove it in test-build.yml before adding it to a release.
-          - platform: "ubuntu-22.04" # Build .deb on 22.04
-            args: "--bundles deb"
+          # Only targets proven green by test-build.yml belong here. Test Build #8
+          # showed that Intel macOS, ubuntu-22.04, .rpm and windows-11-arm had all
+          # been listed in this matrix without ever building once:
+          #   * Intel macOS — no Intel runner since 2025-12-04; build.yml has no
+          #     macOS cross-compile setup.
+          #   * ubuntu-22.04 — xcap's pipewire/libspa cannot compile against
+          #     22.04's older libspa headers (E0560 on spa_video_info_raw.flags).
+          #     .deb is built on 24.04 instead.
+          #   * .rpm — Tauri's rpm bundler omits libtranscribe.so and the ggml
+          #     backends, and an .rpm cannot be unpacked/repacked like a .deb.
+          #   * windows-11-arm — whisper-rs-sys requires VULKAN_SDK; build.yml's
+          #     Vulkan setup is gated to non-aarch64 Windows.
+          - platform: "ubuntu-24.04" # AppImage + .deb, x86_64
+            args: "--bundles appimage,deb"
             target: "x86_64-unknown-linux-gnu"
-          - platform: "ubuntu-24.04" # Build AppImage and RPM on 24.04
-            args: "--bundles appimage,rpm"
-            target: "x86_64-unknown-linux-gnu"
-          - platform: "ubuntu-24.04-arm" # Build for ARM64 Linux
-            args: "--bundles appimage,deb,rpm"
+          - platform: "ubuntu-24.04-arm" # AppImage + .deb, ARM64
+            args: "--bundles appimage,deb"
             target: "aarch64-unknown-linux-gnu"
           - platform: "windows-latest"
             args: ""
             target: "x86_64-pc-windows-msvc"
-          - platform: "windows-11-arm" # ARM64 Windows runner
-            args: "--target aarch64-pc-windows-msvc"
-            target: "aarch64-pc-windows-msvc"
 
     uses: ./.github/workflows/build.yml
     with:

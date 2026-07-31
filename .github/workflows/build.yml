@@ -581,6 +581,67 @@ jobs:
             echo "No AppImage found to process"
           fi
 
+      # Tauri's deb bundler packages the binary + resources only, so the dynamic
+      # engine libs are missing: libtranscribe.so (a NEEDED of `speakoflow`) and
+      # the ggml backend modules that libtranscribe dlopen's from its own
+      # directory at runtime. A .deb built without them installs fine and then
+      # cannot transcribe, which is exactly what the audit below catches.
+      #
+      # The AppImage solves this in its own post-processing step above; do the
+      # same for .deb by unpacking, injecting into /usr/lib, and repacking.
+      # /usr/lib is both on the default loader search path (resolving the NEEDED)
+      # and the directory libtranscribe dlopen's its backends from, so one
+      # location satisfies both.
+      #
+      # NOTE: .rpm has no equivalent step. Injecting into an existing .rpm means
+      # rebuilding it from a spec rather than a simple unpack/repack, so .rpm is
+      # not built until that is wired up properly.
+      - name: Stage transcribe backends into .deb
+        if: contains(inputs.platform, 'ubuntu')
+        shell: bash
+        run: |
+          set -euo pipefail
+          PROFILE="${{ steps.build-profile.outputs.profile }}"
+          DEB_DIR="src-tauri/target/${PROFILE}/bundle/deb"
+
+          if ! compgen -G "${DEB_DIR}/*.deb" > /dev/null; then
+            echo "No .deb produced; nothing to stage."
+            exit 0
+          fi
+
+          if [ -z "${TRANSCRIBE_LIBDIR:-}" ]; then
+            echo "ERROR: TRANSCRIBE_LIBDIR not set; the .deb would ship without the transcribe engine" >&2
+            exit 1
+          fi
+
+          for deb in "${DEB_DIR}"/*.deb; do
+            echo "Injecting engine libs into ${deb}"
+            work="$(mktemp -d)"
+            # -R keeps the control archive, so the package can be rebuilt as-is.
+            dpkg-deb -R "$deb" "$work"
+            mkdir -p "$work/usr/lib"
+            # Collect via nullglob so an unmatched pattern is an explicit error
+            # rather than cp choking on a literal glob under `set -e`.
+            shopt -s nullglob
+            libs=( "$TRANSCRIBE_LIBDIR"/libtranscribe.so* "$TRANSCRIBE_LIBDIR"/libggml*.so* )
+            shopt -u nullglob
+            if [ ${#libs[@]} -eq 0 ]; then
+              echo "ERROR: no engine libs found in ${TRANSCRIBE_LIBDIR}" >&2
+              ls -la "$TRANSCRIBE_LIBDIR" >&2 || true
+              exit 1
+            fi
+            # -L dereferences the versioned symlinks cargo leaves behind.
+            cp -vL "${libs[@]}" "$work/usr/lib/"
+            # Refresh Installed-Size so dpkg reports the real footprint.
+            size_kb="$(du -ks "$work" | cut -f1)"
+            if grep -q '^Installed-Size:' "$work/DEBIAN/control"; then
+              sed -i "s/^Installed-Size:.*/Installed-Size: ${size_kb}/" "$work/DEBIAN/control"
+            fi
+            dpkg-deb -b "$work" "$deb"
+            rm -rf "$work"
+            echo "Repacked ${deb}"
+          done
+
       - name: Audit Linux package runtime contents
         if: contains(inputs.platform, 'ubuntu')
         shell: bash

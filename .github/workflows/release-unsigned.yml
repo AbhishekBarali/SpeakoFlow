@@ -20,21 +20,20 @@ name: "Release (unsigned)"
 # Use the signed release.yml once signing secrets are configured
 # (Apple Developer ID + notarization, Azure Trusted Signing, updater key).
 #
-# Targets: the full release.yml matrix minus Intel macOS. This deliberately
-# mirrors release.yml target-for-target so an unsigned early release is never
-# *narrower* than a signed one — an unsigned build is a signing trade-off, not a
-# platform-support trade-off. Intel macs and Debian/Ubuntu (.deb) in particular
-# had no artifact at all while this workflow only built three targets.
+# Targets: exactly what test-build.yml has proven. Nothing is added here that
+# has not had a green Test Build run first — Test Build #8 exposed three targets
+# that release.yml had listed for months without ever building once.
 #
-# Intel macOS (x86_64-apple-darwin) is intentionally NOT built. GitHub retired
-# the last Intel macOS runner (macos-13) on 2025-12-04, and every remaining
-# label (macos-latest/14/15/26) is arm64 — so an Intel build would be an
-# arm64->x86_64 cross-compile. build.yml has no macOS cross-compile setup (no
-# CMAKE_OSX_ARCHITECTURES), and the vendored CMake-built C++ (whisper.cpp/ggml,
-# llama.cpp) would compile for the host arch and fail to link. The target has
-# never built green here. Adding it back needs a green test-build.yml run first,
-# not a release. GitHub also drops macOS x86_64 entirely after the macOS 15
-# image retires in Fall 2027.
+# Deliberately absent, with reasons (see test-build.yml for the detail):
+#   * Intel macOS — no Intel runner exists since 2025-12-04; cross-compile is
+#     not set up in build.yml.
+#   * ubuntu-22.04 — cannot compile; xcap's pipewire/libspa needs newer libspa
+#     headers than 22.04 ships. The .deb is built on 24.04 instead, so it wants
+#     24.04-era glibc; older distros should use the AppImage.
+#   * .rpm — Tauri's rpm bundler omits the engine libs and an .rpm cannot be
+#     unpacked/repacked the way a .deb can.
+#   * windows-11-arm — whisper-rs-sys requires VULKAN_SDK and build.yml's Vulkan
+#     setup is gated to non-aarch64 Windows.
 
 on: workflow_dispatch
 
@@ -85,21 +84,15 @@ jobs:
           - platform: "macos-26" # Apple Silicon (M1+)
             args: "--target aarch64-apple-darwin"
             target: "aarch64-apple-darwin"
-          - platform: "ubuntu-22.04" # .deb on 22.04 (older glibc = wider compat)
-            args: "--bundles deb"
+          - platform: "ubuntu-24.04" # AppImage + .deb, x86_64
+            args: "--bundles appimage,deb"
             target: "x86_64-unknown-linux-gnu"
-          - platform: "ubuntu-24.04" # AppImage + .rpm on 24.04
-            args: "--bundles appimage,rpm"
-            target: "x86_64-unknown-linux-gnu"
-          - platform: "ubuntu-24.04-arm" # ARM64 Linux
-            args: "--bundles appimage,deb,rpm"
+          - platform: "ubuntu-24.04-arm" # AppImage + .deb, ARM64
+            args: "--bundles appimage,deb"
             target: "aarch64-unknown-linux-gnu"
           - platform: "windows-latest" # .msi + NSIS .exe
             args: ""
             target: "x86_64-pc-windows-msvc"
-          - platform: "windows-11-arm" # ARM64 Windows
-            args: "--target aarch64-pc-windows-msvc"
-            target: "aarch64-pc-windows-msvc"
 
     uses: ./.github/workflows/build.yml
     with:
