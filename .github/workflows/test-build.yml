@@ -7,10 +7,20 @@ name: "Test Build"
 # Trigger from the CLI:  gh workflow run test-build.yml --repo <owner>/<repo>
 # or from the Actions tab -> "Test Build" -> "Run workflow".
 #
-# NOTE: this first pass covers the mainstream x86_64 desktops + Apple Silicon.
-# The Windows-on-ARM and Linux-ARM targets from release.yml are intentionally
-# omitted here (they have the most fragile toolchain setup); add them once the
-# mainstream targets are green.
+# This mirrors the release-unsigned.yml matrix target-for-target, so a green run
+# here means a release will produce the same set of installers. Intel macOS is
+# absent for the same reason it is absent there: GitHub retired the last Intel
+# macOS runner (macos-13) on 2025-12-04, so it could only be an arm64->x86_64
+# cross-compile that build.yml is not set up for.
+#
+# KNOWN: .deb and .rpm are expected to FAIL the "Audit Linux package runtime
+# contents" step in build.yml. That audit requires usr/lib/libtranscribe.so and
+# usr/lib/libggml-cpu*.so inside the package plus a --list-devices smoke test.
+# Only the AppImage gets those staged (build.yml's AppImage post-processing
+# step); deb/rpm have no equivalent staging yet, so the audit hard-fails. They
+# are included here deliberately: fail-fast is off, so this run captures the
+# real failure logs for the fix while every other target still produces
+# artifacts. Do not ship deb/rpm in a release until this audit passes.
 
 on: workflow_dispatch
 
@@ -25,14 +35,21 @@ jobs:
           - platform: "macos-26" # Apple Silicon (M1+)
             args: "--target aarch64-apple-darwin"
             target: "aarch64-apple-darwin"
-          - platform: "ubuntu-24.04" # AppImage only: it's self-contained (the CI
-            # stages libtranscribe.so + ggml backends into it). deb/rpm need extra
-            # engine-lib staging that isn't wired up yet, so they fail the audit.
-            args: "--bundles appimage"
+          - platform: "ubuntu-22.04" # .deb on 22.04 (older glibc = wider compat)
+            args: "--bundles deb"
             target: "x86_64-unknown-linux-gnu"
+          - platform: "ubuntu-24.04" # AppImage + .rpm on 24.04
+            args: "--bundles appimage,rpm"
+            target: "x86_64-unknown-linux-gnu"
+          - platform: "ubuntu-24.04-arm" # ARM64 Linux
+            args: "--bundles appimage,deb,rpm"
+            target: "aarch64-unknown-linux-gnu"
           - platform: "windows-latest" # .msi + NSIS .exe
             args: ""
             target: "x86_64-pc-windows-msvc"
+          - platform: "windows-11-arm" # ARM64 Windows
+            args: "--target aarch64-pc-windows-msvc"
+            target: "aarch64-pc-windows-msvc"
 
     uses: ./.github/workflows/build.yml
     with:
