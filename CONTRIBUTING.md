@@ -90,7 +90,7 @@ For more details, see the Architecture section in [README.md](README.md) or [AGE
 
 1. **Search existing issues** at [github.com/AbhishekBarali/SpeakoFlow/issues](https://github.com/AbhishekBarali/SpeakoFlow/issues)
 2. **Try the latest release** to see if the issue has been fixed
-4. **Enable debug mode** (`Cmd/Ctrl+Shift+D`) to gather diagnostic information
+3. **Enable debug mode** (`Cmd/Ctrl+Shift+D`) to gather diagnostic information
 
 ### Submitting a Bug Report
 
@@ -194,12 +194,12 @@ Use the [Bug Report template](.github/ISSUE_TEMPLATE/bug_report.md) when creatin
    - Go to the [SpeakoFlow repository](https://github.com/AbhishekBarali/SpeakoFlow)
    - Click "New Pull Request"
    - Select your fork and branch
-    - Fill out the PR template completely, including:
-      - Clear description of changes
-      - Links to related issues
-      - How you tested the changes
-      - Screenshots/videos if applicable
-      - Breaking changes (if any)
+   - Fill out the PR template completely, including:
+     - Clear description of changes
+     - Links to related issues
+     - How you tested the changes
+     - Screenshots/videos if applicable
+     - Breaking changes (if any)
 
 ### AI Assistance Disclosure
 
