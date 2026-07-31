@@ -69,7 +69,55 @@ Hold to talk, or tap `Space` while holding to keep recording hands-free. All sho
 
 Download the latest build for Windows, macOS, or Linux from the [Releases](https://github.com/AbhishekBarali/SpeakoFlow/releases) page. A short setup wizard helps you pick a transcription model and, optionally, a local model for the assistant.
 
-**Linux:**
+### Windows
+
+Download the `.exe` installer and run it. Windows may show a SmartScreen notice
+because the installer isn't signed by a known publisher yet — choose **More
+info → Run anyway**.
+
+### macOS
+
+SpeakoFlow works fully on macOS, but it isn't signed by Apple yet, so macOS
+blocks it on first launch with a message that says **"SpeakoFlow is damaged and
+can't be opened."**
+
+**The app is not damaged.** That wording is what macOS shows for any app it
+can't trace to a paid Apple Developer account. Signing costs $99/year, which
+this project doesn't have yet, so the block is expected and harmless.
+
+Install it in three steps:
+
+1. Download `SpeakoFlow_<version>_aarch64.dmg` and drag **SpeakoFlow** into your
+   Applications folder.
+2. Open **Terminal** (press `Cmd + Space`, type `Terminal`) and paste this,
+   then press Return:
+   ```bash
+   xattr -dr com.apple.quarantine /Applications/SpeakoFlow.app
+   ```
+3. Open SpeakoFlow normally, from Launchpad, Spotlight, or Applications.
+
+**You only do this once per version you install.** The command removes the
+"downloaded from the internet" tag that macOS puts on the file; after that the
+app opens like any other. Because SpeakoFlow can't auto-update while unsigned,
+you'll repeat the step the next time you download a new version — one command
+per update, never per launch.
+
+If you're wondering why there's no button to click instead: macOS 15 and later
+removed the old right-click → **Open** bypass, and the "damaged" message is the
+one case where no **Open Anyway** button appears in *System Settings → Privacy &
+Security*. Terminal is the only route left. Proper Apple signing and
+notarization is on the [roadmap](#roadmap) and removes this step entirely.
+
+macOS also needs **Microphone** and **Accessibility** permissions (*System
+Settings → Privacy & Security*) so SpeakoFlow can hear you and type into other
+apps.
+
+**Apple Silicon only for now.** Builds cover M1 and newer. There's no Intel Mac
+build, because GitHub retired its Intel build machines in December 2025, so
+there's currently no way to produce and test one. If you're on an Intel Mac you
+can still [build from source](#build-from-source).
+
+### Linux
 
 - **Arch Linux** — install from the AUR:
   ```bash
@@ -77,7 +125,22 @@ Download the latest build for Windows, macOS, or Linux from the [Releases](https
   # or
   paru -S speakoflow-bin
   ```
-- **Other distributions** — download the AppImage from the [Releases](https://github.com/AbhishekBarali/SpeakoFlow/releases) page, make it executable (`chmod +x`), and run it.
+- **Debian, Ubuntu, Mint, Pop!\_OS, Tuxedo OS** — download the `.deb` and
+  install it. This registers the app icon and menu entry properly, which the
+  AppImage can't do on its own:
+  ```bash
+  sudo apt install ./SpeakoFlow_*_amd64.deb
+  ```
+- **Fedora, openSUSE** — download the `.rpm`:
+  ```bash
+  sudo dnf install ./SpeakoFlow-*.rpm
+  ```
+- **Any other distribution** — download the AppImage, make it executable
+  (`chmod +x`), and run it. Note that an AppImage doesn't integrate with your
+  desktop by itself, so it won't show an icon in your file manager or app menu;
+  tools like Gear Lever or AppImageLauncher add that if you want it.
+
+x86_64 and ARM64 builds are available for all three Linux formats.
 
 To use the assistant, choose a provider in Settings:
 
