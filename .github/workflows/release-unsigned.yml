@@ -8,14 +8,33 @@ name: "Release (unsigned)"
 # reviews and clicks "Publish".
 #
 # Trade-offs of an unsigned release (intentional, for an early build):
-#   * Windows SmartScreen / macOS Gatekeeper will warn ("unknown publisher").
-#   * Auto-update is disabled (no signed updater artifacts).
+#   * Windows SmartScreen warns ("unknown publisher").
+#   * macOS Gatekeeper reports "SpeakoFlow is damaged and can't be opened" — the
+#     app is fine; an unsigned bundle carrying the download quarantine flag has
+#     no Apple-recognized signature, and macOS 15/26 offers no GUI override for
+#     that case. Users clear it once per installed version with
+#     `xattr -dr com.apple.quarantine /Applications/SpeakoFlow.app`.
+#     See the macOS section of README.md — keep the two in sync.
+#   * Auto-update is disabled (no signed updater artifacts), so every platform
+#     ships its full installer here and users update by downloading again.
 # Use the signed release.yml once signing secrets are configured
-# (see docs/TODO_BEFORE_RELEASE.md §3).
+# (Apple Developer ID + notarization, Azure Trusted Signing, updater key).
 #
-# Targets: the three mainstream desktops proven green by test-build.yml
-# (Apple Silicon, x86_64 Linux AppImage, x86_64 Windows). Add the remaining
-# release.yml targets (Intel mac, ARM Linux/Windows, deb/rpm) here once verified.
+# Targets: the full release.yml matrix minus Intel macOS. This deliberately
+# mirrors release.yml target-for-target so an unsigned early release is never
+# *narrower* than a signed one — an unsigned build is a signing trade-off, not a
+# platform-support trade-off. Intel macs and Debian/Ubuntu (.deb) in particular
+# had no artifact at all while this workflow only built three targets.
+#
+# Intel macOS (x86_64-apple-darwin) is intentionally NOT built. GitHub retired
+# the last Intel macOS runner (macos-13) on 2025-12-04, and every remaining
+# label (macos-latest/14/15/26) is arm64 — so an Intel build would be an
+# arm64->x86_64 cross-compile. build.yml has no macOS cross-compile setup (no
+# CMAKE_OSX_ARCHITECTURES), and the vendored CMake-built C++ (whisper.cpp/ggml,
+# llama.cpp) would compile for the host arch and fail to link. The target has
+# never built green here. Adding it back needs a green test-build.yml run first,
+# not a release. GitHub also drops macOS x86_64 entirely after the macOS 15
+# image retires in Fall 2027.
 
 on: workflow_dispatch
 
@@ -66,12 +85,21 @@ jobs:
           - platform: "macos-26" # Apple Silicon (M1+)
             args: "--target aarch64-apple-darwin"
             target: "aarch64-apple-darwin"
-          - platform: "ubuntu-24.04" # AppImage only (self-contained engine libs)
-            args: "--bundles appimage"
+          - platform: "ubuntu-22.04" # .deb on 22.04 (older glibc = wider compat)
+            args: "--bundles deb"
             target: "x86_64-unknown-linux-gnu"
+          - platform: "ubuntu-24.04" # AppImage + .rpm on 24.04
+            args: "--bundles appimage,rpm"
+            target: "x86_64-unknown-linux-gnu"
+          - platform: "ubuntu-24.04-arm" # ARM64 Linux
+            args: "--bundles appimage,deb,rpm"
+            target: "aarch64-unknown-linux-gnu"
           - platform: "windows-latest" # .msi + NSIS .exe
             args: ""
             target: "x86_64-pc-windows-msvc"
+          - platform: "windows-11-arm" # ARM64 Windows
+            args: "--target aarch64-pc-windows-msvc"
+            target: "aarch64-pc-windows-msvc"
 
     uses: ./.github/workflows/build.yml
     with:
