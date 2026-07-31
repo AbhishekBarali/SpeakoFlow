@@ -2103,7 +2103,6 @@ impl ModelManager {
     /// To activate a mirror: upload the exact model file as a GitHub release
     /// asset on the SpeakoFlow repo, then return its `browser_download_url`
     /// here. Until then this returns `None` and the canonical URL is used.
-    /// Full steps + per-model checklist: docs/TODO_BEFORE_RELEASE.md §2.
     // Intentional template: the match is a placeholder for per-model mirror
     // arms that maintainers uncomment once assets are uploaded, so keep it even
     // though it currently has only the wildcard arm.

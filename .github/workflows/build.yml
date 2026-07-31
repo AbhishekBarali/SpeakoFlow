@@ -2,7 +2,7 @@ name: "Build"
 
 # Reusable build workflow for SpeakoFlow. Ported from upstream Handy's build.yml
 # and adapted for SpeakoFlow's shape-(b) engine posture (see
-# docs/engine-migration/PLAN.md §2 / Session 6):
+# the engine-migration plan, Session 6):
 #
 #   * transcribe-cpp (GGUF/ggml) is the new engine. Windows x86_64 + Linux ship
 #     it in the `dynamic-backends` + `vulkan` posture (loadable ggml backend

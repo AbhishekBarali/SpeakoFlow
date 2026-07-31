@@ -6,7 +6,7 @@
 //! handful of models in `model.rs`) is a deliberate choice: pulling a future
 //! Handy model release becomes a one-file copy
 //! (`curl … catalog.json > src/catalog/catalog.json`) with no Rust edits — see
-//! `docs/engine-migration/PLAN.md` §4 / Session 7's FOLLOW_HANDY routine.
+//! the engine-migration plan's FOLLOW_HANDY routine.
 //!
 //! This module only *parses* the catalog into typed structs. Mapping a catalog
 //! entry to a `ModelInfo` (the app's download/UI record) lives in

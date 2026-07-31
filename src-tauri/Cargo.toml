@@ -75,7 +75,7 @@ transcribe-rs = { version = "0.3.11", features = ["whisper-cpp", "onnx"] }
 # (N2: additive; transcribe-rs 0.3.11 + its features stay untouched). This base
 # declaration is backend-less: default-features=false drops the macOS "metal"
 # default, so per-platform GPU backends are opted-in only in the target sections
-# below. Pinned exactly (pre-1.0 ABI). See docs/engine-migration/PLAN.md Session 1.
+# below. Pinned exactly (pre-1.0 ABI).
 transcribe-cpp = { version = "0.1.2", default-features = false }
 handy-keys = "0.2.4"
 ferrous-opencc = "0.2.3"
@@ -120,7 +120,7 @@ winreg = "0.55"
 # Vulkan GPU acceleration. Build-time prereqs: cmake, Vulkan SDK, and
 # SPIRV-Headers (the Vulkan SDK bundles SPIRV-HeadersConfig.cmake; point
 # CMAKE_PREFIX_PATH at the SDK). Windows aarch64 uses the static CPU-only
-# table just below. See docs/engine-migration/PLAN.md Session 7.
+# table just below.
 [target.'cfg(all(windows, target_arch = "x86_64"))'.dependencies]
 transcribe-cpp = { version = "0.1.2", default-features = false, features = [
   "dynamic-backends",

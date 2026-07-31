@@ -86,6 +86,13 @@ speakoflow-feature-reference.html
 # (self-declared internal; contains launch tactics + competitor analysis).
 LAUNCH_PLAN.md
 
+# Maintainer's working notes — plans, session prompts, progress logs, release
+# checklists, provider audits, prompt references, redesign write-ups. These are
+# local scratch documents, not product documentation, so the whole folder stays
+# out of the public repo. User-facing docs live in README.md, BUILD.md,
+# CONTRIBUTING.md, PRIVACY.md and on speakoflow.com/docs.
+docs/
+
 # Demo / marketing capture tooling (not shipped, regenerable, dev-only).
 # The capture harness, its config, the demo-only entry points, and the
 # generated screenshots are all kept out of the public repo.
@@ -96,3 +103,6 @@ src/assistant/panel-demo.tsx
 src/overlay/preview.html
 src/overlay/preview.tsx
 build/*.AppImage
+
+# Reddit promotion working notes (fact sheet, account notes, drafts)
+.promote/
