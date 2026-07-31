@@ -621,6 +621,12 @@ async changeShowTrayIconSetting(enabled: boolean) : Promise<Result<null, string>
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * Set what closing the main window does: minimize to the tray (default) or
+ * fully quit the app. The `Quit` branch reuses the same `app.exit(0)` path as
+ * the tray "Quit" item (see the `CloseRequested` handler in `lib.rs`). See
+ * GitHub issue #6.
+ */
 async changeCloseBehaviorSetting(behavior: string) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("change_close_behavior_setting", { behavior }) };
@@ -1853,8 +1859,8 @@ async setAssistantPreferProviderWebSearch(enabled: boolean) : Promise<Result<nul
 }
 },
 /**
- * Choose the search backend: "serper" (default), "brave", "tavily", "exa", or
- * "serpapi". All are snippet-only and use a single API key.
+ * Choose the search backend: "serper" (default), "brave", "tavily", "exa",
+ * "serpapi", or "tinyfish". All are snippet-only and use a single API key.
  */
 async setAssistantWebSearchProvider(provider: string) : Promise<Result<null, string>> {
     try {
@@ -1927,7 +1933,7 @@ async setAssistantWebSearchFetchContent(enabled: boolean) : Promise<Result<null,
 },
 /**
  * Store the API key for a search provider ("serper", "brave", "tavily", "exa",
- * or "serpapi").
+ * "serpapi", or "tinyfish").
  */
 async setAssistantWebSearchApiKey(provider: string, apiKey: string) : Promise<Result<null, string>> {
     try {
@@ -2339,7 +2345,8 @@ assistant_tts_stop_on_dictation?: boolean;
 assistant_web_search_enabled?: boolean; 
 /**
  * Which search backend to use: "serper" (default), "brave", "tavily",
- * "exa", or "serpapi". All are snippet-only and use a single API key.
+ * "exa", "serpapi", or "tinyfish". All are snippet-only and use a single
+ * API key.
  */
 assistant_web_search_provider?: string; 
 /**
@@ -2381,7 +2388,7 @@ assistant_local_search_smart?: boolean;
 assistant_prefer_provider_web_search?: boolean; 
 /**
  * API keys for the keyed search providers, keyed by provider id
- * ("serper", "brave", "tavily", "exa", "serpapi").
+ * ("serper", "brave", "tavily", "exa", "serpapi", "tinyfish").
  */
 web_search_api_keys?: SecretMap; theme?: Theme; ui_text_size?: UiTextSize; 
 /**
@@ -2584,6 +2591,15 @@ export type ChatMessage = { role: string; content: string;
 images?: string[] }
 export type ClipboardHandling = "dont_modify" | "copy_to_clipboard"
 /**
+ * What happens when the user closes the main window.
+ * 
+ * `MinimizeToTray` (the default) preserves the long-standing behavior: the
+ * window hides and the app keeps running in the tray/menubar so global
+ * hotkeys stay live. `Quit` fully exits the process on window close, for
+ * users who don't want a background process (see GitHub issue #6).
+ */
+export type CloseBehavior = "minimize_to_tray" | "quit"
+/**
  * A user-created writing style for cleanup. It is deliberately separate from
  * `LLMPrompt`: cleanup prompts define what corrections happen; tone presets
  * define how the resulting wording should sound.
@@ -2618,6 +2634,10 @@ export type FileAttachment = { name: string; content: string }
  * `set_assistant_characters`.
  */
 export type GeneratedCharacter = { name: string; prompt: string; greeting: string }
+/**
+ * One compute device. `Deserialize` is needed by the Linux out-of-process
+ * probe, which parses this back out of the child's JSON.
+ */
 export type GpuDeviceOption = { id: number; name: string; kind: string; total_vram_mb: number }
 /**
  * A single `.gguf` file inside a repo.
@@ -2679,7 +2699,6 @@ export type ImplementationChangeResult = { success: boolean;
  * List of binding IDs that were reset to defaults due to incompatibility
  */
 reset_bindings: string[] }
-export type CloseBehavior = "minimize_to_tray" | "quit"
 export type KeyboardImplementation = "tauri" | "handy_keys"
 export type LLMPrompt = { id: string; name: string; prompt: string }
 export type LocalLlmStatus = { 

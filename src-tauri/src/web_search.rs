@@ -27,7 +27,8 @@
 //! Providers (all snippet-first, all benefit from the local rerank, all use a
 //! single API key): **Serper** (fast, cheap Google SERP — the default),
 //! **Brave** (independent index), **Tavily** (LLM-optimized search + answer),
-//! **Exa** (neural/semantic search), and **SerpAPI** (Google SERP). Any unknown
+//! **Exa** (neural/semantic search), **SerpAPI** (Google SERP), and
+//! **TinyFish** (own index, agent-oriented, free tier with no card). Any unknown
 //! or legacy provider value routes to Serper.
 
 use crate::settings::{AppSettings, AssistantSearchDepth};
@@ -40,8 +41,8 @@ use specta::Type;
 use std::collections::HashSet;
 use std::time::Duration;
 
-/// Timeout for a snippet search HTTP call (Serper, Brave, Tavily, Exa, SerpAPI).
-/// Normally ~1–2 s; this is just the ceiling.
+/// Timeout for a snippet search HTTP call (Serper, Brave, Tavily, Exa, SerpAPI,
+/// TinyFish). Normally ~1–2 s; this is just the ceiling.
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(8);
 
 /// Per-snippet character cap.
@@ -453,6 +454,7 @@ async fn snippet_search(
         "tavily" => search_tavily(&key("tavily"), query, limit, tbs, include_news).await,
         "exa" => search_exa(&key("exa"), query, limit, tbs).await,
         "serpapi" => search_serpapi(&key("serpapi"), query, limit, tbs, include_news).await,
+        "tinyfish" => search_tinyfish(&key("tinyfish"), query, limit, tbs).await,
         // "serper" is the default. Any unknown or legacy value (including the
         // removed "firecrawl"/"duckduckgo") also routes here so old settings
         // keep working.
@@ -1004,6 +1006,100 @@ async fn serper_query(
     Ok(candidates)
 }
 
+/// TinyFish Search (`GET https://api.search.tinyfish.ai`) — snippet-only search
+/// over TinyFish's own index, built for agent/LLM consumption. Auth is an
+/// `X-API-Key` header. Free tier needs no card (30 queries/minute), and TinyFish
+/// documents sub-second latency, which puts it in the same class as Serper for a
+/// voice turn.
+///
+/// Note this is TinyFish's *Search* endpoint, not their *Agent* endpoint — no
+/// page fetching, no browsing, one round-trip, same as every other backend here.
+///
+/// Freshness maps to TinyFish's `recency_minutes`. The request always uses the
+/// default `domain_type=web`: a TinyFish call returns *either* web or news
+/// results, never both, and a second call for news would double the round-trip
+/// this module exists to avoid. Instead, results carrying a `date`/`publisher`
+/// are flagged `from_news`, so the local rerank still gets a recency signal out
+/// of a single request.
+async fn search_tinyfish(
+    api_key: &str,
+    query: &str,
+    max_results: usize,
+    tbs: Option<&str>,
+) -> Result<Vec<Candidate>, String> {
+    if api_key.trim().is_empty() {
+        return Err(
+            "TinyFish API key is not set. Add it in Settings → Assistant → Web Search.".to_string(),
+        );
+    }
+
+    let client = http_client(REQUEST_TIMEOUT)?;
+    let mut query_params: Vec<(&str, String)> = vec![("query", query.to_string())];
+    if let Some(minutes) = tinyfish_recency_minutes_from_tbs(tbs) {
+        query_params.push(("recency_minutes", minutes.to_string()));
+    }
+
+    let resp = client
+        .get("https://api.search.tinyfish.ai")
+        .header("X-API-Key", api_key)
+        .header(reqwest::header::ACCEPT, "application/json")
+        .query(&query_params)
+        .send()
+        .await
+        .map_err(|e| format!("TinyFish request failed: {}", e))?;
+
+    let status = resp.status();
+    if !status.is_success() {
+        let text = resp.text().await.unwrap_or_default();
+        return Err(format!(
+            "TinyFish search failed ({}): {}",
+            status,
+            truncate_chars(&text, 200)
+        ));
+    }
+
+    let value: serde_json::Value = resp
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse TinyFish response: {}", e))?;
+
+    let candidates = parse_tinyfish_results(&value, max_results);
+    debug!(
+        "TinyFish returned {} candidate(s) for {:?}",
+        candidates.len(),
+        query
+    );
+    Ok(candidates)
+}
+
+/// Parse a TinyFish `/search` payload into candidates. Split out from the HTTP
+/// call so the response shape — `results[]` of `title` / `url` / `snippet`, with
+/// `date` and `publisher` present on news-ish entries — is unit-testable.
+fn parse_tinyfish_results(value: &serde_json::Value, max_results: usize) -> Vec<Candidate> {
+    let mut candidates = Vec::new();
+    let Some(items) = value.get("results").and_then(|r| r.as_array()) else {
+        return candidates;
+    };
+    for item in items {
+        let title = item.get("title").and_then(|v| v.as_str()).unwrap_or("");
+        let url = item.get("url").and_then(|v| v.as_str()).unwrap_or("");
+        let snippet = item.get("snippet").and_then(|v| v.as_str()).unwrap_or("");
+        // `publisher`/`date` show up on news results and dated web results — a
+        // free recency signal for the rerank, with no second request.
+        let has_text = |key: &str| {
+            item.get(key)
+                .and_then(|v| v.as_str())
+                .is_some_and(|s| !s.trim().is_empty())
+        };
+        let from_news = has_text("publisher") || has_text("date");
+        push_candidate(&mut candidates, title, url, snippet, from_news);
+        if candidates.len() >= max_results {
+            break;
+        }
+    }
+    candidates
+}
+
 /// Extract a Brave `freshness` value from our `tbs` (which encodes the qdr window).
 fn brave_freshness_from_tbs(tbs: Option<&str>) -> Option<&'static str> {
     let tbs = tbs?;
@@ -1031,6 +1127,23 @@ fn tavily_time_range_from_tbs(tbs: Option<&str>) -> Option<&'static str> {
         Some("month")
     } else if tbs.contains("qdr:y") {
         Some("year")
+    } else {
+        None
+    }
+}
+
+/// Map our `tbs` (qdr window) to TinyFish's `recency_minutes` freshness window.
+/// TinyFish accepts 1..=5_256_000 (10 years), so every window below is in range.
+fn tinyfish_recency_minutes_from_tbs(tbs: Option<&str>) -> Option<u32> {
+    let tbs = tbs?;
+    if tbs.contains("qdr:d") {
+        Some(1_440) // 24 hours
+    } else if tbs.contains("qdr:w") {
+        Some(10_080) // 7 days
+    } else if tbs.contains("qdr:m") {
+        Some(43_200) // 30 days
+    } else if tbs.contains("qdr:y") {
+        Some(525_600) // 365 days
     } else {
         None
     }
@@ -1188,6 +1301,84 @@ mod tests {
         // Exa maps the window to an ISO start date (or None when unbounded).
         assert!(exa_start_date_from_tbs(Some("qdr:w")).is_some());
         assert_eq!(exa_start_date_from_tbs(None), None);
+        // TinyFish maps the window to a `recency_minutes` integer.
+        assert_eq!(
+            tinyfish_recency_minutes_from_tbs(Some("qdr:d")),
+            Some(1_440)
+        );
+        assert_eq!(
+            tinyfish_recency_minutes_from_tbs(Some("sbd:1,qdr:w")),
+            Some(10_080)
+        );
+        assert_eq!(
+            tinyfish_recency_minutes_from_tbs(Some("qdr:y")),
+            Some(525_600)
+        );
+        assert_eq!(tinyfish_recency_minutes_from_tbs(Some("sbd:1")), None);
+        assert_eq!(tinyfish_recency_minutes_from_tbs(None), None);
+    }
+
+    #[test]
+    fn parse_tinyfish_reads_title_url_snippet() {
+        let payload = json!({
+            "query": "web automation tools",
+            "results": [
+                {
+                    "position": 1,
+                    "site_name": "tinyfish.ai",
+                    "title": "TinyFish — AI Web Automation Platform",
+                    "snippet": "Automate any website with natural language instructions...",
+                    "url": "https://tinyfish.ai"
+                }
+            ],
+            "total_results": 10,
+            "page": 0
+        });
+        let candidates = parse_tinyfish_results(&payload, 10);
+        assert_eq!(candidates.len(), 1);
+        assert_eq!(candidates[0].title, "TinyFish — AI Web Automation Platform");
+        assert_eq!(candidates[0].url, "https://tinyfish.ai");
+        assert!(candidates[0].snippet.starts_with("Automate any website"));
+        // No date/publisher => plain web result.
+        assert!(!candidates[0].from_news);
+    }
+
+    #[test]
+    fn parse_tinyfish_flags_dated_results_as_news() {
+        let payload = json!({
+            "results": [
+                { "title": "Dated", "url": "https://a.com", "snippet": "s", "date": "2026-07-30" },
+                { "title": "Published", "url": "https://b.com", "snippet": "s", "publisher": "Reuters" },
+                { "title": "Blank date", "url": "https://c.com", "snippet": "s", "date": "  " },
+                { "title": "Plain", "url": "https://d.com", "snippet": "s" }
+            ]
+        });
+        let candidates = parse_tinyfish_results(&payload, 10);
+        assert_eq!(candidates.len(), 4);
+        assert!(candidates[0].from_news, "a `date` is a recency signal");
+        assert!(candidates[1].from_news, "a `publisher` is a recency signal");
+        assert!(!candidates[2].from_news, "whitespace-only date is not one");
+        assert!(!candidates[3].from_news);
+    }
+
+    #[test]
+    fn parse_tinyfish_respects_limit_and_bad_shapes() {
+        let payload = json!({
+            "results": [
+                { "title": "one", "url": "https://1.com", "snippet": "s" },
+                { "title": "two", "url": "https://2.com", "snippet": "s" },
+                { "title": "three", "url": "https://3.com", "snippet": "s" }
+            ]
+        });
+        assert_eq!(parse_tinyfish_results(&payload, 2).len(), 2);
+
+        // Entries with neither title nor URL are dropped by push_candidate.
+        let sparse = json!({ "results": [ { "snippet": "orphan" } ] });
+        assert!(parse_tinyfish_results(&sparse, 10).is_empty());
+
+        // A missing / wrongly-typed `results` key yields no candidates, not a panic.
+        assert!(parse_tinyfish_results(&json!({ "error": "nope" }), 10).is_empty());
+        assert!(parse_tinyfish_results(&json!({ "results": "nope" }), 10).is_empty());
     }
 
     #[test]

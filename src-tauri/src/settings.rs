@@ -1230,7 +1230,8 @@ pub struct AppSettings {
     #[serde(default)]
     pub assistant_web_search_enabled: bool,
     /// Which search backend to use: "serper" (default), "brave", "tavily",
-    /// "exa", or "serpapi". All are snippet-only and use a single API key.
+    /// "exa", "serpapi", or "tinyfish". All are snippet-only and use a single
+    /// API key.
     #[serde(default = "default_assistant_web_search_provider")]
     pub assistant_web_search_provider: String,
     /// How many results to feed the model. Kept modest to bound prompt size;
@@ -1265,7 +1266,7 @@ pub struct AppSettings {
     #[serde(default = "default_assistant_prefer_provider_web_search")]
     pub assistant_prefer_provider_web_search: bool,
     /// API keys for the keyed search providers, keyed by provider id
-    /// ("serper", "brave", "tavily", "exa", "serpapi").
+    /// ("serper", "brave", "tavily", "exa", "serpapi", "tinyfish").
     #[serde(default = "default_web_search_api_keys")]
     pub web_search_api_keys: SecretMap,
     #[serde(default)]
@@ -1963,6 +1964,7 @@ fn default_web_search_api_keys() -> SecretMap {
     map.insert("tavily".to_string(), String::new());
     map.insert("exa".to_string(), String::new());
     map.insert("serpapi".to_string(), String::new());
+    map.insert("tinyfish".to_string(), String::new());
     SecretMap(map)
 }
 
@@ -2152,7 +2154,7 @@ fn ensure_assistant_defaults(settings: &mut AppSettings) -> bool {
     // the default (Serper).
     if !matches!(
         settings.assistant_web_search_provider.as_str(),
-        "serper" | "brave" | "tavily" | "exa" | "serpapi"
+        "serper" | "brave" | "tavily" | "exa" | "serpapi" | "tinyfish"
     ) {
         settings.assistant_web_search_provider = default_assistant_web_search_provider();
         changed = true;
@@ -2163,7 +2165,7 @@ fn ensure_assistant_defaults(settings: &mut AppSettings) -> bool {
         settings.assistant_web_search_max_results = default_assistant_web_search_max_results();
         changed = true;
     }
-    for provider_id in ["serper", "brave", "tavily", "exa", "serpapi"] {
+    for provider_id in ["serper", "brave", "tavily", "exa", "serpapi", "tinyfish"] {
         if !settings.web_search_api_keys.contains_key(provider_id) {
             settings
                 .web_search_api_keys

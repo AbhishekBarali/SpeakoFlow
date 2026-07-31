@@ -1256,13 +1256,14 @@
         "openRouterNativeLabel": "Use OpenRouter's built-in search",
         "openRouterNativeDescription": "When on, OpenRouter runs the search itself (its :online mode) using your OpenRouter credits. When off, the app searches with your search provider below.",
         "providerLabel": "Search provider",
-        "providerDescription": "Serper is a good default. Every provider has a free tier.",
+        "providerDescription": "Serper is a good default. Every provider has a free tier, and TinyFish is free with no card.",
         "providers": {
           "serper": "Serper (Google, fast)",
           "brave": "Brave Search",
           "tavily": "Tavily (AI search)",
           "exa": "Exa (neural)",
-          "serpapi": "SerpAPI (Google)"
+          "serpapi": "SerpAPI (Google)",
+          "tinyfish": "TinyFish (free, no card)"
         },
         "apiKeyLabel": "API key",
         "apiKeyDescription": "Key for the selected search provider.",

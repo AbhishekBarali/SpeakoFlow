@@ -786,14 +786,14 @@ pub fn set_assistant_prefer_provider_web_search(
     Ok(())
 }
 
-/// Choose the search backend: "serper" (default), "brave", "tavily", "exa", or
-/// "serpapi". All are snippet-only and use a single API key.
+/// Choose the search backend: "serper" (default), "brave", "tavily", "exa",
+/// "serpapi", or "tinyfish". All are snippet-only and use a single API key.
 #[tauri::command]
 #[specta::specta]
 pub fn set_assistant_web_search_provider(app: AppHandle, provider: String) -> Result<(), String> {
     if !matches!(
         provider.as_str(),
-        "serper" | "brave" | "tavily" | "exa" | "serpapi"
+        "serper" | "brave" | "tavily" | "exa" | "serpapi" | "tinyfish"
     ) {
         return Err(format!("Unknown web search provider: {}", provider));
     }
@@ -873,7 +873,7 @@ pub fn set_assistant_web_search_fetch_content(app: AppHandle, enabled: bool) -> 
 }
 
 /// Store the API key for a search provider ("serper", "brave", "tavily", "exa",
-/// or "serpapi").
+/// "serpapi", or "tinyfish").
 #[tauri::command]
 #[specta::specta]
 pub fn set_assistant_web_search_api_key(
@@ -883,7 +883,7 @@ pub fn set_assistant_web_search_api_key(
 ) -> Result<(), String> {
     if !matches!(
         provider.as_str(),
-        "serper" | "brave" | "tavily" | "exa" | "serpapi"
+        "serper" | "brave" | "tavily" | "exa" | "serpapi" | "tinyfish"
     ) {
         return Err(format!(
             "Provider '{}' does not use an API key for web search",

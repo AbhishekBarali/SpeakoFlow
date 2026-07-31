@@ -118,7 +118,7 @@ key. Only the answer text needed to synthesize speech is sent to that provider.
 
 ### 6. Web search (optional, off by default)
 If you enable web search, the assistant can send a search query to the **search
-provider you configure** (e.g. Serper, Brave, Tavily, Exa, or SerpAPI) using your
+provider you configure** (e.g. Serper, Brave, Tavily, Exa, SerpAPI, or TinyFish) using your
 own key, to fetch current information. This is off until you turn it on.
 
 ---

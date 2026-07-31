@@ -801,7 +801,8 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
     webSearchProvider === "brave" ||
     webSearchProvider === "tavily" ||
     webSearchProvider === "exa" ||
-    webSearchProvider === "serpapi";
+    webSearchProvider === "serpapi" ||
+    webSearchProvider === "tinyfish";
 
   // Sync the API-key field to the selected provider's stored key.
   useEffect(() => {
@@ -1730,6 +1731,10 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
                   {
                     value: "serpapi",
                     label: t("settings.assistant.webSearch.providers.serpapi"),
+                  },
+                  {
+                    value: "tinyfish",
+                    label: t("settings.assistant.webSearch.providers.tinyfish"),
                   },
                 ]}
                 selectedValue={webSearchProvider}
