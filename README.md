@@ -73,9 +73,9 @@ Download the latest build for Windows, macOS, or Linux from the [Releases](https
 
 - **Arch Linux** — install from the AUR:
   ```bash
-  yay -S speakoflow-appimage
+  yay -S speakoflow-bin
   # or
-  paru -S speakoflow-appimage
+  paru -S speakoflow-bin
   ```
 - **Other distributions** — download the AppImage from the [Releases](https://github.com/AbhishekBarali/SpeakoFlow/releases) page, make it executable (`chmod +x`), and run it.
 
