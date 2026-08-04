@@ -7,6 +7,16 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Configuration
 const LOCALES_DIR = path.join(__dirname, "..", "src", "i18n", "locales");
 const REFERENCE_LANG = "en";
+// Keys that are allowed to stay identical to English (brand names, key caps,
+// sample values, and words that are genuinely the same in that language).
+const BASELINE_PATH = path.join(
+  __dirname,
+  "..",
+  "src",
+  "i18n",
+  "untranslated-baseline.json",
+);
+const UPDATE_BASELINE = process.argv.includes("--update-baseline");
 
 type TranslationData = Record<string, unknown>;
 
@@ -14,6 +24,12 @@ interface ValidationResult {
   valid: boolean;
   missing: string[][];
   extra: string[][];
+}
+
+/** Per-language record of values that are allowed to stay in English. */
+interface LocaleBaseline {
+  sameAsEnglish: string[];
+  englishFromOtherKey: string[];
 }
 
 function getLanguages(): string[] {
@@ -87,6 +103,205 @@ function loadTranslationFile(lang: string): TranslationData | null {
     console.error(`  ${(error as Error).message}`);
     return null;
   }
+}
+
+function flattenStrings(
+  obj: TranslationData,
+  prefix = "",
+  out: Record<string, string> = {},
+): Record<string, string> {
+  for (const key in obj) {
+    if (!Object.hasOwn(obj, key)) continue;
+    const value = obj[key];
+    const dotted = prefix ? `${prefix}.${key}` : key;
+    if (typeof value === "object" && value !== null && !Array.isArray(value)) {
+      flattenStrings(value as TranslationData, dotted, out);
+    } else if (typeof value === "string") {
+      out[dotted] = value;
+    }
+  }
+  return out;
+}
+
+function loadBaseline(): Record<string, LocaleBaseline> {
+  try {
+    return JSON.parse(fs.readFileSync(BASELINE_PATH, "utf8")) as Record<
+      string,
+      LocaleBaseline
+    >;
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Two ways English copy survives in a locale file:
+ *  - sameAsEnglish: the value was never translated;
+ *  - englishFromOtherKey: the value is English that matches a *different*
+ *    English key, i.e. the source was reworded and the locale kept the old
+ *    wording. That is how "Recording" stayed in 19 locales after the English
+ *    string became "Dictation".
+ * Both are errors unless recorded in untranslated-baseline.json, which holds
+ * the legitimate cases: brand names, key caps, sample values, and words that
+ * are simply identical in that language.
+ */
+function checkUntranslated(referenceData: TranslationData): {
+  hasErrors: boolean;
+} {
+  const en = flattenStrings(referenceData);
+  const englishValues = new Set(Object.values(en));
+  const baseline = loadBaseline();
+  const nextBaseline: Record<string, LocaleBaseline> = {};
+  let hasErrors = false;
+
+  console.log(
+    colorize("\nUntranslated strings (English copy in a locale):", "blue"),
+  );
+  console.log("─".repeat(60));
+
+  for (const lang of LANGUAGES) {
+    const langData = loadTranslationFile(lang);
+    if (!langData) {
+      hasErrors = true;
+      continue;
+    }
+    const flat = flattenStrings(langData);
+
+    const sameAsEnglish: string[] = [];
+    const englishFromOtherKey: string[] = [];
+    for (const key of Object.keys(en)) {
+      const value = flat[key];
+      if (value === undefined) continue;
+      if (value === en[key]) sameAsEnglish.push(key);
+      else if (englishValues.has(value)) englishFromOtherKey.push(key);
+    }
+    nextBaseline[lang] = {
+      sameAsEnglish: [...sameAsEnglish].sort(),
+      englishFromOtherKey: [...englishFromOtherKey].sort(),
+    };
+
+    const allowedSame = new Set(baseline[lang]?.sameAsEnglish ?? []);
+    const allowedStale = new Set(baseline[lang]?.englishFromOtherKey ?? []);
+    const unexpected = [
+      ...sameAsEnglish
+        .filter((key) => !allowedSame.has(key))
+        .map((key) => `${key} = ${JSON.stringify(en[key])}`),
+      ...englishFromOtherKey
+        .filter((key) => !allowedStale.has(key))
+        .map(
+          (key) =>
+            `${key} = ${JSON.stringify(flat[key])} — stale English, source now says ${JSON.stringify(en[key])}`,
+        ),
+    ];
+
+    const allowedCount = sameAsEnglish.length + englishFromOtherKey.length;
+    if (unexpected.length === 0) {
+      const fixed =
+        (baseline[lang]?.sameAsEnglish ?? []).filter(
+          (key) => !sameAsEnglish.includes(key),
+        ).length +
+        (baseline[lang]?.englishFromOtherKey ?? []).filter(
+          (key) => !englishFromOtherKey.includes(key),
+        ).length;
+      const note = fixed
+        ? ` (${fixed} baseline entr${fixed === 1 ? "y" : "ies"} now translated — run with --update-baseline)`
+        : "";
+      console.log(
+        colorize(
+          `✓ ${lang.toUpperCase()}: ${allowedCount} allowed, 0 new${note}`,
+          "green",
+        ),
+      );
+      continue;
+    }
+
+    hasErrors = true;
+    console.log(
+      colorize(
+        `✗ ${lang.toUpperCase()}: ${unexpected.length} string(s) still in English`,
+        "red",
+      ),
+    );
+    unexpected.slice(0, 10).forEach((line) => console.log(`    - ${line}`));
+    if (unexpected.length > 10) {
+      console.log(
+        colorize(`    ... and ${unexpected.length - 10} more`, "yellow"),
+      );
+    }
+  }
+
+  if (UPDATE_BASELINE) {
+    fs.writeFileSync(
+      BASELINE_PATH,
+      JSON.stringify(nextBaseline, null, 2) + "\n",
+      "utf8",
+    );
+    console.log(colorize(`\n↻ Baseline rewritten: ${BASELINE_PATH}`, "yellow"));
+    return { hasErrors: false };
+  }
+
+  if (hasErrors) {
+    console.log(
+      colorize(
+        "\nTranslate those keys, or if the English form is correct for the\n" +
+          "language (brand name, key cap, sample value, identical word), run:\n" +
+          "  bun scripts/check-translations.ts --update-baseline",
+        "yellow",
+      ),
+    );
+  }
+
+  return { hasErrors };
+}
+
+/**
+ * i18next substitutes {{placeholders}} at runtime, so a translation that drops
+ * or renames one silently ships a broken string.
+ */
+function checkPlaceholders(referenceData: TranslationData): {
+  hasErrors: boolean;
+} {
+  const en = flattenStrings(referenceData);
+  let hasErrors = false;
+  const findings: string[] = [];
+
+  for (const lang of LANGUAGES) {
+    const langData = loadTranslationFile(lang);
+    if (!langData) {
+      hasErrors = true;
+      continue;
+    }
+    const flat = flattenStrings(langData);
+    for (const key of Object.keys(en)) {
+      if (!(key in flat)) continue;
+      const expected = (en[key].match(/\{\{[^}]+\}\}/g) ?? []).sort().join(",");
+      const actual = (flat[key].match(/\{\{[^}]+\}\}/g) ?? []).sort().join(",");
+      if (expected !== actual) {
+        hasErrors = true;
+        findings.push(
+          `  ${lang}: ${key} expected [${expected}] got [${actual}]`,
+        );
+      }
+    }
+  }
+
+  console.log(colorize("\nPlaceholder check:", "blue"));
+  console.log("─".repeat(60));
+  if (findings.length === 0) {
+    console.log(
+      colorize("✓ All {{placeholders}} match the English source", "green"),
+    );
+  } else {
+    console.log(
+      colorize(`✗ ${findings.length} placeholder mismatch(es):`, "red"),
+    );
+    findings.slice(0, 20).forEach((line) => console.log(line));
+    if (findings.length > 20) {
+      console.log(colorize(`  ... and ${findings.length - 20} more`, "yellow"));
+    }
+  }
+
+  return { hasErrors };
 }
 
 function validateTranslations(): void {
@@ -197,6 +412,12 @@ function validateTranslations(): void {
 
   console.log("─".repeat(60));
 
+  const untranslated = checkUntranslated(referenceData);
+  if (untranslated.hasErrors) hasErrors = true;
+
+  const placeholders = checkPlaceholders(referenceData);
+  if (placeholders.hasErrors) hasErrors = true;
+
   // Summary
   const validCount = Object.values(results).filter((r) => r.valid).length;
   const totalCount = LANGUAGES.length;
@@ -204,7 +425,7 @@ function validateTranslations(): void {
   if (hasErrors) {
     console.log(
       colorize(
-        `\n✗ Validation failed: ${validCount}/${totalCount} languages passed`,
+        `\n✗ Validation failed: ${validCount}/${totalCount} languages have complete key sets`,
         "red",
       ),
     );

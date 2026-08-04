@@ -93,6 +93,22 @@ export const LANGUAGE_METADATA: Record<
 2. Go to Settings → General → App Language
 3. Select your language
 4. Verify all text displays correctly
+5. Run `bun run check:translations`
+
+`check:translations` verifies two things: that your file has exactly the same
+keys as `en/translation.json`, and that no value was left as English copy. A
+handful of strings are _meant_ to stay identical to English — brand and model
+names (`Whisper Small`, `ElevenLabs`), key caps (`Ctrl+Enter`), sample values
+(`sk-...`), and words that are simply the same in your language. Those are
+recorded per language in `src/i18n/untranslated-baseline.json`. If the check
+flags a string that is genuinely correct as-is, refresh the baseline:
+
+```bash
+bun scripts/check-translations.ts --update-baseline
+```
+
+Commit the updated baseline with your translation, and mention in the PR why
+those strings stay in English.
 
 ### Step 6: Submit a Pull Request
 
@@ -108,6 +124,22 @@ Found a typo or better translation?
 
 1. Edit the relevant `translation.json` file
 2. Submit a PR with a brief description of the change
+
+### Translating a large batch
+
+For a big catch-up pass there are two helpers:
+
+```bash
+node scripts/i18n-todo.mjs        # writes .i18n-work/<lang>/chunk-N.source.json
+                                  # with every string still missing or English
+node scripts/i18n-merge.mjs --check   # validate your chunk-N.<lang>.json files
+node scripts/i18n-merge.mjs --apply   # merge them into the locale file
+```
+
+Translate each `chunk-N.source.json` into `chunk-N.<lang>.json` next to it,
+keeping the keys identical. The merge step refuses to write if keys or
+`{{placeholders}}` don't line up, and rewrites the locale file in the English
+key order. `.i18n-work/` is scratch space and is not committed.
 
 ## Translation Guidelines
 

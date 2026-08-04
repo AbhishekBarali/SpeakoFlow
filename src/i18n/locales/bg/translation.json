@@ -1,20 +1,20 @@
 {
   "appearance": {
-    "title": "Appearance",
-    "description": "Choose a light, dark, or system-matched theme for the app and assistant panel.",
-    "system": "System",
-    "light": "Light",
-    "dark": "Dark",
-    "textSize": "Text size",
-    "textSizeDescription": "Scale the size of text and controls across the app.",
-    "textSizeSmall": "Small",
-    "textSizeDefault": "Default",
-    "textSizeLarge": "Large",
-    "textSizeExtraLarge": "Extra large"
+    "title": "Външен вид",
+    "description": "Изберете светла, тъмна или системна тема за приложението и панела на асистента.",
+    "system": "Системна",
+    "light": "Светла",
+    "dark": "Тъмна",
+    "textSize": "Размер на текста",
+    "textSizeDescription": "Променете размера на текста и елементите в цялото приложение.",
+    "textSizeSmall": "Малък",
+    "textSizeDefault": "Стандартен",
+    "textSizeLarge": "Голям",
+    "textSizeExtraLarge": "Много голям"
   },
   "tray": {
     "home": "Начало",
-    "checkUpdates": "Проверка за актуализации...",
+    "checkUpdates": "Проверка за актуализации…",
     "copyLastTranscript": "Копиране на последния транскрипт",
     "unloadModel": "Разтоварване на модела",
     "model": "Модел",
@@ -23,29 +23,29 @@
   },
   "sidebar": {
     "general": "Общи",
-    "dictation": "Dictation",
-    "assistant": "Assistant",
+    "dictation": "Диктовка",
+    "assistant": "Асистент",
     "history": "История",
     "about": "За приложението",
     "debug": "Отстраняване",
-    "characters": "Profiles",
-    "memory": "Memory",
-    "collapse": "Collapse sidebar",
-    "expand": "Expand sidebar"
+    "characters": "Профили",
+    "memory": "Памет",
+    "collapse": "Свиване на страничния панел",
+    "expand": "Разгъване на страничния панел"
   },
   "window": {
-    "minimize": "Minimize",
-    "maximize": "Maximize",
-    "restore": "Restore",
-    "close": "Close"
+    "minimize": "Минимизиране",
+    "maximize": "Максимизиране",
+    "restore": "Възстановяване",
+    "close": "Затваряне"
   },
   "sectionSubtitles": {
-    "general": "Shortcuts, your microphone, and how the app looks.",
-    "dictation": "The model that turns your voice into text, and how it's cleaned up.",
-    "assistant": "Set up the assistant, then tune its voice, screen vision, and web search.",
-    "history": "Your recent transcriptions and assistant chats, stored on this device.",
-    "about": "Version, app language, data locations, and credits.",
-    "debug": "Diagnostics and developer tools."
+    "general": "Бързи клавиши, микрофон и външен вид на приложението.",
+    "dictation": "Моделът, който превръща гласа ви в текст, и как се почиства резултатът.",
+    "assistant": "Настройте асистента, след което донастройте гласа, видимостта на екрана и търсенето в интернет.",
+    "history": "Последните ви диктовки, генерирания с Flow и разговори с асистента, съхранени на това устройство.",
+    "about": "Версия, език на приложението, местоположение на данните и благодарности.",
+    "debug": "Диагностика и инструменти за разработчици."
   },
   "onboarding": {
     "subtitle": "За да започнете, изберете модел за транскрипция",
@@ -53,79 +53,79 @@
       "progress": "Стъпка {{current}} от {{total}}",
       "counter": "Стъпка {{current}} от {{total}} · {{label}}",
       "speechToText": "Транскрипция",
-      "aiModel": "AI модел",
-      "ready": "You're ready"
+      "aiModel": "Дайте му мозък",
+      "ready": "Готови сте"
     },
     "speechToText": {
-      "title": "Изберете модел за транскрипция",
-      "subtitle": "Работи изцяло на вашето устройство и превръща гласа ви в текст. Изберете този, който отговаря на вашия компютър — можете да го промените по всяко време.",
+      "title": "Как да ви чува SpeakoFlow?",
+      "subtitle": "Това превръща гласа ви в текст, директно на вашата машина. Изберете един и сменяйте по всяко време.",
       "cards": {
         "fast": {
-          "description": "Blazingly fast, streams as you speak. English only."
+          "description": "Изключително бърз, извежда текст, докато говорите. Само английски."
         },
         "multilingual": {
-          "description": "Real-time in 28 languages."
+          "description": "В реално време на 28 езика."
         }
       },
-      "downloadAndContinue": "Download and continue",
-      "seeAllModels": "See all models",
-      "hideAllModels": "Show fewer models",
-      "installedHint": "Already set up. You can grab any other model later in Settings.",
-      "useInstalled": "Use installed model",
-      "continue": "Continue",
-      "downloadingHint": "It downloads in the background. Any other model is one click away in Settings.",
-      "downloadStarted": "Downloading your model in the background."
+      "downloadAndContinue": "Изтегляне и напред",
+      "seeAllModels": "Вижте всички модели",
+      "hideAllModels": "Показване на по-малко модели",
+      "installedHint": "Вече е настроен. Можете да вземете друг модел по-късно в Настройки.",
+      "useInstalled": "Използване на инсталирания модел",
+      "continue": "Продължи",
+      "downloadingHint": "Изтегля се на заден план. Всеки друг модел е на един клик в Настройки.",
+      "downloadStarted": "Изтегляне на вашия модел на заден план."
     },
     "aiModel": {
       "title": "Добавяне на локален AI модел",
-      "subtitle": "Захранва асистента, видимостта на екрана и почистването на транскрипции — работейки изцяло офлайн на вашето устройство. Това е по избор; можете също така да свържете облачен доставчик по-късно.",
+      "subtitle": "Изберете според скоростта на отговор и възможностите. E4B е балансираният вариант по подразбиране; 12B е по-точен, но по-бавен.",
       "tiers": {
         "small": {
-          "description": "Runs on any machine. Great for tidying up your writing."
+          "description": "Работи на всяка машина. Отличен за подреждане на текста ви."
         },
         "mid": {
-          "description": "A quick all-rounder that can also answer questions."
+          "description": "Бърз универсален модел, който може и да отговаря на въпроси."
         },
         "capable": {
-          "description": "The sharpest answers, and it can see your screen."
+          "description": "Най-точните отговори, а може и да вижда екрана ви."
         }
       },
-      "seesScreen": "Sees your screen",
-      "textOnly": "Text only",
-      "download": "Download model",
-      "useDownloaded": "Use downloaded model",
+      "seesScreen": "Вижда екрана ви",
+      "textOnly": "Само текст",
+      "download": "Изтегляне на модела",
+      "useDownloaded": "Използване на изтегления модел",
       "skip": "Пропусни засега",
-      "skipHint": "По избор. Можете да изтеглите модел или да свържете облачен доставчик по всяко време в Настройки.",
+      "skipHint": "Можете да го направите по-късно в Настройки > Асистент > На моето устройство.",
       "continue": "Продължи",
       "downloadingHint": "Вашият модел се изтегля на заден план — можете веднага да започнете да използвате приложението.",
       "downloadStarted": "Изтегляне на вашия AI модел на заден план."
     },
     "ready": {
-      "title": "You're ready.",
-      "subtitle": "Two shortcuts are all you need. Press, talk, done.",
-      "dictateLabel": "Dictate anywhere",
-      "dictateCaption": "Hold, talk, let go. Your words type themselves.",
-      "assistantKeysLabel": "Ask the assistant",
-      "assistantKeysCaption": "Hold and ask. It can even see your screen.",
-      "changeAnytime": "You can change these anytime in Settings.",
-      "hotkeyLabel": "Your dictation keys",
-      "downloadingAssistant": "Your assistant is moving in. {{percentage}}% there.",
-      "downloadingVoice": "Your voice model is landing. {{percentage}}% there.",
-      "downloadingGeneric": "Still downloading. {{percentage}}% there.",
-      "signOff": "That's it. Go say something.",
-      "openApp": "Open SpeakoFlow"
+      "title": "Готови сте.",
+      "subtitle": "Нужни са ви само два бързи клавиша. Натиснете, говорете, готово.",
+      "dictateLabel": "Диктувайте навсякъде",
+      "dictateCaption": "Задръжте, говорете, пуснете. Думите ви се изписват сами.",
+      "assistantKeysLabel": "Попитайте асистента",
+      "assistantKeysCaption": "Задръжте и попитайте. Може дори да вижда екрана ви.",
+      "changeAnytime": "Можете да ги промените по всяко време в Настройки.",
+      "hotkeyLabel": "Вашите клавиши за диктовка",
+      "downloadingAssistant": "Вашият асистент се настанява. {{percentage}}% готово.",
+      "downloadingVoice": "Вашият гласов модел каца. {{percentage}}% готово.",
+      "downloadingGeneric": "Все още се изтегля. {{percentage}}% готово.",
+      "signOff": "Това е всичко. Кажете нещо.",
+      "openApp": "Отваряне на SpeakoFlow"
     },
     "errors": {
-      "selectModel": "Couldn't select that model. Please try again.",
+      "selectModel": "Този модел не можа да бъде избран. Опитайте отново.",
       "loadModels": "Неуспешно зареждане на наличните модели",
       "downloadModel": "Неуспешно изтегляне на модела: {{error}}"
     },
     "downloadProgress": {
-      "sizeOf": "{{downloaded}} of {{total}} · {{percentage}}%"
+      "sizeOf": "{{downloaded}} от {{total}} · {{percentage}}%"
     },
     "recommended": "Препоръчан",
     "download": "Изтегляне",
-    "downloading": "Изтегля се...",
+    "downloading": "Изтегля се…",
     "customModelDescription": "Не се поддържа официално",
     "downloadFailed": "Изтеглянето не бе успешно. Опитайте отново.",
     "modelCard": {
@@ -134,49 +134,49 @@
     },
     "models": {
       "parakeet-unified-en-0.6b-gguf": {
-        "description": "Blazingly fast, great for everyday dictation. English only."
+        "description": "Изключително бърз, отличен за ежедневна диктовка. Само английски."
       },
       "nemotron-3.5-asr-streaming-0.6b-gguf": {
-        "description": "Real-time transcription in 28 languages."
+        "description": "Транскрипция в реално време на 28 езика."
       },
       "canary-180m-flash-gguf": {
-        "description": "Tiny and instant — runs well on any machine."
+        "description": "Малък и мигновен — работи добре на всяка машина."
       },
       "cohere-transcribe-03-2026-gguf": {
-        "description": "Slower, but the most accurate. 14 languages."
+        "description": "По-бавен, но най-точен. 14 езика."
       },
       "whisper-medium-gguf": {
-        "description": "Best for many languages — nearly 100 supported."
+        "description": "Най-добър за много езици — поддържа близо 100."
       },
       "gemma-3-1b": {
-        "description": "Very small and quick, but limited for open-ended conversation. Text only."
+        "description": "Много малък и бърз, но ограничен за свободен разговор. Само текст."
       },
       "qwen3.5-2b": {
-        "description": "Small and fast, and it can see images. Good on most laptops."
+        "description": "Малък и бърз, а може и да вижда изображения. Добър на повечето лаптопи."
       },
       "qwen3.5-4b": {
-        "description": "A legacy vision model whose optional reasoning can delay conversational replies."
+        "description": "По-стар модел с видимост, чието разсъждение по избор може да забави отговорите в разговор."
       },
       "qwen3.5-9b": {
-        "description": "More capable, but slower for live conversation, especially when reasoning is enabled."
+        "description": "По-способен, но по-бавен за разговор в реално време, особено когато разсъждението е включено."
       },
       "qwen3.5-27b": {
-        "description": "A large vision model for deliberate tasks, not a low-latency assistant."
+        "description": "Голям модел с видимост за задачи, изискващи обмисляне, а не асистент с бърз отговор."
       },
       "gemma-4-e2b": {
-        "description": "The quickest current Gemma for everyday conversation. Less capable on complex requests."
+        "description": "Най-бързата актуална Gemma за ежедневен разговор. По-слаба при сложни заявки."
       },
       "gemma-4-e4b": {
-        "description": "Recommended for conversation: a stronger quality-and-speed balance without default thinking."
+        "description": "Препоръчана за разговор: по-добър баланс между качество и скорост, без разсъждение по подразбиране."
       },
       "gemma-4-12b": {
-        "description": "More capable for nuanced questions, but noticeably slower and best with a strong GPU."
+        "description": "По-способна при нюансирани въпроси, но значително по-бавна и най-добра със силен GPU."
       },
       "gemma-3-4b": {
-        "description": "Fast, clean answers with screen vision, but less capable than current Gemma 4 models."
+        "description": "Бързи и чисти отговори с видимост на екрана, но по-слаба от актуалните модели Gemma 4."
       },
       "kokoro-82m": {
-        "description": "Built-in local voice for the assistant. No download needed."
+        "description": "Вграден локален глас за асистента. Не е нужно изтегляне."
       },
       "small": {
         "name": "Whisper Small",
@@ -200,7 +200,7 @@
       },
       "parakeet-tdt-0.6b-v3": {
         "name": "Parakeet V3",
-        "description": "Бърз и точен."
+        "description": "Бърз и точен. 25 европейски езика."
       },
       "moonshine-base": {
         "name": "Moonshine Base",
@@ -256,7 +256,7 @@
       },
       "grant": "Даване на разрешение",
       "granted": "Разрешено",
-      "waiting": "Изчакване...",
+      "waiting": "Изчакване…",
       "allGranted": "Готово!",
       "errors": {
         "checkFailed": "Проверката на разрешенията не бе успешна. Опитайте отново.",
@@ -267,29 +267,31 @@
   "modelSelector": {
     "custom": "Персонализиран",
     "active": "Активен",
-    "switching": "Превключване...",
+    "switching": "Превключване…",
     "noModelsAvailable": "Няма налични модели",
-    "verifying": "Проверка на {{modelName}}...",
-    "verifyingGeneric": "Проверка...",
-    "extracting": "Разархивиране на {{modelName}}...",
-    "extractingMultiple": "Разархивиране на {{count}} модела...",
-    "extractingGeneric": "Разархивиране...",
+    "verifying": "Проверка на {{modelName}}…",
+    "verifyingGeneric": "Проверка…",
+    "extracting": "Разархивиране на {{modelName}}…",
+    "extractingMultiple": "Разархивиране на {{count}} модела…",
+    "extractingGeneric": "Разархивиране…",
     "downloading": "Изтегляне {{percentage}}%",
-    "downloadingMultiple": "Изтегляне на {{count}} модела...",
+    "downloadingMultiple": "Изтегляне на {{count}} модела…",
+    "downloadDetails": "Подробности за изтеглянето",
+    "downloadSize": "{{downloaded}} от {{total}}",
     "modelReady": "Моделът е готов",
-    "loading": "Зареждане на {{modelName}}...",
-    "loadingGeneric": "Зареждане...",
+    "loading": "Зареждане на {{modelName}}…",
+    "loadingGeneric": "Зареждане…",
     "modelError": "Грешка в модела",
     "modelUnloaded": "Моделът е разтоварен",
     "noModelDownloadRequired": "Няма модел – необходимо е изтегляне",
-    "llmSelectModel": "Select assistant model",
-    "llmModelTitle": "Assistant model: {{model}}",
+    "llmSelectModel": "Изберете модел за асистента",
+    "llmModelTitle": "Модел на асистента: {{model}}",
     "deleteModel": "Изтриване на {{modelName}}",
     "downloadSpeed": "{{speed}} MB/s",
     "cancel": "Отказ",
     "cancelDownload": "Отказ на изтеглянето",
-    "download": "Download",
-    "useModel": "Use model",
+    "download": "Изтегляне",
+    "useModel": "Използване на модела",
     "capabilities": {
       "languageSelection": "Поддържа няколко входни езика",
       "singleLanguage": "Поддържа само този език",
@@ -297,71 +299,71 @@
       "languageOnly": "Само {{language}}",
       "translation": "Може да превежда на английски",
       "translate": "Превод на английски",
-      "streaming": "Streaming",
-      "quantization": "Quantization",
-      "legacy": "Older"
+      "streaming": "Стрийминг",
+      "quantization": "Квантуване",
+      "legacy": "По-стар"
     }
   },
   "settings": {
     "personalMemory": {
       "enable": {
-        "label": "Remember me",
-        "description": "Let the assistant keep and use a personal memory. Off by default."
+        "label": "Запомняй ме",
+        "description": "Позволете на асистента да поддържа и използва лична памет. По подразбиране е изключено."
       },
       "incognito": {
-        "label": "Incognito chat",
-        "description": "For this conversation, don't use memory and don't learn anything new."
+        "label": "Инкогнито разговор",
+        "description": "За този разговор не използвай паметта и не научавай нищо ново."
       },
       "detail": {
-        "label": "Memory detail",
-        "description": "How much memory to add to each reply. More detail is richer but a little slower.",
+        "label": "Подробност на паметта",
+        "description": "Колко памет да се добавя към всеки отговор. Повече подробност е по-богата, но малко по-бавна.",
         "options": {
-          "light": "Light",
-          "balanced": "Balanced",
-          "detailed": "Detailed"
+          "light": "Лека",
+          "balanced": "Балансирана",
+          "detailed": "Подробна"
         }
       },
       "aboutYou": {
-        "label": "About you",
-        "caption": "A short, always-on summary the assistant keeps in mind.",
-        "fieldLabel": "Summary",
-        "placeholder": "e.g. Prefers short, direct answers. Works in Rust and TypeScript. Building a desktop voice assistant.",
-        "hint": "Always included when memory is on. Keep it to a few sentences — this is the assistant's at-a-glance picture of you.",
-        "edit": "Edit",
-        "done": "Done",
-        "empty": "Nothing saved yet — the assistant fills this in as it learns, or click Edit to write your own.",
-        "collapsedEmpty": "Nothing saved yet"
+        "label": "За вас",
+        "caption": "Кратко, винаги активно резюме, което асистентът има предвид.",
+        "fieldLabel": "Резюме",
+        "placeholder": "напр. Предпочита кратки, директни отговори. Работи с Rust и TypeScript. Разработва настолен гласов асистент.",
+        "hint": "Винаги се включва, когато паметта е активна. Ограничете го до няколко изречения — това е бързата представа на асистента за вас.",
+        "edit": "Редактиране",
+        "done": "Готово",
+        "empty": "Още няма нищо запазено — асистентът попълва това, докато научава, или натиснете „Редактиране“, за да напишете свое.",
+        "collapsedEmpty": "Още няма нищо запазено"
       },
       "notes": {
-        "label": "Notes",
-        "caption": "Specific things worth remembering — learned or added by you.",
-        "empty": "No notes yet. Add one below, or let the assistant learn them from your chats.",
-        "add": "Add",
-        "addPlaceholder": "Add something to remember…",
-        "delete": "Delete note",
-        "learned": "learned",
-        "added": "added by you"
+        "label": "Бележки",
+        "caption": "Конкретни неща, които си струва да се помнят — научени или добавени от вас.",
+        "empty": "Още няма бележки. Добавете една по-долу или оставете асистента да ги научи от разговорите ви.",
+        "add": "Добавяне",
+        "addPlaceholder": "Добавете нещо за запомняне…",
+        "delete": "Изтриване на бележката",
+        "learned": "научено",
+        "added": "добавено от вас"
       },
       "confidence": {
-        "high": "High confidence",
-        "medium": "Medium confidence",
-        "low": "Low confidence"
+        "high": "Висока увереност",
+        "medium": "Средна увереност",
+        "low": "Ниска увереност"
       },
       "actions": {
-        "label": "Manage"
+        "label": "Управление"
       },
       "distill": {
-        "label": "Learn from this chat now",
-        "description": "Pull durable facts from your current conversation into memory, right now.",
-        "button": "Update memory"
+        "label": "Научи от този разговор сега",
+        "description": "Извлечете трайните факти от текущия разговор в паметта, веднага.",
+        "button": "Обновяване на паметта"
       },
-      "export": "Export",
-      "import": "Import",
+      "export": "Експортиране",
+      "import": "Импортиране",
       "wipe": {
-        "button": "Wipe memory",
-        "confirm": "Delete everything the assistant remembers?",
-        "yes": "Delete all",
-        "cancel": "Cancel"
+        "button": "Изчистване на паметта",
+        "confirm": "Да се изтрие всичко, което асистентът помни?",
+        "yes": "Изтриване на всичко",
+        "cancel": "Отказ"
       }
     },
     "modelSettings": {
@@ -371,82 +373,82 @@
     "general": {
       "title": "Общи",
       "recording": {
-        "title": "Recording"
+        "title": "Запис"
       },
       "groups": {
-        "sounds": "Sounds",
-        "startup": "Startup and tray",
-        "overlay": "Overlay",
-        "updates": "Updates",
-        "system": "System"
+        "sounds": "Звуци",
+        "startup": "Стартиране и системна област",
+        "overlay": "Наслагване",
+        "updates": "Актуализации",
+        "system": "Система"
       },
       "shortcut": {
-        "title": "Бързи клавиши на SpeakoFlow",
+        "title": "Бързи клавиши",
         "description": "Настройте клавишни комбинации за стартиране на запис за реч към текст",
-        "loading": "Зареждане на бързите клавиши...",
+        "loading": "Зареждане на бързите клавиши…",
         "none": "Няма настроени бързи клавиши",
         "notFound": "Бързият клавиш не е намерен",
-        "pressKeys": "Натиснете клавишите...",
+        "pressKeys": "Натиснете клавишите…",
         "bindings": {
           "transcribe": {
-            "name": "Бърз клавиш за транскрипция",
+            "name": "Диктовка",
             "description": "Клавишната комбинация за запис и транскрибиране на гласа ви."
           },
           "transcribe_toggle": {
-            "name": "Hands-free dictation",
-            "description": "Press once to start, again to stop — no holding needed."
+            "name": "Диктовка без задържане",
+            "description": "Натиснете веднъж за старт и отново за спиране — без задържане."
           },
           "cancel": {
-            "name": "Бърз клавиш за отказ",
+            "name": "Отказ",
             "description": "Клавишната комбинация за отмяна на текущия запис."
           },
           "transcribe_with_post_process": {
             "name": "Бърз клавиш за постобработка",
-            "description": "По избор: отделна комбинация, която винаги прилага ИИ постобработка върху транскрипцията."
+            "description": "Диктувайте, след което текстът се почиства с ИИ, преди да бъде въведен."
           },
           "assistant": {
-            "name": "Ask assistant",
-            "description": "Ask the assistant by voice; the answer streams into the floating panel."
+            "name": "Попитай асистента",
+            "description": "Попитайте асистента с глас; отговорът се появява в плаващия панел."
           },
           "assistant_vision": {
-            "name": "Ask with screen",
-            "description": "Ask by voice with your screen attached so it can see what you're looking at."
+            "name": "Попитай с екрана",
+            "description": "Попитайте с глас, като прикачите екрана си, за да види какво гледате."
           },
           "assistant_panel_toggle": {
-            "name": "Show or hide panel",
-            "description": "Shows or hides the floating assistant panel."
+            "name": "Показване или скриване на панела",
+            "description": "Показва или скрива плаващия панел на асистента."
           }
         },
         "errors": {
           "restore": "Неуспешно възстановяване на оригиналния бърз клавиш",
           "set": "Неуспешно задаване на бързия клавиш: {{error}}",
-          "reset": "Неуспешно нулиране на бързия клавиш към първоначалната стойност"
+          "reset": "Бързият клавиш не можа да бъде нулиран."
         }
       },
       "language": {
         "title": "Език",
-        "description": "Изберете езика за разпознаване на реч. „Автоматично“ определя езика сам, а изборът на конкретен език може да подобри точността за него.",
+        "description": "Език за разпознаване на реч. Конкретен език може да подобри точността.",
         "descriptionUnsupported": "Моделът Parakeet автоматично открива езика. Ръчен избор не е необходим.",
-        "searchPlaceholder": "Търсене на езици...",
+        "searchPlaceholder": "Търсене на езици…",
         "noResults": "Няма намерени езици",
         "auto": "Автоматично"
       },
       "pushToTalk": {
         "label": "Натискане за говорене",
-        "description": "Задръжте за запис, пуснете за спиране",
-        "hold": "Hold to record",
-        "tap": "Tap to start and stop"
+        "description": "„Задържане“ записва, докато бързият клавиш за диктовка е натиснат. „Натискане“ стартира записа с едно натискане и го спира със следващото.",
+        "hold": "Задържане",
+        "tap": "Натискане"
       },
       "tapToLock": {
-        "label": "Tap to lock",
-        "info": "While holding your record shortcut, tap this to lock hands-free recording so you can let go and keep talking. Pick any key that isn't part of your record shortcut, or clear it to turn this off.",
-        "off": "Off",
-        "clear": "Clear"
+        "label": "Натискане за фиксиране",
+        "info": "Докато държите бързия клавиш за запис, натиснете този, за да фиксирате записа без задържане и да продължите да говорите, след като пуснете. Изберете клавиш, който не е част от бързия клавиш за запис, или го изчистете, за да изключите функцията.",
+        "off": "Изкл.",
+        "clear": "Изчистване"
       }
     },
     "models": {
       "title": "Модели за транскрипция",
-      "description": "Изберете модел за транскрипция или изтеглете допълнителни. Различните модели предлагат различна точност и скорост.",
+      "description": "Моделите жертват точност за скорост — изберете подходящия за вашата машина.",
       "yourModels": "Изтеглени модели",
       "availableModels": "Налични за изтегляне",
       "downloaded": "Изтеглен",
@@ -455,17 +457,17 @@
       "deleteActiveConfirm": "{{modelName}} е вашият активен модел. Изтриването му ще спре транскрипциите, докато не изберете нов модел. Сигурни ли сте?",
       "deleteTitle": "Изтриване на модел",
       "categories": {
-        "stt": "Transcription",
-        "llm": "Assistant",
-        "tts": "Speech"
+        "stt": "Транскрипция",
+        "llm": "Асистент",
+        "tts": "Говор"
       },
       "categoryDescriptions": {
-        "stt": "Models trade accuracy for speed — pick one that fits your machine.",
-        "llm": "Local models for the built-in assistant and AI cleanup.",
-        "tts": "Voices for the assistant's spoken replies. Kokoro runs on your machine."
+        "stt": "Моделите жертват точност за скорост — изберете подходящия за вашата машина.",
+        "llm": "Локални модели за вградения асистент и AI почистването.",
+        "tts": "Гласове за изговорените отговори на асистента. Kokoro работи на вашата машина."
       },
-      "llmHint": "After downloading, pick this model in the Assistant section under the built-in (local) provider.",
-      "ttsHint": "Speech models run on your machine and need no download.",
+      "llmHint": "След изтеглянето изберете този модел в раздел „Асистент“ при вградения (локален) доставчик.",
+      "ttsHint": "Моделите за говор работят на вашата машина и не изискват изтегляне.",
       "filters": {
         "all": "Всички",
         "multiLanguage": "Многоезични",
@@ -473,40 +475,40 @@
         "allLanguages": "Всички езици"
       },
       "noModelsMatch": "Няма модели, отговарящи на този филтър.",
-      "searchPlaceholder": "Search models by name…",
-      "clearSearch": "Clear search",
-      "noSearchResults": "No models named “{{query}}”.",
-      "olderModels": "Older models",
-      "olderModelsHint": "Run on the previous engine. Still fully supported — most people won't need these.",
+      "searchPlaceholder": "Търсене на модели по име…",
+      "clearSearch": "Изчистване на търсенето",
+      "noSearchResults": "Няма модели с име „{{query}}“.",
+      "olderModels": "По-стари модели",
+      "olderModelsHint": "Работят с предишното ядро. Все още се поддържат напълно — повечето хора няма да имат нужда от тях.",
       "customModel": {
-        "addButton": "Search Hugging Face",
-        "searchTitle": "Need a different model?",
-        "searchDescription": "Search Hugging Face for a GGUF model. This is an advanced option, so hardware needs and compatibility can vary.",
-        "searchButton": "Search Hugging Face",
-        "title": "Search Hugging Face",
-        "subtitle": "Find a GGUF model to download and run on this machine.",
-        "searchPlaceholder": "Search models on Hugging Face…",
-        "popularTitle": "Popular GGUF models",
-        "resultsTitle": "Search results",
-        "resultCount_one": "{{count}} model",
-        "resultCount_other": "{{count}} models",
-        "searching": "Searching Hugging Face…",
-        "searchError": "Search failed. Check your connection and try again.",
-        "tryAgain": "Try again",
-        "noResults": "No models found. Try a different search.",
-        "downloads": "{{value}} downloads",
-        "visionBadge": "Vision",
-        "back": "Back to results",
-        "loadingFiles": "Loading available files…",
-        "repoFilesError": "Couldn't load files for this model.",
-        "noGgufFiles": "This repository has no downloadable .gguf files.",
-        "selectQuant": "Choose a download",
-        "selectQuantHint": "Not sure? Q4_K_M is usually the best balance of quality, speed, and memory use.",
-        "enableVision": "Include screen vision",
-        "enableVisionHint": "Downloads an extra file so the model can understand images.",
-        "add": "Download",
-        "adding": "Starting…",
-        "addError": "Couldn't add this model. Please try again."
+        "addButton": "Търсене в Hugging Face",
+        "searchTitle": "Нужен ви е друг модел?",
+        "searchDescription": "Потърсете GGUF модел в Hugging Face. Това е разширена опция, така че хардуерните изисквания и съвместимостта може да варират.",
+        "searchButton": "Търсене в Hugging Face",
+        "title": "Намерете модел в Hugging Face",
+        "subtitle": "Търсете GGUF модели, изберете версия и я изтеглете директно на това устройство.",
+        "searchPlaceholder": "Търсене по модел или създател…",
+        "popularTitle": "Популярни GGUF модели",
+        "resultsTitle": "Резултати от търсенето",
+        "resultCount_one": "{{count}} модел",
+        "resultCount_other": "{{count}} модела",
+        "searching": "Търсене в Hugging Face…",
+        "searchError": "Търсенето не бе успешно. Проверете връзката си и опитайте отново.",
+        "tryAgain": "Опитайте отново",
+        "noResults": "Няма намерени модели. Опитайте с друго търсене.",
+        "downloads": "{{value}} изтегляния",
+        "visionBadge": "Видимост",
+        "back": "Обратно към резултатите",
+        "loadingFiles": "Зареждане на наличните файлове…",
+        "repoFilesError": "Файловете за този модел не можаха да бъдат заредени.",
+        "noGgufFiles": "Това хранилище не съдържа .gguf файлове за изтегляне.",
+        "selectQuant": "Изберете вариант за изтегляне",
+        "selectQuantHint": "Не сте сигурни? Q4_K_M обикновено е най-добрият баланс между качество, скорост и използвана памет.",
+        "enableVision": "Включване на видимост на екрана",
+        "enableVisionHint": "Изтегля допълнителен файл, за да може моделът да разбира изображения.",
+        "add": "Изтегляне",
+        "adding": "Стартиране…",
+        "addError": "Този модел не можа да бъде добавен. Опитайте отново."
       }
     },
     "sound": {
@@ -514,24 +516,24 @@
       "microphone": {
         "title": "Микрофон",
         "description": "Изберете предпочитано микрофонно устройство",
-        "placeholder": "Изберете микрофон...",
-        "loading": "Зареждане..."
+        "placeholder": "Изберете микрофон…",
+        "loading": "Зареждане…"
       },
       "audioFeedback": {
         "label": "Звукова обратна връзка",
         "description": "Възпроизвеждане на звук при старт и край на записа"
       },
       "soundTheme": {
-        "label": "Feedback sound",
-        "description": "Choose the start/stop cue played during dictation",
-        "default": "Default",
-        "preview": "Preview sound (plays start then stop)"
+        "label": "Звук за обратна връзка",
+        "description": "Изберете сигнала за старт и спиране, който се възпроизвежда при диктовка",
+        "default": "По подразбиране",
+        "preview": "Прослушване на звука (пуска старт, после спиране)"
       },
       "outputDevice": {
         "title": "Изходно устройство",
         "description": "Изберете предпочитано изходно аудио устройство за звуци за обратна връзка",
-        "placeholder": "Изберете изходно устройство...",
-        "loading": "Зареждане..."
+        "placeholder": "Изберете изходно устройство…",
+        "loading": "Зареждане…"
       },
       "volume": {
         "title": "Сила на звука",
@@ -544,20 +546,20 @@
         "app": "Приложение",
         "output": "Изход",
         "transcription": "Транскрипция",
-        "textReplacements": "Text replacements",
+        "textReplacements": "Замени на текст",
         "history": "История",
-        "aiCorrection": "AI cleanup",
+        "aiCorrection": "AI почистване",
         "experimental": "Експериментални"
       },
       "aiCorrection": {
-        "label": "AI cleanup (in development)",
-        "description": "Experimental: clean up your dictation with AI. Rough and unpolished — off by default.",
-        "info": "Runs a language model over your dictation to fix punctuation, remove filler words, and optionally adjust the tone. Applies to dictation only (not the assistant chat) and runs on its own shortcut. It adds a delay since the model runs after transcription; if it fails or times out, your raw text is pasted instead. Uses your assistant's model by default. This feature is still in development — you can't yet pick a built-in local model from its own list, and it needs more tuning before it's a main feature."
+        "label": "AI почистване (в разработка)",
+        "description": "Експериментално: почистване на диктовката с AI. Все още е грубо и недоизпипано — по подразбиране е изключено.",
+        "info": "Пуска езиков модел върху диктовката ви, за да поправи пунктуацията, да премахне излишните думи и по избор да промени тона. Важи само за диктовката (не за разговора с асистента) и работи със свой собствен бърз клавиш. Добавя забавяне, тъй като моделът се изпълнява след транскрипцията; ако се провали или времето изтече, се поставя необработеният ви текст. По подразбиране използва модела на асистента ви. Функцията все още е в разработка — засега не можете да изберете вграден локален модел от отделен списък и е нужна още настройка, преди да стане основна функция."
       },
       "postProcessTimeout": {
-        "title": "AI cleanup timeout",
-        "description": "How long to wait for the model before giving up and pasting your raw transcription instead. On the built-in local model, allow enough time for it to load on first use.",
-        "seconds": "{{seconds}} seconds"
+        "title": "Изчакване за AI почистването",
+        "description": "Колко дълго да се чака моделът, преди да се откаже и вместо това да постави необработената транскрипция. При вградения локален модел оставете достатъчно време за зареждането му при първата употреба.",
+        "seconds": "{{seconds}} секунди"
       },
       "experimentalToggle": {
         "label": "Експериментални функции",
@@ -565,28 +567,28 @@
       },
       "lazyStreamClose": {
         "label": "Държане на микрофона отворен между транскрипции",
-        "description": "Държи потокът от микрофона отворен 30 секунди след спиране на записа, което намалява забавянето при поредни транскрипции. Може да влоши качеството на Bluetooth аудио, докато е активно."
+        "description": "По-бърза последователна диктовка. Може да влоши качеството на Bluetooth аудиото."
       },
       "liveTranscription": {
-        "label": "Live transcription",
-        "description": "Transcribe speech as you talk, instead of all at once when you stop. Experimental."
+        "label": "Транскрипция в реално време",
+        "description": "Транскрибиране на речта, докато говорите, вместо наведнъж при спиране. Експериментално."
       },
       "liveTranscriptionWindow": {
-        "label": "Live transcription window",
-        "description": "While live transcription runs, show a larger overlay card with the running text instead of the compact pill. Requires live transcription."
+        "label": "Прозорец за транскрипция в реално време",
+        "description": "Докато работи транскрипцията в реално време, да се показва по-голяма карта с текущия текст вместо компактната лента. Изисква транскрипция в реално време."
       },
       "acceleration": {
         "whisper": {
           "title": "Ускорение за Whisper",
-          "description": "Хардуерно ускорение за моделите Whisper. „Автоматично“ използва GPU при наличност (Metal на macOS, Vulkan на Windows/Linux)."
+          "description": "„Автоматично“ използва GPU, когато е налично."
         },
         "ort": {
           "title": "Ускорение за ONNX",
-          "description": "Хардуерно ускорение за ONNX модели (Parakeet, Canary, Moonshine и др.). DirectML на Windows е експериментален. Моделите може да не транскрибират."
+          "description": "За моделите Parakeet, Canary и Moonshine. DirectML е експериментален."
         },
         "gpuDevice": {
           "title": "GPU устройство",
-          "description": "Изберете кой GPU да се използва за Whisper. Автоматично избира специализирания GPU.",
+          "description": "„Автоматично“ избира специализирания GPU.",
           "auto": "Автоматично"
         }
       },
@@ -599,21 +601,25 @@
         "description": "Автоматично стартиране на SpeakoFlow при влизане в профила ви."
       },
       "showTrayIcon": {
-        "label": "Икона в системната област",
+        "label": "Показване на икона в системната област",
         "description": "Показване на иконата на SpeakoFlow в системната област."
       },
+      "closeBehavior": {
+        "label": "Изход при затваряне на прозореца",
+        "description": "Когато е изключено, затварянето на прозореца оставя SpeakoFlow да работи в системната област, така че бързите клавиши продължават да действат. Когато е включено, затварянето на прозореца затваря приложението напълно."
+      },
       "overlayStyle": {
-        "title": "Overlay",
-        "description": "How the recording overlay looks while you dictate. None hides it, Minimal is the compact pill, and Live shows a readable card with your words as you speak (for models that support it).",
+        "title": "Наслагване",
+        "description": "Как изглежда наслагването при запис, докато диктувате. „Няма“ го скрива, „Минимално“ е компактната лента, а „В реално време“ показва четима карта с думите ви, докато говорите (за моделите, които го поддържат).",
         "options": {
-          "none": "None",
-          "minimal": "Minimal",
-          "live": "Live"
+          "none": "Няма",
+          "minimal": "Минимално",
+          "live": "В реално време"
         }
       },
       "overlay": {
         "title": "Позиция на наслагването",
-        "description": "Показване на визуална обратна връзка при запис и транскрипция. На Linux се препоръчва „Няма“.",
+        "description": "Къде на екрана се намира наслагването при запис.",
         "options": {
           "none": "Няма",
           "bottom": "Долу",
@@ -622,7 +628,7 @@
       },
       "pasteMethod": {
         "title": "Начин на поставяне",
-        "description": "Изберете как се вмъква текстът. Директно: симулира писане чрез системния вход. Няма: пропуска поставянето, актуализира само историята/клипборда.",
+        "description": "Как транскрибираният текст се вмъква в активното приложение.",
         "options": {
           "clipboard": "Клипборд ({{modifier}}+V)",
           "clipboardCtrlShiftV": "Клипборд (Ctrl+Shift+V)",
@@ -635,14 +641,14 @@
       },
       "typingTool": {
         "title": "Инструмент за писане",
-        "description": "Изберете кой Linux инструмент за писане да се използва при директно поставяне. „Автоматично“ открива и използва най-подходящия за вашата система.",
+        "description": "Linux инструментът, използван за директно поставяне.",
         "options": {
           "auto": "Автоматично (препоръчително)"
         }
       },
       "clipboardHandling": {
         "title": "Работа с клипборда",
-        "description": "„Без промяна на клипборда“ запазва съдържанието на клипборда след транскрипция. „Копиране в клипборда“ оставя резултата в клипборда след поставяне.",
+        "description": "Дали транскрипцията остава в клипборда след поставяне.",
         "options": {
           "dontModify": "Без промяна на клипборда",
           "copyToClipboard": "Копиране в клипборда"
@@ -650,7 +656,7 @@
       },
       "autoSubmit": {
         "title": "Автоматично изпращане",
-        "description": "Автоматично изпращане на избраната клавишна комбинация след вмъкване на текста. Cmd+Enter важи за macOS, а Windows/Linux използват Super+Enter.",
+        "description": "Автоматично изпращане на клавишна комбинация след вмъкване на текста.",
         "options": {
           "off": "Изкл.",
           "enter": "Enter",
@@ -661,12 +667,12 @@
       },
       "translateToEnglish": {
         "label": "Превод на английски",
-        "description": "Автоматичен превод на реч от други езици на английски по време на транскрипция.",
+        "description": "Превод на реч от други езици на английски.",
         "descriptionUnsupported": "Моделът {{model}} не поддържа превод."
       },
       "modelUnload": {
         "title": "Разтоварване на модела",
-        "description": "Автоматично освобождаване на памет на GPU/CPU, ако моделът не е използван за зададеното време",
+        "description": "Освобождаване на паметта, когато моделът е бил неактивен толкова време.",
         "options": {
           "never": "Никога",
           "immediately": "Веднага",
@@ -680,83 +686,110 @@
       },
       "customWords": {
         "title": "Персонализирани думи",
-        "description": "Добавете думи, които често се чуват или изписват грешно при транскрипция. Системата автоматично ще коригира близки по звучене думи според вашия списък.",
-        "info": "Example: add “Kokoro” if SpeakoFlow writes “Coco row.”",
-        "placeholder": "Добавете дума",
+        "description": "Имена, продукти и фрази, които SpeakoFlow трябва да изписва по вашия начин.",
+        "info": "Пример: добавете „Kokoro“, ако SpeakoFlow напише „Коко ров“.",
+        "placeholder": "Добавете име, термин или кратка фраза",
         "add": "Добавяне",
-        "empty": "No custom words yet.",
+        "empty": "Още няма персонализирани думи.",
         "remove": "Премахване на {{word}}",
         "duplicate": "„{{word}}“ вече съществува"
       },
       "textReplacements": {
-        "title": "Text replacements",
-        "description": "Replace a phrase in your transcript with text you use often. Example: “my email” becomes “alex@example.com”.",
-        "rulesTitle": "Replacement rules",
-        "rulesHint": "Choose what SpeakoFlow hears and what it should insert.",
-        "empty": "Create a rule for a phrase you say often.",
-        "addFirst": "Create first rule",
-        "addRule": "Add replacement",
-        "manageRules": "Replacements ({{count}})",
-        "searchLabel": "Spoken phrase",
-        "searchPlaceholder": "my email",
-        "replaceLabel": "Insert this text",
+        "title": "Замени на текст",
+        "description": "Заменяйте израз в транскрипцията с текст, който използвате често. Пример: „моят имейл“ става „alex@example.com“.",
+        "rulesTitle": "Правила за замяна",
+        "rulesHint": "Изберете какво чува SpeakoFlow и какво да вмъква.",
+        "empty": "Създайте правило за израз, който казвате често.",
+        "addFirst": "Създаване на първото правило",
+        "addRule": "Добавяне на замяна",
+        "manageRules": "Замени ({{count}})",
+        "searchLabel": "Изговорен израз",
+        "searchPlaceholder": "моят имейл",
+        "replaceLabel": "Вмъкване на този текст",
         "replacePlaceholder": "alex@example.com",
-        "advanced": "Advanced options",
-        "regex": "Regex",
-        "trimBefore": "Trim before",
-        "trimAfter": "Trim after",
-        "enabledLabel": "Enabled",
-        "remove": "Remove rule",
-        "import": "Import",
-        "export": "Export",
-        "importSuccess": "Imported {{count}} replacement rules",
-        "importError": "Could not import: the file is not a valid replacements list",
-        "exportSuccess": "Replacements exported",
-        "exportError": "Could not export replacements",
-        "magicHint": "Use [date], [time], [uppercase], [lowercase], [capitalize], or [nospace] in the inserted text.",
+        "advanced": "Разширени опции",
+        "regex": "Регулярен израз",
+        "trimBefore": "Изрязване преди",
+        "trimAfter": "Изрязване след",
+        "enabledLabel": "Включено",
+        "remove": "Премахване на правилото",
+        "import": "Импортиране",
+        "export": "Експортиране",
+        "importSuccess": "Импортирани са {{count}} правила за замяна",
+        "importError": "Импортирането не бе възможно: файлът не е валиден списък със замени",
+        "exportSuccess": "Замените са експортирани",
+        "exportError": "Замените не можаха да бъдат експортирани",
+        "magicHint": "Използвайте [date], [time], [uppercase], [lowercase], [capitalize] или [nospace] във вмъкнатия текст.",
         "capitalization": {
-          "label": "Caps",
-          "none": "None",
-          "uppercase": "UPPERCASE",
-          "lowercase": "lowercase",
-          "capitalize": "Capitalize"
+          "label": "Регистър",
+          "none": "Няма",
+          "uppercase": "ГЛАВНИ БУКВИ",
+          "lowercase": "малки букви",
+          "capitalize": "Първа главна"
         }
       }
     },
     "postProcessing": {
       "title": "Постобработка",
+      "readiness": {
+        "checking": "Проверка на настройката за AI почистване…",
+        "checkFailed": "Настройката за AI почистване не можа да бъде проверена.",
+        "ready": "Готово — {{provider}}.",
+        "assistantFallback": "Готово — използва се моделът на асистента ви ({{provider}}).",
+        "selectPrompt": "Изберете подкана за почистване.",
+        "selectModel": "Изберете модел за този доставчик.",
+        "addApiKey": "Добавете API ключ за този доставчик.",
+        "providerMissing": "Избраният доставчик вече не е наличен."
+      },
+      "errors": {
+        "saveFailed": "Настройката за AI почистване не можа да бъде запазена.",
+        "modelsLoadFailed": "Моделите за този доставчик не можаха да бъдат заредени.",
+        "promptCreateFailed": "Подканата не можа да бъде създадена.",
+        "promptSelectFailed": "Подканата беше създадена, но не можа да бъде избрана.",
+        "promptUpdateFailed": "Подканата не можа да бъде обновена.",
+        "promptDeleteFailed": "Подканата не можа да бъде изтрита.",
+        "toneSelectFailed": "Стилът на писане не можа да бъде избран.",
+        "toneCreateFailed": "Стилът на писане не можа да бъде създаден.",
+        "toneSelectAfterCreateFailed": "Стилът беше създаден, но не можа да бъде избран.",
+        "toneUpdateFailed": "Стилът на писане не можа да бъде обновен.",
+        "toneDeleteFailed": "Стилът на писане не можа да бъде изтрит."
+      },
       "enable": {
-        "title": "AI cleanup"
+        "title": "AI почистване"
       },
       "hotkey": {
         "title": "Бърз клавиш"
       },
       "tone": {
-        "title": "Tone",
-        "description": "Optionally rewrite your cleaned-up dictation in a chosen tone. \"None\" just tidies the text without changing the wording.",
+        "title": "Готов стил",
+        "description": "Изберете как да звучи почистената диктовка. „Само почистване“ поправя текста, без умишлено да променя стила му.",
         "options": {
-          "none": "None (cleanup only)",
-          "formal": "Formal",
-          "casual": "Casual",
-          "professional": "Professional",
-          "friendly": "Friendly",
-          "concise": "Concise"
+          "none": "Без (само почистване)",
+          "formal": "Формален",
+          "casual": "Непринуден",
+          "professional": "Професионален",
+          "friendly": "Приятелски",
+          "concise": "Стегнат"
         },
-        "edit": "Edit",
-        "closeEditor": "Close",
-        "createNew": "Create style",
-        "nameLabel": "Style name",
-        "namePlaceholder": "For example, Calm and clean",
-        "instructionsLabel": "Style instructions",
-        "instructionsPlaceholder": "Describe exactly how the wording should change. Example: Remove profanity and replace it with calm, neutral wording.",
-        "instructionsHint": "These rules shape the wording after cleanup. They stay separate from your cleanup prompt.",
-        "createTone": "Create style",
-        "updateTone": "Save changes",
-        "deleteTone": "Delete style",
-        "cancel": "Cancel"
+        "edit": "Редактиране",
+        "closeEditor": "Затваряне",
+        "createNew": "Създаване на стил",
+        "nameLabel": "Име на стила",
+        "namePlaceholder": "Например Спокоен и чист",
+        "instructionsLabel": "Инструкции за стила",
+        "instructionsPlaceholder": "Опишете точно как да се промени формулировката. Пример: Премахни грубите изрази и ги замени със спокойни, неутрални думи.",
+        "instructionsHint": "Тези правила оформят формулировката след почистването. Остават отделни от подканата ви за почистване.",
+        "createTone": "Създаване на стил",
+        "updateTone": "Запазване на промените",
+        "deleteTone": "Изтриване на стила",
+        "cancel": "Отказ"
       },
       "api": {
         "title": "API (съвместим с OpenAI)",
+        "location": {
+          "title": "Къде се изпълнява",
+          "description": "Изпълнявайте почистването поверително с изтеглен модел или използвайте облачен доставчик."
+        },
         "provider": {
           "title": "Доставчик",
           "description": "Изберете доставчик, съвместим с OpenAI."
@@ -769,7 +802,7 @@
         },
         "baseUrl": {
           "title": "Базов URL",
-          "description": "Базов API URL за избрания доставчик. Редактируем е само при персонализиран доставчик.",
+          "description": "Базов API URL за избрания доставчик. Може да се редактира за Custom, Local и Azure OpenAI (задайте го към вашия ресурс, напр. https://your-resource.openai.azure.com/openai/v1).",
           "placeholder": "https://api.openai.com/v1"
         },
         "apiKey": {
@@ -778,10 +811,10 @@
           "placeholder": "sk-..."
         },
         "builtin": {
-          "modelDescription": "Pick a model you've downloaded. It runs on your machine with no API key or setup.",
-          "modelPlaceholder": "Select a downloaded model",
-          "noModels": "No local models yet. Download one from the model catalog.",
-          "ready": "Runs fully on your machine. No API key, no setup."
+          "modelDescription": "Изберете модел, който сте изтеглили. Работи на вашата машина без API ключ и без настройка.",
+          "modelPlaceholder": "Изберете изтеглен модел",
+          "noModels": "Още няма локални модели. Изтеглете един от каталога с модели.",
+          "ready": "Работи изцяло на вашата машина. Без API ключ, без настройка."
         },
         "model": {
           "title": "Модел",
@@ -792,10 +825,6 @@
           "placeholderWithOptions": "Търсене или избор на модел",
           "placeholderNoOptions": "Въведете име на модел",
           "refreshModels": "Опресняване на моделите"
-        },
-        "location": {
-          "title": "Where it runs",
-          "description": "Run cleanup privately with a downloaded model or use a cloud provider."
         }
       },
       "prompts": {
@@ -807,138 +836,122 @@
         "noPrompts": "Няма налични подкани",
         "selectPrompt": "Изберете подкана",
         "createNew": "Нова подкана",
-        "edit": "Edit",
-        "closeEditor": "Close",
+        "edit": "Редактиране",
+        "closeEditor": "Затваряне",
         "promptLabel": "Етикет на подканата",
         "promptLabelPlaceholder": "Въведете име на подканата",
         "promptInstructions": "Инструкции за подканата",
         "promptInstructionsPlaceholder": "Напишете инструкциите за изпълнение след транскрипция. Пример: Подобрете граматиката и яснотата на следния текст: ${output}",
-        "promptTip": "Съвет: Използвайте <code>${output}</code>, за да вмъкнете транскрибирания текст в подканата.",
+        "promptTip": "Съвет: Транскрибираният текст се изпраща на модела автоматично — просто напишете инструкции. (По-старите подкани с <code>${output}</code> продължават да работят.)",
         "updatePrompt": "Обновяване на подканата",
         "deletePrompt": "Изтриване на подканата",
         "createPrompt": "Създаване на подкана",
         "cancel": "Отказ",
         "selectToEdit": "Изберете подкана по-горе, за да видите и редактирате подробностите ѝ.",
         "createFirst": "Натиснете „Нова подкана“ по-горе, за да създадете първата си подкана за постобработка."
-      },
-      "readiness": {
-        "checking": "Checking AI cleanup setup…",
-        "checkFailed": "Couldn’t check AI cleanup setup.",
-        "ready": "Ready — {{provider}}.",
-        "assistantFallback": "Ready — using your Assistant model ({{provider}}).",
-        "selectPrompt": "Select a cleanup prompt.",
-        "selectModel": "Select a model for this provider.",
-        "addApiKey": "Add an API key for this provider.",
-        "providerMissing": "The selected provider is no longer available."
-      },
-      "errors": {
-        "saveFailed": "Couldn’t save the AI cleanup setting.",
-        "modelsLoadFailed": "Couldn’t load models for this provider.",
-        "promptCreateFailed": "Couldn’t create the prompt.",
-        "promptSelectFailed": "Created the prompt, but couldn’t select it.",
-        "promptUpdateFailed": "Couldn’t update the prompt.",
-        "promptDeleteFailed": "Couldn’t delete the prompt.",
-        "toneSelectFailed": "Couldn’t select the writing style.",
-        "toneCreateFailed": "Couldn’t create the writing style.",
-        "toneSelectAfterCreateFailed": "Created the style, but couldn’t select it.",
-        "toneUpdateFailed": "Couldn’t update the writing style.",
-        "toneDeleteFailed": "Couldn’t delete the writing style."
       }
     },
     "dictation": {
       "hero": {
-        "eyebrow": "Now listening with",
-        "loading": "Loading your model…",
-        "noModelTitle": "No model yet",
-        "noModelCaption": "Pick a model so your voice becomes text.",
-        "chooseModel": "Choose a model",
-        "changeModel": "Change model",
-        "streams": "Streams live",
-        "accuracy": "Accuracy",
-        "speed": "Speed"
+        "eyebrow": "Сега слуша с",
+        "loading": "Зареждане на вашия модел…",
+        "noModelTitle": "Още няма модел",
+        "noModelCaption": "Изберете модел, за да се превръща гласът ви в текст.",
+        "chooseModel": "Изберете модел",
+        "changeModel": "Промяна на модела",
+        "streams": "Извежда в реално време",
+        "accuracy": "Точност",
+        "speed": "Скорост"
       },
       "catalog": {
-        "title": "Choose your model",
-        "description": "Every model runs on your machine — trade accuracy for speed and pick the one that fits."
+        "title": "Изберете своя модел",
+        "description": "Всеки модел работи на вашата машина — балансирайте точност и скорост и изберете подходящия."
       },
       "aiCleanup": {
-        "groupTitle": "AI cleanup",
-        "modelGroupTitle": "Cleanup model",
-        "promptGroupTitle": "Cleanup prompt",
-        "title": "Fix up my dictation with AI",
-        "caption": "Experimental — tidies punctuation and filler after you dictate.",
-        "info": "Runs a language model over your dictation to fix punctuation, remove filler words, and optionally adjust the tone. Applies to dictation only, on its own shortcut. It adds a short delay after you speak; if the model fails or times out, your raw text is used instead. Still in development.",
-        "styleGroupTitle": "Writing style",
-        "styleGroupDescription": "Choose a built-in style or save your own rules for how cleaned dictation should sound.",
-        "fixMisheardLabel": "Fix misheard words",
-        "fixMisheardDescription": "When a word is clearly wrong for the sentence — a homophone or a near-miss pronunciation — replace it with the word you meant. Helpful for accents; the AI only corrects when the intended word is obvious."
+        "groupTitle": "AI почистване",
+        "styleGroupTitle": "Стил на писане",
+        "styleGroupDescription": "Изберете вграден стил или запазете свои правила за това как да звучи почистената диктовка.",
+        "modelGroupTitle": "Модел за почистване",
+        "promptGroupTitle": "Подкана за почистване",
+        "title": "Оправяй диктовката ми с AI",
+        "caption": "Експериментално — подрежда пунктуацията и излишните думи, след като диктувате.",
+        "strengthLabel": "Сила на почистването",
+        "strengthDescription": "Колко много AI преработва думите ви. „Леко“ поправя само грешките и излишните думи. „Балансирано“ премахва и повторенията и недовършените начала. „Агресивно“ стяга разточителната реч в стегнат, добре структуриран текст — като винаги запазва фактите и смисъла ви.",
+        "strengthOptions": {
+          "light": "Леко",
+          "balanced": "Балансирано",
+          "aggressive": "Агресивно"
+        },
+        "fixMisheardLabel": "Поправяне на неправилно чути думи",
+        "fixMisheardDescription": "Когато една дума явно не пасва на изречението — омофон или почти сходно произношение — да се замени с думата, която сте имали предвид. Полезно при акцент; AI поправя само когато търсената дума е очевидна.",
+        "info": "Пуска езиков модел върху диктовката ви, за да поправи пунктуацията, да премахне излишните думи и по избор да промени тона. Важи само за диктовката, със свой собствен бърз клавиш. Добавя кратко забавяне, след като спрете да говорите; ако моделът се провали или времето изтече, се използва необработеният ви текст. Все още е в разработка."
       },
       "spokenEmoji": {
         "title": "Изговорени емоджита",
         "description": "Кажете “happy emoji” или “thumbs up emoji”, за да вмъкнете 😊 или 👍. Често срещаните варианти и малките грешки при разпознаване се обработват на устройството; непознатите имена остават като текст."
       },
-      "output": {
-        "title": "Output options"
-      },
       "flow": {
-        "groupTitle": "Generate with Flow",
-        "enableLabel": "Generate with Flow",
-        "enableDescription": "Start a dictation with the activation phrase to have AI write the result for you — “Hey Flow, write a polite email asking to reschedule” pastes the finished email.",
-        "phraseLabel": "Activation phrase",
-        "phraseDescription": "Flow activates only when a dictation begins with this phrase. Anywhere else, the same words paste as normal dictation. Uses your assistant's model; leave empty to reset to “Hey Flow”.",
+        "groupTitle": "Генериране с Flow",
+        "enableLabel": "Генериране с Flow",
+        "enableDescription": "Започнете диктовка с активиращата фраза, за да напише AI резултата за вас — „Hey Flow, напиши учтив имейл с молба за нова дата“ поставя готовия имейл.",
+        "phraseLabel": "Активираща фраза",
+        "phraseDescription": "Flow се активира само когато диктовката започва с тази фраза. Навсякъде другаде същите думи се поставят като обикновена диктовка. Използва модела на асистента ви; оставете полето празно, за да се върне „Hey Flow“.",
         "phrasePlaceholder": "Hey Flow",
-        "screenLabel": "Allow screen access",
-        "screenDescription": "Let Flow take one screenshot when a command clearly refers to your screen, like “look at this email and draft a reply”. The model decides if it's needed. Separate from the assistant's screen access."
+        "screenLabel": "Разрешаване на достъп до екрана",
+        "screenDescription": "Позволете на Flow да направи една снимка на екрана, когато командата явно се отнася до екрана ви, например „погледни този имейл и напиши отговор“. Моделът решава дали е нужно. Отделно от достъпа до екрана на асистента."
+      },
+      "output": {
+        "title": "Опции за изхода"
       }
     },
     "history": {
       "title": "История",
       "storage": {
-        "title": "Recording storage",
-        "description": "These controls affect recordings only. Starred recordings are always kept. Assistant chats have separate storage."
+        "title": "Съхранение на записите",
+        "description": "Тези настройки засягат записите от диктовка и Flow. Запазените записи се пазят винаги. Разговорите с асистента имат отделно съхранение."
       },
       "filters": {
-        "label": "History type",
-        "all": "All",
+        "label": "Тип история",
+        "all": "Всички",
         "recordings": "Recordings",
         "flow": "Flow",
-        "assistant": "Assistant chats"
+        "assistant": "Разговори с асистента"
       },
       "openFolder": "Отваряне на папката с записи",
-      "loading": "Зареждане на историята...",
-      "empty": "Все още няма транскрипции. Започнете запис, за да изградите история!",
-      "emptyRecordings": "No recordings yet.",
-      "emptyFlow": "No Flow generations yet.",
-      "emptyAssistant": "No assistant chats yet.",
-      "recordingLabel": "Recording",
+      "loading": "Зареждане на историята…",
+      "empty": "Тук още няма нищо. Вашите диктовки, генерирания с Flow и разговори с асистента ще се появят тук.",
+      "emptyRecordings": "Още няма диктовки.",
+      "emptyFlow": "Още няма генерирания с Flow.",
+      "emptyAssistant": "Още няма разговори с асистента.",
+      "recordingLabel": "Диктовка",
       "flowLabel": "Flow",
-      "flowTranscriptLabel": "You said",
-      "originalTranscriptionLabel": "Original transcription",
-      "flowOutputLabel": "Flow output",
-      "finalTextLabel": "Final text",
-      "flowNoOutput": "No Flow output was generated.",
-      "copyFlowOutput": "Copy Flow output",
-      "copyFinalText": "Copy final text",
+      "flowTranscriptLabel": "Вие казахте",
+      "originalTranscriptionLabel": "Оригинална транскрипция",
+      "flowOutputLabel": "Резултат от Flow",
+      "finalTextLabel": "Окончателен текст",
+      "flowNoOutput": "Не беше генериран резултат от Flow.",
       "copyToClipboard": "Копиране на транскрипцията в клипборда",
+      "copyFlowOutput": "Копиране на резултата от Flow",
+      "copyFinalText": "Копиране на окончателния текст",
       "save": "Запазване на транскрипцията",
       "unsave": "Премахване от запазените",
       "delete": "Изтриване на записа",
       "deleteError": "Изтриването на записа не бе успешно. Опитайте отново.",
       "retranscribe": "Повторна транскрипция",
       "retranscribeError": "Повторната транскрипция не бе успешна. Опитайте отново.",
-      "transcribing": "Транскрибиране...",
+      "transcribing": "Транскрибиране…",
       "transcriptionFailed": "Транскрипцията не бе успешна. Можете да опитате отново с иконата за повторен опит.",
-      "assistantLabel": "Assistant chat",
-      "copyConversation": "Copy conversation",
-      "resumeConversation": "Continue this conversation in the assistant",
-      "showConversation": "Show conversation",
-      "hideConversation": "Hide conversation",
-      "roleUser": "You",
-      "roleAssistant": "Assistant",
-      "screenshotAttached": "Vision",
-      "messageCount_one": "{{count}} message",
-      "messageCount_other": "{{count}} messages",
-      "deleteAssistantError": "Couldn't delete the conversation. Please try again."
+      "assistantLabel": "Разговор с асистента",
+      "copyConversation": "Копиране на разговора",
+      "resumeConversation": "Продължаване на този разговор в асистента",
+      "showConversation": "Показване на разговора",
+      "hideConversation": "Скриване на разговора",
+      "roleUser": "Вие",
+      "roleAssistant": "Асистент",
+      "screenshotAttached": "Видимост",
+      "messageCount_one": "{{count}} съобщение",
+      "messageCount_other": "{{count}} съобщения",
+      "deleteAssistantError": "Разговорът не можа да бъде изтрит. Опитайте отново."
     },
     "debug": {
       "title": "Отстраняване",
@@ -964,24 +977,24 @@
       },
       "historyLimit": {
         "title": "Лимит на историята",
-        "description": "Максимален брой записи в историята за пазене",
+        "description": "Максимален брой незапазени записи от диктовка и Flow, които да се пазят. Запазените записи се пазят винаги, а разговорите с асистента не се броят.",
         "entries": "записа"
       },
       "recordingRetention": {
         "title": "Автоматично изтриване на записи",
-        "description": "Автоматично изтриване на стари записи за пестене на място",
+        "description": "Изберете как се изчистват незапазените записи. Промените влизат в сила веднага и никога не засягат разговорите с асистента.",
         "never": "Никога",
-        "preserveLimit": "Запазване на последните {{count}}",
+        "preserveLimit": "Запазване на определен брой",
         "days3": "След 3 дни",
         "weeks2": "След 2 седмици",
         "months3": "След 3 месеца",
-        "placeholder": "Изберете период на съхранение...",
-        "savedToast": "Retention saved.",
-        "appliedToast": "Recording retention applied"
+        "placeholder": "Изберете период на съхранение…",
+        "savedToast": "Периодът на съхранение е запазен.",
+        "appliedToast": "Периодът на съхранение на записите е приложен"
       },
       "alwaysOnMicrophone": {
         "label": "Постоянно активен микрофон",
-        "description": "Държане на микрофона активен за по-бърз отговор"
+        "description": "Държи микрофона готов, за да не се отрязват първите думи. Изразходва малко повече батерия."
       },
       "clamshellMicrophone": {
         "title": "Микрофон при затворен капак",
@@ -1015,7 +1028,7 @@
       },
       "recordingBuffer": {
         "title": "Допълнителен буфер на записа",
-        "description": "Допълнително време (в милисекунди) за запис след пускане на клавиша, за да се улови краят на аудиото. 0 = без допълнителен буфер."
+        "description": "Милисекунди, през които записът продължава след пускане на клавиша."
       }
     },
     "about": {
@@ -1025,12 +1038,12 @@
         "description": "Текуща версия на SpeakoFlow"
       },
       "updates": {
-        "title": "Updates",
-        "button": "Check for updates",
-        "disabledHint": "Automatic update checks are off. Turn them on in General."
+        "title": "Актуализации",
+        "button": "Проверка за актуализации",
+        "disabledHint": "Автоматичната проверка за актуализации е изключена. Включете я в „Общи“."
       },
       "folders": {
-        "title": "Folders"
+        "title": "Папки"
       },
       "appDataDirectory": {
         "title": "Папка с данни на приложението",
@@ -1042,9 +1055,9 @@
         "button": "Вижте в GitHub"
       },
       "license": {
-        "title": "License",
-        "description": "SpeakoFlow is open source under the MIT License, building on Handy (also MIT) by CJ Pais.",
-        "button": "View license"
+        "title": "Лиценз",
+        "description": "SpeakoFlow е с отворен код под лиценза MIT и се основава на Handy (също MIT) от CJ Pais.",
+        "button": "Преглед на лиценза"
       },
       "supportDevelopment": {
         "title": "Подкрепете разработката",
@@ -1054,326 +1067,340 @@
     },
     "assistant": {
       "shortcuts": {
-        "title": "Shortcuts"
+        "title": "Бързи клавиши"
       },
       "brain": {
-        "title": "Assistant brain",
-        "description": "Choose whether your assistant runs privately on this device or through a cloud provider.",
-        "whereLabel": "Where it runs",
-        "onDevice": "On my device",
-        "cloud": "Cloud provider",
-        "downloadModel": "Browse and download models",
-        "downloadModelDescription": "Pick a recommended model or search Hugging Face.",
-        "downloadModelAction": "Browse models",
-        "catalogTitle": "Download an on-device model",
-        "catalogDescription": "Choose a model to download. It stays on this machine and needs no API key.",
-        "currentModelTitle": "Current model",
-        "currentModelDescription": "Selected for the built-in assistant on this device.",
-        "recommendedTitle": "Recommended models",
-        "recommendedDescription": "Three conversation-first choices: quickest, recommended, and more capable but slower.",
-        "acceleratorDetected": "{{name}} · {{memory}} GB reported graphics memory",
-        "acceleratorDetectedDedicated": "{{name}} · {{memory}} GB dedicated VRAM",
-        "acceleratorDetectedIntegrated": "{{name}} · {{memory}} GB shared graphics memory",
-        "acceleratorDetectedNoMemory": "{{name}} detected · graphics memory not reported",
-        "acceleratorUnknownWithMemory": "Graphics memory unavailable · {{memory}} GB system RAM for CPU fallback",
-        "acceleratorUnknown": "Graphics memory unavailable · response speed cannot be predicted",
-        "details": "Details",
-        "switchBeforeDelete": "Switch the built-in assistant to another model before deleting this one.",
-        "deleteModelConfirm": "Delete {{modelName}}? Its downloaded files and saved entry will be removed.",
-        "deleteModelFailed": "Could not delete the model.",
-        "visionModelNote": "Screen vision downloads an additional image file automatically.",
-        "finderSectionTitle": "More on-device models",
-        "finderSectionDescription": "Search Hugging Face when you need a different model size or capability.",
-        "finderTitle": "Browse Hugging Face",
-        "finderDescription": "Search thousands of GGUF models and download one directly to SpeakoFlow.",
-        "finderAction": "Find a model",
-        "huggingFaceTitle": "From Hugging Face",
-        "huggingFaceDescription": "Models you added yourself. Compatibility and performance can vary.",
-        "catalogEmpty": "No recommended local models are available right now."
+        "title": "Мозък на асистента",
+        "description": "Изберете дали асистентът ви да работи поверително на това устройство или чрез облачен доставчик.",
+        "whereLabel": "Къде се изпълнява",
+        "onDevice": "На моето устройство",
+        "cloud": "Облачен доставчик",
+        "downloadModel": "Разглеждане и изтегляне на модели",
+        "downloadModelDescription": "Изберете препоръчан модел или потърсете в Hugging Face.",
+        "downloadModelAction": "Разглеждане на модели",
+        "catalogTitle": "Изберете модел за устройството",
+        "catalogDescription": "Изтеглете частен локален модел. Той остава на тази машина и не изисква API ключ.",
+        "currentModelTitle": "Текущ модел",
+        "currentModelDescription": "Избран за вградения асистент на това устройство.",
+        "recommendedTitle": "Препоръчани модели",
+        "recommendedDescription": "Три избора, ориентирани към разговор: най-бърз, препоръчан и по-способен, но по-бавен.",
+        "acceleratorDetected": "{{name}} · {{memory}} GB отчетена графична памет",
+        "acceleratorDetectedDedicated": "{{name}} · {{memory}} GB отделна видеопамет",
+        "acceleratorDetectedIntegrated": "{{name}} · {{memory}} GB споделена графична памет",
+        "acceleratorDetectedNoMemory": "Открит е {{name}} · графичната памет не е отчетена",
+        "acceleratorUnknownWithMemory": "Графичната памет е недостъпна · {{memory}} GB системна RAM за работа през CPU",
+        "acceleratorUnknown": "Графичната памет е недостъпна · скоростта на отговорите не може да се предвиди",
+        "details": "Подробности",
+        "switchBeforeDelete": "Превключете вградения асистент към друг модел, преди да изтриете този.",
+        "deleteModelConfirm": "Да се изтрие ли {{modelName}}? Изтеглените му файлове и записът за него ще бъдат премахнати.",
+        "deleteModelFailed": "Моделът не можа да бъде изтрит.",
+        "visionModelNote": "За видимостта на екрана автоматично се изтегля допълнителен файл за изображения.",
+        "finderSectionTitle": "Още модели за устройството",
+        "finderSectionDescription": "Потърсете в Hugging Face, когато ви трябва модел с друг размер или възможности.",
+        "finderTitle": "Разглеждане на Hugging Face",
+        "finderDescription": "Търсете сред хиляди GGUF модели и изтеглете някой директно в SpeakoFlow.",
+        "finderAction": "Намиране на модел",
+        "huggingFaceTitle": "Вашите модели",
+        "huggingFaceDescription": "Изтеглени модели и модели, които сте добавили от Hugging Face.",
+        "catalogEmpty": "В момента няма налични препоръчани локални модели."
       },
       "subpages": {
-        "profilesCaption": "Switch the assistant's name, role, and personality.",
-        "memoryCaption": "What the assistant remembers about you between chats."
+        "profilesCaption": "Сменяйте името, ролята и характера на асистента.",
+        "memoryCaption": "Какво помни асистентът за вас между разговорите."
       },
       "tapToLock": {
-        "label": "Tap to lock",
-        "info": "While holding the assistant shortcut, tap this to lock hands-free so you can let go and keep talking. Pick a key that isn't part of your assistant shortcut (one that overlaps is ignored), or clear it to turn this off.",
-        "off": "Off",
-        "clear": "Clear"
+        "label": "Натискане за фиксиране",
+        "info": "Докато държите бързия клавиш за асистента, натиснете този, за да фиксирате режима без задържане и да продължите да говорите, след като пуснете. Изберете клавиш, който не е част от бързия клавиш за асистента (застъпващ се се игнорира), или го изчистете, за да изключите функцията.",
+        "off": "Изкл.",
+        "clear": "Изчистване"
       },
       "provider": {
-        "title": "Assistant provider",
-        "providerLabel": "Provider",
-        "providerDescription": "The provider that answers assistant questions.",
-        "baseUrlLabel": "Base URL",
-        "baseUrlDescription": "OpenAI-compatible base URL. Azure URLs are normalized automatically.",
-        "apiKeyLabel": "API key",
-        "apiKeyDescription": "Shared with AI cleanup.",
-        "apiKeyPlaceholder": "Enter API key…",
-        "modelLabel": "Model",
-        "modelDescription": "Model or deployment name to use for assistant answers.",
-        "modelPlaceholder": "e.g. gpt-4o-mini",
-        "modelSearchPlaceholder": "Search or type a model…",
-        "modelUse": "Use \"{{model}}\"",
-        "loadModels": "Load models",
-        "loadingModels": "Loading…",
-        "noModelsFound": "No models returned. Type the model name instead.",
-        "builtinModelDescription": "Pick a downloaded local model. It runs on your machine with no API key.",
-        "builtinModelPlaceholder": "Select a downloaded model",
-        "builtinNoModels": "No models on your machine yet — download one below.",
-        "builtinReady": "Runs fully on your machine. No API key, no setup.",
-        "builtinEngineMissing": "First use downloads a small local engine automatically (one time), then runs fully offline. No setup needed.",
-        "contextSizeLabel": "Context window",
-        "contextSizeDescription": "How much the local model can keep in mind at once — the system instructions, your chat history, any screenshot (a single image can eat a big chunk), and its reply. Bigger holds more and keeps screen vision and web search reliable, but uses more memory. The default is 8192; 16384 is a good step up if your machine has the RAM to spare. You can lower it later to save memory.",
-        "unloadTimeoutLabel": "Unload from memory after",
-        "unloadTimeoutDescription": "Free up memory by unloading the local model after it has been idle this long. It reloads automatically on next use.",
-        "saveFailed": "Couldn’t switch the Assistant provider."
+        "title": "Доставчик за асистента",
+        "saveFailed": "Доставчикът за асистента не можа да бъде сменен.",
+        "providerLabel": "Доставчик",
+        "providerDescription": "Доставчикът, който отговаря на въпросите към асистента.",
+        "baseUrlLabel": "Базов URL",
+        "baseUrlDescription": "Базов URL, съвместим с OpenAI. Адресите на Azure се нормализират автоматично.",
+        "apiKeyLabel": "API ключ",
+        "apiKeyDescription": "Общ с AI почистването.",
+        "apiKeyPlaceholder": "Въведете API ключ…",
+        "modelLabel": "Модел",
+        "modelDescription": "Име на модела или на разгръщането, което да се използва за отговорите на асистента.",
+        "modelPlaceholder": "напр. gpt-4o-mini",
+        "modelSearchPlaceholder": "Търсене или въвеждане на модел…",
+        "modelUse": "Използване на „{{model}}“",
+        "loadModels": "Зареждане на моделите",
+        "loadingModels": "Зареждане…",
+        "noModelsFound": "Не бяха върнати модели. Въведете името на модела ръчно.",
+        "builtinModelDescription": "Изберете изтеглен локален модел. Работи на вашата машина без API ключ.",
+        "builtinModelPlaceholder": "Изберете изтеглен модел",
+        "builtinNoModels": "Още няма модели на вашата машина — изтеглете един по-долу.",
+        "builtinReady": "Работи изцяло на вашата машина. Без API ключ, без настройка.",
+        "builtinEngineMissing": "При първата употреба автоматично се изтегля малко локално ядро (еднократно), след което всичко работи офлайн. Не е нужна настройка.",
+        "builtinEngineDownloading": "Изтегляне на локалното ядро… {{percent}}%",
+        "builtinEnginePreparing": "Изтегляне на локалното ядро…",
+        "builtinEngineExtracting": "Инсталиране на локалното ядро…",
+        "builtinEngineReady": "Локалното ядро е готово.",
+        "contextSizeLabel": "Контекстен прозорец",
+        "contextSizeDescription": "Колко може да държи наум локалният модел наведнъж — системните инструкции, историята на разговора, всяка снимка на екрана (едно изображение може да заеме голяма част) и отговора му. По-големият държи повече и запазва надеждни видимостта на екрана и търсенето в интернет, но използва повече памет. По подразбиране е 8192; 16384 е добра стъпка напред, ако машината ви разполага с достатъчно RAM. По-късно можете да го намалите, за да спестите памет.",
+        "unloadTimeoutLabel": "Разтоварване от паметта след",
+        "unloadTimeoutDescription": "Освободете памет, като разтоварите локалния модел, след като е бил неактивен това време. Зарежда се автоматично при следващата употреба."
       },
       "systemPrompt": {
-        "title": "System prompt",
-        "label": "Assistant system prompt",
-        "description": "Sets the assistant's behavior."
+        "title": "Системна подкана",
+        "label": "Системна подкана за асистента",
+        "description": "Определя поведението на асистента."
       },
       "characters": {
-        "title": "Profiles",
-        "description": "Task-focused profiles you can switch between. The active profile sets the assistant's name, role, and instructions — and how long its replies run. Switch anytime from the panel header.",
-        "galleryLabel": "Your profiles",
-        "editSection": "Edit profile",
-        "avatarLabel": "Avatar",
-        "active": "Active",
-        "meowsOnly": "Meows only",
-        "builtin": "Built-in",
-        "custom": "Custom",
-        "new": "New",
-        "newName": "New profile",
-        "copyName": "{{name}} copy",
-        "createAi": "Create with AI",
-        "import": "Import",
-        "aiTitle": "Describe your profile",
-        "aiClose": "Close",
-        "aiPlaceholder": "e.g. a concise release-notes writer, or a patient tutor who explains every step",
-        "aiDictate": "Dictate the description",
-        "aiDictateStop": "Stop dictation",
-        "generate": "Generate",
-        "avatarUpload": "Upload image",
-        "avatarRemove": "Remove",
-        "nameLabel": "Name",
-        "roleLabel": "Role",
-        "rolePlaceholder": "Short description shown on the card (optional)",
-        "promptLabel": "Instructions (system prompt)",
+        "title": "Профили",
+        "description": "Профили, насочени към конкретни задачи, между които можете да превключвате. Активният профил определя името, ролята и инструкциите на асистента — както и дължината на отговорите му. Превключвайте по всяко време от заглавната лента на панела.",
+        "galleryLabel": "Вашите профили",
+        "editSection": "Редактиране на профила",
+        "avatarLabel": "Аватар",
+        "active": "Активен",
+        "meowsOnly": "Само мяука",
+        "builtin": "Вграден",
+        "custom": "Персонализиран",
+        "new": "Нов",
+        "newName": "Нов профил",
+        "copyName": "{{name}} – копие",
+        "createAi": "Създаване с AI",
+        "import": "Импортиране",
+        "aiTitle": "Опишете своя профил",
+        "aiClose": "Затваряне",
+        "aiPlaceholder": "напр. стегнат автор на бележки към издания или търпелив учител, който обяснява всяка стъпка",
+        "aiDictate": "Диктуване на описанието",
+        "aiDictateStop": "Спиране на диктовката",
+        "generate": "Генериране",
+        "avatarUpload": "Качване на изображение",
+        "avatarRemove": "Премахване",
+        "nameLabel": "Име",
+        "roleLabel": "Роля",
+        "rolePlaceholder": "Кратко описание, показвано на картата (по избор)",
+        "promptLabel": "Инструкции (системна подкана)",
         "responseLength": {
-          "label": "Response length",
-          "hint": "How long this profile's replies run. \"Inherit\" follows your global Assistant setting.",
+          "label": "Дължина на отговора",
+          "hint": "Колко дълги да са отговорите на този профил. „Наследяване“ следва общата настройка на асистента.",
           "options": {
-            "inherit": "Inherit global",
-            "short": "Short",
-            "medium": "Medium",
-            "long": "Long"
+            "inherit": "Наследяване на общата",
+            "short": "Кратък",
+            "medium": "Среден",
+            "long": "Дълъг"
           }
         },
-        "greetingLabel": "Greeting (optional)",
-        "greetingPlaceholder": "Optional opening line shown in an empty chat",
-        "catNote": "The Cat ignores the AI entirely — it just meows. Nothing to configure here.",
-        "duplicate": "Duplicate",
-        "export": "Export",
-        "restoreDefault": "Restore default",
-        "restoreBuiltins": "Restore built-ins",
-        "moreActions": "More actions",
-        "expand": "Expand",
-        "collapse": "Collapse",
-        "delete": "Delete",
-        "deleteConfirm": "Delete this profile? This can't be undone.",
-        "emptyState": "No profiles yet. Create your first one to give the assistant a personality."
+        "greetingLabel": "Поздрав (по избор)",
+        "greetingPlaceholder": "Начален ред по избор, показван в празен разговор",
+        "catNote": "Котката напълно игнорира AI — просто мяука. Тук няма нищо за настройване.",
+        "duplicate": "Дублиране",
+        "export": "Експортиране",
+        "restoreDefault": "Възстановяване на стандартния",
+        "restoreBuiltins": "Възстановяване на вградените",
+        "moreActions": "Още действия",
+        "expand": "Разгъване",
+        "collapse": "Свиване",
+        "delete": "Изтриване",
+        "deleteConfirm": "Да се изтрие ли този профил? Действието е необратимо.",
+        "emptyState": "Още няма профили. Създайте първия, за да дадете характер на асистента."
       },
       "behavior": {
-        "title": "Behavior"
+        "title": "Поведение"
       },
       "memory": {
-        "label": "Conversation memory",
-        "description": "How many recent messages are sent as context each turn. 0 disables memory."
+        "label": "Памет за разговора",
+        "description": "Колко от последните съобщения се изпращат като контекст при всяка размяна. 0 изключва паметта."
+      },
+      "autoSummarize": {
+        "label": "Резюмиране на дългите разговори",
+        "description": "Когато разговорът надхвърли контекстния прозорец на модела, по-старите съобщения автоматично се сгъстяват в текущо резюме, за да запази разговорът контекста си, вместо да забрави началото. Докато това се изпълнява, се показва дискретен индикатор."
       },
       "responseLength": {
-        "label": "Response length",
-        "description": "Preferred reply length. \"No effect\" leaves your prompt untouched.",
+        "label": "Дължина на отговора",
+        "description": "Предпочитана дължина на отговора. „Без ефект“ не променя подканата ви.",
         "options": {
-          "default": "No effect",
-          "short": "Short",
-          "medium": "Medium",
-          "long": "Long"
+          "default": "Без ефект",
+          "short": "Кратък",
+          "medium": "Среден",
+          "long": "Дълъг"
         }
       },
       "vision": {
-        "title": "Screen vision",
-        "modeLabel": "Screen access",
+        "title": "Видимост на екрана",
+        "modeLabel": "Достъп до екрана",
         "modes": {
-          "off": "Off",
-          "manual": "Manual",
-          "agentDecides": "Agent decides",
+          "off": "Изкл.",
+          "manual": "Ръчно",
+          "agentDecides": "Агентът решава",
           "descriptions": {
-            "off": "Screen capture is disabled. Camera and region controls are hidden.",
-            "manual": "You choose when to attach the full screen or a region. Voice capture timing applies.",
-            "agent_decides": "The model may request a screen capture when it needs current visual context. Every screenshot sent is shown in the conversation."
+            "off": "Заснемането на екрана е изключено. Бутоните за камера и област са скрити.",
+            "manual": "Вие избирате кога да прикачите целия екран или област. Прилага се моментът на заснемане при гласови въпроси.",
+            "agent_decides": "Моделът може да поиска заснемане на екрана, когато му е нужен текущ визуален контекст. Всяка изпратена снимка се показва в разговора."
           }
         },
         "timing": {
-          "label": "When to capture",
-          "description": "For voice questions: capture the moment you start asking, or wait until the message is sent. Typed messages always capture on send.",
+          "label": "Кога да се заснема",
+          "description": "За гласови въпроси: заснемане в момента, в който започвате да питате, или изчакване до изпращането на съобщението. Написаните съобщения винаги заснемат при изпращане.",
           "options": {
-            "immediate": "When I ask",
-            "on_send": "When the message sends"
+            "immediate": "Когато питам",
+            "on_send": "Когато съобщението се изпрати"
           }
+        },
+        "screenRecording": {
+          "description": "Видимостта на екрана изисква разрешение за запис на екрана в macOS. Дайте го в Системни настройки, след което рестартирайте SpeakoFlow, за да влезе в сила.",
+          "grant": "Отваряне на системните настройки"
         }
       },
       "webSearch": {
-        "title": "Web search",
-        "enableLabel": "Allow web search",
-        "enableDescription": "Let the assistant search the web when a question needs current information.",
-        "openRouterNativeLabel": "Use OpenRouter's built-in search",
-        "openRouterNativeDescription": "When on, OpenRouter runs the search itself (its :online mode) using your OpenRouter credits. When off, the app searches with your search provider below.",
-        "providerLabel": "Search provider",
-        "providerDescription": "Serper is a good default. Every provider has a free tier.",
+        "title": "Търсене в интернет",
+        "enableLabel": "Разрешаване на търсене в интернет",
+        "enableDescription": "Позволете на асистента да търси в интернет, когато въпросът изисква актуална информация.",
+        "openRouterNativeLabel": "Използване на вграденото търсене на OpenRouter",
+        "openRouterNativeDescription": "Когато е включено, OpenRouter извършва търсенето сам (режимът му :online), използвайки вашите кредити в OpenRouter. Когато е изключено, приложението търси чрез избрания по-долу доставчик.",
+        "providerLabel": "Доставчик за търсене",
+        "providerDescription": "Serper е добър вариант по подразбиране. Всеки доставчик има безплатен план, а TinyFish е безплатен без карта.",
         "providers": {
-          "serper": "Serper (Google, fast)",
+          "serper": "Serper (Google, бърз)",
           "brave": "Brave Search",
-          "tavily": "Tavily (AI search)",
-          "exa": "Exa (neural)",
-          "serpapi": "SerpAPI (Google)"
+          "tavily": "Tavily (AI търсене)",
+          "exa": "Exa (невронно)",
+          "serpapi": "SerpAPI (Google)",
+          "tinyfish": "TinyFish (безплатен, без карта)"
         },
-        "apiKeyLabel": "API key",
-        "apiKeyDescription": "Key for the selected search provider.",
-        "apiKeyPlaceholder": "Enter API key…",
-        "fetchContentLabel": "Read full pages (best quality)",
-        "fetchContentDescription": "Read the full text of each result instead of snippets. Better answers, but slower.",
-        "maxResultsLabel": "Sources to use",
-        "maxResultsDescription": "How many results to read (1–10).",
-        "depthLabel": "Search depth",
-        "depthDescription": "Quick for simple facts, Standard for most questions, Deep for hard ones.",
+        "apiKeyLabel": "API ключ",
+        "apiKeyDescription": "Ключ за избрания доставчик за търсене.",
+        "apiKeyPlaceholder": "Въведете API ключ…",
+        "fetchContentLabel": "Четене на цели страници (най-добро качество)",
+        "fetchContentDescription": "Прочитане на целия текст на всеки резултат вместо само на откъси. По-добри отговори, но по-бавно.",
+        "maxResultsLabel": "Използвани източници",
+        "maxResultsDescription": "Колко резултата да се прочитат (1–10).",
+        "depthLabel": "Дълбочина на търсенето",
+        "depthDescription": "„Бързо“ за прости факти, „Стандартно“ за повечето въпроси, „Дълбоко“ за трудните.",
         "depthOptions": {
-          "low": "Quick",
-          "medium": "Standard",
-          "high": "Deep"
+          "low": "Бързо",
+          "medium": "Стандартно",
+          "high": "Дълбоко"
         },
-        "localSmartLabel": "Smart search decisions (local model)",
-        "localSmartDescription": "Let the local model decide when to search. Off uses a fast keyword check instead.",
-        "creditBudgetLabel": "Daily Firecrawl credit limit",
-        "creditBudgetDescription": "Daily cap on Firecrawl credits before search pauses. 0 = no limit.",
-        "testLabel": "Test search",
-        "testDescription": "Run a sample search with the current provider and key.",
-        "testButton": "Test search",
-        "testing": "Searching…",
-        "testResult": "Got {{count}} results."
+        "localSmartLabel": "Интелигентни решения за търсене (локален модел)",
+        "localSmartDescription": "Оставете локалния модел да решава кога да търси. Когато е изключено, се използва бърза проверка по ключови думи.",
+        "creditBudgetLabel": "Дневен лимит на кредитите за Firecrawl",
+        "creditBudgetDescription": "Дневна граница на кредитите за Firecrawl, след която търсенето спира. 0 = без лимит.",
+        "testLabel": "Тестово търсене",
+        "testDescription": "Извършете примерно търсене с текущия доставчик и ключ.",
+        "testButton": "Тестово търсене",
+        "testing": "Търсене…",
+        "testResult": "Получени са {{count}} резултата."
       },
       "tts": {
-        "title": "Voice output",
-        "enableLabel": "Speak responses aloud",
-        "enableDescription": "Read the assistant's replies out loud.",
-        "stopOnDictationLabel": "Stop speech when dictation starts",
-        "stopOnDictationDescription": "Stop any reply that's still playing when you start dictating.",
-        "engineLabel": "Engine",
-        "engineDescription": "Kokoro runs locally for free. The other engines use your API key.",
-        "kokoroSetupLabel": "Kokoro voice model",
-        "kokoroSetupDescription": "Download it once, then spoken replies run privately on this device.",
-        "kokoroDownload": "Download Kokoro",
-        "kokoroDownloading": "Downloading Kokoro",
-        "kokoroReady": "Ready on this device",
-        "kokoroRetry": "Try download again",
+        "title": "Гласов изход",
+        "enableLabel": "Изговаряне на отговорите на глас",
+        "enableDescription": "Прочитане на отговорите на асистента на глас.",
+        "stopOnDictationLabel": "Спиране на говора при започване на диктовка",
+        "stopOnDictationDescription": "Спира всеки отговор, който още се възпроизвежда, когато започнете да диктувате.",
+        "engineLabel": "Ядро",
+        "engineDescription": "Kokoro работи локално и е безплатно. Останалите ядра използват вашия API ключ.",
+        "kokoroSetupLabel": "Гласов модел Kokoro",
+        "kokoroSetupDescription": "Изтеглете го еднократно и изговорените отговори ще се създават поверително на това устройство.",
+        "kokoroDownload": "Изтегляне на Kokoro",
+        "kokoroDownloading": "Изтегляне на Kokoro",
+        "kokoroReady": "Готов на това устройство",
+        "kokoroRetry": "Нов опит за изтегляне",
         "engines": {
-          "kokoro": "Kokoro (local, free)",
-          "openai": "OpenAI-compatible",
+          "kokoro": "Kokoro (локално, безплатно)",
+          "openai": "Съвместимо с OpenAI",
           "openrouter": "OpenRouter",
           "elevenlabs": "ElevenLabs",
           "azure": "Azure AI Speech"
         },
-        "voiceLabel": "Voice",
-        "voiceDescription": "Kokoro voice for spoken replies.",
-        "dtypeLabel": "Kokoro precision",
-        "dtypeDescription": "fp32 is highest quality; q8 is faster on CPU. Changing this reloads the model.",
-        "speedLabel": "Playback speed",
-        "speedDescription": "1× is normal. ElevenLabs supports 0.7×–1.2× only.",
+        "voiceLabel": "Глас",
+        "voiceDescription": "Глас на Kokoro за изговорените отговори.",
+        "dtypeLabel": "Точност на Kokoro",
+        "dtypeDescription": "fp32 е с най-високо качество; q8 е по-бърз на CPU. Промяната презарежда модела.",
+        "speedLabel": "Скорост на възпроизвеждане",
+        "speedDescription": "1× е нормалната. ElevenLabs поддържа само 0,7×–1,2×.",
         "speedValue": "{{value}}×",
-        "speedCustomLabel": "Custom playback speed",
-        "testLabel": "Test voice",
-        "testDescription": "Play a short sample with the current settings.",
-        "testButton": "Test voice",
-        "testing": "Testing…",
-        "testOk": "Played ✓",
-        "testPhrase": "Hi! This is a test of SpeakoFlow's voice output.",
-        "downloadStart": "Downloading Kokoro voice…",
-        "downloadProgress": "Downloading Kokoro voice… {{progress}}%",
-        "downloadReady": "Kokoro voice ready ✓",
-        "downloadError": "Couldn't download the Kokoro voice model",
-        "baseUrlLabel": "Base URL",
-        "baseUrlDescription": "OpenAI-compatible TTS URL. A base URL or a full /audio/speech URL both work.",
-        "azureBaseUrlLabel": "Speech URL",
-        "azureBaseUrlDescription": "Your Azure Speech URL from the portal, e.g. https://eastus2.tts.speech.microsoft.com.",
-        "apiKeyLabel": "API key",
-        "apiKeyDescription": "Separate from the assistant's key.",
-        "modelLabel": "Model",
-        "modelDescription": "Model or deployment name, e.g. gpt-4o-mini-tts (OpenAI/Azure) or eleven_flash_v2_5 (ElevenLabs).",
-        "remoteVoiceLabel": "Voice name",
-        "remoteVoiceDescription": "Voice for OpenAI-compatible TTS, e.g. alloy, echo, nova, shimmer.",
-        "azureVoiceLabel": "Voice name",
-        "azureVoiceDescription": "Azure voice name, e.g. en-US-JennyNeural. Click Load voices to browse.",
-        "loadVoices": "Load voices",
-        "voicesLoading": "Loading…",
-        "voicesPick": "Pick from {{count}} voices…",
-        "loadModels": "Load models",
-        "modelsLoading": "Loading…",
-        "modelsPick": "Pick from {{count}} models…",
-        "modelsUse": "Use \"{{model}}\"",
-        "voicesUse": "Use \"{{voice}}\"",
-        "elevenVoiceLabel": "Voice ID",
-        "elevenVoiceDescription": "ElevenLabs voice ID (from the Voices tab in their dashboard).",
-        "promptLabel": "Summary Prompt",
-        "promptDescription": "Instructions for generating the brief spoken summary of each answer."
+        "speedCustomLabel": "Персонализирана скорост на възпроизвеждане",
+        "testLabel": "Тест на гласа",
+        "testDescription": "Възпроизведете кратък пример с текущите настройки.",
+        "testButton": "Тест на гласа",
+        "testing": "Тестване…",
+        "testOk": "Възпроизведено ✓",
+        "testPhrase": "Здравейте! Това е тест на гласовия изход на SpeakoFlow.",
+        "downloadStart": "Изтегляне на гласа Kokoro…",
+        "downloadProgress": "Изтегляне на гласа Kokoro… {{progress}}%",
+        "downloadReady": "Гласът Kokoro е готов ✓",
+        "downloadError": "Гласовият модел Kokoro не можа да бъде изтеглен",
+        "baseUrlLabel": "Базов URL",
+        "baseUrlDescription": "URL за TTS, съвместим с OpenAI. Работят както базов URL, така и пълен /audio/speech адрес.",
+        "azureBaseUrlLabel": "URL за Speech",
+        "azureBaseUrlDescription": "Вашият Azure Speech URL от портала, напр. https://eastus2.tts.speech.microsoft.com.",
+        "apiKeyLabel": "API ключ",
+        "apiKeyDescription": "Отделен от ключа на асистента.",
+        "modelLabel": "Модел",
+        "modelDescription": "Име на модела или на разгръщането, напр. gpt-4o-mini-tts (OpenAI/Azure) или eleven_flash_v2_5 (ElevenLabs).",
+        "remoteVoiceLabel": "Име на гласа",
+        "remoteVoiceDescription": "Глас за TTS, съвместимо с OpenAI, напр. alloy, echo, nova, shimmer.",
+        "azureVoiceLabel": "Име на гласа",
+        "azureVoiceDescription": "Име на глас в Azure, напр. en-US-JennyNeural. Натиснете „Зареждане на гласовете“, за да разгледате.",
+        "loadVoices": "Зареждане на гласовете",
+        "voicesLoading": "Зареждане…",
+        "voicesPick": "Изберете от {{count}} гласа…",
+        "loadModels": "Зареждане на моделите",
+        "modelsLoading": "Зареждане…",
+        "modelsPick": "Изберете от {{count}} модела…",
+        "modelsUse": "Използване на „{{model}}“",
+        "voicesUse": "Използване на „{{voice}}“",
+        "elevenVoiceLabel": "ID на гласа",
+        "elevenVoiceDescription": "ID на глас в ElevenLabs (от раздела Voices в таблото им).",
+        "promptLabel": "Подкана за резюме",
+        "promptDescription": "Инструкции за създаване на кратко изговорено резюме на всеки отговор."
       },
       "appearance": {
-        "title": "Panel appearance",
-        "previewLabel": "Preview",
-        "previewDescription": "Live preview of the panel with your text size and opacity.",
-        "previewUser": "Hey, what can you do?",
-        "previewAssistant": "Lots! Ask me anything — I can even look at your screen.",
-        "fontSizeLabel": "Text size",
-        "fontSizeDescription": "Size of the chat text in the assistant panel.",
+        "title": "Външен вид на панела",
+        "previewLabel": "Преглед",
+        "previewDescription": "Преглед на панела в реално време с вашия размер на текста и плътност.",
+        "previewUser": "Здрасти, какво можеш да правиш?",
+        "previewAssistant": "Много неща! Питай ме каквото искаш — мога дори да погледна екрана ти.",
+        "fontSizeLabel": "Размер на текста",
+        "fontSizeDescription": "Размер на текста в разговора в панела на асистента.",
         "fontSizes": {
-          "small": "Small",
-          "medium": "Medium",
-          "large": "Large"
+          "small": "Малък",
+          "medium": "Среден",
+          "large": "Голям"
         },
-        "panelSizeLabel": "Panel size",
-        "panelSizeDescription": "Overall size of the floating assistant panel. You can also drag its edges to resize.",
+        "panelSizeLabel": "Размер на панела",
+        "panelSizeDescription": "Общ размер на плаващия панел на асистента. Можете и да влачите краищата му, за да го преоразмерите.",
         "panelSizes": {
-          "compact": "Compact",
-          "standard": "Standard",
-          "large": "Large"
+          "mini": "Малък",
+          "compact": "Компактен",
+          "standard": "Стандартен",
+          "large": "Голям"
         },
-        "opacityLabel": "Panel opacity",
-        "opacityDescription": "How opaque the floating panel is. 100% is fully solid; lower values let the desktop blur through."
+        "opacityLabel": "Плътност на панела",
+        "opacityDescription": "Колко плътен е плаващият панел. 100% е напълно плътен; по-ниските стойности позволяват работният плот да прозира размазано."
       }
     }
   },
   "footer": {
-    "downloadingModel": "Изтегляне на {{model}}...",
-    "checkingUpdates": "Проверка за актуализации...",
+    "downloadingModel": "Изтегляне на {{model}}…",
+    "checkingUpdates": "Проверка за актуализации…",
     "updateAvailable": "Налична актуализация: {{version}}",
     "updateAvailableShort": "Налична актуализация",
     "upToDate": "Актуална версия",
     "downloadUpdate": "Изтегляне на актуализацията",
     "restart": "Рестартиране",
     "updateCheckingDisabled": "Проверката за актуализации е изключена",
-    "downloading": "Изтегля се... {{progress}}%",
-    "installing": "Инсталиране...",
-    "preparing": "Подготовка...",
+    "downloading": "Изтегля се… {{progress}}%",
+    "installing": "Инсталиране…",
+    "preparing": "Подготовка…",
     "checkForUpdates": "Проверка за актуализации",
-    "checkFailed": "Update check failed",
-    "updateFailed": "Update failed",
-    "clickToRetry": "Click to try again",
+    "checkFailed": "Проверката за актуализации не бе успешна",
+    "updateFailed": "Актуализацията не бе успешна",
+    "clickToRetry": "Натиснете за нов опит",
     "portableUpdateTitle": "Необходима е ръчна актуализация",
     "portableUpdateMessage": "Преносимите инсталации не могат да бъдат актуализирани автоматично. За актуализация: изтеглете най-новия NSIS инсталатор от GitHub Releases, инсталирайте го в същата папка, след което копирайте папката Data/ (настройки, модели, записи) от старата версия в новата.",
     "portableUpdateButton": "Отвори GitHub Releases"
   },
   "common": {
-    "loading": "Зареждане...",
+    "loading": "Зареждане…",
     "save": "Запазване",
     "cancel": "Отказ",
     "reset": "Нулиране",
@@ -1393,7 +1420,7 @@
     "yes": "Да",
     "no": "Не",
     "noOptionsFound": "Няма намерени опции",
-    "back": "Back",
+    "back": "Назад",
     "showAdvanced": "Още опции",
     "showLess": "Показване на по-малко"
   },
@@ -1417,7 +1444,7 @@
     "recordingFailed": "Стартирането на записа не бе успешно: {{error}}",
     "modelLoadFailed": "Зареждането на модела не бе успешно: {{model}}",
     "modelLoadFailedUnknown": "неизвестен модел",
-    "downloadFailedTitle": "Download failed",
+    "downloadFailedTitle": "Изтеглянето не бе успешно",
     "pasteFailedTitle": "Неуспешно поставяне на текст",
     "pasteFailed": "Текстът не можа да бъде поставен в активното приложение."
   },
@@ -1426,124 +1453,132 @@
     "description": "Промяна на езика на интерфейса на SpeakoFlow"
   },
   "overlay": {
-    "preparing": "Getting mic ready…",
-    "recording": "Recording",
-    "transcribing": "Транскрибиране...",
-    "processing": "Обработка...",
-    "listening": "Listening…",
-    "locked": "Recording hands-free — press the hotkey again to stop",
-    "cancel": "Cancel",
-    "done": "Done",
-    "askAssistant": "Ask the assistant instead of typing this",
-    "generating": "Writing with Flow…",
-    "vision": "Looking at your screen…",
+    "preparing": "Подготвяне на микрофона…",
+    "recording": "Запис",
+    "transcribing": "Транскрибиране…",
+    "processing": "Обработка…",
+    "generating": "Писане с Flow…",
+    "vision": "Разглеждане на екрана ви…",
     "notices": {
-      "flowNotConfigured": "Flow needs an assistant model — pasted as dictation",
-      "flowFailed": "Flow couldn't generate — nothing was pasted",
-      "flowEmpty": "Say a command after the activation phrase"
-    }
+      "flowNotConfigured": "Flow има нужда от модел за асистента — поставено като диктовка",
+      "flowFailed": "Flow не успя да генерира — нищо не беше поставено",
+      "flowEmpty": "Кажете команда след активиращата фраза"
+    },
+    "listening": "Слуша…",
+    "locked": "Запис без задържане — натиснете бързия клавиш отново за спиране",
+    "cancel": "Отказ",
+    "done": "Готово",
+    "askAssistant": "Попитайте асистента, вместо да изписвате това"
   },
   "assistant": {
-    "title": "Assistant",
+    "title": "Асистент",
     "character": {
-      "switch": "Switch persona"
+      "switch": "Смяна на профила"
     },
-    "empty": "Ask by voice with your assistant shortcut,\nor type below.",
-    "inputPlaceholder": "Message…",
-    "inputPlaceholderScreen": "Ask about your screen…",
-    "send": "Send",
-    "stop": "Stop",
-    "finish": "Finish & send",
-    "clear": "Clear conversation",
-    "hide": "Hide panel",
-    "copy": "Copy",
-    "copyCode": "Copy code",
-    "regenerate": "Regenerate answer (the old one stays in History)",
-    "screenAttached": "Screen",
-    "attachScreen": "Screen vision — attach your screen to each message until turned off",
-    "detachScreen": "Turn off screen vision",
+    "empty": "Попитайте с глас чрез бързия клавиш за асистента\nили напишете по-долу.",
+    "inputPlaceholder": "Съобщение…",
+    "inputPlaceholderScreen": "Попитайте за екрана си…",
+    "send": "Изпращане",
+    "stop": "Спиране",
+    "cancel": "Отказ",
+    "finish": "Край и изпращане",
+    "clear": "Изчистване на разговора",
+    "hide": "Скриване на панела",
+    "copy": "Копиране",
+    "copyCode": "Копиране на кода",
+    "regenerate": "Ново генериране на отговора (старият остава в История)",
+    "summarizing": "Резюмиране на по-старите съобщения…",
+    "screenAttached": "Екран",
+    "attachScreen": "Видимост на екрана — прикачва екрана ви към всяко съобщение, докато не се изключи",
+    "detachScreen": "Изключване на видимостта на екрана",
     "attach": {
-      "file": "Attach an image or file",
-      "snip": "Snip a region of the screen",
-      "image": "Image",
-      "imageCount": "{{count}} image",
-      "imageCount_other": "{{count}} images",
-      "remove": "Remove attachment",
-      "dropHint": "Drop to attach"
+      "file": "Прикачване на изображение или файл",
+      "snip": "Изрязване на област от екрана",
+      "image": "Изображение",
+      "imageCount": "{{count}} изображение",
+      "imageCount_other": "{{count}} изображения",
+      "remove": "Премахване на прикаченото",
+      "dropHint": "Пуснете, за да прикачите"
     },
     "snip": {
-      "hint": "Drag to snip a region — Esc to cancel"
+      "hint": "Влачете, за да изрежете област — Esc за отказ"
     },
     "webSearch": {
-      "enable": "Enable web search",
-      "disable": "Disable web search"
+      "enable": "Включване на търсенето в интернет",
+      "disable": "Изключване на търсенето в интернет"
     },
     "tts": {
-      "enable": "Enable voice summaries",
-      "disable": "Disable voice summaries",
-      "loading": "Loading Kokoro voice model...",
-      "loadingShort": "Voice model {{progress}}%"
+      "enable": "Включване на гласовите резюмета",
+      "disable": "Изключване на гласовите резюмета",
+      "loading": "Зареждане на гласовия модел Kokoro...",
+      "loadingShort": "Гласов модел {{progress}}%"
     },
     "pill": {
-      "talk": "Click to talk",
-      "stop": "Stop and send",
-      "idle": "Assistant",
-      "expand": "Expand panel",
-      "collapse": "Collapse to pill",
-      "close": "Close assistant",
-      "cancel": "Cancel without sending",
-      "cancelTurn": "Cancel",
-      "dismiss": "Dismiss",
-      "disarmScreen": "Screen vision is on — click to turn it off",
-      "armScreen": "Screen vision is off — click to turn it on"
+      "talk": "Натиснете, за да говорите",
+      "stop": "Спиране и изпращане",
+      "idle": "Асистент",
+      "expand": "Разгъване на панела",
+      "collapse": "Свиване до лента",
+      "close": "Затваряне на асистента",
+      "cancel": "Отказ без изпращане",
+      "cancelTurn": "Отказ",
+      "dismiss": "Затваряне",
+      "disarmScreen": "Видимостта на екрана е включена — натиснете, за да я изключите",
+      "armScreen": "Видимостта на екрана е изключена — натиснете, за да я включите"
     },
     "status": {
-      "listening": "Listening…",
-      "locked": "Listening",
-      "transcribing": "Transcribing…",
-      "searching": "Searching the web...",
-      "thinking": "Thinking...",
-      "speaking": "Speaking..."
+      "listening": "Слуша…",
+      "locked": "Слуша",
+      "transcribing": "Транскрибиране…",
+      "searching": "Търсене в интернет...",
+      "thinking": "Мисли...",
+      "speaking": "Говори..."
     },
     "errors": {
-      "generic": "Something went wrong. Please try again.",
-      "genericShort": "Something went wrong",
-      "no_provider": "No assistant model is set up yet. Pick a provider in Settings → Assistant.",
-      "no_providerShort": "No model set up",
-      "no_model": "Your provider has no model selected. Choose one in Settings → Assistant.",
-      "no_modelShort": "No model selected",
-      "engine_start": "The built-in model couldn't start. Try again, or pick a different model in Settings → Assistant.",
-      "engine_startShort": "Model couldn't start",
-      "provider": "The model couldn't answer. Check your API key and connection, then try again.",
-      "providerShort": "Couldn't get an answer",
-      "vision_unsupported": "This model can't read your screen. Pick a vision-capable model in Settings → Assistant, or ask again without screen vision.",
-      "vision_unsupportedShort": "Model can't see images",
-      "screenshot_too_large": "The screen capture was too large for this provider. Please try again — it will be compressed harder.",
-      "screenshot_too_largeShort": "Screen capture too large",
-      "screen_capture": "Couldn't capture the screen. Try again, or ask without screen vision.",
-      "screen_captureShort": "Screen capture failed",
-      "transcription": "Couldn't transcribe your voice. Please try speaking again.",
-      "transcriptionShort": "Transcription failed",
-      "tts": "The spoken reply failed. Check your TTS settings, or read the answer in the panel.",
-      "ttsShort": "Voice reply failed",
-      "tts_local": "The local voice couldn't load. Check your connection or switch TTS engines in Settings.",
-      "tts_localShort": "Voice couldn't load",
-      "tts_blocked": "Your system blocked the voice from playing on its own. Click anywhere in the panel to hear the reply.",
-      "tts_blockedShort": "Tap the panel to hear it",
-      "tts_playback": "Couldn't play the voice on your output device. Check your speaker/output settings, then try again.",
-      "tts_playbackShort": "Voice playback failed",
-      "mic_denied": "Microphone access is blocked. Allow it in your system privacy settings.",
-      "mic_deniedShort": "Mic access blocked",
-      "mic_unavailable": "No microphone was found. Connect one and try again.",
-      "mic_unavailableShort": "No microphone found",
-      "mic_error": "The microphone couldn't start. It may be in use by another app.",
-      "mic_errorShort": "Mic couldn't start",
-      "file_read": "That file couldn't be attached.",
-      "file_readShort": "Couldn't attach file"
+      "generic": "Нещо се обърка. Опитайте отново.",
+      "genericShort": "Нещо се обърка",
+      "no_provider": "Още няма настроен модел за асистента. Изберете доставчик в Настройки → Асистент.",
+      "no_providerShort": "Няма настроен модел",
+      "no_model": "За доставчика ви не е избран модел. Изберете такъв в Настройки → Асистент.",
+      "no_modelShort": "Няма избран модел",
+      "engine_start": "Вграденият модел не успя да стартира. Опитайте отново или изберете друг модел в Настройки → Асистент.",
+      "engine_startShort": "Моделът не стартира",
+      "provider": "Моделът не успя да отговори. Проверете API ключа и връзката си, след което опитайте отново.",
+      "providerShort": "Няма получен отговор",
+      "vision_unsupported": "Този модел не може да чете екрана ви. Изберете модел с видимост в Настройки → Асистент или попитайте отново без видимост на екрана.",
+      "vision_unsupportedShort": "Моделът не вижда изображения",
+      "screenshot_too_large": "Снимката на екрана беше твърде голяма за този доставчик. Опитайте отново — ще бъде компресирана по-силно.",
+      "screenshot_too_largeShort": "Снимката на екрана е твърде голяма",
+      "screen_capture": "Екранът не можа да бъде заснет. Опитайте отново или попитайте без видимост на екрана.",
+      "screen_captureShort": "Заснемането на екрана не бе успешно",
+      "transcription": "Гласът ви не можа да бъде транскрибиран. Опитайте да говорите отново.",
+      "transcriptionShort": "Транскрипцията не бе успешна",
+      "tts": "Изговореният отговор не бе успешен. Проверете настройките за TTS или прочетете отговора в панела.",
+      "ttsShort": "Гласовият отговор не бе успешен",
+      "tts_local": "Локалният глас не можа да се зареди. Проверете връзката си или сменете TTS ядрото в Настройки.",
+      "tts_localShort": "Гласът не се зареди",
+      "tts_blocked": "Системата ви блокира самостоятелното възпроизвеждане на гласа. Натиснете някъде в панела, за да чуете отговора.",
+      "tts_blockedShort": "Натиснете панела, за да го чуете",
+      "tts_playback": "Гласът не можа да се възпроизведе на изходното ви устройство. Проверете настройките на високоговорителя/изхода и опитайте отново.",
+      "tts_playbackShort": "Възпроизвеждането на гласа не бе успешно",
+      "mic_denied": "Достъпът до микрофона е блокиран. Разрешете го в системните настройки за поверителност.",
+      "mic_deniedShort": "Достъпът до микрофона е блокиран",
+      "mic_unavailable": "Не е намерен микрофон. Свържете такъв и опитайте отново.",
+      "mic_unavailableShort": "Не е намерен микрофон",
+      "mic_error": "Микрофонът не успя да стартира. Може да се използва от друго приложение.",
+      "mic_errorShort": "Микрофонът не стартира",
+      "file_read": "Този файл не можа да бъде прикачен.",
+      "file_readShort": "Файлът не беше прикачен"
     },
     "notices": {
-      "web_search_failed": "Web search didn't return results — answering without them.",
-      "web_search_failedShort": "No web results"
+      "web_search_failed": "Търсенето в интернет не върна резултати — отговорът е без тях.",
+      "web_search_failedShort": "Няма резултати от интернет"
+    },
+    "engineSetup": {
+      "downloading": "Настройване на локалното ядро (първо стартиране)… {{percent}}%",
+      "preparing": "Настройване на локалното ядро (първо стартиране)…",
+      "extracting": "Инсталиране на локалното ядро…",
+      "short": "Настройване на ядрото…"
     }
   }
 }

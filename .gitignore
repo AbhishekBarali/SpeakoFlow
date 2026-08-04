@@ -106,3 +106,6 @@ build/*.AppImage
 
 # Reddit promotion working notes (fact sheet, account notes, drafts)
 .promote/
+
+# Scratch space for bulk translation passes (see CONTRIBUTING_TRANSLATIONS.md)
+.i18n-work/

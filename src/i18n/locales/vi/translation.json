@@ -1,20 +1,20 @@
 {
   "appearance": {
-    "title": "Appearance",
-    "description": "Choose a light, dark, or system-matched theme for the app and assistant panel.",
-    "system": "System",
-    "light": "Light",
-    "dark": "Dark",
-    "textSize": "Text size",
-    "textSizeDescription": "Scale the size of text and controls across the app.",
-    "textSizeSmall": "Small",
-    "textSizeDefault": "Default",
-    "textSizeLarge": "Large",
-    "textSizeExtraLarge": "Extra large"
+    "title": "Giao diện",
+    "description": "Chọn giao diện sáng, tối hoặc theo hệ thống cho ứng dụng và bảng trợ lý.",
+    "system": "Hệ thống",
+    "light": "Sáng",
+    "dark": "Tối",
+    "textSize": "Cỡ chữ",
+    "textSizeDescription": "Điều chỉnh cỡ chữ và các điều khiển trong toàn ứng dụng.",
+    "textSizeSmall": "Nhỏ",
+    "textSizeDefault": "Mặc định",
+    "textSizeLarge": "Lớn",
+    "textSizeExtraLarge": "Rất lớn"
   },
   "tray": {
     "home": "Trang chủ",
-    "checkUpdates": "Kiểm tra cập nhật...",
+    "checkUpdates": "Kiểm tra cập nhật…",
     "copyLastTranscript": "Sao chép bản chép lời mới nhất",
     "unloadModel": "Dỡ mô hình",
     "model": "Mô hình",
@@ -23,29 +23,29 @@
   },
   "sidebar": {
     "general": "Chung",
-    "dictation": "Dictation",
-    "assistant": "Assistant",
+    "dictation": "Đọc chính tả",
+    "assistant": "Trợ lý",
     "history": "Lịch sử",
     "about": "Giới thiệu",
     "debug": "Gỡ lỗi",
-    "characters": "Profiles",
-    "memory": "Memory",
-    "collapse": "Collapse sidebar",
-    "expand": "Expand sidebar"
+    "characters": "Hồ sơ",
+    "memory": "Bộ nhớ",
+    "collapse": "Thu gọn thanh bên",
+    "expand": "Mở rộng thanh bên"
   },
   "window": {
-    "minimize": "Minimize",
-    "maximize": "Maximize",
-    "restore": "Restore",
-    "close": "Close"
+    "minimize": "Thu nhỏ",
+    "maximize": "Phóng to",
+    "restore": "Khôi phục",
+    "close": "Đóng"
   },
   "sectionSubtitles": {
-    "general": "Shortcuts, your microphone, and how the app looks.",
-    "dictation": "The model that turns your voice into text, and how it's cleaned up.",
-    "assistant": "Set up the assistant, then tune its voice, screen vision, and web search.",
-    "history": "Your recent transcriptions and assistant chats, stored on this device.",
-    "about": "Version, app language, data locations, and credits.",
-    "debug": "Diagnostics and developer tools."
+    "general": "Phím tắt, micrô và giao diện của ứng dụng.",
+    "dictation": "Mô hình biến giọng nói của bạn thành văn bản, và cách văn bản được dọn dẹp.",
+    "assistant": "Thiết lập trợ lý, rồi tinh chỉnh giọng nói, khả năng xem màn hình và tìm kiếm web.",
+    "history": "Các nội dung đọc chính tả, nội dung do Flow tạo và trò chuyện với trợ lý gần đây của bạn, được lưu trên thiết bị này.",
+    "about": "Phiên bản, ngôn ngữ ứng dụng, vị trí dữ liệu và ghi công.",
+    "debug": "Công cụ chẩn đoán và dành cho nhà phát triển."
   },
   "onboarding": {
     "subtitle": "Để bắt đầu, hãy chọn một mô hình chuyển đổi giọng nói",
@@ -53,79 +53,79 @@
       "progress": "Bước {{current}} trên {{total}}",
       "counter": "Bước {{current}} trên {{total}} · {{label}}",
       "speechToText": "Chuyển giọng nói thành văn bản",
-      "aiModel": "Mô hình AI",
-      "ready": "You're ready"
+      "aiModel": "Cho nó một bộ não",
+      "ready": "Sẵn sàng"
     },
     "speechToText": {
-      "title": "Chọn một mô hình chuyển giọng nói thành văn bản",
-      "subtitle": "Chạy hoàn toàn trên thiết bị của bạn để chuyển giọng nói thành văn bản. Hãy chọn mô hình phù hợp với máy của bạn — bạn có thể thay đổi bất cứ lúc nào.",
+      "title": "SpeakoFlow nên nghe bạn thế nào?",
+      "subtitle": "Phần này biến giọng nói của bạn thành văn bản, ngay trên máy của bạn. Chọn một mô hình, đổi bất cứ lúc nào.",
       "cards": {
         "fast": {
-          "description": "Blazingly fast, streams as you speak. English only."
+          "description": "Cực nhanh, hiện chữ ngay khi bạn nói. Chỉ tiếng Anh."
         },
         "multilingual": {
-          "description": "Real-time in 28 languages."
+          "description": "Thời gian thực với 28 ngôn ngữ."
         }
       },
-      "downloadAndContinue": "Download and continue",
-      "seeAllModels": "See all models",
-      "hideAllModels": "Show fewer models",
-      "installedHint": "Already set up. You can grab any other model later in Settings.",
-      "useInstalled": "Use installed model",
-      "continue": "Continue",
-      "downloadingHint": "It downloads in the background. Any other model is one click away in Settings.",
-      "downloadStarted": "Downloading your model in the background."
+      "downloadAndContinue": "Tải xuống và tiếp tục",
+      "seeAllModels": "Xem tất cả mô hình",
+      "hideAllModels": "Hiện ít mô hình hơn",
+      "installedHint": "Đã thiết lập xong. Bạn có thể lấy mô hình khác sau trong Cài đặt.",
+      "useInstalled": "Dùng mô hình đã cài",
+      "continue": "Tiếp tục",
+      "downloadingHint": "Mô hình được tải ở chế độ nền. Mọi mô hình khác chỉ cách một cú nhấp trong Cài đặt.",
+      "downloadStarted": "Đang tải mô hình của bạn ở chế độ nền."
     },
     "aiModel": {
       "title": "Thêm mô hình AI cục bộ",
-      "subtitle": "Cung cấp năng lượng cho trợ lý, khả năng xem màn hình và dọn dẹp bản ghi — chạy hoàn toàn ngoại tuyến trên thiết bị của bạn. Đây là tùy chọn; bạn cũng có thể kết nối nhà cung cấp đám mây sau.",
+      "subtitle": "Hãy chọn theo tốc độ trả lời và khả năng. E4B là mặc định cân bằng; 12B sắc sảo hơn nhưng chậm hơn.",
       "tiers": {
         "small": {
-          "description": "Runs on any machine. Great for tidying up your writing."
+          "description": "Chạy được trên mọi máy. Rất tốt để chỉnh gọn câu chữ."
         },
         "mid": {
-          "description": "A quick all-rounder that can also answer questions."
+          "description": "Nhanh nhẹn, đa năng và cũng trả lời được câu hỏi."
         },
         "capable": {
-          "description": "The sharpest answers, and it can see your screen."
+          "description": "Câu trả lời sắc sảo nhất, và nó xem được màn hình của bạn."
         }
       },
-      "seesScreen": "Sees your screen",
-      "textOnly": "Text only",
-      "download": "Download model",
-      "useDownloaded": "Use downloaded model",
+      "seesScreen": "Xem được màn hình",
+      "textOnly": "Chỉ văn bản",
+      "download": "Tải mô hình",
+      "useDownloaded": "Dùng mô hình đã tải",
       "skip": "Bỏ qua bây giờ",
-      "skipHint": "Tùy chọn. Bạn có thể tải mô hình hoặc kết nối nhà cung cấp đám mây bất cứ lúc nào trong Cài đặt.",
+      "skipHint": "Bạn có thể làm việc này sau trong Cài đặt > Trợ lý > Trên máy của tôi.",
       "continue": "Tiếp tục",
       "downloadingHint": "Mô hình của bạn đang được tải xuống ở chế độ nền — bạn có thể bắt đầu sử dụng ứng dụng ngay.",
       "downloadStarted": "Đang tải mô hình AI của bạn ở chế độ nền."
     },
     "ready": {
-      "title": "You're ready.",
-      "subtitle": "Two shortcuts are all you need. Press, talk, done.",
-      "dictateLabel": "Dictate anywhere",
-      "dictateCaption": "Hold, talk, let go. Your words type themselves.",
-      "assistantKeysLabel": "Ask the assistant",
-      "assistantKeysCaption": "Hold and ask. It can even see your screen.",
-      "changeAnytime": "You can change these anytime in Settings.",
-      "hotkeyLabel": "Your dictation keys",
-      "downloadingAssistant": "Your assistant is moving in. {{percentage}}% there.",
-      "downloadingVoice": "Your voice model is landing. {{percentage}}% there.",
-      "downloadingGeneric": "Still downloading. {{percentage}}% there.",
-      "signOff": "That's it. Go say something.",
-      "openApp": "Open SpeakoFlow"
+      "title": "Bạn đã sẵn sàng.",
+      "subtitle": "Chỉ cần hai phím tắt. Nhấn, nói, xong.",
+      "dictateLabel": "Đọc chính tả ở mọi nơi",
+      "dictateCaption": "Giữ, nói, thả. Câu chữ tự hiện ra.",
+      "assistantKeysLabel": "Hỏi trợ lý",
+      "assistantKeysCaption": "Giữ và hỏi. Nó còn xem được màn hình của bạn.",
+      "changeAnytime": "Bạn có thể thay đổi những mục này bất cứ lúc nào trong Cài đặt.",
+      "hotkeyLabel": "Phím đọc chính tả của bạn",
+      "downloadingAssistant": "Trợ lý của bạn đang dọn vào. Đã được {{percentage}}%.",
+      "downloadingVoice": "Mô hình giọng nói đang cập bến. Đã được {{percentage}}%.",
+      "downloadingGeneric": "Vẫn đang tải xuống. Đã được {{percentage}}%.",
+      "signOff": "Vậy là xong. Nói gì đi nào.",
+      "openApp": "Mở SpeakoFlow"
     },
     "errors": {
-      "selectModel": "Couldn't select that model. Please try again.",
+      "selectModel": "Không thể chọn mô hình đó. Vui lòng thử lại.",
       "loadModels": "Không thể tải các mô hình có sẵn",
       "downloadModel": "Không thể tải mô hình: {{error}}"
     },
     "downloadProgress": {
-      "sizeOf": "{{downloaded}} of {{total}} · {{percentage}}%"
+      "sizeOf": "{{downloaded}} trên {{total}} · {{percentage}}%"
     },
     "recommended": "Đề xuất",
     "download": "Tải xuống",
-    "downloading": "Đang tải xuống...",
+    "downloading": "Đang tải xuống…",
     "customModelDescription": "Không được hỗ trợ chính thức",
     "downloadFailed": "Tải xuống thất bại. Vui lòng thử lại.",
     "modelCard": {
@@ -134,49 +134,49 @@
     },
     "models": {
       "parakeet-unified-en-0.6b-gguf": {
-        "description": "Blazingly fast, great for everyday dictation. English only."
+        "description": "Cực nhanh, rất phù hợp để đọc chính tả hằng ngày. Chỉ tiếng Anh."
       },
       "nemotron-3.5-asr-streaming-0.6b-gguf": {
-        "description": "Real-time transcription in 28 languages."
+        "description": "Chuyển đổi theo thời gian thực với 28 ngôn ngữ."
       },
       "canary-180m-flash-gguf": {
-        "description": "Tiny and instant — runs well on any machine."
+        "description": "Nhỏ gọn và tức thì — chạy tốt trên mọi máy."
       },
       "cohere-transcribe-03-2026-gguf": {
-        "description": "Slower, but the most accurate. 14 languages."
+        "description": "Chậm hơn, nhưng chính xác nhất. 14 ngôn ngữ."
       },
       "whisper-medium-gguf": {
-        "description": "Best for many languages — nearly 100 supported."
+        "description": "Tốt nhất cho nhiều ngôn ngữ — hỗ trợ gần 100 ngôn ngữ."
       },
       "gemma-3-1b": {
-        "description": "Very small and quick, but limited for open-ended conversation. Text only."
+        "description": "Rất nhỏ và nhanh, nhưng hạn chế khi trò chuyện mở. Chỉ văn bản."
       },
       "qwen3.5-2b": {
-        "description": "Small and fast, and it can see images. Good on most laptops."
+        "description": "Nhỏ và nhanh, lại xem được hình ảnh. Tốt trên phần lớn laptop."
       },
       "qwen3.5-4b": {
-        "description": "A legacy vision model whose optional reasoning can delay conversational replies."
+        "description": "Mô hình hình ảnh thế hệ cũ; chế độ suy luận tùy chọn có thể làm chậm câu trả lời khi trò chuyện."
       },
       "qwen3.5-9b": {
-        "description": "More capable, but slower for live conversation, especially when reasoning is enabled."
+        "description": "Mạnh hơn, nhưng chậm khi trò chuyện trực tiếp, nhất là khi bật suy luận."
       },
       "qwen3.5-27b": {
-        "description": "A large vision model for deliberate tasks, not a low-latency assistant."
+        "description": "Mô hình hình ảnh lớn cho những tác vụ cần cân nhắc, không phải một trợ lý phản hồi tức thì."
       },
       "gemma-4-e2b": {
-        "description": "The quickest current Gemma for everyday conversation. Less capable on complex requests."
+        "description": "Gemma hiện tại nhanh nhất cho trò chuyện hằng ngày. Yếu hơn với yêu cầu phức tạp."
       },
       "gemma-4-e4b": {
-        "description": "Recommended for conversation: a stronger quality-and-speed balance without default thinking."
+        "description": "Khuyến nghị để trò chuyện: cân bằng chất lượng và tốc độ tốt hơn, không suy luận theo mặc định."
       },
       "gemma-4-12b": {
-        "description": "More capable for nuanced questions, but noticeably slower and best with a strong GPU."
+        "description": "Mạnh hơn với những câu hỏi tinh tế, nhưng chậm rõ rệt và cần một GPU mạnh."
       },
       "gemma-3-4b": {
-        "description": "Fast, clean answers with screen vision, but less capable than current Gemma 4 models."
+        "description": "Trả lời nhanh, gọn gàng và xem được màn hình, nhưng yếu hơn các mô hình Gemma 4 hiện tại."
       },
       "kokoro-82m": {
-        "description": "Built-in local voice for the assistant. No download needed."
+        "description": "Giọng nói cục bộ tích hợp cho trợ lý. Không cần tải xuống."
       },
       "small": {
         "name": "Whisper Small",
@@ -200,7 +200,7 @@
       },
       "parakeet-tdt-0.6b-v3": {
         "name": "Parakeet V3",
-        "description": "Nhanh và chính xác"
+        "description": "Nhanh và chính xác. 25 ngôn ngữ châu Âu."
       },
       "moonshine-base": {
         "name": "Moonshine Base",
@@ -256,7 +256,7 @@
       },
       "grant": "Cấp quyền",
       "granted": "Đã cấp",
-      "waiting": "Đang chờ...",
+      "waiting": "Đang chờ…",
       "allGranted": "Hoàn tất!",
       "errors": {
         "checkFailed": "Không thể kiểm tra quyền. Vui lòng thử lại.",
@@ -267,29 +267,31 @@
   "modelSelector": {
     "custom": "Tùy chỉnh",
     "active": "Đang hoạt động",
-    "switching": "Đang chuyển...",
+    "switching": "Đang chuyển…",
     "noModelsAvailable": "Không có mô hình nào",
-    "verifying": "Đang xác minh {{modelName}}...",
-    "verifyingGeneric": "Đang xác minh...",
-    "extracting": "Đang giải nén {{modelName}}...",
-    "extractingMultiple": "Đang giải nén {{count}} mô hình...",
-    "extractingGeneric": "Đang giải nén...",
+    "verifying": "Đang xác minh {{modelName}}…",
+    "verifyingGeneric": "Đang xác minh…",
+    "extracting": "Đang giải nén {{modelName}}…",
+    "extractingMultiple": "Đang giải nén {{count}} mô hình…",
+    "extractingGeneric": "Đang giải nén…",
     "downloading": "Đang tải xuống {{percentage}}%",
-    "downloadingMultiple": "Đang tải xuống {{count}} mô hình...",
+    "downloadingMultiple": "Đang tải xuống {{count}} mô hình…",
+    "downloadDetails": "Chi tiết tải xuống",
+    "downloadSize": "{{downloaded}} trên {{total}}",
     "modelReady": "Mô Hình Sẵn Sàng",
-    "loading": "Đang tải {{modelName}}...",
-    "loadingGeneric": "Đang tải...",
+    "loading": "Đang tải {{modelName}}…",
+    "loadingGeneric": "Đang tải…",
     "modelError": "Lỗi Mô Hình",
     "modelUnloaded": "Mô Hình Đã Gỡ",
     "noModelDownloadRequired": "Chưa Có Mô Hình - Cần Tải Xuống",
-    "llmSelectModel": "Select assistant model",
-    "llmModelTitle": "Assistant model: {{model}}",
+    "llmSelectModel": "Chọn mô hình trợ lý",
+    "llmModelTitle": "Mô hình trợ lý: {{model}}",
     "deleteModel": "Xóa {{modelName}}",
     "downloadSpeed": "{{speed}} MB/s",
     "cancel": "Hủy",
     "cancelDownload": "Hủy tải xuống",
-    "download": "Download",
-    "useModel": "Use model",
+    "download": "Tải xuống",
+    "useModel": "Dùng mô hình",
     "capabilities": {
       "languageSelection": "Hỗ trợ nhiều ngôn ngữ đầu vào",
       "singleLanguage": "Chỉ hỗ trợ ngôn ngữ này",
@@ -297,71 +299,71 @@
       "languageOnly": "Chỉ {{language}}",
       "translation": "Có thể dịch sang tiếng Anh",
       "translate": "Dịch sang tiếng Anh",
-      "streaming": "Streaming",
-      "quantization": "Quantization",
-      "legacy": "Older"
+      "streaming": "Trực tiếp",
+      "quantization": "Lượng tử hóa",
+      "legacy": "Cũ hơn"
     }
   },
   "settings": {
     "personalMemory": {
       "enable": {
-        "label": "Remember me",
-        "description": "Let the assistant keep and use a personal memory. Off by default."
+        "label": "Ghi nhớ về tôi",
+        "description": "Cho phép trợ lý lưu và dùng bộ nhớ cá nhân. Mặc định tắt."
       },
       "incognito": {
-        "label": "Incognito chat",
-        "description": "For this conversation, don't use memory and don't learn anything new."
+        "label": "Trò chuyện ẩn danh",
+        "description": "Trong cuộc trò chuyện này, không dùng bộ nhớ và không học điều gì mới."
       },
       "detail": {
-        "label": "Memory detail",
-        "description": "How much memory to add to each reply. More detail is richer but a little slower.",
+        "label": "Mức chi tiết của bộ nhớ",
+        "description": "Lượng bộ nhớ thêm vào mỗi câu trả lời. Chi tiết hơn thì phong phú hơn nhưng chậm hơn một chút.",
         "options": {
-          "light": "Light",
-          "balanced": "Balanced",
-          "detailed": "Detailed"
+          "light": "Nhẹ",
+          "balanced": "Cân bằng",
+          "detailed": "Chi tiết"
         }
       },
       "aboutYou": {
-        "label": "About you",
-        "caption": "A short, always-on summary the assistant keeps in mind.",
-        "fieldLabel": "Summary",
-        "placeholder": "e.g. Prefers short, direct answers. Works in Rust and TypeScript. Building a desktop voice assistant.",
-        "hint": "Always included when memory is on. Keep it to a few sentences — this is the assistant's at-a-glance picture of you.",
-        "edit": "Edit",
-        "done": "Done",
-        "empty": "Nothing saved yet — the assistant fills this in as it learns, or click Edit to write your own.",
-        "collapsedEmpty": "Nothing saved yet"
+        "label": "Về bạn",
+        "caption": "Bản tóm tắt ngắn, luôn bật, mà trợ lý luôn ghi nhớ.",
+        "fieldLabel": "Tóm tắt",
+        "placeholder": "ví dụ: Thích câu trả lời ngắn, thẳng vào vấn đề. Làm việc với Rust và TypeScript. Đang xây dựng một trợ lý giọng nói cho máy tính.",
+        "hint": "Luôn được đưa vào khi bộ nhớ đang bật. Chỉ nên viết vài câu — đây là bức tranh tổng quan của trợ lý về bạn.",
+        "edit": "Sửa",
+        "done": "Xong",
+        "empty": "Chưa lưu gì cả — trợ lý sẽ tự điền vào khi học được, hoặc nhấn Sửa để tự viết.",
+        "collapsedEmpty": "Chưa lưu gì cả"
       },
       "notes": {
-        "label": "Notes",
-        "caption": "Specific things worth remembering — learned or added by you.",
-        "empty": "No notes yet. Add one below, or let the assistant learn them from your chats.",
-        "add": "Add",
-        "addPlaceholder": "Add something to remember…",
-        "delete": "Delete note",
-        "learned": "learned",
-        "added": "added by you"
+        "label": "Ghi chú",
+        "caption": "Những điều cụ thể đáng ghi nhớ — do trợ lý học được hoặc do bạn thêm.",
+        "empty": "Chưa có ghi chú nào. Thêm một ghi chú bên dưới, hoặc để trợ lý học từ các cuộc trò chuyện của bạn.",
+        "add": "Thêm",
+        "addPlaceholder": "Thêm điều cần ghi nhớ…",
+        "delete": "Xóa ghi chú",
+        "learned": "đã học",
+        "added": "bạn đã thêm"
       },
       "confidence": {
-        "high": "High confidence",
-        "medium": "Medium confidence",
-        "low": "Low confidence"
+        "high": "Độ tin cậy cao",
+        "medium": "Độ tin cậy trung bình",
+        "low": "Độ tin cậy thấp"
       },
       "actions": {
-        "label": "Manage"
+        "label": "Quản lý"
       },
       "distill": {
-        "label": "Learn from this chat now",
-        "description": "Pull durable facts from your current conversation into memory, right now.",
-        "button": "Update memory"
+        "label": "Học từ cuộc trò chuyện này ngay",
+        "description": "Rút những thông tin bền vững từ cuộc trò chuyện hiện tại vào bộ nhớ, ngay lúc này.",
+        "button": "Cập nhật bộ nhớ"
       },
-      "export": "Export",
-      "import": "Import",
+      "export": "Xuất",
+      "import": "Nhập",
       "wipe": {
-        "button": "Wipe memory",
-        "confirm": "Delete everything the assistant remembers?",
-        "yes": "Delete all",
-        "cancel": "Cancel"
+        "button": "Xóa sạch bộ nhớ",
+        "confirm": "Xóa mọi thứ trợ lý đang ghi nhớ?",
+        "yes": "Xóa tất cả",
+        "cancel": "Hủy"
       }
     },
     "modelSettings": {
@@ -371,82 +373,82 @@
     "general": {
       "title": "Chung",
       "recording": {
-        "title": "Recording"
+        "title": "Ghi âm"
       },
       "groups": {
-        "sounds": "Sounds",
-        "startup": "Startup and tray",
-        "overlay": "Overlay",
-        "updates": "Updates",
-        "system": "System"
+        "sounds": "Âm thanh",
+        "startup": "Khởi động và khay hệ thống",
+        "overlay": "Lớp phủ",
+        "updates": "Cập nhật",
+        "system": "Hệ thống"
       },
       "shortcut": {
-        "title": "Phím tắt SpeakoFlow",
+        "title": "Phím tắt",
         "description": "Cấu hình phím tắt để kích hoạt ghi âm chuyển đổi giọng nói thành văn bản",
-        "loading": "Đang tải phím tắt...",
+        "loading": "Đang tải phím tắt…",
         "none": "Chưa cấu hình phím tắt",
         "notFound": "Không tìm thấy phím tắt",
-        "pressKeys": "Nhấn phím...",
+        "pressKeys": "Nhấn phím…",
         "bindings": {
           "transcribe": {
-            "name": "Phím tắt chuyển đổi",
+            "name": "Đọc chính tả",
             "description": "Phím tắt để ghi âm và chuyển đổi giọng nói của bạn."
           },
           "transcribe_toggle": {
-            "name": "Hands-free dictation",
-            "description": "Press once to start, again to stop — no holding needed."
+            "name": "Đọc chính tả rảnh tay",
+            "description": "Nhấn một lần để bắt đầu, nhấn lại để dừng — không cần giữ phím."
           },
           "cancel": {
-            "name": "Phím tắt hủy",
+            "name": "Hủy",
             "description": "Phím tắt để hủy bản ghi hiện tại."
           },
           "transcribe_with_post_process": {
             "name": "Phím tắt xử lý sau",
-            "description": "Tùy chọn: Phím tắt chuyên dụng luôn áp dụng xử lý sau bằng AI cho bản chuyển đổi của bạn."
+            "description": "Đọc chính tả, rồi AI dọn dẹp văn bản trước khi nó được gõ ra."
           },
           "assistant": {
-            "name": "Ask assistant",
-            "description": "Ask the assistant by voice; the answer streams into the floating panel."
+            "name": "Hỏi trợ lý",
+            "description": "Hỏi trợ lý bằng giọng nói; câu trả lời hiện dần trong bảng nổi."
           },
           "assistant_vision": {
-            "name": "Ask with screen",
-            "description": "Ask by voice with your screen attached so it can see what you're looking at."
+            "name": "Hỏi kèm màn hình",
+            "description": "Hỏi bằng giọng nói kèm màn hình của bạn để trợ lý thấy được thứ bạn đang xem."
           },
           "assistant_panel_toggle": {
-            "name": "Show or hide panel",
-            "description": "Shows or hides the floating assistant panel."
+            "name": "Hiện hoặc ẩn bảng",
+            "description": "Hiện hoặc ẩn bảng trợ lý nổi."
           }
         },
         "errors": {
           "restore": "Không thể khôi phục phím tắt gốc",
           "set": "Không thể đặt phím tắt: {{error}}",
-          "reset": "Không thể đặt lại phím tắt về giá trị gốc"
+          "reset": "Không thể đặt lại phím tắt."
         }
       },
       "language": {
         "title": "Ngôn ngữ",
-        "description": "Chọn ngôn ngữ để nhận dạng giọng nói. Tự động sẽ tự động xác định ngôn ngữ, trong khi chọn một ngôn ngữ cụ thể có thể cải thiện độ chính xác cho ngôn ngữ đó.",
+        "description": "Ngôn ngữ cho nhận dạng giọng nói. Chọn một ngôn ngữ cụ thể có thể cải thiện độ chính xác.",
         "descriptionUnsupported": "Mô hình Parakeet tự động phát hiện ngôn ngữ. Không cần chọn thủ công.",
-        "searchPlaceholder": "Tìm kiếm ngôn ngữ...",
+        "searchPlaceholder": "Tìm kiếm ngôn ngữ…",
         "noResults": "Không tìm thấy ngôn ngữ",
         "auto": "Tự động"
       },
       "pushToTalk": {
         "label": "Nhấn để nói",
-        "description": "Giữ để ghi âm, thả để dừng",
-        "hold": "Hold to record",
-        "tap": "Tap to start and stop"
+        "description": "Giữ sẽ ghi âm trong khi bạn giữ phím tắt Đọc chính tả. Nhấn sẽ bắt đầu ghi âm bằng một lần nhấn và dừng lại ở lần nhấn tiếp theo.",
+        "hold": "Giữ",
+        "tap": "Nhấn"
       },
       "tapToLock": {
-        "label": "Tap to lock",
-        "info": "While holding your record shortcut, tap this to lock hands-free recording so you can let go and keep talking. Pick any key that isn't part of your record shortcut, or clear it to turn this off.",
-        "off": "Off",
-        "clear": "Clear"
+        "label": "Nhấn để khóa",
+        "info": "Trong khi giữ phím tắt ghi âm, hãy nhấn phím này để khóa ghi âm rảnh tay, nhờ đó bạn có thể thả tay ra mà vẫn nói tiếp. Chọn phím nào không thuộc phím tắt ghi âm của bạn, hoặc xóa trống để tắt tính năng này.",
+        "off": "Tắt",
+        "clear": "Xóa"
       }
     },
     "models": {
       "title": "Mô hình chuyển đổi",
-      "description": "Chọn mô hình chuyển đổi hoặc tải thêm mô hình. Các mô hình khác nhau có mức độ chính xác và tốc độ khác nhau.",
+      "description": "Các mô hình đánh đổi độ chính xác lấy tốc độ — hãy chọn mô hình phù hợp với máy của bạn.",
       "yourModels": "Mô hình đã tải",
       "availableModels": "Có sẵn để tải xuống",
       "downloaded": "Đã tải xuống",
@@ -455,17 +457,17 @@
       "deleteActiveConfirm": "{{modelName}} là mô hình đang hoạt động của bạn. Xóa nó sẽ dừng phiên âm cho đến khi bạn chọn một mô hình mới. Bạn có chắc không?",
       "deleteTitle": "Xóa mô hình",
       "categories": {
-        "stt": "Transcription",
-        "llm": "Assistant",
-        "tts": "Speech"
+        "stt": "Chuyển đổi",
+        "llm": "Trợ lý",
+        "tts": "Giọng nói"
       },
       "categoryDescriptions": {
-        "stt": "Models trade accuracy for speed — pick one that fits your machine.",
-        "llm": "Local models for the built-in assistant and AI cleanup.",
-        "tts": "Voices for the assistant's spoken replies. Kokoro runs on your machine."
+        "stt": "Các mô hình đánh đổi độ chính xác lấy tốc độ — hãy chọn mô hình phù hợp với máy của bạn.",
+        "llm": "Mô hình cục bộ cho trợ lý tích hợp và dọn dẹp bằng AI.",
+        "tts": "Giọng đọc cho câu trả lời nói của trợ lý. Kokoro chạy trên máy của bạn."
       },
-      "llmHint": "After downloading, pick this model in the Assistant section under the built-in (local) provider.",
-      "ttsHint": "Speech models run on your machine and need no download.",
+      "llmHint": "Sau khi tải xuống, hãy chọn mô hình này ở mục Trợ lý, dưới nhà cung cấp tích hợp (cục bộ).",
+      "ttsHint": "Các mô hình giọng nói chạy trên máy của bạn và không cần tải xuống.",
       "filters": {
         "all": "Tất cả",
         "multiLanguage": "Đa ngôn ngữ",
@@ -473,40 +475,40 @@
         "allLanguages": "Tất cả ngôn ngữ"
       },
       "noModelsMatch": "Không có mô hình nào khớp với bộ lọc này.",
-      "searchPlaceholder": "Search models by name…",
-      "clearSearch": "Clear search",
-      "noSearchResults": "No models named “{{query}}”.",
-      "olderModels": "Older models",
-      "olderModelsHint": "Run on the previous engine. Still fully supported — most people won't need these.",
+      "searchPlaceholder": "Tìm mô hình theo tên…",
+      "clearSearch": "Xóa tìm kiếm",
+      "noSearchResults": "Không có mô hình nào tên “{{query}}”.",
+      "olderModels": "Mô hình cũ hơn",
+      "olderModelsHint": "Chạy trên công cụ thế hệ trước. Vẫn được hỗ trợ đầy đủ — phần lớn mọi người sẽ không cần đến.",
       "customModel": {
-        "addButton": "Search Hugging Face",
-        "searchTitle": "Need a different model?",
-        "searchDescription": "Search Hugging Face for a GGUF model. This is an advanced option, so hardware needs and compatibility can vary.",
-        "searchButton": "Search Hugging Face",
-        "title": "Search Hugging Face",
-        "subtitle": "Find a GGUF model to download and run on this machine.",
-        "searchPlaceholder": "Search models on Hugging Face…",
-        "popularTitle": "Popular GGUF models",
-        "resultsTitle": "Search results",
-        "resultCount_one": "{{count}} model",
-        "resultCount_other": "{{count}} models",
-        "searching": "Searching Hugging Face…",
-        "searchError": "Search failed. Check your connection and try again.",
-        "tryAgain": "Try again",
-        "noResults": "No models found. Try a different search.",
-        "downloads": "{{value}} downloads",
-        "visionBadge": "Vision",
-        "back": "Back to results",
-        "loadingFiles": "Loading available files…",
-        "repoFilesError": "Couldn't load files for this model.",
-        "noGgufFiles": "This repository has no downloadable .gguf files.",
-        "selectQuant": "Choose a download",
-        "selectQuantHint": "Not sure? Q4_K_M is usually the best balance of quality, speed, and memory use.",
-        "enableVision": "Include screen vision",
-        "enableVisionHint": "Downloads an extra file so the model can understand images.",
-        "add": "Download",
-        "adding": "Starting…",
-        "addError": "Couldn't add this model. Please try again."
+        "addButton": "Tìm trên Hugging Face",
+        "searchTitle": "Cần một mô hình khác?",
+        "searchDescription": "Tìm một mô hình GGUF trên Hugging Face. Đây là tùy chọn nâng cao, nên yêu cầu phần cứng và mức tương thích có thể khác nhau.",
+        "searchButton": "Tìm trên Hugging Face",
+        "title": "Tìm một mô hình trên Hugging Face",
+        "subtitle": "Tìm các mô hình GGUF, chọn một phiên bản và tải trực tiếp về thiết bị này.",
+        "searchPlaceholder": "Tìm theo mô hình hoặc người tạo…",
+        "popularTitle": "Mô hình GGUF phổ biến",
+        "resultsTitle": "Kết quả tìm kiếm",
+        "resultCount_one": "{{count}} mô hình",
+        "resultCount_other": "{{count}} mô hình",
+        "searching": "Đang tìm trên Hugging Face…",
+        "searchError": "Tìm kiếm thất bại. Kiểm tra kết nối và thử lại.",
+        "tryAgain": "Thử lại",
+        "noResults": "Không tìm thấy mô hình nào. Hãy thử từ khóa khác.",
+        "downloads": "{{value}} lượt tải",
+        "visionBadge": "Hình ảnh",
+        "back": "Về kết quả",
+        "loadingFiles": "Đang tải danh sách tệp…",
+        "repoFilesError": "Không thể tải danh sách tệp của mô hình này.",
+        "noGgufFiles": "Kho này không có tệp .gguf nào để tải xuống.",
+        "selectQuant": "Chọn bản tải xuống",
+        "selectQuantHint": "Không chắc chọn gì? Q4_K_M thường cân bằng tốt nhất giữa chất lượng, tốc độ và bộ nhớ.",
+        "enableVision": "Kèm khả năng xem màn hình",
+        "enableVisionHint": "Tải thêm một tệp để mô hình hiểu được hình ảnh.",
+        "add": "Tải xuống",
+        "adding": "Đang bắt đầu…",
+        "addError": "Không thể thêm mô hình này. Vui lòng thử lại."
       }
     },
     "sound": {
@@ -514,24 +516,24 @@
       "microphone": {
         "title": "Micrô",
         "description": "Chọn thiết bị micrô ưa thích của bạn",
-        "placeholder": "Chọn micrô...",
-        "loading": "Đang tải..."
+        "placeholder": "Chọn micrô…",
+        "loading": "Đang tải…"
       },
       "audioFeedback": {
         "label": "Phản hồi âm thanh",
         "description": "Phát âm thanh khi bắt đầu và kết thúc ghi âm"
       },
       "soundTheme": {
-        "label": "Feedback sound",
-        "description": "Choose the start/stop cue played during dictation",
-        "default": "Default",
-        "preview": "Preview sound (plays start then stop)"
+        "label": "Âm thanh phản hồi",
+        "description": "Chọn âm báo bắt đầu/kết thúc phát trong khi đọc chính tả",
+        "default": "Mặc định",
+        "preview": "Nghe thử (phát âm bắt đầu rồi âm kết thúc)"
       },
       "outputDevice": {
         "title": "Thiết bị đầu ra",
         "description": "Chọn thiết bị đầu ra âm thanh ưa thích của bạn cho âm thanh phản hồi",
-        "placeholder": "Chọn thiết bị đầu ra...",
-        "loading": "Đang tải..."
+        "placeholder": "Chọn thiết bị đầu ra…",
+        "loading": "Đang tải…"
       },
       "volume": {
         "title": "Âm lượng",
@@ -544,20 +546,20 @@
         "app": "Ứng dụng",
         "output": "Đầu ra",
         "transcription": "Chuyển đổi",
-        "textReplacements": "Text replacements",
+        "textReplacements": "Thay thế văn bản",
         "history": "Lịch sử",
-        "aiCorrection": "AI cleanup",
+        "aiCorrection": "Dọn dẹp bằng AI",
         "experimental": "Thử nghiệm"
       },
       "aiCorrection": {
-        "label": "AI cleanup (in development)",
-        "description": "Experimental: clean up your dictation with AI. Rough and unpolished — off by default.",
-        "info": "Runs a language model over your dictation to fix punctuation, remove filler words, and optionally adjust the tone. Applies to dictation only (not the assistant chat) and runs on its own shortcut. It adds a delay since the model runs after transcription; if it fails or times out, your raw text is pasted instead. Uses your assistant's model by default. This feature is still in development — you can't yet pick a built-in local model from its own list, and it needs more tuning before it's a main feature."
+        "label": "Dọn dẹp bằng AI (đang phát triển)",
+        "description": "Thử nghiệm: dùng AI dọn dẹp phần đọc chính tả của bạn. Còn thô và chưa hoàn thiện — mặc định tắt.",
+        "info": "Chạy một mô hình ngôn ngữ trên phần đọc chính tả của bạn để sửa dấu câu, loại bỏ từ đệm và tùy chọn điều chỉnh văn phong. Chỉ áp dụng cho đọc chính tả (không áp dụng cho trò chuyện với trợ lý) và chạy bằng phím tắt riêng. Nó thêm một khoảng chờ vì mô hình chạy sau khi chuyển đổi; nếu thất bại hoặc quá thời gian, văn bản gốc của bạn sẽ được dán. Mặc định dùng mô hình của trợ lý. Tính năng này vẫn đang phát triển — bạn chưa thể chọn mô hình cục bộ tích hợp từ danh sách riêng của nó, và nó cần tinh chỉnh thêm trước khi trở thành một tính năng chính."
       },
       "postProcessTimeout": {
-        "title": "AI cleanup timeout",
-        "description": "How long to wait for the model before giving up and pasting your raw transcription instead. On the built-in local model, allow enough time for it to load on first use.",
-        "seconds": "{{seconds}} seconds"
+        "title": "Thời gian chờ dọn dẹp bằng AI",
+        "description": "Chờ mô hình trong bao lâu trước khi bỏ qua và dán bản chuyển đổi gốc của bạn. Với mô hình cục bộ tích hợp, hãy để đủ thời gian cho nó nạp lần đầu.",
+        "seconds": "{{seconds}} giây"
       },
       "experimentalToggle": {
         "label": "Tính năng thử nghiệm",
@@ -565,28 +567,28 @@
       },
       "lazyStreamClose": {
         "label": "Giữ micro mở giữa các lần phiên âm",
-        "description": "Giữ luồng micro mở trong 30 giây sau khi dừng ghi âm, giảm độ trễ khi phiên âm liên tiếp. Có thể làm giảm chất lượng âm thanh Bluetooth khi đang hoạt động."
+        "description": "Đọc chính tả liên tiếp nhanh hơn. Có thể ảnh hưởng đến chất lượng âm thanh Bluetooth."
       },
       "liveTranscription": {
-        "label": "Live transcription",
-        "description": "Transcribe speech as you talk, instead of all at once when you stop. Experimental."
+        "label": "Chuyển đổi trực tiếp",
+        "description": "Chuyển giọng nói thành văn bản ngay khi bạn nói, thay vì chờ đến lúc bạn dừng. Thử nghiệm."
       },
       "liveTranscriptionWindow": {
-        "label": "Live transcription window",
-        "description": "While live transcription runs, show a larger overlay card with the running text instead of the compact pill. Requires live transcription."
+        "label": "Cửa sổ chuyển đổi trực tiếp",
+        "description": "Khi chuyển đổi trực tiếp đang chạy, hiển thị thẻ lớp phủ lớn hơn kèm văn bản đang chạy thay vì viên nhỏ gọn. Cần bật chuyển đổi trực tiếp."
       },
       "acceleration": {
         "whisper": {
           "title": "Tăng tốc Whisper",
-          "description": "Tăng tốc phần cứng cho các mô hình Whisper. Chế độ tự động sử dụng GPU nếu có (Metal trên macOS, Vulkan trên Windows/Linux)."
+          "description": "Tự động sẽ dùng GPU khi có sẵn."
         },
         "ort": {
           "title": "Tăng tốc ONNX",
-          "description": "Tăng tốc phần cứng cho các mô hình ONNX (Parakeet, Canary, Moonshine, v.v.). DirectML trên Windows là thử nghiệm. Các mô hình có thể không chuyển đổi giọng nói được."
+          "description": "Dành cho các mô hình Parakeet, Canary và Moonshine. DirectML là thử nghiệm."
         },
         "gpuDevice": {
           "title": "Thiết bị GPU",
-          "description": "Chọn GPU để sử dụng cho suy luận Whisper. Tự động chọn GPU chuyên dụng.",
+          "description": "Tự động sẽ chọn GPU chuyên dụng.",
           "auto": "Tự động"
         }
       },
@@ -602,18 +604,22 @@
         "label": "Hiển thị biểu tượng khay",
         "description": "Hiển thị biểu tượng SpeakoFlow trong khay hệ thống."
       },
+      "closeBehavior": {
+        "label": "Thoát khi tôi đóng cửa sổ",
+        "description": "Khi tắt, đóng cửa sổ vẫn giữ SpeakoFlow chạy trong khay hệ thống để phím tắt của bạn tiếp tục hoạt động. Khi bật, đóng cửa sổ sẽ thoát hẳn ứng dụng."
+      },
       "overlayStyle": {
-        "title": "Overlay",
-        "description": "How the recording overlay looks while you dictate. None hides it, Minimal is the compact pill, and Live shows a readable card with your words as you speak (for models that support it).",
+        "title": "Lớp phủ",
+        "description": "Lớp phủ ghi âm trông thế nào khi bạn đọc chính tả. Không có sẽ ẩn nó, Tối giản là viên nhỏ gọn, còn Trực tiếp hiện một thẻ dễ đọc kèm câu chữ của bạn khi bạn nói (với những mô hình hỗ trợ).",
         "options": {
-          "none": "None",
-          "minimal": "Minimal",
-          "live": "Live"
+          "none": "Không có",
+          "minimal": "Tối giản",
+          "live": "Trực tiếp"
         }
       },
       "overlay": {
         "title": "Vị trí lớp phủ",
-        "description": "Hiển thị lớp phủ phản hồi trực quan trong quá trình ghi âm và chuyển đổi. Trên Linux, 'Không có' được khuyến nghị.",
+        "description": "Vị trí của lớp phủ ghi âm trên màn hình của bạn.",
         "options": {
           "none": "Không có",
           "bottom": "Dưới",
@@ -622,7 +628,7 @@
       },
       "pasteMethod": {
         "title": "Phương thức dán",
-        "description": "Chọn cách chèn văn bản. Trực tiếp: mô phỏng gõ phím qua đầu vào hệ thống. Không có: bỏ qua dán, chỉ cập nhật lịch sử/clipboard.",
+        "description": "Cách văn bản đã chuyển đổi được chèn vào ứng dụng đang hoạt động.",
         "options": {
           "clipboard": "Clipboard ({{modifier}}+V)",
           "clipboardCtrlShiftV": "Clipboard (Ctrl+Shift+V)",
@@ -635,14 +641,14 @@
       },
       "typingTool": {
         "title": "Công cụ gõ",
-        "description": "Chọn công cụ gõ trên Linux cho phương thức dán trực tiếp. Auto sẽ tự động phát hiện và dùng công cụ tốt nhất có sẵn cho hệ thống của bạn.",
+        "description": "Công cụ Linux dùng cho phương thức dán Trực tiếp.",
         "options": {
           "auto": "Auto (Khuyến nghị)"
         }
       },
       "clipboardHandling": {
         "title": "Xử lý Clipboard",
-        "description": "Không sửa đổi Clipboard giữ nguyên nội dung clipboard hiện tại sau khi chuyển đổi. Sao chép vào Clipboard để lại kết quả chuyển đổi trong clipboard sau khi dán.",
+        "description": "Bản chuyển đổi có còn nằm trong clipboard sau khi dán hay không.",
         "options": {
           "dontModify": "Không sửa đổi Clipboard",
           "copyToClipboard": "Sao chép vào Clipboard"
@@ -650,7 +656,7 @@
       },
       "autoSubmit": {
         "title": "Gửi tự động",
-        "description": "Tự động gửi tổ hợp phím đã chọn sau khi chèn văn bản. Cmd+Enter áp dụng trên macOS, còn Windows/Linux dùng Super+Enter.",
+        "description": "Tự động gửi một tổ hợp phím sau khi chèn văn bản.",
         "options": {
           "off": "Tắt",
           "enter": "Enter",
@@ -661,12 +667,12 @@
       },
       "translateToEnglish": {
         "label": "Dịch sang tiếng Anh",
-        "description": "Tự động dịch giọng nói từ các ngôn ngữ khác sang tiếng Anh trong quá trình chuyển đổi.",
+        "description": "Dịch giọng nói từ các ngôn ngữ khác sang tiếng Anh.",
         "descriptionUnsupported": "Mô hình {{model}} không hỗ trợ dịch thuật."
       },
       "modelUnload": {
         "title": "Giải phóng mô hình",
-        "description": "Tự động giải phóng bộ nhớ GPU/CPU khi mô hình không được sử dụng trong thời gian quy định",
+        "description": "Giải phóng bộ nhớ khi mô hình không hoạt động trong khoảng thời gian này.",
         "options": {
           "never": "Không bao giờ",
           "immediately": "Ngay lập tức",
@@ -680,83 +686,110 @@
       },
       "customWords": {
         "title": "Từ tùy chỉnh",
-        "description": "Thêm các từ thường bị nghe nhầm hoặc viết sai trong quá trình chuyển đổi. Hệ thống sẽ tự động sửa các từ có âm thanh tương tự để khớp với danh sách của bạn.",
-        "info": "Example: add “Kokoro” if SpeakoFlow writes “Coco row.”",
-        "placeholder": "Thêm một từ",
+        "description": "Tên riêng, sản phẩm và cụm từ mà SpeakoFlow nên viết theo cách của bạn.",
+        "info": "Ví dụ: thêm “Kokoro” nếu SpeakoFlow viết thành “Coco row.”",
+        "placeholder": "Thêm tên riêng, thuật ngữ hoặc cụm từ ngắn",
         "add": "Thêm",
-        "empty": "No custom words yet.",
+        "empty": "Chưa có từ tùy chỉnh nào.",
         "remove": "Xóa {{word}}",
         "duplicate": "\"{{word}}\" đã tồn tại"
       },
       "textReplacements": {
-        "title": "Text replacements",
-        "description": "Replace a phrase in your transcript with text you use often. Example: “my email” becomes “alex@example.com”.",
-        "rulesTitle": "Replacement rules",
-        "rulesHint": "Choose what SpeakoFlow hears and what it should insert.",
-        "empty": "Create a rule for a phrase you say often.",
-        "addFirst": "Create first rule",
-        "addRule": "Add replacement",
-        "manageRules": "Replacements ({{count}})",
-        "searchLabel": "Spoken phrase",
-        "searchPlaceholder": "my email",
-        "replaceLabel": "Insert this text",
+        "title": "Thay thế văn bản",
+        "description": "Thay một cụm từ trong bản chuyển đổi bằng đoạn văn bản bạn hay dùng. Ví dụ: “email của tôi” thành “alex@example.com”.",
+        "rulesTitle": "Quy tắc thay thế",
+        "rulesHint": "Chọn điều SpeakoFlow nghe được và điều nó nên chèn vào.",
+        "empty": "Hãy tạo một quy tắc cho cụm từ bạn thường nói.",
+        "addFirst": "Tạo quy tắc đầu tiên",
+        "addRule": "Thêm thay thế",
+        "manageRules": "Thay thế ({{count}})",
+        "searchLabel": "Cụm từ nói ra",
+        "searchPlaceholder": "email của tôi",
+        "replaceLabel": "Chèn văn bản này",
         "replacePlaceholder": "alex@example.com",
-        "advanced": "Advanced options",
+        "advanced": "Tùy chọn nâng cao",
         "regex": "Regex",
-        "trimBefore": "Trim before",
-        "trimAfter": "Trim after",
-        "enabledLabel": "Enabled",
-        "remove": "Remove rule",
-        "import": "Import",
-        "export": "Export",
-        "importSuccess": "Imported {{count}} replacement rules",
-        "importError": "Could not import: the file is not a valid replacements list",
-        "exportSuccess": "Replacements exported",
-        "exportError": "Could not export replacements",
-        "magicHint": "Use [date], [time], [uppercase], [lowercase], [capitalize], or [nospace] in the inserted text.",
+        "trimBefore": "Cắt phía trước",
+        "trimAfter": "Cắt phía sau",
+        "enabledLabel": "Đã bật",
+        "remove": "Xóa quy tắc",
+        "import": "Nhập",
+        "export": "Xuất",
+        "importSuccess": "Đã nhập {{count}} quy tắc thay thế",
+        "importError": "Không thể nhập: tệp không phải là danh sách thay thế hợp lệ",
+        "exportSuccess": "Đã xuất các quy tắc thay thế",
+        "exportError": "Không thể xuất các quy tắc thay thế",
+        "magicHint": "Dùng [date], [time], [uppercase], [lowercase], [capitalize] hoặc [nospace] trong văn bản được chèn.",
         "capitalization": {
-          "label": "Caps",
-          "none": "None",
-          "uppercase": "UPPERCASE",
-          "lowercase": "lowercase",
-          "capitalize": "Capitalize"
+          "label": "Chữ hoa",
+          "none": "Không",
+          "uppercase": "CHỮ IN HOA",
+          "lowercase": "chữ thường",
+          "capitalize": "Viết hoa đầu"
         }
       }
     },
     "postProcessing": {
       "title": "Xử lý sau",
+      "readiness": {
+        "checking": "Đang kiểm tra thiết lập dọn dẹp bằng AI…",
+        "checkFailed": "Không thể kiểm tra thiết lập dọn dẹp bằng AI.",
+        "ready": "Sẵn sàng — {{provider}}.",
+        "assistantFallback": "Sẵn sàng — đang dùng mô hình Trợ lý của bạn ({{provider}}).",
+        "selectPrompt": "Hãy chọn một prompt dọn dẹp.",
+        "selectModel": "Hãy chọn một mô hình cho nhà cung cấp này.",
+        "addApiKey": "Hãy thêm khóa API cho nhà cung cấp này.",
+        "providerMissing": "Nhà cung cấp đã chọn không còn khả dụng."
+      },
+      "errors": {
+        "saveFailed": "Không thể lưu cài đặt dọn dẹp bằng AI.",
+        "modelsLoadFailed": "Không thể tải danh sách mô hình của nhà cung cấp này.",
+        "promptCreateFailed": "Không thể tạo prompt.",
+        "promptSelectFailed": "Đã tạo prompt, nhưng không thể chọn nó.",
+        "promptUpdateFailed": "Không thể cập nhật prompt.",
+        "promptDeleteFailed": "Không thể xóa prompt.",
+        "toneSelectFailed": "Không thể chọn văn phong.",
+        "toneCreateFailed": "Không thể tạo văn phong.",
+        "toneSelectAfterCreateFailed": "Đã tạo văn phong, nhưng không thể chọn nó.",
+        "toneUpdateFailed": "Không thể cập nhật văn phong.",
+        "toneDeleteFailed": "Không thể xóa văn phong."
+      },
       "enable": {
-        "title": "AI cleanup"
+        "title": "Dọn dẹp bằng AI"
       },
       "hotkey": {
         "title": "Phím tắt"
       },
       "tone": {
-        "title": "Tone",
-        "description": "Optionally rewrite your cleaned-up dictation in a chosen tone. \"None\" just tidies the text without changing the wording.",
+        "title": "Mẫu văn phong",
+        "description": "Chọn văn phong cho bản đọc chính tả sau khi dọn dẹp. Chỉ dọn dẹp sẽ sửa văn bản mà không cố ý thay đổi giọng điệu.",
         "options": {
-          "none": "None (cleanup only)",
-          "formal": "Formal",
-          "casual": "Casual",
-          "professional": "Professional",
-          "friendly": "Friendly",
-          "concise": "Concise"
+          "none": "Không (chỉ dọn dẹp)",
+          "formal": "Trang trọng",
+          "casual": "Thoải mái",
+          "professional": "Chuyên nghiệp",
+          "friendly": "Thân thiện",
+          "concise": "Ngắn gọn"
         },
-        "edit": "Edit",
-        "closeEditor": "Close",
-        "createNew": "Create style",
-        "nameLabel": "Style name",
-        "namePlaceholder": "For example, Calm and clean",
-        "instructionsLabel": "Style instructions",
-        "instructionsPlaceholder": "Describe exactly how the wording should change. Example: Remove profanity and replace it with calm, neutral wording.",
-        "instructionsHint": "These rules shape the wording after cleanup. They stay separate from your cleanup prompt.",
-        "createTone": "Create style",
-        "updateTone": "Save changes",
-        "deleteTone": "Delete style",
-        "cancel": "Cancel"
+        "edit": "Sửa",
+        "closeEditor": "Đóng",
+        "createNew": "Tạo văn phong",
+        "nameLabel": "Tên văn phong",
+        "namePlaceholder": "Ví dụ: Điềm tĩnh và gọn gàng",
+        "instructionsLabel": "Hướng dẫn văn phong",
+        "instructionsPlaceholder": "Mô tả chính xác cách câu chữ nên thay đổi. Ví dụ: Bỏ từ ngữ thô tục và thay bằng cách diễn đạt điềm tĩnh, trung tính.",
+        "instructionsHint": "Những quy tắc này định hình câu chữ sau khi dọn dẹp. Chúng tách biệt với prompt dọn dẹp của bạn.",
+        "createTone": "Tạo văn phong",
+        "updateTone": "Lưu thay đổi",
+        "deleteTone": "Xóa văn phong",
+        "cancel": "Hủy"
       },
       "api": {
         "title": "API (Tương thích OpenAI)",
+        "location": {
+          "title": "Nơi chạy",
+          "description": "Chạy dọn dẹp riêng tư bằng một mô hình đã tải, hoặc dùng nhà cung cấp đám mây."
+        },
         "provider": {
           "title": "Nhà cung cấp",
           "description": "Chọn một nhà cung cấp tương thích OpenAI."
@@ -769,7 +802,7 @@
         },
         "baseUrl": {
           "title": "URL cơ sở",
-          "description": "URL cơ sở API cho nhà cung cấp đã chọn. Chỉ có thể chỉnh sửa nhà cung cấp tùy chỉnh.",
+          "description": "URL cơ sở API cho nhà cung cấp đã chọn. Có thể chỉnh sửa với Custom, Local và Azure OpenAI (hãy đặt thành tài nguyên của bạn, ví dụ https://your-resource.openai.azure.com/openai/v1).",
           "placeholder": "https://api.openai.com/v1"
         },
         "apiKey": {
@@ -778,10 +811,10 @@
           "placeholder": "sk-..."
         },
         "builtin": {
-          "modelDescription": "Pick a model you've downloaded. It runs on your machine with no API key or setup.",
-          "modelPlaceholder": "Select a downloaded model",
-          "noModels": "No local models yet. Download one from the model catalog.",
-          "ready": "Runs fully on your machine. No API key, no setup."
+          "modelDescription": "Chọn một mô hình bạn đã tải. Nó chạy trên máy của bạn, không cần khóa API hay thiết lập.",
+          "modelPlaceholder": "Chọn một mô hình đã tải",
+          "noModels": "Chưa có mô hình cục bộ nào. Hãy tải một mô hình từ danh mục mô hình.",
+          "ready": "Chạy hoàn toàn trên máy của bạn. Không cần khóa API, không cần thiết lập."
         },
         "model": {
           "title": "Mô hình",
@@ -792,10 +825,6 @@
           "placeholderWithOptions": "Tìm kiếm hoặc chọn một mô hình",
           "placeholderNoOptions": "Nhập tên mô hình",
           "refreshModels": "Làm mới mô hình"
-        },
-        "location": {
-          "title": "Where it runs",
-          "description": "Run cleanup privately with a downloaded model or use a cloud provider."
         }
       },
       "prompts": {
@@ -807,138 +836,122 @@
         "noPrompts": "Không có prompt nào",
         "selectPrompt": "Chọn một prompt",
         "createNew": "Tạo Prompt mới",
-        "edit": "Edit",
-        "closeEditor": "Close",
+        "edit": "Sửa",
+        "closeEditor": "Đóng",
         "promptLabel": "Nhãn Prompt",
         "promptLabelPlaceholder": "Nhập tên prompt",
         "promptInstructions": "Hướng dẫn Prompt",
         "promptInstructionsPlaceholder": "Viết hướng dẫn để chạy sau khi chuyển đổi. Ví dụ: Cải thiện ngữ pháp và độ rõ ràng cho văn bản sau: ${output}",
-        "promptTip": "Mẹo: Sử dụng <code>${output}</code> để chèn văn bản đã chuyển đổi vào prompt của bạn.",
+        "promptTip": "Mẹo: Văn bản đã chuyển đổi của bạn được gửi tới mô hình tự động — bạn chỉ cần viết hướng dẫn. (Các prompt cũ dùng <code>${output}</code> vẫn hoạt động.)",
         "updatePrompt": "Cập nhật Prompt",
         "deletePrompt": "Xóa Prompt",
         "createPrompt": "Tạo Prompt",
         "cancel": "Hủy",
         "selectToEdit": "Chọn một prompt ở trên để xem và chỉnh sửa chi tiết.",
         "createFirst": "Nhấn 'Tạo Prompt mới' ở trên để tạo prompt xử lý sau đầu tiên của bạn."
-      },
-      "readiness": {
-        "checking": "Checking AI cleanup setup…",
-        "checkFailed": "Couldn’t check AI cleanup setup.",
-        "ready": "Ready — {{provider}}.",
-        "assistantFallback": "Ready — using your Assistant model ({{provider}}).",
-        "selectPrompt": "Select a cleanup prompt.",
-        "selectModel": "Select a model for this provider.",
-        "addApiKey": "Add an API key for this provider.",
-        "providerMissing": "The selected provider is no longer available."
-      },
-      "errors": {
-        "saveFailed": "Couldn’t save the AI cleanup setting.",
-        "modelsLoadFailed": "Couldn’t load models for this provider.",
-        "promptCreateFailed": "Couldn’t create the prompt.",
-        "promptSelectFailed": "Created the prompt, but couldn’t select it.",
-        "promptUpdateFailed": "Couldn’t update the prompt.",
-        "promptDeleteFailed": "Couldn’t delete the prompt.",
-        "toneSelectFailed": "Couldn’t select the writing style.",
-        "toneCreateFailed": "Couldn’t create the writing style.",
-        "toneSelectAfterCreateFailed": "Created the style, but couldn’t select it.",
-        "toneUpdateFailed": "Couldn’t update the writing style.",
-        "toneDeleteFailed": "Couldn’t delete the writing style."
       }
     },
     "dictation": {
       "hero": {
-        "eyebrow": "Now listening with",
-        "loading": "Loading your model…",
-        "noModelTitle": "No model yet",
-        "noModelCaption": "Pick a model so your voice becomes text.",
-        "chooseModel": "Choose a model",
-        "changeModel": "Change model",
-        "streams": "Streams live",
-        "accuracy": "Accuracy",
-        "speed": "Speed"
+        "eyebrow": "Đang lắng nghe bằng",
+        "loading": "Đang nạp mô hình của bạn…",
+        "noModelTitle": "Chưa có mô hình",
+        "noModelCaption": "Hãy chọn một mô hình để giọng nói của bạn thành văn bản.",
+        "chooseModel": "Chọn mô hình",
+        "changeModel": "Đổi mô hình",
+        "streams": "Hiện chữ trực tiếp",
+        "accuracy": "Độ chính xác",
+        "speed": "Tốc độ"
       },
       "catalog": {
-        "title": "Choose your model",
-        "description": "Every model runs on your machine — trade accuracy for speed and pick the one that fits."
+        "title": "Chọn mô hình của bạn",
+        "description": "Mọi mô hình đều chạy trên máy của bạn — hãy đánh đổi độ chính xác lấy tốc độ và chọn mô hình vừa vặn."
       },
       "aiCleanup": {
-        "groupTitle": "AI cleanup",
-        "modelGroupTitle": "Cleanup model",
-        "promptGroupTitle": "Cleanup prompt",
-        "title": "Fix up my dictation with AI",
-        "caption": "Experimental — tidies punctuation and filler after you dictate.",
-        "info": "Runs a language model over your dictation to fix punctuation, remove filler words, and optionally adjust the tone. Applies to dictation only, on its own shortcut. It adds a short delay after you speak; if the model fails or times out, your raw text is used instead. Still in development.",
-        "styleGroupTitle": "Writing style",
-        "styleGroupDescription": "Choose a built-in style or save your own rules for how cleaned dictation should sound.",
-        "fixMisheardLabel": "Fix misheard words",
-        "fixMisheardDescription": "When a word is clearly wrong for the sentence — a homophone or a near-miss pronunciation — replace it with the word you meant. Helpful for accents; the AI only corrects when the intended word is obvious."
+        "groupTitle": "Dọn dẹp bằng AI",
+        "styleGroupTitle": "Văn phong",
+        "styleGroupDescription": "Chọn một văn phong có sẵn hoặc lưu quy tắc riêng của bạn về cách phần đọc chính tả sau khi dọn dẹp nên nghe ra sao.",
+        "modelGroupTitle": "Mô hình dọn dẹp",
+        "promptGroupTitle": "Prompt dọn dẹp",
+        "title": "Dùng AI chỉnh lại phần đọc chính tả của tôi",
+        "caption": "Thử nghiệm — dọn dấu câu và từ đệm sau khi bạn đọc chính tả.",
+        "strengthLabel": "Mức độ dọn dẹp",
+        "strengthDescription": "AI viết lại câu chữ của bạn nhiều đến đâu. Nhẹ chỉ sửa lỗi và từ đệm. Cân bằng còn cắt những ý lặp lại và những câu bỏ dở. Mạnh siết phần nói lan man thành văn bản ngắn gọn, có cấu trúc rõ — luôn giữ nguyên thông tin và ý của bạn.",
+        "strengthOptions": {
+          "light": "Nhẹ",
+          "balanced": "Cân bằng",
+          "aggressive": "Mạnh"
+        },
+        "fixMisheardLabel": "Sửa từ bị nghe nhầm",
+        "fixMisheardDescription": "Khi một từ rõ ràng không đúng với câu — từ đồng âm hoặc phát âm gần giống — hãy thay bằng từ bạn muốn nói. Hữu ích với các giọng địa phương; AI chỉ sửa khi từ đúng là hiển nhiên.",
+        "info": "Chạy một mô hình ngôn ngữ trên phần đọc chính tả của bạn để sửa dấu câu, loại bỏ từ đệm và tùy chọn điều chỉnh văn phong. Chỉ áp dụng cho đọc chính tả, bằng phím tắt riêng. Nó thêm một khoảng chờ ngắn sau khi bạn nói; nếu mô hình thất bại hoặc quá thời gian, văn bản gốc của bạn sẽ được dùng. Vẫn đang phát triển."
       },
       "spokenEmoji": {
         "title": "Emoji bằng giọng nói",
         "description": "Nói “happy emoji” hoặc “thumbs up emoji” để chèn 😊 hoặc 👍. Các tên gọi phổ biến và lỗi nhận dạng nhỏ được xử lý trên thiết bị; tên không xác định vẫn giữ nguyên dạng văn bản."
       },
-      "output": {
-        "title": "Output options"
-      },
       "flow": {
-        "groupTitle": "Generate with Flow",
-        "enableLabel": "Generate with Flow",
-        "enableDescription": "Start a dictation with the activation phrase to have AI write the result for you — “Hey Flow, write a polite email asking to reschedule” pastes the finished email.",
-        "phraseLabel": "Activation phrase",
-        "phraseDescription": "Flow activates only when a dictation begins with this phrase. Anywhere else, the same words paste as normal dictation. Uses your assistant's model; leave empty to reset to “Hey Flow”.",
+        "groupTitle": "Tạo nội dung với Flow",
+        "enableLabel": "Tạo nội dung với Flow",
+        "enableDescription": "Bắt đầu một lần đọc chính tả bằng cụm từ kích hoạt để AI viết kết quả cho bạn — “Hey Flow, viết một email lịch sự xin đổi lịch hẹn” sẽ dán ra email đã hoàn chỉnh.",
+        "phraseLabel": "Cụm từ kích hoạt",
+        "phraseDescription": "Flow chỉ kích hoạt khi một lần đọc chính tả bắt đầu bằng cụm từ này. Ở mọi chỗ khác, cùng những từ đó vẫn được dán như đọc chính tả bình thường. Dùng mô hình của trợ lý; để trống để đặt lại thành “Hey Flow”.",
         "phrasePlaceholder": "Hey Flow",
-        "screenLabel": "Allow screen access",
-        "screenDescription": "Let Flow take one screenshot when a command clearly refers to your screen, like “look at this email and draft a reply”. The model decides if it's needed. Separate from the assistant's screen access."
+        "screenLabel": "Cho phép truy cập màn hình",
+        "screenDescription": "Cho Flow chụp một ảnh màn hình khi câu lệnh rõ ràng nói về màn hình của bạn, kiểu “xem email này và viết nháp một câu trả lời”. Mô hình tự quyết định có cần hay không. Tách biệt với quyền truy cập màn hình của trợ lý."
+      },
+      "output": {
+        "title": "Tùy chọn đầu ra"
       }
     },
     "history": {
       "title": "Lịch sử",
       "storage": {
-        "title": "Recording storage",
-        "description": "These controls affect recordings only. Starred recordings are always kept. Assistant chats have separate storage."
+        "title": "Lưu trữ bản ghi âm",
+        "description": "Các tùy chọn này ảnh hưởng đến bản ghi đọc chính tả và Flow. Bản ghi đã lưu luôn được giữ lại. Trò chuyện với trợ lý được lưu trữ riêng."
       },
       "filters": {
-        "label": "History type",
-        "all": "All",
+        "label": "Loại lịch sử",
+        "all": "Tất cả",
         "recordings": "Recordings",
         "flow": "Flow",
-        "assistant": "Assistant chats"
+        "assistant": "Trò chuyện với trợ lý"
       },
       "openFolder": "Mở thư mục ghi âm",
-      "loading": "Đang tải lịch sử...",
-      "empty": "Chưa có bản ghi nào. Bắt đầu ghi âm để xây dựng lịch sử của bạn!",
-      "emptyRecordings": "No recordings yet.",
-      "emptyFlow": "No Flow generations yet.",
-      "emptyAssistant": "No assistant chats yet.",
-      "recordingLabel": "Recording",
+      "loading": "Đang tải lịch sử…",
+      "empty": "Chưa có gì ở đây. Nội dung đọc chính tả, nội dung do Flow tạo và trò chuyện với trợ lý của bạn sẽ xuất hiện ở đây.",
+      "emptyRecordings": "Chưa có nội dung đọc chính tả nào.",
+      "emptyFlow": "Chưa có nội dung nào do Flow tạo.",
+      "emptyAssistant": "Chưa có cuộc trò chuyện nào với trợ lý.",
+      "recordingLabel": "Đọc chính tả",
       "flowLabel": "Flow",
-      "flowTranscriptLabel": "You said",
-      "originalTranscriptionLabel": "Original transcription",
-      "flowOutputLabel": "Flow output",
-      "finalTextLabel": "Final text",
-      "flowNoOutput": "No Flow output was generated.",
-      "copyFlowOutput": "Copy Flow output",
-      "copyFinalText": "Copy final text",
+      "flowTranscriptLabel": "Bạn đã nói",
+      "originalTranscriptionLabel": "Bản chuyển đổi gốc",
+      "flowOutputLabel": "Kết quả từ Flow",
+      "finalTextLabel": "Văn bản cuối",
+      "flowNoOutput": "Flow không tạo ra kết quả nào.",
       "copyToClipboard": "Sao chép bản ghi vào clipboard",
+      "copyFlowOutput": "Sao chép kết quả từ Flow",
+      "copyFinalText": "Sao chép văn bản cuối",
       "save": "Lưu bản ghi",
       "unsave": "Xóa khỏi đã lưu",
       "delete": "Xóa mục",
       "deleteError": "Không thể xóa mục. Vui lòng thử lại.",
       "retranscribe": "Phiên âm lại",
       "retranscribeError": "Không thể phiên âm lại. Vui lòng thử lại.",
-      "transcribing": "Đang phiên âm...",
+      "transcribing": "Đang phiên âm…",
       "transcriptionFailed": "Phiên âm thất bại. Bạn có thể phiên âm lại bằng biểu tượng thử lại.",
-      "assistantLabel": "Assistant chat",
-      "copyConversation": "Copy conversation",
-      "resumeConversation": "Continue this conversation in the assistant",
-      "showConversation": "Show conversation",
-      "hideConversation": "Hide conversation",
-      "roleUser": "You",
-      "roleAssistant": "Assistant",
-      "screenshotAttached": "Vision",
-      "messageCount_one": "{{count}} message",
-      "messageCount_other": "{{count}} messages",
-      "deleteAssistantError": "Couldn't delete the conversation. Please try again."
+      "assistantLabel": "Trò chuyện với trợ lý",
+      "copyConversation": "Sao chép cuộc trò chuyện",
+      "resumeConversation": "Tiếp tục cuộc trò chuyện này trong trợ lý",
+      "showConversation": "Hiện cuộc trò chuyện",
+      "hideConversation": "Ẩn cuộc trò chuyện",
+      "roleUser": "Bạn",
+      "roleAssistant": "Trợ lý",
+      "screenshotAttached": "Màn hình",
+      "messageCount_one": "{{count}} tin nhắn",
+      "messageCount_other": "{{count}} tin nhắn",
+      "deleteAssistantError": "Không thể xóa cuộc trò chuyện. Vui lòng thử lại."
     },
     "debug": {
       "title": "Gỡ lỗi",
@@ -964,24 +977,24 @@
       },
       "historyLimit": {
         "title": "Giới hạn lịch sử",
-        "description": "Số lượng mục lịch sử tối đa cần giữ",
-        "entries": "mục"
+        "description": "Số bản ghi đọc chính tả và Flow chưa lưu tối đa cần giữ. Bản ghi đã lưu luôn được giữ lại, và trò chuyện với trợ lý không được tính.",
+        "entries": "bản ghi"
       },
       "recordingRetention": {
         "title": "Tự động xóa ghi âm",
-        "description": "Tự động xóa các bản ghi âm cũ để tiết kiệm dung lượng",
+        "description": "Chọn cách dọn các bản ghi chưa lưu. Thay đổi có hiệu lực ngay và không bao giờ ảnh hưởng đến trò chuyện với trợ lý.",
         "never": "Không bao giờ",
-        "preserveLimit": "Giữ {{count}} bản mới nhất",
+        "preserveLimit": "Giữ một số lượng nhất định",
         "days3": "Sau 3 ngày",
         "weeks2": "Sau 2 tuần",
         "months3": "Sau 3 tháng",
-        "placeholder": "Chọn thời gian lưu giữ...",
-        "savedToast": "Retention saved.",
-        "appliedToast": "Recording retention applied"
+        "placeholder": "Chọn thời gian lưu giữ…",
+        "savedToast": "Đã lưu thời gian lưu giữ.",
+        "appliedToast": "Đã áp dụng thời gian lưu giữ bản ghi âm"
       },
       "alwaysOnMicrophone": {
         "label": "Micrô luôn bật",
-        "description": "Giữ micrô hoạt động để phản hồi nhanh hơn"
+        "description": "Giữ micrô sẵn sàng để không bao giờ mất những từ đầu tiên. Tốn thêm một chút pin."
       },
       "clamshellMicrophone": {
         "title": "Micrô chế độ gập",
@@ -1015,7 +1028,7 @@
       },
       "recordingBuffer": {
         "title": "Bộ đệm ghi âm thêm",
-        "description": "Thời gian thêm (tính bằng mili giây) để tiếp tục ghi âm sau khi nhả phím, để thu âm thanh cuối. 0 = không có bộ đệm thêm."
+        "description": "Số mili giây tiếp tục ghi âm sau khi bạn nhả phím."
       }
     },
     "about": {
@@ -1025,12 +1038,12 @@
         "description": "Phiên bản hiện tại của SpeakoFlow"
       },
       "updates": {
-        "title": "Updates",
-        "button": "Check for updates",
-        "disabledHint": "Automatic update checks are off. Turn them on in General."
+        "title": "Cập nhật",
+        "button": "Kiểm tra cập nhật",
+        "disabledHint": "Tự động kiểm tra cập nhật đang tắt. Bật lại trong mục Chung."
       },
       "folders": {
-        "title": "Folders"
+        "title": "Thư mục"
       },
       "appDataDirectory": {
         "title": "Thư mục dữ liệu ứng dụng",
@@ -1042,9 +1055,9 @@
         "button": "Xem trên GitHub"
       },
       "license": {
-        "title": "License",
-        "description": "SpeakoFlow is open source under the MIT License, building on Handy (also MIT) by CJ Pais.",
-        "button": "View license"
+        "title": "Giấy phép",
+        "description": "SpeakoFlow là mã nguồn mở theo Giấy phép MIT, dựa trên Handy (cũng MIT) của CJ Pais.",
+        "button": "Xem giấy phép"
       },
       "supportDevelopment": {
         "title": "Hỗ trợ phát triển",
@@ -1054,326 +1067,340 @@
     },
     "assistant": {
       "shortcuts": {
-        "title": "Shortcuts"
+        "title": "Phím tắt"
       },
       "brain": {
-        "title": "Assistant brain",
-        "description": "Choose whether your assistant runs privately on this device or through a cloud provider.",
-        "whereLabel": "Where it runs",
-        "onDevice": "On my device",
-        "cloud": "Cloud provider",
-        "downloadModel": "Browse and download models",
-        "downloadModelDescription": "Pick a recommended model or search Hugging Face.",
-        "downloadModelAction": "Browse models",
-        "catalogTitle": "Download an on-device model",
-        "catalogDescription": "Choose a model to download. It stays on this machine and needs no API key.",
-        "currentModelTitle": "Current model",
-        "currentModelDescription": "Selected for the built-in assistant on this device.",
-        "recommendedTitle": "Recommended models",
-        "recommendedDescription": "Three conversation-first choices: quickest, recommended, and more capable but slower.",
-        "acceleratorDetected": "{{name}} · {{memory}} GB reported graphics memory",
-        "acceleratorDetectedDedicated": "{{name}} · {{memory}} GB dedicated VRAM",
-        "acceleratorDetectedIntegrated": "{{name}} · {{memory}} GB shared graphics memory",
-        "acceleratorDetectedNoMemory": "{{name}} detected · graphics memory not reported",
-        "acceleratorUnknownWithMemory": "Graphics memory unavailable · {{memory}} GB system RAM for CPU fallback",
-        "acceleratorUnknown": "Graphics memory unavailable · response speed cannot be predicted",
-        "details": "Details",
-        "switchBeforeDelete": "Switch the built-in assistant to another model before deleting this one.",
-        "deleteModelConfirm": "Delete {{modelName}}? Its downloaded files and saved entry will be removed.",
-        "deleteModelFailed": "Could not delete the model.",
-        "visionModelNote": "Screen vision downloads an additional image file automatically.",
-        "finderSectionTitle": "More on-device models",
-        "finderSectionDescription": "Search Hugging Face when you need a different model size or capability.",
-        "finderTitle": "Browse Hugging Face",
-        "finderDescription": "Search thousands of GGUF models and download one directly to SpeakoFlow.",
-        "finderAction": "Find a model",
-        "huggingFaceTitle": "From Hugging Face",
-        "huggingFaceDescription": "Models you added yourself. Compatibility and performance can vary.",
-        "catalogEmpty": "No recommended local models are available right now."
+        "title": "Bộ não trợ lý",
+        "description": "Chọn xem trợ lý của bạn chạy riêng tư trên thiết bị này hay qua một nhà cung cấp đám mây.",
+        "whereLabel": "Nơi chạy",
+        "onDevice": "Trên máy của tôi",
+        "cloud": "Nhà cung cấp đám mây",
+        "downloadModel": "Xem và tải mô hình",
+        "downloadModelDescription": "Chọn một mô hình được đề xuất hoặc tìm trên Hugging Face.",
+        "downloadModelAction": "Xem các mô hình",
+        "catalogTitle": "Chọn một mô hình chạy trên thiết bị",
+        "catalogDescription": "Tải một mô hình cục bộ riêng tư. Nó nằm lại trên máy này và không cần khóa API.",
+        "currentModelTitle": "Mô hình hiện tại",
+        "currentModelDescription": "Đã chọn cho trợ lý tích hợp trên thiết bị này.",
+        "recommendedTitle": "Mô hình được đề xuất",
+        "recommendedDescription": "Ba lựa chọn ưu tiên trò chuyện: nhanh nhất, được đề xuất, và mạnh hơn nhưng chậm hơn.",
+        "acceleratorDetected": "{{name}} · {{memory}} GB bộ nhớ đồ họa được báo cáo",
+        "acceleratorDetectedDedicated": "{{name}} · {{memory}} GB VRAM riêng",
+        "acceleratorDetectedIntegrated": "{{name}} · {{memory}} GB bộ nhớ đồ họa dùng chung",
+        "acceleratorDetectedNoMemory": "Đã phát hiện {{name}} · không có báo cáo về bộ nhớ đồ họa",
+        "acceleratorUnknownWithMemory": "Không rõ bộ nhớ đồ họa · {{memory}} GB RAM hệ thống để dự phòng bằng CPU",
+        "acceleratorUnknown": "Không rõ bộ nhớ đồ họa · không thể dự đoán tốc độ trả lời",
+        "details": "Chi tiết",
+        "switchBeforeDelete": "Hãy chuyển trợ lý tích hợp sang mô hình khác trước khi xóa mô hình này.",
+        "deleteModelConfirm": "Xóa {{modelName}}? Các tệp đã tải và mục đã lưu của nó sẽ bị loại bỏ.",
+        "deleteModelFailed": "Không thể xóa mô hình.",
+        "visionModelNote": "Khả năng xem màn hình sẽ tự động tải thêm một tệp hình ảnh.",
+        "finderSectionTitle": "Thêm mô hình chạy trên thiết bị",
+        "finderSectionDescription": "Tìm trên Hugging Face khi bạn cần một mô hình có kích thước hoặc khả năng khác.",
+        "finderTitle": "Xem trên Hugging Face",
+        "finderDescription": "Tìm trong hàng nghìn mô hình GGUF và tải một mô hình trực tiếp vào SpeakoFlow.",
+        "finderAction": "Tìm một mô hình",
+        "huggingFaceTitle": "Mô hình của bạn",
+        "huggingFaceDescription": "Các mô hình đã tải và các mô hình bạn thêm từ Hugging Face.",
+        "catalogEmpty": "Hiện không có mô hình cục bộ được đề xuất nào."
       },
       "subpages": {
-        "profilesCaption": "Switch the assistant's name, role, and personality.",
-        "memoryCaption": "What the assistant remembers about you between chats."
+        "profilesCaption": "Đổi tên, vai trò và tính cách của trợ lý.",
+        "memoryCaption": "Những gì trợ lý ghi nhớ về bạn giữa các cuộc trò chuyện."
       },
       "tapToLock": {
-        "label": "Tap to lock",
-        "info": "While holding the assistant shortcut, tap this to lock hands-free so you can let go and keep talking. Pick a key that isn't part of your assistant shortcut (one that overlaps is ignored), or clear it to turn this off.",
-        "off": "Off",
-        "clear": "Clear"
+        "label": "Nhấn để khóa",
+        "info": "Trong khi giữ phím tắt trợ lý, hãy nhấn phím này để khóa chế độ rảnh tay, nhờ đó bạn có thể thả tay ra mà vẫn nói tiếp. Chọn phím nào không thuộc phím tắt trợ lý của bạn (phím bị trùng sẽ bị bỏ qua), hoặc xóa trống để tắt tính năng này.",
+        "off": "Tắt",
+        "clear": "Xóa"
       },
       "provider": {
-        "title": "Assistant provider",
-        "providerLabel": "Provider",
-        "providerDescription": "The provider that answers assistant questions.",
-        "baseUrlLabel": "Base URL",
-        "baseUrlDescription": "OpenAI-compatible base URL. Azure URLs are normalized automatically.",
-        "apiKeyLabel": "API key",
-        "apiKeyDescription": "Shared with AI cleanup.",
-        "apiKeyPlaceholder": "Enter API key…",
-        "modelLabel": "Model",
-        "modelDescription": "Model or deployment name to use for assistant answers.",
-        "modelPlaceholder": "e.g. gpt-4o-mini",
-        "modelSearchPlaceholder": "Search or type a model…",
-        "modelUse": "Use \"{{model}}\"",
-        "loadModels": "Load models",
-        "loadingModels": "Loading…",
-        "noModelsFound": "No models returned. Type the model name instead.",
-        "builtinModelDescription": "Pick a downloaded local model. It runs on your machine with no API key.",
-        "builtinModelPlaceholder": "Select a downloaded model",
-        "builtinNoModels": "No models on your machine yet — download one below.",
-        "builtinReady": "Runs fully on your machine. No API key, no setup.",
-        "builtinEngineMissing": "First use downloads a small local engine automatically (one time), then runs fully offline. No setup needed.",
-        "contextSizeLabel": "Context window",
-        "contextSizeDescription": "How much the local model can keep in mind at once — the system instructions, your chat history, any screenshot (a single image can eat a big chunk), and its reply. Bigger holds more and keeps screen vision and web search reliable, but uses more memory. The default is 8192; 16384 is a good step up if your machine has the RAM to spare. You can lower it later to save memory.",
-        "unloadTimeoutLabel": "Unload from memory after",
-        "unloadTimeoutDescription": "Free up memory by unloading the local model after it has been idle this long. It reloads automatically on next use.",
-        "saveFailed": "Couldn’t switch the Assistant provider."
+        "title": "Nhà cung cấp cho trợ lý",
+        "saveFailed": "Không thể chuyển nhà cung cấp cho Trợ lý.",
+        "providerLabel": "Nhà cung cấp",
+        "providerDescription": "Nhà cung cấp trả lời các câu hỏi cho trợ lý.",
+        "baseUrlLabel": "URL cơ sở",
+        "baseUrlDescription": "URL cơ sở tương thích OpenAI. URL của Azure được chuẩn hóa tự động.",
+        "apiKeyLabel": "Khóa API",
+        "apiKeyDescription": "Dùng chung với dọn dẹp bằng AI.",
+        "apiKeyPlaceholder": "Nhập khóa API…",
+        "modelLabel": "Mô hình",
+        "modelDescription": "Tên mô hình hoặc tên bản triển khai dùng cho câu trả lời của trợ lý.",
+        "modelPlaceholder": "ví dụ: gpt-4o-mini",
+        "modelSearchPlaceholder": "Tìm hoặc nhập tên mô hình…",
+        "modelUse": "Dùng “{{model}}”",
+        "loadModels": "Tải danh sách mô hình",
+        "loadingModels": "Đang tải…",
+        "noModelsFound": "Không có mô hình nào được trả về. Hãy tự nhập tên mô hình.",
+        "builtinModelDescription": "Chọn một mô hình cục bộ đã tải. Nó chạy trên máy của bạn, không cần khóa API.",
+        "builtinModelPlaceholder": "Chọn một mô hình đã tải",
+        "builtinNoModels": "Chưa có mô hình nào trên máy của bạn — hãy tải một mô hình bên dưới.",
+        "builtinReady": "Chạy hoàn toàn trên máy của bạn. Không cần khóa API, không cần thiết lập.",
+        "builtinEngineMissing": "Lần dùng đầu tiên sẽ tự động tải một công cụ cục bộ nhỏ (chỉ một lần), sau đó chạy hoàn toàn ngoại tuyến. Không cần thiết lập gì.",
+        "builtinEngineDownloading": "Đang tải công cụ cục bộ… {{percent}}%",
+        "builtinEnginePreparing": "Đang tải công cụ cục bộ…",
+        "builtinEngineExtracting": "Đang cài đặt công cụ cục bộ…",
+        "builtinEngineReady": "Công cụ cục bộ đã sẵn sàng.",
+        "contextSizeLabel": "Cửa sổ ngữ cảnh",
+        "contextSizeDescription": "Lượng thông tin mô hình cục bộ có thể ghi nhớ cùng lúc — hướng dẫn hệ thống, lịch sử trò chuyện của bạn, ảnh màn hình nếu có (một ảnh có thể chiếm phần khá lớn) và câu trả lời của nó. Cửa sổ lớn hơn chứa được nhiều hơn và giúp khả năng xem màn hình cùng tìm kiếm web đáng tin cậy, nhưng dùng nhiều bộ nhớ hơn. Mặc định là 8192; 16384 là bước nâng tốt nếu máy của bạn còn dư RAM. Bạn có thể giảm lại sau để tiết kiệm bộ nhớ.",
+        "unloadTimeoutLabel": "Giải phóng khỏi bộ nhớ sau",
+        "unloadTimeoutDescription": "Giải phóng bộ nhớ bằng cách dỡ mô hình cục bộ sau khi nó rảnh đủ lâu. Nó tự nạp lại ở lần dùng tiếp theo."
       },
       "systemPrompt": {
-        "title": "System prompt",
-        "label": "Assistant system prompt",
-        "description": "Sets the assistant's behavior."
+        "title": "Prompt hệ thống",
+        "label": "Prompt hệ thống của trợ lý",
+        "description": "Quy định cách trợ lý hành xử."
       },
       "characters": {
-        "title": "Profiles",
-        "description": "Task-focused profiles you can switch between. The active profile sets the assistant's name, role, and instructions — and how long its replies run. Switch anytime from the panel header.",
-        "galleryLabel": "Your profiles",
-        "editSection": "Edit profile",
-        "avatarLabel": "Avatar",
-        "active": "Active",
-        "meowsOnly": "Meows only",
-        "builtin": "Built-in",
-        "custom": "Custom",
-        "new": "New",
-        "newName": "New profile",
-        "copyName": "{{name}} copy",
-        "createAi": "Create with AI",
-        "import": "Import",
-        "aiTitle": "Describe your profile",
-        "aiClose": "Close",
-        "aiPlaceholder": "e.g. a concise release-notes writer, or a patient tutor who explains every step",
-        "aiDictate": "Dictate the description",
-        "aiDictateStop": "Stop dictation",
-        "generate": "Generate",
-        "avatarUpload": "Upload image",
-        "avatarRemove": "Remove",
-        "nameLabel": "Name",
-        "roleLabel": "Role",
-        "rolePlaceholder": "Short description shown on the card (optional)",
-        "promptLabel": "Instructions (system prompt)",
+        "title": "Hồ sơ",
+        "description": "Những hồ sơ tập trung theo tác vụ mà bạn có thể chuyển qua lại. Hồ sơ đang dùng quy định tên, vai trò và hướng dẫn của trợ lý — cùng độ dài câu trả lời. Chuyển bất cứ lúc nào từ phần đầu của bảng.",
+        "galleryLabel": "Hồ sơ của bạn",
+        "editSection": "Sửa hồ sơ",
+        "avatarLabel": "Ảnh đại diện",
+        "active": "Đang dùng",
+        "meowsOnly": "Chỉ biết meo meo",
+        "builtin": "Có sẵn",
+        "custom": "Tùy chỉnh",
+        "new": "Mới",
+        "newName": "Hồ sơ mới",
+        "copyName": "Bản sao của {{name}}",
+        "createAi": "Tạo bằng AI",
+        "import": "Nhập",
+        "aiTitle": "Mô tả hồ sơ của bạn",
+        "aiClose": "Đóng",
+        "aiPlaceholder": "ví dụ: một người viết ghi chú phát hành ngắn gọn, hoặc một gia sư kiên nhẫn giải thích từng bước",
+        "aiDictate": "Đọc chính tả phần mô tả",
+        "aiDictateStop": "Dừng đọc chính tả",
+        "generate": "Tạo",
+        "avatarUpload": "Tải ảnh lên",
+        "avatarRemove": "Xóa",
+        "nameLabel": "Tên",
+        "roleLabel": "Vai trò",
+        "rolePlaceholder": "Mô tả ngắn hiện trên thẻ (tùy chọn)",
+        "promptLabel": "Hướng dẫn (prompt hệ thống)",
         "responseLength": {
-          "label": "Response length",
-          "hint": "How long this profile's replies run. \"Inherit\" follows your global Assistant setting.",
+          "label": "Độ dài câu trả lời",
+          "hint": "Câu trả lời của hồ sơ này dài đến đâu. “Kế thừa” sẽ theo cài đặt Trợ lý chung của bạn.",
           "options": {
-            "inherit": "Inherit global",
-            "short": "Short",
-            "medium": "Medium",
-            "long": "Long"
+            "inherit": "Kế thừa cài đặt chung",
+            "short": "Ngắn",
+            "medium": "Trung bình",
+            "long": "Dài"
           }
         },
-        "greetingLabel": "Greeting (optional)",
-        "greetingPlaceholder": "Optional opening line shown in an empty chat",
-        "catNote": "The Cat ignores the AI entirely — it just meows. Nothing to configure here.",
-        "duplicate": "Duplicate",
-        "export": "Export",
-        "restoreDefault": "Restore default",
-        "restoreBuiltins": "Restore built-ins",
-        "moreActions": "More actions",
-        "expand": "Expand",
-        "collapse": "Collapse",
-        "delete": "Delete",
-        "deleteConfirm": "Delete this profile? This can't be undone.",
-        "emptyState": "No profiles yet. Create your first one to give the assistant a personality."
+        "greetingLabel": "Lời chào (tùy chọn)",
+        "greetingPlaceholder": "Câu mở đầu tùy chọn hiện trong cuộc trò chuyện trống",
+        "catNote": "Con Mèo bỏ qua AI hoàn toàn — nó chỉ meo meo. Không có gì để cấu hình ở đây.",
+        "duplicate": "Tạo bản sao",
+        "export": "Xuất",
+        "restoreDefault": "Khôi phục mặc định",
+        "restoreBuiltins": "Khôi phục hồ sơ có sẵn",
+        "moreActions": "Thêm hành động",
+        "expand": "Mở rộng",
+        "collapse": "Thu gọn",
+        "delete": "Xóa",
+        "deleteConfirm": "Xóa hồ sơ này? Hành động này không thể hoàn tác.",
+        "emptyState": "Chưa có hồ sơ nào. Hãy tạo hồ sơ đầu tiên để trợ lý có một tính cách."
       },
       "behavior": {
-        "title": "Behavior"
+        "title": "Hành vi"
       },
       "memory": {
-        "label": "Conversation memory",
-        "description": "How many recent messages are sent as context each turn. 0 disables memory."
+        "label": "Bộ nhớ cuộc trò chuyện",
+        "description": "Số tin nhắn gần đây được gửi kèm làm ngữ cảnh mỗi lượt. 0 sẽ tắt bộ nhớ."
+      },
+      "autoSummarize": {
+        "label": "Tóm tắt cuộc trò chuyện dài",
+        "description": "Khi một cuộc trò chuyện vượt quá cửa sổ ngữ cảnh của mô hình, tự động cô đọng các tin nhắn cũ thành một bản tóm tắt liên tục để cuộc trò chuyện giữ được ngữ cảnh thay vì quên phần đầu. Một chỉ báo mờ nhạt hiện ra trong lúc chạy."
       },
       "responseLength": {
-        "label": "Response length",
-        "description": "Preferred reply length. \"No effect\" leaves your prompt untouched.",
+        "label": "Độ dài câu trả lời",
+        "description": "Độ dài câu trả lời bạn muốn. “Không tác động” sẽ giữ nguyên prompt của bạn.",
         "options": {
-          "default": "No effect",
-          "short": "Short",
-          "medium": "Medium",
-          "long": "Long"
+          "default": "Không tác động",
+          "short": "Ngắn",
+          "medium": "Trung bình",
+          "long": "Dài"
         }
       },
       "vision": {
-        "title": "Screen vision",
-        "modeLabel": "Screen access",
+        "title": "Xem màn hình",
+        "modeLabel": "Truy cập màn hình",
         "modes": {
-          "off": "Off",
-          "manual": "Manual",
-          "agentDecides": "Agent decides",
+          "off": "Tắt",
+          "manual": "Thủ công",
+          "agentDecides": "AI tự quyết",
           "descriptions": {
-            "off": "Screen capture is disabled. Camera and region controls are hidden.",
-            "manual": "You choose when to attach the full screen or a region. Voice capture timing applies.",
-            "agent_decides": "The model may request a screen capture when it needs current visual context. Every screenshot sent is shown in the conversation."
+            "off": "Chụp màn hình đã tắt. Các điều khiển máy ảnh và chọn vùng bị ẩn.",
+            "manual": "Bạn chọn khi nào gửi kèm toàn màn hình hoặc một vùng. Thời điểm chụp cho câu hỏi bằng giọng nói vẫn được áp dụng.",
+            "agent_decides": "Mô hình có thể yêu cầu chụp màn hình khi nó cần ngữ cảnh hình ảnh hiện tại. Mọi ảnh màn hình được gửi đều hiện trong cuộc trò chuyện."
           }
         },
         "timing": {
-          "label": "When to capture",
-          "description": "For voice questions: capture the moment you start asking, or wait until the message is sent. Typed messages always capture on send.",
+          "label": "Chụp khi nào",
+          "description": "Với câu hỏi bằng giọng nói: chụp ngay lúc bạn bắt đầu hỏi, hoặc chờ đến khi tin nhắn được gửi. Tin nhắn gõ tay luôn chụp lúc gửi.",
           "options": {
-            "immediate": "When I ask",
-            "on_send": "When the message sends"
+            "immediate": "Khi tôi bắt đầu hỏi",
+            "on_send": "Khi tin nhắn được gửi"
           }
+        },
+        "screenRecording": {
+          "description": "Khả năng xem màn hình cần quyền Ghi màn hình của macOS. Hãy cấp quyền trong Cài đặt Hệ thống, rồi khởi động lại SpeakoFlow để có hiệu lực.",
+          "grant": "Mở Cài đặt Hệ thống"
         }
       },
       "webSearch": {
-        "title": "Web search",
-        "enableLabel": "Allow web search",
-        "enableDescription": "Let the assistant search the web when a question needs current information.",
-        "openRouterNativeLabel": "Use OpenRouter's built-in search",
-        "openRouterNativeDescription": "When on, OpenRouter runs the search itself (its :online mode) using your OpenRouter credits. When off, the app searches with your search provider below.",
-        "providerLabel": "Search provider",
-        "providerDescription": "Serper is a good default. Every provider has a free tier.",
+        "title": "Tìm kiếm web",
+        "enableLabel": "Cho phép tìm kiếm web",
+        "enableDescription": "Cho trợ lý tìm trên web khi một câu hỏi cần thông tin mới nhất.",
+        "openRouterNativeLabel": "Dùng tìm kiếm tích hợp của OpenRouter",
+        "openRouterNativeDescription": "Khi bật, OpenRouter tự thực hiện việc tìm kiếm (chế độ :online của họ) và dùng tín dụng OpenRouter của bạn. Khi tắt, ứng dụng tìm kiếm bằng nhà cung cấp bạn chọn bên dưới.",
+        "providerLabel": "Nhà cung cấp tìm kiếm",
+        "providerDescription": "Serper là lựa chọn mặc định tốt. Mọi nhà cung cấp đều có bậc miễn phí, và TinyFish miễn phí mà không cần thẻ.",
         "providers": {
-          "serper": "Serper (Google, fast)",
+          "serper": "Serper (Google, nhanh)",
           "brave": "Brave Search",
-          "tavily": "Tavily (AI search)",
-          "exa": "Exa (neural)",
-          "serpapi": "SerpAPI (Google)"
+          "tavily": "Tavily (tìm kiếm AI)",
+          "exa": "Exa (nơ-ron)",
+          "serpapi": "SerpAPI (Google)",
+          "tinyfish": "TinyFish (miễn phí, không cần thẻ)"
         },
-        "apiKeyLabel": "API key",
-        "apiKeyDescription": "Key for the selected search provider.",
-        "apiKeyPlaceholder": "Enter API key…",
-        "fetchContentLabel": "Read full pages (best quality)",
-        "fetchContentDescription": "Read the full text of each result instead of snippets. Better answers, but slower.",
-        "maxResultsLabel": "Sources to use",
-        "maxResultsDescription": "How many results to read (1–10).",
-        "depthLabel": "Search depth",
-        "depthDescription": "Quick for simple facts, Standard for most questions, Deep for hard ones.",
+        "apiKeyLabel": "Khóa API",
+        "apiKeyDescription": "Khóa cho nhà cung cấp tìm kiếm đã chọn.",
+        "apiKeyPlaceholder": "Nhập khóa API…",
+        "fetchContentLabel": "Đọc toàn bộ trang (chất lượng tốt nhất)",
+        "fetchContentDescription": "Đọc toàn văn từng kết quả thay vì chỉ đoạn trích. Câu trả lời tốt hơn, nhưng chậm hơn.",
+        "maxResultsLabel": "Số nguồn sử dụng",
+        "maxResultsDescription": "Số kết quả cần đọc (1–10).",
+        "depthLabel": "Độ sâu tìm kiếm",
+        "depthDescription": "Nhanh cho thông tin đơn giản, Chuẩn cho phần lớn câu hỏi, Sâu cho câu hỏi khó.",
         "depthOptions": {
-          "low": "Quick",
-          "medium": "Standard",
-          "high": "Deep"
+          "low": "Nhanh",
+          "medium": "Chuẩn",
+          "high": "Sâu"
         },
-        "localSmartLabel": "Smart search decisions (local model)",
-        "localSmartDescription": "Let the local model decide when to search. Off uses a fast keyword check instead.",
-        "creditBudgetLabel": "Daily Firecrawl credit limit",
-        "creditBudgetDescription": "Daily cap on Firecrawl credits before search pauses. 0 = no limit.",
-        "testLabel": "Test search",
-        "testDescription": "Run a sample search with the current provider and key.",
-        "testButton": "Test search",
-        "testing": "Searching…",
-        "testResult": "Got {{count}} results."
+        "localSmartLabel": "Tự quyết định tìm kiếm thông minh (mô hình cục bộ)",
+        "localSmartDescription": "Cho mô hình cục bộ tự quyết khi nào cần tìm kiếm. Khi tắt, ứng dụng dùng phép kiểm tra từ khóa nhanh.",
+        "creditBudgetLabel": "Giới hạn tín dụng Firecrawl mỗi ngày",
+        "creditBudgetDescription": "Mức trần tín dụng Firecrawl mỗi ngày trước khi tìm kiếm tạm dừng. 0 = không giới hạn.",
+        "testLabel": "Thử tìm kiếm",
+        "testDescription": "Chạy một lần tìm kiếm mẫu với nhà cung cấp và khóa hiện tại.",
+        "testButton": "Thử tìm kiếm",
+        "testing": "Đang tìm…",
+        "testResult": "Đã nhận {{count}} kết quả."
       },
       "tts": {
-        "title": "Voice output",
-        "enableLabel": "Speak responses aloud",
-        "enableDescription": "Read the assistant's replies out loud.",
-        "stopOnDictationLabel": "Stop speech when dictation starts",
-        "stopOnDictationDescription": "Stop any reply that's still playing when you start dictating.",
-        "engineLabel": "Engine",
-        "engineDescription": "Kokoro runs locally for free. The other engines use your API key.",
-        "kokoroSetupLabel": "Kokoro voice model",
-        "kokoroSetupDescription": "Download it once, then spoken replies run privately on this device.",
-        "kokoroDownload": "Download Kokoro",
-        "kokoroDownloading": "Downloading Kokoro",
-        "kokoroReady": "Ready on this device",
-        "kokoroRetry": "Try download again",
+        "title": "Đầu ra giọng nói",
+        "enableLabel": "Đọc to câu trả lời",
+        "enableDescription": "Đọc to các câu trả lời của trợ lý.",
+        "stopOnDictationLabel": "Dừng đọc khi bắt đầu đọc chính tả",
+        "stopOnDictationDescription": "Dừng câu trả lời còn đang phát khi bạn bắt đầu đọc chính tả.",
+        "engineLabel": "Công cụ",
+        "engineDescription": "Kokoro chạy cục bộ và miễn phí. Các công cụ khác dùng khóa API của bạn.",
+        "kokoroSetupLabel": "Mô hình giọng nói Kokoro",
+        "kokoroSetupDescription": "Tải một lần, sau đó câu trả lời nói ra sẽ chạy riêng tư trên thiết bị này.",
+        "kokoroDownload": "Tải Kokoro",
+        "kokoroDownloading": "Đang tải Kokoro",
+        "kokoroReady": "Đã sẵn sàng trên thiết bị này",
+        "kokoroRetry": "Thử tải lại",
         "engines": {
-          "kokoro": "Kokoro (local, free)",
-          "openai": "OpenAI-compatible",
+          "kokoro": "Kokoro (cục bộ, miễn phí)",
+          "openai": "Tương thích OpenAI",
           "openrouter": "OpenRouter",
           "elevenlabs": "ElevenLabs",
           "azure": "Azure AI Speech"
         },
-        "voiceLabel": "Voice",
-        "voiceDescription": "Kokoro voice for spoken replies.",
-        "dtypeLabel": "Kokoro precision",
-        "dtypeDescription": "fp32 is highest quality; q8 is faster on CPU. Changing this reloads the model.",
-        "speedLabel": "Playback speed",
-        "speedDescription": "1× is normal. ElevenLabs supports 0.7×–1.2× only.",
+        "voiceLabel": "Giọng",
+        "voiceDescription": "Giọng Kokoro cho câu trả lời nói ra.",
+        "dtypeLabel": "Độ chính xác Kokoro",
+        "dtypeDescription": "fp32 cho chất lượng cao nhất; q8 nhanh hơn trên CPU. Đổi tùy chọn này sẽ nạp lại mô hình.",
+        "speedLabel": "Tốc độ phát",
+        "speedDescription": "1× là bình thường. ElevenLabs chỉ hỗ trợ 0.7×–1.2×.",
         "speedValue": "{{value}}×",
-        "speedCustomLabel": "Custom playback speed",
-        "testLabel": "Test voice",
-        "testDescription": "Play a short sample with the current settings.",
-        "testButton": "Test voice",
-        "testing": "Testing…",
-        "testOk": "Played ✓",
-        "testPhrase": "Hi! This is a test of SpeakoFlow's voice output.",
-        "downloadStart": "Downloading Kokoro voice…",
-        "downloadProgress": "Downloading Kokoro voice… {{progress}}%",
-        "downloadReady": "Kokoro voice ready ✓",
-        "downloadError": "Couldn't download the Kokoro voice model",
-        "baseUrlLabel": "Base URL",
-        "baseUrlDescription": "OpenAI-compatible TTS URL. A base URL or a full /audio/speech URL both work.",
-        "azureBaseUrlLabel": "Speech URL",
-        "azureBaseUrlDescription": "Your Azure Speech URL from the portal, e.g. https://eastus2.tts.speech.microsoft.com.",
-        "apiKeyLabel": "API key",
-        "apiKeyDescription": "Separate from the assistant's key.",
-        "modelLabel": "Model",
-        "modelDescription": "Model or deployment name, e.g. gpt-4o-mini-tts (OpenAI/Azure) or eleven_flash_v2_5 (ElevenLabs).",
-        "remoteVoiceLabel": "Voice name",
-        "remoteVoiceDescription": "Voice for OpenAI-compatible TTS, e.g. alloy, echo, nova, shimmer.",
-        "azureVoiceLabel": "Voice name",
-        "azureVoiceDescription": "Azure voice name, e.g. en-US-JennyNeural. Click Load voices to browse.",
-        "loadVoices": "Load voices",
-        "voicesLoading": "Loading…",
-        "voicesPick": "Pick from {{count}} voices…",
-        "loadModels": "Load models",
-        "modelsLoading": "Loading…",
-        "modelsPick": "Pick from {{count}} models…",
-        "modelsUse": "Use \"{{model}}\"",
-        "voicesUse": "Use \"{{voice}}\"",
-        "elevenVoiceLabel": "Voice ID",
-        "elevenVoiceDescription": "ElevenLabs voice ID (from the Voices tab in their dashboard).",
-        "promptLabel": "Summary Prompt",
-        "promptDescription": "Instructions for generating the brief spoken summary of each answer."
+        "speedCustomLabel": "Tốc độ phát tùy chỉnh",
+        "testLabel": "Thử giọng",
+        "testDescription": "Phát một mẫu ngắn với cài đặt hiện tại.",
+        "testButton": "Thử giọng",
+        "testing": "Đang thử…",
+        "testOk": "Đã phát ✓",
+        "testPhrase": "Xin chào! Đây là bản thử đầu ra giọng nói của SpeakoFlow.",
+        "downloadStart": "Đang tải giọng Kokoro…",
+        "downloadProgress": "Đang tải giọng Kokoro… {{progress}}%",
+        "downloadReady": "Giọng Kokoro đã sẵn sàng ✓",
+        "downloadError": "Không thể tải mô hình giọng nói Kokoro",
+        "baseUrlLabel": "URL cơ sở",
+        "baseUrlDescription": "URL TTS tương thích OpenAI. Dùng URL cơ sở hoặc URL /audio/speech đầy đủ đều được.",
+        "azureBaseUrlLabel": "URL Speech",
+        "azureBaseUrlDescription": "URL Azure Speech của bạn lấy từ cổng quản trị, ví dụ https://eastus2.tts.speech.microsoft.com.",
+        "apiKeyLabel": "Khóa API",
+        "apiKeyDescription": "Tách biệt với khóa của trợ lý.",
+        "modelLabel": "Mô hình",
+        "modelDescription": "Tên mô hình hoặc bản triển khai, ví dụ gpt-4o-mini-tts (OpenAI/Azure) hoặc eleven_flash_v2_5 (ElevenLabs).",
+        "remoteVoiceLabel": "Tên giọng",
+        "remoteVoiceDescription": "Giọng cho TTS tương thích OpenAI, ví dụ alloy, echo, nova, shimmer.",
+        "azureVoiceLabel": "Tên giọng",
+        "azureVoiceDescription": "Tên giọng Azure, ví dụ en-US-JennyNeural. Nhấn Tải danh sách giọng để xem.",
+        "loadVoices": "Tải danh sách giọng",
+        "voicesLoading": "Đang tải…",
+        "voicesPick": "Chọn trong {{count}} giọng…",
+        "loadModels": "Tải danh sách mô hình",
+        "modelsLoading": "Đang tải…",
+        "modelsPick": "Chọn trong {{count}} mô hình…",
+        "modelsUse": "Dùng “{{model}}”",
+        "voicesUse": "Dùng “{{voice}}”",
+        "elevenVoiceLabel": "ID giọng",
+        "elevenVoiceDescription": "ID giọng của ElevenLabs (lấy ở tab Voices trong bảng điều khiển của họ).",
+        "promptLabel": "Prompt tóm tắt",
+        "promptDescription": "Hướng dẫn để tạo bản tóm tắt ngắn được đọc lên cho mỗi câu trả lời."
       },
       "appearance": {
-        "title": "Panel appearance",
-        "previewLabel": "Preview",
-        "previewDescription": "Live preview of the panel with your text size and opacity.",
-        "previewUser": "Hey, what can you do?",
-        "previewAssistant": "Lots! Ask me anything — I can even look at your screen.",
-        "fontSizeLabel": "Text size",
-        "fontSizeDescription": "Size of the chat text in the assistant panel.",
+        "title": "Giao diện bảng",
+        "previewLabel": "Xem trước",
+        "previewDescription": "Xem trước trực tiếp bảng với cỡ chữ và độ mờ bạn chọn.",
+        "previewUser": "Này, bạn làm được những gì?",
+        "previewAssistant": "Nhiều lắm! Hỏi tôi bất cứ điều gì — tôi còn xem được màn hình của bạn.",
+        "fontSizeLabel": "Cỡ chữ",
+        "fontSizeDescription": "Cỡ chữ của phần trò chuyện trong bảng trợ lý.",
         "fontSizes": {
-          "small": "Small",
-          "medium": "Medium",
-          "large": "Large"
+          "small": "Nhỏ",
+          "medium": "Trung bình",
+          "large": "Lớn"
         },
-        "panelSizeLabel": "Panel size",
-        "panelSizeDescription": "Overall size of the floating assistant panel. You can also drag its edges to resize.",
+        "panelSizeLabel": "Kích thước bảng",
+        "panelSizeDescription": "Kích thước tổng thể của bảng trợ lý nổi. Bạn cũng có thể kéo các cạnh của nó để thay đổi kích thước.",
         "panelSizes": {
-          "compact": "Compact",
-          "standard": "Standard",
-          "large": "Large"
+          "mini": "Nhỏ",
+          "compact": "Gọn",
+          "standard": "Chuẩn",
+          "large": "Lớn"
         },
-        "opacityLabel": "Panel opacity",
-        "opacityDescription": "How opaque the floating panel is. 100% is fully solid; lower values let the desktop blur through."
+        "opacityLabel": "Độ mờ của bảng",
+        "opacityDescription": "Bảng nổi đục đến mức nào. 100% là hoàn toàn đặc; giá trị thấp hơn cho phép thấy mờ màn hình nền phía sau."
       }
     }
   },
   "footer": {
-    "downloadingModel": "Đang tải {{model}}...",
-    "checkingUpdates": "Đang kiểm tra cập nhật...",
+    "downloadingModel": "Đang tải {{model}}…",
+    "checkingUpdates": "Đang kiểm tra cập nhật…",
     "updateAvailable": "Có bản cập nhật: {{version}}",
     "updateAvailableShort": "Có bản cập nhật",
     "upToDate": "Đã cập nhật",
     "downloadUpdate": "Tải cập nhật",
     "restart": "Khởi động lại",
     "updateCheckingDisabled": "Đã tắt kiểm tra cập nhật",
-    "downloading": "Đang tải... {{progress}}%",
-    "installing": "Đang cài đặt...",
-    "preparing": "Đang chuẩn bị...",
+    "downloading": "Đang tải… {{progress}}%",
+    "installing": "Đang cài đặt…",
+    "preparing": "Đang chuẩn bị…",
     "checkForUpdates": "Kiểm tra cập nhật",
-    "checkFailed": "Update check failed",
-    "updateFailed": "Update failed",
-    "clickToRetry": "Click to try again",
-    "portableUpdateTitle": "Manual update required",
-    "portableUpdateMessage": "Portable installs cannot be updated automatically. To update: download the latest NSIS installer from GitHub Releases, install it to the same folder, then copy your Data/ folder (settings, models, recordings) from the old version to the new one.",
-    "portableUpdateButton": "Open GitHub Releases"
+    "checkFailed": "Kiểm tra cập nhật thất bại",
+    "updateFailed": "Cập nhật thất bại",
+    "clickToRetry": "Nhấn để thử lại",
+    "portableUpdateTitle": "Cần cập nhật thủ công",
+    "portableUpdateMessage": "Bản cài đặt di động không thể tự cập nhật. Để cập nhật: tải bộ cài NSIS mới nhất từ GitHub Releases, cài vào cùng thư mục, rồi sao chép thư mục Data/ của bạn (cài đặt, mô hình, bản ghi âm) từ phiên bản cũ sang phiên bản mới.",
+    "portableUpdateButton": "Mở GitHub Releases"
   },
   "common": {
-    "loading": "Đang tải...",
+    "loading": "Đang tải…",
     "save": "Lưu",
     "cancel": "Hủy",
     "reset": "Đặt lại",
@@ -1393,7 +1420,7 @@
     "yes": "Có",
     "no": "Không",
     "noOptionsFound": "Không tìm thấy tùy chọn",
-    "back": "Back",
+    "back": "Quay lại",
     "showAdvanced": "Thêm tùy chọn",
     "showLess": "Hiển thị ít hơn"
   },
@@ -1417,7 +1444,7 @@
     "recordingFailed": "Không thể bắt đầu ghi âm: {{error}}",
     "modelLoadFailed": "Không thể tải mô hình: {{model}}",
     "modelLoadFailedUnknown": "mô hình không xác định",
-    "downloadFailedTitle": "Download failed",
+    "downloadFailedTitle": "Tải xuống thất bại",
     "pasteFailedTitle": "Không thể dán văn bản",
     "pasteFailed": "Không thể dán văn bản vào ứng dụng đang hoạt động."
   },
@@ -1426,124 +1453,132 @@
     "description": "Thay đổi ngôn ngữ giao diện của SpeakoFlow"
   },
   "overlay": {
-    "preparing": "Getting mic ready…",
-    "recording": "Recording",
-    "transcribing": "Đang chuyển đổi...",
-    "processing": "Đang xử lý...",
-    "listening": "Listening…",
-    "locked": "Recording hands-free — press the hotkey again to stop",
-    "cancel": "Cancel",
-    "done": "Done",
-    "askAssistant": "Ask the assistant instead of typing this",
-    "generating": "Writing with Flow…",
-    "vision": "Looking at your screen…",
+    "preparing": "Đang chuẩn bị micrô…",
+    "recording": "Đang ghi âm",
+    "transcribing": "Đang chuyển đổi…",
+    "processing": "Đang xử lý…",
+    "generating": "Đang viết bằng Flow…",
+    "vision": "Đang xem màn hình của bạn…",
     "notices": {
-      "flowNotConfigured": "Flow needs an assistant model — pasted as dictation",
-      "flowFailed": "Flow couldn't generate — nothing was pasted",
-      "flowEmpty": "Say a command after the activation phrase"
-    }
+      "flowNotConfigured": "Flow cần một mô hình trợ lý — đã dán như đọc chính tả",
+      "flowFailed": "Flow không tạo được nội dung — không có gì được dán",
+      "flowEmpty": "Hãy nói một câu lệnh sau cụm từ kích hoạt"
+    },
+    "listening": "Đang lắng nghe…",
+    "locked": "Đang ghi âm rảnh tay — nhấn lại phím tắt để dừng",
+    "cancel": "Hủy",
+    "done": "Xong",
+    "askAssistant": "Hỏi trợ lý thay vì gõ nội dung này"
   },
   "assistant": {
-    "title": "Assistant",
+    "title": "Trợ lý",
     "character": {
-      "switch": "Switch persona"
+      "switch": "Đổi hồ sơ"
     },
-    "empty": "Ask by voice with your assistant shortcut,\nor type below.",
-    "inputPlaceholder": "Message…",
-    "inputPlaceholderScreen": "Ask about your screen…",
-    "send": "Send",
-    "stop": "Stop",
-    "finish": "Finish & send",
-    "clear": "Clear conversation",
-    "hide": "Hide panel",
-    "copy": "Copy",
-    "copyCode": "Copy code",
-    "regenerate": "Regenerate answer (the old one stays in History)",
-    "screenAttached": "Screen",
-    "attachScreen": "Screen vision — attach your screen to each message until turned off",
-    "detachScreen": "Turn off screen vision",
+    "empty": "Hỏi bằng giọng nói với phím tắt trợ lý,\nhoặc gõ bên dưới.",
+    "inputPlaceholder": "Tin nhắn…",
+    "inputPlaceholderScreen": "Hỏi về màn hình của bạn…",
+    "send": "Gửi",
+    "stop": "Dừng",
+    "cancel": "Hủy",
+    "finish": "Xong và gửi",
+    "clear": "Xóa cuộc trò chuyện",
+    "hide": "Ẩn bảng",
+    "copy": "Sao chép",
+    "copyCode": "Sao chép mã",
+    "regenerate": "Tạo lại câu trả lời (câu cũ vẫn còn trong Lịch sử)",
+    "summarizing": "Đang tóm tắt các tin nhắn trước đó…",
+    "screenAttached": "Màn hình",
+    "attachScreen": "Xem màn hình — gửi kèm màn hình của bạn vào mỗi tin nhắn cho đến khi tắt",
+    "detachScreen": "Tắt khả năng xem màn hình",
     "attach": {
-      "file": "Attach an image or file",
-      "snip": "Snip a region of the screen",
-      "image": "Image",
-      "imageCount": "{{count}} image",
-      "imageCount_other": "{{count}} images",
-      "remove": "Remove attachment",
-      "dropHint": "Drop to attach"
+      "file": "Gửi kèm hình ảnh hoặc tệp",
+      "snip": "Cắt một vùng của màn hình",
+      "image": "Hình ảnh",
+      "imageCount": "{{count}} hình ảnh",
+      "imageCount_other": "{{count}} hình ảnh",
+      "remove": "Bỏ tệp gửi kèm",
+      "dropHint": "Thả để gửi kèm"
     },
     "snip": {
-      "hint": "Drag to snip a region — Esc to cancel"
+      "hint": "Kéo để cắt một vùng — Esc để hủy"
     },
     "webSearch": {
-      "enable": "Enable web search",
-      "disable": "Disable web search"
+      "enable": "Bật tìm kiếm web",
+      "disable": "Tắt tìm kiếm web"
     },
     "tts": {
-      "enable": "Enable voice summaries",
-      "disable": "Disable voice summaries",
-      "loading": "Loading Kokoro voice model...",
-      "loadingShort": "Voice model {{progress}}%"
+      "enable": "Bật tóm tắt bằng giọng nói",
+      "disable": "Tắt tóm tắt bằng giọng nói",
+      "loading": "Đang nạp mô hình giọng nói Kokoro...",
+      "loadingShort": "Mô hình giọng nói {{progress}}%"
     },
     "pill": {
-      "talk": "Click to talk",
-      "stop": "Stop and send",
-      "idle": "Assistant",
-      "expand": "Expand panel",
-      "collapse": "Collapse to pill",
-      "close": "Close assistant",
-      "cancel": "Cancel without sending",
-      "cancelTurn": "Cancel",
-      "dismiss": "Dismiss",
-      "disarmScreen": "Screen vision is on — click to turn it off",
-      "armScreen": "Screen vision is off — click to turn it on"
+      "talk": "Nhấn để nói",
+      "stop": "Dừng và gửi",
+      "idle": "Trợ lý",
+      "expand": "Mở rộng bảng",
+      "collapse": "Thu về dạng viên",
+      "close": "Đóng trợ lý",
+      "cancel": "Hủy mà không gửi",
+      "cancelTurn": "Hủy",
+      "dismiss": "Bỏ qua",
+      "disarmScreen": "Xem màn hình đang bật — nhấn để tắt",
+      "armScreen": "Xem màn hình đang tắt — nhấn để bật"
     },
     "status": {
-      "listening": "Listening…",
-      "locked": "Listening",
-      "transcribing": "Transcribing…",
-      "searching": "Searching the web...",
-      "thinking": "Thinking...",
-      "speaking": "Speaking..."
+      "listening": "Đang lắng nghe…",
+      "locked": "Đang lắng nghe",
+      "transcribing": "Đang chuyển đổi…",
+      "searching": "Đang tìm trên web...",
+      "thinking": "Đang suy nghĩ...",
+      "speaking": "Đang nói..."
     },
     "errors": {
-      "generic": "Something went wrong. Please try again.",
-      "genericShort": "Something went wrong",
-      "no_provider": "No assistant model is set up yet. Pick a provider in Settings → Assistant.",
-      "no_providerShort": "No model set up",
-      "no_model": "Your provider has no model selected. Choose one in Settings → Assistant.",
-      "no_modelShort": "No model selected",
-      "engine_start": "The built-in model couldn't start. Try again, or pick a different model in Settings → Assistant.",
-      "engine_startShort": "Model couldn't start",
-      "provider": "The model couldn't answer. Check your API key and connection, then try again.",
-      "providerShort": "Couldn't get an answer",
-      "vision_unsupported": "This model can't read your screen. Pick a vision-capable model in Settings → Assistant, or ask again without screen vision.",
-      "vision_unsupportedShort": "Model can't see images",
-      "screenshot_too_large": "The screen capture was too large for this provider. Please try again — it will be compressed harder.",
-      "screenshot_too_largeShort": "Screen capture too large",
-      "screen_capture": "Couldn't capture the screen. Try again, or ask without screen vision.",
-      "screen_captureShort": "Screen capture failed",
-      "transcription": "Couldn't transcribe your voice. Please try speaking again.",
-      "transcriptionShort": "Transcription failed",
-      "tts": "The spoken reply failed. Check your TTS settings, or read the answer in the panel.",
-      "ttsShort": "Voice reply failed",
-      "tts_local": "The local voice couldn't load. Check your connection or switch TTS engines in Settings.",
-      "tts_localShort": "Voice couldn't load",
-      "tts_blocked": "Your system blocked the voice from playing on its own. Click anywhere in the panel to hear the reply.",
-      "tts_blockedShort": "Tap the panel to hear it",
-      "tts_playback": "Couldn't play the voice on your output device. Check your speaker/output settings, then try again.",
-      "tts_playbackShort": "Voice playback failed",
-      "mic_denied": "Microphone access is blocked. Allow it in your system privacy settings.",
-      "mic_deniedShort": "Mic access blocked",
-      "mic_unavailable": "No microphone was found. Connect one and try again.",
-      "mic_unavailableShort": "No microphone found",
-      "mic_error": "The microphone couldn't start. It may be in use by another app.",
-      "mic_errorShort": "Mic couldn't start",
-      "file_read": "That file couldn't be attached.",
-      "file_readShort": "Couldn't attach file"
+      "generic": "Đã xảy ra lỗi. Vui lòng thử lại.",
+      "genericShort": "Đã xảy ra lỗi",
+      "no_provider": "Chưa thiết lập mô hình trợ lý nào. Hãy chọn một nhà cung cấp trong Cài đặt → Trợ lý.",
+      "no_providerShort": "Chưa thiết lập mô hình",
+      "no_model": "Nhà cung cấp của bạn chưa chọn mô hình nào. Hãy chọn một mô hình trong Cài đặt → Trợ lý.",
+      "no_modelShort": "Chưa chọn mô hình",
+      "engine_start": "Mô hình tích hợp không khởi động được. Hãy thử lại, hoặc chọn mô hình khác trong Cài đặt → Trợ lý.",
+      "engine_startShort": "Mô hình không khởi động được",
+      "provider": "Mô hình không trả lời được. Hãy kiểm tra khóa API và kết nối của bạn, rồi thử lại.",
+      "providerShort": "Không nhận được câu trả lời",
+      "vision_unsupported": "Mô hình này không đọc được màn hình của bạn. Hãy chọn một mô hình xem được hình ảnh trong Cài đặt → Trợ lý, hoặc hỏi lại mà không dùng khả năng xem màn hình.",
+      "vision_unsupportedShort": "Mô hình không xem được hình ảnh",
+      "screenshot_too_large": "Ảnh màn hình quá lớn với nhà cung cấp này. Vui lòng thử lại — ảnh sẽ được nén mạnh hơn.",
+      "screenshot_too_largeShort": "Ảnh màn hình quá lớn",
+      "screen_capture": "Không thể chụp màn hình. Hãy thử lại, hoặc hỏi mà không dùng khả năng xem màn hình.",
+      "screen_captureShort": "Chụp màn hình thất bại",
+      "transcription": "Không thể chuyển giọng nói của bạn thành văn bản. Vui lòng thử nói lại.",
+      "transcriptionShort": "Chuyển đổi thất bại",
+      "tts": "Câu trả lời bằng giọng nói thất bại. Hãy kiểm tra cài đặt TTS, hoặc đọc câu trả lời trong bảng.",
+      "ttsShort": "Trả lời bằng giọng nói thất bại",
+      "tts_local": "Giọng nói cục bộ không nạp được. Hãy kiểm tra kết nối hoặc đổi công cụ TTS trong Cài đặt.",
+      "tts_localShort": "Không nạp được giọng nói",
+      "tts_blocked": "Hệ thống của bạn đã chặn giọng nói tự phát. Hãy nhấn vào bất kỳ đâu trong bảng để nghe câu trả lời.",
+      "tts_blockedShort": "Nhấn vào bảng để nghe",
+      "tts_playback": "Không thể phát giọng nói trên thiết bị đầu ra của bạn. Hãy kiểm tra cài đặt loa/đầu ra, rồi thử lại.",
+      "tts_playbackShort": "Phát giọng nói thất bại",
+      "mic_denied": "Quyền truy cập micrô đang bị chặn. Hãy cho phép trong cài đặt quyền riêng tư của hệ thống.",
+      "mic_deniedShort": "Quyền micrô bị chặn",
+      "mic_unavailable": "Không tìm thấy micrô nào. Hãy kết nối một micrô rồi thử lại.",
+      "mic_unavailableShort": "Không tìm thấy micrô",
+      "mic_error": "Micrô không khởi động được. Có thể nó đang được ứng dụng khác sử dụng.",
+      "mic_errorShort": "Micrô không khởi động được",
+      "file_read": "Không thể gửi kèm tệp đó.",
+      "file_readShort": "Không thể gửi kèm tệp"
     },
     "notices": {
-      "web_search_failed": "Web search didn't return results — answering without them.",
-      "web_search_failedShort": "No web results"
+      "web_search_failed": "Tìm kiếm web không trả về kết quả — đang trả lời mà không có chúng.",
+      "web_search_failedShort": "Không có kết quả từ web"
+    },
+    "engineSetup": {
+      "downloading": "Đang thiết lập công cụ cục bộ (lần chạy đầu)… {{percent}}%",
+      "preparing": "Đang thiết lập công cụ cục bộ (lần chạy đầu)…",
+      "extracting": "Đang cài đặt công cụ cục bộ…",
+      "short": "Đang thiết lập công cụ…"
     }
   }
 }

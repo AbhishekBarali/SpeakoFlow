@@ -1,20 +1,20 @@
 {
   "appearance": {
-    "title": "Appearance",
-    "description": "Choose a light, dark, or system-matched theme for the app and assistant panel.",
-    "system": "System",
-    "light": "Light",
-    "dark": "Dark",
-    "textSize": "Text size",
-    "textSizeDescription": "Scale the size of text and controls across the app.",
-    "textSizeSmall": "Small",
-    "textSizeDefault": "Default",
-    "textSizeLarge": "Large",
-    "textSizeExtraLarge": "Extra large"
+    "title": "Внешний вид",
+    "description": "Выберите светлую, тёмную или системную тему для приложения и панели ассистента.",
+    "system": "Системная",
+    "light": "Светлая",
+    "dark": "Тёмная",
+    "textSize": "Размер текста",
+    "textSizeDescription": "Масштаб текста и элементов управления во всём приложении.",
+    "textSizeSmall": "Маленький",
+    "textSizeDefault": "По умолчанию",
+    "textSizeLarge": "Большой",
+    "textSizeExtraLarge": "Очень большой"
   },
   "tray": {
     "home": "Главная",
-    "checkUpdates": "Проверить обновления...",
+    "checkUpdates": "Проверить обновления…",
     "copyLastTranscript": "Скопировать последнюю транскрипцию",
     "unloadModel": "Выгрузить модель",
     "model": "Модель",
@@ -23,29 +23,29 @@
   },
   "sidebar": {
     "general": "Общие",
-    "dictation": "Dictation",
-    "assistant": "Assistant",
+    "dictation": "Диктовка",
+    "assistant": "Ассистент",
     "history": "История",
     "about": "О программе",
     "debug": "Отладка",
-    "characters": "Profiles",
-    "memory": "Memory",
-    "collapse": "Collapse sidebar",
-    "expand": "Expand sidebar"
+    "characters": "Профили",
+    "memory": "Память",
+    "collapse": "Свернуть боковую панель",
+    "expand": "Развернуть боковую панель"
   },
   "window": {
-    "minimize": "Minimize",
-    "maximize": "Maximize",
-    "restore": "Restore",
-    "close": "Close"
+    "minimize": "Свернуть",
+    "maximize": "Развернуть",
+    "restore": "Восстановить",
+    "close": "Закрыть"
   },
   "sectionSubtitles": {
-    "general": "Shortcuts, your microphone, and how the app looks.",
-    "dictation": "The model that turns your voice into text, and how it's cleaned up.",
-    "assistant": "Set up the assistant, then tune its voice, screen vision, and web search.",
-    "history": "Your recent transcriptions and assistant chats, stored on this device.",
-    "about": "Version, app language, data locations, and credits.",
-    "debug": "Diagnostics and developer tools."
+    "general": "Сочетания клавиш, микрофон и внешний вид приложения.",
+    "dictation": "Модель, которая превращает ваш голос в текст, и то, как он затем очищается.",
+    "assistant": "Настройте ассистента, а затем его голос, просмотр экрана и поиск в интернете.",
+    "history": "Ваши недавние диктовки, генерации Flow и чаты с ассистентом, сохранённые на этом устройстве.",
+    "about": "Версия, язык приложения, расположение данных и благодарности.",
+    "debug": "Диагностика и инструменты разработчика."
   },
   "onboarding": {
     "subtitle": "Для начала выберите модель транскрипции",
@@ -53,79 +53,79 @@
       "progress": "Шаг {{current}} из {{total}}",
       "counter": "Шаг {{current}} из {{total}} · {{label}}",
       "speechToText": "Распознавание речи",
-      "aiModel": "Модель ИИ",
-      "ready": "You're ready"
+      "aiModel": "Дайте ему мозг",
+      "ready": "Всё готово"
     },
     "speechToText": {
-      "title": "Выберите модель распознавания речи",
-      "subtitle": "Работает полностью на вашем устройстве и превращает голос в текст. Выберите модель, подходящую для вашего компьютера — её можно изменить в любой момент.",
+      "title": "Как SpeakoFlow должен вас слышать?",
+      "subtitle": "Превращает ваш голос в текст прямо на вашем компьютере. Выберите одну, менять можно в любой момент.",
       "cards": {
         "fast": {
-          "description": "Blazingly fast, streams as you speak. English only."
+          "description": "Молниеносно быстрая, распознаёт прямо по ходу речи. Только английский."
         },
         "multilingual": {
-          "description": "Real-time in 28 languages."
+          "description": "В реальном времени на 28 языках."
         }
       },
-      "downloadAndContinue": "Download and continue",
-      "seeAllModels": "See all models",
-      "hideAllModels": "Show fewer models",
-      "installedHint": "Already set up. You can grab any other model later in Settings.",
-      "useInstalled": "Use installed model",
-      "continue": "Continue",
-      "downloadingHint": "It downloads in the background. Any other model is one click away in Settings.",
-      "downloadStarted": "Downloading your model in the background."
+      "downloadAndContinue": "Скачать и продолжить",
+      "seeAllModels": "Показать все модели",
+      "hideAllModels": "Показать меньше моделей",
+      "installedHint": "Уже настроено. Любую другую модель можно скачать позже в настройках.",
+      "useInstalled": "Использовать установленную модель",
+      "continue": "Продолжить",
+      "downloadingHint": "Загрузка идёт в фоновом режиме. Любая другая модель — в один клик в настройках.",
+      "downloadStarted": "Модель загружается в фоновом режиме."
     },
     "aiModel": {
       "title": "Добавить локальную модель ИИ",
-      "subtitle": "Обеспечивает работу ассистента, просмотра экрана и очистки транскриптов — полностью офлайн на вашем устройстве. Это необязательно; позже можно подключить облачного провайдера.",
+      "subtitle": "Выбирайте по скорости ответа и возможностям. E4B — сбалансированный вариант по умолчанию; 12B точнее, но медленнее.",
       "tiers": {
         "small": {
-          "description": "Runs on any machine. Great for tidying up your writing."
+          "description": "Работает на любом компьютере. Отлично приводит текст в порядок."
         },
         "mid": {
-          "description": "A quick all-rounder that can also answer questions."
+          "description": "Быстрая универсальная модель, которая ещё и отвечает на вопросы."
         },
         "capable": {
-          "description": "The sharpest answers, and it can see your screen."
+          "description": "Самые точные ответы, к тому же видит ваш экран."
         }
       },
-      "seesScreen": "Sees your screen",
-      "textOnly": "Text only",
-      "download": "Download model",
-      "useDownloaded": "Use downloaded model",
+      "seesScreen": "Видит ваш экран",
+      "textOnly": "Только текст",
+      "download": "Скачать модель",
+      "useDownloaded": "Использовать загруженную модель",
       "skip": "Пропустить пока",
-      "skipHint": "Необязательно. Вы можете загрузить модель или подключить облачного провайдера в любое время в настройках.",
+      "skipHint": "Это можно сделать позже в Настройки > Ассистент > На моём устройстве.",
       "continue": "Продолжить",
       "downloadingHint": "Ваша модель загружается в фоновом режиме — вы можете сразу начать пользоваться приложением.",
       "downloadStarted": "Загрузка модели ИИ в фоновом режиме."
     },
     "ready": {
-      "title": "You're ready.",
-      "subtitle": "Two shortcuts are all you need. Press, talk, done.",
-      "dictateLabel": "Dictate anywhere",
-      "dictateCaption": "Hold, talk, let go. Your words type themselves.",
-      "assistantKeysLabel": "Ask the assistant",
-      "assistantKeysCaption": "Hold and ask. It can even see your screen.",
-      "changeAnytime": "You can change these anytime in Settings.",
-      "hotkeyLabel": "Your dictation keys",
-      "downloadingAssistant": "Your assistant is moving in. {{percentage}}% there.",
-      "downloadingVoice": "Your voice model is landing. {{percentage}}% there.",
-      "downloadingGeneric": "Still downloading. {{percentage}}% there.",
-      "signOff": "That's it. Go say something.",
-      "openApp": "Open SpeakoFlow"
+      "title": "Всё готово.",
+      "subtitle": "Нужны всего два сочетания клавиш. Нажмите, говорите, готово.",
+      "dictateLabel": "Диктуйте где угодно",
+      "dictateCaption": "Зажмите, говорите, отпустите. Слова напечатаются сами.",
+      "assistantKeysLabel": "Спросите ассистента",
+      "assistantKeysCaption": "Зажмите и спросите. Он даже видит ваш экран.",
+      "changeAnytime": "Всё это можно изменить в любой момент в настройках.",
+      "hotkeyLabel": "Ваши клавиши для диктовки",
+      "downloadingAssistant": "Ассистент устраивается на месте. Уже {{percentage}} %.",
+      "downloadingVoice": "Голосовая модель заходит на посадку. Уже {{percentage}} %.",
+      "downloadingGeneric": "Загрузка продолжается. Уже {{percentage}} %.",
+      "signOff": "Вот и всё. Скажите что-нибудь.",
+      "openApp": "Открыть SpeakoFlow"
     },
     "errors": {
-      "selectModel": "Couldn't select that model. Please try again.",
+      "selectModel": "Не удалось выбрать эту модель. Пожалуйста, попробуйте снова.",
       "loadModels": "Не удалось загрузить доступные модели.",
       "downloadModel": "Не удалось загрузить модель: {{error}}."
     },
     "downloadProgress": {
-      "sizeOf": "{{downloaded}} of {{total}} · {{percentage}}%"
+      "sizeOf": "{{downloaded}} из {{total}} · {{percentage}} %"
     },
     "recommended": "Рекомендуется",
     "download": "Скачать",
-    "downloading": "Загрузка...",
+    "downloading": "Загрузка…",
     "customModelDescription": "Официально не поддерживается",
     "downloadFailed": "Загрузка не удалась. Пожалуйста, попробуйте снова.",
     "modelCard": {
@@ -134,49 +134,49 @@
     },
     "models": {
       "parakeet-unified-en-0.6b-gguf": {
-        "description": "Blazingly fast, great for everyday dictation. English only."
+        "description": "Молниеносно быстрая, отлично подходит для повседневной диктовки. Только английский."
       },
       "nemotron-3.5-asr-streaming-0.6b-gguf": {
-        "description": "Real-time transcription in 28 languages."
+        "description": "Транскрипция в реальном времени на 28 языках."
       },
       "canary-180m-flash-gguf": {
-        "description": "Tiny and instant — runs well on any machine."
+        "description": "Крошечная и мгновенная — хорошо работает на любом компьютере."
       },
       "cohere-transcribe-03-2026-gguf": {
-        "description": "Slower, but the most accurate. 14 languages."
+        "description": "Медленнее, но самая точная. 14 языков."
       },
       "whisper-medium-gguf": {
-        "description": "Best for many languages — nearly 100 supported."
+        "description": "Лучший выбор для многих языков — поддерживается почти 100."
       },
       "gemma-3-1b": {
-        "description": "Very small and quick, but limited for open-ended conversation. Text only."
+        "description": "Очень маленькая и быстрая, но слабовата для свободного разговора. Только текст."
       },
       "qwen3.5-2b": {
-        "description": "Small and fast, and it can see images. Good on most laptops."
+        "description": "Небольшая и быстрая, к тому же видит изображения. Хорошо идёт на большинстве ноутбуков."
       },
       "qwen3.5-4b": {
-        "description": "A legacy vision model whose optional reasoning can delay conversational replies."
+        "description": "Устаревшая модель с распознаванием изображений; её необязательные размышления могут задерживать ответы в разговоре."
       },
       "qwen3.5-9b": {
-        "description": "More capable, but slower for live conversation, especially when reasoning is enabled."
+        "description": "Более способная, но медленнее в живом разговоре, особенно с включёнными размышлениями."
       },
       "qwen3.5-27b": {
-        "description": "A large vision model for deliberate tasks, not a low-latency assistant."
+        "description": "Большая модель с распознаванием изображений для вдумчивых задач, а не для быстрого ассистента."
       },
       "gemma-4-e2b": {
-        "description": "The quickest current Gemma for everyday conversation. Less capable on complex requests."
+        "description": "Самая быстрая из актуальных Gemma для повседневного разговора. Слабее на сложных запросах."
       },
       "gemma-4-e4b": {
-        "description": "Recommended for conversation: a stronger quality-and-speed balance without default thinking."
+        "description": "Рекомендуется для разговора: лучший баланс качества и скорости без размышлений по умолчанию."
       },
       "gemma-4-12b": {
-        "description": "More capable for nuanced questions, but noticeably slower and best with a strong GPU."
+        "description": "Лучше справляется с тонкими вопросами, но заметно медленнее и требует мощного GPU."
       },
       "gemma-3-4b": {
-        "description": "Fast, clean answers with screen vision, but less capable than current Gemma 4 models."
+        "description": "Быстрые, аккуратные ответы с просмотром экрана, но слабее актуальных моделей Gemma 4."
       },
       "kokoro-82m": {
-        "description": "Built-in local voice for the assistant. No download needed."
+        "description": "Встроенный локальный голос для ассистента. Загрузка не требуется."
       },
       "small": {
         "name": "Whisper Small",
@@ -200,7 +200,7 @@
       },
       "parakeet-tdt-0.6b-v3": {
         "name": "Parakeet V3",
-        "description": "Быстрая и точная"
+        "description": "Быстрая и точная. 25 европейских языков."
       },
       "moonshine-base": {
         "name": "Moonshine Base",
@@ -256,7 +256,7 @@
       },
       "grant": "Предоставить разрешение",
       "granted": "Предоставлено",
-      "waiting": "Ожидание...",
+      "waiting": "Ожидание…",
       "allGranted": "Всё готово!",
       "errors": {
         "checkFailed": "Не удалось проверить разрешения. Пожалуйста, попробуйте снова.",
@@ -267,29 +267,31 @@
   "modelSelector": {
     "custom": "Пользовательская",
     "active": "Активный",
-    "switching": "Переключение...",
+    "switching": "Переключение…",
     "noModelsAvailable": "Нет доступных моделей",
-    "verifying": "Проверка {{modelName}}...",
-    "verifyingGeneric": "Проверка...",
-    "extracting": "Извлечение {{modelName}}...",
-    "extractingMultiple": "Извлечение моделей {{count}}...",
-    "extractingGeneric": "Извлечение...",
+    "verifying": "Проверка {{modelName}}…",
+    "verifyingGeneric": "Проверка…",
+    "extracting": "Извлечение {{modelName}}…",
+    "extractingMultiple": "Извлечение моделей {{count}}…",
+    "extractingGeneric": "Извлечение…",
     "downloading": "Загрузка {{percentage}} %",
-    "downloadingMultiple": "Загрузка моделей {{count}}...",
+    "downloadingMultiple": "Загрузка моделей {{count}}…",
+    "downloadDetails": "Сведения о загрузке",
+    "downloadSize": "{{downloaded}} из {{total}}",
     "modelReady": "Модель готова",
-    "loading": "Загрузка {{modelName}}...",
-    "loadingGeneric": "Загрузка...",
+    "loading": "Загрузка {{modelName}}…",
+    "loadingGeneric": "Загрузка…",
     "modelError": "Ошибка модели",
     "modelUnloaded": "Модель выгружена",
     "noModelDownloadRequired": "Нет модели – требуется загрузка",
-    "llmSelectModel": "Select assistant model",
-    "llmModelTitle": "Assistant model: {{model}}",
+    "llmSelectModel": "Выбрать модель ассистента",
+    "llmModelTitle": "Модель ассистента: {{model}}",
     "deleteModel": "Удалить {{modelName}}",
     "downloadSpeed": "{{speed}} МБ/с",
     "cancel": "Отмена",
     "cancelDownload": "Отменить загрузку",
-    "download": "Download",
-    "useModel": "Use model",
+    "download": "Скачать",
+    "useModel": "Использовать модель",
     "capabilities": {
       "languageSelection": "Поддерживает несколько языков ввода",
       "singleLanguage": "Поддерживает только этот язык",
@@ -297,71 +299,71 @@
       "languageOnly": "Только {{language}}",
       "translation": "Может переводить на английский",
       "translate": "Перевод на английский",
-      "streaming": "Streaming",
-      "quantization": "Quantization",
-      "legacy": "Older"
+      "streaming": "Потоковая",
+      "quantization": "Квантизация",
+      "legacy": "Устаревшая"
     }
   },
   "settings": {
     "personalMemory": {
       "enable": {
-        "label": "Remember me",
-        "description": "Let the assistant keep and use a personal memory. Off by default."
+        "label": "Запоминать меня",
+        "description": "Разрешить ассистенту вести и использовать личную память. По умолчанию выключено."
       },
       "incognito": {
-        "label": "Incognito chat",
-        "description": "For this conversation, don't use memory and don't learn anything new."
+        "label": "Чат инкогнито",
+        "description": "В этом разговоре не использовать память и ничего не запоминать."
       },
       "detail": {
-        "label": "Memory detail",
-        "description": "How much memory to add to each reply. More detail is richer but a little slower.",
+        "label": "Подробность памяти",
+        "description": "Сколько памяти добавлять к каждому ответу. Больше подробностей — богаче, но немного медленнее.",
         "options": {
-          "light": "Light",
-          "balanced": "Balanced",
-          "detailed": "Detailed"
+          "light": "Лёгкая",
+          "balanced": "Сбалансированная",
+          "detailed": "Подробная"
         }
       },
       "aboutYou": {
-        "label": "About you",
-        "caption": "A short, always-on summary the assistant keeps in mind.",
-        "fieldLabel": "Summary",
-        "placeholder": "e.g. Prefers short, direct answers. Works in Rust and TypeScript. Building a desktop voice assistant.",
-        "hint": "Always included when memory is on. Keep it to a few sentences — this is the assistant's at-a-glance picture of you.",
-        "edit": "Edit",
-        "done": "Done",
-        "empty": "Nothing saved yet — the assistant fills this in as it learns, or click Edit to write your own.",
-        "collapsedEmpty": "Nothing saved yet"
+        "label": "О вас",
+        "caption": "Короткая сводка, которую ассистент всегда держит в голове.",
+        "fieldLabel": "Сводка",
+        "placeholder": "например: предпочитает короткие прямые ответы. Работает с Rust и TypeScript. Разрабатывает голосового ассистента для компьютера.",
+        "hint": "Всегда добавляется, когда память включена. Ограничьтесь несколькими предложениями — это то, как ассистент видит вас с первого взгляда.",
+        "edit": "Редактировать",
+        "done": "Готово",
+        "empty": "Пока ничего не сохранено — ассистент заполнит это по мере обучения, или нажмите «Редактировать» и напишите сами.",
+        "collapsedEmpty": "Пока ничего не сохранено"
       },
       "notes": {
-        "label": "Notes",
-        "caption": "Specific things worth remembering — learned or added by you.",
-        "empty": "No notes yet. Add one below, or let the assistant learn them from your chats.",
-        "add": "Add",
-        "addPlaceholder": "Add something to remember…",
-        "delete": "Delete note",
-        "learned": "learned",
-        "added": "added by you"
+        "label": "Заметки",
+        "caption": "Конкретные вещи, которые стоит помнить — выученные или добавленные вами.",
+        "empty": "Заметок пока нет. Добавьте их ниже или дайте ассистенту узнать их из ваших разговоров.",
+        "add": "Добавить",
+        "addPlaceholder": "Добавьте, что нужно запомнить…",
+        "delete": "Удалить заметку",
+        "learned": "выучено",
+        "added": "добавлено вами"
       },
       "confidence": {
-        "high": "High confidence",
-        "medium": "Medium confidence",
-        "low": "Low confidence"
+        "high": "Высокая уверенность",
+        "medium": "Средняя уверенность",
+        "low": "Низкая уверенность"
       },
       "actions": {
-        "label": "Manage"
+        "label": "Управление"
       },
       "distill": {
-        "label": "Learn from this chat now",
-        "description": "Pull durable facts from your current conversation into memory, right now.",
-        "button": "Update memory"
+        "label": "Запомнить из этого разговора сейчас",
+        "description": "Прямо сейчас извлечь из текущего разговора устойчивые факты и добавить их в память.",
+        "button": "Обновить память"
       },
-      "export": "Export",
-      "import": "Import",
+      "export": "Экспорт",
+      "import": "Импорт",
       "wipe": {
-        "button": "Wipe memory",
-        "confirm": "Delete everything the assistant remembers?",
-        "yes": "Delete all",
-        "cancel": "Cancel"
+        "button": "Очистить память",
+        "confirm": "Удалить всё, что помнит ассистент?",
+        "yes": "Удалить всё",
+        "cancel": "Отмена"
       }
     },
     "modelSettings": {
@@ -371,82 +373,82 @@
     "general": {
       "title": "Общие",
       "recording": {
-        "title": "Recording"
+        "title": "Запись"
       },
       "groups": {
-        "sounds": "Sounds",
-        "startup": "Startup and tray",
-        "overlay": "Overlay",
-        "updates": "Updates",
-        "system": "System"
+        "sounds": "Звуки",
+        "startup": "Запуск и трей",
+        "overlay": "Индикатор",
+        "updates": "Обновления",
+        "system": "Система"
       },
       "shortcut": {
-        "title": "Ярлыки SpeakoFlow",
+        "title": "Сочетания клавиш",
         "description": "Настройте сочетания клавиш для запуска записи речи в текст",
-        "loading": "Загрузка ярлыков...",
+        "loading": "Загрузка ярлыков…",
         "none": "Ярлыки не настроены",
         "notFound": "Ярлык не найден",
-        "pressKeys": "Нажимайте клавиши...",
+        "pressKeys": "Нажимайте клавиши…",
         "bindings": {
           "transcribe": {
-            "name": "Горячая клавиша транскрипции",
+            "name": "Диктовка",
             "description": "Сочетание клавиш для записи и транскрибирования вашего голоса."
           },
           "transcribe_toggle": {
-            "name": "Hands-free dictation",
-            "description": "Press once to start, again to stop — no holding needed."
+            "name": "Диктовка без удержания",
+            "description": "Нажмите один раз, чтобы начать, и ещё раз, чтобы остановить — удерживать не нужно."
           },
           "cancel": {
-            "name": "Горячая клавиша отмены",
+            "name": "Отмена",
             "description": "Сочетание клавиш для отмены текущей записи."
           },
           "transcribe_with_post_process": {
             "name": "Горячая клавиша постобработки",
-            "description": "Специальное сочетание клавиш для ИИ-постобработки вашей транскрипции."
+            "description": "Продиктуйте, и ИИ приведёт текст в порядок перед вставкой."
           },
           "assistant": {
-            "name": "Ask assistant",
-            "description": "Ask the assistant by voice; the answer streams into the floating panel."
+            "name": "Спросить ассистента",
+            "description": "Задайте вопрос ассистенту голосом; ответ появится в плавающей панели."
           },
           "assistant_vision": {
-            "name": "Ask with screen",
-            "description": "Ask by voice with your screen attached so it can see what you're looking at."
+            "name": "Спросить с экраном",
+            "description": "Задайте вопрос голосом с приложенным экраном, чтобы ассистент видел, на что вы смотрите."
           },
           "assistant_panel_toggle": {
-            "name": "Show or hide panel",
-            "description": "Shows or hides the floating assistant panel."
+            "name": "Показать или скрыть панель",
+            "description": "Показывает или скрывает плавающую панель ассистента."
           }
         },
         "errors": {
           "restore": "Не удалось восстановить исходный ярлык",
           "set": "Не удалось установить ярлык: {{error}}",
-          "reset": "Не удалось сбросить ярлык до исходного значения"
+          "reset": "Не удалось сбросить сочетание клавиш."
         }
       },
       "language": {
         "title": "Язык",
-        "description": "Выберите язык для распознавания речи. «Авто» автоматически определит язык, а выбор конкретного языка может повысить точность определения этого языка.",
+        "description": "Язык распознавания речи. Конкретный язык может повысить точность.",
         "descriptionUnsupported": "Модель Parakeet автоматически определяет язык. Ручной выбор не требуется.",
-        "searchPlaceholder": "Поиск языков...",
+        "searchPlaceholder": "Поиск языков…",
         "noResults": "Языки не найдены",
         "auto": "Авто"
       },
       "pushToTalk": {
         "label": "Нажми и говори",
-        "description": "Удерживайте, чтобы записать, отпустите, чтобы остановить",
-        "hold": "Hold to record",
-        "tap": "Tap to start and stop"
+        "description": "«Удержание» записывает, пока нажата горячая клавиша диктовки. «Нажатие» начинает запись одним нажатием и останавливает её следующим.",
+        "hold": "Удержание",
+        "tap": "Нажатие"
       },
       "tapToLock": {
-        "label": "Tap to lock",
-        "info": "While holding your record shortcut, tap this to lock hands-free recording so you can let go and keep talking. Pick any key that isn't part of your record shortcut, or clear it to turn this off.",
-        "off": "Off",
-        "clear": "Clear"
+        "label": "Нажатие для фиксации",
+        "info": "Удерживая сочетание клавиш записи, нажмите эту клавишу, чтобы зафиксировать запись без удержания — можно отпустить клавиши и продолжать говорить. Выберите любую клавишу, которая не входит в сочетание для записи, или очистите поле, чтобы отключить это.",
+        "off": "Выкл.",
+        "clear": "Очистить"
       }
     },
     "models": {
       "title": "Модели транскрипции",
-      "description": "Выберите модель транскрипции или загрузите дополнительные модели. Разные модели предлагают разные уровни точности и скорости.",
+      "description": "Модели меняют точность на скорость — выберите ту, что подходит вашему компьютеру.",
       "yourModels": "Загруженные модели",
       "availableModels": "Доступны для загрузки",
       "downloaded": "Загружено",
@@ -455,17 +457,17 @@
       "deleteActiveConfirm": "{{modelName}} — ваша активная модель. Удаление остановит транскрипцию, пока вы не выберете новую модель. Вы уверены?",
       "deleteTitle": "Удалить модель",
       "categories": {
-        "stt": "Transcription",
-        "llm": "Assistant",
-        "tts": "Speech"
+        "stt": "Транскрипция",
+        "llm": "Ассистент",
+        "tts": "Речь"
       },
       "categoryDescriptions": {
-        "stt": "Models trade accuracy for speed — pick one that fits your machine.",
-        "llm": "Local models for the built-in assistant and AI cleanup.",
-        "tts": "Voices for the assistant's spoken replies. Kokoro runs on your machine."
+        "stt": "Модели меняют точность на скорость — выберите ту, что подходит вашему компьютеру.",
+        "llm": "Локальные модели для встроенного ассистента и ИИ-очистки.",
+        "tts": "Голоса для устных ответов ассистента. Kokoro работает на вашем компьютере."
       },
-      "llmHint": "After downloading, pick this model in the Assistant section under the built-in (local) provider.",
-      "ttsHint": "Speech models run on your machine and need no download.",
+      "llmHint": "После загрузки выберите эту модель в разделе «Ассистент» у встроенного (локального) провайдера.",
+      "ttsHint": "Модели речи работают на вашем компьютере и не требуют загрузки.",
       "filters": {
         "all": "Все",
         "multiLanguage": "Многоязычные",
@@ -473,40 +475,40 @@
         "allLanguages": "Все языки"
       },
       "noModelsMatch": "Нет моделей, соответствующих этому фильтру.",
-      "searchPlaceholder": "Search models by name…",
-      "clearSearch": "Clear search",
-      "noSearchResults": "No models named “{{query}}”.",
-      "olderModels": "Older models",
-      "olderModelsHint": "Run on the previous engine. Still fully supported — most people won't need these.",
+      "searchPlaceholder": "Поиск моделей по названию…",
+      "clearSearch": "Очистить поиск",
+      "noSearchResults": "Моделей с названием «{{query}}» нет.",
+      "olderModels": "Старые модели",
+      "olderModelsHint": "Работают на предыдущем движке. Полностью поддерживаются — но большинству они не понадобятся.",
       "customModel": {
-        "addButton": "Search Hugging Face",
-        "searchTitle": "Need a different model?",
-        "searchDescription": "Search Hugging Face for a GGUF model. This is an advanced option, so hardware needs and compatibility can vary.",
-        "searchButton": "Search Hugging Face",
-        "title": "Search Hugging Face",
-        "subtitle": "Find a GGUF model to download and run on this machine.",
-        "searchPlaceholder": "Search models on Hugging Face…",
-        "popularTitle": "Popular GGUF models",
-        "resultsTitle": "Search results",
-        "resultCount_one": "{{count}} model",
-        "resultCount_other": "{{count}} models",
-        "searching": "Searching Hugging Face…",
-        "searchError": "Search failed. Check your connection and try again.",
-        "tryAgain": "Try again",
-        "noResults": "No models found. Try a different search.",
-        "downloads": "{{value}} downloads",
-        "visionBadge": "Vision",
-        "back": "Back to results",
-        "loadingFiles": "Loading available files…",
-        "repoFilesError": "Couldn't load files for this model.",
-        "noGgufFiles": "This repository has no downloadable .gguf files.",
-        "selectQuant": "Choose a download",
-        "selectQuantHint": "Not sure? Q4_K_M is usually the best balance of quality, speed, and memory use.",
-        "enableVision": "Include screen vision",
-        "enableVisionHint": "Downloads an extra file so the model can understand images.",
-        "add": "Download",
-        "adding": "Starting…",
-        "addError": "Couldn't add this model. Please try again."
+        "addButton": "Поиск на Hugging Face",
+        "searchTitle": "Нужна другая модель?",
+        "searchDescription": "Найдите модель GGUF на Hugging Face. Это продвинутая возможность, поэтому требования к железу и совместимость могут отличаться.",
+        "searchButton": "Поиск на Hugging Face",
+        "title": "Найдите модель на Hugging Face",
+        "subtitle": "Ищите модели GGUF, выбирайте версию и загружайте её прямо на это устройство.",
+        "searchPlaceholder": "Поиск по модели или автору…",
+        "popularTitle": "Популярные модели GGUF",
+        "resultsTitle": "Результаты поиска",
+        "resultCount_one": "{{count}} модель",
+        "resultCount_other": "{{count}} моделей",
+        "searching": "Поиск на Hugging Face…",
+        "searchError": "Поиск не удался. Проверьте соединение и попробуйте снова.",
+        "tryAgain": "Попробовать снова",
+        "noResults": "Моделей не найдено. Попробуйте другой запрос.",
+        "downloads": "{{value}} загрузок",
+        "visionBadge": "Изображения",
+        "back": "Назад к результатам",
+        "loadingFiles": "Загрузка доступных файлов…",
+        "repoFilesError": "Не удалось загрузить файлы этой модели.",
+        "noGgufFiles": "В этом репозитории нет файлов .gguf для загрузки.",
+        "selectQuant": "Выберите вариант загрузки",
+        "selectQuantHint": "Не уверены? Q4_K_M обычно даёт лучший баланс качества, скорости и расхода памяти.",
+        "enableVision": "Добавить просмотр экрана",
+        "enableVisionHint": "Загружает дополнительный файл, чтобы модель понимала изображения.",
+        "add": "Скачать",
+        "adding": "Запуск…",
+        "addError": "Не удалось добавить эту модель. Пожалуйста, попробуйте снова."
       }
     },
     "sound": {
@@ -514,24 +516,24 @@
       "microphone": {
         "title": "Микрофон",
         "description": "Выберите предпочитаемое устройство ввода звука",
-        "placeholder": "Выбрать микрофон...",
-        "loading": "Загрузка..."
+        "placeholder": "Выбрать микрофон…",
+        "loading": "Загрузка…"
       },
       "audioFeedback": {
         "label": "Обратная звуковая связь",
         "description": "Воспроизведение звука при запуске и остановке записи"
       },
       "soundTheme": {
-        "label": "Feedback sound",
-        "description": "Choose the start/stop cue played during dictation",
-        "default": "Default",
-        "preview": "Preview sound (plays start then stop)"
+        "label": "Звук обратной связи",
+        "description": "Выберите сигнал начала и остановки, который звучит во время диктовки",
+        "default": "По умолчанию",
+        "preview": "Прослушать звук (сначала начало, затем остановка)"
       },
       "outputDevice": {
         "title": "Устройство вывода",
         "description": "Выберите предпочитаемое устройство вывода звука для звуков обратной связи",
-        "placeholder": "Выберите устройство вывода...",
-        "loading": "Загрузка..."
+        "placeholder": "Выберите устройство вывода…",
+        "loading": "Загрузка…"
       },
       "volume": {
         "title": "Громкость",
@@ -544,20 +546,20 @@
         "app": "Приложение",
         "output": "Вывод",
         "transcription": "Транскрипция",
-        "textReplacements": "Text replacements",
+        "textReplacements": "Замены текста",
         "history": "История",
-        "aiCorrection": "AI cleanup",
+        "aiCorrection": "ИИ-очистка",
         "experimental": "Экспериментальное"
       },
       "aiCorrection": {
-        "label": "AI cleanup (in development)",
-        "description": "Experimental: clean up your dictation with AI. Rough and unpolished — off by default.",
-        "info": "Runs a language model over your dictation to fix punctuation, remove filler words, and optionally adjust the tone. Applies to dictation only (not the assistant chat) and runs on its own shortcut. It adds a delay since the model runs after transcription; if it fails or times out, your raw text is pasted instead. Uses your assistant's model by default. This feature is still in development — you can't yet pick a built-in local model from its own list, and it needs more tuning before it's a main feature."
+        "label": "ИИ-очистка (в разработке)",
+        "description": "Экспериментально: очистка вашей диктовки с помощью ИИ. Пока сыро и не отполировано — по умолчанию выключено.",
+        "info": "Прогоняет вашу диктовку через языковую модель, чтобы исправить пунктуацию, убрать слова-заполнители и при желании изменить тон. Работает только для диктовки (не для чата с ассистентом) и вызывается своим сочетанием клавиш. Это добавляет задержку, так как модель запускается после транскрипции; если она не справится или превысит время ожидания, будет вставлен исходный текст. По умолчанию используется модель вашего ассистента. Функция ещё в разработке — встроенную локальную модель пока нельзя выбрать из отдельного списка, и до полноценной функции ей нужна доработка."
       },
       "postProcessTimeout": {
-        "title": "AI cleanup timeout",
-        "description": "How long to wait for the model before giving up and pasting your raw transcription instead. On the built-in local model, allow enough time for it to load on first use.",
-        "seconds": "{{seconds}} seconds"
+        "title": "Время ожидания ИИ-очистки",
+        "description": "Сколько ждать модель, прежде чем отказаться и вставить исходную транскрипцию. Для встроенной локальной модели оставьте достаточно времени на её загрузку при первом использовании.",
+        "seconds": "{{seconds}} секунд"
       },
       "experimentalToggle": {
         "label": "Экспериментальные функции",
@@ -565,28 +567,28 @@
       },
       "lazyStreamClose": {
         "label": "Оставлять микрофон включённым между транскрипциями",
-        "description": "Оставляет поток микрофона открытым в течение 30 секунд после остановки записи, уменьшая задержку при последовательных транскрипциях. Может ухудшить качество звука Bluetooth."
+        "description": "Быстрее диктовать подряд. Может повлиять на качество звука Bluetooth."
       },
       "liveTranscription": {
-        "label": "Live transcription",
-        "description": "Transcribe speech as you talk, instead of all at once when you stop. Experimental."
+        "label": "Транскрипция на ходу",
+        "description": "Расшифровывать речь по ходу разговора, а не целиком после остановки. Экспериментально."
       },
       "liveTranscriptionWindow": {
-        "label": "Live transcription window",
-        "description": "While live transcription runs, show a larger overlay card with the running text instead of the compact pill. Requires live transcription."
+        "label": "Окно транскрипции на ходу",
+        "description": "Пока идёт транскрипция на ходу, показывать вместо компактного индикатора большую карточку с текущим текстом. Требует транскрипции на ходу."
       },
       "acceleration": {
         "whisper": {
           "title": "Ускорение Whisper",
-          "description": "Аппаратное ускорение для моделей Whisper. Автоматический режим использует GPU при наличии (Metal на macOS, Vulkan на Windows/Linux)."
+          "description": "Авто использует GPU, когда он доступен."
         },
         "ort": {
           "title": "Ускорение ONNX",
-          "description": "Аппаратное ускорение для моделей ONNX (Parakeet, Canary, Moonshine и др.). DirectML на Windows является экспериментальным. Модели могут не выполнять транскрипцию."
+          "description": "Для моделей Parakeet, Canary и Moonshine. DirectML — экспериментальный."
         },
         "gpuDevice": {
           "title": "Устройство GPU",
-          "description": "Выберите GPU для инференса Whisper. Авто выбирает выделенный GPU.",
+          "description": "Авто выбирает выделенный GPU.",
           "auto": "Авто"
         }
       },
@@ -602,18 +604,22 @@
         "label": "Показать значок в трее",
         "description": "Отображать значок SpeakoFlow в системном трее."
       },
+      "closeBehavior": {
+        "label": "Выходить при закрытии окна",
+        "description": "Когда выключено, закрытие окна оставляет SpeakoFlow работать в трее, и горячие клавиши продолжают действовать. Когда включено, закрытие окна полностью завершает приложение."
+      },
       "overlayStyle": {
-        "title": "Overlay",
-        "description": "How the recording overlay looks while you dictate. None hides it, Minimal is the compact pill, and Live shows a readable card with your words as you speak (for models that support it).",
+        "title": "Индикатор",
+        "description": "Как выглядит индикатор записи во время диктовки. «Нет» скрывает его, «Минимальный» — компактная плашка, а «На ходу» показывает читаемую карточку с вашими словами по мере речи (для моделей, которые это поддерживают).",
         "options": {
-          "none": "None",
-          "minimal": "Minimal",
-          "live": "Live"
+          "none": "Нет",
+          "minimal": "Минимальный",
+          "live": "На ходу"
         }
       },
       "overlay": {
         "title": "Позиция индикатора",
-        "description": "Отображение индикатора визуальной обратной связи во время записи и транскрипции. В Linux рекомендуется выбрать «Нет».",
+        "description": "Где на экране находится индикатор записи.",
         "options": {
           "none": "Нет",
           "bottom": "Снизу",
@@ -622,7 +628,7 @@
       },
       "pasteMethod": {
         "title": "Метод вставки",
-        "description": "Выбрать способ вставки текста. Прямой: имитирует набор текста через системный ввод. Нет: пропуск вставки, обновление только истории/буфера обмена.",
+        "description": "Как транскрибированный текст вставляется в активное приложение.",
         "options": {
           "clipboard": "Буфер обмена ({{modifier}}+V)",
           "clipboardCtrlShiftV": "Буфер обмена (Ctrl+Shift+V)",
@@ -635,14 +641,14 @@
       },
       "typingTool": {
         "title": "Инструмент ввода",
-        "description": "Выберите, какой инструмент ввода в Linux использовать для метода прямой вставки. Auto автоматически определит и использует лучший доступный инструмент для вашей системы.",
+        "description": "Инструмент Linux для метода вставки «Прямой».",
         "options": {
           "auto": "Auto (Рекомендуется)"
         }
       },
       "clipboardHandling": {
         "title": "Обработка буфера обмена",
-        "description": "Функция «Не изменять буфер обмена» сохраняет текущее содержимое буфера обмена после транскрипции. Копировать в буфер обмена оставляет результат транскрипции в буфере обмена после вставки.",
+        "description": "Остаётся ли транскрипция в буфере обмена после вставки.",
         "options": {
           "dontModify": "Не изменять буфер обмена",
           "copyToClipboard": "Копировать в буфер обмена"
@@ -650,7 +656,7 @@
       },
       "autoSubmit": {
         "title": "Автоматическая отправка",
-        "description": "Автоматически отправляет выбранную комбинацию клавиш после вставки текста. Cmd+Enter применяется на macOS, а Windows/Linux используют Super+Enter.",
+        "description": "Автоматически отправлять сочетание клавиш после вставки текста.",
         "options": {
           "off": "Выкл.",
           "enter": "Enter",
@@ -661,12 +667,12 @@
       },
       "translateToEnglish": {
         "label": "Перевести на английский",
-        "description": "Автоматически переводить речь с других языков на английский во время транскрипции.",
+        "description": "Переводить речь с других языков на английский.",
         "descriptionUnsupported": "Перевод не поддерживается моделью {{model}}."
       },
       "modelUnload": {
         "title": "Выгрузить модель",
-        "description": "Автоматически освобождать память, если модель не использовалась в течение указанного времени.",
+        "description": "Освобождать память, когда модель простаивает столько времени.",
         "options": {
           "never": "Никогда",
           "immediately": "Немедленно",
@@ -680,96 +686,123 @@
       },
       "customWords": {
         "title": "Пользовательский словарь",
-        "description": "Добавить слова, которые часто неправильно слышатся или пишутся с ошибками во время транскрипции. Система автоматически исправит похожие по звучанию слова, чтобы они соответствовали вашему списку.",
-        "info": "Example: add “Kokoro” if SpeakoFlow writes “Coco row.”",
-        "placeholder": "Добавить слово",
+        "description": "Имена, продукты и фразы, которые SpeakoFlow должен писать так, как нужно вам.",
+        "info": "Например: добавьте «Kokoro», если SpeakoFlow пишет «Коко Роу».",
+        "placeholder": "Добавьте имя, термин или короткую фразу",
         "add": "Добавить",
-        "empty": "No custom words yet.",
+        "empty": "Пользовательских слов пока нет.",
         "remove": "Удалить {{word}}",
         "duplicate": "\"{{word}}\" уже существует"
       },
       "textReplacements": {
-        "title": "Text replacements",
-        "description": "Replace a phrase in your transcript with text you use often. Example: “my email” becomes “alex@example.com”.",
-        "rulesTitle": "Replacement rules",
-        "rulesHint": "Choose what SpeakoFlow hears and what it should insert.",
-        "empty": "Create a rule for a phrase you say often.",
-        "addFirst": "Create first rule",
-        "addRule": "Add replacement",
-        "manageRules": "Replacements ({{count}})",
-        "searchLabel": "Spoken phrase",
-        "searchPlaceholder": "my email",
-        "replaceLabel": "Insert this text",
+        "title": "Замены текста",
+        "description": "Заменяйте фразу в транскрипции на текст, который вы часто используете. Например: «моя почта» превращается в «alex@example.com».",
+        "rulesTitle": "Правила замены",
+        "rulesHint": "Укажите, что слышит SpeakoFlow и что он должен вставить.",
+        "empty": "Создайте правило для фразы, которую вы часто говорите.",
+        "addFirst": "Создать первое правило",
+        "addRule": "Добавить замену",
+        "manageRules": "Замены ({{count}})",
+        "searchLabel": "Произносимая фраза",
+        "searchPlaceholder": "моя почта",
+        "replaceLabel": "Вставлять этот текст",
         "replacePlaceholder": "alex@example.com",
-        "advanced": "Advanced options",
-        "regex": "Regex",
-        "trimBefore": "Trim before",
-        "trimAfter": "Trim after",
-        "enabledLabel": "Enabled",
-        "remove": "Remove rule",
-        "import": "Import",
-        "export": "Export",
-        "importSuccess": "Imported {{count}} replacement rules",
-        "importError": "Could not import: the file is not a valid replacements list",
-        "exportSuccess": "Replacements exported",
-        "exportError": "Could not export replacements",
-        "magicHint": "Use [date], [time], [uppercase], [lowercase], [capitalize], or [nospace] in the inserted text.",
+        "advanced": "Дополнительные параметры",
+        "regex": "Регулярное выражение",
+        "trimBefore": "Убрать пробел перед",
+        "trimAfter": "Убрать пробел после",
+        "enabledLabel": "Включено",
+        "remove": "Удалить правило",
+        "import": "Импорт",
+        "export": "Экспорт",
+        "importSuccess": "Импортировано правил замены: {{count}}",
+        "importError": "Не удалось импортировать: файл не является корректным списком замен",
+        "exportSuccess": "Замены экспортированы",
+        "exportError": "Не удалось экспортировать замены",
+        "magicHint": "Используйте [date], [time], [uppercase], [lowercase], [capitalize] или [nospace] во вставляемом тексте.",
         "capitalization": {
-          "label": "Caps",
-          "none": "None",
-          "uppercase": "UPPERCASE",
-          "lowercase": "lowercase",
-          "capitalize": "Capitalize"
+          "label": "Регистр",
+          "none": "Без изменений",
+          "uppercase": "ВЕРХНИЙ РЕГИСТР",
+          "lowercase": "нижний регистр",
+          "capitalize": "С Заглавной"
         }
       }
     },
     "postProcessing": {
       "title": "Постобработка",
+      "readiness": {
+        "checking": "Проверка настроек ИИ-очистки…",
+        "checkFailed": "Не удалось проверить настройки ИИ-очистки.",
+        "ready": "Готово — {{provider}}.",
+        "assistantFallback": "Готово — используется модель ассистента ({{provider}}).",
+        "selectPrompt": "Выберите запрос для очистки.",
+        "selectModel": "Выберите модель для этого провайдера.",
+        "addApiKey": "Добавьте API-ключ для этого провайдера.",
+        "providerMissing": "Выбранный провайдер больше недоступен."
+      },
+      "errors": {
+        "saveFailed": "Не удалось сохранить настройку ИИ-очистки.",
+        "modelsLoadFailed": "Не удалось загрузить модели этого провайдера.",
+        "promptCreateFailed": "Не удалось создать запрос.",
+        "promptSelectFailed": "Запрос создан, но выбрать его не удалось.",
+        "promptUpdateFailed": "Не удалось обновить запрос.",
+        "promptDeleteFailed": "Не удалось удалить запрос.",
+        "toneSelectFailed": "Не удалось выбрать стиль письма.",
+        "toneCreateFailed": "Не удалось создать стиль письма.",
+        "toneSelectAfterCreateFailed": "Стиль создан, но выбрать его не удалось.",
+        "toneUpdateFailed": "Не удалось обновить стиль письма.",
+        "toneDeleteFailed": "Не удалось удалить стиль письма."
+      },
       "enable": {
-        "title": "AI cleanup"
+        "title": "ИИ-очистка"
       },
       "hotkey": {
-        "title": "Горячая клавиша"
+        "title": "Сочетание клавиш"
       },
       "tone": {
-        "title": "Tone",
-        "description": "Optionally rewrite your cleaned-up dictation in a chosen tone. \"None\" just tidies the text without changing the wording.",
+        "title": "Готовый стиль",
+        "description": "Выберите, как должна звучать очищенная диктовка. «Только очистка» правит текст, не меняя намеренно вашу манеру речи.",
         "options": {
-          "none": "None (cleanup only)",
-          "formal": "Formal",
-          "casual": "Casual",
-          "professional": "Professional",
-          "friendly": "Friendly",
-          "concise": "Concise"
+          "none": "Нет (только очистка)",
+          "formal": "Формальный",
+          "casual": "Непринуждённый",
+          "professional": "Деловой",
+          "friendly": "Дружелюбный",
+          "concise": "Лаконичный"
         },
-        "edit": "Edit",
-        "closeEditor": "Close",
-        "createNew": "Create style",
-        "nameLabel": "Style name",
-        "namePlaceholder": "For example, Calm and clean",
-        "instructionsLabel": "Style instructions",
-        "instructionsPlaceholder": "Describe exactly how the wording should change. Example: Remove profanity and replace it with calm, neutral wording.",
-        "instructionsHint": "These rules shape the wording after cleanup. They stay separate from your cleanup prompt.",
-        "createTone": "Create style",
-        "updateTone": "Save changes",
-        "deleteTone": "Delete style",
-        "cancel": "Cancel"
+        "edit": "Редактировать",
+        "closeEditor": "Закрыть",
+        "createNew": "Создать стиль",
+        "nameLabel": "Название стиля",
+        "namePlaceholder": "Например, «Спокойно и чисто»",
+        "instructionsLabel": "Инструкции стиля",
+        "instructionsPlaceholder": "Опишите точно, как должны меняться формулировки. Например: убрать грубые выражения и заменить их спокойными, нейтральными.",
+        "instructionsHint": "Эти правила определяют формулировки после очистки. Они не связаны с вашим запросом для очистки.",
+        "createTone": "Создать стиль",
+        "updateTone": "Сохранить изменения",
+        "deleteTone": "Удалить стиль",
+        "cancel": "Отмена"
       },
       "api": {
         "title": "API (совместимый с OpenAI)",
+        "location": {
+          "title": "Где выполняется",
+          "description": "Выполняйте очистку приватно на загруженной модели или используйте облачного провайдера."
+        },
         "provider": {
           "title": "Поставщик",
           "description": "Выберите поставщика, совместимого с OpenAI."
         },
         "appleIntelligence": {
-          "title": "Apple Интеллект",
+          "title": "Apple Intelligence",
           "description": "Полностью работает на устройстве. Никакой ключ API или доступ к сети не требуется.",
           "requirements": "Требуется Apple Silicon Mac под управлением macOS Tahoe (26.0) или более поздней версии. Apple Intelligence должен быть включен в настройках системы.",
           "unavailable": "Apple Intelligence недоступен на этом устройстве. Требуется Apple Silicon Mac под управлением macOS Tahoe (26.0) или более поздней версии с включенным Apple Intelligence в настройках системы."
         },
         "baseUrl": {
           "title": "Базовый URL",
-          "description": "Базовый URL-адрес API для выбранного провайдера. Редактировать можно только настраиваемого поставщика.",
+          "description": "Базовый URL API для выбранного провайдера. Можно изменить для «Custom», «Local» и «Azure OpenAI» (укажите свой ресурс, например https://your-resource.openai.azure.com/openai/v1).",
           "placeholder": "https://api.openai.com/v1"
         },
         "apiKey": {
@@ -778,24 +811,20 @@
           "placeholder": "sk-..."
         },
         "builtin": {
-          "modelDescription": "Pick a model you've downloaded. It runs on your machine with no API key or setup.",
-          "modelPlaceholder": "Select a downloaded model",
-          "noModels": "No local models yet. Download one from the model catalog.",
-          "ready": "Runs fully on your machine. No API key, no setup."
+          "modelDescription": "Выберите одну из загруженных моделей. Она работает на вашем компьютере без API-ключа и настройки.",
+          "modelPlaceholder": "Выберите загруженную модель",
+          "noModels": "Локальных моделей пока нет. Скачайте одну из каталога моделей.",
+          "ready": "Работает полностью на вашем компьютере. Без API-ключа и настройки."
         },
         "model": {
           "title": "Модель",
           "descriptionApple": "Укажите дополнительный числовой лимит токенов или сохраните настройки по умолчанию, установленные на устройстве.",
           "descriptionCustom": "Укажите идентификатор модели, ожидаемый вашей пользовательской конечной точкой.",
           "descriptionDefault": "Выберите модель, предоставляемую выбранным поставщиком.",
-          "placeholderApple": "Apple Интеллект",
+          "placeholderApple": "Apple Intelligence",
           "placeholderWithOptions": "Найдите или выберите модель",
           "placeholderNoOptions": "Введите название модели",
           "refreshModels": "Обновить модели"
-        },
-        "location": {
-          "title": "Where it runs",
-          "description": "Run cleanup privately with a downloaded model or use a cloud provider."
         }
       },
       "prompts": {
@@ -807,138 +836,122 @@
         "noPrompts": "Нет доступных запросов",
         "selectPrompt": "Выберите запрос",
         "createNew": "Создать новый запрос",
-        "edit": "Edit",
-        "closeEditor": "Close",
+        "edit": "Редактировать",
+        "closeEditor": "Закрыть",
         "promptLabel": "Название запроса",
         "promptLabelPlaceholder": "Введите название запроса",
         "promptInstructions": "Инструкции",
         "promptInstructionsPlaceholder": "Напишите инструкции для постобработки транскрипции. Например: Улучшить грамматику и ясность следующего текста: ${output}",
-        "promptTip": "Совет: используйте <code>${output}</code>, чтобы вставить транскрипцию.",
+        "promptTip": "Совет: транскрипция отправляется модели автоматически — просто напишите инструкции. (Старые промпты с <code>${output}</code> по-прежнему работают.)",
         "updatePrompt": "Обновить запрос",
         "deletePrompt": "Удалить запрос",
         "createPrompt": "Создать запрос",
         "cancel": "Отмена",
         "selectToEdit": "Выберите запрос выше, чтобы просмотреть и изменить его сведения.",
         "createFirst": "Нажмите «Создать новый запрос» выше, чтобы создать первый запрос для постобработки."
-      },
-      "readiness": {
-        "checking": "Checking AI cleanup setup…",
-        "checkFailed": "Couldn’t check AI cleanup setup.",
-        "ready": "Ready — {{provider}}.",
-        "assistantFallback": "Ready — using your Assistant model ({{provider}}).",
-        "selectPrompt": "Select a cleanup prompt.",
-        "selectModel": "Select a model for this provider.",
-        "addApiKey": "Add an API key for this provider.",
-        "providerMissing": "The selected provider is no longer available."
-      },
-      "errors": {
-        "saveFailed": "Couldn’t save the AI cleanup setting.",
-        "modelsLoadFailed": "Couldn’t load models for this provider.",
-        "promptCreateFailed": "Couldn’t create the prompt.",
-        "promptSelectFailed": "Created the prompt, but couldn’t select it.",
-        "promptUpdateFailed": "Couldn’t update the prompt.",
-        "promptDeleteFailed": "Couldn’t delete the prompt.",
-        "toneSelectFailed": "Couldn’t select the writing style.",
-        "toneCreateFailed": "Couldn’t create the writing style.",
-        "toneSelectAfterCreateFailed": "Created the style, but couldn’t select it.",
-        "toneUpdateFailed": "Couldn’t update the writing style.",
-        "toneDeleteFailed": "Couldn’t delete the writing style."
       }
     },
     "dictation": {
       "hero": {
-        "eyebrow": "Now listening with",
-        "loading": "Loading your model…",
-        "noModelTitle": "No model yet",
-        "noModelCaption": "Pick a model so your voice becomes text.",
-        "chooseModel": "Choose a model",
-        "changeModel": "Change model",
-        "streams": "Streams live",
-        "accuracy": "Accuracy",
-        "speed": "Speed"
+        "eyebrow": "Сейчас слушает",
+        "loading": "Загрузка вашей модели…",
+        "noModelTitle": "Модели пока нет",
+        "noModelCaption": "Выберите модель, чтобы ваш голос превращался в текст.",
+        "chooseModel": "Выбрать модель",
+        "changeModel": "Сменить модель",
+        "streams": "Распознаёт на ходу",
+        "accuracy": "Точность",
+        "speed": "Скорость"
       },
       "catalog": {
-        "title": "Choose your model",
-        "description": "Every model runs on your machine — trade accuracy for speed and pick the one that fits."
+        "title": "Выберите свою модель",
+        "description": "Все модели работают на вашем компьютере — меняйте точность на скорость и выберите подходящую."
       },
       "aiCleanup": {
-        "groupTitle": "AI cleanup",
-        "modelGroupTitle": "Cleanup model",
-        "promptGroupTitle": "Cleanup prompt",
-        "title": "Fix up my dictation with AI",
-        "caption": "Experimental — tidies punctuation and filler after you dictate.",
-        "info": "Runs a language model over your dictation to fix punctuation, remove filler words, and optionally adjust the tone. Applies to dictation only, on its own shortcut. It adds a short delay after you speak; if the model fails or times out, your raw text is used instead. Still in development.",
-        "styleGroupTitle": "Writing style",
-        "styleGroupDescription": "Choose a built-in style or save your own rules for how cleaned dictation should sound.",
-        "fixMisheardLabel": "Fix misheard words",
-        "fixMisheardDescription": "When a word is clearly wrong for the sentence — a homophone or a near-miss pronunciation — replace it with the word you meant. Helpful for accents; the AI only corrects when the intended word is obvious."
+        "groupTitle": "ИИ-очистка",
+        "styleGroupTitle": "Стиль письма",
+        "styleGroupDescription": "Выберите встроенный стиль или сохраните свои правила того, как должна звучать очищенная диктовка.",
+        "modelGroupTitle": "Модель для очистки",
+        "promptGroupTitle": "Запрос для очистки",
+        "title": "Приводить мою диктовку в порядок с помощью ИИ",
+        "caption": "Экспериментально — исправляет пунктуацию и убирает слова-заполнители после диктовки.",
+        "strengthLabel": "Сила очистки",
+        "strengthDescription": "Насколько сильно ИИ переписывает ваши слова. «Лёгкая» исправляет только ошибки и слова-заполнители. «Сбалансированная» ещё убирает повторы и неудачные начала фраз. «Сильная» превращает рассуждения в лаконичный, хорошо структурированный текст — всегда сохраняя факты и смысл.",
+        "strengthOptions": {
+          "light": "Лёгкая",
+          "balanced": "Сбалансированная",
+          "aggressive": "Сильная"
+        },
+        "fixMisheardLabel": "Исправлять неверно услышанные слова",
+        "fixMisheardDescription": "Когда слово явно не подходит по смыслу — омофон или почти угаданное произношение — заменять его на то, которое вы имели в виду. Помогает при акценте; ИИ исправляет только тогда, когда нужное слово очевидно.",
+        "info": "Прогоняет вашу диктовку через языковую модель, чтобы исправить пунктуацию, убрать слова-заполнители и при желании изменить тон. Работает только для диктовки и вызывается своим сочетанием клавиш. После речи добавляется небольшая задержка; если модель не справится или превысит время ожидания, будет использован исходный текст. Функция ещё в разработке."
       },
       "spokenEmoji": {
         "title": "Эмодзи голосом",
         "description": "Скажите “happy emoji” или “thumbs up emoji”, чтобы вставить 😊 или 👍. Распространённые варианты и небольшие ошибки распознавания обрабатываются на устройстве; неизвестные названия остаются текстом."
       },
-      "output": {
-        "title": "Output options"
-      },
       "flow": {
-        "groupTitle": "Generate with Flow",
-        "enableLabel": "Generate with Flow",
-        "enableDescription": "Start a dictation with the activation phrase to have AI write the result for you — “Hey Flow, write a polite email asking to reschedule” pastes the finished email.",
-        "phraseLabel": "Activation phrase",
-        "phraseDescription": "Flow activates only when a dictation begins with this phrase. Anywhere else, the same words paste as normal dictation. Uses your assistant's model; leave empty to reset to “Hey Flow”.",
+        "groupTitle": "Генерация с Flow",
+        "enableLabel": "Генерация с Flow",
+        "enableDescription": "Начните диктовку с фразы активации, и ИИ напишет результат за вас — «Hey Flow, напиши вежливое письмо с просьбой перенести встречу» вставит готовое письмо.",
+        "phraseLabel": "Фраза активации",
+        "phraseDescription": "Flow срабатывает только тогда, когда диктовка начинается с этой фразы. В остальных случаях те же слова вставляются как обычная диктовка. Используется модель вашего ассистента; оставьте поле пустым, чтобы вернуть «Hey Flow».",
         "phrasePlaceholder": "Hey Flow",
-        "screenLabel": "Allow screen access",
-        "screenDescription": "Let Flow take one screenshot when a command clearly refers to your screen, like “look at this email and draft a reply”. The model decides if it's needed. Separate from the assistant's screen access."
+        "screenLabel": "Разрешить доступ к экрану",
+        "screenDescription": "Позволяет Flow сделать один снимок экрана, когда команда явно относится к экрану, например «посмотри на это письмо и набросай ответ». Модель сама решает, нужно ли это. Не связано с доступом к экрану у ассистента."
+      },
+      "output": {
+        "title": "Параметры вывода"
       }
     },
     "history": {
       "title": "История",
       "storage": {
-        "title": "Recording storage",
-        "description": "These controls affect recordings only. Starred recordings are always kept. Assistant chats have separate storage."
+        "title": "Хранение записей",
+        "description": "Эти настройки касаются записей диктовки и Flow. Сохранённые записи хранятся всегда. У чатов с ассистентом отдельное хранение."
       },
       "filters": {
-        "label": "History type",
-        "all": "All",
+        "label": "Тип истории",
+        "all": "Все",
         "recordings": "Recordings",
         "flow": "Flow",
-        "assistant": "Assistant chats"
+        "assistant": "Чаты с ассистентом"
       },
       "openFolder": "Открыть папку с записями",
-      "loading": "Загрузка истории...",
-      "empty": "Транскрипций пока нет. Начните запись, чтобы создать свою историю!",
-      "emptyRecordings": "No recordings yet.",
-      "emptyFlow": "No Flow generations yet.",
-      "emptyAssistant": "No assistant chats yet.",
-      "recordingLabel": "Recording",
+      "loading": "Загрузка истории…",
+      "empty": "Здесь пока ничего нет. Ваши диктовки, генерации Flow и чаты с ассистентом появятся здесь.",
+      "emptyRecordings": "Диктовок пока нет.",
+      "emptyFlow": "Генераций Flow пока нет.",
+      "emptyAssistant": "Чатов с ассистентом пока нет.",
+      "recordingLabel": "Диктовка",
       "flowLabel": "Flow",
-      "flowTranscriptLabel": "You said",
-      "originalTranscriptionLabel": "Original transcription",
-      "flowOutputLabel": "Flow output",
-      "finalTextLabel": "Final text",
-      "flowNoOutput": "No Flow output was generated.",
-      "copyFlowOutput": "Copy Flow output",
-      "copyFinalText": "Copy final text",
+      "flowTranscriptLabel": "Вы сказали",
+      "originalTranscriptionLabel": "Исходная транскрипция",
+      "flowOutputLabel": "Результат Flow",
+      "finalTextLabel": "Итоговый текст",
+      "flowNoOutput": "Flow не сгенерировал результат.",
       "copyToClipboard": "Скопировать транскрипцию в буфер обмена",
+      "copyFlowOutput": "Скопировать результат Flow",
+      "copyFinalText": "Скопировать итоговый текст",
       "save": "Сохранить транскрипцию",
       "unsave": "Удалить из сохраненных",
       "delete": "Удалить запись",
       "deleteError": "Не удалось удалить запись. Пожалуйста, попробуйте еще раз.",
       "retranscribe": "Перетранскрибировать",
       "retranscribeError": "Не удалось перетранскрибировать. Пожалуйста, попробуйте снова.",
-      "transcribing": "Транскрибирование...",
+      "transcribing": "Транскрибирование…",
       "transcriptionFailed": "Транскрипция не удалась. Вы можете перетранскрибировать, используя значок повтора.",
-      "assistantLabel": "Assistant chat",
-      "copyConversation": "Copy conversation",
-      "resumeConversation": "Continue this conversation in the assistant",
-      "showConversation": "Show conversation",
-      "hideConversation": "Hide conversation",
-      "roleUser": "You",
-      "roleAssistant": "Assistant",
-      "screenshotAttached": "Vision",
-      "messageCount_one": "{{count}} message",
-      "messageCount_other": "{{count}} messages",
-      "deleteAssistantError": "Couldn't delete the conversation. Please try again."
+      "assistantLabel": "Чат с ассистентом",
+      "copyConversation": "Скопировать разговор",
+      "resumeConversation": "Продолжить этот разговор в ассистенте",
+      "showConversation": "Показать разговор",
+      "hideConversation": "Скрыть разговор",
+      "roleUser": "Вы",
+      "roleAssistant": "Ассистент",
+      "screenshotAttached": "Экран",
+      "messageCount_one": "{{count}} сообщение",
+      "messageCount_other": "{{count}} сообщений",
+      "deleteAssistantError": "Не удалось удалить разговор. Пожалуйста, попробуйте снова."
     },
     "debug": {
       "title": "Отлаживать",
@@ -964,24 +977,24 @@
       },
       "historyLimit": {
         "title": "Размер истории",
-        "description": "Максимальное количество записей истории, которые можно сохранить",
-        "entries": "записи"
+        "description": "Максимальное число несохранённых записей диктовки и Flow. Сохранённые записи хранятся всегда, а чаты с ассистентом не учитываются.",
+        "entries": "записей"
       },
       "recordingRetention": {
         "title": "Автоматическое удаление записей",
-        "description": "Автоматически удалять старые записи для экономии места",
+        "description": "Выберите, как удаляются записи без звёздочки. Изменения применяются сразу и никогда не затрагивают чаты с ассистентом.",
         "never": "Никогда",
-        "preserveLimit": "Хранить последние {{count}}",
+        "preserveLimit": "Хранить заданное количество",
         "days3": "Через 3 дня",
         "weeks2": "Через 2 недели",
         "months3": "Через 3 месяца",
-        "placeholder": "Выберите срок хранения...",
-        "savedToast": "Retention saved.",
-        "appliedToast": "Recording retention applied"
+        "placeholder": "Выберите срок хранения…",
+        "savedToast": "Срок хранения сохранён.",
+        "appliedToast": "Срок хранения записей применён"
       },
       "alwaysOnMicrophone": {
         "label": "Всегда включенный микрофон",
-        "description": "Держите микрофон активным для более быстрого ответа"
+        "description": "Держит микрофон наготове, чтобы первые слова никогда не обрезались. Расходует немного больше заряда."
       },
       "clamshellMicrophone": {
         "title": "Раскладной микрофон",
@@ -1015,7 +1028,7 @@
       },
       "recordingBuffer": {
         "title": "Дополнительный буфер записи",
-        "description": "Дополнительное время (в миллисекундах) для продолжения записи после отпускания клавиши, чтобы захватить завершающий звук. 0 = без дополнительного буфера."
+        "description": "Сколько миллисекунд продолжать запись после отпускания клавиши."
       }
     },
     "about": {
@@ -1025,12 +1038,12 @@
         "description": "Текущая версия SpeakoFlow"
       },
       "updates": {
-        "title": "Updates",
-        "button": "Check for updates",
-        "disabledHint": "Automatic update checks are off. Turn them on in General."
+        "title": "Обновления",
+        "button": "Проверить наличие обновлений",
+        "disabledHint": "Автоматическая проверка обновлений отключена. Включите её в разделе «Общие»."
       },
       "folders": {
-        "title": "Folders"
+        "title": "Папки"
       },
       "appDataDirectory": {
         "title": "Каталог данных приложения",
@@ -1042,9 +1055,9 @@
         "button": "Посмотреть на GitHub"
       },
       "license": {
-        "title": "License",
-        "description": "SpeakoFlow is open source under the MIT License, building on Handy (also MIT) by CJ Pais.",
-        "button": "View license"
+        "title": "Лицензия",
+        "description": "SpeakoFlow — проект с открытым исходным кодом под лицензией MIT, основанный на Handy (также MIT) от CJ Pais.",
+        "button": "Посмотреть лицензию"
       },
       "supportDevelopment": {
         "title": "Поддержка развития",
@@ -1054,326 +1067,340 @@
     },
     "assistant": {
       "shortcuts": {
-        "title": "Shortcuts"
+        "title": "Сочетания клавиш"
       },
       "brain": {
-        "title": "Assistant brain",
-        "description": "Choose whether your assistant runs privately on this device or through a cloud provider.",
-        "whereLabel": "Where it runs",
-        "onDevice": "On my device",
-        "cloud": "Cloud provider",
-        "downloadModel": "Browse and download models",
-        "downloadModelDescription": "Pick a recommended model or search Hugging Face.",
-        "downloadModelAction": "Browse models",
-        "catalogTitle": "Download an on-device model",
-        "catalogDescription": "Choose a model to download. It stays on this machine and needs no API key.",
-        "currentModelTitle": "Current model",
-        "currentModelDescription": "Selected for the built-in assistant on this device.",
-        "recommendedTitle": "Recommended models",
-        "recommendedDescription": "Three conversation-first choices: quickest, recommended, and more capable but slower.",
-        "acceleratorDetected": "{{name}} · {{memory}} GB reported graphics memory",
-        "acceleratorDetectedDedicated": "{{name}} · {{memory}} GB dedicated VRAM",
-        "acceleratorDetectedIntegrated": "{{name}} · {{memory}} GB shared graphics memory",
-        "acceleratorDetectedNoMemory": "{{name}} detected · graphics memory not reported",
-        "acceleratorUnknownWithMemory": "Graphics memory unavailable · {{memory}} GB system RAM for CPU fallback",
-        "acceleratorUnknown": "Graphics memory unavailable · response speed cannot be predicted",
-        "details": "Details",
-        "switchBeforeDelete": "Switch the built-in assistant to another model before deleting this one.",
-        "deleteModelConfirm": "Delete {{modelName}}? Its downloaded files and saved entry will be removed.",
-        "deleteModelFailed": "Could not delete the model.",
-        "visionModelNote": "Screen vision downloads an additional image file automatically.",
-        "finderSectionTitle": "More on-device models",
-        "finderSectionDescription": "Search Hugging Face when you need a different model size or capability.",
-        "finderTitle": "Browse Hugging Face",
-        "finderDescription": "Search thousands of GGUF models and download one directly to SpeakoFlow.",
-        "finderAction": "Find a model",
-        "huggingFaceTitle": "From Hugging Face",
-        "huggingFaceDescription": "Models you added yourself. Compatibility and performance can vary.",
-        "catalogEmpty": "No recommended local models are available right now."
+        "title": "Мозг ассистента",
+        "description": "Выберите, работает ли ассистент приватно на этом устройстве или через облачного провайдера.",
+        "whereLabel": "Где выполняется",
+        "onDevice": "На моём устройстве",
+        "cloud": "Облачный провайдер",
+        "downloadModel": "Просмотр и загрузка моделей",
+        "downloadModelDescription": "Выберите рекомендованную модель или найдите её на Hugging Face.",
+        "downloadModelAction": "Смотреть модели",
+        "catalogTitle": "Выберите модель для работы на устройстве",
+        "catalogDescription": "Загрузите приватную локальную модель. Она остаётся на этом компьютере и не требует API-ключа.",
+        "currentModelTitle": "Текущая модель",
+        "currentModelDescription": "Выбрана для встроенного ассистента на этом устройстве.",
+        "recommendedTitle": "Рекомендуемые модели",
+        "recommendedDescription": "Три варианта, ориентированных на разговор: самый быстрый, рекомендуемый и более способный, но медленный.",
+        "acceleratorDetected": "{{name}} · {{memory}} ГБ видеопамяти по данным системы",
+        "acceleratorDetectedDedicated": "{{name}} · {{memory}} ГБ выделенной видеопамяти",
+        "acceleratorDetectedIntegrated": "{{name}} · {{memory}} ГБ общей видеопамяти",
+        "acceleratorDetectedNoMemory": "Обнаружен {{name}} · объём видеопамяти не сообщается",
+        "acceleratorUnknownWithMemory": "Видеопамять недоступна · {{memory}} ГБ ОЗУ для работы на CPU",
+        "acceleratorUnknown": "Видеопамять недоступна · скорость ответа предсказать нельзя",
+        "details": "Подробнее",
+        "switchBeforeDelete": "Прежде чем удалить эту модель, переключите встроенного ассистента на другую.",
+        "deleteModelConfirm": "Удалить {{modelName}}? Загруженные файлы и сохранённая запись будут удалены.",
+        "deleteModelFailed": "Не удалось удалить модель.",
+        "visionModelNote": "Для просмотра экрана дополнительный файл изображений загружается автоматически.",
+        "finderSectionTitle": "Другие модели для устройства",
+        "finderSectionDescription": "Ищите на Hugging Face, если нужен другой размер модели или другие возможности.",
+        "finderTitle": "Обзор Hugging Face",
+        "finderDescription": "Найдите одну из тысяч моделей GGUF и скачайте её прямо в SpeakoFlow.",
+        "finderAction": "Найти модель",
+        "huggingFaceTitle": "Ваши модели",
+        "huggingFaceDescription": "Загруженные модели и модели, добавленные вами с Hugging Face.",
+        "catalogEmpty": "Сейчас нет доступных рекомендованных локальных моделей."
       },
       "subpages": {
-        "profilesCaption": "Switch the assistant's name, role, and personality.",
-        "memoryCaption": "What the assistant remembers about you between chats."
+        "profilesCaption": "Меняйте имя, роль и характер ассистента.",
+        "memoryCaption": "Что ассистент помнит о вас между разговорами."
       },
       "tapToLock": {
-        "label": "Tap to lock",
-        "info": "While holding the assistant shortcut, tap this to lock hands-free so you can let go and keep talking. Pick a key that isn't part of your assistant shortcut (one that overlaps is ignored), or clear it to turn this off.",
-        "off": "Off",
-        "clear": "Clear"
+        "label": "Нажатие для фиксации",
+        "info": "Удерживая сочетание клавиш ассистента, нажмите эту клавишу, чтобы зафиксировать запись без удержания — можно отпустить клавиши и продолжать говорить. Выберите клавишу, которая не входит в сочетание для ассистента (пересекающаяся будет проигнорирована), или очистите поле, чтобы отключить это.",
+        "off": "Выкл.",
+        "clear": "Очистить"
       },
       "provider": {
-        "title": "Assistant provider",
-        "providerLabel": "Provider",
-        "providerDescription": "The provider that answers assistant questions.",
-        "baseUrlLabel": "Base URL",
-        "baseUrlDescription": "OpenAI-compatible base URL. Azure URLs are normalized automatically.",
-        "apiKeyLabel": "API key",
-        "apiKeyDescription": "Shared with AI cleanup.",
-        "apiKeyPlaceholder": "Enter API key…",
-        "modelLabel": "Model",
-        "modelDescription": "Model or deployment name to use for assistant answers.",
-        "modelPlaceholder": "e.g. gpt-4o-mini",
-        "modelSearchPlaceholder": "Search or type a model…",
-        "modelUse": "Use \"{{model}}\"",
-        "loadModels": "Load models",
-        "loadingModels": "Loading…",
-        "noModelsFound": "No models returned. Type the model name instead.",
-        "builtinModelDescription": "Pick a downloaded local model. It runs on your machine with no API key.",
-        "builtinModelPlaceholder": "Select a downloaded model",
-        "builtinNoModels": "No models on your machine yet — download one below.",
-        "builtinReady": "Runs fully on your machine. No API key, no setup.",
-        "builtinEngineMissing": "First use downloads a small local engine automatically (one time), then runs fully offline. No setup needed.",
-        "contextSizeLabel": "Context window",
-        "contextSizeDescription": "How much the local model can keep in mind at once — the system instructions, your chat history, any screenshot (a single image can eat a big chunk), and its reply. Bigger holds more and keeps screen vision and web search reliable, but uses more memory. The default is 8192; 16384 is a good step up if your machine has the RAM to spare. You can lower it later to save memory.",
-        "unloadTimeoutLabel": "Unload from memory after",
-        "unloadTimeoutDescription": "Free up memory by unloading the local model after it has been idle this long. It reloads automatically on next use.",
-        "saveFailed": "Couldn’t switch the Assistant provider."
+        "title": "Провайдер ассистента",
+        "saveFailed": "Не удалось сменить провайдера ассистента.",
+        "providerLabel": "Провайдер",
+        "providerDescription": "Провайдер, который отвечает на вопросы к ассистенту.",
+        "baseUrlLabel": "Базовый URL",
+        "baseUrlDescription": "Базовый URL, совместимый с OpenAI. Адреса Azure нормализуются автоматически.",
+        "apiKeyLabel": "API-ключ",
+        "apiKeyDescription": "Общий с ИИ-очисткой.",
+        "apiKeyPlaceholder": "Введите API-ключ…",
+        "modelLabel": "Модель",
+        "modelDescription": "Название модели или развёртывания для ответов ассистента.",
+        "modelPlaceholder": "например, gpt-4o-mini",
+        "modelSearchPlaceholder": "Найдите или введите модель…",
+        "modelUse": "Использовать «{{model}}»",
+        "loadModels": "Загрузить модели",
+        "loadingModels": "Загрузка…",
+        "noModelsFound": "Модели не получены. Введите название модели вручную.",
+        "builtinModelDescription": "Выберите загруженную локальную модель. Она работает на вашем компьютере без API-ключа.",
+        "builtinModelPlaceholder": "Выберите загруженную модель",
+        "builtinNoModels": "На вашем компьютере пока нет моделей — скачайте одну ниже.",
+        "builtinReady": "Работает полностью на вашем компьютере. Без API-ключа и настройки.",
+        "builtinEngineMissing": "При первом использовании небольшой локальный движок загрузится автоматически (один раз), а дальше всё работает полностью офлайн. Настройка не нужна.",
+        "builtinEngineDownloading": "Загрузка локального движка… {{percent}} %",
+        "builtinEnginePreparing": "Загрузка локального движка…",
+        "builtinEngineExtracting": "Установка локального движка…",
+        "builtinEngineReady": "Локальный движок готов.",
+        "contextSizeLabel": "Окно контекста",
+        "contextSizeDescription": "Сколько локальная модель может держать в голове одновременно — системные инструкции, историю чата, снимок экрана (одно изображение может занять большую часть) и её ответ. Больше окно — больше вмещается, просмотр экрана и поиск в интернете работают надёжнее, но памяти уходит больше. По умолчанию 8192; 16384 — хороший следующий шаг, если у компьютера есть свободное ОЗУ. Позже значение можно уменьшить, чтобы сэкономить память.",
+        "unloadTimeoutLabel": "Выгружать из памяти через",
+        "unloadTimeoutDescription": "Освобождать память, выгружая локальную модель после такого времени простоя. При следующем использовании она загрузится автоматически."
       },
       "systemPrompt": {
-        "title": "System prompt",
-        "label": "Assistant system prompt",
-        "description": "Sets the assistant's behavior."
+        "title": "Системный запрос",
+        "label": "Системный запрос ассистента",
+        "description": "Задаёт поведение ассистента."
       },
       "characters": {
-        "title": "Profiles",
-        "description": "Task-focused profiles you can switch between. The active profile sets the assistant's name, role, and instructions — and how long its replies run. Switch anytime from the panel header.",
-        "galleryLabel": "Your profiles",
-        "editSection": "Edit profile",
-        "avatarLabel": "Avatar",
-        "active": "Active",
-        "meowsOnly": "Meows only",
-        "builtin": "Built-in",
-        "custom": "Custom",
-        "new": "New",
-        "newName": "New profile",
-        "copyName": "{{name}} copy",
-        "createAi": "Create with AI",
-        "import": "Import",
-        "aiTitle": "Describe your profile",
-        "aiClose": "Close",
-        "aiPlaceholder": "e.g. a concise release-notes writer, or a patient tutor who explains every step",
-        "aiDictate": "Dictate the description",
-        "aiDictateStop": "Stop dictation",
-        "generate": "Generate",
-        "avatarUpload": "Upload image",
-        "avatarRemove": "Remove",
-        "nameLabel": "Name",
-        "roleLabel": "Role",
-        "rolePlaceholder": "Short description shown on the card (optional)",
-        "promptLabel": "Instructions (system prompt)",
+        "title": "Профили",
+        "description": "Профили под конкретные задачи, между которыми можно переключаться. Активный профиль задаёт имя, роль и инструкции ассистента — а также длину его ответов. Переключайтесь в любой момент в заголовке панели.",
+        "galleryLabel": "Ваши профили",
+        "editSection": "Изменить профиль",
+        "avatarLabel": "Аватар",
+        "active": "Активный",
+        "meowsOnly": "Только мяуканье",
+        "builtin": "Встроенный",
+        "custom": "Свой",
+        "new": "Новый",
+        "newName": "Новый профиль",
+        "copyName": "{{name}} — копия",
+        "createAi": "Создать с помощью ИИ",
+        "import": "Импорт",
+        "aiTitle": "Опишите свой профиль",
+        "aiClose": "Закрыть",
+        "aiPlaceholder": "например: лаконичный автор описаний к релизам или терпеливый наставник, который объясняет каждый шаг",
+        "aiDictate": "Продиктовать описание",
+        "aiDictateStop": "Остановить диктовку",
+        "generate": "Сгенерировать",
+        "avatarUpload": "Загрузить изображение",
+        "avatarRemove": "Удалить",
+        "nameLabel": "Имя",
+        "roleLabel": "Роль",
+        "rolePlaceholder": "Короткое описание на карточке (необязательно)",
+        "promptLabel": "Инструкции (системный запрос)",
         "responseLength": {
-          "label": "Response length",
-          "hint": "How long this profile's replies run. \"Inherit\" follows your global Assistant setting.",
+          "label": "Длина ответа",
+          "hint": "Насколько длинными будут ответы этого профиля. «Как в общих настройках» следует глобальной настройке ассистента.",
           "options": {
-            "inherit": "Inherit global",
-            "short": "Short",
-            "medium": "Medium",
-            "long": "Long"
+            "inherit": "Как в общих настройках",
+            "short": "Короткие",
+            "medium": "Средние",
+            "long": "Длинные"
           }
         },
-        "greetingLabel": "Greeting (optional)",
-        "greetingPlaceholder": "Optional opening line shown in an empty chat",
-        "catNote": "The Cat ignores the AI entirely — it just meows. Nothing to configure here.",
-        "duplicate": "Duplicate",
-        "export": "Export",
-        "restoreDefault": "Restore default",
-        "restoreBuiltins": "Restore built-ins",
-        "moreActions": "More actions",
-        "expand": "Expand",
-        "collapse": "Collapse",
-        "delete": "Delete",
-        "deleteConfirm": "Delete this profile? This can't be undone.",
-        "emptyState": "No profiles yet. Create your first one to give the assistant a personality."
+        "greetingLabel": "Приветствие (необязательно)",
+        "greetingPlaceholder": "Необязательная первая фраза, которая появляется в пустом чате",
+        "catNote": "Кот полностью игнорирует ИИ — он просто мяукает. Здесь нечего настраивать.",
+        "duplicate": "Дублировать",
+        "export": "Экспорт",
+        "restoreDefault": "Восстановить исходный",
+        "restoreBuiltins": "Восстановить встроенные",
+        "moreActions": "Другие действия",
+        "expand": "Развернуть",
+        "collapse": "Свернуть",
+        "delete": "Удалить",
+        "deleteConfirm": "Удалить этот профиль? Это нельзя отменить.",
+        "emptyState": "Профилей пока нет. Создайте первый, чтобы задать ассистенту характер."
       },
       "behavior": {
-        "title": "Behavior"
+        "title": "Поведение"
       },
       "memory": {
-        "label": "Conversation memory",
-        "description": "How many recent messages are sent as context each turn. 0 disables memory."
+        "label": "Память разговора",
+        "description": "Сколько последних сообщений отправляется как контекст на каждом шаге. 0 отключает память."
+      },
+      "autoSummarize": {
+        "label": "Сжимать длинные разговоры",
+        "description": "Когда разговор перестаёт помещаться в окно контекста модели, старые сообщения автоматически сжимаются в текущую сводку, чтобы чат сохранял контекст и не забывал начало. Пока это происходит, показывается неброский индикатор."
       },
       "responseLength": {
-        "label": "Response length",
-        "description": "Preferred reply length. \"No effect\" leaves your prompt untouched.",
+        "label": "Длина ответа",
+        "description": "Предпочтительная длина ответа. «Без изменений» оставляет ваш запрос как есть.",
         "options": {
-          "default": "No effect",
-          "short": "Short",
-          "medium": "Medium",
-          "long": "Long"
+          "default": "Без изменений",
+          "short": "Короткие",
+          "medium": "Средние",
+          "long": "Длинные"
         }
       },
       "vision": {
-        "title": "Screen vision",
-        "modeLabel": "Screen access",
+        "title": "Просмотр экрана",
+        "modeLabel": "Доступ к экрану",
         "modes": {
-          "off": "Off",
-          "manual": "Manual",
-          "agentDecides": "Agent decides",
+          "off": "Выкл.",
+          "manual": "Вручную",
+          "agentDecides": "Решает ассистент",
           "descriptions": {
-            "off": "Screen capture is disabled. Camera and region controls are hidden.",
-            "manual": "You choose when to attach the full screen or a region. Voice capture timing applies.",
-            "agent_decides": "The model may request a screen capture when it needs current visual context. Every screenshot sent is shown in the conversation."
+            "off": "Снимки экрана отключены. Кнопки камеры и выбора области скрыты.",
+            "manual": "Вы сами решаете, когда приложить весь экран или его область. Действует настройка момента съёмки для голоса.",
+            "agent_decides": "Модель может запросить снимок экрана, когда ей нужен актуальный визуальный контекст. Каждый отправленный снимок показывается в разговоре."
           }
         },
         "timing": {
-          "label": "When to capture",
-          "description": "For voice questions: capture the moment you start asking, or wait until the message is sent. Typed messages always capture on send.",
+          "label": "Когда делать снимок",
+          "description": "Для голосовых вопросов: снимать в момент, когда вы начинаете спрашивать, или дождаться отправки сообщения. Набранные сообщения всегда снимают экран при отправке.",
           "options": {
-            "immediate": "When I ask",
-            "on_send": "When the message sends"
+            "immediate": "Когда я спрашиваю",
+            "on_send": "При отправке сообщения"
           }
+        },
+        "screenRecording": {
+          "description": "Для просмотра экрана нужно разрешение macOS на запись экрана. Выдайте его в системных настройках, затем перезапустите SpeakoFlow, чтобы оно вступило в силу.",
+          "grant": "Открыть настройки системы"
         }
       },
       "webSearch": {
-        "title": "Web search",
-        "enableLabel": "Allow web search",
-        "enableDescription": "Let the assistant search the web when a question needs current information.",
-        "openRouterNativeLabel": "Use OpenRouter's built-in search",
-        "openRouterNativeDescription": "When on, OpenRouter runs the search itself (its :online mode) using your OpenRouter credits. When off, the app searches with your search provider below.",
-        "providerLabel": "Search provider",
-        "providerDescription": "Serper is a good default. Every provider has a free tier.",
+        "title": "Поиск в интернете",
+        "enableLabel": "Разрешить поиск в интернете",
+        "enableDescription": "Позволяет ассистенту искать в интернете, когда для ответа нужна актуальная информация.",
+        "openRouterNativeLabel": "Использовать встроенный поиск OpenRouter",
+        "openRouterNativeDescription": "Когда включено, поиск выполняет сам OpenRouter (его режим :online) за счёт ваших кредитов OpenRouter. Когда выключено, приложение ищет через выбранного ниже поискового провайдера.",
+        "providerLabel": "Поисковый провайдер",
+        "providerDescription": "Serper — хороший вариант по умолчанию. У каждого провайдера есть бесплатный тариф, а TinyFish бесплатен без карты.",
         "providers": {
-          "serper": "Serper (Google, fast)",
+          "serper": "Serper (Google, быстро)",
           "brave": "Brave Search",
-          "tavily": "Tavily (AI search)",
-          "exa": "Exa (neural)",
-          "serpapi": "SerpAPI (Google)"
+          "tavily": "Tavily (ИИ-поиск)",
+          "exa": "Exa (нейросетевой)",
+          "serpapi": "SerpAPI (Google)",
+          "tinyfish": "TinyFish (бесплатно, без карты)"
         },
-        "apiKeyLabel": "API key",
-        "apiKeyDescription": "Key for the selected search provider.",
-        "apiKeyPlaceholder": "Enter API key…",
-        "fetchContentLabel": "Read full pages (best quality)",
-        "fetchContentDescription": "Read the full text of each result instead of snippets. Better answers, but slower.",
-        "maxResultsLabel": "Sources to use",
-        "maxResultsDescription": "How many results to read (1–10).",
-        "depthLabel": "Search depth",
-        "depthDescription": "Quick for simple facts, Standard for most questions, Deep for hard ones.",
+        "apiKeyLabel": "API-ключ",
+        "apiKeyDescription": "Ключ для выбранного поискового провайдера.",
+        "apiKeyPlaceholder": "Введите API-ключ…",
+        "fetchContentLabel": "Читать страницы полностью (лучшее качество)",
+        "fetchContentDescription": "Читать полный текст каждого результата вместо фрагментов. Ответы лучше, но медленнее.",
+        "maxResultsLabel": "Сколько источников использовать",
+        "maxResultsDescription": "Сколько результатов читать (1–10).",
+        "depthLabel": "Глубина поиска",
+        "depthDescription": "«Быстро» — для простых фактов, «Стандартно» — для большинства вопросов, «Глубоко» — для сложных.",
         "depthOptions": {
-          "low": "Quick",
-          "medium": "Standard",
-          "high": "Deep"
+          "low": "Быстро",
+          "medium": "Стандартно",
+          "high": "Глубоко"
         },
-        "localSmartLabel": "Smart search decisions (local model)",
-        "localSmartDescription": "Let the local model decide when to search. Off uses a fast keyword check instead.",
-        "creditBudgetLabel": "Daily Firecrawl credit limit",
-        "creditBudgetDescription": "Daily cap on Firecrawl credits before search pauses. 0 = no limit.",
-        "testLabel": "Test search",
-        "testDescription": "Run a sample search with the current provider and key.",
-        "testButton": "Test search",
-        "testing": "Searching…",
-        "testResult": "Got {{count}} results."
+        "localSmartLabel": "Умное решение о поиске (локальная модель)",
+        "localSmartDescription": "Позволяет локальной модели решать, когда искать. Когда выключено, используется быстрая проверка по ключевым словам.",
+        "creditBudgetLabel": "Дневной лимит кредитов Firecrawl",
+        "creditBudgetDescription": "Дневной предел кредитов Firecrawl, после которого поиск приостанавливается. 0 = без лимита.",
+        "testLabel": "Проверить поиск",
+        "testDescription": "Выполнить пробный поиск с текущим провайдером и ключом.",
+        "testButton": "Проверить поиск",
+        "testing": "Поиск…",
+        "testResult": "Получено результатов: {{count}}."
       },
       "tts": {
-        "title": "Voice output",
-        "enableLabel": "Speak responses aloud",
-        "enableDescription": "Read the assistant's replies out loud.",
-        "stopOnDictationLabel": "Stop speech when dictation starts",
-        "stopOnDictationDescription": "Stop any reply that's still playing when you start dictating.",
-        "engineLabel": "Engine",
-        "engineDescription": "Kokoro runs locally for free. The other engines use your API key.",
-        "kokoroSetupLabel": "Kokoro voice model",
-        "kokoroSetupDescription": "Download it once, then spoken replies run privately on this device.",
-        "kokoroDownload": "Download Kokoro",
-        "kokoroDownloading": "Downloading Kokoro",
-        "kokoroReady": "Ready on this device",
-        "kokoroRetry": "Try download again",
+        "title": "Голосовой вывод",
+        "enableLabel": "Произносить ответы вслух",
+        "enableDescription": "Читать ответы ассистента вслух.",
+        "stopOnDictationLabel": "Прерывать речь при начале диктовки",
+        "stopOnDictationDescription": "Останавливать ещё звучащий ответ, когда вы начинаете диктовать.",
+        "engineLabel": "Движок",
+        "engineDescription": "Kokoro работает локально и бесплатно. Остальные движки используют ваш API-ключ.",
+        "kokoroSetupLabel": "Голосовая модель Kokoro",
+        "kokoroSetupDescription": "Скачайте её один раз, и устные ответы будут звучать приватно на этом устройстве.",
+        "kokoroDownload": "Скачать Kokoro",
+        "kokoroDownloading": "Загрузка Kokoro",
+        "kokoroReady": "Готово на этом устройстве",
+        "kokoroRetry": "Повторить загрузку",
         "engines": {
-          "kokoro": "Kokoro (local, free)",
-          "openai": "OpenAI-compatible",
+          "kokoro": "Kokoro (локально, бесплатно)",
+          "openai": "Совместимый с OpenAI",
           "openrouter": "OpenRouter",
           "elevenlabs": "ElevenLabs",
           "azure": "Azure AI Speech"
         },
-        "voiceLabel": "Voice",
-        "voiceDescription": "Kokoro voice for spoken replies.",
-        "dtypeLabel": "Kokoro precision",
-        "dtypeDescription": "fp32 is highest quality; q8 is faster on CPU. Changing this reloads the model.",
-        "speedLabel": "Playback speed",
-        "speedDescription": "1× is normal. ElevenLabs supports 0.7×–1.2× only.",
+        "voiceLabel": "Голос",
+        "voiceDescription": "Голос Kokoro для устных ответов.",
+        "dtypeLabel": "Точность Kokoro",
+        "dtypeDescription": "fp32 даёт наивысшее качество; q8 быстрее на CPU. Изменение перезагружает модель.",
+        "speedLabel": "Скорость воспроизведения",
+        "speedDescription": "1× — обычная. ElevenLabs поддерживает только 0,7×–1,2×.",
         "speedValue": "{{value}}×",
-        "speedCustomLabel": "Custom playback speed",
-        "testLabel": "Test voice",
-        "testDescription": "Play a short sample with the current settings.",
-        "testButton": "Test voice",
-        "testing": "Testing…",
-        "testOk": "Played ✓",
-        "testPhrase": "Hi! This is a test of SpeakoFlow's voice output.",
-        "downloadStart": "Downloading Kokoro voice…",
-        "downloadProgress": "Downloading Kokoro voice… {{progress}}%",
-        "downloadReady": "Kokoro voice ready ✓",
-        "downloadError": "Couldn't download the Kokoro voice model",
-        "baseUrlLabel": "Base URL",
-        "baseUrlDescription": "OpenAI-compatible TTS URL. A base URL or a full /audio/speech URL both work.",
-        "azureBaseUrlLabel": "Speech URL",
-        "azureBaseUrlDescription": "Your Azure Speech URL from the portal, e.g. https://eastus2.tts.speech.microsoft.com.",
-        "apiKeyLabel": "API key",
-        "apiKeyDescription": "Separate from the assistant's key.",
-        "modelLabel": "Model",
-        "modelDescription": "Model or deployment name, e.g. gpt-4o-mini-tts (OpenAI/Azure) or eleven_flash_v2_5 (ElevenLabs).",
-        "remoteVoiceLabel": "Voice name",
-        "remoteVoiceDescription": "Voice for OpenAI-compatible TTS, e.g. alloy, echo, nova, shimmer.",
-        "azureVoiceLabel": "Voice name",
-        "azureVoiceDescription": "Azure voice name, e.g. en-US-JennyNeural. Click Load voices to browse.",
-        "loadVoices": "Load voices",
-        "voicesLoading": "Loading…",
-        "voicesPick": "Pick from {{count}} voices…",
-        "loadModels": "Load models",
-        "modelsLoading": "Loading…",
-        "modelsPick": "Pick from {{count}} models…",
-        "modelsUse": "Use \"{{model}}\"",
-        "voicesUse": "Use \"{{voice}}\"",
-        "elevenVoiceLabel": "Voice ID",
-        "elevenVoiceDescription": "ElevenLabs voice ID (from the Voices tab in their dashboard).",
-        "promptLabel": "Summary Prompt",
-        "promptDescription": "Instructions for generating the brief spoken summary of each answer."
+        "speedCustomLabel": "Своя скорость воспроизведения",
+        "testLabel": "Проверить голос",
+        "testDescription": "Воспроизвести короткий образец с текущими настройками.",
+        "testButton": "Проверить голос",
+        "testing": "Проверка…",
+        "testOk": "Воспроизведено ✓",
+        "testPhrase": "Привет! Это проверка голосового вывода SpeakoFlow.",
+        "downloadStart": "Загрузка голоса Kokoro…",
+        "downloadProgress": "Загрузка голоса Kokoro… {{progress}} %",
+        "downloadReady": "Голос Kokoro готов ✓",
+        "downloadError": "Не удалось загрузить голосовую модель Kokoro",
+        "baseUrlLabel": "Базовый URL",
+        "baseUrlDescription": "URL синтеза речи, совместимый с OpenAI. Подойдёт как базовый URL, так и полный адрес /audio/speech.",
+        "azureBaseUrlLabel": "URL службы речи",
+        "azureBaseUrlDescription": "Ваш URL Azure Speech из портала, например https://eastus2.tts.speech.microsoft.com.",
+        "apiKeyLabel": "API-ключ",
+        "apiKeyDescription": "Отдельный от ключа ассистента.",
+        "modelLabel": "Модель",
+        "modelDescription": "Название модели или развёртывания, например gpt-4o-mini-tts (OpenAI/Azure) или eleven_flash_v2_5 (ElevenLabs).",
+        "remoteVoiceLabel": "Название голоса",
+        "remoteVoiceDescription": "Голос для синтеза речи, совместимого с OpenAI, например alloy, echo, nova, shimmer.",
+        "azureVoiceLabel": "Название голоса",
+        "azureVoiceDescription": "Название голоса Azure, например en-US-JennyNeural. Нажмите «Загрузить голоса», чтобы посмотреть список.",
+        "loadVoices": "Загрузить голоса",
+        "voicesLoading": "Загрузка…",
+        "voicesPick": "Выбрать из {{count}} голосов…",
+        "loadModels": "Загрузить модели",
+        "modelsLoading": "Загрузка…",
+        "modelsPick": "Выбрать из {{count}} моделей…",
+        "modelsUse": "Использовать «{{model}}»",
+        "voicesUse": "Использовать «{{voice}}»",
+        "elevenVoiceLabel": "ID голоса",
+        "elevenVoiceDescription": "ID голоса ElevenLabs (из вкладки Voices в их панели).",
+        "promptLabel": "Запрос для сводки",
+        "promptDescription": "Инструкции для составления краткой устной сводки каждого ответа."
       },
       "appearance": {
-        "title": "Panel appearance",
-        "previewLabel": "Preview",
-        "previewDescription": "Live preview of the panel with your text size and opacity.",
-        "previewUser": "Hey, what can you do?",
-        "previewAssistant": "Lots! Ask me anything — I can even look at your screen.",
-        "fontSizeLabel": "Text size",
-        "fontSizeDescription": "Size of the chat text in the assistant panel.",
+        "title": "Внешний вид панели",
+        "previewLabel": "Предпросмотр",
+        "previewDescription": "Живой предпросмотр панели с вашим размером текста и прозрачностью.",
+        "previewUser": "Привет, что ты умеешь?",
+        "previewAssistant": "Много всего! Спрашивайте о чём угодно — я даже могу посмотреть на ваш экран.",
+        "fontSizeLabel": "Размер текста",
+        "fontSizeDescription": "Размер текста чата в панели ассистента.",
         "fontSizes": {
-          "small": "Small",
-          "medium": "Medium",
-          "large": "Large"
+          "small": "Маленький",
+          "medium": "Средний",
+          "large": "Большой"
         },
-        "panelSizeLabel": "Panel size",
-        "panelSizeDescription": "Overall size of the floating assistant panel. You can also drag its edges to resize.",
+        "panelSizeLabel": "Размер панели",
+        "panelSizeDescription": "Общий размер плавающей панели ассистента. Её также можно растягивать за края.",
         "panelSizes": {
-          "compact": "Compact",
-          "standard": "Standard",
-          "large": "Large"
+          "mini": "Маленькая",
+          "compact": "Компактная",
+          "standard": "Стандартная",
+          "large": "Большая"
         },
-        "opacityLabel": "Panel opacity",
-        "opacityDescription": "How opaque the floating panel is. 100% is fully solid; lower values let the desktop blur through."
+        "opacityLabel": "Прозрачность панели",
+        "opacityDescription": "Насколько плотной выглядит плавающая панель. 100 % — полностью непрозрачная; при меньших значениях сквозь неё просматривается рабочий стол."
       }
     }
   },
   "footer": {
-    "downloadingModel": "Загрузка {{model}}...",
-    "checkingUpdates": "Проверяем наличие обновлений...",
+    "downloadingModel": "Загрузка {{model}}…",
+    "checkingUpdates": "Проверяем наличие обновлений…",
     "updateAvailable": "Доступно обновление: {{version}}",
     "updateAvailableShort": "Доступно обновление",
     "upToDate": "Не требует обновлений",
     "downloadUpdate": "Скачать обновление",
     "restart": "Перезапуск",
     "updateCheckingDisabled": "Проверка обновлений отключена",
-    "downloading": "Загрузка... {{progress}} %",
-    "installing": "Установка...",
-    "preparing": "Подготовка...",
+    "downloading": "Загрузка… {{progress}} %",
+    "installing": "Установка…",
+    "preparing": "Подготовка…",
     "checkForUpdates": "Проверить наличие обновлений",
-    "checkFailed": "Update check failed",
-    "updateFailed": "Update failed",
-    "clickToRetry": "Click to try again",
-    "portableUpdateTitle": "Manual update required",
-    "portableUpdateMessage": "Portable installs cannot be updated automatically. To update: download the latest NSIS installer from GitHub Releases, install it to the same folder, then copy your Data/ folder (settings, models, recordings) from the old version to the new one.",
-    "portableUpdateButton": "Open GitHub Releases"
+    "checkFailed": "Не удалось проверить обновления",
+    "updateFailed": "Не удалось обновить",
+    "clickToRetry": "Нажмите, чтобы попробовать снова",
+    "portableUpdateTitle": "Нужно обновить вручную",
+    "portableUpdateMessage": "Портативные установки нельзя обновить автоматически. Чтобы обновиться: скачайте последний установщик NSIS из GitHub Releases, установите его в ту же папку, затем скопируйте свою папку Data/ (настройки, модели, записи) из старой версии в новую.",
+    "portableUpdateButton": "Открыть GitHub Releases"
   },
   "common": {
-    "loading": "Загрузка...",
+    "loading": "Загрузка…",
     "save": "Сохранять",
     "cancel": "Отмена",
     "reset": "Перезагрузить",
@@ -1393,7 +1420,7 @@
     "yes": "Да",
     "no": "Нет",
     "noOptionsFound": "Вариантов не найдено",
-    "back": "Back",
+    "back": "Назад",
     "showAdvanced": "Ещё параметры",
     "showLess": "Показать меньше"
   },
@@ -1417,7 +1444,7 @@
     "recordingFailed": "Не удалось начать запись: {{error}}",
     "modelLoadFailed": "Не удалось загрузить модель: {{model}}",
     "modelLoadFailedUnknown": "неизвестная модель",
-    "downloadFailedTitle": "Download failed",
+    "downloadFailedTitle": "Загрузка не удалась",
     "pasteFailedTitle": "Не удалось вставить текст",
     "pasteFailed": "Не удалось вставить текст в активное приложение."
   },
@@ -1426,124 +1453,132 @@
     "description": "Изменить язык интерфейса SpeakoFlow"
   },
   "overlay": {
-    "preparing": "Getting mic ready…",
-    "recording": "Recording",
-    "transcribing": "Расшифровка...",
-    "processing": "Обработка...",
-    "listening": "Listening…",
-    "locked": "Recording hands-free — press the hotkey again to stop",
-    "cancel": "Cancel",
-    "done": "Done",
-    "askAssistant": "Ask the assistant instead of typing this",
-    "generating": "Writing with Flow…",
-    "vision": "Looking at your screen…",
+    "preparing": "Готовим микрофон…",
+    "recording": "Запись",
+    "transcribing": "Расшифровка…",
+    "processing": "Обработка…",
+    "generating": "Пишем с Flow…",
+    "vision": "Смотрим на ваш экран…",
     "notices": {
-      "flowNotConfigured": "Flow needs an assistant model — pasted as dictation",
-      "flowFailed": "Flow couldn't generate — nothing was pasted",
-      "flowEmpty": "Say a command after the activation phrase"
-    }
+      "flowNotConfigured": "Для Flow нужна модель ассистента — вставлено как диктовка",
+      "flowFailed": "Flow не смог сгенерировать — ничего не вставлено",
+      "flowEmpty": "Произнесите команду после фразы активации"
+    },
+    "listening": "Слушаем…",
+    "locked": "Запись без удержания — нажмите горячую клавишу снова, чтобы остановить",
+    "cancel": "Отмена",
+    "done": "Готово",
+    "askAssistant": "Спросить ассистента вместо того, чтобы вставлять это текстом"
   },
   "assistant": {
-    "title": "Assistant",
+    "title": "Ассистент",
     "character": {
-      "switch": "Switch persona"
+      "switch": "Сменить профиль"
     },
-    "empty": "Ask by voice with your assistant shortcut,\nor type below.",
-    "inputPlaceholder": "Message…",
-    "inputPlaceholderScreen": "Ask about your screen…",
-    "send": "Send",
-    "stop": "Stop",
-    "finish": "Finish & send",
-    "clear": "Clear conversation",
-    "hide": "Hide panel",
-    "copy": "Copy",
-    "copyCode": "Copy code",
-    "regenerate": "Regenerate answer (the old one stays in History)",
-    "screenAttached": "Screen",
-    "attachScreen": "Screen vision — attach your screen to each message until turned off",
-    "detachScreen": "Turn off screen vision",
+    "empty": "Спросите голосом по сочетанию клавиш ассистента\nили наберите текст ниже.",
+    "inputPlaceholder": "Сообщение…",
+    "inputPlaceholderScreen": "Спросите о вашем экране…",
+    "send": "Отправить",
+    "stop": "Остановить",
+    "cancel": "Отмена",
+    "finish": "Закончить и отправить",
+    "clear": "Очистить разговор",
+    "hide": "Скрыть панель",
+    "copy": "Копировать",
+    "copyCode": "Копировать код",
+    "regenerate": "Сгенерировать ответ заново (старый останется в истории)",
+    "summarizing": "Сжимаем предыдущие сообщения…",
+    "screenAttached": "Экран",
+    "attachScreen": "Просмотр экрана — прикладывать ваш экран к каждому сообщению, пока не отключите",
+    "detachScreen": "Отключить просмотр экрана",
     "attach": {
-      "file": "Attach an image or file",
-      "snip": "Snip a region of the screen",
-      "image": "Image",
-      "imageCount": "{{count}} image",
-      "imageCount_other": "{{count}} images",
-      "remove": "Remove attachment",
-      "dropHint": "Drop to attach"
+      "file": "Прикрепить изображение или файл",
+      "snip": "Выделить область экрана",
+      "image": "Изображение",
+      "imageCount": "{{count}} изображение",
+      "imageCount_other": "{{count}} изображений",
+      "remove": "Удалить вложение",
+      "dropHint": "Отпустите, чтобы прикрепить"
     },
     "snip": {
-      "hint": "Drag to snip a region — Esc to cancel"
+      "hint": "Выделите область мышью — Esc для отмены"
     },
     "webSearch": {
-      "enable": "Enable web search",
-      "disable": "Disable web search"
+      "enable": "Включить поиск в интернете",
+      "disable": "Отключить поиск в интернете"
     },
     "tts": {
-      "enable": "Enable voice summaries",
-      "disable": "Disable voice summaries",
-      "loading": "Loading Kokoro voice model...",
-      "loadingShort": "Voice model {{progress}}%"
+      "enable": "Включить голосовые сводки",
+      "disable": "Отключить голосовые сводки",
+      "loading": "Загрузка голосовой модели Kokoro...",
+      "loadingShort": "Голосовая модель {{progress}} %"
     },
     "pill": {
-      "talk": "Click to talk",
-      "stop": "Stop and send",
-      "idle": "Assistant",
-      "expand": "Expand panel",
-      "collapse": "Collapse to pill",
-      "close": "Close assistant",
-      "cancel": "Cancel without sending",
-      "cancelTurn": "Cancel",
-      "dismiss": "Dismiss",
-      "disarmScreen": "Screen vision is on — click to turn it off",
-      "armScreen": "Screen vision is off — click to turn it on"
+      "talk": "Нажмите, чтобы говорить",
+      "stop": "Остановить и отправить",
+      "idle": "Ассистент",
+      "expand": "Развернуть панель",
+      "collapse": "Свернуть в плашку",
+      "close": "Закрыть ассистента",
+      "cancel": "Отменить без отправки",
+      "cancelTurn": "Отмена",
+      "dismiss": "Скрыть",
+      "disarmScreen": "Просмотр экрана включён — нажмите, чтобы отключить",
+      "armScreen": "Просмотр экрана выключен — нажмите, чтобы включить"
     },
     "status": {
-      "listening": "Listening…",
-      "locked": "Listening",
-      "transcribing": "Transcribing…",
-      "searching": "Searching the web...",
-      "thinking": "Thinking...",
-      "speaking": "Speaking..."
+      "listening": "Слушаем…",
+      "locked": "Слушаем",
+      "transcribing": "Расшифровка…",
+      "searching": "Ищем в интернете...",
+      "thinking": "Думаем...",
+      "speaking": "Говорим..."
     },
     "errors": {
-      "generic": "Something went wrong. Please try again.",
-      "genericShort": "Something went wrong",
-      "no_provider": "No assistant model is set up yet. Pick a provider in Settings → Assistant.",
-      "no_providerShort": "No model set up",
-      "no_model": "Your provider has no model selected. Choose one in Settings → Assistant.",
-      "no_modelShort": "No model selected",
-      "engine_start": "The built-in model couldn't start. Try again, or pick a different model in Settings → Assistant.",
-      "engine_startShort": "Model couldn't start",
-      "provider": "The model couldn't answer. Check your API key and connection, then try again.",
-      "providerShort": "Couldn't get an answer",
-      "vision_unsupported": "This model can't read your screen. Pick a vision-capable model in Settings → Assistant, or ask again without screen vision.",
-      "vision_unsupportedShort": "Model can't see images",
-      "screenshot_too_large": "The screen capture was too large for this provider. Please try again — it will be compressed harder.",
-      "screenshot_too_largeShort": "Screen capture too large",
-      "screen_capture": "Couldn't capture the screen. Try again, or ask without screen vision.",
-      "screen_captureShort": "Screen capture failed",
-      "transcription": "Couldn't transcribe your voice. Please try speaking again.",
-      "transcriptionShort": "Transcription failed",
-      "tts": "The spoken reply failed. Check your TTS settings, or read the answer in the panel.",
-      "ttsShort": "Voice reply failed",
-      "tts_local": "The local voice couldn't load. Check your connection or switch TTS engines in Settings.",
-      "tts_localShort": "Voice couldn't load",
-      "tts_blocked": "Your system blocked the voice from playing on its own. Click anywhere in the panel to hear the reply.",
-      "tts_blockedShort": "Tap the panel to hear it",
-      "tts_playback": "Couldn't play the voice on your output device. Check your speaker/output settings, then try again.",
-      "tts_playbackShort": "Voice playback failed",
-      "mic_denied": "Microphone access is blocked. Allow it in your system privacy settings.",
-      "mic_deniedShort": "Mic access blocked",
-      "mic_unavailable": "No microphone was found. Connect one and try again.",
-      "mic_unavailableShort": "No microphone found",
-      "mic_error": "The microphone couldn't start. It may be in use by another app.",
-      "mic_errorShort": "Mic couldn't start",
-      "file_read": "That file couldn't be attached.",
-      "file_readShort": "Couldn't attach file"
+      "generic": "Что-то пошло не так. Пожалуйста, попробуйте снова.",
+      "genericShort": "Что-то пошло не так",
+      "no_provider": "Модель ассистента ещё не настроена. Выберите провайдера в «Настройки → Ассистент».",
+      "no_providerShort": "Модель не настроена",
+      "no_model": "У вашего провайдера не выбрана модель. Выберите её в «Настройки → Ассистент».",
+      "no_modelShort": "Модель не выбрана",
+      "engine_start": "Встроенная модель не запустилась. Попробуйте снова или выберите другую модель в «Настройки → Ассистент».",
+      "engine_startShort": "Модель не запустилась",
+      "provider": "Модель не смогла ответить. Проверьте API-ключ и соединение, затем попробуйте снова.",
+      "providerShort": "Не удалось получить ответ",
+      "vision_unsupported": "Эта модель не умеет читать ваш экран. Выберите модель с поддержкой изображений в «Настройки → Ассистент» или спросите снова без просмотра экрана.",
+      "vision_unsupportedShort": "Модель не видит изображения",
+      "screenshot_too_large": "Снимок экрана оказался слишком большим для этого провайдера. Пожалуйста, попробуйте снова — он будет сжат сильнее.",
+      "screenshot_too_largeShort": "Снимок экрана слишком большой",
+      "screen_capture": "Не удалось снять экран. Попробуйте снова или спросите без просмотра экрана.",
+      "screen_captureShort": "Не удалось снять экран",
+      "transcription": "Не удалось расшифровать ваш голос. Пожалуйста, попробуйте сказать снова.",
+      "transcriptionShort": "Транскрипция не удалась",
+      "tts": "Не удалось произнести ответ. Проверьте настройки синтеза речи или прочитайте ответ в панели.",
+      "ttsShort": "Голосовой ответ не удался",
+      "tts_local": "Локальный голос не загрузился. Проверьте соединение или смените движок синтеза речи в настройках.",
+      "tts_localShort": "Голос не загрузился",
+      "tts_blocked": "Система запретила голосу воспроизводиться самостоятельно. Нажмите в любом месте панели, чтобы услышать ответ.",
+      "tts_blockedShort": "Нажмите на панель, чтобы услышать",
+      "tts_playback": "Не удалось воспроизвести голос на вашем устройстве вывода. Проверьте настройки колонок или вывода звука и попробуйте снова.",
+      "tts_playbackShort": "Не удалось воспроизвести голос",
+      "mic_denied": "Доступ к микрофону заблокирован. Разрешите его в системных настройках конфиденциальности.",
+      "mic_deniedShort": "Доступ к микрофону заблокирован",
+      "mic_unavailable": "Микрофон не найден. Подключите его и попробуйте снова.",
+      "mic_unavailableShort": "Микрофон не найден",
+      "mic_error": "Микрофон не запустился. Возможно, его использует другое приложение.",
+      "mic_errorShort": "Микрофон не запустился",
+      "file_read": "Этот файл не удалось прикрепить.",
+      "file_readShort": "Не удалось прикрепить файл"
     },
     "notices": {
-      "web_search_failed": "Web search didn't return results — answering without them.",
-      "web_search_failedShort": "No web results"
+      "web_search_failed": "Поиск в интернете не дал результатов — отвечаем без него.",
+      "web_search_failedShort": "Нет результатов из интернета"
+    },
+    "engineSetup": {
+      "downloading": "Настройка локального движка (первый запуск)… {{percent}} %",
+      "preparing": "Настройка локального движка (первый запуск)…",
+      "extracting": "Установка локального движка…",
+      "short": "Настройка движка…"
     }
   }
 }

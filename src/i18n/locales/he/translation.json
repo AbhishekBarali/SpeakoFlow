@@ -1,20 +1,20 @@
 {
   "appearance": {
-    "title": "Appearance",
-    "description": "Choose a light, dark, or system-matched theme for the app and assistant panel.",
-    "system": "System",
-    "light": "Light",
-    "dark": "Dark",
-    "textSize": "Text size",
-    "textSizeDescription": "Scale the size of text and controls across the app.",
-    "textSizeSmall": "Small",
-    "textSizeDefault": "Default",
-    "textSizeLarge": "Large",
-    "textSizeExtraLarge": "Extra large"
+    "title": "מראה",
+    "description": "בחר ערכת נושא בהירה, כהה או כזו שמתאימה למערכת, עבור האפליקציה וחלונית העוזר.",
+    "system": "מערכת",
+    "light": "בהיר",
+    "dark": "כהה",
+    "textSize": "גודל טקסט",
+    "textSizeDescription": "שנה את גודל הטקסט והפקדים בכל האפליקציה.",
+    "textSizeSmall": "קטן",
+    "textSizeDefault": "ברירת מחדל",
+    "textSizeLarge": "גדול",
+    "textSizeExtraLarge": "גדול מאוד"
   },
   "tray": {
     "home": "בית",
-    "checkUpdates": "בדוק עדכונים...",
+    "checkUpdates": "בדוק עדכונים…",
     "copyLastTranscript": "העתק את התמלול האחרון",
     "unloadModel": "פרוק מודל",
     "model": "מודל",
@@ -23,29 +23,29 @@
   },
   "sidebar": {
     "general": "כללי",
-    "dictation": "Dictation",
-    "assistant": "Assistant",
+    "dictation": "הכתבה",
+    "assistant": "עוזר",
     "history": "היסטוריה",
     "about": "אודות",
     "debug": "ניפוי שגיאות",
-    "characters": "Profiles",
-    "memory": "Memory",
-    "collapse": "Collapse sidebar",
-    "expand": "Expand sidebar"
+    "characters": "פרופילים",
+    "memory": "זיכרון",
+    "collapse": "כווץ את סרגל הצד",
+    "expand": "הרחב את סרגל הצד"
   },
   "window": {
-    "minimize": "Minimize",
-    "maximize": "Maximize",
-    "restore": "Restore",
-    "close": "Close"
+    "minimize": "מזער",
+    "maximize": "הגדל",
+    "restore": "שחזר",
+    "close": "סגור"
   },
   "sectionSubtitles": {
-    "general": "Shortcuts, your microphone, and how the app looks.",
-    "dictation": "The model that turns your voice into text, and how it's cleaned up.",
-    "assistant": "Set up the assistant, then tune its voice, screen vision, and web search.",
-    "history": "Your recent transcriptions and assistant chats, stored on this device.",
-    "about": "Version, app language, data locations, and credits.",
-    "debug": "Diagnostics and developer tools."
+    "general": "קיצורי מקשים, המיקרופון שלך ואיך האפליקציה נראית.",
+    "dictation": "המודל שהופך את הקול שלך לטקסט, ואיך הטקסט עובר ניקוי.",
+    "assistant": "הגדר את העוזר, ואז כוונן את הקול שלו, את ראיית המסך ואת החיפוש באינטרנט.",
+    "history": "ההכתבות האחרונות שלך, היצירות של Flow והשיחות עם העוזר, שמורות במכשיר הזה.",
+    "about": "גרסה, שפת האפליקציה, מיקומי נתונים וקרדיטים.",
+    "debug": "אבחון וכלי פיתוח."
   },
   "onboarding": {
     "subtitle": "כדי להתחיל, בחר מודל תמלול",
@@ -53,79 +53,79 @@
       "progress": "שלב {{current}} מתוך {{total}}",
       "counter": "שלב {{current}} מתוך {{total}} · {{label}}",
       "speechToText": "תמלול",
-      "aiModel": "מודל בינה מלאכותית",
-      "ready": "You're ready"
+      "aiModel": "תן לו מוח",
+      "ready": "הכול מוכן"
     },
     "speechToText": {
-      "title": "בחר מודל תמלול",
-      "subtitle": "פועל לחלוטין במכשיר שלך והופך את הקול שלך לטקסט. בחר את המודל שמתאים למחשב שלך — ניתן לשנות בכל עת.",
+      "title": "איך SpeakoFlow צריך לשמוע אותך?",
+      "subtitle": "זה הופך את הקול שלך לטקסט, ישר במחשב שלך. בחר אחד, אפשר להחליף בכל עת.",
       "cards": {
         "fast": {
-          "description": "Blazingly fast, streams as you speak. English only."
+          "description": "מהיר במיוחד, מתמלל תוך כדי דיבור. אנגלית בלבד."
         },
         "multilingual": {
-          "description": "Real-time in 28 languages."
+          "description": "בזמן אמת ב-28 שפות."
         }
       },
-      "downloadAndContinue": "Download and continue",
-      "seeAllModels": "See all models",
-      "hideAllModels": "Show fewer models",
-      "installedHint": "Already set up. You can grab any other model later in Settings.",
-      "useInstalled": "Use installed model",
-      "continue": "Continue",
-      "downloadingHint": "It downloads in the background. Any other model is one click away in Settings.",
-      "downloadStarted": "Downloading your model in the background."
+      "downloadAndContinue": "הורד והמשך",
+      "seeAllModels": "הצג את כל המודלים",
+      "hideAllModels": "הצג פחות מודלים",
+      "installedHint": "כבר מוגדר. תוכל להוריד כל מודל אחר מאוחר יותר בהגדרות.",
+      "useInstalled": "השתמש במודל המותקן",
+      "continue": "המשך",
+      "downloadingHint": "ההורדה מתבצעת ברקע. כל מודל אחר נמצא בלחיצה אחת בהגדרות.",
+      "downloadStarted": "מוריד את המודל שלך ברקע."
     },
     "aiModel": {
       "title": "הוסף מודל בינה מלאכותית מקומי",
-      "subtitle": "מפעיל את העוזר, את ראיית המסך ואת ניקוי התמלולים — ופועל לחלוטין במצב לא מקוון במכשיר שלך. זה אופציונלי; ניתן גם לחבר ספק ענן מאוחר יותר.",
+      "subtitle": "בחר לפי מהירות התגובה והיכולת. E4B הוא ברירת המחדל המאוזנת; 12B חד יותר אבל אטי יותר.",
       "tiers": {
         "small": {
-          "description": "Runs on any machine. Great for tidying up your writing."
+          "description": "פועל בכל מחשב. מצוין לסידור הכתיבה שלך."
         },
         "mid": {
-          "description": "A quick all-rounder that can also answer questions."
+          "description": "מודל מהיר לכל מטרה, שגם יודע לענות על שאלות."
         },
         "capable": {
-          "description": "The sharpest answers, and it can see your screen."
+          "description": "התשובות החדות ביותר, והוא גם רואה את המסך שלך."
         }
       },
-      "seesScreen": "Sees your screen",
-      "textOnly": "Text only",
-      "download": "Download model",
-      "useDownloaded": "Use downloaded model",
+      "seesScreen": "רואה את המסך שלך",
+      "textOnly": "טקסט בלבד",
+      "download": "הורד מודל",
+      "useDownloaded": "השתמש במודל שהורדת",
       "skip": "דלג לעת עתה",
-      "skipHint": "אופציונלי. ניתן להוריד מודל או לחבר ספק ענן בכל עת בהגדרות.",
+      "skipHint": "אפשר לעשות את זה מאוחר יותר בהגדרות > עוזר > במכשיר שלי.",
       "continue": "המשך",
       "downloadingHint": "המודל שלך יורד ברקע — ניתן להתחיל להשתמש באפליקציה מיד.",
       "downloadStarted": "מוריד את מודל הבינה המלאכותית שלך ברקע."
     },
     "ready": {
-      "title": "You're ready.",
-      "subtitle": "Two shortcuts are all you need. Press, talk, done.",
-      "dictateLabel": "Dictate anywhere",
-      "dictateCaption": "Hold, talk, let go. Your words type themselves.",
-      "assistantKeysLabel": "Ask the assistant",
-      "assistantKeysCaption": "Hold and ask. It can even see your screen.",
-      "changeAnytime": "You can change these anytime in Settings.",
-      "hotkeyLabel": "Your dictation keys",
-      "downloadingAssistant": "Your assistant is moving in. {{percentage}}% there.",
-      "downloadingVoice": "Your voice model is landing. {{percentage}}% there.",
-      "downloadingGeneric": "Still downloading. {{percentage}}% there.",
-      "signOff": "That's it. Go say something.",
-      "openApp": "Open SpeakoFlow"
+      "title": "הכול מוכן.",
+      "subtitle": "שני קיצורי מקשים זה כל מה שצריך. לחץ, דבר, זה הכול.",
+      "dictateLabel": "הכתב בכל מקום",
+      "dictateCaption": "החזק, דבר, שחרר. המילים שלך נכתבות מעצמן.",
+      "assistantKeysLabel": "שאל את העוזר",
+      "assistantKeysCaption": "החזק ושאל. הוא אפילו יכול לראות את המסך שלך.",
+      "changeAnytime": "אפשר לשנות את אלה בכל עת בהגדרות.",
+      "hotkeyLabel": "מקשי ההכתבה שלך",
+      "downloadingAssistant": "העוזר שלך בדרך אליך. {{percentage}}% הושלמו.",
+      "downloadingVoice": "מודל הקול שלך כמעט כאן. {{percentage}}% הושלמו.",
+      "downloadingGeneric": "עדיין מוריד. {{percentage}}% הושלמו.",
+      "signOff": "זה הכול. קדימה, תגיד משהו.",
+      "openApp": "פתח את SpeakoFlow"
     },
     "errors": {
-      "selectModel": "Couldn't select that model. Please try again.",
+      "selectModel": "לא ניתן היה לבחור את המודל הזה. נסה שוב.",
       "loadModels": "טעינת המודלים הזמינים נכשלה",
       "downloadModel": "הורדת המודל נכשלה: {{error}}"
     },
     "downloadProgress": {
-      "sizeOf": "{{downloaded}} of {{total}} · {{percentage}}%"
+      "sizeOf": "{{downloaded}} מתוך {{total}} · {{percentage}}%"
     },
     "recommended": "מומלץ",
     "download": "הורדה",
-    "downloading": "מוריד...",
+    "downloading": "מוריד…",
     "customModelDescription": "לא נתמך באופן רשמי",
     "downloadFailed": "ההורדה נכשלה. נסה שוב.",
     "modelCard": {
@@ -134,49 +134,49 @@
     },
     "models": {
       "parakeet-unified-en-0.6b-gguf": {
-        "description": "Blazingly fast, great for everyday dictation. English only."
+        "description": "מהיר במיוחד, מצוין להכתבה יומיומית. אנגלית בלבד."
       },
       "nemotron-3.5-asr-streaming-0.6b-gguf": {
-        "description": "Real-time transcription in 28 languages."
+        "description": "תמלול בזמן אמת ב-28 שפות."
       },
       "canary-180m-flash-gguf": {
-        "description": "Tiny and instant — runs well on any machine."
+        "description": "זעיר ומיידי — פועל היטב בכל מחשב."
       },
       "cohere-transcribe-03-2026-gguf": {
-        "description": "Slower, but the most accurate. 14 languages."
+        "description": "איטי יותר, אבל המדויק ביותר. 14 שפות."
       },
       "whisper-medium-gguf": {
-        "description": "Best for many languages — nearly 100 supported."
+        "description": "הבחירה הטובה ביותר לשפות רבות — כמעט 100 שפות נתמכות."
       },
       "gemma-3-1b": {
-        "description": "Very small and quick, but limited for open-ended conversation. Text only."
+        "description": "קטן ומהיר מאוד, אבל מוגבל בשיחה פתוחה. טקסט בלבד."
       },
       "qwen3.5-2b": {
-        "description": "Small and fast, and it can see images. Good on most laptops."
+        "description": "קטן ומהיר, וגם רואה תמונות. עובד טוב ברוב המחשבים הניידים."
       },
       "qwen3.5-4b": {
-        "description": "A legacy vision model whose optional reasoning can delay conversational replies."
+        "description": "מודל ראייה מדור קודם, שההיסק האופציונלי שלו עלול לעכב תשובות בשיחה."
       },
       "qwen3.5-9b": {
-        "description": "More capable, but slower for live conversation, especially when reasoning is enabled."
+        "description": "בעל יכולת גבוהה יותר, אבל איטי יותר לשיחה חיה, במיוחד כשההיסק מופעל."
       },
       "qwen3.5-27b": {
-        "description": "A large vision model for deliberate tasks, not a low-latency assistant."
+        "description": "מודל ראייה גדול למשימות שדורשות מחשבה, לא לעוזר בזמן אמת."
       },
       "gemma-4-e2b": {
-        "description": "The quickest current Gemma for everyday conversation. Less capable on complex requests."
+        "description": "ה-Gemma העכשווי המהיר ביותר לשיחה יומיומית. פחות מוצלח בבקשות מורכבות."
       },
       "gemma-4-e4b": {
-        "description": "Recommended for conversation: a stronger quality-and-speed balance without default thinking."
+        "description": "מומלץ לשיחה: איזון טוב יותר בין איכות למהירות, בלי חשיבה כברירת מחדל."
       },
       "gemma-4-12b": {
-        "description": "More capable for nuanced questions, but noticeably slower and best with a strong GPU."
+        "description": "מתמודד טוב יותר עם שאלות מורכבות, אבל איטי בצורה מורגשת ועובד הכי טוב עם GPU חזק."
       },
       "gemma-3-4b": {
-        "description": "Fast, clean answers with screen vision, but less capable than current Gemma 4 models."
+        "description": "תשובות מהירות ונקיות עם ראיית מסך, אבל פחות מוצלח ממודלי Gemma 4 העכשוויים."
       },
       "kokoro-82m": {
-        "description": "Built-in local voice for the assistant. No download needed."
+        "description": "קול מקומי מובנה עבור העוזר. לא נדרשת הורדה."
       },
       "small": {
         "name": "Whisper Small",
@@ -200,7 +200,7 @@
       },
       "parakeet-tdt-0.6b-v3": {
         "name": "Parakeet V3",
-        "description": "מהיר ומדויק"
+        "description": "מהיר ומדויק. 25 שפות אירופיות."
       },
       "moonshine-base": {
         "name": "Moonshine Base",
@@ -256,7 +256,7 @@
       },
       "grant": "תן הרשאה",
       "granted": "ניתנה",
-      "waiting": "ממתין...",
+      "waiting": "ממתין…",
       "allGranted": "הכול מוכן!",
       "errors": {
         "checkFailed": "בדיקת ההרשאות נכשלה. נסה שוב.",
@@ -267,29 +267,31 @@
   "modelSelector": {
     "custom": "מותאם אישית",
     "active": "פעיל",
-    "switching": "מחליף...",
+    "switching": "מחליף…",
     "noModelsAvailable": "אין מודלים זמינים",
-    "verifying": "מאמת את {{modelName}}...",
-    "verifyingGeneric": "מאמת...",
-    "extracting": "מחלץ את {{modelName}}...",
-    "extractingMultiple": "מחלץ {{count}} מודלים...",
-    "extractingGeneric": "מחלץ...",
+    "verifying": "מאמת את {{modelName}}…",
+    "verifyingGeneric": "מאמת…",
+    "extracting": "מחלץ את {{modelName}}…",
+    "extractingMultiple": "מחלץ {{count}} מודלים…",
+    "extractingGeneric": "מחלץ…",
     "downloading": "מוריד {{percentage}}%",
-    "downloadingMultiple": "מוריד {{count}} מודלים...",
+    "downloadingMultiple": "מוריד {{count}} מודלים…",
+    "downloadDetails": "פרטי ההורדה",
+    "downloadSize": "{{downloaded}} מתוך {{total}}",
     "modelReady": "המודל מוכן",
-    "loading": "טוען את {{modelName}}...",
-    "loadingGeneric": "טוען...",
+    "loading": "טוען את {{modelName}}…",
+    "loadingGeneric": "טוען…",
     "modelError": "שגיאת מודל",
     "modelUnloaded": "המודל נפרק",
     "noModelDownloadRequired": "אין מודל, נדרשת הורדה",
-    "llmSelectModel": "Select assistant model",
-    "llmModelTitle": "Assistant model: {{model}}",
+    "llmSelectModel": "בחר מודל עוזר",
+    "llmModelTitle": "מודל העוזר: {{model}}",
     "deleteModel": "מחק את {{modelName}}",
     "downloadSpeed": "{{speed}} MB/s",
     "cancel": "ביטול",
     "cancelDownload": "בטל הורדה",
-    "download": "Download",
-    "useModel": "Use model",
+    "download": "הורדה",
+    "useModel": "השתמש במודל",
     "capabilities": {
       "languageSelection": "תומך בכמה שפות קלט",
       "singleLanguage": "תומך רק בשפה הזו",
@@ -297,71 +299,71 @@
       "languageOnly": "{{language}} בלבד",
       "translation": "יכול לתרגם לאנגלית",
       "translate": "תרגם לאנגלית",
-      "streaming": "Streaming",
-      "quantization": "Quantization",
-      "legacy": "Older"
+      "streaming": "הזרמה",
+      "quantization": "קוונטיזציה",
+      "legacy": "מדור קודם"
     }
   },
   "settings": {
     "personalMemory": {
       "enable": {
-        "label": "Remember me",
-        "description": "Let the assistant keep and use a personal memory. Off by default."
+        "label": "זכור אותי",
+        "description": "אפשר לעוזר לשמור זיכרון אישי ולהשתמש בו. כבוי כברירת מחדל."
       },
       "incognito": {
-        "label": "Incognito chat",
-        "description": "For this conversation, don't use memory and don't learn anything new."
+        "label": "שיחה בסתר",
+        "description": "בשיחה הזו, אל תשתמש בזיכרון ואל תלמד שום דבר חדש."
       },
       "detail": {
-        "label": "Memory detail",
-        "description": "How much memory to add to each reply. More detail is richer but a little slower.",
+        "label": "רמת פירוט הזיכרון",
+        "description": "כמה זיכרון להוסיף לכל תשובה. יותר פירוט מעשיר את התשובה אבל מאט אותה מעט.",
         "options": {
-          "light": "Light",
-          "balanced": "Balanced",
-          "detailed": "Detailed"
+          "light": "מצומצם",
+          "balanced": "מאוזן",
+          "detailed": "מפורט"
         }
       },
       "aboutYou": {
-        "label": "About you",
-        "caption": "A short, always-on summary the assistant keeps in mind.",
-        "fieldLabel": "Summary",
-        "placeholder": "e.g. Prefers short, direct answers. Works in Rust and TypeScript. Building a desktop voice assistant.",
-        "hint": "Always included when memory is on. Keep it to a few sentences — this is the assistant's at-a-glance picture of you.",
-        "edit": "Edit",
-        "done": "Done",
-        "empty": "Nothing saved yet — the assistant fills this in as it learns, or click Edit to write your own.",
-        "collapsedEmpty": "Nothing saved yet"
+        "label": "עליך",
+        "caption": "סיכום קצר שתמיד פעיל ושהעוזר מביא בחשבון.",
+        "fieldLabel": "סיכום",
+        "placeholder": "לדוגמה: מעדיף תשובות קצרות וישירות. עובד ב-Rust וב-TypeScript. בונה עוזר קולי לשולחן העבודה.",
+        "hint": "נכלל תמיד כשהזיכרון מופעל. השאר את זה בכמה משפטים — זו התמונה המהירה שיש לעוזר עליך.",
+        "edit": "ערוך",
+        "done": "סיום",
+        "empty": "עדיין לא נשמר כלום — העוזר ימלא את זה תוך כדי למידה, או שתלחץ על ״ערוך״ כדי לכתוב בעצמך.",
+        "collapsedEmpty": "עדיין לא נשמר כלום"
       },
       "notes": {
-        "label": "Notes",
-        "caption": "Specific things worth remembering — learned or added by you.",
-        "empty": "No notes yet. Add one below, or let the assistant learn them from your chats.",
-        "add": "Add",
-        "addPlaceholder": "Add something to remember…",
-        "delete": "Delete note",
-        "learned": "learned",
-        "added": "added by you"
+        "label": "הערות",
+        "caption": "דברים ספציפיים ששווה לזכור — שנלמדו או שהוספת בעצמך.",
+        "empty": "אין עדיין הערות. הוסף אחת למטה, או תן לעוזר ללמוד אותן מהשיחות שלך.",
+        "add": "הוסף",
+        "addPlaceholder": "הוסף משהו לזכור…",
+        "delete": "מחק הערה",
+        "learned": "נלמד",
+        "added": "נוסף על ידך"
       },
       "confidence": {
-        "high": "High confidence",
-        "medium": "Medium confidence",
-        "low": "Low confidence"
+        "high": "ביטחון גבוה",
+        "medium": "ביטחון בינוני",
+        "low": "ביטחון נמוך"
       },
       "actions": {
-        "label": "Manage"
+        "label": "ניהול"
       },
       "distill": {
-        "label": "Learn from this chat now",
-        "description": "Pull durable facts from your current conversation into memory, right now.",
-        "button": "Update memory"
+        "label": "למד מהשיחה הזו עכשיו",
+        "description": "חלץ עכשיו עובדות קבועות מהשיחה הנוכחית אל הזיכרון.",
+        "button": "עדכן זיכרון"
       },
-      "export": "Export",
-      "import": "Import",
+      "export": "ייצוא",
+      "import": "ייבוא",
       "wipe": {
-        "button": "Wipe memory",
-        "confirm": "Delete everything the assistant remembers?",
-        "yes": "Delete all",
-        "cancel": "Cancel"
+        "button": "מחק את הזיכרון",
+        "confirm": "למחוק את כל מה שהעוזר זוכר?",
+        "yes": "מחק הכול",
+        "cancel": "ביטול"
       }
     },
     "modelSettings": {
@@ -371,82 +373,82 @@
     "general": {
       "title": "כללי",
       "recording": {
-        "title": "Recording"
+        "title": "הקלטה"
       },
       "groups": {
-        "sounds": "Sounds",
-        "startup": "Startup and tray",
-        "overlay": "Overlay",
-        "updates": "Updates",
-        "system": "System"
+        "sounds": "צלילים",
+        "startup": "הפעלה ומגש המערכת",
+        "overlay": "שכבת משוב",
+        "updates": "עדכונים",
+        "system": "מערכת"
       },
       "shortcut": {
-        "title": "קיצורי מקשים של SpeakoFlow",
+        "title": "קיצורי מקשים",
         "description": "הגדר קיצורי מקשים כדי להפעיל הקלטה ותמלול דיבור",
-        "loading": "טוען קיצורי מקשים...",
+        "loading": "טוען קיצורי מקשים…",
         "none": "לא הוגדרו קיצורי מקשים",
         "notFound": "קיצור הדרך לא נמצא",
-        "pressKeys": "לחץ על המקשים...",
+        "pressKeys": "לחץ על המקשים…",
         "bindings": {
           "transcribe": {
-            "name": "קיצור מקשים לתמלול",
+            "name": "הכתבה",
             "description": "קיצור המקלדת להקלטה ולתמלול הקול שלך."
           },
           "transcribe_toggle": {
-            "name": "Hands-free dictation",
-            "description": "Press once to start, again to stop — no holding needed."
+            "name": "הכתבה ללא ידיים",
+            "description": "לחיצה אחת מתחילה, לחיצה נוספת עוצרת — בלי להחזיק את המקש."
           },
           "cancel": {
-            "name": "קיצור מקשים לביטול",
+            "name": "ביטול",
             "description": "קיצור המקלדת לביטול ההקלטה הנוכחית."
           },
           "transcribe_with_post_process": {
             "name": "קיצור לעיבוד משלים",
-            "description": "אופציונלי: קיצור מקשים ייעודי שתמיד מפעיל עיבוד AI על התמלול."
+            "description": "הכתב, ואז נקה את הטקסט עם AI לפני שהוא מוקלד."
           },
           "assistant": {
-            "name": "Ask assistant",
-            "description": "Ask the assistant by voice; the answer streams into the floating panel."
+            "name": "שאל את העוזר",
+            "description": "שאל את העוזר בקול; התשובה מוזרמת לחלונית הצפה."
           },
           "assistant_vision": {
-            "name": "Ask with screen",
-            "description": "Ask by voice with your screen attached so it can see what you're looking at."
+            "name": "שאל עם המסך",
+            "description": "שאל בקול כשהמסך שלך מצורף, כדי שהעוזר יראה במה אתה מסתכל."
           },
           "assistant_panel_toggle": {
-            "name": "Show or hide panel",
-            "description": "Shows or hides the floating assistant panel."
+            "name": "הצג או הסתר את החלונית",
+            "description": "מציג או מסתיר את חלונית העוזר הצפה."
           }
         },
         "errors": {
           "restore": "שחזור קיצור הדרך המקורי נכשל",
           "set": "הגדרת קיצור הדרך נכשלה: {{error}}",
-          "reset": "איפוס קיצור הדרך לערך המקורי נכשל"
+          "reset": "איפוס קיצור המקשים נכשל."
         }
       },
       "language": {
         "title": "שפה",
-        "description": "בחר את שפת זיהוי הדיבור. מצב אוטומטי יזהה את השפה לבד, בעוד שבחירת שפה מסוימת יכולה לשפר את הדיוק עבורה.",
+        "description": "השפה לזיהוי דיבור. בחירת שפה מסוימת יכולה לשפר את הדיוק.",
         "descriptionUnsupported": "מודל Parakeet מזהה את השפה אוטומטית. אין צורך בבחירה ידנית.",
-        "searchPlaceholder": "חפש שפות...",
+        "searchPlaceholder": "חפש שפות…",
         "noResults": "לא נמצאו שפות",
         "auto": "אוטומטי"
       },
       "pushToTalk": {
         "label": "לחץ כדי לדבר",
-        "description": "החזק כדי להקליט, שחרר כדי לעצור",
-        "hold": "Hold to record",
-        "tap": "Tap to start and stop"
+        "description": "החזקה מקליטה כל עוד קיצור ההכתבה לחוץ. הקשה מתחילה הקלטה בלחיצה אחת ועוצרת אותה בלחיצה הבאה.",
+        "hold": "החזקה",
+        "tap": "הקשה"
       },
       "tapToLock": {
-        "label": "Tap to lock",
-        "info": "While holding your record shortcut, tap this to lock hands-free recording so you can let go and keep talking. Pick any key that isn't part of your record shortcut, or clear it to turn this off.",
-        "off": "Off",
-        "clear": "Clear"
+        "label": "הקש כדי לנעול",
+        "info": "בזמן שאתה מחזיק את קיצור ההקלטה, הקש על המקש הזה כדי לנעול הקלטה ללא ידיים, כך שתוכל לשחרר ולהמשיך לדבר. בחר כל מקש שאינו חלק מקיצור ההקלטה, או נקה אותו כדי לכבות את האפשרות.",
+        "off": "כבוי",
+        "clear": "נקה"
       }
     },
     "models": {
       "title": "מודלי תמלול",
-      "description": "בחר מודל תמלול או הורד מודלים נוספים. מודלים שונים מציעים רמות שונות של דיוק ומהירות.",
+      "description": "מודלים מאזנים בין דיוק למהירות — בחר אחד שמתאים למחשב שלך.",
       "yourModels": "מודלים שהורדו",
       "availableModels": "זמינים להורדה",
       "downloaded": "הורד",
@@ -455,17 +457,17 @@
       "deleteActiveConfirm": "{{modelName}} הוא המודל הפעיל שלך כרגע. מחיקה שלו תעצור את התמלול עד שתבחר מודל חדש. להמשיך?",
       "deleteTitle": "מחיקת מודל",
       "categories": {
-        "stt": "Transcription",
-        "llm": "Assistant",
-        "tts": "Speech"
+        "stt": "תמלול",
+        "llm": "עוזר",
+        "tts": "דיבור"
       },
       "categoryDescriptions": {
-        "stt": "Models trade accuracy for speed — pick one that fits your machine.",
-        "llm": "Local models for the built-in assistant and AI cleanup.",
-        "tts": "Voices for the assistant's spoken replies. Kokoro runs on your machine."
+        "stt": "המודלים מתפשרים על דיוק לטובת מהירות — בחר אחד שמתאים למחשב שלך.",
+        "llm": "מודלים מקומיים עבור העוזר המובנה וניקוי AI.",
+        "tts": "קולות לתשובות המדוברות של העוזר. Kokoro פועל במכשיר שלך."
       },
-      "llmHint": "After downloading, pick this model in the Assistant section under the built-in (local) provider.",
-      "ttsHint": "Speech models run on your machine and need no download.",
+      "llmHint": "אחרי ההורדה, בחר את המודל הזה בקטע ״עוזר״, תחת הספק המובנה (המקומי).",
+      "ttsHint": "מודלי הדיבור פועלים במכשיר שלך ואינם דורשים הורדה.",
       "filters": {
         "all": "הכול",
         "multiLanguage": "רב-לשוני",
@@ -473,40 +475,40 @@
         "allLanguages": "כל השפות"
       },
       "noModelsMatch": "אין מודלים שמתאימים לסינון הזה.",
-      "searchPlaceholder": "Search models by name…",
-      "clearSearch": "Clear search",
-      "noSearchResults": "No models named “{{query}}”.",
-      "olderModels": "Older models",
-      "olderModelsHint": "Run on the previous engine. Still fully supported — most people won't need these.",
+      "searchPlaceholder": "חפש מודלים לפי שם…",
+      "clearSearch": "נקה חיפוש",
+      "noSearchResults": "אין מודלים בשם ״{{query}}״.",
+      "olderModels": "מודלים מדור קודם",
+      "olderModelsHint": "פועלים על המנוע הקודם. עדיין נתמכים במלואם — לרוב האנשים לא יהיה צורך בהם.",
       "customModel": {
-        "addButton": "Search Hugging Face",
-        "searchTitle": "Need a different model?",
-        "searchDescription": "Search Hugging Face for a GGUF model. This is an advanced option, so hardware needs and compatibility can vary.",
-        "searchButton": "Search Hugging Face",
-        "title": "Search Hugging Face",
-        "subtitle": "Find a GGUF model to download and run on this machine.",
-        "searchPlaceholder": "Search models on Hugging Face…",
-        "popularTitle": "Popular GGUF models",
-        "resultsTitle": "Search results",
-        "resultCount_one": "{{count}} model",
-        "resultCount_other": "{{count}} models",
-        "searching": "Searching Hugging Face…",
-        "searchError": "Search failed. Check your connection and try again.",
-        "tryAgain": "Try again",
-        "noResults": "No models found. Try a different search.",
-        "downloads": "{{value}} downloads",
-        "visionBadge": "Vision",
-        "back": "Back to results",
-        "loadingFiles": "Loading available files…",
-        "repoFilesError": "Couldn't load files for this model.",
-        "noGgufFiles": "This repository has no downloadable .gguf files.",
-        "selectQuant": "Choose a download",
-        "selectQuantHint": "Not sure? Q4_K_M is usually the best balance of quality, speed, and memory use.",
-        "enableVision": "Include screen vision",
-        "enableVisionHint": "Downloads an extra file so the model can understand images.",
-        "add": "Download",
-        "adding": "Starting…",
-        "addError": "Couldn't add this model. Please try again."
+        "addButton": "חפש ב-Hugging Face",
+        "searchTitle": "צריך מודל אחר?",
+        "searchDescription": "חפש מודל GGUF ב-Hugging Face. זו אפשרות למשתמשים מתקדמים, ולכן דרישות החומרה והתאימות עשויות להשתנות.",
+        "searchButton": "חפש ב-Hugging Face",
+        "title": "מצא מודל ב-Hugging Face",
+        "subtitle": "חפש מודלי GGUF, בחר גרסה והורד אותה ישירות למכשיר הזה.",
+        "searchPlaceholder": "חפש לפי מודל או יוצר…",
+        "popularTitle": "מודלי GGUF פופולריים",
+        "resultsTitle": "תוצאות חיפוש",
+        "resultCount_one": "{{count}} מודל",
+        "resultCount_other": "{{count}} מודלים",
+        "searching": "מחפש ב-Hugging Face…",
+        "searchError": "החיפוש נכשל. בדוק את החיבור שלך ונסה שוב.",
+        "tryAgain": "נסה שוב",
+        "noResults": "לא נמצאו מודלים. נסה חיפוש אחר.",
+        "downloads": "{{value}} הורדות",
+        "visionBadge": "ראייה",
+        "back": "חזרה לתוצאות",
+        "loadingFiles": "טוען את הקבצים הזמינים…",
+        "repoFilesError": "לא ניתן היה לטעון את הקבצים של המודל הזה.",
+        "noGgufFiles": "במאגר הזה אין קבצי .gguf להורדה.",
+        "selectQuant": "בחר הורדה",
+        "selectQuantHint": "לא בטוח? Q4_K_M הוא בדרך כלל האיזון הטוב ביותר בין איכות, מהירות ושימוש בזיכרון.",
+        "enableVision": "כלול ראיית מסך",
+        "enableVisionHint": "מוריד קובץ נוסף כדי שהמודל יוכל להבין תמונות.",
+        "add": "הורדה",
+        "adding": "מתחיל…",
+        "addError": "לא ניתן היה להוסיף את המודל הזה. נסה שוב."
       }
     },
     "sound": {
@@ -514,24 +516,24 @@
       "microphone": {
         "title": "מיקרופון",
         "description": "בחר את המיקרופון המועדף עליך",
-        "placeholder": "בחר מיקרופון...",
-        "loading": "טוען..."
+        "placeholder": "בחר מיקרופון…",
+        "loading": "טוען…"
       },
       "audioFeedback": {
         "label": "משוב קולי",
         "description": "נגן צליל כשההקלטה מתחילה ומסתיימת"
       },
       "soundTheme": {
-        "label": "Feedback sound",
-        "description": "Choose the start/stop cue played during dictation",
-        "default": "Default",
-        "preview": "Preview sound (plays start then stop)"
+        "label": "צליל משוב",
+        "description": "בחר את צליל ההתחלה והסיום שמתנגן במהלך ההכתבה",
+        "default": "ברירת מחדל",
+        "preview": "השמע דוגמה (מנגן התחלה ואז סיום)"
       },
       "outputDevice": {
         "title": "התקן פלט",
         "description": "בחר את התקן השמע המועדף עליך עבור צלילי המשוב",
-        "placeholder": "בחר התקן פלט...",
-        "loading": "טוען..."
+        "placeholder": "בחר התקן פלט…",
+        "loading": "טוען…"
       },
       "volume": {
         "title": "עוצמת קול",
@@ -544,20 +546,20 @@
         "app": "אפליקציה",
         "output": "פלט",
         "transcription": "תמלול",
-        "textReplacements": "Text replacements",
+        "textReplacements": "החלפות טקסט",
         "history": "היסטוריה",
-        "aiCorrection": "AI cleanup",
+        "aiCorrection": "ניקוי AI",
         "experimental": "ניסיוני"
       },
       "aiCorrection": {
-        "label": "AI cleanup (in development)",
-        "description": "Experimental: clean up your dictation with AI. Rough and unpolished — off by default.",
-        "info": "Runs a language model over your dictation to fix punctuation, remove filler words, and optionally adjust the tone. Applies to dictation only (not the assistant chat) and runs on its own shortcut. It adds a delay since the model runs after transcription; if it fails or times out, your raw text is pasted instead. Uses your assistant's model by default. This feature is still in development — you can't yet pick a built-in local model from its own list, and it needs more tuning before it's a main feature."
+        "label": "ניקוי AI (בפיתוח)",
+        "description": "ניסיוני: נקה את ההכתבה שלך בעזרת AI. גולמי ולא מלוטש — כבוי כברירת מחדל.",
+        "info": "מריץ מודל שפה על ההכתבה שלך כדי לתקן פיסוק, להסיר מילות מילוי ובאופן אופציונלי גם להתאים את הטון. חל על הכתבה בלבד (לא על שיחת העוזר) ופועל בקיצור מקשים נפרד. זה מוסיף השהיה, כי המודל רץ אחרי התמלול; אם הוא נכשל או חורג מהזמן, הטקסט הגולמי שלך מודבק במקום. משתמש כברירת מחדל במודל של העוזר שלך. התכונה הזו עדיין בפיתוח — אי אפשר עדיין לבחור מודל מקומי מובנה מרשימה נפרדת, והיא דורשת כיוונון נוסף לפני שתהפוך לתכונה מרכזית."
       },
       "postProcessTimeout": {
-        "title": "AI cleanup timeout",
-        "description": "How long to wait for the model before giving up and pasting your raw transcription instead. On the built-in local model, allow enough time for it to load on first use.",
-        "seconds": "{{seconds}} seconds"
+        "title": "פסק זמן לניקוי AI",
+        "description": "כמה זמן להמתין למודל לפני שמפסיקים ומדביקים את התמלול הגולמי במקום. עבור המודל המקומי המובנה, השאר מספיק זמן לטעינה שלו בשימוש הראשון.",
+        "seconds": "{{seconds}} שניות"
       },
       "experimentalToggle": {
         "label": "תכונות ניסיוניות",
@@ -565,28 +567,28 @@
       },
       "lazyStreamClose": {
         "label": "השאר את המיקרופון פתוח בין תמלולים",
-        "description": "משאיר את זרם המיקרופון פתוח למשך 30 שניות אחרי סיום ההקלטה, וכך מפחית השהיה בתמלולים רצופים. עשוי לפגוע באיכות שמע Bluetooth בזמן שהאפשרות פעילה."
+        "description": "הכתבות רצופות מהירות יותר. עשוי לפגוע באיכות שמע Bluetooth."
       },
       "liveTranscription": {
-        "label": "Live transcription",
-        "description": "Transcribe speech as you talk, instead of all at once when you stop. Experimental."
+        "label": "תמלול חי",
+        "description": "תמלל את הדיבור תוך כדי שאתה מדבר, במקום הכול בבת אחת כשאתה מפסיק. ניסיוני."
       },
       "liveTranscriptionWindow": {
-        "label": "Live transcription window",
-        "description": "While live transcription runs, show a larger overlay card with the running text instead of the compact pill. Requires live transcription."
+        "label": "חלון תמלול חי",
+        "description": "בזמן שתמלול חי פועל, הצג כרטיס משוב גדול יותר עם הטקסט המתגלגל במקום הגלולה הקומפקטית. דורש תמלול חי."
       },
       "acceleration": {
         "whisper": {
           "title": "האצת Whisper",
-          "description": "האצת חומרה למודלי Whisper. מצב אוטומטי משתמש ב-GPU אם זמין (Metal ב-macOS, Vulkan ב-Windows/Linux)."
+          "description": "מצב אוטומטי משתמש ב-GPU כשהוא זמין."
         },
         "ort": {
           "title": "האצת ONNX",
-          "description": "האצת חומרה למודלי ONNX (Parakeet, Canary, Moonshine ועוד). DirectML ב-Windows הוא ניסיוני. ייתכן שמודלים ייכשלו בתמלול."
+          "description": "עבור מודלי Parakeet, Canary ו-Moonshine. DirectML הוא ניסיוני."
         },
         "gpuDevice": {
           "title": "התקן GPU",
-          "description": "בחר באיזה GPU להשתמש עבור הסקת Whisper. מצב אוטומטי בוחר את ה-GPU הייעודי.",
+          "description": "מצב אוטומטי בוחר את ה-GPU הייעודי.",
           "auto": "אוטומטי"
         }
       },
@@ -602,18 +604,22 @@
         "label": "הצג אייקון במגש",
         "description": "הצג את האייקון של SpeakoFlow במגש המערכת."
       },
+      "closeBehavior": {
+        "label": "צא מהאפליקציה כשאני סוגר את החלון",
+        "description": "כשהאפשרות כבויה, סגירת החלון משאירה את SpeakoFlow פועל במגש המערכת, כך שקיצורי המקשים שלך ימשיכו לעבוד. כשהיא מופעלת, סגירת החלון סוגרת את האפליקציה לגמרי."
+      },
       "overlayStyle": {
-        "title": "Overlay",
-        "description": "How the recording overlay looks while you dictate. None hides it, Minimal is the compact pill, and Live shows a readable card with your words as you speak (for models that support it).",
+        "title": "שכבת משוב",
+        "description": "איך שכבת משוב ההקלטה נראית בזמן שאתה מכתיב. ״ללא״ מסתירה אותה, ״מינימלי״ הוא הגלולה הקומפקטית, ו״חי״ מציג כרטיס קריא עם המילים שלך תוך כדי דיבור (במודלים שתומכים בכך).",
         "options": {
-          "none": "None",
-          "minimal": "Minimal",
-          "live": "Live"
+          "none": "ללא",
+          "minimal": "מינימלי",
+          "live": "חי"
         }
       },
       "overlay": {
         "title": "מיקום שכבת המשוב",
-        "description": "הצג שכבת משוב חזותית בזמן הקלטה ותמלול. בלינוקס מומלץ לבחור 'ללא'.",
+        "description": "איפה שכבת המשוב של ההקלטה ממוקמת על המסך שלך.",
         "options": {
           "none": "ללא",
           "bottom": "למטה",
@@ -622,7 +628,7 @@
       },
       "pasteMethod": {
         "title": "שיטת הדבקה",
-        "description": "בחר איך הטקסט יוכנס. ישיר: מדמה הקלדה דרך קלט המערכת. ללא: מדלג על הדבקה ומעדכן רק היסטוריה/לוח.",
+        "description": "איך הטקסט המתומלל מוכנס לאפליקציה הפעילה.",
         "options": {
           "clipboard": "לוח ({{modifier}}+V)",
           "clipboardCtrlShiftV": "לוח (Ctrl+Shift+V)",
@@ -635,14 +641,14 @@
       },
       "typingTool": {
         "title": "כלי הקלדה",
-        "description": "בחר איזה כלי הקלדה בלינוקס ישמש עבור הדבקה ישירה. מצב אוטומטי יזהה וישתמש בכלי המתאים ביותר למערכת שלך.",
+        "description": "כלי הלינוקס שמשמש לשיטת ההדבקה הישירה.",
         "options": {
           "auto": "אוטומטי (מומלץ)"
         }
       },
       "clipboardHandling": {
         "title": "התנהגות הלוח",
-        "description": "אל תשנה את הלוח ישמור על תוכן הלוח הנוכחי שלך אחרי התמלול. העתק ללוח ישאיר את תוצאת התמלול בלוח אחרי ההדבקה.",
+        "description": "האם התמלול נשאר בלוח שלך אחרי ההדבקה.",
         "options": {
           "dontModify": "אל תשנה את הלוח",
           "copyToClipboard": "העתק ללוח"
@@ -650,7 +656,7 @@
       },
       "autoSubmit": {
         "title": "שליחה אוטומטית",
-        "description": "שלח אוטומטית את צירוף המקשים שנבחר אחרי הכנסת הטקסט. ב-macOS יופעל Cmd+Enter, וב-Windows/Linux יופעל Super+Enter.",
+        "description": "שלח אוטומטית צירוף מקשים אחרי הכנסת הטקסט.",
         "options": {
           "off": "כבוי",
           "enter": "Enter",
@@ -661,12 +667,12 @@
       },
       "translateToEnglish": {
         "label": "תרגם לאנגלית",
-        "description": "תרגם אוטומטית דיבור משפות אחרות לאנגלית בזמן התמלול.",
+        "description": "תרגם דיבור משפות אחרות לאנגלית.",
         "descriptionUnsupported": "המודל {{model}} לא תומך בתרגום."
       },
       "modelUnload": {
         "title": "פרוק מודל",
-        "description": "שחרר אוטומטית זיכרון GPU/CPU כשהמודל לא היה בשימוש במשך הזמן שנבחר",
+        "description": "שחרר זיכרון כשהמודל לא היה בשימוש למשך הזמן הזה.",
         "options": {
           "never": "אף פעם",
           "immediately": "מיידית",
@@ -680,43 +686,43 @@
       },
       "customWords": {
         "title": "מילים מותאמות אישית",
-        "description": "הוסף מילים שנשמעות או נכתבות לא נכון לעיתים קרובות במהלך התמלול. המערכת תתקן אוטומטית מילים דומות כך שיתאימו לרשימה שלך.",
-        "info": "Example: add “Kokoro” if SpeakoFlow writes “Coco row.”",
-        "placeholder": "הוסף מילה",
+        "description": "שמות, מוצרים וביטויים ש-SpeakoFlow צריך לאיית בדרך שלך.",
+        "info": "לדוגמה: הוסף ״Kokoro״ אם SpeakoFlow כותב ״Coco row״.",
+        "placeholder": "הוסף שם, מונח או ביטוי קצר",
         "add": "הוסף",
-        "empty": "No custom words yet.",
+        "empty": "אין עדיין מילים מותאמות אישית.",
         "remove": "הסר את {{word}}",
         "duplicate": "\"{{word}}\" כבר קיימת"
       },
       "textReplacements": {
-        "title": "Text replacements",
-        "description": "Replace a phrase in your transcript with text you use often. Example: “my email” becomes “alex@example.com”.",
-        "rulesTitle": "Replacement rules",
-        "rulesHint": "Choose what SpeakoFlow hears and what it should insert.",
-        "empty": "Create a rule for a phrase you say often.",
-        "addFirst": "Create first rule",
-        "addRule": "Add replacement",
-        "manageRules": "Replacements ({{count}})",
-        "searchLabel": "Spoken phrase",
-        "searchPlaceholder": "my email",
-        "replaceLabel": "Insert this text",
+        "title": "החלפות טקסט",
+        "description": "החלף ביטוי בתמלול שלך בטקסט שאתה משתמש בו לעיתים קרובות. לדוגמה: ״האימייל שלי״ הופך ל״alex@example.com״.",
+        "rulesTitle": "כללי החלפה",
+        "rulesHint": "בחר מה SpeakoFlow שומע ומה הוא צריך להכניס במקום.",
+        "empty": "צור כלל לביטוי שאתה אומר לעיתים קרובות.",
+        "addFirst": "צור כלל ראשון",
+        "addRule": "הוסף החלפה",
+        "manageRules": "החלפות ({{count}})",
+        "searchLabel": "הביטוי שנאמר",
+        "searchPlaceholder": "האימייל שלי",
+        "replaceLabel": "הכנס את הטקסט הזה",
         "replacePlaceholder": "alex@example.com",
-        "advanced": "Advanced options",
+        "advanced": "אפשרויות מתקדמות",
         "regex": "Regex",
-        "trimBefore": "Trim before",
-        "trimAfter": "Trim after",
-        "enabledLabel": "Enabled",
-        "remove": "Remove rule",
-        "import": "Import",
-        "export": "Export",
-        "importSuccess": "Imported {{count}} replacement rules",
-        "importError": "Could not import: the file is not a valid replacements list",
-        "exportSuccess": "Replacements exported",
-        "exportError": "Could not export replacements",
-        "magicHint": "Use [date], [time], [uppercase], [lowercase], [capitalize], or [nospace] in the inserted text.",
+        "trimBefore": "קצץ לפני",
+        "trimAfter": "קצץ אחרי",
+        "enabledLabel": "פעיל",
+        "remove": "הסר כלל",
+        "import": "ייבוא",
+        "export": "ייצוא",
+        "importSuccess": "יובאו {{count}} כללי החלפה",
+        "importError": "הייבוא נכשל: הקובץ אינו רשימת החלפות תקינה",
+        "exportSuccess": "ההחלפות יוצאו",
+        "exportError": "לא ניתן היה לייצא את ההחלפות",
+        "magicHint": "השתמש ב-[date], [time], [uppercase], [lowercase], [capitalize] או [nospace] בטקסט שמוכנס.",
         "capitalization": {
-          "label": "Caps",
-          "none": "None",
+          "label": "אותיות רישיות",
+          "none": "ללא",
           "uppercase": "UPPERCASE",
           "lowercase": "lowercase",
           "capitalize": "Capitalize"
@@ -725,38 +731,65 @@
     },
     "postProcessing": {
       "title": "עיבוד משלים",
+      "readiness": {
+        "checking": "בודק את הגדרת ניקוי ה-AI…",
+        "checkFailed": "לא ניתן היה לבדוק את הגדרת ניקוי ה-AI.",
+        "ready": "מוכן — {{provider}}.",
+        "assistantFallback": "מוכן — משתמש במודל העוזר שלך ({{provider}}).",
+        "selectPrompt": "בחר פרומפט ניקוי.",
+        "selectModel": "בחר מודל עבור הספק הזה.",
+        "addApiKey": "הוסף מפתח API עבור הספק הזה.",
+        "providerMissing": "הספק שנבחר אינו זמין יותר."
+      },
+      "errors": {
+        "saveFailed": "לא ניתן היה לשמור את הגדרת ניקוי ה-AI.",
+        "modelsLoadFailed": "לא ניתן היה לטעון מודלים עבור הספק הזה.",
+        "promptCreateFailed": "לא ניתן היה ליצור את הפרומפט.",
+        "promptSelectFailed": "הפרומפט נוצר, אבל לא ניתן היה לבחור אותו.",
+        "promptUpdateFailed": "לא ניתן היה לעדכן את הפרומפט.",
+        "promptDeleteFailed": "לא ניתן היה למחוק את הפרומפט.",
+        "toneSelectFailed": "לא ניתן היה לבחור את סגנון הכתיבה.",
+        "toneCreateFailed": "לא ניתן היה ליצור את סגנון הכתיבה.",
+        "toneSelectAfterCreateFailed": "הסגנון נוצר, אבל לא ניתן היה לבחור אותו.",
+        "toneUpdateFailed": "לא ניתן היה לעדכן את סגנון הכתיבה.",
+        "toneDeleteFailed": "לא ניתן היה למחוק את סגנון הכתיבה."
+      },
       "enable": {
-        "title": "AI cleanup"
+        "title": "ניקוי AI"
       },
       "hotkey": {
         "title": "קיצור מקשים"
       },
       "tone": {
-        "title": "Tone",
-        "description": "Optionally rewrite your cleaned-up dictation in a chosen tone. \"None\" just tidies the text without changing the wording.",
+        "title": "סגנון מוכן",
+        "description": "בחר איך ההכתבה המנוקה תישמע. ״ניקוי בלבד״ מתקן את הטקסט בלי לשנות את הסגנון שלו בכוונה.",
         "options": {
-          "none": "None (cleanup only)",
-          "formal": "Formal",
-          "casual": "Casual",
-          "professional": "Professional",
-          "friendly": "Friendly",
-          "concise": "Concise"
+          "none": "ללא (ניקוי בלבד)",
+          "formal": "רשמי",
+          "casual": "יומיומי",
+          "professional": "מקצועי",
+          "friendly": "ידידותי",
+          "concise": "תמציתי"
         },
-        "edit": "Edit",
-        "closeEditor": "Close",
-        "createNew": "Create style",
-        "nameLabel": "Style name",
-        "namePlaceholder": "For example, Calm and clean",
-        "instructionsLabel": "Style instructions",
-        "instructionsPlaceholder": "Describe exactly how the wording should change. Example: Remove profanity and replace it with calm, neutral wording.",
-        "instructionsHint": "These rules shape the wording after cleanup. They stay separate from your cleanup prompt.",
-        "createTone": "Create style",
-        "updateTone": "Save changes",
-        "deleteTone": "Delete style",
-        "cancel": "Cancel"
+        "edit": "ערוך",
+        "closeEditor": "סגור",
+        "createNew": "צור סגנון",
+        "nameLabel": "שם הסגנון",
+        "namePlaceholder": "לדוגמה, רגוע ונקי",
+        "instructionsLabel": "הוראות הסגנון",
+        "instructionsPlaceholder": "תאר בדיוק איך הניסוח צריך להשתנות. לדוגמה: הסר קללות והחלף אותן בניסוח רגוע וניטרלי.",
+        "instructionsHint": "הכללים האלה מעצבים את הניסוח אחרי הניקוי. הם נשארים נפרדים מפרומפט הניקוי שלך.",
+        "createTone": "צור סגנון",
+        "updateTone": "שמור שינויים",
+        "deleteTone": "מחק סגנון",
+        "cancel": "ביטול"
       },
       "api": {
         "title": "API (תואם OpenAI)",
+        "location": {
+          "title": "איפה זה רץ",
+          "description": "הרץ את הניקוי באופן פרטי עם מודל שהורדת, או השתמש בספק ענן."
+        },
         "provider": {
           "title": "ספק",
           "description": "בחר ספק שתואם ל-OpenAI."
@@ -768,8 +801,8 @@
           "unavailable": "Apple Intelligence לא זמין במכשיר הזה. נדרש Mac עם Apple Silicon שמריץ macOS Tahoe (26.0) ומעלה, עם Apple Intelligence מופעל בהגדרות המערכת."
         },
         "baseUrl": {
-          "title": "Base URL",
-          "description": "כתובת ה-API הבסיסית עבור הספק הנבחר. רק ספק מותאם אישית ניתן לעריכה.",
+          "title": "כתובת בסיס",
+          "description": "כתובת ה-API הבסיסית עבור הספק הנבחר. ניתנת לעריכה עבור Custom, Local ו-Azure OpenAI (הגדר אותה למשאב שלך, לדוגמה https://your-resource.openai.azure.com/openai/v1).",
           "placeholder": "https://api.openai.com/v1"
         },
         "apiKey": {
@@ -778,10 +811,10 @@
           "placeholder": "sk-..."
         },
         "builtin": {
-          "modelDescription": "Pick a model you've downloaded. It runs on your machine with no API key or setup.",
-          "modelPlaceholder": "Select a downloaded model",
-          "noModels": "No local models yet. Download one from the model catalog.",
-          "ready": "Runs fully on your machine. No API key, no setup."
+          "modelDescription": "בחר מודל שהורדת. הוא פועל במכשיר שלך בלי מפתח API ובלי הגדרות.",
+          "modelPlaceholder": "בחר מודל שהורדת",
+          "noModels": "אין עדיין מודלים מקומיים. הורד אחד מקטלוג המודלים.",
+          "ready": "פועל כולו במכשיר שלך. בלי מפתח API, בלי הגדרות."
         },
         "model": {
           "title": "מודל",
@@ -792,10 +825,6 @@
           "placeholderWithOptions": "חפש או בחר מודל",
           "placeholderNoOptions": "הקלד שם מודל",
           "refreshModels": "רענן מודלים"
-        },
-        "location": {
-          "title": "Where it runs",
-          "description": "Run cleanup privately with a downloaded model or use a cloud provider."
         }
       },
       "prompts": {
@@ -807,138 +836,122 @@
         "noPrompts": "אין פרומפטים זמינים",
         "selectPrompt": "בחר פרומפט",
         "createNew": "צור פרומפט חדש",
-        "edit": "Edit",
-        "closeEditor": "Close",
+        "edit": "ערוך",
+        "closeEditor": "סגור",
         "promptLabel": "שם הפרומפט",
         "promptLabelPlaceholder": "הזן שם לפרומפט",
         "promptInstructions": "הוראות לפרומפט",
         "promptInstructionsPlaceholder": "כתוב את ההוראות שירוצו אחרי התמלול. לדוגמה: שפר דקדוק ובהירות עבור הטקסט הבא: ${output}",
-        "promptTip": "טיפ: השתמש ב-<code>${output}</code> כדי להכניס את הטקסט המתומלל לפרומפט שלך.",
+        "promptTip": "טיפ: הטקסט המתומלל שלך נשלח למודל אוטומטית — פשוט כתוב הוראות. (פרומפטים ותיקים שמשתמשים ב-<code>${output}</code> עדיין עובדים.)",
         "updatePrompt": "עדכן פרומפט",
         "deletePrompt": "מחק פרומפט",
         "createPrompt": "צור פרומפט",
         "cancel": "ביטול",
         "selectToEdit": "בחר פרומפט למעלה כדי לצפות בפרטים שלו ולערוך אותם.",
         "createFirst": "לחץ על 'צור פרומפט חדש' למעלה כדי ליצור את פרומפט העיבוד הראשון שלך."
-      },
-      "readiness": {
-        "checking": "Checking AI cleanup setup…",
-        "checkFailed": "Couldn’t check AI cleanup setup.",
-        "ready": "Ready — {{provider}}.",
-        "assistantFallback": "Ready — using your Assistant model ({{provider}}).",
-        "selectPrompt": "Select a cleanup prompt.",
-        "selectModel": "Select a model for this provider.",
-        "addApiKey": "Add an API key for this provider.",
-        "providerMissing": "The selected provider is no longer available."
-      },
-      "errors": {
-        "saveFailed": "Couldn’t save the AI cleanup setting.",
-        "modelsLoadFailed": "Couldn’t load models for this provider.",
-        "promptCreateFailed": "Couldn’t create the prompt.",
-        "promptSelectFailed": "Created the prompt, but couldn’t select it.",
-        "promptUpdateFailed": "Couldn’t update the prompt.",
-        "promptDeleteFailed": "Couldn’t delete the prompt.",
-        "toneSelectFailed": "Couldn’t select the writing style.",
-        "toneCreateFailed": "Couldn’t create the writing style.",
-        "toneSelectAfterCreateFailed": "Created the style, but couldn’t select it.",
-        "toneUpdateFailed": "Couldn’t update the writing style.",
-        "toneDeleteFailed": "Couldn’t delete the writing style."
       }
     },
     "dictation": {
       "hero": {
-        "eyebrow": "Now listening with",
-        "loading": "Loading your model…",
-        "noModelTitle": "No model yet",
-        "noModelCaption": "Pick a model so your voice becomes text.",
-        "chooseModel": "Choose a model",
-        "changeModel": "Change model",
-        "streams": "Streams live",
-        "accuracy": "Accuracy",
-        "speed": "Speed"
+        "eyebrow": "מקשיב עכשיו עם",
+        "loading": "טוען את המודל שלך…",
+        "noModelTitle": "אין עדיין מודל",
+        "noModelCaption": "בחר מודל כדי שהקול שלך יהפוך לטקסט.",
+        "chooseModel": "בחר מודל",
+        "changeModel": "החלף מודל",
+        "streams": "מזרים בזמן אמת",
+        "accuracy": "דיוק",
+        "speed": "מהירות"
       },
       "catalog": {
-        "title": "Choose your model",
-        "description": "Every model runs on your machine — trade accuracy for speed and pick the one that fits."
+        "title": "בחר את המודל שלך",
+        "description": "כל המודלים פועלים במכשיר שלך — התפשר על דיוק לטובת מהירות ובחר את זה שמתאים לך."
       },
       "aiCleanup": {
-        "groupTitle": "AI cleanup",
-        "modelGroupTitle": "Cleanup model",
-        "promptGroupTitle": "Cleanup prompt",
-        "title": "Fix up my dictation with AI",
-        "caption": "Experimental — tidies punctuation and filler after you dictate.",
-        "info": "Runs a language model over your dictation to fix punctuation, remove filler words, and optionally adjust the tone. Applies to dictation only, on its own shortcut. It adds a short delay after you speak; if the model fails or times out, your raw text is used instead. Still in development.",
-        "styleGroupTitle": "Writing style",
-        "styleGroupDescription": "Choose a built-in style or save your own rules for how cleaned dictation should sound.",
-        "fixMisheardLabel": "Fix misheard words",
-        "fixMisheardDescription": "When a word is clearly wrong for the sentence — a homophone or a near-miss pronunciation — replace it with the word you meant. Helpful for accents; the AI only corrects when the intended word is obvious."
+        "groupTitle": "ניקוי AI",
+        "styleGroupTitle": "סגנון כתיבה",
+        "styleGroupDescription": "בחר סגנון מובנה או שמור כללים משלך לאיך שההכתבה המנוקה צריכה להישמע.",
+        "modelGroupTitle": "מודל הניקוי",
+        "promptGroupTitle": "פרומפט הניקוי",
+        "title": "שפר את ההכתבה שלי בעזרת AI",
+        "caption": "ניסיוני — מסדר פיסוק ומילות מילוי אחרי שאתה מכתיב.",
+        "strengthLabel": "עוצמת הניקוי",
+        "strengthDescription": "כמה ה-AI משכתב את המילים שלך. ״עדין״ מתקן רק שגיאות ומילות מילוי. ״מאוזן״ גם מקצר חזרות ופתיחות שנקטעו. ״אגרסיבי״ הופך דיבור מפוזר לטקסט תמציתי ומסודר — תוך שמירה על העובדות והמשמעות שלך.",
+        "strengthOptions": {
+          "light": "עדין",
+          "balanced": "מאוזן",
+          "aggressive": "אגרסיבי"
+        },
+        "fixMisheardLabel": "תקן מילים שנשמעו לא נכון",
+        "fixMisheardDescription": "כשמילה בבירור לא מתאימה למשפט — הומופון או הגייה שקרובה למילה אחרת — החלף אותה במילה שהתכוונת אליה. עוזר במיוחד עם מבטאים; ה-AI מתקן רק כשהמילה המכוונת ברורה.",
+        "info": "מריץ מודל שפה על ההכתבה שלך כדי לתקן פיסוק, להסיר מילות מילוי ובאופן אופציונלי גם להתאים את הטון. חל על הכתבה בלבד, בקיצור מקשים נפרד. זה מוסיף השהיה קצרה אחרי שאתה מדבר; אם המודל נכשל או חורג מהזמן, נעשה שימוש בטקסט הגולמי שלך. עדיין בפיתוח."
       },
       "spokenEmoji": {
         "title": "אמוג׳י בקול",
         "description": "אמרו “happy emoji” או “thumbs up emoji” כדי להוסיף 😊 או 👍. כינויים נפוצים ושגיאות תמלול קלות מטופלים במכשיר; שמות לא מוכרים נשארים כטקסט."
       },
-      "output": {
-        "title": "Output options"
-      },
       "flow": {
-        "groupTitle": "Generate with Flow",
-        "enableLabel": "Generate with Flow",
-        "enableDescription": "Start a dictation with the activation phrase to have AI write the result for you — “Hey Flow, write a polite email asking to reschedule” pastes the finished email.",
-        "phraseLabel": "Activation phrase",
-        "phraseDescription": "Flow activates only when a dictation begins with this phrase. Anywhere else, the same words paste as normal dictation. Uses your assistant's model; leave empty to reset to “Hey Flow”.",
+        "groupTitle": "יצירה עם Flow",
+        "enableLabel": "יצירה עם Flow",
+        "enableDescription": "התחל הכתבה בביטוי ההפעלה כדי שה-AI יכתוב עבורך את התוצאה — ״Hey Flow, write a polite email asking to reschedule״ מדביק את האימייל המוכן.",
+        "phraseLabel": "ביטוי ההפעלה",
+        "phraseDescription": "Flow מופעל רק כשהכתבה מתחילה בביטוי הזה. בכל מקום אחר, אותן מילים מודבקות כהכתבה רגילה. משתמש במודל של העוזר שלך; השאר ריק כדי לחזור ל״Hey Flow״.",
         "phrasePlaceholder": "Hey Flow",
-        "screenLabel": "Allow screen access",
-        "screenDescription": "Let Flow take one screenshot when a command clearly refers to your screen, like “look at this email and draft a reply”. The model decides if it's needed. Separate from the assistant's screen access."
+        "screenLabel": "אפשר גישה למסך",
+        "screenDescription": "אפשר ל-Flow לצלם את המסך פעם אחת כשפקודה מתייחסת בבירור למסך שלך, למשל ״look at this email and draft a reply״. המודל מחליט אם זה נחוץ. הגדרה נפרדת מהגישה למסך של העוזר."
+      },
+      "output": {
+        "title": "אפשרויות פלט"
       }
     },
     "history": {
       "title": "היסטוריה",
       "storage": {
-        "title": "Recording storage",
-        "description": "These controls affect recordings only. Starred recordings are always kept. Assistant chats have separate storage."
+        "title": "אחסון הקלטות",
+        "description": "הפקדים האלה משפיעים על הקלטות ההכתבה ועל הקלטות Flow. הקלטות שמורות נשמרות תמיד. לשיחות עם העוזר יש אחסון נפרד."
       },
       "filters": {
-        "label": "History type",
-        "all": "All",
+        "label": "סוג ההיסטוריה",
+        "all": "הכול",
         "recordings": "Recordings",
         "flow": "Flow",
-        "assistant": "Assistant chats"
+        "assistant": "שיחות עם העוזר"
       },
       "openFolder": "פתח את תיקיית ההקלטות",
-      "loading": "טוען היסטוריה...",
-      "empty": "עדיין אין תמלולים. התחל להקליט כדי לבנות את ההיסטוריה שלך!",
-      "emptyRecordings": "No recordings yet.",
-      "emptyFlow": "No Flow generations yet.",
-      "emptyAssistant": "No assistant chats yet.",
-      "recordingLabel": "Recording",
+      "loading": "טוען היסטוריה…",
+      "empty": "אין כאן עדיין כלום. ההכתבות, היצירות של Flow והשיחות עם העוזר יופיעו כאן.",
+      "emptyRecordings": "אין עדיין הכתבות.",
+      "emptyFlow": "אין עדיין יצירות של Flow.",
+      "emptyAssistant": "אין עדיין שיחות עם העוזר.",
+      "recordingLabel": "הכתבה",
       "flowLabel": "Flow",
-      "flowTranscriptLabel": "You said",
-      "originalTranscriptionLabel": "Original transcription",
-      "flowOutputLabel": "Flow output",
-      "finalTextLabel": "Final text",
-      "flowNoOutput": "No Flow output was generated.",
-      "copyFlowOutput": "Copy Flow output",
-      "copyFinalText": "Copy final text",
+      "flowTranscriptLabel": "מה שאמרת",
+      "originalTranscriptionLabel": "התמלול המקורי",
+      "flowOutputLabel": "הפלט של Flow",
+      "finalTextLabel": "הטקסט הסופי",
+      "flowNoOutput": "לא נוצר פלט של Flow.",
       "copyToClipboard": "העתק תמלול ללוח",
+      "copyFlowOutput": "העתק את הפלט של Flow",
+      "copyFinalText": "העתק את הטקסט הסופי",
       "save": "שמור תמלול",
       "unsave": "הסר משמורים",
       "delete": "מחק רשומה",
       "deleteError": "מחיקת הרשומה נכשלה. נסה שוב.",
       "retranscribe": "תמלל מחדש",
       "retranscribeError": "תמלול מחדש נכשל. נסה שוב.",
-      "transcribing": "מתמלל...",
+      "transcribing": "מתמלל…",
       "transcriptionFailed": "התמלול נכשל. אפשר לתמלל מחדש באמצעות אייקון הניסיון החוזר.",
-      "assistantLabel": "Assistant chat",
-      "copyConversation": "Copy conversation",
-      "resumeConversation": "Continue this conversation in the assistant",
-      "showConversation": "Show conversation",
-      "hideConversation": "Hide conversation",
-      "roleUser": "You",
-      "roleAssistant": "Assistant",
-      "screenshotAttached": "Vision",
-      "messageCount_one": "{{count}} message",
-      "messageCount_other": "{{count}} messages",
-      "deleteAssistantError": "Couldn't delete the conversation. Please try again."
+      "assistantLabel": "שיחה עם העוזר",
+      "copyConversation": "העתק את השיחה",
+      "resumeConversation": "המשך את השיחה הזו בעוזר",
+      "showConversation": "הצג את השיחה",
+      "hideConversation": "הסתר את השיחה",
+      "roleUser": "אתה",
+      "roleAssistant": "העוזר",
+      "screenshotAttached": "ראייה",
+      "messageCount_one": "{{count}} הודעה",
+      "messageCount_other": "{{count}} הודעות",
+      "deleteAssistantError": "לא ניתן היה למחוק את השיחה. נסה שוב."
     },
     "debug": {
       "title": "ניפוי שגיאות",
@@ -964,24 +977,24 @@
       },
       "historyLimit": {
         "title": "מגבלת היסטוריה",
-        "description": "המספר המרבי של רשומות היסטוריה לשמירה",
-        "entries": "רשומות"
+        "description": "המספר המרבי של הקלטות הכתבה והקלטות Flow שאינן שמורות שיישמרו. הקלטות שמורות נשמרות תמיד, ושיחות עם העוזר אינן נספרות.",
+        "entries": "הקלטות"
       },
       "recordingRetention": {
         "title": "מחיקה אוטומטית של הקלטות",
-        "description": "מחק הקלטות ישנות אוטומטית כדי לחסוך מקום",
+        "description": "בחר איך הקלטות שאינן שמורות מנוקות. השינויים חלים מיד ואינם משפיעים על שיחות עם העוזר.",
         "never": "אף פעם",
-        "preserveLimit": "שמור את {{count}} האחרונות",
+        "preserveLimit": "שמירה על מספר קבוע",
         "days3": "אחרי 3 ימים",
         "weeks2": "אחרי שבועיים",
         "months3": "אחרי 3 חודשים",
-        "placeholder": "בחר משך שמירה...",
-        "savedToast": "Retention saved.",
-        "appliedToast": "Recording retention applied"
+        "placeholder": "בחר משך שמירה…",
+        "savedToast": "משך השמירה נשמר.",
+        "appliedToast": "משך שמירת ההקלטות הוחל"
       },
       "alwaysOnMicrophone": {
         "label": "מיקרופון תמיד פעיל",
-        "description": "השאר את המיקרופון פעיל לתגובה מהירה יותר"
+        "description": "השאר את המיקרופון חם כדי שהמילים הראשונות לא ייחתכו. צורך קצת יותר סוללה."
       },
       "clamshellMicrophone": {
         "title": "מיקרופון במצב clamshell",
@@ -1015,7 +1028,7 @@
       },
       "recordingBuffer": {
         "title": "באפר הקלטה נוסף",
-        "description": "זמן נוסף (במילישניות) להמשך הקלטה אחרי שחרור המקש, כדי ללכוד סוף דיבור. 0 = בלי באפר נוסף."
+        "description": "מספר המילישניות להמשך הקלטה אחרי שחרור המקש."
       }
     },
     "about": {
@@ -1025,12 +1038,12 @@
         "description": "הגרסה הנוכחית של SpeakoFlow"
       },
       "updates": {
-        "title": "Updates",
-        "button": "Check for updates",
-        "disabledHint": "Automatic update checks are off. Turn them on in General."
+        "title": "עדכונים",
+        "button": "בדוק עדכונים",
+        "disabledHint": "בדיקת עדכונים אוטומטית כבויה. אפשר להפעיל אותה בקטע ״כללי״."
       },
       "folders": {
-        "title": "Folders"
+        "title": "תיקיות"
       },
       "appDataDirectory": {
         "title": "תיקיית נתוני אפליקציה",
@@ -1042,9 +1055,9 @@
         "button": "צפה ב-GitHub"
       },
       "license": {
-        "title": "License",
-        "description": "SpeakoFlow is open source under the MIT License, building on Handy (also MIT) by CJ Pais.",
-        "button": "View license"
+        "title": "רישיון",
+        "description": "SpeakoFlow הוא קוד פתוח תחת רישיון MIT, ומבוסס על Handy (גם הוא MIT) מאת CJ Pais.",
+        "button": "הצג את הרישיון"
       },
       "supportDevelopment": {
         "title": "תמיכה בפיתוח",
@@ -1054,326 +1067,340 @@
     },
     "assistant": {
       "shortcuts": {
-        "title": "Shortcuts"
+        "title": "קיצורי מקשים"
       },
       "brain": {
-        "title": "Assistant brain",
-        "description": "Choose whether your assistant runs privately on this device or through a cloud provider.",
-        "whereLabel": "Where it runs",
-        "onDevice": "On my device",
-        "cloud": "Cloud provider",
-        "downloadModel": "Browse and download models",
-        "downloadModelDescription": "Pick a recommended model or search Hugging Face.",
-        "downloadModelAction": "Browse models",
-        "catalogTitle": "Download an on-device model",
-        "catalogDescription": "Choose a model to download. It stays on this machine and needs no API key.",
-        "currentModelTitle": "Current model",
-        "currentModelDescription": "Selected for the built-in assistant on this device.",
-        "recommendedTitle": "Recommended models",
-        "recommendedDescription": "Three conversation-first choices: quickest, recommended, and more capable but slower.",
-        "acceleratorDetected": "{{name}} · {{memory}} GB reported graphics memory",
-        "acceleratorDetectedDedicated": "{{name}} · {{memory}} GB dedicated VRAM",
-        "acceleratorDetectedIntegrated": "{{name}} · {{memory}} GB shared graphics memory",
-        "acceleratorDetectedNoMemory": "{{name}} detected · graphics memory not reported",
-        "acceleratorUnknownWithMemory": "Graphics memory unavailable · {{memory}} GB system RAM for CPU fallback",
-        "acceleratorUnknown": "Graphics memory unavailable · response speed cannot be predicted",
-        "details": "Details",
-        "switchBeforeDelete": "Switch the built-in assistant to another model before deleting this one.",
-        "deleteModelConfirm": "Delete {{modelName}}? Its downloaded files and saved entry will be removed.",
-        "deleteModelFailed": "Could not delete the model.",
-        "visionModelNote": "Screen vision downloads an additional image file automatically.",
-        "finderSectionTitle": "More on-device models",
-        "finderSectionDescription": "Search Hugging Face when you need a different model size or capability.",
-        "finderTitle": "Browse Hugging Face",
-        "finderDescription": "Search thousands of GGUF models and download one directly to SpeakoFlow.",
-        "finderAction": "Find a model",
-        "huggingFaceTitle": "From Hugging Face",
-        "huggingFaceDescription": "Models you added yourself. Compatibility and performance can vary.",
-        "catalogEmpty": "No recommended local models are available right now."
+        "title": "המוח של העוזר",
+        "description": "בחר אם העוזר שלך יפעל באופן פרטי במכשיר הזה או דרך ספק ענן.",
+        "whereLabel": "איפה זה רץ",
+        "onDevice": "במכשיר שלי",
+        "cloud": "ספק ענן",
+        "downloadModel": "עיין והורד מודלים",
+        "downloadModelDescription": "בחר מודל מומלץ או חפש ב-Hugging Face.",
+        "downloadModelAction": "עיין במודלים",
+        "catalogTitle": "בחר מודל שפועל במכשיר",
+        "catalogDescription": "הורד מודל מקומי ופרטי. הוא נשאר במכשיר הזה ולא דורש מפתח API.",
+        "currentModelTitle": "המודל הנוכחי",
+        "currentModelDescription": "נבחר עבור העוזר המובנה במכשיר הזה.",
+        "recommendedTitle": "מודלים מומלצים",
+        "recommendedDescription": "שלוש אפשרויות שמתמקדות בשיחה: המהיר ביותר, המומלץ, והחזק יותר אך האיטי יותר.",
+        "acceleratorDetected": "{{name}} · {{memory}} GB זיכרון גרפי מדווח",
+        "acceleratorDetectedDedicated": "{{name}} · {{memory}} GB זיכרון VRAM ייעודי",
+        "acceleratorDetectedIntegrated": "{{name}} · {{memory}} GB זיכרון גרפי משותף",
+        "acceleratorDetectedNoMemory": "זוהה {{name}} · הזיכרון הגרפי לא דווח",
+        "acceleratorUnknownWithMemory": "הזיכרון הגרפי אינו זמין · {{memory}} GB זיכרון מערכת לגיבוי על ה-CPU",
+        "acceleratorUnknown": "הזיכרון הגרפי אינו זמין · לא ניתן לחזות את מהירות התגובה",
+        "details": "פרטים",
+        "switchBeforeDelete": "העבר את העוזר המובנה למודל אחר לפני מחיקת המודל הזה.",
+        "deleteModelConfirm": "למחוק את {{modelName}}? הקבצים שהורדו והרשומה השמורה יוסרו.",
+        "deleteModelFailed": "לא ניתן היה למחוק את המודל.",
+        "visionModelNote": "ראיית מסך מורידה אוטומטית קובץ תמונה נוסף.",
+        "finderSectionTitle": "עוד מודלים שפועלים במכשיר",
+        "finderSectionDescription": "חפש ב-Hugging Face כשאתה צריך גודל מודל או יכולת אחרים.",
+        "finderTitle": "עיין ב-Hugging Face",
+        "finderDescription": "חפש בין אלפי מודלי GGUF והורד אחד ישירות ל-SpeakoFlow.",
+        "finderAction": "מצא מודל",
+        "huggingFaceTitle": "המודלים שלך",
+        "huggingFaceDescription": "מודלים שהורדת ומודלים שהוספת מ-Hugging Face.",
+        "catalogEmpty": "אין כרגע מודלים מקומיים מומלצים זמינים."
       },
       "subpages": {
-        "profilesCaption": "Switch the assistant's name, role, and personality.",
-        "memoryCaption": "What the assistant remembers about you between chats."
+        "profilesCaption": "החלף את השם, התפקיד והאישיות של העוזר.",
+        "memoryCaption": "מה שהעוזר זוכר עליך בין שיחה לשיחה."
       },
       "tapToLock": {
-        "label": "Tap to lock",
-        "info": "While holding the assistant shortcut, tap this to lock hands-free so you can let go and keep talking. Pick a key that isn't part of your assistant shortcut (one that overlaps is ignored), or clear it to turn this off.",
-        "off": "Off",
-        "clear": "Clear"
+        "label": "הקש כדי לנעול",
+        "info": "בזמן שאתה מחזיק את קיצור העוזר, הקש על המקש הזה כדי לנעול מצב ללא ידיים, כך שתוכל לשחרר ולהמשיך לדבר. בחר מקש שאינו חלק מקיצור העוזר (מקש חופף יידחה), או נקה אותו כדי לכבות את האפשרות.",
+        "off": "כבוי",
+        "clear": "נקה"
       },
       "provider": {
-        "title": "Assistant provider",
-        "providerLabel": "Provider",
-        "providerDescription": "The provider that answers assistant questions.",
-        "baseUrlLabel": "Base URL",
-        "baseUrlDescription": "OpenAI-compatible base URL. Azure URLs are normalized automatically.",
-        "apiKeyLabel": "API key",
-        "apiKeyDescription": "Shared with AI cleanup.",
-        "apiKeyPlaceholder": "Enter API key…",
-        "modelLabel": "Model",
-        "modelDescription": "Model or deployment name to use for assistant answers.",
-        "modelPlaceholder": "e.g. gpt-4o-mini",
-        "modelSearchPlaceholder": "Search or type a model…",
-        "modelUse": "Use \"{{model}}\"",
-        "loadModels": "Load models",
-        "loadingModels": "Loading…",
-        "noModelsFound": "No models returned. Type the model name instead.",
-        "builtinModelDescription": "Pick a downloaded local model. It runs on your machine with no API key.",
-        "builtinModelPlaceholder": "Select a downloaded model",
-        "builtinNoModels": "No models on your machine yet — download one below.",
-        "builtinReady": "Runs fully on your machine. No API key, no setup.",
-        "builtinEngineMissing": "First use downloads a small local engine automatically (one time), then runs fully offline. No setup needed.",
-        "contextSizeLabel": "Context window",
-        "contextSizeDescription": "How much the local model can keep in mind at once — the system instructions, your chat history, any screenshot (a single image can eat a big chunk), and its reply. Bigger holds more and keeps screen vision and web search reliable, but uses more memory. The default is 8192; 16384 is a good step up if your machine has the RAM to spare. You can lower it later to save memory.",
-        "unloadTimeoutLabel": "Unload from memory after",
-        "unloadTimeoutDescription": "Free up memory by unloading the local model after it has been idle this long. It reloads automatically on next use.",
-        "saveFailed": "Couldn’t switch the Assistant provider."
+        "title": "ספק העוזר",
+        "saveFailed": "לא ניתן היה להחליף את ספק העוזר.",
+        "providerLabel": "ספק",
+        "providerDescription": "הספק שעונה על השאלות לעוזר.",
+        "baseUrlLabel": "כתובת בסיס",
+        "baseUrlDescription": "כתובת בסיס תואמת OpenAI. כתובות Azure מותאמות אוטומטית.",
+        "apiKeyLabel": "מפתח API",
+        "apiKeyDescription": "משותף עם ניקוי ה-AI.",
+        "apiKeyPlaceholder": "הזן מפתח API…",
+        "modelLabel": "מודל",
+        "modelDescription": "שם המודל או הפריסה שישמשו לתשובות העוזר.",
+        "modelPlaceholder": "לדוגמה, gpt-4o-mini",
+        "modelSearchPlaceholder": "חפש או הקלד שם מודל…",
+        "modelUse": "השתמש ב-\"{{model}}\"",
+        "loadModels": "טען מודלים",
+        "loadingModels": "טוען…",
+        "noModelsFound": "לא הוחזרו מודלים. הקלד את שם המודל במקום זאת.",
+        "builtinModelDescription": "בחר מודל מקומי שהורדת. הוא פועל במכשיר שלך בלי מפתח API.",
+        "builtinModelPlaceholder": "בחר מודל שהורדת",
+        "builtinNoModels": "אין עדיין מודלים במכשיר שלך — הורד אחד למטה.",
+        "builtinReady": "פועל כולו במכשיר שלך. בלי מפתח API, בלי הגדרות.",
+        "builtinEngineMissing": "בשימוש הראשון מורד אוטומטית מנוע מקומי קטן (פעם אחת), ומשם הכול פועל לחלוטין ללא חיבור לאינטרנט. לא נדרשות הגדרות.",
+        "builtinEngineDownloading": "מוריד את המנוע המקומי… {{percent}}%",
+        "builtinEnginePreparing": "מוריד את המנוע המקומי…",
+        "builtinEngineExtracting": "מתקין את המנוע המקומי…",
+        "builtinEngineReady": "המנוע המקומי מוכן.",
+        "contextSizeLabel": "חלון הקשר",
+        "contextSizeDescription": "כמה המודל המקומי יכול להחזיק בראש בו-זמנית — הוראות המערכת, היסטוריית השיחה שלך, כל צילום מסך (תמונה אחת יכולה לתפוס חלק גדול) והתשובה שלו. חלון גדול יותר מחזיק יותר ושומר על ראיית המסך והחיפוש באינטרנט אמינים, אבל צורך יותר זיכרון. ברירת המחדל היא 8192; 16384 היא שדרוג טוב אם יש למחשב שלך מספיק זיכרון פנוי. אפשר להקטין אותו מאוחר יותר כדי לחסוך בזיכרון.",
+        "unloadTimeoutLabel": "פרוק מהזיכרון אחרי",
+        "unloadTimeoutDescription": "פנה זיכרון על ידי פריקת המודל המקומי אחרי שלא היה בשימוש למשך הזמן הזה. הוא נטען מחדש אוטומטית בשימוש הבא."
       },
       "systemPrompt": {
-        "title": "System prompt",
-        "label": "Assistant system prompt",
-        "description": "Sets the assistant's behavior."
+        "title": "פרומפט מערכת",
+        "label": "פרומפט המערכת של העוזר",
+        "description": "קובע את ההתנהגות של העוזר."
       },
       "characters": {
-        "title": "Profiles",
-        "description": "Task-focused profiles you can switch between. The active profile sets the assistant's name, role, and instructions — and how long its replies run. Switch anytime from the panel header.",
-        "galleryLabel": "Your profiles",
-        "editSection": "Edit profile",
-        "avatarLabel": "Avatar",
-        "active": "Active",
-        "meowsOnly": "Meows only",
-        "builtin": "Built-in",
-        "custom": "Custom",
-        "new": "New",
-        "newName": "New profile",
-        "copyName": "{{name}} copy",
-        "createAi": "Create with AI",
-        "import": "Import",
-        "aiTitle": "Describe your profile",
-        "aiClose": "Close",
-        "aiPlaceholder": "e.g. a concise release-notes writer, or a patient tutor who explains every step",
-        "aiDictate": "Dictate the description",
-        "aiDictateStop": "Stop dictation",
-        "generate": "Generate",
-        "avatarUpload": "Upload image",
-        "avatarRemove": "Remove",
-        "nameLabel": "Name",
-        "roleLabel": "Role",
-        "rolePlaceholder": "Short description shown on the card (optional)",
-        "promptLabel": "Instructions (system prompt)",
+        "title": "פרופילים",
+        "description": "פרופילים ממוקדי משימה שאפשר להחליף ביניהם. הפרופיל הפעיל קובע את השם, התפקיד וההוראות של העוזר — וגם את אורך התשובות שלו. אפשר להחליף בכל עת מכותרת החלונית.",
+        "galleryLabel": "הפרופילים שלך",
+        "editSection": "ערוך פרופיל",
+        "avatarLabel": "אווטאר",
+        "active": "פעיל",
+        "meowsOnly": "מייאו בלבד",
+        "builtin": "מובנה",
+        "custom": "מותאם אישית",
+        "new": "חדש",
+        "newName": "פרופיל חדש",
+        "copyName": "עותק של {{name}}",
+        "createAi": "צור עם AI",
+        "import": "ייבוא",
+        "aiTitle": "תאר את הפרופיל שלך",
+        "aiClose": "סגור",
+        "aiPlaceholder": "לדוגמה, כותב הערות גרסה תמציתי, או מורה סבלני שמסביר כל שלב",
+        "aiDictate": "הכתב את התיאור",
+        "aiDictateStop": "עצור את ההכתבה",
+        "generate": "צור",
+        "avatarUpload": "העלה תמונה",
+        "avatarRemove": "הסר",
+        "nameLabel": "שם",
+        "roleLabel": "תפקיד",
+        "rolePlaceholder": "תיאור קצר שמוצג על הכרטיס (אופציונלי)",
+        "promptLabel": "הוראות (פרומפט מערכת)",
         "responseLength": {
-          "label": "Response length",
-          "hint": "How long this profile's replies run. \"Inherit\" follows your global Assistant setting.",
+          "label": "אורך התשובה",
+          "hint": "כמה ארוכות התשובות של הפרופיל הזה. ״ירושה״ עוקב אחרי הגדרת העוזר הגלובלית שלך.",
           "options": {
-            "inherit": "Inherit global",
-            "short": "Short",
-            "medium": "Medium",
-            "long": "Long"
+            "inherit": "ירושה מהגלובלי",
+            "short": "קצרה",
+            "medium": "בינונית",
+            "long": "ארוכה"
           }
         },
-        "greetingLabel": "Greeting (optional)",
-        "greetingPlaceholder": "Optional opening line shown in an empty chat",
-        "catNote": "The Cat ignores the AI entirely — it just meows. Nothing to configure here.",
-        "duplicate": "Duplicate",
-        "export": "Export",
-        "restoreDefault": "Restore default",
-        "restoreBuiltins": "Restore built-ins",
-        "moreActions": "More actions",
-        "expand": "Expand",
-        "collapse": "Collapse",
-        "delete": "Delete",
-        "deleteConfirm": "Delete this profile? This can't be undone.",
-        "emptyState": "No profiles yet. Create your first one to give the assistant a personality."
+        "greetingLabel": "ברכה (אופציונלי)",
+        "greetingPlaceholder": "שורת פתיחה אופציונלית שמוצגת בשיחה ריקה",
+        "catNote": "החתול מתעלם מה-AI לגמרי — הוא סתם מייאו. אין מה להגדיר כאן.",
+        "duplicate": "שכפל",
+        "export": "ייצוא",
+        "restoreDefault": "שחזר לברירת המחדל",
+        "restoreBuiltins": "שחזר את הפרופילים המובנים",
+        "moreActions": "עוד פעולות",
+        "expand": "הרחב",
+        "collapse": "כווץ",
+        "delete": "מחק",
+        "deleteConfirm": "למחוק את הפרופיל הזה? לא ניתן לבטל את הפעולה.",
+        "emptyState": "אין עדיין פרופילים. צור את הראשון שלך כדי להעניק לעוזר אישיות."
       },
       "behavior": {
-        "title": "Behavior"
+        "title": "התנהגות"
       },
       "memory": {
-        "label": "Conversation memory",
-        "description": "How many recent messages are sent as context each turn. 0 disables memory."
+        "label": "זיכרון השיחה",
+        "description": "כמה מההודעות האחרונות נשלחות כהקשר בכל תור. 0 מכבה את הזיכרון."
+      },
+      "autoSummarize": {
+        "label": "סכם שיחות ארוכות",
+        "description": "כששיחה גדלה מעבר לחלון ההקשר של המודל, הודעות ותיקות יצטמצמו אוטומטית לסיכום מתגלגל, כך שהשיחה תשמור על ההקשר שלה במקום לשכוח את ההתחלה. חיווי עדין מוצג בזמן שזה קורה."
       },
       "responseLength": {
-        "label": "Response length",
-        "description": "Preferred reply length. \"No effect\" leaves your prompt untouched.",
+        "label": "אורך התשובה",
+        "description": "אורך התשובה המועדף. ״בלי השפעה״ משאיר את הפרומפט שלך כמו שהוא.",
         "options": {
-          "default": "No effect",
-          "short": "Short",
-          "medium": "Medium",
-          "long": "Long"
+          "default": "בלי השפעה",
+          "short": "קצרה",
+          "medium": "בינונית",
+          "long": "ארוכה"
         }
       },
       "vision": {
-        "title": "Screen vision",
-        "modeLabel": "Screen access",
+        "title": "ראיית מסך",
+        "modeLabel": "גישה למסך",
         "modes": {
-          "off": "Off",
-          "manual": "Manual",
-          "agentDecides": "Agent decides",
+          "off": "כבוי",
+          "manual": "ידני",
+          "agentDecides": "הסוכן מחליט",
           "descriptions": {
-            "off": "Screen capture is disabled. Camera and region controls are hidden.",
-            "manual": "You choose when to attach the full screen or a region. Voice capture timing applies.",
-            "agent_decides": "The model may request a screen capture when it needs current visual context. Every screenshot sent is shown in the conversation."
+            "off": "צילום המסך מושבת. פקדי המצלמה ובחירת האזור מוסתרים.",
+            "manual": "אתה בוחר מתי לצרף את המסך המלא או אזור ממנו. תזמון הצילום בשאלות קוליות חל כאן.",
+            "agent_decides": "המודל יכול לבקש צילום מסך כשהוא צריך הקשר חזותי עדכני. כל צילום מסך שנשלח מוצג בשיחה."
           }
         },
         "timing": {
-          "label": "When to capture",
-          "description": "For voice questions: capture the moment you start asking, or wait until the message is sent. Typed messages always capture on send.",
+          "label": "מתי לצלם",
+          "description": "בשאלות קוליות: צלם ברגע שאתה מתחיל לשאול, או המתן עד לשליחת ההודעה. הודעות מוקלדות תמיד מצלמות בשליחה.",
           "options": {
-            "immediate": "When I ask",
-            "on_send": "When the message sends"
+            "immediate": "כשאני שואל",
+            "on_send": "כשההודעה נשלחת"
           }
+        },
+        "screenRecording": {
+          "description": "ראיית מסך דורשת את הרשאת הקלטת המסך של macOS. תן אותה בהגדרות המערכת, ואז הפעל מחדש את SpeakoFlow כדי שהשינוי ייכנס לתוקף.",
+          "grant": "פתח את הגדרות המערכת"
         }
       },
       "webSearch": {
-        "title": "Web search",
-        "enableLabel": "Allow web search",
-        "enableDescription": "Let the assistant search the web when a question needs current information.",
-        "openRouterNativeLabel": "Use OpenRouter's built-in search",
-        "openRouterNativeDescription": "When on, OpenRouter runs the search itself (its :online mode) using your OpenRouter credits. When off, the app searches with your search provider below.",
-        "providerLabel": "Search provider",
-        "providerDescription": "Serper is a good default. Every provider has a free tier.",
+        "title": "חיפוש באינטרנט",
+        "enableLabel": "אפשר חיפוש באינטרנט",
+        "enableDescription": "אפשר לעוזר לחפש באינטרנט כששאלה דורשת מידע עדכני.",
+        "openRouterNativeLabel": "השתמש בחיפוש המובנה של OpenRouter",
+        "openRouterNativeDescription": "כשהאפשרות מופעלת, OpenRouter מבצע את החיפוש בעצמו (מצב :online שלו) ומשתמש בקרדיטים שלך ב-OpenRouter. כשהיא כבויה, האפליקציה מחפשת דרך ספק החיפוש שלך למטה.",
+        "providerLabel": "ספק החיפוש",
+        "providerDescription": "ברירת המחדל המומלצת היא Serper. לכל ספק יש תוכנית חינמית, ו-TinyFish חינמי בלי כרטיס אשראי.",
         "providers": {
-          "serper": "Serper (Google, fast)",
+          "serper": "Serper (Google, מהיר)",
           "brave": "Brave Search",
-          "tavily": "Tavily (AI search)",
-          "exa": "Exa (neural)",
-          "serpapi": "SerpAPI (Google)"
+          "tavily": "Tavily (חיפוש AI)",
+          "exa": "Exa (נוירוני)",
+          "serpapi": "SerpAPI (Google)",
+          "tinyfish": "TinyFish (חינם, בלי כרטיס אשראי)"
         },
-        "apiKeyLabel": "API key",
-        "apiKeyDescription": "Key for the selected search provider.",
-        "apiKeyPlaceholder": "Enter API key…",
-        "fetchContentLabel": "Read full pages (best quality)",
-        "fetchContentDescription": "Read the full text of each result instead of snippets. Better answers, but slower.",
-        "maxResultsLabel": "Sources to use",
-        "maxResultsDescription": "How many results to read (1–10).",
-        "depthLabel": "Search depth",
-        "depthDescription": "Quick for simple facts, Standard for most questions, Deep for hard ones.",
+        "apiKeyLabel": "מפתח API",
+        "apiKeyDescription": "מפתח עבור ספק החיפוש שנבחר.",
+        "apiKeyPlaceholder": "הזן מפתח API…",
+        "fetchContentLabel": "קרא עמודים שלמים (האיכות הטובה ביותר)",
+        "fetchContentDescription": "קרא את הטקסט המלא של כל תוצאה במקום קטעים קצרים. תשובות טובות יותר, אבל איטי יותר.",
+        "maxResultsLabel": "מספר המקורות",
+        "maxResultsDescription": "כמה תוצאות לקרוא (1–10).",
+        "depthLabel": "עומק החיפוש",
+        "depthDescription": "״מהיר״ לעובדות פשוטות, ״רגיל״ לרוב השאלות, ״עמוק״ לשאלות קשות.",
         "depthOptions": {
-          "low": "Quick",
-          "medium": "Standard",
-          "high": "Deep"
+          "low": "מהיר",
+          "medium": "רגיל",
+          "high": "עמוק"
         },
-        "localSmartLabel": "Smart search decisions (local model)",
-        "localSmartDescription": "Let the local model decide when to search. Off uses a fast keyword check instead.",
-        "creditBudgetLabel": "Daily Firecrawl credit limit",
-        "creditBudgetDescription": "Daily cap on Firecrawl credits before search pauses. 0 = no limit.",
-        "testLabel": "Test search",
-        "testDescription": "Run a sample search with the current provider and key.",
-        "testButton": "Test search",
-        "testing": "Searching…",
-        "testResult": "Got {{count}} results."
+        "localSmartLabel": "החלטות חיפוש חכמות (מודל מקומי)",
+        "localSmartDescription": "תן למודל המקומי להחליט מתי לחפש. כשהאפשרות כבויה, נעשה שימוש בבדיקת מילות מפתח מהירה.",
+        "creditBudgetLabel": "מגבלת קרדיטים יומית ב-Firecrawl",
+        "creditBudgetDescription": "תקרה יומית לקרדיטים של Firecrawl, שאחריה החיפוש נעצר. 0 = בלי מגבלה.",
+        "testLabel": "בדוק את החיפוש",
+        "testDescription": "הרץ חיפוש לדוגמה עם הספק והמפתח הנוכחיים.",
+        "testButton": "בדוק את החיפוש",
+        "testing": "מחפש…",
+        "testResult": "התקבלו {{count}} תוצאות."
       },
       "tts": {
-        "title": "Voice output",
-        "enableLabel": "Speak responses aloud",
-        "enableDescription": "Read the assistant's replies out loud.",
-        "stopOnDictationLabel": "Stop speech when dictation starts",
-        "stopOnDictationDescription": "Stop any reply that's still playing when you start dictating.",
-        "engineLabel": "Engine",
-        "engineDescription": "Kokoro runs locally for free. The other engines use your API key.",
-        "kokoroSetupLabel": "Kokoro voice model",
-        "kokoroSetupDescription": "Download it once, then spoken replies run privately on this device.",
-        "kokoroDownload": "Download Kokoro",
-        "kokoroDownloading": "Downloading Kokoro",
-        "kokoroReady": "Ready on this device",
-        "kokoroRetry": "Try download again",
+        "title": "פלט קולי",
+        "enableLabel": "הקרא את התשובות בקול",
+        "enableDescription": "הקרא בקול את התשובות של העוזר.",
+        "stopOnDictationLabel": "עצור את הדיבור כשההכתבה מתחילה",
+        "stopOnDictationDescription": "עצור כל תשובה שעדיין מתנגנת כשאתה מתחיל להכתיב.",
+        "engineLabel": "מנוע",
+        "engineDescription": "Kokoro פועל מקומית בחינם. המנועים האחרים משתמשים במפתח ה-API שלך.",
+        "kokoroSetupLabel": "מודל הקול Kokoro",
+        "kokoroSetupDescription": "הורד אותו פעם אחת, ומשם התשובות המדוברות פועלות באופן פרטי במכשיר הזה.",
+        "kokoroDownload": "הורד את Kokoro",
+        "kokoroDownloading": "מוריד את Kokoro",
+        "kokoroReady": "מוכן במכשיר הזה",
+        "kokoroRetry": "נסה להוריד שוב",
         "engines": {
-          "kokoro": "Kokoro (local, free)",
-          "openai": "OpenAI-compatible",
+          "kokoro": "Kokoro (מקומי, חינם)",
+          "openai": "תואם OpenAI",
           "openrouter": "OpenRouter",
           "elevenlabs": "ElevenLabs",
           "azure": "Azure AI Speech"
         },
-        "voiceLabel": "Voice",
-        "voiceDescription": "Kokoro voice for spoken replies.",
-        "dtypeLabel": "Kokoro precision",
-        "dtypeDescription": "fp32 is highest quality; q8 is faster on CPU. Changing this reloads the model.",
-        "speedLabel": "Playback speed",
-        "speedDescription": "1× is normal. ElevenLabs supports 0.7×–1.2× only.",
+        "voiceLabel": "קול",
+        "voiceDescription": "הקול של Kokoro לתשובות המדוברות.",
+        "dtypeLabel": "דיוק חישובי של Kokoro",
+        "dtypeDescription": "fp32 הוא האיכות הגבוהה ביותר; q8 מהיר יותר על ה-CPU. שינוי כאן טוען את המודל מחדש.",
+        "speedLabel": "מהירות ההשמעה",
+        "speedDescription": "1× היא המהירות הרגילה. ElevenLabs תומך רק בטווח 0.7×–1.2×.",
         "speedValue": "{{value}}×",
-        "speedCustomLabel": "Custom playback speed",
-        "testLabel": "Test voice",
-        "testDescription": "Play a short sample with the current settings.",
-        "testButton": "Test voice",
-        "testing": "Testing…",
-        "testOk": "Played ✓",
-        "testPhrase": "Hi! This is a test of SpeakoFlow's voice output.",
-        "downloadStart": "Downloading Kokoro voice…",
-        "downloadProgress": "Downloading Kokoro voice… {{progress}}%",
-        "downloadReady": "Kokoro voice ready ✓",
-        "downloadError": "Couldn't download the Kokoro voice model",
-        "baseUrlLabel": "Base URL",
-        "baseUrlDescription": "OpenAI-compatible TTS URL. A base URL or a full /audio/speech URL both work.",
-        "azureBaseUrlLabel": "Speech URL",
-        "azureBaseUrlDescription": "Your Azure Speech URL from the portal, e.g. https://eastus2.tts.speech.microsoft.com.",
-        "apiKeyLabel": "API key",
-        "apiKeyDescription": "Separate from the assistant's key.",
-        "modelLabel": "Model",
-        "modelDescription": "Model or deployment name, e.g. gpt-4o-mini-tts (OpenAI/Azure) or eleven_flash_v2_5 (ElevenLabs).",
-        "remoteVoiceLabel": "Voice name",
-        "remoteVoiceDescription": "Voice for OpenAI-compatible TTS, e.g. alloy, echo, nova, shimmer.",
-        "azureVoiceLabel": "Voice name",
-        "azureVoiceDescription": "Azure voice name, e.g. en-US-JennyNeural. Click Load voices to browse.",
-        "loadVoices": "Load voices",
-        "voicesLoading": "Loading…",
-        "voicesPick": "Pick from {{count}} voices…",
-        "loadModels": "Load models",
-        "modelsLoading": "Loading…",
-        "modelsPick": "Pick from {{count}} models…",
-        "modelsUse": "Use \"{{model}}\"",
-        "voicesUse": "Use \"{{voice}}\"",
-        "elevenVoiceLabel": "Voice ID",
-        "elevenVoiceDescription": "ElevenLabs voice ID (from the Voices tab in their dashboard).",
-        "promptLabel": "Summary Prompt",
-        "promptDescription": "Instructions for generating the brief spoken summary of each answer."
+        "speedCustomLabel": "מהירות השמעה מותאמת אישית",
+        "testLabel": "בדוק את הקול",
+        "testDescription": "השמע דוגמה קצרה עם ההגדרות הנוכחיות.",
+        "testButton": "בדוק את הקול",
+        "testing": "בודק…",
+        "testOk": "הושמע ✓",
+        "testPhrase": "שלום! זו בדיקה של הפלט הקולי של SpeakoFlow.",
+        "downloadStart": "מוריד את הקול של Kokoro…",
+        "downloadProgress": "מוריד את הקול של Kokoro… {{progress}}%",
+        "downloadReady": "הקול של Kokoro מוכן ✓",
+        "downloadError": "לא ניתן היה להוריד את מודל הקול Kokoro",
+        "baseUrlLabel": "כתובת בסיס",
+        "baseUrlDescription": "כתובת TTS תואמת OpenAI. גם כתובת בסיס וגם כתובת מלאה של /audio/speech יעבדו.",
+        "azureBaseUrlLabel": "כתובת Speech",
+        "azureBaseUrlDescription": "כתובת ה-Azure Speech שלך מהפורטל, לדוגמה https://eastus2.tts.speech.microsoft.com.",
+        "apiKeyLabel": "מפתח API",
+        "apiKeyDescription": "נפרד מהמפתח של העוזר.",
+        "modelLabel": "מודל",
+        "modelDescription": "שם המודל או הפריסה, לדוגמה gpt-4o-mini-tts (OpenAI/Azure) או eleven_flash_v2_5 (ElevenLabs).",
+        "remoteVoiceLabel": "שם הקול",
+        "remoteVoiceDescription": "הקול עבור TTS תואם OpenAI, לדוגמה alloy, echo, nova, shimmer.",
+        "azureVoiceLabel": "שם הקול",
+        "azureVoiceDescription": "שם הקול ב-Azure, לדוגמה en-US-JennyNeural. לחץ על ״טען קולות״ כדי לעיין.",
+        "loadVoices": "טען קולות",
+        "voicesLoading": "טוען…",
+        "voicesPick": "בחר מתוך {{count}} קולות…",
+        "loadModels": "טען מודלים",
+        "modelsLoading": "טוען…",
+        "modelsPick": "בחר מתוך {{count}} מודלים…",
+        "modelsUse": "השתמש ב-\"{{model}}\"",
+        "voicesUse": "השתמש ב-\"{{voice}}\"",
+        "elevenVoiceLabel": "מזהה הקול",
+        "elevenVoiceDescription": "מזהה הקול ב-ElevenLabs (מלשונית Voices בלוח הבקרה שלהם).",
+        "promptLabel": "פרומפט הסיכום",
+        "promptDescription": "הוראות ליצירת הסיכום המדובר הקצר של כל תשובה."
       },
       "appearance": {
-        "title": "Panel appearance",
-        "previewLabel": "Preview",
-        "previewDescription": "Live preview of the panel with your text size and opacity.",
-        "previewUser": "Hey, what can you do?",
-        "previewAssistant": "Lots! Ask me anything — I can even look at your screen.",
-        "fontSizeLabel": "Text size",
-        "fontSizeDescription": "Size of the chat text in the assistant panel.",
+        "title": "מראה החלונית",
+        "previewLabel": "תצוגה מקדימה",
+        "previewDescription": "תצוגה מקדימה חיה של החלונית עם גודל הטקסט והשקיפות שלך.",
+        "previewUser": "היי, מה אתה יכול לעשות?",
+        "previewAssistant": "הרבה! שאל אותי כל דבר — אני גם יכול להסתכל על המסך שלך.",
+        "fontSizeLabel": "גודל טקסט",
+        "fontSizeDescription": "גודל טקסט השיחה בחלונית העוזר.",
         "fontSizes": {
-          "small": "Small",
-          "medium": "Medium",
-          "large": "Large"
+          "small": "קטן",
+          "medium": "בינוני",
+          "large": "גדול"
         },
-        "panelSizeLabel": "Panel size",
-        "panelSizeDescription": "Overall size of the floating assistant panel. You can also drag its edges to resize.",
+        "panelSizeLabel": "גודל החלונית",
+        "panelSizeDescription": "הגודל הכללי של חלונית העוזר הצפה. אפשר גם לגרור את הקצוות שלה כדי לשנות את הגודל.",
         "panelSizes": {
-          "compact": "Compact",
-          "standard": "Standard",
-          "large": "Large"
+          "mini": "קטן",
+          "compact": "קומפקטי",
+          "standard": "רגיל",
+          "large": "גדול"
         },
-        "opacityLabel": "Panel opacity",
-        "opacityDescription": "How opaque the floating panel is. 100% is fully solid; lower values let the desktop blur through."
+        "opacityLabel": "אטימות החלונית",
+        "opacityDescription": "כמה אטומה החלונית הצפה. 100% אטום לחלוטין; ערכים נמוכים יותר מאפשרים לשולחן העבודה להיראות מטושטש דרכה."
       }
     }
   },
   "footer": {
-    "downloadingModel": "מוריד את {{model}}...",
-    "checkingUpdates": "בודק עדכונים...",
+    "downloadingModel": "מוריד את {{model}}…",
+    "checkingUpdates": "בודק עדכונים…",
     "updateAvailable": "יש עדכון זמין: {{version}}",
     "updateAvailableShort": "יש עדכון זמין",
     "upToDate": "מעודכן",
     "downloadUpdate": "הורד עדכון",
     "restart": "הפעל מחדש",
     "updateCheckingDisabled": "בדיקת העדכונים כבויה",
-    "downloading": "מוריד... {{progress}}%",
-    "installing": "מתקין...",
-    "preparing": "מכין...",
+    "downloading": "מוריד… {{progress}}%",
+    "installing": "מתקין…",
+    "preparing": "מכין…",
     "checkForUpdates": "בדוק עדכונים",
-    "checkFailed": "Update check failed",
-    "updateFailed": "Update failed",
-    "clickToRetry": "Click to try again",
+    "checkFailed": "בדיקת העדכונים נכשלה",
+    "updateFailed": "העדכון נכשל",
+    "clickToRetry": "לחץ כדי לנסות שוב",
     "portableUpdateTitle": "נדרש עדכון ידני",
     "portableUpdateMessage": "התקנות ניידות אינן מתעדכנות אוטומטית. כדי לעדכן, הורד את מתקין ה-NSIS האחרון מ-GitHub Releases, התקן לאותה תיקייה, ואז העתק את תיקיית Data/ (הגדרות, מודלים, הקלטות) מהגרסה הישנה לחדשה.",
     "portableUpdateButton": "פתח את GitHub Releases"
   },
   "common": {
-    "loading": "טוען...",
+    "loading": "טוען…",
     "save": "שמור",
     "cancel": "ביטול",
     "reset": "איפוס",
@@ -1393,7 +1420,7 @@
     "yes": "כן",
     "no": "לא",
     "noOptionsFound": "לא נמצאו אפשרויות",
-    "back": "Back",
+    "back": "חזרה",
     "showAdvanced": "אפשרויות נוספות",
     "showLess": "הצג פחות"
   },
@@ -1417,7 +1444,7 @@
     "recordingFailed": "הפעלת ההקלטה נכשלה: {{error}}",
     "modelLoadFailed": "טעינת המודל נכשלה: {{model}}",
     "modelLoadFailedUnknown": "מודל לא ידוע",
-    "downloadFailedTitle": "Download failed",
+    "downloadFailedTitle": "ההורדה נכשלה",
     "pasteFailedTitle": "ההדבקה נכשלה",
     "pasteFailed": "לא ניתן היה להדביק את הטקסט ביישום הפעיל."
   },
@@ -1426,124 +1453,132 @@
     "description": "שנה את שפת הממשק של SpeakoFlow"
   },
   "overlay": {
-    "preparing": "Getting mic ready…",
-    "recording": "Recording",
-    "transcribing": "מתמלל...",
-    "processing": "מעבד...",
-    "listening": "Listening…",
-    "locked": "Recording hands-free — press the hotkey again to stop",
-    "cancel": "Cancel",
-    "done": "Done",
-    "askAssistant": "Ask the assistant instead of typing this",
-    "generating": "Writing with Flow…",
-    "vision": "Looking at your screen…",
+    "preparing": "מכין את המיקרופון…",
+    "recording": "מקליט",
+    "transcribing": "מתמלל…",
+    "processing": "מעבד…",
+    "generating": "כותב עם Flow…",
+    "vision": "מסתכל על המסך שלך…",
     "notices": {
-      "flowNotConfigured": "Flow needs an assistant model — pasted as dictation",
-      "flowFailed": "Flow couldn't generate — nothing was pasted",
-      "flowEmpty": "Say a command after the activation phrase"
-    }
+      "flowNotConfigured": "Flow דורש מודל עוזר — הודבק כהכתבה",
+      "flowFailed": "Flow לא הצליח ליצור — שום דבר לא הודבק",
+      "flowEmpty": "אמור פקודה אחרי ביטוי ההפעלה"
+    },
+    "listening": "מקשיב…",
+    "locked": "מקליט ללא ידיים — לחץ שוב על קיצור המקשים כדי לעצור",
+    "cancel": "ביטול",
+    "done": "סיום",
+    "askAssistant": "שאל את העוזר במקום להקליד את זה"
   },
   "assistant": {
-    "title": "Assistant",
+    "title": "עוזר",
     "character": {
-      "switch": "Switch persona"
+      "switch": "החלף פרופיל"
     },
-    "empty": "Ask by voice with your assistant shortcut,\nor type below.",
-    "inputPlaceholder": "Message…",
-    "inputPlaceholderScreen": "Ask about your screen…",
-    "send": "Send",
-    "stop": "Stop",
-    "finish": "Finish & send",
-    "clear": "Clear conversation",
-    "hide": "Hide panel",
-    "copy": "Copy",
-    "copyCode": "Copy code",
-    "regenerate": "Regenerate answer (the old one stays in History)",
-    "screenAttached": "Screen",
-    "attachScreen": "Screen vision — attach your screen to each message until turned off",
-    "detachScreen": "Turn off screen vision",
+    "empty": "שאל בקול בעזרת קיצור העוזר,\nאו הקלד למטה.",
+    "inputPlaceholder": "הודעה…",
+    "inputPlaceholderScreen": "שאל על המסך שלך…",
+    "send": "שלח",
+    "stop": "עצור",
+    "cancel": "ביטול",
+    "finish": "סיים ושלח",
+    "clear": "נקה את השיחה",
+    "hide": "הסתר את החלונית",
+    "copy": "העתק",
+    "copyCode": "העתק את הקוד",
+    "regenerate": "צור תשובה מחדש (הקודמת נשמרת בהיסטוריה)",
+    "summarizing": "מסכם הודעות קודמות…",
+    "screenAttached": "מסך",
+    "attachScreen": "ראיית מסך — צרף את המסך שלך לכל הודעה עד לכיבוי",
+    "detachScreen": "כבה את ראיית המסך",
     "attach": {
-      "file": "Attach an image or file",
-      "snip": "Snip a region of the screen",
-      "image": "Image",
-      "imageCount": "{{count}} image",
-      "imageCount_other": "{{count}} images",
-      "remove": "Remove attachment",
-      "dropHint": "Drop to attach"
+      "file": "צרף תמונה או קובץ",
+      "snip": "גזור אזור מהמסך",
+      "image": "תמונה",
+      "imageCount": "{{count}} תמונה",
+      "imageCount_other": "{{count}} תמונות",
+      "remove": "הסר את הקובץ המצורף",
+      "dropHint": "שחרר כדי לצרף"
     },
     "snip": {
-      "hint": "Drag to snip a region — Esc to cancel"
+      "hint": "גרור כדי לגזור אזור — Esc לביטול"
     },
     "webSearch": {
-      "enable": "Enable web search",
-      "disable": "Disable web search"
+      "enable": "הפעל חיפוש באינטרנט",
+      "disable": "כבה את החיפוש באינטרנט"
     },
     "tts": {
-      "enable": "Enable voice summaries",
-      "disable": "Disable voice summaries",
-      "loading": "Loading Kokoro voice model...",
-      "loadingShort": "Voice model {{progress}}%"
+      "enable": "הפעל סיכומים קוליים",
+      "disable": "כבה את הסיכומים הקוליים",
+      "loading": "טוען את מודל הקול Kokoro...",
+      "loadingShort": "מודל הקול {{progress}}%"
     },
     "pill": {
-      "talk": "Click to talk",
-      "stop": "Stop and send",
-      "idle": "Assistant",
-      "expand": "Expand panel",
-      "collapse": "Collapse to pill",
-      "close": "Close assistant",
-      "cancel": "Cancel without sending",
-      "cancelTurn": "Cancel",
-      "dismiss": "Dismiss",
-      "disarmScreen": "Screen vision is on — click to turn it off",
-      "armScreen": "Screen vision is off — click to turn it on"
+      "talk": "לחץ כדי לדבר",
+      "stop": "עצור ושלח",
+      "idle": "עוזר",
+      "expand": "הרחב את החלונית",
+      "collapse": "כווץ לגלולה",
+      "close": "סגור את העוזר",
+      "cancel": "בטל בלי לשלוח",
+      "cancelTurn": "ביטול",
+      "dismiss": "סגור",
+      "disarmScreen": "ראיית המסך מופעלת — לחץ כדי לכבות אותה",
+      "armScreen": "ראיית המסך כבויה — לחץ כדי להפעיל אותה"
     },
     "status": {
-      "listening": "Listening…",
-      "locked": "Listening",
-      "transcribing": "Transcribing…",
-      "searching": "Searching the web...",
-      "thinking": "Thinking...",
-      "speaking": "Speaking..."
+      "listening": "מקשיב…",
+      "locked": "מקשיב",
+      "transcribing": "מתמלל…",
+      "searching": "מחפש באינטרנט...",
+      "thinking": "חושב...",
+      "speaking": "מדבר..."
     },
     "errors": {
-      "generic": "Something went wrong. Please try again.",
-      "genericShort": "Something went wrong",
-      "no_provider": "No assistant model is set up yet. Pick a provider in Settings → Assistant.",
-      "no_providerShort": "No model set up",
-      "no_model": "Your provider has no model selected. Choose one in Settings → Assistant.",
-      "no_modelShort": "No model selected",
-      "engine_start": "The built-in model couldn't start. Try again, or pick a different model in Settings → Assistant.",
-      "engine_startShort": "Model couldn't start",
-      "provider": "The model couldn't answer. Check your API key and connection, then try again.",
-      "providerShort": "Couldn't get an answer",
-      "vision_unsupported": "This model can't read your screen. Pick a vision-capable model in Settings → Assistant, or ask again without screen vision.",
-      "vision_unsupportedShort": "Model can't see images",
-      "screenshot_too_large": "The screen capture was too large for this provider. Please try again — it will be compressed harder.",
-      "screenshot_too_largeShort": "Screen capture too large",
-      "screen_capture": "Couldn't capture the screen. Try again, or ask without screen vision.",
-      "screen_captureShort": "Screen capture failed",
-      "transcription": "Couldn't transcribe your voice. Please try speaking again.",
-      "transcriptionShort": "Transcription failed",
-      "tts": "The spoken reply failed. Check your TTS settings, or read the answer in the panel.",
-      "ttsShort": "Voice reply failed",
-      "tts_local": "The local voice couldn't load. Check your connection or switch TTS engines in Settings.",
-      "tts_localShort": "Voice couldn't load",
-      "tts_blocked": "Your system blocked the voice from playing on its own. Click anywhere in the panel to hear the reply.",
-      "tts_blockedShort": "Tap the panel to hear it",
-      "tts_playback": "Couldn't play the voice on your output device. Check your speaker/output settings, then try again.",
-      "tts_playbackShort": "Voice playback failed",
-      "mic_denied": "Microphone access is blocked. Allow it in your system privacy settings.",
-      "mic_deniedShort": "Mic access blocked",
-      "mic_unavailable": "No microphone was found. Connect one and try again.",
-      "mic_unavailableShort": "No microphone found",
-      "mic_error": "The microphone couldn't start. It may be in use by another app.",
-      "mic_errorShort": "Mic couldn't start",
-      "file_read": "That file couldn't be attached.",
-      "file_readShort": "Couldn't attach file"
+      "generic": "משהו השתבש. נסה שוב.",
+      "genericShort": "משהו השתבש",
+      "no_provider": "עדיין לא הוגדר מודל עוזר. בחר ספק בהגדרות → עוזר.",
+      "no_providerShort": "לא הוגדר מודל",
+      "no_model": "לא נבחר מודל אצל הספק שלך. בחר אחד בהגדרות → עוזר.",
+      "no_modelShort": "לא נבחר מודל",
+      "engine_start": "המודל המובנה לא הצליח להיטען. נסה שוב, או בחר מודל אחר בהגדרות → עוזר.",
+      "engine_startShort": "המודל לא הצליח להיטען",
+      "provider": "המודל לא הצליח לענות. בדוק את מפתח ה-API והחיבור שלך, ואז נסה שוב.",
+      "providerShort": "לא התקבלה תשובה",
+      "vision_unsupported": "המודל הזה לא יכול לקרוא את המסך שלך. בחר מודל שתומך בראייה בהגדרות → עוזר, או שאל שוב בלי ראיית מסך.",
+      "vision_unsupportedShort": "המודל לא רואה תמונות",
+      "screenshot_too_large": "צילום המסך היה גדול מדי עבור הספק הזה. נסה שוב — הוא יעבור דחיסה חזקה יותר.",
+      "screenshot_too_largeShort": "צילום המסך גדול מדי",
+      "screen_capture": "לא ניתן היה לצלם את המסך. נסה שוב, או שאל בלי ראיית מסך.",
+      "screen_captureShort": "צילום המסך נכשל",
+      "transcription": "לא ניתן היה לתמלל את הקול שלך. נסה לדבר שוב.",
+      "transcriptionShort": "התמלול נכשל",
+      "tts": "התשובה המדוברת נכשלה. בדוק את הגדרות ה-TTS שלך, או קרא את התשובה בחלונית.",
+      "ttsShort": "התשובה הקולית נכשלה",
+      "tts_local": "הקול המקומי לא נטען. בדוק את החיבור שלך או החלף מנוע TTS בהגדרות.",
+      "tts_localShort": "הקול לא נטען",
+      "tts_blocked": "המערכת שלך חסמה את השמעת הקול באופן עצמאי. לחץ בכל מקום בחלונית כדי לשמוע את התשובה.",
+      "tts_blockedShort": "הקש על החלונית כדי לשמוע",
+      "tts_playback": "לא ניתן היה להשמיע את הקול בהתקן הפלט שלך. בדוק את הגדרות הרמקולים/הפלט, ואז נסה שוב.",
+      "tts_playbackShort": "השמעת הקול נכשלה",
+      "mic_denied": "הגישה למיקרופון חסומה. אשר אותה בהגדרות הפרטיות של המערכת.",
+      "mic_deniedShort": "הגישה למיקרופון חסומה",
+      "mic_unavailable": "לא נמצא מיקרופון. חבר מיקרופון ונסה שוב.",
+      "mic_unavailableShort": "לא נמצא מיקרופון",
+      "mic_error": "המיקרופון לא הצליח להתחיל. ייתכן שאפליקציה אחרת משתמשת בו.",
+      "mic_errorShort": "המיקרופון לא התחיל",
+      "file_read": "לא ניתן היה לצרף את הקובץ הזה.",
+      "file_readShort": "לא ניתן לצרף את הקובץ"
     },
     "notices": {
-      "web_search_failed": "Web search didn't return results — answering without them.",
-      "web_search_failedShort": "No web results"
+      "web_search_failed": "החיפוש באינטרנט לא החזיר תוצאות — עונה בלעדיהן.",
+      "web_search_failedShort": "אין תוצאות מהאינטרנט"
+    },
+    "engineSetup": {
+      "downloading": "מגדיר את המנוע המקומי (הפעלה ראשונה)… {{percent}}%",
+      "preparing": "מגדיר את המנוע המקומי (הפעלה ראשונה)…",
+      "extracting": "מתקין את המנוע המקומי…",
+      "short": "מגדיר את המנוע…"
     }
   }
 }

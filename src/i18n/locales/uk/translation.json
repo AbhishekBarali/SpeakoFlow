@@ -1,20 +1,20 @@
 {
   "appearance": {
-    "title": "Appearance",
-    "description": "Choose a light, dark, or system-matched theme for the app and assistant panel.",
-    "system": "System",
-    "light": "Light",
-    "dark": "Dark",
-    "textSize": "Text size",
-    "textSizeDescription": "Scale the size of text and controls across the app.",
-    "textSizeSmall": "Small",
-    "textSizeDefault": "Default",
-    "textSizeLarge": "Large",
-    "textSizeExtraLarge": "Extra large"
+    "title": "Вигляд",
+    "description": "Виберіть світлу, темну або системну тему для застосунку та панелі асистента.",
+    "system": "Системна",
+    "light": "Світла",
+    "dark": "Темна",
+    "textSize": "Розмір тексту",
+    "textSizeDescription": "Масштабуйте розмір тексту та елементів керування в усьому застосунку.",
+    "textSizeSmall": "Малий",
+    "textSizeDefault": "Стандартний",
+    "textSizeLarge": "Великий",
+    "textSizeExtraLarge": "Дуже великий"
   },
   "tray": {
     "home": "Головна",
-    "checkUpdates": "Перевірити оновлення...",
+    "checkUpdates": "Перевірити оновлення…",
     "copyLastTranscript": "Скопіювати останню транскрипцію",
     "unloadModel": "Вивантажити модель",
     "model": "Модель",
@@ -23,29 +23,29 @@
   },
   "sidebar": {
     "general": "Загальні",
-    "dictation": "Dictation",
-    "assistant": "Assistant",
+    "dictation": "Диктування",
+    "assistant": "Асистент",
     "history": "Історія",
     "about": "Інфо",
     "debug": "Дебаг",
-    "characters": "Profiles",
-    "memory": "Memory",
-    "collapse": "Collapse sidebar",
-    "expand": "Expand sidebar"
+    "characters": "Профілі",
+    "memory": "Пам'ять",
+    "collapse": "Згорнути бічну панель",
+    "expand": "Розгорнути бічну панель"
   },
   "window": {
-    "minimize": "Minimize",
-    "maximize": "Maximize",
-    "restore": "Restore",
-    "close": "Close"
+    "minimize": "Згорнути",
+    "maximize": "Розгорнути",
+    "restore": "Відновити",
+    "close": "Закрити"
   },
   "sectionSubtitles": {
-    "general": "Shortcuts, your microphone, and how the app looks.",
-    "dictation": "The model that turns your voice into text, and how it's cleaned up.",
-    "assistant": "Set up the assistant, then tune its voice, screen vision, and web search.",
-    "history": "Your recent transcriptions and assistant chats, stored on this device.",
-    "about": "Version, app language, data locations, and credits.",
-    "debug": "Diagnostics and developer tools."
+    "general": "Скорочення, мікрофон і вигляд застосунку.",
+    "dictation": "Модель, яка перетворює ваш голос на текст, і як він очищується.",
+    "assistant": "Налаштуйте асистента, а потім його голос, перегляд екрана та пошук в інтернеті.",
+    "history": "Ваші останні диктування, генерації Flow і чати з асистентом, збережені на цьому пристрої.",
+    "about": "Версія, мова інтерфейсу, розташування даних і подяки.",
+    "debug": "Діагностика та інструменти розробника."
   },
   "onboarding": {
     "subtitle": "Для початку оберіть модель транскрипції",
@@ -53,79 +53,79 @@
       "progress": "Крок {{current}} з {{total}}",
       "counter": "Крок {{current}} з {{total}} · {{label}}",
       "speechToText": "Розпізнавання мовлення",
-      "aiModel": "Модель ШІ",
-      "ready": "You're ready"
+      "aiModel": "Дайте йому мозок",
+      "ready": "Усе готово"
     },
     "speechToText": {
-      "title": "Виберіть модель розпізнавання мовлення",
-      "subtitle": "Працює повністю на вашому пристрої й перетворює голос на текст. Виберіть модель, що підходить для вашого комп'ютера — її можна змінити будь-коли.",
+      "title": "Як SpeakoFlow має вас чути?",
+      "subtitle": "Перетворює ваш голос на текст просто на вашому комп'ютері. Виберіть одну, змінити можна будь-коли.",
       "cards": {
         "fast": {
-          "description": "Blazingly fast, streams as you speak. English only."
+          "description": "Надзвичайно швидка, розпізнає під час мовлення. Лише англійська."
         },
         "multilingual": {
-          "description": "Real-time in 28 languages."
+          "description": "У реальному часі, 28 мов."
         }
       },
-      "downloadAndContinue": "Download and continue",
-      "seeAllModels": "See all models",
-      "hideAllModels": "Show fewer models",
-      "installedHint": "Already set up. You can grab any other model later in Settings.",
-      "useInstalled": "Use installed model",
-      "continue": "Continue",
-      "downloadingHint": "It downloads in the background. Any other model is one click away in Settings.",
-      "downloadStarted": "Downloading your model in the background."
+      "downloadAndContinue": "Завантажити й продовжити",
+      "seeAllModels": "Показати всі моделі",
+      "hideAllModels": "Показати менше моделей",
+      "installedHint": "Уже налаштовано. Будь-яку іншу модель можна додати пізніше в налаштуваннях.",
+      "useInstalled": "Використати встановлену модель",
+      "continue": "Продовжити",
+      "downloadingHint": "Завантаження триває у фоновому режимі. Будь-яка інша модель — за один клік у налаштуваннях.",
+      "downloadStarted": "Завантаження моделі у фоновому режимі."
     },
     "aiModel": {
       "title": "Додати локальну модель ШІ",
-      "subtitle": "Забезпечує роботу асистента, перегляду екрана та очищення транскриптів — повністю офлайн на вашому пристрої. Це необов'язково; пізніше можна підключити хмарного провайдера.",
+      "subtitle": "Вибирайте за швидкістю відповіді та можливостями. E4B — збалансований варіант за замовчуванням; 12B точніша, але повільніша.",
       "tiers": {
         "small": {
-          "description": "Runs on any machine. Great for tidying up your writing."
+          "description": "Працює на будь-якому комп'ютері. Добре впорядковує ваші тексти."
         },
         "mid": {
-          "description": "A quick all-rounder that can also answer questions."
+          "description": "Швидка універсальна модель, яка також відповідає на запитання."
         },
         "capable": {
-          "description": "The sharpest answers, and it can see your screen."
+          "description": "Найточніші відповіді, а ще вона бачить ваш екран."
         }
       },
-      "seesScreen": "Sees your screen",
-      "textOnly": "Text only",
-      "download": "Download model",
-      "useDownloaded": "Use downloaded model",
+      "seesScreen": "Бачить ваш екран",
+      "textOnly": "Лише текст",
+      "download": "Завантажити модель",
+      "useDownloaded": "Використати завантажену модель",
       "skip": "Пропустити поки що",
-      "skipHint": "Необов'язково. Ви можете завантажити модель або підключити хмарного провайдера будь-коли в налаштуваннях.",
+      "skipHint": "Це можна зробити пізніше в Налаштування > Асистент > На моєму пристрої.",
       "continue": "Продовжити",
       "downloadingHint": "Ваша модель завантажується у фоновому режимі — ви можете одразу почати користуватися застосунком.",
       "downloadStarted": "Завантаження моделі ШІ у фоновому режимі."
     },
     "ready": {
-      "title": "You're ready.",
-      "subtitle": "Two shortcuts are all you need. Press, talk, done.",
-      "dictateLabel": "Dictate anywhere",
-      "dictateCaption": "Hold, talk, let go. Your words type themselves.",
-      "assistantKeysLabel": "Ask the assistant",
-      "assistantKeysCaption": "Hold and ask. It can even see your screen.",
-      "changeAnytime": "You can change these anytime in Settings.",
-      "hotkeyLabel": "Your dictation keys",
-      "downloadingAssistant": "Your assistant is moving in. {{percentage}}% there.",
-      "downloadingVoice": "Your voice model is landing. {{percentage}}% there.",
-      "downloadingGeneric": "Still downloading. {{percentage}}% there.",
-      "signOff": "That's it. Go say something.",
-      "openApp": "Open SpeakoFlow"
+      "title": "Усе готово.",
+      "subtitle": "Потрібні лише два скорочення. Натисніть, говоріть, готово.",
+      "dictateLabel": "Диктуйте будь-де",
+      "dictateCaption": "Утримуйте, говоріть, відпустіть. Ваші слова наберуться самі.",
+      "assistantKeysLabel": "Запитайте асистента",
+      "assistantKeysCaption": "Утримуйте й запитуйте. Він навіть бачить ваш екран.",
+      "changeAnytime": "Це можна змінити будь-коли в налаштуваннях.",
+      "hotkeyLabel": "Ваші клавіші для диктування",
+      "downloadingAssistant": "Ваш асистент уже в дорозі. Готово {{percentage}}%.",
+      "downloadingVoice": "Ваша голосова модель майже тут. Готово {{percentage}}%.",
+      "downloadingGeneric": "Завантаження триває. Готово {{percentage}}%.",
+      "signOff": "Ось і все. Скажіть щось.",
+      "openApp": "Відкрити SpeakoFlow"
     },
     "errors": {
-      "selectModel": "Couldn't select that model. Please try again.",
+      "selectModel": "Не вдалося вибрати цю модель. Будь ласка, спробуйте ще раз.",
       "loadModels": "Не вдалося завантажити доступні моделі",
       "downloadModel": "Не вдалося завантажити модель: {{error}}"
     },
     "downloadProgress": {
-      "sizeOf": "{{downloaded}} of {{total}} · {{percentage}}%"
+      "sizeOf": "{{downloaded}} з {{total}} · {{percentage}}%"
     },
     "recommended": "Рекомендовано",
     "download": "Завантажити",
-    "downloading": "Завантаження...",
+    "downloading": "Завантаження…",
     "customModelDescription": "Офіційно не підтримується",
     "downloadFailed": "Завантаження не вдалося. Будь ласка, спробуйте ще раз.",
     "modelCard": {
@@ -134,49 +134,49 @@
     },
     "models": {
       "parakeet-unified-en-0.6b-gguf": {
-        "description": "Blazingly fast, great for everyday dictation. English only."
+        "description": "Надзвичайно швидка, ідеальна для щоденного диктування. Лише англійська."
       },
       "nemotron-3.5-asr-streaming-0.6b-gguf": {
-        "description": "Real-time transcription in 28 languages."
+        "description": "Транскрипція в реальному часі, 28 мов."
       },
       "canary-180m-flash-gguf": {
-        "description": "Tiny and instant — runs well on any machine."
+        "description": "Крихітна та миттєва — добре працює на будь-якому комп'ютері."
       },
       "cohere-transcribe-03-2026-gguf": {
-        "description": "Slower, but the most accurate. 14 languages."
+        "description": "Повільніша, але найточніша. 14 мов."
       },
       "whisper-medium-gguf": {
-        "description": "Best for many languages — nearly 100 supported."
+        "description": "Найкраща для багатьох мов — підтримує майже 100."
       },
       "gemma-3-1b": {
-        "description": "Very small and quick, but limited for open-ended conversation. Text only."
+        "description": "Дуже мала та швидка, але обмежена у вільній розмові. Лише текст."
       },
       "qwen3.5-2b": {
-        "description": "Small and fast, and it can see images. Good on most laptops."
+        "description": "Мала та швидка, до того ж бачить зображення. Добре працює на більшості ноутбуків."
       },
       "qwen3.5-4b": {
-        "description": "A legacy vision model whose optional reasoning can delay conversational replies."
+        "description": "Стара модель із розпізнаванням зображень, чиї необов'язкові розмірковування можуть затримувати відповіді в розмові."
       },
       "qwen3.5-9b": {
-        "description": "More capable, but slower for live conversation, especially when reasoning is enabled."
+        "description": "Потужніша, але повільніша для живої розмови, особливо з увімкненими розмірковуваннями."
       },
       "qwen3.5-27b": {
-        "description": "A large vision model for deliberate tasks, not a low-latency assistant."
+        "description": "Велика модель із розпізнаванням зображень для вдумливих завдань, а не для швидкого асистента."
       },
       "gemma-4-e2b": {
-        "description": "The quickest current Gemma for everyday conversation. Less capable on complex requests."
+        "description": "Найшвидша з поточних Gemma для щоденної розмови. Слабша у складних запитах."
       },
       "gemma-4-e4b": {
-        "description": "Recommended for conversation: a stronger quality-and-speed balance without default thinking."
+        "description": "Рекомендована для розмови: кращий баланс якості та швидкості без розмірковувань за замовчуванням."
       },
       "gemma-4-12b": {
-        "description": "More capable for nuanced questions, but noticeably slower and best with a strong GPU."
+        "description": "Потужніша для тонких запитань, але помітно повільніша й найкраще працює з потужним GPU."
       },
       "gemma-3-4b": {
-        "description": "Fast, clean answers with screen vision, but less capable than current Gemma 4 models."
+        "description": "Швидкі, чіткі відповіді з переглядом екрана, але слабша за поточні моделі Gemma 4."
       },
       "kokoro-82m": {
-        "description": "Built-in local voice for the assistant. No download needed."
+        "description": "Вбудований локальний голос для асистента. Завантаження не потрібне."
       },
       "small": {
         "name": "Whisper Small",
@@ -200,7 +200,7 @@
       },
       "parakeet-tdt-0.6b-v3": {
         "name": "Parakeet V3",
-        "description": "Швидка та точна"
+        "description": "Швидка та точна. 25 європейських мов."
       },
       "moonshine-base": {
         "name": "Moonshine Base",
@@ -256,7 +256,7 @@
       },
       "grant": "Надати дозвіл",
       "granted": "Надано",
-      "waiting": "Очікування...",
+      "waiting": "Очікування…",
       "allGranted": "Все готово!",
       "errors": {
         "checkFailed": "Не вдалося перевірити дозволи. Будь ласка, спробуйте ще раз.",
@@ -267,29 +267,31 @@
   "modelSelector": {
     "custom": "Користувацька",
     "active": "Активна",
-    "switching": "Перемикання...",
+    "switching": "Перемикання…",
     "noModelsAvailable": "Немає доступних моделей",
-    "verifying": "Перевірка {{modelName}}...",
-    "verifyingGeneric": "Перевірка...",
-    "extracting": "Розпакування {{modelName}}...",
-    "extractingMultiple": "Розпакування {{count}} моделей...",
-    "extractingGeneric": "Розпакування...",
+    "verifying": "Перевірка {{modelName}}…",
+    "verifyingGeneric": "Перевірка…",
+    "extracting": "Розпакування {{modelName}}…",
+    "extractingMultiple": "Розпакування {{count}} моделей…",
+    "extractingGeneric": "Розпакування…",
     "downloading": "Завантаження {{percentage}}%",
-    "downloadingMultiple": "Завантаження {{count}} моделей...",
+    "downloadingMultiple": "Завантаження {{count}} моделей…",
+    "downloadDetails": "Деталі завантаження",
+    "downloadSize": "{{downloaded}} з {{total}}",
     "modelReady": "Модель готова",
-    "loading": "Завантаження {{modelName}}...",
-    "loadingGeneric": "Завантаження...",
+    "loading": "Завантаження {{modelName}}…",
+    "loadingGeneric": "Завантаження…",
     "modelError": "Помилка моделі",
     "modelUnloaded": "Модель вивантажена",
     "noModelDownloadRequired": "Немає моделі - потрібно завантажити",
-    "llmSelectModel": "Select assistant model",
-    "llmModelTitle": "Assistant model: {{model}}",
+    "llmSelectModel": "Виберіть модель асистента",
+    "llmModelTitle": "Модель асистента: {{model}}",
     "deleteModel": "Видалити {{modelName}}",
     "downloadSpeed": "{{speed}} MB/s",
     "cancel": "Скасувати",
     "cancelDownload": "Скасувати завантаження",
-    "download": "Download",
-    "useModel": "Use model",
+    "download": "Завантажити",
+    "useModel": "Використати модель",
     "capabilities": {
       "languageSelection": "Підтримує кілька мов введення",
       "singleLanguage": "Підтримує лише цю мову",
@@ -297,71 +299,71 @@
       "languageOnly": "Лише {{language}}",
       "translation": "Може перекладати на англійську",
       "translate": "Перекласти на англійську",
-      "streaming": "Streaming",
-      "quantization": "Quantization",
-      "legacy": "Older"
+      "streaming": "Потокове розпізнавання",
+      "quantization": "Квантизація",
+      "legacy": "Старіша"
     }
   },
   "settings": {
     "personalMemory": {
       "enable": {
-        "label": "Remember me",
-        "description": "Let the assistant keep and use a personal memory. Off by default."
+        "label": "Запам'ятовувати мене",
+        "description": "Дозвольте асистентові зберігати й використовувати персональну пам'ять. Типово вимкнено."
       },
       "incognito": {
-        "label": "Incognito chat",
-        "description": "For this conversation, don't use memory and don't learn anything new."
+        "label": "Чат інкогніто",
+        "description": "У цій розмові не використовувати пам'ять і не запам'ятовувати нічого нового."
       },
       "detail": {
-        "label": "Memory detail",
-        "description": "How much memory to add to each reply. More detail is richer but a little slower.",
+        "label": "Детальність пам'яті",
+        "description": "Скільки пам'яті додавати до кожної відповіді. Більше деталей — багатший контекст, але трохи повільніше.",
         "options": {
-          "light": "Light",
-          "balanced": "Balanced",
-          "detailed": "Detailed"
+          "light": "Мінімальна",
+          "balanced": "Збалансована",
+          "detailed": "Детальна"
         }
       },
       "aboutYou": {
-        "label": "About you",
-        "caption": "A short, always-on summary the assistant keeps in mind.",
-        "fieldLabel": "Summary",
-        "placeholder": "e.g. Prefers short, direct answers. Works in Rust and TypeScript. Building a desktop voice assistant.",
-        "hint": "Always included when memory is on. Keep it to a few sentences — this is the assistant's at-a-glance picture of you.",
-        "edit": "Edit",
-        "done": "Done",
-        "empty": "Nothing saved yet — the assistant fills this in as it learns, or click Edit to write your own.",
-        "collapsedEmpty": "Nothing saved yet"
+        "label": "Про вас",
+        "caption": "Короткий постійний опис, який асистент завжди тримає на увазі.",
+        "fieldLabel": "Опис",
+        "placeholder": "напр. Надає перевагу коротким прямим відповідям. Працює з Rust і TypeScript. Створює десктопний голосовий асистент.",
+        "hint": "Завжди додається, коли пам'ять увімкнена. Обмежтеся кількома реченнями — це швидкий портрет вас для асистента.",
+        "edit": "Редагувати",
+        "done": "Готово",
+        "empty": "Поки нічого не збережено — асистент заповнить це, коли навчиться, або натисніть «Редагувати», щоб написати самостійно.",
+        "collapsedEmpty": "Поки нічого не збережено"
       },
       "notes": {
-        "label": "Notes",
-        "caption": "Specific things worth remembering — learned or added by you.",
-        "empty": "No notes yet. Add one below, or let the assistant learn them from your chats.",
-        "add": "Add",
-        "addPlaceholder": "Add something to remember…",
-        "delete": "Delete note",
-        "learned": "learned",
-        "added": "added by you"
+        "label": "Нотатки",
+        "caption": "Конкретні речі, які варто пам'ятати — вивчені асистентом або додані вами.",
+        "empty": "Нотаток поки немає. Додайте нижче або дозвольте асистентові дізнатися їх із ваших чатів.",
+        "add": "Додати",
+        "addPlaceholder": "Додайте те, що варто пам'ятати…",
+        "delete": "Видалити нотатку",
+        "learned": "вивчено",
+        "added": "додано вами"
       },
       "confidence": {
-        "high": "High confidence",
-        "medium": "Medium confidence",
-        "low": "Low confidence"
+        "high": "Висока впевненість",
+        "medium": "Середня впевненість",
+        "low": "Низька впевненість"
       },
       "actions": {
-        "label": "Manage"
+        "label": "Керування"
       },
       "distill": {
-        "label": "Learn from this chat now",
-        "description": "Pull durable facts from your current conversation into memory, right now.",
-        "button": "Update memory"
+        "label": "Вивчити з цього чату зараз",
+        "description": "Одразу перенести стійкі факти з поточної розмови до пам'яті.",
+        "button": "Оновити пам'ять"
       },
-      "export": "Export",
-      "import": "Import",
+      "export": "Експорт",
+      "import": "Імпорт",
       "wipe": {
-        "button": "Wipe memory",
-        "confirm": "Delete everything the assistant remembers?",
-        "yes": "Delete all",
-        "cancel": "Cancel"
+        "button": "Очистити пам'ять",
+        "confirm": "Видалити все, що пам'ятає асистент?",
+        "yes": "Видалити все",
+        "cancel": "Скасувати"
       }
     },
     "modelSettings": {
@@ -371,82 +373,82 @@
     "general": {
       "title": "Загальні",
       "recording": {
-        "title": "Recording"
+        "title": "Запис"
       },
       "groups": {
-        "sounds": "Sounds",
-        "startup": "Startup and tray",
-        "overlay": "Overlay",
-        "updates": "Updates",
-        "system": "System"
+        "sounds": "Звуки",
+        "startup": "Запуск і трей",
+        "overlay": "Оверлей",
+        "updates": "Оновлення",
+        "system": "Система"
       },
       "shortcut": {
         "title": "Комбінації клавіш",
         "description": "Налаштуйте клавіатурні скорочення для запуску запису мовлення в текст",
-        "loading": "Завантаження скорочень...",
+        "loading": "Завантаження скорочень…",
         "none": "Скорочення не налаштовані",
         "notFound": "Скорочення не знайдено",
-        "pressKeys": "Натисніть клавіші...",
+        "pressKeys": "Натисніть клавіші…",
         "bindings": {
           "transcribe": {
-            "name": "Гаряча клавіша транскрипції",
+            "name": "Диктування",
             "description": "Комбінація клавіш для запису та транскрибування вашого голосу."
           },
           "transcribe_toggle": {
-            "name": "Hands-free dictation",
-            "description": "Press once to start, again to stop — no holding needed."
+            "name": "Диктування без утримання",
+            "description": "Натисніть раз, щоб почати, і ще раз, щоб зупинити — утримувати не потрібно."
           },
           "cancel": {
-            "name": "Гаряча клавіша скасування",
+            "name": "Скасування",
             "description": "Комбінація клавіш для скасування поточного запису."
           },
           "transcribe_with_post_process": {
             "name": "Гаряча клавіша постобробки",
-            "description": "Необов'язково: Спеціальна гаряча клавіша, яка завжди застосовує AI-постобробку до вашої транскрипції."
+            "description": "Продиктуйте, і ШІ впорядкує текст перед вставкою."
           },
           "assistant": {
-            "name": "Ask assistant",
-            "description": "Ask the assistant by voice; the answer streams into the floating panel."
+            "name": "Запитати асистента",
+            "description": "Запитайте асистента голосом; відповідь з'явиться в плаваючій панелі."
           },
           "assistant_vision": {
-            "name": "Ask with screen",
-            "description": "Ask by voice with your screen attached so it can see what you're looking at."
+            "name": "Запитати з екраном",
+            "description": "Запитайте голосом, додавши свій екран, щоб асистент бачив, на що ви дивитесь."
           },
           "assistant_panel_toggle": {
-            "name": "Show or hide panel",
-            "description": "Shows or hides the floating assistant panel."
+            "name": "Показати або сховати панель",
+            "description": "Показує або ховає плаваючу панель асистента."
           }
         },
         "errors": {
           "restore": "Не вдалося відновити початкове скорочення",
           "set": "Не вдалося встановити скорочення: {{error}}",
-          "reset": "Не вдалося скинути скорочення до початкового значення"
+          "reset": "Не вдалося скинути комбінацію клавіш."
         }
       },
       "language": {
         "title": "Мова",
-        "description": "Оберіть мову для розпізнавання мовлення. Режим «Авто» визначить мову автоматично, а вибір конкретної мови може покращити точність.",
+        "description": "Мова розпізнавання мовлення. Конкретна мова може підвищити точність.",
         "descriptionUnsupported": "Модель Parakeet автоматично визначає мову. Ручний вибір не потрібен.",
-        "searchPlaceholder": "Пошук мов...",
+        "searchPlaceholder": "Пошук мов…",
         "noResults": "Мов не знайдено",
         "auto": "Авто"
       },
       "pushToTalk": {
         "label": "Утримувати для запису (Push To Talk)",
-        "description": "Утримуйте для запису, відпустіть для зупинки",
-        "hold": "Hold to record",
-        "tap": "Tap to start and stop"
+        "description": "«Утримання» записує, поки натиснута гаряча клавіша диктування. «Натискання» починає запис одним натисканням і зупиняє його наступним.",
+        "hold": "Утримання",
+        "tap": "Натискання"
       },
       "tapToLock": {
-        "label": "Tap to lock",
-        "info": "While holding your record shortcut, tap this to lock hands-free recording so you can let go and keep talking. Pick any key that isn't part of your record shortcut, or clear it to turn this off.",
-        "off": "Off",
-        "clear": "Clear"
+        "label": "Натисніть для фіксації",
+        "info": "Утримуючи скорочення запису, натисніть цю клавішу, щоб зафіксувати запис без утримання — тоді можна відпустити клавіші й говорити далі. Виберіть будь-яку клавішу, яка не входить до скорочення запису, або очистіть поле, щоб вимкнути це.",
+        "off": "Вимк.",
+        "clear": "Очистити"
       }
     },
     "models": {
       "title": "Моделі транскрипції",
-      "description": "Виберіть модель транскрипції або завантажте додаткові моделі. Різні моделі пропонують різні рівні точності та швидкості.",
+      "description": "Моделі міняють точність на швидкість — виберіть ту, що підходить вашому комп'ютеру.",
       "yourModels": "Завантажені моделі",
       "availableModels": "Доступні для завантаження",
       "downloaded": "Завантажено",
@@ -455,17 +457,17 @@
       "deleteActiveConfirm": "{{modelName}} — ваша активна модель. Видалення зупинить транскрипцію, доки ви не оберете нову модель. Ви впевнені?",
       "deleteTitle": "Видалити модель",
       "categories": {
-        "stt": "Transcription",
-        "llm": "Assistant",
-        "tts": "Speech"
+        "stt": "Транскрипція",
+        "llm": "Асистент",
+        "tts": "Мовлення"
       },
       "categoryDescriptions": {
-        "stt": "Models trade accuracy for speed — pick one that fits your machine.",
-        "llm": "Local models for the built-in assistant and AI cleanup.",
-        "tts": "Voices for the assistant's spoken replies. Kokoro runs on your machine."
+        "stt": "Моделі балансують між точністю та швидкістю — виберіть ту, що підходить вашому комп'ютеру.",
+        "llm": "Локальні моделі для вбудованого асистента та очищення ШІ.",
+        "tts": "Голоси для озвучених відповідей асистента. Kokoro працює на вашому комп'ютері."
       },
-      "llmHint": "After downloading, pick this model in the Assistant section under the built-in (local) provider.",
-      "ttsHint": "Speech models run on your machine and need no download.",
+      "llmHint": "Після завантаження виберіть цю модель у розділі «Асистент» у вбудованого (локального) провайдера.",
+      "ttsHint": "Моделі мовлення працюють на вашому комп'ютері й не потребують завантаження.",
       "filters": {
         "all": "Усі",
         "multiLanguage": "Багатомовні",
@@ -473,40 +475,40 @@
         "allLanguages": "Усі мови"
       },
       "noModelsMatch": "Жодна модель не відповідає цьому фільтру.",
-      "searchPlaceholder": "Search models by name…",
-      "clearSearch": "Clear search",
-      "noSearchResults": "No models named “{{query}}”.",
-      "olderModels": "Older models",
-      "olderModelsHint": "Run on the previous engine. Still fully supported — most people won't need these.",
+      "searchPlaceholder": "Пошук моделей за назвою…",
+      "clearSearch": "Очистити пошук",
+      "noSearchResults": "Немає моделей з назвою «{{query}}».",
+      "olderModels": "Старіші моделі",
+      "olderModelsHint": "Працюють на попередньому рушії. Досі повністю підтримуються — більшості користувачів вони не потрібні.",
       "customModel": {
-        "addButton": "Search Hugging Face",
-        "searchTitle": "Need a different model?",
-        "searchDescription": "Search Hugging Face for a GGUF model. This is an advanced option, so hardware needs and compatibility can vary.",
-        "searchButton": "Search Hugging Face",
-        "title": "Search Hugging Face",
-        "subtitle": "Find a GGUF model to download and run on this machine.",
-        "searchPlaceholder": "Search models on Hugging Face…",
-        "popularTitle": "Popular GGUF models",
-        "resultsTitle": "Search results",
-        "resultCount_one": "{{count}} model",
-        "resultCount_other": "{{count}} models",
-        "searching": "Searching Hugging Face…",
-        "searchError": "Search failed. Check your connection and try again.",
-        "tryAgain": "Try again",
-        "noResults": "No models found. Try a different search.",
-        "downloads": "{{value}} downloads",
-        "visionBadge": "Vision",
-        "back": "Back to results",
-        "loadingFiles": "Loading available files…",
-        "repoFilesError": "Couldn't load files for this model.",
-        "noGgufFiles": "This repository has no downloadable .gguf files.",
-        "selectQuant": "Choose a download",
-        "selectQuantHint": "Not sure? Q4_K_M is usually the best balance of quality, speed, and memory use.",
-        "enableVision": "Include screen vision",
-        "enableVisionHint": "Downloads an extra file so the model can understand images.",
-        "add": "Download",
-        "adding": "Starting…",
-        "addError": "Couldn't add this model. Please try again."
+        "addButton": "Пошук у Hugging Face",
+        "searchTitle": "Потрібна інша модель?",
+        "searchDescription": "Знайдіть модель GGUF у Hugging Face. Це розширена опція, тож вимоги до обладнання та сумісність можуть різнитися.",
+        "searchButton": "Пошук у Hugging Face",
+        "title": "Знайдіть модель у Hugging Face",
+        "subtitle": "Шукайте моделі GGUF, вибирайте версію та завантажуйте її прямо на цей пристрій.",
+        "searchPlaceholder": "Пошук за моделлю або автором…",
+        "popularTitle": "Популярні моделі GGUF",
+        "resultsTitle": "Результати пошуку",
+        "resultCount_one": "{{count}} модель",
+        "resultCount_other": "{{count}} моделей",
+        "searching": "Пошук у Hugging Face…",
+        "searchError": "Пошук не вдався. Перевірте з'єднання та спробуйте ще раз.",
+        "tryAgain": "Спробувати ще раз",
+        "noResults": "Моделей не знайдено. Спробуйте інший запит.",
+        "downloads": "{{value}} завантажень",
+        "visionBadge": "Зображення",
+        "back": "Назад до результатів",
+        "loadingFiles": "Завантаження доступних файлів…",
+        "repoFilesError": "Не вдалося завантажити файли для цієї моделі.",
+        "noGgufFiles": "У цьому репозиторії немає файлів .gguf для завантаження.",
+        "selectQuant": "Виберіть файл для завантаження",
+        "selectQuantHint": "Не впевнені? Q4_K_M зазвичай дає найкращий баланс якості, швидкості та використання пам'яті.",
+        "enableVision": "Додати перегляд екрана",
+        "enableVisionHint": "Завантажує додатковий файл, щоб модель розуміла зображення.",
+        "add": "Завантажити",
+        "adding": "Запуск…",
+        "addError": "Не вдалося додати цю модель. Будь ласка, спробуйте ще раз."
       }
     },
     "sound": {
@@ -514,24 +516,24 @@
       "microphone": {
         "title": "Мікрофон",
         "description": "Оберіть бажаний мікрофон",
-        "placeholder": "Оберіть мікрофон...",
-        "loading": "Завантаження..."
+        "placeholder": "Оберіть мікрофон…",
+        "loading": "Завантаження…"
       },
       "audioFeedback": {
         "label": "Звукове сповіщення",
         "description": "Відтворювати звук при початку та зупинці запису"
       },
       "soundTheme": {
-        "label": "Feedback sound",
-        "description": "Choose the start/stop cue played during dictation",
-        "default": "Default",
-        "preview": "Preview sound (plays start then stop)"
+        "label": "Звук сповіщення",
+        "description": "Виберіть сигнал початку/зупинки, який відтворюється під час диктування",
+        "default": "Стандартний",
+        "preview": "Прослухати звук (спочатку початок, потім зупинка)"
       },
       "outputDevice": {
         "title": "Пристрій виводу",
         "description": "Оберіть бажаний пристрій виводу звуку для звукових сповіщень",
-        "placeholder": "Оберіть пристрій виводу...",
-        "loading": "Завантаження..."
+        "placeholder": "Оберіть пристрій виводу…",
+        "loading": "Завантаження…"
       },
       "volume": {
         "title": "Гучність",
@@ -544,20 +546,20 @@
         "app": "Додаток",
         "output": "Вивід",
         "transcription": "Транскрипція",
-        "textReplacements": "Text replacements",
+        "textReplacements": "Заміни тексту",
         "history": "Історія",
-        "aiCorrection": "AI cleanup",
+        "aiCorrection": "Очищення ШІ",
         "experimental": "Експериментальне"
       },
       "aiCorrection": {
-        "label": "AI cleanup (in development)",
-        "description": "Experimental: clean up your dictation with AI. Rough and unpolished — off by default.",
-        "info": "Runs a language model over your dictation to fix punctuation, remove filler words, and optionally adjust the tone. Applies to dictation only (not the assistant chat) and runs on its own shortcut. It adds a delay since the model runs after transcription; if it fails or times out, your raw text is pasted instead. Uses your assistant's model by default. This feature is still in development — you can't yet pick a built-in local model from its own list, and it needs more tuning before it's a main feature."
+        "label": "Очищення ШІ (у розробці)",
+        "description": "Експериментально: очищення надиктованого тексту за допомогою ШІ. Ще сире й недопрацьоване — типово вимкнено.",
+        "info": "Пропускає надиктований текст через мовну модель, щоб виправити пунктуацію, прибрати слова-заповнювачі та за бажанням змінити тон. Застосовується лише до диктування (не до чату асистента) і працює за власним скороченням. Це додає затримку, бо модель запускається після транскрипції; якщо вона не спрацює або перевищить час очікування, буде вставлено вихідний текст. Типово використовує модель вашого асистента. Ця функція ще в розробці — поки не можна вибрати вбудовану локальну модель з окремого списку, і вона потребує доопрацювання, перш ніж стане основною."
       },
       "postProcessTimeout": {
-        "title": "AI cleanup timeout",
-        "description": "How long to wait for the model before giving up and pasting your raw transcription instead. On the built-in local model, allow enough time for it to load on first use.",
-        "seconds": "{{seconds}} seconds"
+        "title": "Час очікування очищення ШІ",
+        "description": "Скільки чекати на модель, перш ніж відмовитися й вставити вихідну транскрипцію. Для вбудованої локальної моделі дайте достатньо часу на її завантаження при першому використанні.",
+        "seconds": "{{seconds}} секунд"
       },
       "experimentalToggle": {
         "label": "Експериментальні функції",
@@ -565,28 +567,28 @@
       },
       "lazyStreamClose": {
         "label": "Залишати мікрофон увімкненим між транскрипціями",
-        "description": "Залишає потік мікрофона відкритим протягом 30 секунд після зупинки запису, зменшуючи затримку при послідовних транскрипціях. Може погіршити якість звуку Bluetooth."
+        "description": "Швидше диктувати підряд. Може вплинути на якість звуку Bluetooth."
       },
       "liveTranscription": {
-        "label": "Live transcription",
-        "description": "Transcribe speech as you talk, instead of all at once when you stop. Experimental."
+        "label": "Транскрипція в реальному часі",
+        "description": "Транскрибувати мовлення під час говоріння, а не все одразу після зупинки. Експериментально."
       },
       "liveTranscriptionWindow": {
-        "label": "Live transcription window",
-        "description": "While live transcription runs, show a larger overlay card with the running text instead of the compact pill. Requires live transcription."
+        "label": "Вікно транскрипції в реальному часі",
+        "description": "Під час транскрипції в реальному часі показувати більшу картку оверлею з поточним текстом замість компактної капсули. Потребує транскрипції в реальному часі."
       },
       "acceleration": {
         "whisper": {
           "title": "Прискорення Whisper",
-          "description": "Апаратне прискорення для моделей Whisper. Автоматичний режим використовує GPU за наявності (Metal на macOS, Vulkan на Windows/Linux)."
+          "description": "Авто використовує GPU, коли він доступний."
         },
         "ort": {
           "title": "Прискорення ONNX",
-          "description": "Апаратне прискорення для моделей ONNX (Parakeet, Canary, Moonshine тощо). DirectML на Windows є експериментальним. Моделі можуть не виконувати транскрипцію."
+          "description": "Для моделей Parakeet, Canary та Moonshine. DirectML — експериментальний."
         },
         "gpuDevice": {
           "title": "Пристрій GPU",
-          "description": "Виберіть GPU для інференсу Whisper. Автоматично обирає виділений GPU.",
+          "description": "Авто обирає виділений GPU.",
           "auto": "Авто"
         }
       },
@@ -602,18 +604,22 @@
         "label": "Показати значок у треї",
         "description": "Відображати значок SpeakoFlow у системному треї."
       },
+      "closeBehavior": {
+        "label": "Виходити, коли я закриваю вікно",
+        "description": "Коли вимкнено, закриття вікна залишає SpeakoFlow у треї, тож ваші гарячі клавіші продовжують працювати. Коли увімкнено, закриття вікна повністю завершує застосунок."
+      },
       "overlayStyle": {
-        "title": "Overlay",
-        "description": "How the recording overlay looks while you dictate. None hides it, Minimal is the compact pill, and Live shows a readable card with your words as you speak (for models that support it).",
+        "title": "Оверлей",
+        "description": "Як виглядає оверлей запису під час диктування. «Немає» ховає його, «Мінімальний» — це компактна капсула, а «Живий» показує читабельну картку з вашими словами під час мовлення (для моделей, які це підтримують).",
         "options": {
-          "none": "None",
-          "minimal": "Minimal",
-          "live": "Live"
+          "none": "Немає",
+          "minimal": "Мінімальний",
+          "live": "Живий"
         }
       },
       "overlay": {
         "title": "Позиція оверлею",
-        "description": "Показувати візуальний оверлей під час запису та транскрипції. На Linux рекомендовано «Немає»",
+        "description": "Де на екрані розташований оверлей запису.",
         "options": {
           "none": "Немає",
           "bottom": "Внизу",
@@ -622,7 +628,7 @@
       },
       "pasteMethod": {
         "title": "Метод вставки",
-        "description": "Оберіть спосіб вставки тексту. Прямий: емулює набір тексту. Немає: пропускає вставку, оновлює лише історію/буфер обміну.",
+        "description": "Як транскрибований текст вставляється в активну програму.",
         "options": {
           "clipboard": "Буфер обміну ({{modifier}}+V)",
           "clipboardCtrlShiftV": "Буфер обміну (Ctrl+Shift+V)",
@@ -635,14 +641,14 @@
       },
       "typingTool": {
         "title": "Інструмент введення",
-        "description": "Виберіть, який інструмент введення в Linux використовувати для методу прямого вставлення. Auto автоматично визначить і використає найкращий доступний інструмент для вашої системи.",
+        "description": "Інструмент Linux для методу вставки «Прямий».",
         "options": {
           "auto": "Auto (Рекомендовано)"
         }
       },
       "clipboardHandling": {
         "title": "Робота з буфером обміну",
-        "description": "Не змінювати буфер обміну зберігає поточний вміст буфера після транскрипції. Копіювати в буфер обміну залишає результат транскрипції в буфері після вставки.",
+        "description": "Чи залишається транскрипція в буфері обміну після вставки.",
         "options": {
           "dontModify": "Не змінювати буфер обміну",
           "copyToClipboard": "Копіювати в буфер обміну"
@@ -650,7 +656,7 @@
       },
       "autoSubmit": {
         "title": "Автоматичне надсилання",
-        "description": "Автоматично надсилає вибрану комбінацію клавіш після вставки тексту. Cmd+Enter застосовується на macOS, тоді як Windows/Linux використовують Super+Enter.",
+        "description": "Автоматично надсилати комбінацію клавіш після вставки тексту.",
         "options": {
           "off": "Вимк.",
           "enter": "Enter",
@@ -661,12 +667,12 @@
       },
       "translateToEnglish": {
         "label": "Перекласти на англійську",
-        "description": "Автоматично перекладати мовлення з інших мов англійською під час транскрипції.",
+        "description": "Перекладати мовлення з інших мов англійською.",
         "descriptionUnsupported": "Переклад не підтримується моделлю {{model}}."
       },
       "modelUnload": {
         "title": "Вивантаження моделі",
-        "description": "Автоматично звільняти пам'ять GPU/CPU, коли модель не використовується протягом вказаного часу",
+        "description": "Звільняти пам'ять, коли модель простоює стільки часу.",
         "options": {
           "never": "Ніколи",
           "immediately": "Негайно",
@@ -680,83 +686,110 @@
       },
       "customWords": {
         "title": "Власні слова",
-        "description": "Додайте слова, які часто неправильно розпізнаються під час транскрипції. Система автоматично виправлятиме схожі за звучанням слова відповідно до вашого списку.",
-        "info": "Example: add “Kokoro” if SpeakoFlow writes “Coco row.”",
-        "placeholder": "Додати слово",
+        "description": "Імена, продукти та фрази, які SpeakoFlow має писати так, як вам потрібно.",
+        "info": "Приклад: додайте «Kokoro», якщо SpeakoFlow пише «Coco row».",
+        "placeholder": "Додайте ім'я, термін або коротку фразу",
         "add": "Додати",
-        "empty": "No custom words yet.",
+        "empty": "Власних слів поки немає.",
         "remove": "Видалити {{word}}",
         "duplicate": "\"{{word}}\" вже існує"
       },
       "textReplacements": {
-        "title": "Text replacements",
-        "description": "Replace a phrase in your transcript with text you use often. Example: “my email” becomes “alex@example.com”.",
-        "rulesTitle": "Replacement rules",
-        "rulesHint": "Choose what SpeakoFlow hears and what it should insert.",
-        "empty": "Create a rule for a phrase you say often.",
-        "addFirst": "Create first rule",
-        "addRule": "Add replacement",
-        "manageRules": "Replacements ({{count}})",
-        "searchLabel": "Spoken phrase",
-        "searchPlaceholder": "my email",
-        "replaceLabel": "Insert this text",
+        "title": "Заміни тексту",
+        "description": "Замінюйте фразу у транскрипції на текст, який ви часто використовуєте. Приклад: «моя пошта» стає «alex@example.com».",
+        "rulesTitle": "Правила заміни",
+        "rulesHint": "Виберіть, що чує SpeakoFlow і що він має вставити.",
+        "empty": "Створіть правило для фрази, яку ви часто говорите.",
+        "addFirst": "Створити перше правило",
+        "addRule": "Додати заміну",
+        "manageRules": "Заміни ({{count}})",
+        "searchLabel": "Вимовлена фраза",
+        "searchPlaceholder": "моя пошта",
+        "replaceLabel": "Вставити цей текст",
         "replacePlaceholder": "alex@example.com",
-        "advanced": "Advanced options",
-        "regex": "Regex",
-        "trimBefore": "Trim before",
-        "trimAfter": "Trim after",
-        "enabledLabel": "Enabled",
-        "remove": "Remove rule",
-        "import": "Import",
-        "export": "Export",
-        "importSuccess": "Imported {{count}} replacement rules",
-        "importError": "Could not import: the file is not a valid replacements list",
-        "exportSuccess": "Replacements exported",
-        "exportError": "Could not export replacements",
-        "magicHint": "Use [date], [time], [uppercase], [lowercase], [capitalize], or [nospace] in the inserted text.",
+        "advanced": "Розширені опції",
+        "regex": "Регулярний вираз",
+        "trimBefore": "Обрізати перед",
+        "trimAfter": "Обрізати після",
+        "enabledLabel": "Увімкнено",
+        "remove": "Видалити правило",
+        "import": "Імпорт",
+        "export": "Експорт",
+        "importSuccess": "Імпортовано правил заміни: {{count}}",
+        "importError": "Не вдалося імпортувати: файл не є дійсним списком замін",
+        "exportSuccess": "Заміни експортовано",
+        "exportError": "Не вдалося експортувати заміни",
+        "magicHint": "Використовуйте [date], [time], [uppercase], [lowercase], [capitalize] або [nospace] у вставленому тексті.",
         "capitalization": {
-          "label": "Caps",
-          "none": "None",
-          "uppercase": "UPPERCASE",
-          "lowercase": "lowercase",
-          "capitalize": "Capitalize"
+          "label": "Регістр",
+          "none": "Немає",
+          "uppercase": "ВЕЛИКІ",
+          "lowercase": "малі",
+          "capitalize": "З великої"
         }
       }
     },
     "postProcessing": {
       "title": "Постобробка",
+      "readiness": {
+        "checking": "Перевірка налаштувань очищення ШІ…",
+        "checkFailed": "Не вдалося перевірити налаштування очищення ШІ.",
+        "ready": "Готово — {{provider}}.",
+        "assistantFallback": "Готово — використовується модель вашого асистента ({{provider}}).",
+        "selectPrompt": "Виберіть промпт очищення.",
+        "selectModel": "Виберіть модель для цього провайдера.",
+        "addApiKey": "Додайте API-ключ для цього провайдера.",
+        "providerMissing": "Вибраний провайдер більше недоступний."
+      },
+      "errors": {
+        "saveFailed": "Не вдалося зберегти налаштування очищення ШІ.",
+        "modelsLoadFailed": "Не вдалося завантажити моделі для цього провайдера.",
+        "promptCreateFailed": "Не вдалося створити промпт.",
+        "promptSelectFailed": "Промпт створено, але не вдалося його вибрати.",
+        "promptUpdateFailed": "Не вдалося оновити промпт.",
+        "promptDeleteFailed": "Не вдалося видалити промпт.",
+        "toneSelectFailed": "Не вдалося вибрати стиль письма.",
+        "toneCreateFailed": "Не вдалося створити стиль письма.",
+        "toneSelectAfterCreateFailed": "Стиль створено, але не вдалося його вибрати.",
+        "toneUpdateFailed": "Не вдалося оновити стиль письма.",
+        "toneDeleteFailed": "Не вдалося видалити стиль письма."
+      },
       "enable": {
-        "title": "AI cleanup"
+        "title": "Очищення ШІ"
       },
       "hotkey": {
-        "title": "Гаряча клавіша"
+        "title": "Комбінація клавіш"
       },
       "tone": {
-        "title": "Tone",
-        "description": "Optionally rewrite your cleaned-up dictation in a chosen tone. \"None\" just tidies the text without changing the wording.",
+        "title": "Готовий стиль",
+        "description": "Виберіть, як має звучати очищене диктування. «Лише очищення» виправляє текст, не змінюючи навмисно вашу манеру мовлення.",
         "options": {
-          "none": "None (cleanup only)",
-          "formal": "Formal",
-          "casual": "Casual",
-          "professional": "Professional",
-          "friendly": "Friendly",
-          "concise": "Concise"
+          "none": "Немає (лише очищення)",
+          "formal": "Офіційний",
+          "casual": "Неформальний",
+          "professional": "Професійний",
+          "friendly": "Дружній",
+          "concise": "Лаконічний"
         },
-        "edit": "Edit",
-        "closeEditor": "Close",
-        "createNew": "Create style",
-        "nameLabel": "Style name",
-        "namePlaceholder": "For example, Calm and clean",
-        "instructionsLabel": "Style instructions",
-        "instructionsPlaceholder": "Describe exactly how the wording should change. Example: Remove profanity and replace it with calm, neutral wording.",
-        "instructionsHint": "These rules shape the wording after cleanup. They stay separate from your cleanup prompt.",
-        "createTone": "Create style",
-        "updateTone": "Save changes",
-        "deleteTone": "Delete style",
-        "cancel": "Cancel"
+        "edit": "Редагувати",
+        "closeEditor": "Закрити",
+        "createNew": "Створити стиль",
+        "nameLabel": "Назва стилю",
+        "namePlaceholder": "Наприклад, Спокійний і чистий",
+        "instructionsLabel": "Інструкції стилю",
+        "instructionsPlaceholder": "Опишіть точно, як має змінитися формулювання. Приклад: приберіть нецензурні слова й замініть їх спокійними, нейтральними.",
+        "instructionsHint": "Ці правила формують текст після очищення. Вони не пов'язані з вашим промптом очищення.",
+        "createTone": "Створити стиль",
+        "updateTone": "Зберегти зміни",
+        "deleteTone": "Видалити стиль",
+        "cancel": "Скасувати"
       },
       "api": {
         "title": "API (сумісний з OpenAI)",
+        "location": {
+          "title": "Де це працює",
+          "description": "Виконуйте очищення приватно за допомогою завантаженої моделі або скористайтеся хмарним провайдером."
+        },
         "provider": {
           "title": "Провайдер",
           "description": "Оберіть OpenAI-сумісного провайдера"
@@ -769,7 +802,7 @@
         },
         "baseUrl": {
           "title": "Базова URL-адреса",
-          "description": "Базова URL-адреса API для обраного провайдера. Лише власний провайдер можна редагувати.",
+          "description": "Базова URL-адреса API для обраного провайдера. Можна редагувати для «Custom», «Local» та «Azure OpenAI» (вкажіть свій ресурс, наприклад https://your-resource.openai.azure.com/openai/v1).",
           "placeholder": "https://api.openai.com/v1"
         },
         "apiKey": {
@@ -778,10 +811,10 @@
           "placeholder": "sk-..."
         },
         "builtin": {
-          "modelDescription": "Pick a model you've downloaded. It runs on your machine with no API key or setup.",
-          "modelPlaceholder": "Select a downloaded model",
-          "noModels": "No local models yet. Download one from the model catalog.",
-          "ready": "Runs fully on your machine. No API key, no setup."
+          "modelDescription": "Виберіть завантажену модель. Вона працює на вашому комп'ютері без API-ключа та налаштування.",
+          "modelPlaceholder": "Виберіть завантажену модель",
+          "noModels": "Локальних моделей поки немає. Завантажте одну з каталогу моделей.",
+          "ready": "Працює повністю на вашому комп'ютері. Без API-ключа та налаштувань."
         },
         "model": {
           "title": "Модель",
@@ -792,10 +825,6 @@
           "placeholderWithOptions": "Шукайте або оберіть модель",
           "placeholderNoOptions": "Введіть назву моделі",
           "refreshModels": "Оновити моделі"
-        },
-        "location": {
-          "title": "Where it runs",
-          "description": "Run cleanup privately with a downloaded model or use a cloud provider."
         }
       },
       "prompts": {
@@ -807,138 +836,122 @@
         "noPrompts": "Немає доступних промптів",
         "selectPrompt": "Оберіть промпт",
         "createNew": "Створити новий промпт",
-        "edit": "Edit",
-        "closeEditor": "Close",
+        "edit": "Редагувати",
+        "closeEditor": "Закрити",
         "promptLabel": "Назва промпта",
         "promptLabelPlaceholder": "Введіть назву промпта",
         "promptInstructions": "Інструкції промпта",
         "promptInstructionsPlaceholder": "Напишіть інструкції для виконання після транскрипції. Приклад: Покращити граматику та ясність для наступного тексту: ${output}",
-        "promptTip": "Порада: Використовуйте <code>${output}</code> для вставки транскрибованого тексту у ваш промпт.",
+        "promptTip": "Порада: транскрибований текст надсилається моделі автоматично — просто напишіть інструкції. (Старі промпти з <code>${output}</code> досі працюють.)",
         "updatePrompt": "Оновити промпт",
         "deletePrompt": "Видалити промпт",
         "createPrompt": "Створити промпт",
         "cancel": "Скасувати",
         "selectToEdit": "Оберіть промпт вище для перегляду та редагування його деталей.",
         "createFirst": "Натисніть «Створити новий промпт» вище, щоб створити ваш перший промпт постобробки."
-      },
-      "readiness": {
-        "checking": "Checking AI cleanup setup…",
-        "checkFailed": "Couldn’t check AI cleanup setup.",
-        "ready": "Ready — {{provider}}.",
-        "assistantFallback": "Ready — using your Assistant model ({{provider}}).",
-        "selectPrompt": "Select a cleanup prompt.",
-        "selectModel": "Select a model for this provider.",
-        "addApiKey": "Add an API key for this provider.",
-        "providerMissing": "The selected provider is no longer available."
-      },
-      "errors": {
-        "saveFailed": "Couldn’t save the AI cleanup setting.",
-        "modelsLoadFailed": "Couldn’t load models for this provider.",
-        "promptCreateFailed": "Couldn’t create the prompt.",
-        "promptSelectFailed": "Created the prompt, but couldn’t select it.",
-        "promptUpdateFailed": "Couldn’t update the prompt.",
-        "promptDeleteFailed": "Couldn’t delete the prompt.",
-        "toneSelectFailed": "Couldn’t select the writing style.",
-        "toneCreateFailed": "Couldn’t create the writing style.",
-        "toneSelectAfterCreateFailed": "Created the style, but couldn’t select it.",
-        "toneUpdateFailed": "Couldn’t update the writing style.",
-        "toneDeleteFailed": "Couldn’t delete the writing style."
       }
     },
     "dictation": {
       "hero": {
-        "eyebrow": "Now listening with",
-        "loading": "Loading your model…",
-        "noModelTitle": "No model yet",
-        "noModelCaption": "Pick a model so your voice becomes text.",
-        "chooseModel": "Choose a model",
-        "changeModel": "Change model",
-        "streams": "Streams live",
-        "accuracy": "Accuracy",
-        "speed": "Speed"
+        "eyebrow": "Зараз слухає через",
+        "loading": "Завантаження вашої моделі…",
+        "noModelTitle": "Моделі ще немає",
+        "noModelCaption": "Виберіть модель, щоб ваш голос став текстом.",
+        "chooseModel": "Виберіть модель",
+        "changeModel": "Змінити модель",
+        "streams": "Розпізнає в реальному часі",
+        "accuracy": "Точність",
+        "speed": "Швидкість"
       },
       "catalog": {
-        "title": "Choose your model",
-        "description": "Every model runs on your machine — trade accuracy for speed and pick the one that fits."
+        "title": "Виберіть свою модель",
+        "description": "Кожна модель працює на вашому комп'ютері — знайдіть баланс між точністю та швидкістю й виберіть підхожу."
       },
       "aiCleanup": {
-        "groupTitle": "AI cleanup",
-        "modelGroupTitle": "Cleanup model",
-        "promptGroupTitle": "Cleanup prompt",
-        "title": "Fix up my dictation with AI",
-        "caption": "Experimental — tidies punctuation and filler after you dictate.",
-        "info": "Runs a language model over your dictation to fix punctuation, remove filler words, and optionally adjust the tone. Applies to dictation only, on its own shortcut. It adds a short delay after you speak; if the model fails or times out, your raw text is used instead. Still in development.",
-        "styleGroupTitle": "Writing style",
-        "styleGroupDescription": "Choose a built-in style or save your own rules for how cleaned dictation should sound.",
-        "fixMisheardLabel": "Fix misheard words",
-        "fixMisheardDescription": "When a word is clearly wrong for the sentence — a homophone or a near-miss pronunciation — replace it with the word you meant. Helpful for accents; the AI only corrects when the intended word is obvious."
+        "groupTitle": "Очищення ШІ",
+        "styleGroupTitle": "Стиль письма",
+        "styleGroupDescription": "Виберіть вбудований стиль або збережіть власні правила того, як має звучати очищений надиктований текст.",
+        "modelGroupTitle": "Модель очищення",
+        "promptGroupTitle": "Промпт очищення",
+        "title": "Виправляти моє диктування за допомогою ШІ",
+        "caption": "Експериментально — впорядковує пунктуацію та прибирає зайві слова після диктування.",
+        "strengthLabel": "Сила очищення",
+        "strengthDescription": "Наскільки сильно ШІ переписує ваші слова. «Легке» виправляє лише помилки та слова-заповнювачі. «Збалансоване» також прибирає повтори й невдалі початки. «Агресивне» стискає розмиті думки в лаконічний, добре структурований текст — завжди зберігаючи ваші факти та зміст.",
+        "strengthOptions": {
+          "light": "Легке",
+          "balanced": "Збалансоване",
+          "aggressive": "Агресивне"
+        },
+        "fixMisheardLabel": "Виправляти неправильно почуті слова",
+        "fixMisheardDescription": "Коли слово явно не пасує до речення — омофон або майже вгадана вимова — замінювати його на те, яке ви мали на увазі. Корисно за наявності акценту; ШІ виправляє лише тоді, коли потрібне слово очевидне.",
+        "info": "Пропускає надиктований текст через мовну модель, щоб виправити пунктуацію, прибрати слова-заповнювачі та за бажанням змінити тон. Застосовується лише до диктування, за власним скороченням. Це додає невелику затримку після мовлення; якщо модель не спрацює або перевищить час очікування, буде використано вихідний текст. Ще в розробці."
       },
       "spokenEmoji": {
         "title": "Емодзі голосом",
         "description": "Скажіть “happy emoji” або “thumbs up emoji”, щоб вставити 😊 або 👍. Поширені варіанти та незначні помилки розпізнавання обробляються на пристрої; невідомі назви залишаються текстом."
       },
-      "output": {
-        "title": "Output options"
-      },
       "flow": {
-        "groupTitle": "Generate with Flow",
-        "enableLabel": "Generate with Flow",
-        "enableDescription": "Start a dictation with the activation phrase to have AI write the result for you — “Hey Flow, write a polite email asking to reschedule” pastes the finished email.",
-        "phraseLabel": "Activation phrase",
-        "phraseDescription": "Flow activates only when a dictation begins with this phrase. Anywhere else, the same words paste as normal dictation. Uses your assistant's model; leave empty to reset to “Hey Flow”.",
+        "groupTitle": "Генерація з Flow",
+        "enableLabel": "Генерація з Flow",
+        "enableDescription": "Почніть диктування з фрази активації, щоб ШІ написав результат за вас — «Hey Flow, напиши ввічливий лист із проханням перенести зустріч» вставить готовий лист.",
+        "phraseLabel": "Фраза активації",
+        "phraseDescription": "Flow активується лише тоді, коли диктування починається з цієї фрази. В інших випадках ті самі слова вставляються як звичайне диктування. Використовує модель вашого асистента; залиште поле порожнім, щоб повернути «Hey Flow».",
         "phrasePlaceholder": "Hey Flow",
-        "screenLabel": "Allow screen access",
-        "screenDescription": "Let Flow take one screenshot when a command clearly refers to your screen, like “look at this email and draft a reply”. The model decides if it's needed. Separate from the assistant's screen access."
+        "screenLabel": "Дозволити доступ до екрана",
+        "screenDescription": "Дозвольте Flow зробити один знімок екрана, коли команда явно стосується вашого екрана, як-от «подивись на цей лист і склади відповідь». Модель сама вирішує, чи це потрібно. Не пов'язано з доступом до екрана в асистента."
+      },
+      "output": {
+        "title": "Параметри виводу"
       }
     },
     "history": {
       "title": "Історія",
       "storage": {
-        "title": "Recording storage",
-        "description": "These controls affect recordings only. Starred recordings are always kept. Assistant chats have separate storage."
+        "title": "Зберігання записів",
+        "description": "Ці параметри стосуються записів диктування та Flow. Збережені записи зберігаються завжди. Чати з асистентом мають окреме зберігання."
       },
       "filters": {
-        "label": "History type",
-        "all": "All",
+        "label": "Тип історії",
+        "all": "Усі",
         "recordings": "Recordings",
         "flow": "Flow",
-        "assistant": "Assistant chats"
+        "assistant": "Чати асистента"
       },
       "openFolder": "Відкрити папку записів",
-      "loading": "Завантаження історії...",
-      "empty": "Транскрипцій поки немає. Почніть запис, щоб створити історію!",
-      "emptyRecordings": "No recordings yet.",
-      "emptyFlow": "No Flow generations yet.",
-      "emptyAssistant": "No assistant chats yet.",
-      "recordingLabel": "Recording",
+      "loading": "Завантаження історії…",
+      "empty": "Тут поки нічого немає. Ваші диктування, генерації Flow і чати з асистентом з'являться тут.",
+      "emptyRecordings": "Диктувань поки немає.",
+      "emptyFlow": "Генерацій Flow поки немає.",
+      "emptyAssistant": "Чатів з асистентом поки немає.",
+      "recordingLabel": "Диктування",
       "flowLabel": "Flow",
-      "flowTranscriptLabel": "You said",
-      "originalTranscriptionLabel": "Original transcription",
-      "flowOutputLabel": "Flow output",
-      "finalTextLabel": "Final text",
-      "flowNoOutput": "No Flow output was generated.",
-      "copyFlowOutput": "Copy Flow output",
-      "copyFinalText": "Copy final text",
+      "flowTranscriptLabel": "Ви сказали",
+      "originalTranscriptionLabel": "Початкова транскрипція",
+      "flowOutputLabel": "Результат Flow",
+      "finalTextLabel": "Кінцевий текст",
+      "flowNoOutput": "Flow не створив результату.",
       "copyToClipboard": "Копіювати транскрипцію в буфер обміну",
+      "copyFlowOutput": "Копіювати результат Flow",
+      "copyFinalText": "Копіювати кінцевий текст",
       "save": "Зберегти транскрипцію",
       "unsave": "Видалити зі збережених",
       "delete": "Видалити запис",
       "deleteError": "Не вдалося видалити запис. Спробуйте ще раз.",
       "retranscribe": "Перетранскрибувати",
       "retranscribeError": "Не вдалося перетранскрибувати. Будь ласка, спробуйте ще раз.",
-      "transcribing": "Транскрибування...",
+      "transcribing": "Транскрибування…",
       "transcriptionFailed": "Транскрипція не вдалася. Ви можете перетранскрибувати за допомогою іконки повтору.",
-      "assistantLabel": "Assistant chat",
-      "copyConversation": "Copy conversation",
-      "resumeConversation": "Continue this conversation in the assistant",
-      "showConversation": "Show conversation",
-      "hideConversation": "Hide conversation",
-      "roleUser": "You",
-      "roleAssistant": "Assistant",
-      "screenshotAttached": "Vision",
-      "messageCount_one": "{{count}} message",
-      "messageCount_other": "{{count}} messages",
-      "deleteAssistantError": "Couldn't delete the conversation. Please try again."
+      "assistantLabel": "Чат з асистентом",
+      "copyConversation": "Копіювати розмову",
+      "resumeConversation": "Продовжити цю розмову в асистенті",
+      "showConversation": "Показати розмову",
+      "hideConversation": "Сховати розмову",
+      "roleUser": "Ви",
+      "roleAssistant": "Асистент",
+      "screenshotAttached": "Екран",
+      "messageCount_one": "{{count}} повідомлення",
+      "messageCount_other": "{{count}} повідомлень",
+      "deleteAssistantError": "Не вдалося видалити розмову. Будь ласка, спробуйте ще раз."
     },
     "debug": {
       "title": "Дебаг",
@@ -964,24 +977,24 @@
       },
       "historyLimit": {
         "title": "Ліміт історії",
-        "description": "Максимальна кількість записів в історії",
+        "description": "Максимальна кількість незбережених записів диктування та Flow. Збережені записи зберігаються завжди, а чати з асистентом не враховуються.",
         "entries": "записів"
       },
       "recordingRetention": {
         "title": "Автовидалення записів",
-        "description": "Автоматично видаляти старі записи для економії місця",
+        "description": "Виберіть, як прибираються записи без зірочки. Зміни діють одразу й ніколи не торкаються чатів з асистентом.",
         "never": "Ніколи",
-        "preserveLimit": "Зберігати останні {{count}}",
+        "preserveLimit": "Зберігати задану кількість",
         "days3": "Через 3 дні",
         "weeks2": "Через 2 тижні",
         "months3": "Через 3 місяці",
-        "placeholder": "Оберіть період зберігання...",
-        "savedToast": "Retention saved.",
-        "appliedToast": "Recording retention applied"
+        "placeholder": "Оберіть період зберігання…",
+        "savedToast": "Період зберігання збережено.",
+        "appliedToast": "Період зберігання записів застосовано"
       },
       "alwaysOnMicrophone": {
         "label": "Постійно активний мікрофон",
-        "description": "Тримати мікрофон активним для швидшого відгуку"
+        "description": "Тримає мікрофон напоготові, щоб перші слова ніколи не обрізалися. Витрачає трохи більше заряду."
       },
       "clamshellMicrophone": {
         "title": "Мікрофон у закритому режимі",
@@ -1015,7 +1028,7 @@
       },
       "recordingBuffer": {
         "title": "Додатковий буфер запису",
-        "description": "Додатковий час (у мілісекундах) для продовження запису після відпускання клавіші, щоб захопити завершальний звук. 0 = без додаткового буфера."
+        "description": "Скільки мілісекунд продовжувати запис після відпускання клавіші."
       }
     },
     "about": {
@@ -1025,12 +1038,12 @@
         "description": "Поточна версія SpeakoFlow"
       },
       "updates": {
-        "title": "Updates",
-        "button": "Check for updates",
-        "disabledHint": "Automatic update checks are off. Turn them on in General."
+        "title": "Оновлення",
+        "button": "Перевірити оновлення",
+        "disabledHint": "Автоматична перевірка оновлень вимкнена. Увімкніть її в розділі «Загальні»."
       },
       "folders": {
-        "title": "Folders"
+        "title": "Папки"
       },
       "appDataDirectory": {
         "title": "Папка даних програми",
@@ -1042,9 +1055,9 @@
         "button": "Переглянути на GitHub"
       },
       "license": {
-        "title": "License",
-        "description": "SpeakoFlow is open source under the MIT License, building on Handy (also MIT) by CJ Pais.",
-        "button": "View license"
+        "title": "Ліцензія",
+        "description": "SpeakoFlow — програма з відкритим кодом за ліцензією MIT, створена на основі Handy (також MIT) від CJ Pais.",
+        "button": "Переглянути ліцензію"
       },
       "supportDevelopment": {
         "title": "Підтримати розробку",
@@ -1054,326 +1067,340 @@
     },
     "assistant": {
       "shortcuts": {
-        "title": "Shortcuts"
+        "title": "Скорочення"
       },
       "brain": {
-        "title": "Assistant brain",
-        "description": "Choose whether your assistant runs privately on this device or through a cloud provider.",
-        "whereLabel": "Where it runs",
-        "onDevice": "On my device",
-        "cloud": "Cloud provider",
-        "downloadModel": "Browse and download models",
-        "downloadModelDescription": "Pick a recommended model or search Hugging Face.",
-        "downloadModelAction": "Browse models",
-        "catalogTitle": "Download an on-device model",
-        "catalogDescription": "Choose a model to download. It stays on this machine and needs no API key.",
-        "currentModelTitle": "Current model",
-        "currentModelDescription": "Selected for the built-in assistant on this device.",
-        "recommendedTitle": "Recommended models",
-        "recommendedDescription": "Three conversation-first choices: quickest, recommended, and more capable but slower.",
-        "acceleratorDetected": "{{name}} · {{memory}} GB reported graphics memory",
-        "acceleratorDetectedDedicated": "{{name}} · {{memory}} GB dedicated VRAM",
-        "acceleratorDetectedIntegrated": "{{name}} · {{memory}} GB shared graphics memory",
-        "acceleratorDetectedNoMemory": "{{name}} detected · graphics memory not reported",
-        "acceleratorUnknownWithMemory": "Graphics memory unavailable · {{memory}} GB system RAM for CPU fallback",
-        "acceleratorUnknown": "Graphics memory unavailable · response speed cannot be predicted",
-        "details": "Details",
-        "switchBeforeDelete": "Switch the built-in assistant to another model before deleting this one.",
-        "deleteModelConfirm": "Delete {{modelName}}? Its downloaded files and saved entry will be removed.",
-        "deleteModelFailed": "Could not delete the model.",
-        "visionModelNote": "Screen vision downloads an additional image file automatically.",
-        "finderSectionTitle": "More on-device models",
-        "finderSectionDescription": "Search Hugging Face when you need a different model size or capability.",
-        "finderTitle": "Browse Hugging Face",
-        "finderDescription": "Search thousands of GGUF models and download one directly to SpeakoFlow.",
-        "finderAction": "Find a model",
-        "huggingFaceTitle": "From Hugging Face",
-        "huggingFaceDescription": "Models you added yourself. Compatibility and performance can vary.",
-        "catalogEmpty": "No recommended local models are available right now."
+        "title": "Мозок асистента",
+        "description": "Виберіть, чи асистент працює приватно на цьому пристрої, чи через хмарного провайдера.",
+        "whereLabel": "Де це працює",
+        "onDevice": "На моєму пристрої",
+        "cloud": "Хмарний провайдер",
+        "downloadModel": "Огляд і завантаження моделей",
+        "downloadModelDescription": "Виберіть рекомендовану модель або знайдіть її в Hugging Face.",
+        "downloadModelAction": "Огляд моделей",
+        "catalogTitle": "Виберіть модель для роботи на пристрої",
+        "catalogDescription": "Завантажте приватну локальну модель. Вона залишається на цьому комп'ютері й не потребує API-ключа.",
+        "currentModelTitle": "Поточна модель",
+        "currentModelDescription": "Вибрана для вбудованого асистента на цьому пристрої.",
+        "recommendedTitle": "Рекомендовані моделі",
+        "recommendedDescription": "Три варіанти, орієнтовані на розмову: найшвидший, рекомендований і потужніший, але повільніший.",
+        "acceleratorDetected": "{{name}} · {{memory}} GB заявленої графічної пам'яті",
+        "acceleratorDetectedDedicated": "{{name}} · {{memory}} GB виділеної VRAM",
+        "acceleratorDetectedIntegrated": "{{name}} · {{memory}} GB спільної графічної пам'яті",
+        "acceleratorDetectedNoMemory": "Виявлено {{name}} · графічна пам'ять не вказана",
+        "acceleratorUnknownWithMemory": "Графічна пам'ять недоступна · {{memory}} GB системної RAM для запасного режиму CPU",
+        "acceleratorUnknown": "Графічна пам'ять недоступна · швидкість відповіді неможливо передбачити",
+        "details": "Деталі",
+        "switchBeforeDelete": "Перед видаленням цієї моделі переведіть вбудованого асистента на іншу.",
+        "deleteModelConfirm": "Видалити {{modelName}}? Завантажені файли та збережений запис буде видалено.",
+        "deleteModelFailed": "Не вдалося видалити модель.",
+        "visionModelNote": "Для перегляду екрана автоматично завантажується додатковий файл для зображень.",
+        "finderSectionTitle": "Більше моделей для пристрою",
+        "finderSectionDescription": "Шукайте в Hugging Face, якщо потрібен інший розмір моделі або інші можливості.",
+        "finderTitle": "Огляд Hugging Face",
+        "finderDescription": "Шукайте серед тисяч моделей GGUF і завантажуйте їх безпосередньо у SpeakoFlow.",
+        "finderAction": "Знайти модель",
+        "huggingFaceTitle": "Ваші моделі",
+        "huggingFaceDescription": "Завантажені моделі та моделі, які ви додали з Hugging Face.",
+        "catalogEmpty": "Зараз немає доступних рекомендованих локальних моделей."
       },
       "subpages": {
-        "profilesCaption": "Switch the assistant's name, role, and personality.",
-        "memoryCaption": "What the assistant remembers about you between chats."
+        "profilesCaption": "Змінюйте ім'я, роль і характер асистента.",
+        "memoryCaption": "Що асистент пам'ятає про вас між чатами."
       },
       "tapToLock": {
-        "label": "Tap to lock",
-        "info": "While holding the assistant shortcut, tap this to lock hands-free so you can let go and keep talking. Pick a key that isn't part of your assistant shortcut (one that overlaps is ignored), or clear it to turn this off.",
-        "off": "Off",
-        "clear": "Clear"
+        "label": "Натисніть для фіксації",
+        "info": "Утримуючи скорочення асистента, натисніть цю клавішу, щоб зафіксувати запис без утримання — тоді можна відпустити клавіші й говорити далі. Виберіть клавішу, яка не входить до скорочення асистента (та, що збігається, ігнорується), або очистіть поле, щоб вимкнути це.",
+        "off": "Вимк.",
+        "clear": "Очистити"
       },
       "provider": {
-        "title": "Assistant provider",
-        "providerLabel": "Provider",
-        "providerDescription": "The provider that answers assistant questions.",
-        "baseUrlLabel": "Base URL",
-        "baseUrlDescription": "OpenAI-compatible base URL. Azure URLs are normalized automatically.",
-        "apiKeyLabel": "API key",
-        "apiKeyDescription": "Shared with AI cleanup.",
-        "apiKeyPlaceholder": "Enter API key…",
-        "modelLabel": "Model",
-        "modelDescription": "Model or deployment name to use for assistant answers.",
-        "modelPlaceholder": "e.g. gpt-4o-mini",
-        "modelSearchPlaceholder": "Search or type a model…",
-        "modelUse": "Use \"{{model}}\"",
-        "loadModels": "Load models",
-        "loadingModels": "Loading…",
-        "noModelsFound": "No models returned. Type the model name instead.",
-        "builtinModelDescription": "Pick a downloaded local model. It runs on your machine with no API key.",
-        "builtinModelPlaceholder": "Select a downloaded model",
-        "builtinNoModels": "No models on your machine yet — download one below.",
-        "builtinReady": "Runs fully on your machine. No API key, no setup.",
-        "builtinEngineMissing": "First use downloads a small local engine automatically (one time), then runs fully offline. No setup needed.",
-        "contextSizeLabel": "Context window",
-        "contextSizeDescription": "How much the local model can keep in mind at once — the system instructions, your chat history, any screenshot (a single image can eat a big chunk), and its reply. Bigger holds more and keeps screen vision and web search reliable, but uses more memory. The default is 8192; 16384 is a good step up if your machine has the RAM to spare. You can lower it later to save memory.",
-        "unloadTimeoutLabel": "Unload from memory after",
-        "unloadTimeoutDescription": "Free up memory by unloading the local model after it has been idle this long. It reloads automatically on next use.",
-        "saveFailed": "Couldn’t switch the Assistant provider."
+        "title": "Провайдер асистента",
+        "saveFailed": "Не вдалося змінити провайдера асистента.",
+        "providerLabel": "Провайдер",
+        "providerDescription": "Провайдер, який відповідає на запитання до асистента.",
+        "baseUrlLabel": "Базова URL-адреса",
+        "baseUrlDescription": "Базова URL-адреса, сумісна з OpenAI. URL-адреси Azure нормалізуються автоматично.",
+        "apiKeyLabel": "API-ключ",
+        "apiKeyDescription": "Спільний з очищенням ШІ.",
+        "apiKeyPlaceholder": "Введіть API-ключ…",
+        "modelLabel": "Модель",
+        "modelDescription": "Назва моделі або розгортання для відповідей асистента.",
+        "modelPlaceholder": "напр. gpt-4o-mini",
+        "modelSearchPlaceholder": "Шукайте або введіть модель…",
+        "modelUse": "Використати «{{model}}»",
+        "loadModels": "Завантажити моделі",
+        "loadingModels": "Завантаження…",
+        "noModelsFound": "Моделей не повернуто. Введіть назву моделі вручну.",
+        "builtinModelDescription": "Виберіть завантажену локальну модель. Вона працює на вашому комп'ютері без API-ключа.",
+        "builtinModelPlaceholder": "Виберіть завантажену модель",
+        "builtinNoModels": "На вашому комп'ютері поки немає моделей — завантажте одну нижче.",
+        "builtinReady": "Працює повністю на вашому комп'ютері. Без API-ключа та налаштувань.",
+        "builtinEngineMissing": "При першому використанні автоматично завантажується невеликий локальний рушій (одноразово), далі все працює повністю офлайн. Налаштування не потрібне.",
+        "builtinEngineDownloading": "Завантаження локального рушія… {{percent}}%",
+        "builtinEnginePreparing": "Завантаження локального рушія…",
+        "builtinEngineExtracting": "Встановлення локального рушія…",
+        "builtinEngineReady": "Локальний рушій готовий.",
+        "contextSizeLabel": "Контекстне вікно",
+        "contextSizeDescription": "Скільки локальна модель може тримати в голові одночасно — системні інструкції, історію чату, будь-який знімок екрана (одне зображення може займати значну частину) і свою відповідь. Більше вікно вміщує більше й робить перегляд екрана та пошук в інтернеті надійнішими, але потребує більше пам'яті. Стандартне значення — 8192; 16384 буде добрим наступним кроком, якщо у вашого комп'ютера є вільна RAM. Пізніше його можна зменшити, щоб зекономити пам'ять.",
+        "unloadTimeoutLabel": "Вивантажувати з пам'яті через",
+        "unloadTimeoutDescription": "Звільняйте пам'ять, вивантажуючи локальну модель після такого часу без використання. Вона автоматично завантажиться знову при наступному використанні."
       },
       "systemPrompt": {
-        "title": "System prompt",
-        "label": "Assistant system prompt",
-        "description": "Sets the assistant's behavior."
+        "title": "Системний промпт",
+        "label": "Системний промпт асистента",
+        "description": "Визначає поведінку асистента."
       },
       "characters": {
-        "title": "Profiles",
-        "description": "Task-focused profiles you can switch between. The active profile sets the assistant's name, role, and instructions — and how long its replies run. Switch anytime from the panel header.",
-        "galleryLabel": "Your profiles",
-        "editSection": "Edit profile",
-        "avatarLabel": "Avatar",
-        "active": "Active",
-        "meowsOnly": "Meows only",
-        "builtin": "Built-in",
-        "custom": "Custom",
-        "new": "New",
-        "newName": "New profile",
-        "copyName": "{{name}} copy",
-        "createAi": "Create with AI",
-        "import": "Import",
-        "aiTitle": "Describe your profile",
-        "aiClose": "Close",
-        "aiPlaceholder": "e.g. a concise release-notes writer, or a patient tutor who explains every step",
-        "aiDictate": "Dictate the description",
-        "aiDictateStop": "Stop dictation",
-        "generate": "Generate",
-        "avatarUpload": "Upload image",
-        "avatarRemove": "Remove",
-        "nameLabel": "Name",
-        "roleLabel": "Role",
-        "rolePlaceholder": "Short description shown on the card (optional)",
-        "promptLabel": "Instructions (system prompt)",
+        "title": "Профілі",
+        "description": "Профілі під конкретні задачі, між якими можна перемикатися. Активний профіль визначає ім'я, роль та інструкції асистента — а також довжину його відповідей. Перемикайтеся будь-коли у заголовку панелі.",
+        "galleryLabel": "Ваші профілі",
+        "editSection": "Редагувати профіль",
+        "avatarLabel": "Аватар",
+        "active": "Активний",
+        "meowsOnly": "Лише нявкає",
+        "builtin": "Вбудований",
+        "custom": "Власний",
+        "new": "Новий",
+        "newName": "Новий профіль",
+        "copyName": "{{name}} — копія",
+        "createAi": "Створити за допомогою ШІ",
+        "import": "Імпорт",
+        "aiTitle": "Опишіть свій профіль",
+        "aiClose": "Закрити",
+        "aiPlaceholder": "напр. лаконічний автор нотаток до випусків або терплячий репетитор, який пояснює кожен крок",
+        "aiDictate": "Надиктувати опис",
+        "aiDictateStop": "Зупинити диктування",
+        "generate": "Згенерувати",
+        "avatarUpload": "Завантажити зображення",
+        "avatarRemove": "Видалити",
+        "nameLabel": "Ім'я",
+        "roleLabel": "Роль",
+        "rolePlaceholder": "Короткий опис, що показується на картці (необов'язково)",
+        "promptLabel": "Інструкції (системний промпт)",
         "responseLength": {
-          "label": "Response length",
-          "hint": "How long this profile's replies run. \"Inherit\" follows your global Assistant setting.",
+          "label": "Довжина відповіді",
+          "hint": "Наскільки довгими будуть відповіді цього профілю. «Успадкувати» використовує загальне налаштування асистента.",
           "options": {
-            "inherit": "Inherit global",
-            "short": "Short",
-            "medium": "Medium",
-            "long": "Long"
+            "inherit": "Успадкувати загальне",
+            "short": "Коротка",
+            "medium": "Середня",
+            "long": "Довга"
           }
         },
-        "greetingLabel": "Greeting (optional)",
-        "greetingPlaceholder": "Optional opening line shown in an empty chat",
-        "catNote": "The Cat ignores the AI entirely — it just meows. Nothing to configure here.",
-        "duplicate": "Duplicate",
-        "export": "Export",
-        "restoreDefault": "Restore default",
-        "restoreBuiltins": "Restore built-ins",
-        "moreActions": "More actions",
-        "expand": "Expand",
-        "collapse": "Collapse",
-        "delete": "Delete",
-        "deleteConfirm": "Delete this profile? This can't be undone.",
-        "emptyState": "No profiles yet. Create your first one to give the assistant a personality."
+        "greetingLabel": "Привітання (необов'язково)",
+        "greetingPlaceholder": "Необов'язкова перша фраза, що показується в порожньому чаті",
+        "catNote": "Кіт повністю ігнорує ШІ — він просто нявкає. Тут нема чого налаштовувати.",
+        "duplicate": "Дублювати",
+        "export": "Експорт",
+        "restoreDefault": "Відновити стандартний",
+        "restoreBuiltins": "Відновити вбудовані",
+        "moreActions": "Більше дій",
+        "expand": "Розгорнути",
+        "collapse": "Згорнути",
+        "delete": "Видалити",
+        "deleteConfirm": "Видалити цей профіль? Цю дію не можна скасувати.",
+        "emptyState": "Профілів поки немає. Створіть перший, щоб надати асистентові характер."
       },
       "behavior": {
-        "title": "Behavior"
+        "title": "Поведінка"
       },
       "memory": {
-        "label": "Conversation memory",
-        "description": "How many recent messages are sent as context each turn. 0 disables memory."
+        "label": "Пам'ять розмови",
+        "description": "Скільки останніх повідомлень надсилається як контекст у кожному запиті. 0 вимикає пам'ять."
+      },
+      "autoSummarize": {
+        "label": "Стискати довгі чати",
+        "description": "Коли розмова перевищує контекстне вікно моделі, старіші повідомлення автоматично стискаються в поточне зведення, щоб чат зберігав контекст, а не забував початок. Під час цього показується непомітний індикатор."
       },
       "responseLength": {
-        "label": "Response length",
-        "description": "Preferred reply length. \"No effect\" leaves your prompt untouched.",
+        "label": "Довжина відповіді",
+        "description": "Бажана довжина відповіді. «Без впливу» залишає ваш промпт без змін.",
         "options": {
-          "default": "No effect",
-          "short": "Short",
-          "medium": "Medium",
-          "long": "Long"
+          "default": "Без впливу",
+          "short": "Коротка",
+          "medium": "Середня",
+          "long": "Довга"
         }
       },
       "vision": {
-        "title": "Screen vision",
-        "modeLabel": "Screen access",
+        "title": "Перегляд екрана",
+        "modeLabel": "Доступ до екрана",
         "modes": {
-          "off": "Off",
-          "manual": "Manual",
-          "agentDecides": "Agent decides",
+          "off": "Вимк.",
+          "manual": "Вручну",
+          "agentDecides": "Вирішує агент",
           "descriptions": {
-            "off": "Screen capture is disabled. Camera and region controls are hidden.",
-            "manual": "You choose when to attach the full screen or a region. Voice capture timing applies.",
-            "agent_decides": "The model may request a screen capture when it needs current visual context. Every screenshot sent is shown in the conversation."
+            "off": "Захоплення екрана вимкнено. Кнопки камери та вибору області приховані.",
+            "manual": "Ви самі вирішуєте, коли додати весь екран або його частину. Застосовується вибраний момент захоплення для голосу.",
+            "agent_decides": "Модель може запросити знімок екрана, коли їй потрібен поточний візуальний контекст. Кожен надісланий знімок показується в розмові."
           }
         },
         "timing": {
-          "label": "When to capture",
-          "description": "For voice questions: capture the moment you start asking, or wait until the message is sent. Typed messages always capture on send.",
+          "label": "Коли робити знімок",
+          "description": "Для голосових запитань: робити знімок у момент, коли ви починаєте питати, або чекати надсилання повідомлення. Для набраних повідомлень знімок завжди робиться при надсиланні.",
           "options": {
-            "immediate": "When I ask",
-            "on_send": "When the message sends"
+            "immediate": "Коли я питаю",
+            "on_send": "Коли надсилається повідомлення"
           }
+        },
+        "screenRecording": {
+          "description": "Перегляд екрана потребує дозволу macOS на запис екрана. Надайте його в Системних налаштуваннях, а потім перезапустіть SpeakoFlow, щоб зміни набули чинності.",
+          "grant": "Відкрити Системні налаштування"
         }
       },
       "webSearch": {
-        "title": "Web search",
-        "enableLabel": "Allow web search",
-        "enableDescription": "Let the assistant search the web when a question needs current information.",
-        "openRouterNativeLabel": "Use OpenRouter's built-in search",
-        "openRouterNativeDescription": "When on, OpenRouter runs the search itself (its :online mode) using your OpenRouter credits. When off, the app searches with your search provider below.",
-        "providerLabel": "Search provider",
-        "providerDescription": "Serper is a good default. Every provider has a free tier.",
+        "title": "Пошук в інтернеті",
+        "enableLabel": "Дозволити пошук в інтернеті",
+        "enableDescription": "Дозвольте асистентові шукати в інтернеті, коли запитання потребує актуальної інформації.",
+        "openRouterNativeLabel": "Використовувати вбудований пошук OpenRouter",
+        "openRouterNativeDescription": "Коли увімкнено, OpenRouter виконує пошук самостійно (режим :online), витрачаючи ваші кредити OpenRouter. Коли вимкнено, застосунок шукає через вибраного нижче провайдера пошуку.",
+        "providerLabel": "Провайдер пошуку",
+        "providerDescription": "Serper — добрий варіант за умовчанням. Кожен провайдер має безкоштовний тариф, а TinyFish безкоштовний і без картки.",
         "providers": {
-          "serper": "Serper (Google, fast)",
+          "serper": "Serper (Google, швидкий)",
           "brave": "Brave Search",
-          "tavily": "Tavily (AI search)",
-          "exa": "Exa (neural)",
-          "serpapi": "SerpAPI (Google)"
+          "tavily": "Tavily (пошук з ШІ)",
+          "exa": "Exa (нейронний)",
+          "serpapi": "SerpAPI (Google)",
+          "tinyfish": "TinyFish (безкоштовно, без картки)"
         },
-        "apiKeyLabel": "API key",
-        "apiKeyDescription": "Key for the selected search provider.",
-        "apiKeyPlaceholder": "Enter API key…",
-        "fetchContentLabel": "Read full pages (best quality)",
-        "fetchContentDescription": "Read the full text of each result instead of snippets. Better answers, but slower.",
-        "maxResultsLabel": "Sources to use",
-        "maxResultsDescription": "How many results to read (1–10).",
-        "depthLabel": "Search depth",
-        "depthDescription": "Quick for simple facts, Standard for most questions, Deep for hard ones.",
+        "apiKeyLabel": "API-ключ",
+        "apiKeyDescription": "Ключ для вибраного провайдера пошуку.",
+        "apiKeyPlaceholder": "Введіть API-ключ…",
+        "fetchContentLabel": "Читати сторінки повністю (найкраща якість)",
+        "fetchContentDescription": "Читати повний текст кожного результату замість фрагментів. Кращі відповіді, але повільніше.",
+        "maxResultsLabel": "Скільки джерел використовувати",
+        "maxResultsDescription": "Скільки результатів читати (1–10).",
+        "depthLabel": "Глибина пошуку",
+        "depthDescription": "«Швидкий» для простих фактів, «Стандартний» для більшості запитань, «Глибокий» для складних.",
         "depthOptions": {
-          "low": "Quick",
-          "medium": "Standard",
-          "high": "Deep"
+          "low": "Швидкий",
+          "medium": "Стандартний",
+          "high": "Глибокий"
         },
-        "localSmartLabel": "Smart search decisions (local model)",
-        "localSmartDescription": "Let the local model decide when to search. Off uses a fast keyword check instead.",
-        "creditBudgetLabel": "Daily Firecrawl credit limit",
-        "creditBudgetDescription": "Daily cap on Firecrawl credits before search pauses. 0 = no limit.",
-        "testLabel": "Test search",
-        "testDescription": "Run a sample search with the current provider and key.",
-        "testButton": "Test search",
-        "testing": "Searching…",
-        "testResult": "Got {{count}} results."
+        "localSmartLabel": "Розумні рішення про пошук (локальна модель)",
+        "localSmartDescription": "Дозвольте локальній моделі вирішувати, коли шукати. Коли вимкнено, використовується швидка перевірка за ключовими словами.",
+        "creditBudgetLabel": "Денний ліміт кредитів Firecrawl",
+        "creditBudgetDescription": "Денна межа кредитів Firecrawl, після якої пошук припиняється. 0 = без обмежень.",
+        "testLabel": "Перевірити пошук",
+        "testDescription": "Виконати пробний пошук з поточним провайдером і ключем.",
+        "testButton": "Перевірити пошук",
+        "testing": "Пошук…",
+        "testResult": "Отримано результатів: {{count}}."
       },
       "tts": {
-        "title": "Voice output",
-        "enableLabel": "Speak responses aloud",
-        "enableDescription": "Read the assistant's replies out loud.",
-        "stopOnDictationLabel": "Stop speech when dictation starts",
-        "stopOnDictationDescription": "Stop any reply that's still playing when you start dictating.",
-        "engineLabel": "Engine",
-        "engineDescription": "Kokoro runs locally for free. The other engines use your API key.",
-        "kokoroSetupLabel": "Kokoro voice model",
-        "kokoroSetupDescription": "Download it once, then spoken replies run privately on this device.",
-        "kokoroDownload": "Download Kokoro",
-        "kokoroDownloading": "Downloading Kokoro",
-        "kokoroReady": "Ready on this device",
-        "kokoroRetry": "Try download again",
+        "title": "Голосовий вивід",
+        "enableLabel": "Озвучувати відповіді",
+        "enableDescription": "Читати відповіді асистента вголос.",
+        "stopOnDictationLabel": "Зупиняти озвучення на початку диктування",
+        "stopOnDictationDescription": "Зупиняти будь-яку відповідь, що ще звучить, коли ви починаєте диктувати.",
+        "engineLabel": "Рушій",
+        "engineDescription": "Kokoro працює локально й безкоштовно. Інші рушії використовують ваш API-ключ.",
+        "kokoroSetupLabel": "Голосова модель Kokoro",
+        "kokoroSetupDescription": "Завантажте її один раз, і озвучені відповіді працюватимуть приватно на цьому пристрої.",
+        "kokoroDownload": "Завантажити Kokoro",
+        "kokoroDownloading": "Завантаження Kokoro",
+        "kokoroReady": "Готово на цьому пристрої",
+        "kokoroRetry": "Спробувати завантажити знову",
         "engines": {
-          "kokoro": "Kokoro (local, free)",
-          "openai": "OpenAI-compatible",
+          "kokoro": "Kokoro (локально, безкоштовно)",
+          "openai": "Сумісний з OpenAI",
           "openrouter": "OpenRouter",
           "elevenlabs": "ElevenLabs",
           "azure": "Azure AI Speech"
         },
-        "voiceLabel": "Voice",
-        "voiceDescription": "Kokoro voice for spoken replies.",
-        "dtypeLabel": "Kokoro precision",
-        "dtypeDescription": "fp32 is highest quality; q8 is faster on CPU. Changing this reloads the model.",
-        "speedLabel": "Playback speed",
-        "speedDescription": "1× is normal. ElevenLabs supports 0.7×–1.2× only.",
+        "voiceLabel": "Голос",
+        "voiceDescription": "Голос Kokoro для озвучених відповідей.",
+        "dtypeLabel": "Точність Kokoro",
+        "dtypeDescription": "fp32 дає найвищу якість; q8 швидший на CPU. Зміна цього параметра перезавантажує модель.",
+        "speedLabel": "Швидкість відтворення",
+        "speedDescription": "1× — звичайна. ElevenLabs підтримує лише 0,7×–1,2×.",
         "speedValue": "{{value}}×",
-        "speedCustomLabel": "Custom playback speed",
-        "testLabel": "Test voice",
-        "testDescription": "Play a short sample with the current settings.",
-        "testButton": "Test voice",
-        "testing": "Testing…",
-        "testOk": "Played ✓",
-        "testPhrase": "Hi! This is a test of SpeakoFlow's voice output.",
-        "downloadStart": "Downloading Kokoro voice…",
-        "downloadProgress": "Downloading Kokoro voice… {{progress}}%",
-        "downloadReady": "Kokoro voice ready ✓",
-        "downloadError": "Couldn't download the Kokoro voice model",
-        "baseUrlLabel": "Base URL",
-        "baseUrlDescription": "OpenAI-compatible TTS URL. A base URL or a full /audio/speech URL both work.",
-        "azureBaseUrlLabel": "Speech URL",
-        "azureBaseUrlDescription": "Your Azure Speech URL from the portal, e.g. https://eastus2.tts.speech.microsoft.com.",
-        "apiKeyLabel": "API key",
-        "apiKeyDescription": "Separate from the assistant's key.",
-        "modelLabel": "Model",
-        "modelDescription": "Model or deployment name, e.g. gpt-4o-mini-tts (OpenAI/Azure) or eleven_flash_v2_5 (ElevenLabs).",
-        "remoteVoiceLabel": "Voice name",
-        "remoteVoiceDescription": "Voice for OpenAI-compatible TTS, e.g. alloy, echo, nova, shimmer.",
-        "azureVoiceLabel": "Voice name",
-        "azureVoiceDescription": "Azure voice name, e.g. en-US-JennyNeural. Click Load voices to browse.",
-        "loadVoices": "Load voices",
-        "voicesLoading": "Loading…",
-        "voicesPick": "Pick from {{count}} voices…",
-        "loadModels": "Load models",
-        "modelsLoading": "Loading…",
-        "modelsPick": "Pick from {{count}} models…",
-        "modelsUse": "Use \"{{model}}\"",
-        "voicesUse": "Use \"{{voice}}\"",
-        "elevenVoiceLabel": "Voice ID",
-        "elevenVoiceDescription": "ElevenLabs voice ID (from the Voices tab in their dashboard).",
-        "promptLabel": "Summary Prompt",
-        "promptDescription": "Instructions for generating the brief spoken summary of each answer."
+        "speedCustomLabel": "Власна швидкість відтворення",
+        "testLabel": "Перевірити голос",
+        "testDescription": "Відтворити короткий приклад з поточними налаштуваннями.",
+        "testButton": "Перевірити голос",
+        "testing": "Перевірка…",
+        "testOk": "Відтворено ✓",
+        "testPhrase": "Привіт! Це перевірка голосового виводу SpeakoFlow.",
+        "downloadStart": "Завантаження голосу Kokoro…",
+        "downloadProgress": "Завантаження голосу Kokoro… {{progress}}%",
+        "downloadReady": "Голос Kokoro готовий ✓",
+        "downloadError": "Не вдалося завантажити голосову модель Kokoro",
+        "baseUrlLabel": "Базова URL-адреса",
+        "baseUrlDescription": "URL-адреса TTS, сумісна з OpenAI. Підходить і базова URL-адреса, і повна /audio/speech.",
+        "azureBaseUrlLabel": "URL-адреса Speech",
+        "azureBaseUrlDescription": "Ваша URL-адреса Azure Speech із порталу, напр. https://eastus2.tts.speech.microsoft.com.",
+        "apiKeyLabel": "API-ключ",
+        "apiKeyDescription": "Окремий від ключа асистента.",
+        "modelLabel": "Модель",
+        "modelDescription": "Назва моделі або розгортання, напр. gpt-4o-mini-tts (OpenAI/Azure) або eleven_flash_v2_5 (ElevenLabs).",
+        "remoteVoiceLabel": "Назва голосу",
+        "remoteVoiceDescription": "Голос для TTS, сумісного з OpenAI, напр. alloy, echo, nova, shimmer.",
+        "azureVoiceLabel": "Назва голосу",
+        "azureVoiceDescription": "Назва голосу Azure, напр. en-US-JennyNeural. Натисніть «Завантажити голоси», щоб переглянути.",
+        "loadVoices": "Завантажити голоси",
+        "voicesLoading": "Завантаження…",
+        "voicesPick": "Виберіть з {{count}} голосів…",
+        "loadModels": "Завантажити моделі",
+        "modelsLoading": "Завантаження…",
+        "modelsPick": "Виберіть з {{count}} моделей…",
+        "modelsUse": "Використати «{{model}}»",
+        "voicesUse": "Використати «{{voice}}»",
+        "elevenVoiceLabel": "ID голосу",
+        "elevenVoiceDescription": "ID голосу ElevenLabs (з вкладки Voices у їхній панелі).",
+        "promptLabel": "Промпт зведення",
+        "promptDescription": "Інструкції для створення короткого озвученого зведення кожної відповіді."
       },
       "appearance": {
-        "title": "Panel appearance",
-        "previewLabel": "Preview",
-        "previewDescription": "Live preview of the panel with your text size and opacity.",
-        "previewUser": "Hey, what can you do?",
-        "previewAssistant": "Lots! Ask me anything — I can even look at your screen.",
-        "fontSizeLabel": "Text size",
-        "fontSizeDescription": "Size of the chat text in the assistant panel.",
+        "title": "Вигляд панелі",
+        "previewLabel": "Попередній перегляд",
+        "previewDescription": "Живий перегляд панелі з вашим розміром тексту та прозорістю.",
+        "previewUser": "Привіт, що ти вмієш?",
+        "previewAssistant": "Багато що! Питай про будь-що — я навіть можу подивитися на твій екран.",
+        "fontSizeLabel": "Розмір тексту",
+        "fontSizeDescription": "Розмір тексту чату в панелі асистента.",
         "fontSizes": {
-          "small": "Small",
-          "medium": "Medium",
-          "large": "Large"
+          "small": "Малий",
+          "medium": "Середній",
+          "large": "Великий"
         },
-        "panelSizeLabel": "Panel size",
-        "panelSizeDescription": "Overall size of the floating assistant panel. You can also drag its edges to resize.",
+        "panelSizeLabel": "Розмір панелі",
+        "panelSizeDescription": "Загальний розмір плаваючої панелі асистента. Її розмір також можна змінити, перетягнувши краї.",
         "panelSizes": {
-          "compact": "Compact",
-          "standard": "Standard",
-          "large": "Large"
+          "mini": "Малий",
+          "compact": "Компактний",
+          "standard": "Стандартний",
+          "large": "Великий"
         },
-        "opacityLabel": "Panel opacity",
-        "opacityDescription": "How opaque the floating panel is. 100% is fully solid; lower values let the desktop blur through."
+        "opacityLabel": "Прозорість панелі",
+        "opacityDescription": "Наскільки щільною є плаваюча панель. 100% — повністю непрозора; нижчі значення дають розмите просвічування робочого стола."
       }
     }
   },
   "footer": {
-    "downloadingModel": "Завантаження {{model}}...",
-    "checkingUpdates": "Перевірка оновлень...",
+    "downloadingModel": "Завантаження {{model}}…",
+    "checkingUpdates": "Перевірка оновлень…",
     "updateAvailable": "Доступне оновлення: {{version}}",
     "updateAvailableShort": "Доступне оновлення",
     "upToDate": "Актуальна версія",
     "downloadUpdate": "Завантажити оновлення",
     "restart": "Перезапустити",
     "updateCheckingDisabled": "Перевірка оновлень вимкнена",
-    "downloading": "Завантаження... {{progress}}%",
-    "installing": "Встановлення...",
-    "preparing": "Підготовка...",
+    "downloading": "Завантаження… {{progress}}%",
+    "installing": "Встановлення…",
+    "preparing": "Підготовка…",
     "checkForUpdates": "Перевірити оновлення",
-    "checkFailed": "Update check failed",
-    "updateFailed": "Update failed",
-    "clickToRetry": "Click to try again",
-    "portableUpdateTitle": "Manual update required",
-    "portableUpdateMessage": "Portable installs cannot be updated automatically. To update: download the latest NSIS installer from GitHub Releases, install it to the same folder, then copy your Data/ folder (settings, models, recordings) from the old version to the new one.",
-    "portableUpdateButton": "Open GitHub Releases"
+    "checkFailed": "Не вдалося перевірити оновлення",
+    "updateFailed": "Не вдалося оновити",
+    "clickToRetry": "Натисніть, щоб спробувати ще раз",
+    "portableUpdateTitle": "Потрібне оновлення вручну",
+    "portableUpdateMessage": "Портативні версії не можна оновити автоматично. Щоб оновити: завантажте найновіший інсталятор NSIS зі сторінки GitHub Releases, установіть його в ту саму папку, а потім скопіюйте свою папку Data/ (налаштування, моделі, записи) зі старої версії до нової.",
+    "portableUpdateButton": "Відкрити GitHub Releases"
   },
   "common": {
-    "loading": "Завантаження...",
+    "loading": "Завантаження…",
     "save": "Зберегти",
     "cancel": "Скасувати",
     "reset": "Скинути",
@@ -1393,7 +1420,7 @@
     "yes": "Так",
     "no": "Ні",
     "noOptionsFound": "Опцій не знайдено",
-    "back": "Back",
+    "back": "Назад",
     "showAdvanced": "Більше опцій",
     "showLess": "Показати менше"
   },
@@ -1417,7 +1444,7 @@
     "recordingFailed": "Не вдалося розпочати запис: {{error}}",
     "modelLoadFailed": "Не вдалося завантажити модель: {{model}}",
     "modelLoadFailedUnknown": "невідома модель",
-    "downloadFailedTitle": "Download failed",
+    "downloadFailedTitle": "Не вдалося завантажити",
     "pasteFailedTitle": "Не вдалося вставити текст",
     "pasteFailed": "Не вдалося вставити текст до активної програми."
   },
@@ -1426,124 +1453,132 @@
     "description": "Змінити мову інтерфейсу SpeakoFlow"
   },
   "overlay": {
-    "preparing": "Getting mic ready…",
-    "recording": "Recording",
-    "transcribing": "Обробка...",
-    "processing": "Постобробка...",
-    "listening": "Listening…",
-    "locked": "Recording hands-free — press the hotkey again to stop",
-    "cancel": "Cancel",
-    "done": "Done",
-    "askAssistant": "Ask the assistant instead of typing this",
-    "generating": "Writing with Flow…",
-    "vision": "Looking at your screen…",
+    "preparing": "Готуємо мікрофон…",
+    "recording": "Запис",
+    "transcribing": "Обробка…",
+    "processing": "Постобробка…",
+    "generating": "Flow пише…",
+    "vision": "Дивимося на ваш екран…",
     "notices": {
-      "flowNotConfigured": "Flow needs an assistant model — pasted as dictation",
-      "flowFailed": "Flow couldn't generate — nothing was pasted",
-      "flowEmpty": "Say a command after the activation phrase"
-    }
+      "flowNotConfigured": "Flow потребує моделі асистента — вставлено як диктування",
+      "flowFailed": "Flow не зміг згенерувати — нічого не вставлено",
+      "flowEmpty": "Скажіть команду після фрази активації"
+    },
+    "listening": "Слухаю…",
+    "locked": "Запис без утримання — натисніть гарячу клавішу ще раз, щоб зупинити",
+    "cancel": "Скасувати",
+    "done": "Готово",
+    "askAssistant": "Запитати асистента замість набору цього тексту"
   },
   "assistant": {
-    "title": "Assistant",
+    "title": "Асистент",
     "character": {
-      "switch": "Switch persona"
+      "switch": "Змінити персону"
     },
-    "empty": "Ask by voice with your assistant shortcut,\nor type below.",
-    "inputPlaceholder": "Message…",
-    "inputPlaceholderScreen": "Ask about your screen…",
-    "send": "Send",
-    "stop": "Stop",
-    "finish": "Finish & send",
-    "clear": "Clear conversation",
-    "hide": "Hide panel",
-    "copy": "Copy",
-    "copyCode": "Copy code",
-    "regenerate": "Regenerate answer (the old one stays in History)",
-    "screenAttached": "Screen",
-    "attachScreen": "Screen vision — attach your screen to each message until turned off",
-    "detachScreen": "Turn off screen vision",
+    "empty": "Запитайте голосом за скороченням асистента,\nабо напишіть нижче.",
+    "inputPlaceholder": "Повідомлення…",
+    "inputPlaceholderScreen": "Запитайте про свій екран…",
+    "send": "Надіслати",
+    "stop": "Зупинити",
+    "cancel": "Скасувати",
+    "finish": "Завершити й надіслати",
+    "clear": "Очистити розмову",
+    "hide": "Сховати панель",
+    "copy": "Копіювати",
+    "copyCode": "Копіювати код",
+    "regenerate": "Згенерувати відповідь знову (стара залишиться в історії)",
+    "summarizing": "Стискаємо попередні повідомлення…",
+    "screenAttached": "Екран",
+    "attachScreen": "Перегляд екрана — додавати ваш екран до кожного повідомлення, доки не вимкнено",
+    "detachScreen": "Вимкнути перегляд екрана",
     "attach": {
-      "file": "Attach an image or file",
-      "snip": "Snip a region of the screen",
-      "image": "Image",
-      "imageCount": "{{count}} image",
-      "imageCount_other": "{{count}} images",
-      "remove": "Remove attachment",
-      "dropHint": "Drop to attach"
+      "file": "Додати зображення або файл",
+      "snip": "Вирізати частину екрана",
+      "image": "Зображення",
+      "imageCount": "{{count}} зображення",
+      "imageCount_other": "{{count}} зображень",
+      "remove": "Видалити вкладення",
+      "dropHint": "Відпустіть, щоб додати"
     },
     "snip": {
-      "hint": "Drag to snip a region — Esc to cancel"
+      "hint": "Потягніть, щоб вирізати область — Esc для скасування"
     },
     "webSearch": {
-      "enable": "Enable web search",
-      "disable": "Disable web search"
+      "enable": "Увімкнути пошук в інтернеті",
+      "disable": "Вимкнути пошук в інтернеті"
     },
     "tts": {
-      "enable": "Enable voice summaries",
-      "disable": "Disable voice summaries",
-      "loading": "Loading Kokoro voice model...",
-      "loadingShort": "Voice model {{progress}}%"
+      "enable": "Увімкнути голосові зведення",
+      "disable": "Вимкнути голосові зведення",
+      "loading": "Завантаження голосової моделі Kokoro...",
+      "loadingShort": "Голосова модель {{progress}}%"
     },
     "pill": {
-      "talk": "Click to talk",
-      "stop": "Stop and send",
-      "idle": "Assistant",
-      "expand": "Expand panel",
-      "collapse": "Collapse to pill",
-      "close": "Close assistant",
-      "cancel": "Cancel without sending",
-      "cancelTurn": "Cancel",
-      "dismiss": "Dismiss",
-      "disarmScreen": "Screen vision is on — click to turn it off",
-      "armScreen": "Screen vision is off — click to turn it on"
+      "talk": "Натисніть, щоб говорити",
+      "stop": "Зупинити й надіслати",
+      "idle": "Асистент",
+      "expand": "Розгорнути панель",
+      "collapse": "Згорнути в капсулу",
+      "close": "Закрити асистента",
+      "cancel": "Скасувати без надсилання",
+      "cancelTurn": "Скасувати",
+      "dismiss": "Закрити",
+      "disarmScreen": "Перегляд екрана увімкнено — натисніть, щоб вимкнути",
+      "armScreen": "Перегляд екрана вимкнено — натисніть, щоб увімкнути"
     },
     "status": {
-      "listening": "Listening…",
-      "locked": "Listening",
-      "transcribing": "Transcribing…",
-      "searching": "Searching the web...",
-      "thinking": "Thinking...",
-      "speaking": "Speaking..."
+      "listening": "Слухаю…",
+      "locked": "Слухаю",
+      "transcribing": "Транскрибування…",
+      "searching": "Пошук в інтернеті...",
+      "thinking": "Думаю...",
+      "speaking": "Говорю..."
     },
     "errors": {
-      "generic": "Something went wrong. Please try again.",
-      "genericShort": "Something went wrong",
-      "no_provider": "No assistant model is set up yet. Pick a provider in Settings → Assistant.",
-      "no_providerShort": "No model set up",
-      "no_model": "Your provider has no model selected. Choose one in Settings → Assistant.",
-      "no_modelShort": "No model selected",
-      "engine_start": "The built-in model couldn't start. Try again, or pick a different model in Settings → Assistant.",
-      "engine_startShort": "Model couldn't start",
-      "provider": "The model couldn't answer. Check your API key and connection, then try again.",
-      "providerShort": "Couldn't get an answer",
-      "vision_unsupported": "This model can't read your screen. Pick a vision-capable model in Settings → Assistant, or ask again without screen vision.",
-      "vision_unsupportedShort": "Model can't see images",
-      "screenshot_too_large": "The screen capture was too large for this provider. Please try again — it will be compressed harder.",
-      "screenshot_too_largeShort": "Screen capture too large",
-      "screen_capture": "Couldn't capture the screen. Try again, or ask without screen vision.",
-      "screen_captureShort": "Screen capture failed",
-      "transcription": "Couldn't transcribe your voice. Please try speaking again.",
-      "transcriptionShort": "Transcription failed",
-      "tts": "The spoken reply failed. Check your TTS settings, or read the answer in the panel.",
-      "ttsShort": "Voice reply failed",
-      "tts_local": "The local voice couldn't load. Check your connection or switch TTS engines in Settings.",
-      "tts_localShort": "Voice couldn't load",
-      "tts_blocked": "Your system blocked the voice from playing on its own. Click anywhere in the panel to hear the reply.",
-      "tts_blockedShort": "Tap the panel to hear it",
-      "tts_playback": "Couldn't play the voice on your output device. Check your speaker/output settings, then try again.",
-      "tts_playbackShort": "Voice playback failed",
-      "mic_denied": "Microphone access is blocked. Allow it in your system privacy settings.",
-      "mic_deniedShort": "Mic access blocked",
-      "mic_unavailable": "No microphone was found. Connect one and try again.",
-      "mic_unavailableShort": "No microphone found",
-      "mic_error": "The microphone couldn't start. It may be in use by another app.",
-      "mic_errorShort": "Mic couldn't start",
-      "file_read": "That file couldn't be attached.",
-      "file_readShort": "Couldn't attach file"
+      "generic": "Щось пішло не так. Будь ласка, спробуйте ще раз.",
+      "genericShort": "Щось пішло не так",
+      "no_provider": "Модель асистента ще не налаштована. Виберіть провайдера в Налаштування → Асистент.",
+      "no_providerShort": "Модель не налаштована",
+      "no_model": "Для вашого провайдера не вибрано модель. Виберіть її в Налаштування → Асистент.",
+      "no_modelShort": "Модель не вибрана",
+      "engine_start": "Вбудована модель не запустилася. Спробуйте ще раз або виберіть іншу модель у Налаштування → Асистент.",
+      "engine_startShort": "Модель не запустилася",
+      "provider": "Модель не змогла відповісти. Перевірте API-ключ і з'єднання, потім спробуйте ще раз.",
+      "providerShort": "Не вдалося отримати відповідь",
+      "vision_unsupported": "Ця модель не може читати ваш екран. Виберіть модель із розпізнаванням зображень у Налаштування → Асистент або запитайте знову без перегляду екрана.",
+      "vision_unsupportedShort": "Модель не бачить зображень",
+      "screenshot_too_large": "Знімок екрана був завеликим для цього провайдера. Будь ласка, спробуйте ще раз — його стиснуть сильніше.",
+      "screenshot_too_largeShort": "Знімок екрана завеликий",
+      "screen_capture": "Не вдалося зробити знімок екрана. Спробуйте ще раз або запитайте без перегляду екрана.",
+      "screen_captureShort": "Не вдалося зробити знімок екрана",
+      "transcription": "Не вдалося транскрибувати ваш голос. Будь ласка, спробуйте сказати ще раз.",
+      "transcriptionShort": "Транскрипція не вдалася",
+      "tts": "Не вдалося озвучити відповідь. Перевірте налаштування TTS або прочитайте відповідь у панелі.",
+      "ttsShort": "Не вдалося озвучити відповідь",
+      "tts_local": "Локальний голос не завантажився. Перевірте з'єднання або змініть рушій TTS у налаштуваннях.",
+      "tts_localShort": "Голос не завантажився",
+      "tts_blocked": "Ваша система заблокувала самостійне відтворення голосу. Натисніть будь-де в панелі, щоб почути відповідь.",
+      "tts_blockedShort": "Натисніть панель, щоб почути",
+      "tts_playback": "Не вдалося відтворити голос на вашому пристрої виводу. Перевірте налаштування динаміків/виводу, потім спробуйте ще раз.",
+      "tts_playbackShort": "Не вдалося відтворити голос",
+      "mic_denied": "Доступ до мікрофона заблоковано. Дозвольте його в системних налаштуваннях конфіденційності.",
+      "mic_deniedShort": "Доступ до мікрофона заблоковано",
+      "mic_unavailable": "Мікрофон не знайдено. Підключіть його та спробуйте ще раз.",
+      "mic_unavailableShort": "Мікрофон не знайдено",
+      "mic_error": "Мікрофон не запустився. Можливо, його використовує інший застосунок.",
+      "mic_errorShort": "Мікрофон не запустився",
+      "file_read": "Не вдалося додати цей файл.",
+      "file_readShort": "Не вдалося додати файл"
     },
     "notices": {
-      "web_search_failed": "Web search didn't return results — answering without them.",
-      "web_search_failedShort": "No web results"
+      "web_search_failed": "Пошук в інтернеті не дав результатів — відповідаю без них.",
+      "web_search_failedShort": "Немає результатів з інтернету"
+    },
+    "engineSetup": {
+      "downloading": "Налаштування локального рушія (перший запуск)… {{percent}}%",
+      "preparing": "Налаштування локального рушія (перший запуск)…",
+      "extracting": "Встановлення локального рушія…",
+      "short": "Налаштування рушія…"
     }
   }
 }
