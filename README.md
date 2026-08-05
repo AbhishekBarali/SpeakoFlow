@@ -28,8 +28,7 @@
 </div>
 
 > **Get told when there's a new version:** click **Watch → Custom → Releases** at
-> the top of this page. SpeakoFlow can't auto-update until it's code signed, so
-> this is the only way to hear about updates.
+> the top of this page.
 
 ---
 
