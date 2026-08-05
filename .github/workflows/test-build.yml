@@ -7,17 +7,13 @@ name: "Test Build"
 # Trigger from the CLI:  gh workflow run test-build.yml --repo <owner>/<repo>
 # or from the Actions tab -> "Test Build" -> "Run workflow".
 #
-# This mirrors the release-unsigned.yml matrix target-for-target, so a green run
-# here means a release will produce the same set of installers. Nothing belongs
-# in a release matrix that has not passed here first — Test Build #8 exposed
-# three targets that release.yml had listed for months without ever building.
+# This is the proving ground for release-unsigned.yml: every target there must
+# have gone green here first — Test Build #8 exposed three targets that
+# release.yml had listed for months without ever building. The reverse does not
+# hold; this matrix may carry extra targets that are still being proven (today:
+# Intel macOS), which is exactly what it is for.
 #
 # Deliberately absent, with reasons (from Test Build #8):
-#
-#   * Intel macOS (x86_64-apple-darwin) — GitHub retired the last Intel macOS
-#     runner (macos-13) on 2025-12-04 and every remaining label is arm64, so it
-#     could only be an arm64->x86_64 cross-compile that build.yml is not set up
-#     for. Never built green.
 #
 #   * ubuntu-22.04 — cannot compile at all. xcap (screen capture) pulls
 #     pipewire/libspa 0.9.2, whose bindings are generated from the system libspa
@@ -36,6 +32,20 @@ name: "Test Build"
 #     Vulkan/SPIRV setup steps in build.yml are gated to non-aarch64 Windows, so
 #     ARM64 never gets an SDK. Needs either an ARM64 Vulkan SDK in CI or a
 #     target-specific opt-out of the vulkan feature.
+#
+# CORRECTION (supersedes the Test Build #8 note that Intel macOS was impossible):
+# GitHub retired `macos-13` on 2025-12-04 but REPLACED it with `macos-15-intel`,
+# which is available until August 2027 (actions/runner-images#13045). The earlier
+# conclusion that every remaining macOS label was arm64 — and therefore that an
+# Intel build could only be a cross-compile — was simply wrong, and the same
+# mistaken premise reached README.md. Intel macOS is now built natively HERE
+# ONLY, as an unproven target. It must go green here, and be confirmed on real
+# Intel hardware by a tester, before it is considered for either release matrix.
+# What it needs beyond a matrix entry (all landed in build.yml / Cargo.toml):
+#   * CPU-only engines — ggml's Metal backend targets Apple Silicon and misbehaves
+#     on Intel GPUs, so Cargo.toml arch-gates `metal` to aarch64.
+#   * Dynamically linked ONNX Runtime from Homebrew, bundled into the .app —
+#     pykeio's `ort` has no prebuilt x86_64-apple-darwin binaries to embed.
 
 on: workflow_dispatch
 
@@ -50,6 +60,13 @@ jobs:
           - platform: "macos-26" # Apple Silicon (M1+)
             args: "--target aarch64-apple-darwin"
             target: "aarch64-apple-darwin"
+          # UNPROVEN — Intel Macs (x86_64), CPU-only. Test-build only; not in any
+          # release matrix until this is green AND a tester confirms it runs on a
+          # real Intel Mac. `fail-fast: false` above keeps a red Intel job from
+          # taking the other four targets down with it.
+          - platform: "macos-15-intel"
+            args: "--target x86_64-apple-darwin"
+            target: "x86_64-apple-darwin"
           - platform: "ubuntu-24.04" # AppImage + .deb, x86_64
             args: "--bundles appimage,deb"
             target: "x86_64-unknown-linux-gnu"
