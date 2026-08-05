@@ -684,13 +684,62 @@ jobs:
           smoke_binary() {
             local root="$1"
             local label="$2"
+            local rc=0
             # Run under a virtual X server: speakoflow initializes GTK on startup
             # even on the headless --list-devices path, which fails without a
             # display. SPEAKOFLOW_NO_GTK_LAYER_SHELL avoids the layer-shell path.
+            set +e
             SPEAKOFLOW_NO_GTK_LAYER_SHELL=1 \
             LD_LIBRARY_PATH="${root}/usr/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}" \
-              xvfb-run -a "${root}/usr/bin/speakoflow" --list-devices >/tmp/speakoflow-package-smoke.log
-            echo "${label} --list-devices smoke passed"
+              xvfb-run -a "${root}/usr/bin/speakoflow" --list-devices \
+              >/tmp/speakoflow-package-smoke.log 2>/tmp/speakoflow-package-smoke.err
+            rc=$?
+            set -e
+
+            if [ "$rc" -eq 0 ]; then
+              cat /tmp/speakoflow-package-smoke.log || true
+              echo "${label} --list-devices smoke passed"
+              return 0
+            fi
+
+            # A bare "exit code 132" tells us nothing actionable, and this is the
+            # single most important failure in the whole pipeline: it is the exact
+            # thing a user sees as "installs, then does nothing". Dump enough to
+            # identify the faulting module in ONE run instead of guessing.
+            echo "::error::${label} --list-devices FAILED with exit code ${rc}"
+            if [ "$rc" -gt 128 ]; then
+              local sig=$((rc - 128))
+              echo "Killed by signal ${sig} ($(kill -l "${sig}" 2>/dev/null || echo unknown))"
+              echo "  4=SIGILL (illegal instruction: a lib built for a wider ISA than this CPU)"
+              echo "  11=SIGSEGV, 6=SIGABRT"
+            fi
+
+            echo "--- stdout ---"; cat /tmp/speakoflow-package-smoke.log || true
+            echo "--- stderr ---"; cat /tmp/speakoflow-package-smoke.err || true
+
+            echo "--- engine libs present in the package ---"
+            ls -la "${root}/usr/lib/" | grep -E 'libtranscribe|libggml' || echo "(none!)"
+
+            echo "--- NEEDED libs of the binary ---"
+            readelf -d "${root}/usr/bin/speakoflow" 2>/dev/null | grep NEEDED || true
+
+            echo "--- this runner's CPU ---"
+            lscpu 2>/dev/null | grep -Ei 'model name|^flags|architecture' | cut -c1-400 || true
+
+            echo "--- backtrace ---"
+            if ! command -v gdb >/dev/null 2>&1; then
+              sudo apt-get install -y -qq gdb >/dev/null 2>&1 || true
+            fi
+            if command -v gdb >/dev/null 2>&1; then
+              SPEAKOFLOW_NO_GTK_LAYER_SHELL=1 \
+              LD_LIBRARY_PATH="${root}/usr/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}" \
+                xvfb-run -a gdb -batch \
+                  -ex 'run --list-devices' \
+                  -ex 'bt' \
+                  -ex 'info sharedlibrary' \
+                  --args "${root}/usr/bin/speakoflow" --list-devices 2>&1 | tail -60 || true
+            fi
+            return 1
           }
 
           if compgen -G "${BUNDLE_DIR}/deb/*.deb" > /dev/null; then
@@ -745,6 +794,82 @@ jobs:
               rm -rf "$workdir"
             done
           fi
+
+      # ── THE FIX for v1.1.0's unlaunchable .deb ─────────────────────────────
+      # `tauri-action` is given `releaseId`, so it uploads the bundles to the
+      # GitHub Release from INSIDE the "Build with Tauri" step. Both Linux
+      # post-processing steps above — the AppImage repack and the .deb
+      # inject/repack that add libtranscribe.so and the ggml backend modules —
+      # run AFTER that upload. So the release got the pre-injection files while
+      # the fixes landed on local copies nobody downloads, and the audit then
+      # inspected those same local (correct) copies and passed.
+      #
+      # Result in v1.1.0: a fully green release run that shipped a .deb with zero
+      # engine libs, which dies at load with
+      #   speakoflow: error while loading shared libraries: libtranscribe.so.0:
+      #   cannot open shared object file
+      # Reported in the wild; reproduced by unpacking the released asset.
+      #
+      # Overwrite those assets with the repacked ones. Runs only for release
+      # builds (release-id set); test builds are unaffected because their
+      # "Upload artifacts (Linux)" step already runs after the audit — which is
+      # exactly why test builds always looked fine.
+      - name: Republish repacked Linux packages to the release
+        if: ${{ contains(inputs.platform, 'ubuntu') && inputs.release-id != '' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="v${{ steps.get-version.outputs.version }}"
+          BUNDLE_DIR="src-tauri/target/${{ steps.build-profile.outputs.profile }}/bundle"
+
+          shopt -s nullglob
+          assets=( "${BUNDLE_DIR}"/deb/*.deb "${BUNDLE_DIR}"/appimage/*.AppImage )
+          shopt -u nullglob
+          if [ ${#assets[@]} -eq 0 ]; then
+            echo "ERROR: no Linux packages found to republish under ${BUNDLE_DIR}" >&2
+            exit 1
+          fi
+
+          for a in "${assets[@]}"; do
+            echo "Republishing $(basename "$a") ($(du -h "$a" | cut -f1)) to ${TAG}"
+          done
+          # --clobber replaces the stale asset tauri-action attached earlier.
+          gh release upload "$TAG" "${assets[@]}" --clobber --repo "$GITHUB_REPOSITORY"
+
+          # Close the loop: pull the asset back DOWN from the release and confirm
+          # the engine libs are in the file a user would actually get. Auditing a
+          # local build artifact is what hid this bug for a whole release, so the
+          # check that matters is the one against the published file.
+          verify_dir="$(mktemp -d)"
+          for a in "${assets[@]}"; do
+            name="$(basename "$a")"
+            case "$name" in
+              *.deb) ;;
+              *) continue ;;  # .deb is the one with an inspectable index
+            esac
+            echo "Verifying published asset: ${name}"
+            gh release download "$TAG" --pattern "$name" --dir "$verify_dir" \
+              --clobber --repo "$GITHUB_REPOSITORY"
+            if ! dpkg-deb -c "${verify_dir}/${name}" | grep -Eq 'usr/lib/libtranscribe\.so'; then
+              echo "ERROR: published ${name} is STILL missing libtranscribe.so" >&2
+              dpkg-deb -c "${verify_dir}/${name}" | grep 'usr/lib' >&2 || true
+              exit 1
+            fi
+            if ! dpkg-deb -c "${verify_dir}/${name}" | grep -Eq 'usr/lib/libggml-cpu.*\.so'; then
+              echo "ERROR: published ${name} is STILL missing the ggml CPU backend" >&2
+              exit 1
+            fi
+            echo "Published ${name} contains the engine libs."
+          done
+          rm -rf "$verify_dir"
+
+          # NOTE (not yet handled): with signing enabled, createUpdaterArtifacts
+          # also produces <AppImage>.tar.gz + .sig, built from the PRE-repack
+          # AppImage. release.yml has never run, so nothing ships them today, but
+          # they must be regenerated from the repacked AppImage before the signed
+          # release path is used for Linux auto-updates.
 
       - name: Upload artifacts (Linux)
         if: inputs.upload-artifacts && contains(inputs.platform, 'ubuntu')
