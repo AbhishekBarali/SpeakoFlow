@@ -5,7 +5,7 @@
   <img src="Logo/final/lockup.svg" alt="SpeakoFlow" width="340" />
 </picture>
 
-# SpeakoFlow — free voice dictation and an AI assistant for Windows, macOS, and Linux
+# SpeakoFlow: free voice dictation and an AI assistant for Windows, macOS, and Linux
 
 ### You think faster than you type.
 
@@ -54,7 +54,7 @@ SpeakoFlow turns your voice into text, right where you're working. Press a hotke
 
 Speech-to-text runs locally on your machine, so your voice never leaves your device. The AI assistant runs on any model you choose, from a fully offline built-in model to your own local server or a cloud provider with your own key. You decide how much stays on your machine.
 
-I built it while studying alone for exams, because I was paying for dictation software that stopped at typing — it could hear me, but it couldn't help me.
+I built it while studying alone for exams. I was paying for dictation software that stopped at typing: it could hear me, but it couldn't help me.
 
 ## Why SpeakoFlow
 
@@ -62,18 +62,18 @@ Most dictation tools stop at typing. Wispr Flow, Superwhisper, and Handy all tur
 speech into text well. None of them can look at what you are working on and write
 the reply for you.
 
-SpeakoFlow does both — and it's the only one of the four that's free, open source,
+SpeakoFlow does both. It's also the only one of the four that's free, open source,
 and runs on all three desktop platforms.
 
-- **Compared with Wispr Flow** — Wispr Flow is closed source, transcribes in the
+- **Compared with Wispr Flow.** Wispr Flow is closed source, transcribes in the
   cloud, has no Linux build, and caps its free tier at 2,000 words per week
   ($15/month after that). SpeakoFlow is MIT licensed, transcribes on your own
   machine, and has no cap. Full breakdown:
   [SpeakoFlow vs Wispr Flow](https://www.speakoflow.com/blog/speakoflow-vs-wispr-flow).
-- **Compared with Superwhisper** — Superwhisper is a capable closed-source app on
+- **Compared with Superwhisper.** Superwhisper is a capable closed-source app on
   macOS, Windows, and iOS, with Pro at $8.49/month or $249.99 for a lifetime
   licence. SpeakoFlow is free, MIT licensed, and also runs on Linux.
-- **Built on Handy** — SpeakoFlow's dictation core comes from
+- **Built on Handy.** SpeakoFlow's dictation core comes from
   [Handy](https://github.com/cjpais/Handy), the more established project and a
   genuinely good pure-dictation tool. SpeakoFlow takes that core further:
   spoken-instruction writing, on-device translation, text-to-speech, personal
@@ -85,15 +85,15 @@ to answer you, keep reading. See also:
 
 ## Features
 
-### Generate with Flow — say "Hey Flow" and it writes the reply
+### Generate with Flow: say "Hey Flow" and it writes the reply
 
-Begin a dictation with "Hey Flow" and SpeakoFlow doesn't transcribe what you said,
-it acts on it. Describe the email, reply, or draft you want and it writes the
+Begin a dictation with "Hey Flow" and SpeakoFlow acts on what you said instead of
+transcribing it. Describe the email, reply, or draft you want and it writes the
 finished text and pastes it where your cursor is. The trigger phrase is renameable,
 and it works in any app that accepts text. This is the part plain dictation tools
 don't do.
 
-### Screen vision — ask about what's on your screen
+### Screen vision: ask about what's on your screen
 
 Ask a question about whatever you're looking at and the assistant answers with that
 context: the error in your terminal, the contract in your browser, the chart in your
@@ -102,24 +102,24 @@ on screen rather than on what you dictate. It only captures when you ask it to, 
 capture goes only to the model provider you chose, and only a small thumbnail is
 kept locally.
 
-### Dictation — type into any app with your voice
+### Dictation: type into any app with your voice
 
 Press a hotkey and talk. Words type into any app, live as you speak or all at once
 when you stop. Transcription runs on your GPU or CPU with whisper.cpp or Parakeet,
 fully offline.
 
-### Assistant panel — a floating voice chat over your work
+### Assistant panel: a floating voice chat over your work
 
 A floating always-on-top chat you open with a hotkey. Ask by voice or text, get
 streaming answers, and have them read back aloud. Collapses to a pill when you
 don't need it.
 
-### Translate — speak any language, get clean English, offline
+### Translate: speak any language, get clean English, offline
 
 Speak another language and get clean English, on your device, with a Whisper model.
 No cloud round-trip.
 
-### AI cleanup — strip filler and set the tone
+### AI cleanup: strip filler and set the tone
 
 Remove filler words and fix grammar in a tone you choose: Professional, Friendly,
 Concise, or your own custom instruction.
@@ -129,7 +129,7 @@ Concise, or your own custom instruction.
 Optional web search so the assistant can look things up for current, factual
 answers. Profiles switch it between personas, each with its own voice and reply
 length. Personal memory is on-device and optional, so it learns how you like to
-work — off until you turn it on, and editable or erasable at any time.
+work. It's off until you turn it on, and you can edit or erase it at any time.
 
 Everything lives in Settings, and every hotkey is rebindable.
 
@@ -149,18 +149,18 @@ Download the latest build for Windows, macOS, or Linux from the [Releases](https
 ### Windows
 
 Download the `.exe` installer and run it. Windows may show a SmartScreen notice
-because the installer isn't signed by a known publisher yet — choose **More
+because the installer isn't signed by a known publisher yet. Choose **More
 info → Run anyway**.
 
 ### Linux
 
-- **Arch Linux** — install from the AUR:
+- **Arch Linux.** Install from the AUR:
   ```bash
   yay -S speakoflow-bin
   # or
   paru -S speakoflow-bin
   ```
-- **Debian, Ubuntu 24.04+, Mint 22+, Pop!\_OS, Tuxedo OS** — download the `.deb`
+- **Debian, Ubuntu 24.04+, Mint 22+, Pop!\_OS, Tuxedo OS.** Download the `.deb`
   and install it. This registers the app icon and menu entry properly, which the
   AppImage can't do on its own:
   ```bash
@@ -168,15 +168,16 @@ info → Run anyway**.
   ```
   The `.deb` is built on Ubuntu 24.04, so it needs that era of glibc. On an
   older release, use the AppImage instead.
-- **Any other distribution, including Fedora and openSUSE** — download the
+- **Any other distribution, including Fedora and openSUSE.** Download the
   AppImage, make it executable (`chmod +x`), and run it. Note that an AppImage
   doesn't integrate with your desktop by itself, so it won't show an icon in your
   file manager or app menu; tools like Gear Lever or AppImageLauncher add that if
   you want it.
 
 The AppImage and `.deb` are both built for x86_64 and ARM64. There's no `.rpm`
-yet — the packaging doesn't bundle the speech engine correctly, and shipping one
-that installs but can't transcribe would be worse than not shipping it.
+yet, because the packaging doesn't bundle the speech engine correctly, and
+shipping one that installs but can't transcribe would be worse than not shipping
+it.
 
 ### macOS
 
@@ -189,7 +190,7 @@ one Terminal command to clear it. Full explanation below, or in the
 [install docs](https://www.speakoflow.com/docs).
 
 <details>
-<summary><b>macOS says "SpeakoFlow is damaged" — here's why, and the one-line fix</b></summary>
+<summary><b>Why macOS says "SpeakoFlow is damaged", and the one-line fix</b></summary>
 
 <br />
 
@@ -215,7 +216,7 @@ Install it in three steps:
 **You only do this once per version you install.** The command removes the
 "downloaded from the internet" tag that macOS puts on the file; after that the
 app opens like any other. Because SpeakoFlow can't auto-update while unsigned,
-you'll repeat the step the next time you download a new version — one command
+you'll repeat the step the next time you download a new version. One command
 per update, never per launch.
 
 If you're wondering why there's no button to click instead: macOS 15 and later
@@ -278,7 +279,7 @@ Common issues are collapsed below. For anything not covered here, see
 
 The recording overlay has to float above every other window. On Linux that is only possible two ways: the `wlr-layer-shell` protocol (used by wlroots compositors like Sway and Hyprland, and by KDE Plasma) or classic X11 "keep above" stacking.
 
-**A native GNOME/Wayland session supports neither** — Mutter does not implement `wlr-layer-shell`, and Wayland gives apps no way to raise themselves above others. So under native GNOME/Wayland the overlay can't stay on top.
+**A native GNOME/Wayland session supports neither.** Mutter does not implement `wlr-layer-shell`, and Wayland gives apps no way to raise themselves above others. So under native GNOME/Wayland the overlay can't stay on top.
 
 SpeakoFlow handles this automatically: when it detects GNOME on Wayland it runs under **XWayland**, where "keep above" works and the overlay floats normally. This is on by default and needs no setup. X11 sessions and KDE/wlroots Wayland already work out of the box.
 
@@ -299,13 +300,13 @@ your input devices. This affects the **handy-keys** keyboard engine, which reads
 
 Two ways to fix it:
 
-- **Grant access** — add your user to the `input` group, then log out and back in:
+- **Grant access.** Add your user to the `input` group, then log out and back in:
 
   ```bash
   sudo usermod -aG input $USER
   ```
 
-- **Or switch engines** — set the keyboard engine to **Tauri** in Settings, which
+- **Or switch engines.** Set the keyboard engine to **Tauri** in Settings, which
   uses the compositor's global-shortcut API and needs no special permissions.
   (Tauri is already the default engine on Linux, so this only affects you if you
   switched to handy-keys.)
@@ -351,7 +352,7 @@ Released under the [MIT License](LICENSE).
 ## Credits
 
 SpeakoFlow builds on the dictation core from [Handy](https://github.com/cjpais/Handy)
-by CJ Pais, used under the MIT licence — thanks to CJ for making it open. The
+by CJ Pais, used under the MIT licence. Thanks to CJ for making it open. The
 assistant, screen vision, Generate with Flow, translation, text-to-speech, and
 memory layers are SpeakoFlow's own.
 
