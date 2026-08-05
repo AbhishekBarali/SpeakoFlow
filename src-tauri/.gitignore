@@ -9,3 +9,8 @@
 # Native runtime libraries staged by build.rs (transcribe-cpp .dll/.so + VC++
 # redist) for the installer. Regenerated on every build; never committed.
 /transcribe-libs/
+
+# ONNX Runtime dylib staged by CI for the Intel macOS build only (copied from
+# Homebrew, install name rewritten to @rpath, then bundled into the .app). Same
+# deal as transcribe-libs/: regenerated per build, never committed.
+/onnx-libs/

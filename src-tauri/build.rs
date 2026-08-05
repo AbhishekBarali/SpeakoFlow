@@ -17,10 +17,31 @@ fn main() {
     // -> `usr/lib`, and deb/rpm `/usr/bin/speakoflow` -> `/usr/lib`.
     // transcribe's init_backends_default() then loads the ggml modules
     // co-located there. (Windows resolves DLLs from the exe directory, so it
-    // needs no rpath; macOS links transcribe-cpp statically via the `metal`
-    // feature.)
+    // needs no rpath; macOS links transcribe-cpp statically — Apple Silicon via
+    // the `metal` feature, Intel CPU-only with no features.)
     if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("linux") {
         println!("cargo:rustc-link-arg=-Wl,-rpath,$ORIGIN/../lib");
+    }
+
+    // Intel macOS is the one target that links ONNX Runtime DYNAMICALLY: pykeio's
+    // `ort` dropped prebuilt x86_64-apple-darwin binaries, so transcribe-rs's
+    // `onnx` feature has no static ORT to embed there and CI links against a
+    // Homebrew-provided libonnxruntime instead (see BUILD.md and the
+    // "Stage ONNX Runtime for Intel macOS" step in .github/workflows/build.yml).
+    //
+    // For a *distributable* .dmg that dylib has to travel inside the bundle, in
+    // `SpeakoFlow.app/Contents/Frameworks` (tauri-bundler puts `bundle.macOS.
+    // frameworks` entries there). tauri-bundler explicitly does NOT touch load
+    // paths — embedding the rpath is the caller's job — so bake it in here.
+    //
+    // A no-op for Apple Silicon (static ORT, nothing to resolve) and harmless
+    // for a local Intel dev build, where ORT_LIB_LOCATION points straight at the
+    // Homebrew prefix and the dylib's absolute install name resolves without the
+    // rpath ever being consulted.
+    if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("macos")
+        && std::env::var("CARGO_CFG_TARGET_ARCH").as_deref() == Ok("x86_64")
+    {
+        println!("cargo:rustc-link-arg=-Wl,-rpath,@executable_path/../Frameworks");
     }
 
     // Stage transcribe-cpp's shared runtime libraries (and the dlopen'd ggml

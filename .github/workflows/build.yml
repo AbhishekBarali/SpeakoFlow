@@ -6,13 +6,20 @@ name: "Build"
 #
 #   * transcribe-cpp (GGUF/ggml) is the new engine. Windows x86_64 + Linux ship
 #     it in the `dynamic-backends` + `vulkan` posture (loadable ggml backend
-#     DLLs/.so + a Vulkan GPU backend); macOS links it statically (`metal`);
-#     Windows-on-ARM links it statically CPU-only (no DLLs).
+#     DLLs/.so + a Vulkan GPU backend); macOS aarch64 links it statically
+#     (`metal`); macOS x86_64 and Windows-on-ARM link it statically CPU-only
+#     (no DLLs, no GPU backend).
 #   * transcribe-rs 0.3.11 is KEPT AS-IS with its statically-embedded ONNX
 #     Runtime (+ `ort-directml` on Windows). We deliberately do NOT converge to
 #     Handy's shape-(a) dynamically-linked baseline ORT, so — unlike Handy —
 #     there are NO `ORT_LIB_LOCATION` / `ORT_PREFER_DYNAMIC_LINK` steps and no
 #     onnxruntime.dll staging/audit here.
+#
+#     ONE EXCEPTION: Intel macOS (x86_64-apple-darwin), where pykeio's `ort`
+#     dropped prebuilt binaries entirely, so there is no static ORT to embed.
+#     That target links against Homebrew's onnxruntime and ships the dylib inside
+#     the .app — see "Stage ONNX Runtime for Intel macOS" and
+#     "Audit Intel macOS bundle" below. Apple Silicon is untouched by this.
 #
 # What this covers (Session 7 requirements):
 #   * Vulkan SDK (Windows x64) + SPIRV-Headers (vcpkg) on CMAKE_PREFIX_PATH.
@@ -467,6 +474,85 @@ jobs:
             console.log("Patched tauri.conf.json: signing disabled for unsigned test build");
           '
 
+      # ── Intel macOS (x86_64-apple-darwin) ─────────────────────────────────
+      # Intel macOS is the ONE target where SpeakoFlow links ONNX Runtime
+      # dynamically. pykeio's `ort` dropped prebuilt x86_64-apple-darwin binaries
+      # ("Support for Intel macOS has been dropped following upstream changes to
+      # ONNX Runtime & Rust"), so transcribe-rs's `onnx` feature has no static ORT
+      # to embed there — the shape-(b) posture that holds on every other target.
+      # Homebrew's onnxruntime fills the gap (this is what BUILD.md documents for
+      # local Intel builds).
+      #
+      # A *distributable* .dmg needs more than `brew --prefix`, though: a Homebrew
+      # dylib's install name is an absolute path into the build machine's Cellar,
+      # so linking straight against it produces an app that only starts on a Mac
+      # that happens to have the same formula installed. It has to travel inside
+      # the bundle instead.
+      #
+      # The rewrite happens BEFORE linking, which avoids all post-bundle surgery
+      # on the .app (and the stale-DMG problem that comes with it):
+      #   1. copy the dylib into src-tauri/onnx-libs/, dereferenced,
+      #   2. rewrite its install name to @rpath/libonnxruntime.dylib,
+      #   3. point ORT_LIB_LOCATION at that staged copy — so the linker records
+      #      @rpath/libonnxruntime.dylib in `speakoflow`, not /usr/local/...
+      # build.rs emits the matching @executable_path/../Frameworks rpath, the
+      # config patch below makes tauri-bundler copy the dylib into
+      # Contents/Frameworks, and the audit step after the build verifies all
+      # three halves actually met.
+      - name: Stage ONNX Runtime for Intel macOS
+        if: inputs.target == 'x86_64-apple-darwin'
+        shell: bash
+        run: |
+          set -euo pipefail
+          brew install onnxruntime
+          BREW_LIB="$(brew --prefix onnxruntime)/lib"
+          echo "Homebrew onnxruntime lib dir: $BREW_LIB"
+          ls -la "$BREW_LIB"
+
+          STAGE="$GITHUB_WORKSPACE/src-tauri/onnx-libs"
+          rm -rf "$STAGE"
+          mkdir -p "$STAGE"
+
+          # -L dereferences Homebrew's libonnxruntime.dylib symlink into the real
+          # versioned object, so ONE self-contained file lands in the bundle under
+          # the plain name the linker resolves for -lonnxruntime.
+          cp -L "$BREW_LIB/libonnxruntime.dylib" "$STAGE/libonnxruntime.dylib"
+          chmod u+w "$STAGE/libonnxruntime.dylib"
+          install_name_tool -id "@rpath/libonnxruntime.dylib" "$STAGE/libonnxruntime.dylib"
+          # install_name_tool invalidates the dylib's existing signature; re-sign
+          # ad-hoc so it stays loadable (and re-signable later by the bundler).
+          codesign --force --sign - "$STAGE/libonnxruntime.dylib"
+
+          echo "Staged dylib install name:"
+          otool -D "$STAGE/libonnxruntime.dylib"
+
+          echo "ORT_LIB_LOCATION=$STAGE" >> "$GITHUB_ENV"
+          echo "ORT_PREFER_DYNAMIC_LINK=1" >> "$GITHUB_ENV"
+
+      # Make tauri-bundler copy the staged dylib into
+      # SpeakoFlow.app/Contents/Frameworks. `bundle.macOS.frameworks` accepts a
+      # path to a .dylib and copies it there verbatim — it deliberately does not
+      # touch install names or rpaths, which the two steps above/around it handle.
+      # Patched here rather than committed to tauri.conf.json so the path only
+      # exists for the Intel job; every other target would fail on a missing file.
+      - name: Bundle ONNX Runtime into the app (Intel macOS)
+        if: inputs.target == 'x86_64-apple-darwin'
+        shell: bash
+        run: |
+          node -e '
+            const fs = require("fs");
+            const p = "src-tauri/tauri.conf.json";
+            const c = JSON.parse(fs.readFileSync(p, "utf8"));
+            c.bundle = c.bundle || {};
+            c.bundle.macOS = c.bundle.macOS || {};
+            const fw = new Set(c.bundle.macOS.frameworks || []);
+            // Relative to tauri.conf.json (src-tauri/), same as bundle.resources.
+            fw.add("onnx-libs/libonnxruntime.dylib");
+            c.bundle.macOS.frameworks = [...fw];
+            fs.writeFileSync(p, JSON.stringify(c, null, 2));
+            console.log("Patched tauri.conf.json: macOS frameworks =", c.bundle.macOS.frameworks);
+          '
+
       # Split signed (production) vs unsigned (test). The UNSIGNED path passes NO
       # Apple/Azure/updater env at all: a present-but-EMPTY APPLE_CERTIFICATE makes
       # tauri attempt a keychain `security import` that fails ("SecKeychainItemImport:
@@ -506,6 +592,117 @@ jobs:
           releaseId: ${{ inputs.release-id }}
           assetNamePattern: ${{ steps.patch-release-name.outputs.platform }}
           args: ${{ inputs.build-args }}
+
+      # The hard gate for Intel macOS, mirroring the Windows/Linux package audits:
+      # a .dmg that installs and then cannot start is the failure mode worth
+      # catching in CI rather than in a user's issue tracker. Four failing checks,
+      # because each covers a different way the ORT bundling can silently
+      # half-work, plus one informational report:
+      #   1. the binary is really x86_64 (not an accidental arm64 build),
+      #   2. it references @rpath/libonnxruntime.dylib and NOT a Homebrew path
+      #      (a Homebrew path means step 2 of the staging never took effect),
+      #   3. the dylib is actually inside Contents/Frameworks (i.e. tauri-bundler
+      #      honored the `frameworks` entry) and carries the rpath to find it,
+      #   4. the bundled binary launches: `--list-devices` exits before Tauri and
+      #      any window setup, but dyld still has to resolve every linked dylib
+      #      first — so a missing/unresolvable libonnxruntime fails right here.
+      #      This runs on an Intel runner, so it is a genuine native check.
+      #   5. it prints the real minimum macOS version of the artifact, which the
+      #      bundled Homebrew dylib — not tauri.conf.json — ultimately decides.
+      #
+      # ONNX Runtime is NOT optional here, which is why all of this exists: `ort`
+      # is pulled in by vad-rs (Silero VAD, core to every recording) as well as
+      # transcribe-rs (Parakeet). Dropping the Parakeet engine would not remove it.
+      - name: Audit Intel macOS bundle
+        if: inputs.target == 'x86_64-apple-darwin'
+        shell: bash
+        run: |
+          set -euo pipefail
+          PROFILE="${{ steps.build-profile.outputs.profile }}"
+          BUNDLE_DIR="src-tauri/target/x86_64-apple-darwin/${PROFILE}/bundle"
+
+          APP="$(find "${BUNDLE_DIR}/macos" -maxdepth 1 -name '*.app' | head -1)"
+          if [ -z "${APP:-}" ]; then
+            echo "ERROR: no .app produced under ${BUNDLE_DIR}/macos" >&2
+            find "src-tauri/target/x86_64-apple-darwin/${PROFILE}" -maxdepth 3 -name '*.app' -o -maxdepth 3 -name '*.dmg' >&2 || true
+            exit 1
+          fi
+          echo "Auditing ${APP}"
+
+          BIN="$(find "${APP}/Contents/MacOS" -maxdepth 1 -type f -perm -u+x | head -1)"
+          if [ -z "${BIN:-}" ]; then
+            echo "ERROR: no executable in ${APP}/Contents/MacOS" >&2
+            ls -la "${APP}/Contents/MacOS" >&2 || true
+            exit 1
+          fi
+
+          # 1. Architecture.
+          echo "--- file ---"
+          file "$BIN"
+          if ! file "$BIN" | grep -q 'x86_64'; then
+            echo "ERROR: ${BIN} is not x86_64" >&2
+            exit 1
+          fi
+
+          # 2. Load paths: @rpath in, Homebrew out.
+          echo "--- otool -L ---"
+          otool -L "$BIN"
+          if ! otool -L "$BIN" | grep -q '@rpath/libonnxruntime.dylib'; then
+            echo "ERROR: ${BIN} does not reference @rpath/libonnxruntime.dylib" >&2
+            echo "The ONNX Runtime staging step did not take effect before linking." >&2
+            exit 1
+          fi
+          if otool -L "$BIN" | grep -Ei 'onnxruntime' | grep -Eq '/(usr/local|opt/homebrew)/|Cellar'; then
+            echo "ERROR: ${BIN} still links ONNX Runtime from a Homebrew path" >&2
+            echo "The .dmg would only run on Macs with that exact formula installed." >&2
+            exit 1
+          fi
+
+          # 3. The dylib travelled, and the rpath to reach it is embedded.
+          if [ ! -f "${APP}/Contents/Frameworks/libonnxruntime.dylib" ]; then
+            echo "ERROR: libonnxruntime.dylib is missing from ${APP}/Contents/Frameworks" >&2
+            echo "tauri-bundler did not honor the bundle.macOS.frameworks entry." >&2
+            ls -la "${APP}/Contents/Frameworks" 2>/dev/null >&2 || echo "(no Frameworks dir at all)" >&2
+            exit 1
+          fi
+          echo "--- LC_RPATH ---"
+          otool -l "$BIN" | grep -A2 LC_RPATH || true
+          if ! otool -l "$BIN" | grep -q '@executable_path/../Frameworks'; then
+            echo "ERROR: ${BIN} has no @executable_path/../Frameworks rpath" >&2
+            echo "build.rs did not emit the rpath for this target." >&2
+            exit 1
+          fi
+
+          # 4. It actually starts. dyld resolves libonnxruntime before main() runs,
+          #    so this is the real end-to-end proof the bundling worked.
+          echo "--- runtime smoke test ---"
+          "$BIN" --list-devices
+          echo "Intel macOS bundle audit passed"
+
+          # 5. Informational, but decides who can actually run this: the REAL
+          #    minimum macOS is whichever of the app binary or the bundled dylib
+          #    demands more, not tauri.conf.json's minimumSystemVersion (10.15).
+          #    Homebrew builds bottles per-OS version, so a dylib pulled on a
+          #    macOS 15 runner may well refuse to load on an older Intel Mac —
+          #    and plenty of Intel Macs top out at Monterey or Ventura. Printed
+          #    loudly instead of assumed; it is what tells us which Intel Macs
+          #    this artifact is worth handing to a tester.
+          echo "--- minimum macOS: app binary ---"
+          vtool -show-build "$BIN" 2>/dev/null || otool -l "$BIN" | grep -A4 LC_BUILD_VERSION || true
+          echo "--- minimum macOS: bundled libonnxruntime.dylib ---"
+          vtool -show-build "${APP}/Contents/Frameworks/libonnxruntime.dylib" 2>/dev/null || true
+          echo "--- Homebrew bottle provenance ---"
+          brew info --json=v2 onnxruntime 2>/dev/null | node -e '
+            let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{
+              try {
+                const f=JSON.parse(s).formulae[0];
+                console.log("onnxruntime", f.versions.stable, "| bottle tags:",
+                  Object.keys(f.bottle?.stable?.files || {}).join(", ") || "(none)");
+              } catch { console.log("(could not parse brew info)"); }
+            });' || true
+
+          echo "--- produced artifacts ---"
+          ls -la "${BUNDLE_DIR}/macos" "${BUNDLE_DIR}/dmg" 2>/dev/null || true
 
       - name: Upload artifacts (macOS)
         if: inputs.upload-artifacts && contains(inputs.platform, 'macos')
