@@ -5,6 +5,8 @@
   <img src="Logo/final/lockup.svg" alt="SpeakoFlow" width="340" />
 </picture>
 
+# SpeakoFlow — free voice dictation and an AI assistant for Windows, macOS, and Linux
+
 ### You think faster than you type.
 
 **A free, local voice assistant for your desktop. Dictation, writing, and an AI assistant, all by voice.**
@@ -13,17 +15,27 @@
 [![Platforms](https://img.shields.io/badge/Windows%20%7C%20macOS%20%7C%20Linux-informational)](#install)
 [![Built with Tauri](https://img.shields.io/badge/built%20with-Tauri%202-24C8DB?logo=tauri&logoColor=white)](https://tauri.app)
 
-[Download](https://github.com/AbhishekBarali/SpeakoFlow/releases) &nbsp;·&nbsp; [Website](https://www.speakoflow.com)
-
 <img src="assets/darko.gif" alt="SpeakoFlow live dictation demo" width="720" />
 
+### Download
+
+[![Download for Windows](https://img.shields.io/badge/Download-Windows-0078D4?logo=windows&logoColor=white&style=for-the-badge)](https://github.com/AbhishekBarali/SpeakoFlow/releases/latest)
+[![Download for macOS](https://img.shields.io/badge/Download-macOS-000000?logo=apple&logoColor=white&style=for-the-badge)](https://github.com/AbhishekBarali/SpeakoFlow/releases/latest)
+[![Download for Linux](https://img.shields.io/badge/Download-Linux-FCC624?logo=linux&logoColor=black&style=for-the-badge)](https://github.com/AbhishekBarali/SpeakoFlow/releases/latest)
+
+[All releases](https://github.com/AbhishekBarali/SpeakoFlow/releases) &nbsp;·&nbsp; [Website](https://www.speakoflow.com) &nbsp;·&nbsp; [Documentation](https://www.speakoflow.com/docs)
+
 </div>
+
+> **Get told when there's a new version:** click **Watch → Custom → Releases** at
+> the top of this page.
 
 ---
 
 ## Contents
 
 - [What is SpeakoFlow?](#what-is-speakoflow)
+- [Why SpeakoFlow](#why-speakoflow)
 - [Features](#features)
 - [Default hotkeys](#default-hotkeys)
 - [Install](#install)
@@ -42,17 +54,82 @@ SpeakoFlow turns your voice into text, right where you're working. Press a hotke
 
 Speech-to-text runs locally on your machine, so your voice never leaves your device. The AI assistant runs on any model you choose, from a fully offline built-in model to your own local server or a cloud provider with your own key. You decide how much stays on your machine.
 
+I built it while studying alone for exams, because I was paying for dictation software that stopped at typing — it could hear me, but it couldn't help me.
+
+## Why SpeakoFlow
+
+Most dictation tools stop at typing. Wispr Flow, Superwhisper, and Handy all turn
+speech into text well. None of them can look at what you are working on and write
+the reply for you.
+
+SpeakoFlow does both — and it's the only one of the four that's free, open source,
+and runs on all three desktop platforms.
+
+- **Compared with Wispr Flow** — Wispr Flow is closed source, transcribes in the
+  cloud, has no Linux build, and caps its free tier at 2,000 words per week
+  ($15/month after that). SpeakoFlow is MIT licensed, transcribes on your own
+  machine, and has no cap. Full breakdown:
+  [SpeakoFlow vs Wispr Flow](https://www.speakoflow.com/blog/speakoflow-vs-wispr-flow).
+- **Compared with Superwhisper** — Superwhisper is a capable closed-source app on
+  macOS, Windows, and iOS, with Pro at $8.49/month or $249.99 for a lifetime
+  licence. SpeakoFlow is free, MIT licensed, and also runs on Linux.
+- **Built on Handy** — SpeakoFlow's dictation core comes from
+  [Handy](https://github.com/cjpais/Handy), the more established project and a
+  genuinely good pure-dictation tool. SpeakoFlow takes that core further:
+  spoken-instruction writing, on-device translation, text-to-speech, personal
+  memory, and a screen-aware assistant.
+
+If all you need is dictation, Handy is a solid choice. If you want your computer
+to answer you, keep reading. See also:
+[the best free and open-source Wispr Flow alternatives](https://www.speakoflow.com/blog/best-free-open-source-wispr-flow-alternatives).
+
 ## Features
 
-- **Dictation.** Press a hotkey and talk. Words type into any app, live as you speak or all at once when you stop. Transcription runs on your GPU or CPU.
-- **Generate with Flow.** Begin a dictation with "Hey Flow" and it writes the reply, email, or draft and pastes it for you. The trigger phrase is renameable.
-- **Translate.** Speak another language and get clean English, on your device, with a Whisper model.
-- **AI cleanup.** Strip filler and fix grammar in a tone you choose: Professional, Friendly, Concise, or your own.
-- **Assistant panel.** A floating chat you open with a hotkey. Ask by voice or text, get streaming answers, and have them read back aloud.
-- **Screen vision.** Ask about what's on your screen and the assistant answers with that context. It only looks when you ask it to.
-- **Web search.** Optional. The assistant can look things up for current, factual answers.
-- **Profiles.** Switch the assistant between personas, each with its own voice and reply length.
-- **Personal memory.** Optional, on-device memory so the assistant learns how you like to work. Off until you turn it on.
+### Generate with Flow — say "Hey Flow" and it writes the reply
+
+Begin a dictation with "Hey Flow" and SpeakoFlow doesn't transcribe what you said,
+it acts on it. Describe the email, reply, or draft you want and it writes the
+finished text and pastes it where your cursor is. The trigger phrase is renameable,
+and it works in any app that accepts text. This is the part plain dictation tools
+don't do.
+
+### Screen vision — ask about what's on your screen
+
+Ask a question about whatever you're looking at and the assistant answers with that
+context: the error in your terminal, the contract in your browser, the chart in your
+spreadsheet. Combined with Generate with Flow, it can write a reply based on what's
+on screen rather than on what you dictate. It only captures when you ask it to, the
+capture goes only to the model provider you chose, and only a small thumbnail is
+kept locally.
+
+### Dictation — type into any app with your voice
+
+Press a hotkey and talk. Words type into any app, live as you speak or all at once
+when you stop. Transcription runs on your GPU or CPU with whisper.cpp or Parakeet,
+fully offline.
+
+### Assistant panel — a floating voice chat over your work
+
+A floating always-on-top chat you open with a hotkey. Ask by voice or text, get
+streaming answers, and have them read back aloud. Collapses to a pill when you
+don't need it.
+
+### Translate — speak any language, get clean English, offline
+
+Speak another language and get clean English, on your device, with a Whisper model.
+No cloud round-trip.
+
+### AI cleanup — strip filler and set the tone
+
+Remove filler words and fix grammar in a tone you choose: Professional, Friendly,
+Concise, or your own custom instruction.
+
+### Web search, profiles, and personal memory
+
+Optional web search so the assistant can look things up for current, factual
+answers. Profiles switch it between personas, each with its own voice and reply
+length. Personal memory is on-device and optional, so it learns how you like to
+work — off until you turn it on, and editable or erasable at any time.
 
 Everything lives in Settings, and every hotkey is rebindable.
 
@@ -75,7 +152,46 @@ Download the `.exe` installer and run it. Windows may show a SmartScreen notice
 because the installer isn't signed by a known publisher yet — choose **More
 info → Run anyway**.
 
+### Linux
+
+- **Arch Linux** — install from the AUR:
+  ```bash
+  yay -S speakoflow-bin
+  # or
+  paru -S speakoflow-bin
+  ```
+- **Debian, Ubuntu 24.04+, Mint 22+, Pop!\_OS, Tuxedo OS** — download the `.deb`
+  and install it. This registers the app icon and menu entry properly, which the
+  AppImage can't do on its own:
+  ```bash
+  sudo apt install ./SpeakoFlow_*_amd64.deb
+  ```
+  The `.deb` is built on Ubuntu 24.04, so it needs that era of glibc. On an
+  older release, use the AppImage instead.
+- **Any other distribution, including Fedora and openSUSE** — download the
+  AppImage, make it executable (`chmod +x`), and run it. Note that an AppImage
+  doesn't integrate with your desktop by itself, so it won't show an icon in your
+  file manager or app menu; tools like Gear Lever or AppImageLauncher add that if
+  you want it.
+
+The AppImage and `.deb` are both built for x86_64 and ARM64. There's no `.rpm`
+yet — the packaging doesn't bundle the speech engine correctly, and shipping one
+that installs but can't transcribe would be worse than not shipping it.
+
 ### macOS
+
+Download the `.dmg` and drag **SpeakoFlow** into Applications. macOS then needs
+**Microphone** and **Accessibility** permissions (_System Settings → Privacy &
+Security_) so SpeakoFlow can hear you and type into other apps.
+
+Because the app isn't Apple-signed yet, macOS blocks the first launch and needs
+one Terminal command to clear it. Full explanation below, or in the
+[install docs](https://www.speakoflow.com/docs).
+
+<details>
+<summary><b>macOS says "SpeakoFlow is damaged" — here's why, and the one-line fix</b></summary>
+
+<br />
 
 SpeakoFlow works fully on macOS, but it isn't signed by Apple yet, so macOS
 blocks it on first launch with a message that says **"SpeakoFlow is damaged and
@@ -104,44 +220,16 @@ per update, never per launch.
 
 If you're wondering why there's no button to click instead: macOS 15 and later
 removed the old right-click → **Open** bypass, and the "damaged" message is the
-one case where no **Open Anyway** button appears in *System Settings → Privacy &
-Security*. Terminal is the only route left. Proper Apple signing and
+one case where no **Open Anyway** button appears in _System Settings → Privacy &
+Security_. Terminal is the only route left. Proper Apple signing and
 notarization is on the [roadmap](#roadmap) and removes this step entirely.
-
-macOS also needs **Microphone** and **Accessibility** permissions (*System
-Settings → Privacy & Security*) so SpeakoFlow can hear you and type into other
-apps.
 
 **Apple Silicon only for now.** Builds cover M1 and newer. There's no Intel Mac
 build, because GitHub retired its Intel build machines in December 2025, so
 there's currently no way to produce and test one. If you're on an Intel Mac you
 can still [build from source](#build-from-source).
 
-### Linux
-
-- **Arch Linux** — install from the AUR:
-  ```bash
-  yay -S speakoflow-bin
-  # or
-  paru -S speakoflow-bin
-  ```
-- **Debian, Ubuntu 24.04+, Mint 22+, Pop!\_OS, Tuxedo OS** — download the `.deb`
-  and install it. This registers the app icon and menu entry properly, which the
-  AppImage can't do on its own:
-  ```bash
-  sudo apt install ./SpeakoFlow_*_amd64.deb
-  ```
-  The `.deb` is built on Ubuntu 24.04, so it needs that era of glibc. On an
-  older release, use the AppImage instead.
-- **Any other distribution, including Fedora and openSUSE** — download the
-  AppImage, make it executable (`chmod +x`), and run it. Note that an AppImage
-  doesn't integrate with your desktop by itself, so it won't show an icon in your
-  file manager or app menu; tools like Gear Lever or AppImageLauncher add that if
-  you want it.
-
-The AppImage and `.deb` are both built for x86_64 and ARM64. There's no `.rpm`
-yet — the packaging doesn't bundle the speech engine correctly, and shipping one
-that installs but can't transcribe would be worse than not shipping it.
+</details>
 
 To use the assistant, choose a provider in Settings:
 
@@ -175,9 +263,18 @@ See [BUILD.md](BUILD.md) for platform-specific setup.
 
 Your voice is transcribed on your device and never uploaded. The assistant only contacts the model provider you choose, which can be a fully local one. There is no telemetry and no account. Optional features like web search and personal memory are off until you turn them on, and memory is stored on your device where you can view, edit, or erase it.
 
+Full detail on what is stored and where: [the privacy section of the docs](https://www.speakoflow.com/docs).
+
 ## Troubleshooting
 
-### Linux: the recording overlay won't stay on top of other apps
+Common issues are collapsed below. For anything not covered here, see
+[the documentation](https://www.speakoflow.com/docs) or
+[open an issue](https://github.com/AbhishekBarali/SpeakoFlow/issues).
+
+<details>
+<summary><b>Linux: the recording overlay won't stay on top of other apps</b></summary>
+
+<br />
 
 The recording overlay has to float above every other window. On Linux that is only possible two ways: the `wlr-layer-shell` protocol (used by wlroots compositors like Sway and Hyprland, and by KDE Plasma) or classic X11 "keep above" stacking.
 
@@ -188,7 +285,12 @@ SpeakoFlow handles this automatically: when it detects GNOME on Wayland it runs 
 - Force native Wayland anyway (the overlay may not stay on top): launch with `SPEAKOFLOW_ALLOW_WAYLAND=1`.
 - If the overlay misbehaves under a layer-shell compositor, disable layer shell with `SPEAKOFLOW_NO_GTK_LAYER_SHELL=1`.
 
-### Linux: hotkeys do nothing and the logs repeat "Permission denied"
+</details>
+
+<details>
+<summary><b>Linux: hotkeys do nothing and the logs repeat "Permission denied"</b></summary>
+
+<br />
 
 If dictation and the assistant hotkeys don't respond on Linux and you see the log
 repeating `rdev grab error: ... PermissionDenied` (errno 13), the app can't read
@@ -208,7 +310,12 @@ Two ways to fix it:
   (Tauri is already the default engine on Linux, so this only affects you if you
   switched to handy-keys.)
 
-### Linux: the app crashes when you pinch-to-zoom on a touchpad
+</details>
+
+<details>
+<summary><b>Linux: the app crashes when you pinch-to-zoom on a touchpad</b></summary>
+
+<br />
 
 On some Linux setups a trackpad pinch-to-zoom gesture crashes the window, with
 `Received invalid message: 'DrawingArea_CommitTransientZoom'` in the logs. This
@@ -221,6 +328,8 @@ Until there's an upstream fix, avoid the pinch-to-zoom gesture inside the app
 window. Updating your system's WebKitGTK packages (`webkit2gtk-4.1`) to the
 latest version can also help, since newer releases handle the gesture more
 gracefully.
+
+</details>
 
 ## Roadmap
 
@@ -241,7 +350,13 @@ Released under the [MIT License](LICENSE).
 
 ## Credits
 
-SpeakoFlow started as a fork of [Handy](https://github.com/cjpais/Handy) by CJ Pais, which provides the local dictation core, under the MIT license. Thanks also to [Tauri](https://tauri.app), whisper.cpp, llama.cpp, Silero VAD, and [Kokoro](https://github.com/hexgrad/kokoro).
+SpeakoFlow builds on the dictation core from [Handy](https://github.com/cjpais/Handy)
+by CJ Pais, used under the MIT licence — thanks to CJ for making it open. The
+assistant, screen vision, Generate with Flow, translation, text-to-speech, and
+memory layers are SpeakoFlow's own.
+
+Thanks also to [Tauri](https://tauri.app), whisper.cpp, llama.cpp, Silero VAD, and
+[Kokoro](https://github.com/hexgrad/kokoro).
 
 <div align="center">
 
