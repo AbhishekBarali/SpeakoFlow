@@ -733,12 +733,55 @@ jobs:
             if command -v gdb >/dev/null 2>&1; then
               SPEAKOFLOW_NO_GTK_LAYER_SHELL=1 \
               LD_LIBRARY_PATH="${root}/usr/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}" \
-                xvfb-run -a gdb -batch \
-                  -ex 'run --list-devices' \
-                  -ex 'bt' \
-                  -ex 'info sharedlibrary' \
-                  --args "${root}/usr/bin/speakoflow" --list-devices 2>&1 | tail -60 || true
+                xvfb-run -a gdb -batch -ex 'run' -ex 'bt' \
+                  --args "${root}/usr/bin/speakoflow" --list-devices \
+                  >/tmp/speakoflow-gdb.log 2>&1 || true
+              # Grep for the fault; do NOT tail. gdb's shared-library table is
+              # hundreds of lines and buries the one line that matters.
+              grep -E 'Program received|Program terminated|signal SIG|^#[0-9]+ ' \
+                /tmp/speakoflow-gdb.log | head -30 \
+                || echo "(no signal line — gdb may not have reproduced it)"
             fi
+
+            # DECISIVE EXPERIMENT. ggml dlopen()s every libggml-cpu-<arch>.so in
+            # the directory to score it, which runs each module's load-time code on
+            # THIS CPU. Seven shipped variants require AVX-512 (skylakex,
+            # cannonlake, cascadelake, cooperlake, icelake, sapphirerapids, zen4).
+            # This runner is an AMD EPYC 7763 (Zen 3) with no AVX-512 — and neither
+            # have most machines users actually run this on.
+            #
+            # If deleting ONLY those seven makes the very same binary start, the
+            # cause is load-time ISA probing and the fix is to stop shipping
+            # variants the host may be unable to load. If it still dies, the cause
+            # is elsewhere and we must not blame CPU variants.
+            echo "--- experiment: retry without the AVX-512-only CPU variants ---"
+            local exp_root exp_rc=0
+            exp_root="$(mktemp -d)"
+            cp -a "${root}/." "${exp_root}/"
+            rm -f "${exp_root}"/usr/lib/libggml-cpu-skylakex.so \
+                  "${exp_root}"/usr/lib/libggml-cpu-cannonlake.so \
+                  "${exp_root}"/usr/lib/libggml-cpu-cascadelake.so \
+                  "${exp_root}"/usr/lib/libggml-cpu-cooperlake.so \
+                  "${exp_root}"/usr/lib/libggml-cpu-icelake.so \
+                  "${exp_root}"/usr/lib/libggml-cpu-sapphirerapids.so \
+                  "${exp_root}"/usr/lib/libggml-cpu-zen4.so
+            echo "CPU variants left in place:"
+            ls "${exp_root}/usr/lib/" | grep 'libggml-cpu' || true
+            set +e
+            SPEAKOFLOW_NO_GTK_LAYER_SHELL=1 \
+            LD_LIBRARY_PATH="${exp_root}/usr/lib" \
+              xvfb-run -a "${exp_root}/usr/bin/speakoflow" --list-devices
+            exp_rc=$?
+            set -e
+            if [ "$exp_rc" -eq 0 ]; then
+              echo "EXPERIMENT RESULT: the same binary STARTS FINE without the"
+              echo "  AVX-512 variants (rc=0). Load-time ISA probing confirmed."
+              echo "  Fix: ship a single portable CPU backend on linux x86_64."
+            else
+              echo "EXPERIMENT RESULT: still fails without them (rc=${exp_rc})."
+              echo "  The CPU variants are NOT the cause; look elsewhere."
+            fi
+            rm -rf "$exp_root"
             return 1
           }
 
