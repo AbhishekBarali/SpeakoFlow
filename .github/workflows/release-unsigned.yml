@@ -35,7 +35,29 @@ name: "Release (unsigned)"
 #   * windows-11-arm — whisper-rs-sys requires VULKAN_SDK and build.yml's Vulkan
 #     setup is gated to non-aarch64 Windows.
 
-on: workflow_dispatch
+on:
+  workflow_dispatch:
+    inputs:
+      release-id:
+        description: >-
+          Existing draft release ID to upload into. Leave empty to have the
+          workflow create the draft itself.
+        required: false
+        type: string
+
+# WHY the release-id input exists: a GitHub Release is authored by whoever
+# created it, and that CANNOT be changed afterwards. When this workflow creates
+# the draft with the default GITHUB_TOKEN, the release is authored by
+# `github-actions[bot]` — which is what happened to v1.1.0, so the maintainer's
+# name is nowhere on it. To get proper attribution, create the draft yourself
+# first and pass its ID in:
+#
+#   gh release create v1.1.1 --draft --title v1.1.1 --notes-file NOTES.md
+#   gh release view v1.1.1 --json id --jq .id
+#   gh workflow run release-unsigned.yml -f release-id=<that id>
+#
+# Everything else is unchanged; the builds just attach to your release instead
+# of a bot's.
 
 jobs:
   create-release:
@@ -43,7 +65,7 @@ jobs:
       contents: write
     runs-on: ubuntu-latest
     outputs:
-      release-id: ${{ steps.create-release.outputs.result }}
+      release-id: ${{ steps.resolve-release.outputs.id }}
       version: ${{ steps.get-version.outputs.version }}
     steps:
       - name: Checkout repository
@@ -59,6 +81,7 @@ jobs:
 
       - name: Create Draft Release
         id: create-release
+        if: ${{ inputs.release-id == '' }}
         uses: actions/github-script@v9
         with:
           script: |
@@ -72,6 +95,41 @@ jobs:
               generate_release_notes: true
             })
             return data.id
+
+      # Resolve which release the build jobs upload into, and refuse to touch a
+      # release whose tag does not match the version being built — uploading a
+      # 1.1.1 build into the v1.1.0 release would silently corrupt a published
+      # download.
+      - name: Resolve release id
+        id: resolve-release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SUPPLIED_ID: ${{ inputs.release-id }}
+          CREATED_ID: ${{ steps.create-release.outputs.result }}
+          VERSION: ${{ steps.get-version.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "${SUPPLIED_ID}" ]; then
+            TAG="$(gh api "repos/${GITHUB_REPOSITORY}/releases/${SUPPLIED_ID}" --jq .tag_name)"
+            AUTHOR="$(gh api "repos/${GITHUB_REPOSITORY}/releases/${SUPPLIED_ID}" --jq .author.login)"
+            DRAFT="$(gh api "repos/${GITHUB_REPOSITORY}/releases/${SUPPLIED_ID}" --jq .draft)"
+            echo "Supplied release ${SUPPLIED_ID}: tag=${TAG} author=${AUTHOR} draft=${DRAFT}"
+            if [ "${TAG}" != "v${VERSION}" ]; then
+              echo "ERROR: release ${SUPPLIED_ID} is tagged ${TAG} but this build is v${VERSION}" >&2
+              exit 1
+            fi
+            if [ "${DRAFT}" != "true" ]; then
+              echo "ERROR: release ${SUPPLIED_ID} is already published; refusing to overwrite its assets" >&2
+              exit 1
+            fi
+            echo "id=${SUPPLIED_ID}" >> "$GITHUB_OUTPUT"
+          else
+            echo "No release-id supplied; using the draft this workflow just created (${CREATED_ID})."
+            echo "NOTE: it will be authored by github-actions[bot], not you."
+            echo "id=${CREATED_ID}" >> "$GITHUB_OUTPUT"
+          fi
+
 
   publish:
     permissions:
