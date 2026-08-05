@@ -842,6 +842,7 @@ jobs:
         if: ${{ contains(inputs.platform, 'ubuntu') && inputs.release-id != '' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_ID: ${{ inputs.release-id }}
         shell: bash
         run: |
           set -euo pipefail
@@ -866,6 +867,14 @@ jobs:
           # the engine libs are in the file a user would actually get. Auditing a
           # local build artifact is what hid this bug for a whole release, so the
           # check that matters is the one against the published file.
+          #
+          # NOTE: do NOT use `gh release download`, which resolves by tag. The
+          # GitHub API's /releases/tags/{tag} endpoint does not return DRAFT
+          # releases, so during a release that 404s and leaves an empty file,
+          # which then reads as "the engine libs are missing" and is badly
+          # misleading. That is exactly what happened on the v1.1.1 run: the
+          # packages were correct and published, and this check failed anyway.
+          # Look the asset up by release ID and fetch it through the asset API.
           verify_dir="$(mktemp -d)"
           for a in "${assets[@]}"; do
             name="$(basename "$a")"
@@ -874,18 +883,34 @@ jobs:
               *) continue ;;  # .deb is the one with an inspectable index
             esac
             echo "Verifying published asset: ${name}"
-            gh release download "$TAG" --pattern "$name" --dir "$verify_dir" \
-              --clobber --repo "$GITHUB_REPOSITORY"
-            if ! dpkg-deb -c "${verify_dir}/${name}" | grep -Eq 'usr/lib/libtranscribe\.so'; then
-              echo "ERROR: published ${name} is STILL missing libtranscribe.so" >&2
-              dpkg-deb -c "${verify_dir}/${name}" | grep 'usr/lib' >&2 || true
+            asset_id="$(gh api "repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}" \
+              --jq ".assets[] | select(.name==\"${name}\") | .id")"
+            if [ -z "${asset_id}" ]; then
+              echo "ERROR: ${name} is not attached to release ${RELEASE_ID}" >&2
               exit 1
             fi
-            if ! dpkg-deb -c "${verify_dir}/${name}" | grep -Eq 'usr/lib/libggml-cpu.*\.so'; then
-              echo "ERROR: published ${name} is STILL missing the ggml CPU backend" >&2
+            gh api "repos/${GITHUB_REPOSITORY}/releases/assets/${asset_id}" \
+              -H "Accept: application/octet-stream" > "${verify_dir}/${name}"
+
+            # Distinguish "the download broke" from "the libs are missing", so a
+            # tooling failure can never masquerade as a packaging regression.
+            if ! dpkg-deb -c "${verify_dir}/${name}" > "${verify_dir}/listing.txt" 2>"${verify_dir}/err.txt"; then
+              echo "ERROR: could not read the downloaded ${name}. This is a download/tooling failure, NOT proof that the libs are missing." >&2
+              ls -la "${verify_dir}" >&2
+              cat "${verify_dir}/err.txt" >&2 || true
               exit 1
             fi
-            echo "Published ${name} contains the engine libs."
+            if ! grep -Eq 'usr/lib/libtranscribe\.so' "${verify_dir}/listing.txt"; then
+              echo "ERROR: published ${name} is missing libtranscribe.so" >&2
+              grep 'usr/lib' "${verify_dir}/listing.txt" >&2 || true
+              exit 1
+            fi
+            if ! grep -Eq 'usr/lib/libggml-cpu.*\.so' "${verify_dir}/listing.txt"; then
+              echo "ERROR: published ${name} is missing the ggml CPU backend" >&2
+              exit 1
+            fi
+            echo "Published ${name} contains the engine libs ($(grep -cE 'libtranscribe|libggml' "${verify_dir}/listing.txt") entries)."
+            rm -f "${verify_dir}/${name}" "${verify_dir}/listing.txt"
           done
           rm -rf "$verify_dir"
 
