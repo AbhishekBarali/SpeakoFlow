@@ -1,0 +1,60 @@
+---
+title: "Troubleshooting"
+description: "Fixes for the most common SpeakoFlow issues: the macOS \"app is damaged\" message, blocked microphone access, text that won't type, the Linux overlay, and clipped or wrong pastes."
+icon: "life-ring"
+---
+
+Fixes for the issues people hit most often.
+
+<AccordionGroup>
+  <Accordion title="macOS says the app is damaged" icon="apple">
+    If macOS tells you *"SpeakoFlow is damaged and can't be opened. You should move it to the Trash"*, the download is fine — don't delete it. macOS shows that message for any app it can't trace to a paid Apple Developer account, and SpeakoFlow isn't signed yet.
+
+    One Terminal command clears it, once per version you install:
+
+    ```bash
+    xattr -dr com.apple.quarantine /Applications/SpeakoFlow.app
+    ```
+
+    Full explanation in [Install → macOS](/start/install).
+  </Accordion>
+
+  <Accordion title="The AppImage has no icon or menu entry" icon="linux">
+    Expected. An AppImage is one self-contained file and can't register an icon or app-menu entry with your desktop, so the file stays generic in your file manager. The icon does appear once the app is running.
+
+    Install the `.deb` instead if you're on Ubuntu 24.04+ or Debian 13, or use a helper like Gear Lever or AppImageLauncher. Details in [Install → Linux](/start/install).
+  </Accordion>
+
+  <Accordion title="Microphone access is blocked" icon="microphone-slash">
+    - **Windows** — enable microphone access in *Settings → Privacy & security → Microphone*, including desktop-app access.
+    - **macOS** — grant access in *System Settings → Privacy & Security → Microphone*.
+    - **Linux** — grant access in your system's sound or privacy settings.
+  </Accordion>
+
+  <Accordion title="Transcribed text won't type (macOS)" icon="keyboard">
+    SpeakoFlow needs Accessibility permission to type into apps. Grant it in *System Settings → Privacy & Security → Accessibility*, then restart the app.
+  </Accordion>
+
+  <Accordion title="Screen vision does nothing (macOS)" icon="eye-slash">
+    Grant Screen Recording permission in *System Settings → Privacy & Security → Screen Recording* and restart SpeakoFlow for it to take effect.
+  </Accordion>
+
+  <Accordion title="The recording overlay won't stay on top (Linux)" icon="window-restore">
+    The overlay has to float above every other window, which on Linux requires either the `wlr-layer-shell` protocol (wlroots compositors like Sway and Hyprland, and KDE Plasma) or classic X11 "keep above" stacking. Native GNOME/Wayland supports neither.
+
+    SpeakoFlow handles this automatically: when it detects GNOME on Wayland it runs under XWayland, where "keep above" works. If you need to override the behavior:
+
+    - Force native Wayland anyway (overlay may not stay on top): launch with `SPEAKOFLOW_ALLOW_WAYLAND=1`.
+    - If the overlay misbehaves under a layer-shell compositor, disable layer shell with `SPEAKOFLOW_NO_GTK_LAYER_SHELL=1`.
+  </Accordion>
+
+  <Accordion title="The wrong text pastes, or words get clipped" icon="clipboard">
+    Increase the paste delay and the extra recording buffer in [Debug settings](/settings/debug). If a specific app misbehaves with clipboard paste, try the **Direct** [paste method](/dictation/output).
+  </Accordion>
+
+  <Accordion title="Automatic update failed (Windows)" icon="rotate">
+    Portable installs can't update automatically. Download the latest NSIS installer from GitHub Releases, install it to the same folder, then copy your `Data/` folder (settings, models, recordings) from the old version to the new one.
+  </Accordion>
+</AccordionGroup>
+
+Still stuck? Open an [issue](https://github.com/AbhishekBarali/SpeakoFlow/issues) with your log level raised — see [Debug & advanced](/settings/debug).

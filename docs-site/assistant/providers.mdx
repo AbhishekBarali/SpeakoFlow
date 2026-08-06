@@ -1,0 +1,45 @@
+---
+title: "Providers & keys"
+description: "SpeakoFlow speaks the OpenAI-compatible API, so it works with OpenAI, Anthropic, Azure OpenAI, OpenRouter, custom endpoints, and local servers like Ollama and LM Studio."
+icon: "key"
+---
+
+For cloud or local-server brains, SpeakoFlow speaks the OpenAI-compatible API, so it works with most providers.
+
+## Supported providers
+
+OpenAI, Anthropic, Azure OpenAI, OpenRouter, any custom OpenAI-compatible endpoint, and local servers like Ollama or LM Studio. Provider quirks are handled for you — Anthropic's `x-api-key`, Azure's `api-key` and base-URL normalization, and OpenRouter's headers.
+
+<ResponseField name="Provider" type="OpenAI | Anthropic | Azure | OpenRouter | Custom | Local">
+  The provider that answers assistant questions.
+</ResponseField>
+
+<ResponseField name="Base URL" type="url">
+  The OpenAI-compatible base URL. Editable for Custom, Local, and Azure. Azure URLs are normalized automatically (e.g. to `/openai/v1`). For a local server, point it at your machine, e.g. `http://localhost:11434/v1`.
+</ResponseField>
+
+<ResponseField name="API key" type="secret">
+  The key for the selected provider, stored securely in your OS keychain. Shared with [AI cleanup](/writing/ai-cleanup), since both use the same chat client.
+</ResponseField>
+
+<ResponseField name="Model" type="string">
+  The model or deployment name to use for answers, e.g. `gpt-5-mini`. Load the provider's model list, or type a name directly.
+</ResponseField>
+
+## Local model tuning
+
+<ResponseField name="Context window" type="number" default="8192">
+  How much the local model can keep in mind at once — the system instructions, your chat history, any screenshot (a single image can eat a big chunk), and its reply. Bigger holds more and keeps screen vision and web search reliable, but uses more memory. **16384** is a good step up if your machine has the RAM; you can lower it later to save memory.
+</ResponseField>
+
+<ResponseField name="Unload from memory after" type="duration">
+  Free memory by unloading the local model after it's been idle this long. It reloads automatically on next use.
+</ResponseField>
+
+<ResponseField name="System prompt" type="string">
+  Sets the assistant's baseline behavior. Profiles can override this per-persona (see [Profiles](/personalize/profiles)).
+</ResponseField>
+
+<Note>
+  API keys live in your operating system's keychain, not in a plain settings file. The assistant only ever contacts the provider you choose — which can be a fully local one. See [Privacy](/reference/privacy).
+</Note>

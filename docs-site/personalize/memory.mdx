@@ -1,0 +1,38 @@
+---
+title: "Personal memory"
+description: "Optional on-device memory so the SpeakoFlow assistant remembers how you work between chats, fully editable and exportable, with guardrails against storing secrets."
+icon: "note-sticky"
+---
+
+Optional, on-device memory so the assistant learns how you like to work and remembers useful facts between chats. Off until you turn it on.
+
+Everything here is stored on your device and fully editable in *Settings → Memory*.
+
+<ResponseField name="Remember me" type="toggle" default="off">
+  Let the assistant keep and use a personal memory.
+</ResponseField>
+
+<ResponseField name="Incognito chat" type="toggle">
+  For the current conversation, don't use memory and don't learn anything new.
+</ResponseField>
+
+<ResponseField name="Memory detail" type="Light | Balanced | Detailed">
+  How much memory to add to each reply. More detail is richer but a little slower.
+</ResponseField>
+
+## What it stores
+
+- **About you** — a short, always-on summary the assistant keeps in mind (e.g. "Prefers short, direct answers. Works in Rust and TypeScript.").
+- **Notes** — specific things worth remembering, either learned from your chats or added by you. Each note shows a confidence level and whether it was learned or added by you.
+
+## Managing memory
+
+- **Learn from this chat now** — pull durable facts from the current conversation into memory on demand. Otherwise, learning happens quietly at the end of a conversation.
+- **Export / Import** — back up or move your memory.
+- **Wipe memory** — delete everything the assistant remembers.
+
+<Note>
+  **Safety by design.** Memory refuses to store secrets, passwords, and personal identifiers, and never lets remembered text override your current message. It's advisory only, stored on-device, and you can view, edit, or erase all of it. Learning runs off the hot path so it never slows a reply.
+</Note>
+
+For short-term, per-conversation context instead, see [Behavior & memory](/assistant/behavior).

@@ -1,0 +1,29 @@
+---
+title: "About & license"
+description: "Where SpeakoFlow keeps your data, the tech stack behind it, known limitations around code signing, and the MIT license and credits including Handy by CJ Pais."
+icon: "circle-info"
+---
+
+Where things live, and the people this is built on.
+
+## Folders
+
+The *About* section shows your app-data folder, where SpeakoFlow keeps your models, history, and settings, plus quick links to the model and settings locations.
+
+## Tech stack
+
+- **App:** Tauri 2 with a Rust backend and a React + TypeScript frontend.
+- **Speech-to-text:** whisper.cpp and Parakeet with GPU acceleration, plus Silero VAD for voice detection.
+- **Assistant:** a built-in llama.cpp engine, or any OpenAI-compatible provider you configure.
+- **Text-to-speech:** Kokoro locally, with OpenAI-compatible, ElevenLabs, and Azure options.
+
+## Known limitations
+
+- **Code signing for Windows and macOS** is on the roadmap and not done yet. On macOS that means one Terminal command on first install ([steps here](/start/install)); on Windows it means SmartScreen may warn you the first time you run the installer. The release pipeline is already wired for signing — it needs the paid Apple Developer membership and a Windows certificate.
+- **Unsigned builds can't auto-update on macOS**, so updating means downloading the new `.dmg` and repeating the one-time command.
+
+## License & credits
+
+SpeakoFlow is open source under the **MIT License**. It started as a fork of [Handy](https://github.com/cjpais/Handy) by CJ Pais (also MIT), which provides the local dictation core. Thanks also to Tauri, whisper.cpp, llama.cpp, Silero VAD, and Kokoro.
+
+Have an idea or hit a bug not covered here? Open an [issue](https://github.com/AbhishekBarali/SpeakoFlow/issues) or check the [repository](https://github.com/AbhishekBarali/SpeakoFlow).

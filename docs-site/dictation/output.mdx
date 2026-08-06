@@ -1,0 +1,31 @@
+---
+title: "Output & pasting"
+description: "Control exactly how SpeakoFlow inserts transcribed text: clipboard or direct typing, clipboard handling, auto submit, and trailing spaces."
+icon: "clipboard"
+---
+
+Fine control over exactly how transcribed text is inserted into the active app. Most people never need to touch these — the defaults just work.
+
+<ResponseField name="Paste method" type="Clipboard | Direct | None | External script" default="Clipboard">
+  How transcribed text is inserted. **Clipboard** pastes via `Ctrl/Cmd` + `V`, with `Ctrl+Shift+V` and `Shift+Insert` variants. **Direct** types it key by key. **External script** hands off to a script you point to.
+</ResponseField>
+
+<ResponseField name="Typing tool" type="Auto | specific tool" default="Auto (recommended)">
+  **Linux only.** The tool used for the Direct paste method. Leave on Auto unless you have a reason to change it.
+</ResponseField>
+
+<ResponseField name="Clipboard handling" type="Don't modify clipboard | Copy to clipboard">
+  Whether the transcription stays in your clipboard after pasting. The default restores what you had before.
+</ResponseField>
+
+<ResponseField name="Auto submit" type="Off | Enter | Cmd+Enter | Super+Enter | Ctrl+Enter" default="Off">
+  Send a key combination automatically after text is inserted. Handy for firing off chat messages hands-free.
+</ResponseField>
+
+<ResponseField name="Append trailing space" type="toggle">
+  Add a space after inserted text so consecutive dictations don't run together.
+</ResponseField>
+
+<Tip>
+  If text is occasionally cut off or the wrong text pastes, the paste delay and extra recording buffer in [Debug settings](/settings/debug) usually fix it. For a specific app that misbehaves with clipboard paste, try the **Direct** paste method.
+</Tip>

@@ -1,0 +1,31 @@
+---
+title: "Generate with Flow"
+description: "Start a dictation with \"Hey Flow\" and the AI writes the finished result — a reply, an email, a draft — and pastes it where you're typing."
+icon: "wand-magic-sparkles"
+---
+
+Begin a dictation with an activation phrase and the AI writes the finished result — a reply, an email, a draft — and pastes it for you.
+
+## How to use it
+
+Turn on **Generate with Flow** in *Settings → Dictation*, then dictate a command that starts with your activation phrase:
+
+```text
+"Hey Flow, write a polite email asking to reschedule Friday's call to Monday."
+```
+
+Flow generates the finished email and pastes it where you're typing. Anywhere the phrase *isn't* at the start, the same words paste as normal dictation — so Flow never gets in the way of regular use.
+
+## Settings
+
+<ResponseField name="Activation phrase" type="string" default="Hey Flow">
+  Flow activates only when a dictation begins with this phrase. Rename it to anything you like; leave it empty to reset back to "Hey Flow". Flow uses your assistant's model to generate.
+</ResponseField>
+
+<ResponseField name="Allow screen access" type="toggle" default="off">
+  Let Flow take one screenshot when a command clearly refers to your screen — like "look at this email and draft a reply." The model decides whether it's needed. This is separate from the assistant's screen access.
+</ResponseField>
+
+<Note>
+  Flow needs an assistant model configured. If none is set up, your words are pasted as ordinary dictation and the overlay lets you know. Set one up in [Brain: local or cloud](/assistant/brain).
+</Note>

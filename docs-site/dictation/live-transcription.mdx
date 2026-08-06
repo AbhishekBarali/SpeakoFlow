@@ -1,0 +1,23 @@
+---
+title: "Live vs. batch transcription"
+description: "Choose whether SpeakoFlow streams text as you speak or transcribes everything in one batch when you stop, and which models support streaming."
+icon: "tower-broadcast"
+---
+
+Choose whether words appear as you speak, or all at once when you stop.
+
+By default, SpeakoFlow transcribes in a single batch when you finish — accurate and simple. With live transcription on, text streams in as you talk (on models that support streaming).
+
+<ResponseField name="Live transcription" type="toggle" default="off">
+  **Experimental.** Transcribe speech as you talk, instead of all at once when you stop.
+</ResponseField>
+
+<ResponseField name="Live transcription window" type="toggle" default="off">
+  While live transcription runs, show a larger overlay card with the running text instead of the compact pill. Requires live transcription.
+</ResponseField>
+
+<Note>
+  Streaming-capable models (like the Moonshine V2 and Nemotron streaming models) are the best fit for live mode. See [Transcription models](/models/transcription-models) for which ones stream.
+</Note>
+
+Live transcription is an experimental feature, so it's hidden until you turn on **Experimental features** in [Debug & advanced](/settings/debug).

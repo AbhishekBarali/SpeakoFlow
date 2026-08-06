@@ -1,0 +1,33 @@
+---
+title: "Brain: local or cloud"
+description: "Run the SpeakoFlow assistant on a private local model that needs no API key, or on an OpenAI-compatible cloud provider with your own key. How to choose a local model for your GPU."
+icon: "brain"
+---
+
+The assistant runs on whatever model you choose. This is the single most important assistant setting — set it in *Settings → Assistant → Assistant brain*.
+
+<CardGroup cols={2}>
+  <Card title="On my device" icon="microchip">
+    Download a private local model. It stays on this machine and needs no API key. First use downloads a small local engine automatically, one time, then runs fully offline.
+  </Card>
+
+  <Card title="Cloud provider" icon="cloud">
+    Answer through an OpenAI-compatible cloud provider using your own API key.
+  </Card>
+</CardGroup>
+
+## Choosing a local model
+
+The catalog recommends three conversation-first choices: quickest, recommended, and more capable but slower. SpeakoFlow detects your GPU and reports graphics memory so you can gauge which size will run well.
+
+| Tier | Example | Notes |
+| --- | --- | --- |
+| Small / quick | Gemma 4 E2B, Gemma 3 1B | Runs on any machine. Great for tidying writing and simple questions. |
+| Recommended | Gemma 4 E4B | A strong balance of quality and speed for conversation. |
+| More capable | Gemma 4 12B, Qwen vision models | Sharper answers, some can see your screen — but slower, best with a strong GPU. |
+
+<Note>
+  Vision-capable models download an extra image file automatically so they can read your screen. You can also browse Hugging Face for other GGUF models — see [Custom models](/models/custom-models).
+</Note>
+
+Next: [Providers & keys](/assistant/providers) for cloud and local-server setup, including the local model tuning options.

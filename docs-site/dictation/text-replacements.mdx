@@ -1,0 +1,41 @@
+---
+title: "Text replacements"
+description: "Map a spoken phrase to text you use often, with regex matching, trimming, capitalization, and magic tokens like [date] and [time]."
+icon: "right-left"
+---
+
+Swap a phrase you say for text you use often — like turning "my email" into your actual address.
+
+Create rules that map a spoken phrase to inserted text. Say "my email" and SpeakoFlow inserts `alex@example.com`. Rules are managed in *Settings → Dictation* (Advanced → Text replacements) and can be imported and exported as a list.
+
+## Each rule has
+
+<ResponseField name="Spoken phrase" type="string">
+  What SpeakoFlow hears, for example "my email".
+</ResponseField>
+
+<ResponseField name="Insert this text" type="string">
+  What it types instead.
+</ResponseField>
+
+<ResponseField name="Enabled" type="toggle">
+  Toggle a rule on or off without deleting it.
+</ResponseField>
+
+## Advanced options
+
+<ResponseField name="Regex" type="toggle">
+  Match with a regular expression instead of a literal phrase.
+</ResponseField>
+
+<ResponseField name="Trim before / Trim after" type="toggle">
+  Remove surrounding whitespace around the match.
+</ResponseField>
+
+<ResponseField name="Caps" type="None | UPPERCASE | lowercase | Capitalize">
+  Force the inserted text into a specific case.
+</ResponseField>
+
+<Note>
+  **Magic tokens.** Use `[date]`, `[time]`, `[uppercase]`, `[lowercase]`, `[capitalize]`, or `[nospace]` inside the inserted text for dynamic values and formatting.
+</Note>

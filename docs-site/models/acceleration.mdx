@@ -1,0 +1,23 @@
+---
+title: "Acceleration & GPU"
+description: "How SpeakoFlow uses your GPU for transcription — Metal on macOS, Vulkan on Windows, OpenBLAS plus Vulkan on Linux — and the ONNX and GPU device settings."
+icon: "bolt"
+---
+
+SpeakoFlow uses your GPU when it can, falling back to CPU otherwise. These live under *Settings → Dictation → Advanced*.
+
+<ResponseField name="Whisper acceleration" type="Auto | CPU | GPU" default="Auto">
+  Auto uses the GPU when available: Metal on macOS, Vulkan on Windows, OpenBLAS + Vulkan on Linux.
+</ResponseField>
+
+<ResponseField name="ONNX acceleration" type="Auto | CPU | DirectML" default="Auto">
+  For Parakeet, Canary, and Moonshine models. DirectML is experimental.
+</ResponseField>
+
+<ResponseField name="GPU device" type="Auto | specific device" default="Auto">
+  Auto picks the dedicated GPU. Choose a specific device if you have more than one.
+</ResponseField>
+
+<Note>
+  Compute-device detection is crash-isolated on Linux, so a driver that misbehaves when listing GPUs costs you the GPU list rather than the whole app at launch.
+</Note>

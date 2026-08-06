@@ -1,0 +1,39 @@
+---
+title: "Debug & advanced"
+description: "SpeakoFlow diagnostics and fine-grained settings: logs, word correction threshold, paste delay, extra recording buffer, keyboard backend, and the experimental features toggle."
+icon: "bug"
+---
+
+Diagnostics and fine-grained knobs. Open the Debug section with `Ctrl` + `Shift` + `D` (`Cmd` + `Shift` + `D` on macOS). Most people never need these.
+
+<ResponseField name="Log directory & log level" type="path, level">
+  Where logs are written, and how verbose they are. Raise the level when reporting a bug.
+</ResponseField>
+
+<ResponseField name="Word correction threshold" type="number">
+  Sensitivity for custom-word corrections — how aggressively SpeakoFlow snaps near-misses to your [custom words](/dictation/custom-words).
+</ResponseField>
+
+<ResponseField name="Clamshell microphone" type="device">
+  **macOS only.** Which microphone to use when the laptop lid is closed.
+</ResponseField>
+
+<ResponseField name="Mute while recording" type="toggle">
+  Mute system audio during recording so playback doesn't bleed into your dictation.
+</ResponseField>
+
+<ResponseField name="Keyboard implementation" type="handy-keys | Tauri global-shortcut">
+  Choose the shortcut backend. **handy-keys** supports modifier-only combos like `Ctrl`+`Super`. If a switch makes your shortcuts incompatible, they reset to defaults.
+</ResponseField>
+
+<ResponseField name="Paste delay" type="milliseconds">
+  How long to wait before pasting. Increase if the wrong text is occasionally pasted.
+</ResponseField>
+
+<ResponseField name="Extra recording buffer" type="milliseconds">
+  How long to keep recording after you release the key, so trailing words aren't clipped.
+</ResponseField>
+
+<ResponseField name="Experimental features" type="toggle" default="off">
+  Reveal in-development features, like [AI cleanup](/writing/ai-cleanup) and [live transcription](/dictation/live-transcription).
+</ResponseField>

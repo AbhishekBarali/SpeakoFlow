@@ -1,0 +1,20 @@
+---
+title: "Command-line flags"
+description: "SpeakoFlow accepts command-line flags on Windows, macOS, and Linux for scripts, window managers, and autostart setups, including remote control of a running instance."
+icon: "terminal"
+---
+
+SpeakoFlow accepts command-line flags on all platforms, for scripts, window managers, and autostart setups. Remote-control flags are sent to the already-running instance.
+
+| Flag | What it does |
+| --- | --- |
+| `--toggle-transcription` | Toggle recording on/off on a running instance. |
+| `--toggle-post-process` | Toggle recording with AI cleanup on/off. |
+| `--cancel` | Cancel the current operation on a running instance. |
+| `--start-hidden` | Launch without showing the main window (tray icon visible). |
+| `--no-tray` | Launch without a system tray (closing the window quits the app). |
+| `--debug` | Enable debug mode with verbose (Trace) logging. |
+
+<Note>
+  CLI flags are runtime-only overrides — they don't modify your saved settings. You can bind them to a hardware key or a window-manager shortcut for a fully custom trigger.
+</Note>

@@ -1,0 +1,56 @@
+---
+title: "Transcription models"
+description: "Every speech-to-text model SpeakoFlow can run locally — Parakeet, Nemotron, Canary, Whisper, Moonshine, Cohere, SenseVoice, GigaAM, Breeze — and how to pick one for your hardware and languages."
+icon: "microchip"
+---
+
+The model is what turns your voice into text. Every model runs on your machine — they trade accuracy for speed, so pick the one that fits your hardware and languages. Manage them in *Settings → Dictation* and the model catalog.
+
+## Current models
+
+| Model | Best for | Notes |
+| --- | --- | --- |
+| **Parakeet** (V2 / V3 / unified) | Fast everyday dictation | V2 English-only; V3 covers 25 European languages. Blazingly fast. |
+| **Nemotron streaming** | Real-time multilingual | Streams as you speak. 28 languages. |
+| **Canary** (180M Flash / 1B v2) | Speed + translation | 180M is tiny and instant; 1B covers 25 European languages. Both translate to English. |
+| **Whisper** (Small / Medium / Turbo / Large) | Broad multilingual accuracy | Medium supports nearly 100 languages. The most versatile family. |
+| **Moonshine** (Base / V2 Tiny·Small·Medium) | Ultra-fast English | English only; handles accents well. V2 variants stream. |
+| **Cohere** | Highest accuracy | Large and slower, but the most accurate. Many languages. |
+| **SenseVoice** | East Asian languages | Very fast. Chinese, English, Japanese, Korean, and Cantonese. |
+| **GigaAM v3** | Russian | Russian only. Fast and accurate. |
+| **Breeze ASR** | Taiwanese Mandarin | Tuned for Taiwanese Mandarin with English code-switching. |
+
+<Note>
+  **Streaming models.** Nemotron streaming and the Moonshine V2 variants can transcribe as you speak. They're the right choice if you want [live transcription](/dictation/live-transcription).
+</Note>
+
+<Note>
+  **Older models** run on the previous engine and are grouped separately in the catalog. They're still fully supported, but most people won't need them.
+</Note>
+
+## Managing models
+
+- Browse **Downloaded models** and **Available to download** in the catalog.
+- Filter by **All**, **Multi-language**, **Translation**, or search by name.
+- Downloads resume automatically if interrupted, and retry on flaky connections.
+- Delete a model to free disk space; you'll be warned if it's your active model.
+
+## Related
+
+<CardGroup cols={2}>
+  <Card title="Languages & accents" icon="language" href="/models/languages">
+    Which model to pick for which languages, and non-Western names.
+  </Card>
+
+  <Card title="Acceleration & GPU" icon="bolt" href="/models/acceleration">
+    Metal, Vulkan, OpenBLAS, and ONNX settings.
+  </Card>
+
+  <Card title="Custom models" icon="box" href="/models/custom-models">
+    Pull GGUF models straight from Hugging Face.
+  </Card>
+
+  <Card title="Memory & the microphone" icon="memory" href="/models/memory">
+    Trade a little memory or battery for speed.
+  </Card>
+</CardGroup>

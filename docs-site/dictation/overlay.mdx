@@ -1,0 +1,27 @@
+---
+title: "The recording overlay"
+description: "The small on-screen indicator that shows SpeakoFlow is listening, its style and position options, and the Linux compositor caveat on GNOME/Wayland."
+icon: "window-maximize"
+---
+
+A small on-screen indicator that shows SpeakoFlow is listening, so you're never guessing whether it heard you.
+
+## Overlay style
+
+Set in *Settings → General → Overlay*. Controls how the recording overlay looks while you dictate:
+
+- **None** — hides the overlay entirely.
+- **Minimal** — a compact pill that shows recording state.
+- **Live** — a readable card that shows your words as you speak (for models that support it).
+
+## Overlay position
+
+Where the overlay sits on your screen: **Bottom** (default), **Top**, or **None**.
+
+## Status while you work
+
+The overlay also surfaces status as things happen — *Getting mic ready*, *Recording*, *Transcribing*, *Writing with Flow*, or *Looking at your screen* — and lets you cancel in progress.
+
+<Warning>
+  **Linux.** On native GNOME/Wayland the overlay can't always stay on top of other windows. SpeakoFlow works around this automatically — see [Troubleshooting](/reference/troubleshooting).
+</Warning>

@@ -1,0 +1,53 @@
+---
+title: "Voice output (TTS)"
+description: "Have the SpeakoFlow assistant read replies aloud, free and local with Kokoro or through OpenAI-compatible, OpenRouter, ElevenLabs, or Azure AI Speech voices."
+icon: "volume-high"
+---
+
+Have the assistant read its replies aloud. Runs locally and free with Kokoro, or through a cloud voice with your own key.
+
+Set up in *Settings → Assistant → Voice output*.
+
+<ResponseField name="Speak responses aloud" type="toggle" default="off">
+  Read the assistant's replies out loud.
+</ResponseField>
+
+<ResponseField name="Stop speech when dictation starts" type="toggle">
+  Stop any reply that's still playing when you start dictating, so you never talk over it.
+</ResponseField>
+
+## Engines
+
+| Engine | Runs | Needs |
+| --- | --- | --- |
+| **Kokoro** (local) | On your machine | One-time voice model download, then fully private. Free. |
+| **OpenAI-compatible** | Cloud | Base URL, API key, model (e.g. `gpt-4o-mini-tts`), voice (e.g. `alloy`, `coral`, `sage`). |
+| **OpenRouter** | Cloud | Your OpenRouter key. |
+| **ElevenLabs** | Cloud | API key, model (e.g. `eleven_v3`, `eleven_multilingual_v2`, or `eleven_flash_v2_5`), voice ID. |
+| **Azure AI Speech** | Cloud | Speech URL, key, voice (e.g. `en-US-AvaMultilingualNeural`). |
+
+<Tip>
+  **Picking an ElevenLabs model.** `eleven_v3` is the newest and most expressive, `eleven_multilingual_v2` is the consistent-quality choice across 29 languages, and `eleven_flash_v2_5` is the fastest (ultra-low latency, around 75 ms). Model names are the API IDs — type them exactly as shown.
+</Tip>
+
+## Voice settings
+
+<ResponseField name="Voice" type="string">
+  The voice used for spoken replies. Kokoro has its own set; cloud engines let you load and pick from their available voices.
+
+  - **OpenAI-compatible** — `alloy`, `ash`, `ballad`, `coral`, `echo`, `fable`, `nova`, `onyx`, `sage`, `shimmer`, `verse`.
+  - **ElevenLabs** — a voice ID from the Voices tab in your ElevenLabs dashboard.
+  - **Azure** — a neural voice like `en-US-AvaMultilingualNeural`, or an HD voice such as `en-US-Ava:DragonHDLatestNeural`. Click *Load voices* to browse.
+</ResponseField>
+
+<ResponseField name="Kokoro precision" type="fp32 | q8">
+  **fp32** is highest quality; **q8** is faster on CPU. Changing this reloads the model.
+</ResponseField>
+
+<ResponseField name="Playback speed" type="number" default="1×">
+  Adjust faster or slower to taste. ElevenLabs supports 0.7×–1.2× only.
+</ResponseField>
+
+<ResponseField name="Test voice" type="action">
+  Play a short sample with the current settings before you commit.
+</ResponseField>

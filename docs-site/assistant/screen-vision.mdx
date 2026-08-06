@@ -1,0 +1,29 @@
+---
+title: "Screen vision"
+description: "Ask the SpeakoFlow assistant about what's on your screen. Manual or agent-decided capture, when the frame is grabbed, and the macOS Screen Recording permission."
+icon: "eye"
+---
+
+Ask about what's on your screen and the assistant answers with that context. It only looks when you let it.
+
+Screen vision needs a vision-capable model (many Gemma and Qwen models qualify). Set it up in *Settings → Assistant → Screen vision*.
+
+<ResponseField name="Screen access" type="Off | Manual | Agent decides" default="Off">
+  - **Off** — screen capture is disabled; camera and region controls are hidden.
+  - **Manual** — you choose when to attach the full screen or a region.
+  - **Agent decides** — the model may request a capture when it needs current visual context.
+
+  Every screenshot sent is shown in the conversation.
+</ResponseField>
+
+<ResponseField name="When to capture" type="When I ask | When the message sends" default="When I ask">
+  For voice questions: capture the moment you start asking, or wait until the message is sent. Typed messages always capture on send.
+</ResponseField>
+
+<Warning>
+  **macOS.** Screen vision needs macOS Screen Recording permission. Grant it in *System Settings → Privacy & Security → Screen Recording*, then restart SpeakoFlow for it to take effect.
+</Warning>
+
+<Note>
+  SpeakoFlow captures the monitor under your mouse cursor, so multi-monitor users get the screen they're actually working on. Only a compact thumbnail is stored in history; the full-resolution frame is sent once to the model and not kept.
+</Note>

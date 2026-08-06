@@ -1,0 +1,23 @@
+---
+title: "Memory & the microphone"
+description: "Settings that trade a little memory or battery for faster, more reliable dictation: model unloading, always-on microphone, and keeping the mic open between transcriptions."
+icon: "memory"
+---
+
+Settings that trade a little memory or battery for speed and reliability.
+
+<ResponseField name="Unload model" type="Never | Immediately | 2–15 min | 1 hour" default="idle timeout">
+  Free memory when the model has been idle for a while. The model reloads automatically the next time you dictate.
+</ResponseField>
+
+<ResponseField name="Always-on microphone" type="toggle" default="off">
+  Keep the mic warm so the first words are never clipped. Uses a little more battery.
+</ResponseField>
+
+<ResponseField name="Keep mic open between transcriptions" type="toggle" default="off">
+  Faster back-to-back dictation by leaving the audio stream open. May affect Bluetooth audio quality.
+</ResponseField>
+
+<Note>
+  The assistant's local model has its own separate unload setting. See [Brain: local or cloud](/assistant/brain).
+</Note>

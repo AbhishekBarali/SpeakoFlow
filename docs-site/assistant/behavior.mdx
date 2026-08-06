@@ -1,0 +1,23 @@
+---
+title: "Behavior & memory"
+description: "Tune how the SpeakoFlow assistant carries a conversation: how much recent context it sends, whether long chats get summarized, and how long replies run."
+icon: "sliders"
+---
+
+Tune how the assistant carries a conversation and how long its answers run.
+
+<ResponseField name="Conversation memory" type="number">
+  How many recent messages are sent as context each turn. Higher keeps more of the thread in mind; **0** disables it and treats every message as standalone.
+</ResponseField>
+
+<ResponseField name="Summarize long chats" type="toggle">
+  When a conversation grows past the model's context window, automatically condense older messages into a running summary so the chat keeps its context instead of forgetting the start. A subtle indicator shows while it runs.
+</ResponseField>
+
+<ResponseField name="Response length" type="No effect | Short | Medium | Long">
+  Preferred reply length. "No effect" leaves your prompt untouched. Individual [profiles](/personalize/profiles) can override this.
+</ResponseField>
+
+<Note>
+  This is short-term, per-conversation context. For durable facts the assistant remembers *across* chats, see [Personal memory](/personalize/memory) — a separate, opt-in feature.
+</Note>

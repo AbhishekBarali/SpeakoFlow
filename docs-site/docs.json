@@ -1,0 +1,162 @@
+{
+  "theme": "mint",
+  "name": "SpeakoFlow",
+  "description": "Documentation for SpeakoFlow, the free and open-source local voice layer for your desktop: dictation, Generate with Flow, AI cleanup, the assistant, screen vision, memory, profiles, settings, and shortcuts for Windows, macOS, and Linux.",
+  "colors": {
+    "primary": "#0A7A70",
+    "light": "#14B8A6",
+    "dark": "#075E57"
+  },
+  "fonts": {
+    "family": "Manrope"
+  },
+  "logo": {
+    "light": "/logo/lockup.svg",
+    "dark": "/logo/lockup-dark.svg",
+    "href": "https://www.speakoflow.com"
+  },
+  "favicon": "/favicon.png",
+  "appearance": {
+    "default": "system"
+  },
+  "background": {
+    "decoration": "gradient"
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "Download",
+        "href": "https://www.speakoflow.com"
+      }
+    ],
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/AbhishekBarali/SpeakoFlow"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/AbhishekBarali/SpeakoFlow",
+      "website": "https://www.speakoflow.com"
+    },
+    "links": [
+      {
+        "header": "SpeakoFlow",
+        "items": [
+          { "label": "Download", "href": "https://www.speakoflow.com" },
+          { "label": "Releases", "href": "https://github.com/AbhishekBarali/SpeakoFlow/releases" },
+          { "label": "Repository", "href": "https://github.com/AbhishekBarali/SpeakoFlow" }
+        ]
+      },
+      {
+        "header": "Help",
+        "items": [
+          { "label": "Troubleshooting", "href": "/reference/troubleshooting" },
+          { "label": "Privacy", "href": "/reference/privacy" },
+          { "label": "Report an issue", "href": "https://github.com/AbhishekBarali/SpeakoFlow/issues" }
+        ]
+      }
+    ]
+  },
+  "contextual": {
+    "options": ["copy", "view", "chatgpt", "claude", "cursor", "mcp"]
+  },
+  "metadata": {
+    "timestamp": true
+  },
+  "seo": {
+    "indexing": "navigable",
+    "metatags": {
+      "og:site_name": "SpeakoFlow Documentation",
+      "og:type": "website",
+      "twitter:card": "summary_large_image"
+    },
+    "organization": {
+      "name": "SpeakoFlow",
+      "url": "https://www.speakoflow.com",
+      "logo": "https://www.speakoflow.com/assets/img/logo/lockup.svg",
+      "sameAs": ["https://github.com/AbhishekBarali/SpeakoFlow"]
+    }
+  },
+  "search": {
+    "prompt": "Search the docs..."
+  },
+  "navigation": {
+    "groups": [
+      {
+        "group": "Start here",
+        "pages": [
+          "index",
+          "start/install",
+          "start/getting-started",
+          "start/how-it-works",
+          "start/keyboard-shortcuts"
+        ]
+      },
+      {
+        "group": "Dictation",
+        "pages": [
+          "dictation/basics",
+          "dictation/hands-free",
+          "dictation/live-transcription",
+          "dictation/overlay",
+          "dictation/translate",
+          "dictation/custom-words",
+          "dictation/text-replacements",
+          "dictation/spoken-emoji",
+          "dictation/output"
+        ]
+      },
+      {
+        "group": "Models",
+        "pages": [
+          "models/transcription-models",
+          "models/languages",
+          "models/acceleration",
+          "models/custom-models",
+          "models/memory"
+        ]
+      },
+      {
+        "group": "Writing with AI",
+        "pages": [
+          "writing/generate-with-flow",
+          "writing/ai-cleanup",
+          "writing/writing-styles"
+        ]
+      },
+      {
+        "group": "The assistant",
+        "pages": [
+          "assistant/panel",
+          "assistant/brain",
+          "assistant/providers",
+          "assistant/behavior",
+          "assistant/screen-vision",
+          "assistant/web-search",
+          "assistant/voice-output",
+          "assistant/appearance"
+        ]
+      },
+      {
+        "group": "Personalization",
+        "pages": [
+          "personalize/profiles",
+          "personalize/memory",
+          "personalize/history"
+        ]
+      },
+      {
+        "group": "Settings & reference",
+        "pages": [
+          "settings/general",
+          "settings/debug",
+          "settings/cli",
+          "reference/privacy",
+          "reference/troubleshooting",
+          "reference/about"
+        ]
+      }
+    ]
+  }
+}

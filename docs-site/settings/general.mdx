@@ -1,0 +1,85 @@
+---
+title: "General settings"
+description: "Shortcuts, microphone, sounds, startup, tray, and appearance — everything in the SpeakoFlow General settings section, grouped as you'll find it in the app."
+icon: "gear"
+---
+
+Shortcuts, your microphone, sounds, startup, and how the app looks. Everything in the *General* section, grouped as you'll find it.
+
+<Frame caption="The main Settings window — General section.">
+  <img src="https://www.speakoflow.com/general-dark.png" alt="The SpeakoFlow Settings window open to the General section, shown in dark mode, with Recording, Appearance, Sounds, and Overlay groups." />
+</Frame>
+
+## Appearance
+
+<ResponseField name="Theme" type="Light | Dark | System">
+  A theme for the app and the assistant panel.
+</ResponseField>
+
+<ResponseField name="Text size" type="Small | Default | Large | Extra large">
+  Scale text and controls across the app.
+</ResponseField>
+
+<ResponseField name="App language" type="language">
+  Change the language of the SpeakoFlow interface. This is separate from your speech-recognition language.
+</ResponseField>
+
+## Recording & input
+
+<ResponseField name="Shortcuts" type="key combinations">
+  The keyboard shortcuts that start and stop recording and open the assistant. See [Keyboard shortcuts](/start/keyboard-shortcuts) for the full list and defaults.
+</ResponseField>
+
+<ResponseField name="Recording behavior" type="Hold | Tap" default="Hold">
+  **Hold** records while the shortcut is pressed; **Tap** starts with one press and stops with the next.
+</ResponseField>
+
+<ResponseField name="Tap to lock" type="key" default="Space">
+  The key you tap mid-hold to go hands-free. See [Hands-free & tap-to-lock](/dictation/hands-free).
+</ResponseField>
+
+<ResponseField name="Language" type="Auto | specific language" default="Auto">
+  Speech-recognition language. A specific language can improve accuracy. See [Languages & accents](/models/languages).
+</ResponseField>
+
+<ResponseField name="Microphone" type="device">
+  Select your preferred microphone device.
+</ResponseField>
+
+## Sounds
+
+<ResponseField name="Audio feedback" type="toggle" default="off">
+  Play a sound when recording starts and stops.
+</ResponseField>
+
+<ResponseField name="Feedback sound" type="Default | Marimba | Pop | Click | more">
+  Choose the start/stop cue — several themes are bundled, with a preview button.
+</ResponseField>
+
+<ResponseField name="Output device" type="device">
+  Which device plays feedback sounds.
+</ResponseField>
+
+<ResponseField name="Volume" type="percentage">
+  Adjust the volume of audio feedback sounds.
+</ResponseField>
+
+## Startup & tray
+
+<ResponseField name="Launch on startup" type="toggle">
+  Open SpeakoFlow automatically when you sign in.
+</ResponseField>
+
+<ResponseField name="Start hidden" type="toggle">
+  Launch to the tray without opening the window.
+</ResponseField>
+
+<ResponseField name="Show tray icon" type="toggle">
+  Keep SpeakoFlow in your system tray. The tray menu offers Home, Check for updates, Copy last transcript, Unload model, and Quit.
+</ResponseField>
+
+## Updates
+
+<ResponseField name="Check for updates" type="toggle">
+  Let SpeakoFlow check for new versions and offer to download them. Turn off to disable automatic checks.
+</ResponseField>

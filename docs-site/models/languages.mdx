@@ -1,0 +1,24 @@
+---
+title: "Languages & accents"
+description: "Pick the right SpeakoFlow model for your languages and accent, and get non-Western names spelled correctly with Whisper plus custom words."
+icon: "language"
+---
+
+Getting names and non-English speech right comes down to the model you pick — and a couple of settings that reinforce it.
+
+<ResponseField name="Language" type="Auto | specific language" default="Auto">
+  The language for speech recognition. Setting a specific language (instead of Auto) can improve accuracy noticeably. Some models detect the language automatically and don't expose this setting.
+</ResponseField>
+
+## Which model for which languages
+
+- **Whisper Medium/Large** — the widest coverage, nearly 100 languages. The best all-rounder for mixed or non-Western speech.
+- **Nemotron streaming** — 28 languages in real time.
+- **Parakeet V3 / Canary 1B** — 25 European languages.
+- **SenseVoice** — Chinese, English, Japanese, Korean, Cantonese.
+
+<Tip>
+  **Non-Western names.** Whisper models are particularly strong at names and words that trip up English-only models — for example Nepali, Indian, and other South Asian names that don't follow standard English spelling. If you dictate names like these often, use a Whisper model and add the tricky ones to [Custom words](/dictation/custom-words) so they're spelled your way every time.
+</Tip>
+
+Speaking a language and want English out? See [Translate to English](/dictation/translate).

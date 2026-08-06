@@ -1,0 +1,33 @@
+---
+title: "Keyboard shortcuts"
+description: "Every SpeakoFlow keyboard shortcut and its default on Windows, macOS, and Linux, plus Hold vs. Tap recording behavior and why the Windows defaults are modifier-only."
+icon: "keyboard"
+---
+
+Every shortcut is configurable in *Settings → General → Shortcuts*. These are the defaults out of the box.
+
+| Action | Windows | macOS | Linux |
+| --- | --- | --- | --- |
+| **Dictate**<br />Start/stop recording, type it out | `Left Ctrl` + `Left Win` | `Option` + `Space` | `Ctrl` + `Space` |
+| **Dictate & clean up**<br />Dictate, then AI-clean before pasting | `Ctrl` + `Shift` + `Space` | `Option` + `Shift` + `Space` | `Ctrl` + `Shift` + `Space` |
+| **Ask the assistant**<br />Voice question into the panel | `Left Ctrl` + `Left Alt` | `Option` + `Ctrl` + `Space` | `Ctrl` + `Alt` + `Space` |
+| **Show / hide panel**<br />Toggle the floating assistant | `Ctrl` + `Shift` + `A` | `Option` + `Ctrl` + `A` | `Ctrl` + `Alt` + `A` |
+| **Cancel**<br />Stop a recording or streaming reply | Unset by default — bind any key (e.g. `Esc`) in Settings | | |
+| **Debug mode**<br />Reveal diagnostics | `Ctrl` + `Shift` + `D` | `Cmd` + `Shift` + `D` | `Ctrl` + `Shift` + `D` |
+
+<Note>
+  **Why the modifier-only defaults on Windows?** Holding `Left Ctrl` + `Left Win` keeps every letter and the Space bar free, so the shortcut can't collide with text shortcuts inside your apps. Left-side keys specifically, so an international `AltGr` layout won't trigger the assistant by accident.
+</Note>
+
+## Recording behavior: Hold vs. Tap
+
+In *Settings → General* you choose how the Dictate shortcut behaves:
+
+- **Hold** (default) — records while the shortcut is held down, and types out when you let go.
+- **Tap** — one press starts recording, the next press stops it. No holding.
+
+For hands-free recording without switching modes, see [Hands-free & tap-to-lock](/dictation/hands-free).
+
+<Tip>
+  Prefer a hardware key or a window-manager binding? SpeakoFlow also accepts [command-line flags](/settings/cli) like `--toggle-transcription` that you can wire to anything.
+</Tip>

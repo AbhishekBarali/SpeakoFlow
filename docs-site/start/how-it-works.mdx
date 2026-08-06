@@ -1,0 +1,54 @@
+---
+title: "How SpeakoFlow works"
+description: "The mental model behind SpeakoFlow: one hotkey layer over your real work, a fully local dictation pipeline, and an assistant you can run offline, on your own server, or in the cloud."
+icon: "diagram-project"
+---
+
+A quick mental model that makes the rest of the docs click into place.
+
+## One hotkey layer over your real work
+
+SpeakoFlow sits quietly in your system tray and does nothing until you press a shortcut. It's a layer over whatever app you're already in — you never switch to it to dictate. Three jobs live under that hotkey layer:
+
+- **[Dictation](/dictation/basics)** — local speech-to-text typed into the active app. Your audio never leaves the machine.
+- **[Generate with Flow](/writing/generate-with-flow)** — start a dictation with an activation phrase and the AI writes the finished result.
+- **[The assistant](/assistant/panel)** — a floating panel you summon to ask questions by voice or text, optionally with screen vision and spoken answers.
+
+## The dictation pipeline
+
+When you dictate, your audio flows through a local pipeline:
+
+```
+microphone → voice-activity detection → speech-to-text model (GPU or CPU) → text inserted into the active app
+```
+
+Voice-activity detection filters out silence, the model runs on your own hardware, and text is inserted via the clipboard or direct typing. Nothing in that chain touches the network.
+
+## Local-first, your choice
+
+Speech-to-text is always local. The assistant is where you choose your comfort level:
+
+<CardGroup cols={3}>
+  <Card title="Built-in (offline)" icon="microchip">
+    Download a small local model and run it fully on your machine. No key, no network.
+  </Card>
+
+  <Card title="Local server" icon="server">
+    Point SpeakoFlow at Ollama or LM Studio running on your own machine.
+  </Card>
+
+  <Card title="Cloud" icon="cloud">
+    Bring your own API key for any OpenAI-compatible provider.
+  </Card>
+</CardGroup>
+
+See [Brain: local or cloud](/assistant/brain) to set this up, and [Privacy](/reference/privacy) for exactly what is stored and where.
+
+## Settings, organized the same way
+
+The Settings window mirrors this guide:
+
+- **[General](/settings/general)** — shortcuts, microphone, appearance
+- **Dictation** — the model and how text is cleaned up
+- **Assistant** — [brain](/assistant/brain), [voice](/assistant/voice-output), [screen vision](/assistant/screen-vision), [web search](/assistant/web-search)
+- **[Profiles](/personalize/profiles)**, **[Memory](/personalize/memory)**, **[History](/personalize/history)**, and **[Debug](/settings/debug)**

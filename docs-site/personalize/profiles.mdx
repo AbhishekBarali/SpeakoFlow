@@ -1,0 +1,43 @@
+---
+title: "Profiles"
+description: "Task-focused assistant personas you switch between from the panel header. Each profile sets a name, role, instructions, reply length, and greeting."
+icon: "users"
+---
+
+Task-focused personas you switch between. Each profile sets the assistant's name, role, instructions, and how long its replies run. Switch anytime from the panel header.
+
+Manage them in *Settings → Profiles*.
+
+## Creating a profile
+
+Start from scratch, duplicate an existing one, or use **Create with AI** — describe the persona you want (e.g. "a concise release-notes writer" or "a patient tutor who explains every step") and SpeakoFlow drafts it. You can even dictate the description.
+
+## Each profile has
+
+<ResponseField name="Name & role" type="string">
+  Shown on the card and in the panel.
+</ResponseField>
+
+<ResponseField name="Avatar" type="image">
+  Upload an image or use the default.
+</ResponseField>
+
+<ResponseField name="Instructions" type="string">
+  The system prompt that shapes its personality.
+</ResponseField>
+
+<ResponseField name="Response length" type="Short | Medium | Long | Inherit global">
+  Choose *Inherit global* to follow your main [Assistant setting](/assistant/behavior).
+</ResponseField>
+
+<ResponseField name="Greeting" type="string">
+  An optional opening line shown in an empty chat.
+</ResponseField>
+
+## Import & export
+
+Share profiles or back them up. Export a profile to a file and import it on another machine. You can restore the built-in profiles at any time.
+
+<Tip>
+  There's a built-in **Cat** profile that ignores the AI entirely and just meows. Nothing to configure — it's there for fun.
+</Tip>
