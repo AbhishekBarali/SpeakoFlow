@@ -1,18 +1,18 @@
 ---
 title: "Live vs. batch transcription"
-description: "Choose whether SpeakoFlow streams text as you speak or transcribes everything in one batch when you stop, and which models support streaming."
+description: "SpeakoFlow streams text as you speak on streaming-capable models and transcribes in a single batch on the rest. Which models stream, and how to change the behavior."
 icon: "tower-broadcast"
 ---
 
-Choose whether words appear as you speak, or all at once when you stop.
+Your words can land as you speak them, or all at once when you stop. Which one you get depends on the model you're running.
 
-By default, SpeakoFlow transcribes in a single batch when you finish — accurate and simple. With live transcription on, text streams in as you talk (on models that support streaming).
+On a streaming-capable model, live transcription is on out of the box — text appears while you're still talking. Every other model transcribes in one batch when you finish, which stays accurate and simple.
 
 ## Live transcription
 
-*Default: off.*
+*Default: on for streaming models, off for the rest.*
 
-**Experimental.** Transcribe speech as you talk, instead of all at once when you stop.
+Transcribe speech as you talk instead of all at once when you stop. This only takes effect on a model that supports streaming — on any other model SpeakoFlow batches regardless of the setting, so there's no harm in leaving it on.
 
 ## Live transcription window
 
@@ -21,7 +21,7 @@ By default, SpeakoFlow transcribes in a single batch when you finish — accurat
 While live transcription runs, show a larger overlay card with the running text instead of the compact pill. Requires live transcription.
 
 <Note>
-  Streaming-capable models (like the Moonshine V2 and Nemotron streaming models) are the best fit for live mode. See [Transcription models](/models/transcription-models) for which ones stream.
+  The streaming-capable models are the Moonshine V2 variants and the Nemotron streaming model. See [Transcription models](/models/transcription-models) for the full catalog and what each one is good at.
 </Note>
 
-Live transcription is an experimental feature, so it's hidden until you turn on **Experimental features** in [Debug & advanced](/settings/debug).
+Switching to a non-streaming model, like Whisper Large for its accuracy, moves you back to batch transcription automatically. Nothing to reconfigure.
