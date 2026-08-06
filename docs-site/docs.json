@@ -1,11 +1,11 @@
 {
-  "theme": "mint",
+  "theme": "maple",
   "name": "SpeakoFlow",
   "description": "Documentation for SpeakoFlow, the free and open-source local voice layer for your desktop: dictation, Generate with Flow, AI cleanup, the assistant, screen vision, memory, profiles, settings, and shortcuts for Windows, macOS, and Linux.",
   "colors": {
     "primary": "#0A7A70",
-    "light": "#14B8A6",
-    "dark": "#075E57"
+    "light": "#2DD4BF",
+    "dark": "#0D9488"
   },
   "fonts": {
     "family": "Inter",
