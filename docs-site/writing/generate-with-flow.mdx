@@ -18,13 +18,17 @@ Flow generates the finished email and pastes it where you're typing. Anywhere th
 
 ## Settings
 
-<ResponseField name="Activation phrase" type="string" default="Hey Flow">
-  Flow activates only when a dictation begins with this phrase. Rename it to anything you like; leave it empty to reset back to "Hey Flow". Flow uses your assistant's model to generate.
-</ResponseField>
+### Activation phrase
 
-<ResponseField name="Allow screen access" type="toggle" default="off">
-  Let Flow take one screenshot when a command clearly refers to your screen — like "look at this email and draft a reply." The model decides whether it's needed. This is separate from the assistant's screen access.
-</ResponseField>
+*Default: Hey Flow.*
+
+Flow activates only when a dictation begins with this phrase. Rename it to anything you like; leave it empty to reset back to "Hey Flow". Flow uses your assistant's model to generate.
+
+### Allow screen access
+
+*Default: off.*
+
+Let Flow take one screenshot when a command clearly refers to your screen — like "look at this email and draft a reply." The model decides whether it's needed. This is separate from the assistant's screen access.
 
 <Note>
   Flow needs an assistant model configured. If none is set up, your words are pasted as ordinary dictation and the overlay lets you know. Set one up in [Brain: local or cloud](/assistant/brain).

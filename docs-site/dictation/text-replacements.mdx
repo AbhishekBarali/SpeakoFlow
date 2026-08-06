@@ -10,31 +10,33 @@ Create rules that map a spoken phrase to inserted text. Say "my email" and Speak
 
 ## Each rule has
 
-<ResponseField name="Spoken phrase" type="string">
-  What SpeakoFlow hears, for example "my email".
-</ResponseField>
+### Spoken phrase
 
-<ResponseField name="Insert this text" type="string">
-  What it types instead.
-</ResponseField>
+What SpeakoFlow hears, for example "my email".
 
-<ResponseField name="Enabled" type="toggle">
-  Toggle a rule on or off without deleting it.
-</ResponseField>
+### Insert this text
+
+What it types instead.
+
+### Enabled
+
+Toggle a rule on or off without deleting it.
 
 ## Advanced options
 
-<ResponseField name="Regex" type="toggle">
-  Match with a regular expression instead of a literal phrase.
-</ResponseField>
+### Regex
 
-<ResponseField name="Trim before / Trim after" type="toggle">
-  Remove surrounding whitespace around the match.
-</ResponseField>
+Match with a regular expression instead of a literal phrase.
 
-<ResponseField name="Caps" type="None | UPPERCASE | lowercase | Capitalize">
-  Force the inserted text into a specific case.
-</ResponseField>
+### Trim before / Trim after
+
+Remove surrounding whitespace around the match.
+
+### Caps
+
+*None, UPPERCASE, lowercase, Capitalize.*
+
+Force the inserted text into a specific case.
 
 <Note>
   **Magic tokens.** Use `[date]`, `[time]`, `[uppercase]`, `[lowercase]`, `[capitalize]`, or `[nospace]` inside the inserted text for dynamic values and formatting.

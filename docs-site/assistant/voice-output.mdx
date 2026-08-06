@@ -8,13 +8,15 @@ Have the assistant read its replies aloud. Runs locally and free with Kokoro, or
 
 Set up in *Settings → Assistant → Voice output*.
 
-<ResponseField name="Speak responses aloud" type="toggle" default="off">
-  Read the assistant's replies out loud.
-</ResponseField>
+## Speak responses aloud
 
-<ResponseField name="Stop speech when dictation starts" type="toggle">
-  Stop any reply that's still playing when you start dictating, so you never talk over it.
-</ResponseField>
+*Default: off.*
+
+Read the assistant's replies out loud.
+
+## Stop speech when dictation starts
+
+Stop any reply that's still playing when you start dictating, so you never talk over it.
 
 ## Engines
 
@@ -32,22 +34,27 @@ Set up in *Settings → Assistant → Voice output*.
 
 ## Voice settings
 
-<ResponseField name="Voice" type="string">
-  The voice used for spoken replies. Kokoro has its own set; cloud engines let you load and pick from their available voices.
+### Voice
 
-  - **OpenAI-compatible** — `alloy`, `ash`, `ballad`, `coral`, `echo`, `fable`, `nova`, `onyx`, `sage`, `shimmer`, `verse`.
-  - **ElevenLabs** — a voice ID from the Voices tab in your ElevenLabs dashboard.
-  - **Azure** — a neural voice like `en-US-AvaMultilingualNeural`, or an HD voice such as `en-US-Ava:DragonHDLatestNeural`. Click *Load voices* to browse.
-</ResponseField>
+The voice used for spoken replies. Kokoro has its own set; cloud engines let you load and pick from their available voices.
 
-<ResponseField name="Kokoro precision" type="fp32 | q8">
-  **fp32** is highest quality; **q8** is faster on CPU. Changing this reloads the model.
-</ResponseField>
+- **OpenAI-compatible** — `alloy`, `ash`, `ballad`, `coral`, `echo`, `fable`, `nova`, `onyx`, `sage`, `shimmer`, `verse`.
+- **ElevenLabs** — a voice ID from the Voices tab in your ElevenLabs dashboard.
+- **Azure** — a neural voice like `en-US-AvaMultilingualNeural`, or an HD voice such as `en-US-Ava:DragonHDLatestNeural`. Click *Load voices* to browse.
 
-<ResponseField name="Playback speed" type="number" default="1×">
-  Adjust faster or slower to taste. ElevenLabs supports 0.7×–1.2× only.
-</ResponseField>
+### Kokoro precision
 
-<ResponseField name="Test voice" type="action">
-  Play a short sample with the current settings before you commit.
-</ResponseField>
+*fp32, q8.*
+
+**fp32** is highest quality; **q8** is faster on CPU. Changing this reloads the model.
+
+### Playback speed
+
+*Default: 1×.*
+
+Adjust faster or slower to taste. ElevenLabs supports 0.7×–1.2× only.
+
+### Test voice
+
+Play a short sample with the current settings before you commit.
+

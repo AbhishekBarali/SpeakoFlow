@@ -6,34 +6,39 @@ icon: "bug"
 
 Diagnostics and fine-grained knobs. Open the Debug section with `Ctrl` + `Shift` + `D` (`Cmd` + `Shift` + `D` on macOS). Most people never need these.
 
-<ResponseField name="Log directory & log level" type="path, level">
-  Where logs are written, and how verbose they are. Raise the level when reporting a bug.
-</ResponseField>
+## Log directory & log level
 
-<ResponseField name="Word correction threshold" type="number">
-  Sensitivity for custom-word corrections — how aggressively SpeakoFlow snaps near-misses to your [custom words](/dictation/custom-words).
-</ResponseField>
+Where logs are written, and how verbose they are. Raise the level when reporting a bug.
 
-<ResponseField name="Clamshell microphone" type="device">
-  **macOS only.** Which microphone to use when the laptop lid is closed.
-</ResponseField>
+## Word correction threshold
 
-<ResponseField name="Mute while recording" type="toggle">
-  Mute system audio during recording so playback doesn't bleed into your dictation.
-</ResponseField>
+Sensitivity for custom-word corrections — how aggressively SpeakoFlow snaps near-misses to your [custom words](/dictation/custom-words).
 
-<ResponseField name="Keyboard implementation" type="handy-keys | Tauri global-shortcut">
-  Choose the shortcut backend. **handy-keys** supports modifier-only combos like `Ctrl`+`Super`. If a switch makes your shortcuts incompatible, they reset to defaults.
-</ResponseField>
+## Clamshell microphone
 
-<ResponseField name="Paste delay" type="milliseconds">
-  How long to wait before pasting. Increase if the wrong text is occasionally pasted.
-</ResponseField>
+**macOS only.** Which microphone to use when the laptop lid is closed.
 
-<ResponseField name="Extra recording buffer" type="milliseconds">
-  How long to keep recording after you release the key, so trailing words aren't clipped.
-</ResponseField>
+## Mute while recording
 
-<ResponseField name="Experimental features" type="toggle" default="off">
-  Reveal in-development features, like [AI cleanup](/writing/ai-cleanup) and [live transcription](/dictation/live-transcription).
-</ResponseField>
+Mute system audio during recording so playback doesn't bleed into your dictation.
+
+## Keyboard implementation
+
+*handy-keys, Tauri global-shortcut.*
+
+Choose the shortcut backend. **handy-keys** supports modifier-only combos like `Ctrl`+`Super`. If a switch makes your shortcuts incompatible, they reset to defaults.
+
+## Paste delay
+
+How long to wait before pasting. Increase if the wrong text is occasionally pasted.
+
+## Extra recording buffer
+
+How long to keep recording after you release the key, so trailing words aren't clipped.
+
+## Experimental features
+
+*Default: off.*
+
+Reveal in-development features, like [AI cleanup](/writing/ai-cleanup) and [live transcription](/dictation/live-transcription).
+

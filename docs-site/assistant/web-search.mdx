@@ -8,9 +8,11 @@ Optional. When a question needs current, factual information, the assistant can 
 
 Enable it in *Settings → Assistant → Web search*. Off until you turn it on.
 
-<ResponseField name="Allow web search" type="toggle" default="off">
-  Let the assistant search the web when a question needs current information.
-</ResponseField>
+## Allow web search
+
+*Default: off.*
+
+Let the assistant search the web when a question needs current information.
 
 ## How it decides to search
 
@@ -20,41 +22,50 @@ Each search is a single round-trip that returns titles and snippets. Result page
 
 ## Two ways to search
 
-<ResponseField name="Use OpenRouter's built-in search" type="toggle" default="off">
-  If you use OpenRouter, turn this on to let OpenRouter run the search itself (its `:online` mode) using your OpenRouter credits — **no separate search API key needed**. When off, the app searches with your own search provider below.
-</ResponseField>
+### Use OpenRouter's built-in search
 
-<ResponseField name="Search provider" type="Serper | Brave | Tavily | Exa | SerpAPI | TinyFish" default="Serper">
-  All six return titles and snippets, and each needs one API key. Every one has a free tier.
+*Default: off.*
 
-  | Provider | What you get |
-  | --- | --- |
-  | **Serper** | Google results, fast. The default. |
-  | **Brave Search** | An independent index. |
-  | **Tavily** | LLM-optimized; returns a synthesized answer. |
-  | **Exa** | Neural, semantic search. |
-  | **SerpAPI** | Google SERP. |
-  | **TinyFish** | Its own index, built for agents. Free with no credit card, 30 queries a minute, sub-second latency. |
-</ResponseField>
+If you use OpenRouter, turn this on to let OpenRouter run the search itself (its `:online` mode) using your OpenRouter credits — **no separate search API key needed**. When off, the app searches with your own search provider below.
+
+### Search provider
+
+*Serper, Brave, Tavily, Exa, SerpAPI, TinyFish. Default: Serper.*
+
+All six return titles and snippets, and each needs one API key. Every one has a free tier.
+
+| Provider | What you get |
+| --- | --- |
+| **Serper** | Google results, fast. The default. |
+| **Brave Search** | An independent index. |
+| **Tavily** | LLM-optimized; returns a synthesized answer. |
+| **Exa** | Neural, semantic search. |
+| **SerpAPI** | Google SERP. |
+| **TinyFish** | Its own index, built for agents. Free with no credit card, 30 queries a minute, sub-second latency. |
 
 <Tip>
   Serper stays the default. TinyFish is the most generous free tier of the six — no card required — if you'd rather not hand over payment details to try search out.
 </Tip>
 
-<ResponseField name="API key" type="secret">
-  Key for the selected search provider. Not needed when using OpenRouter's built-in search.
-</ResponseField>
+### API key
+
+Key for the selected search provider. Not needed when using OpenRouter's built-in search.
 
 ## Quality controls
 
-<ResponseField name="Sources to use" type="1–10">
-  How many results to read.
-</ResponseField>
+### Sources to use
 
-<ResponseField name="Search depth" type="Quick | Standard | Deep">
-  **Quick** for simple facts, **Standard** for most questions, **Deep** for hard ones.
-</ResponseField>
+*1–10.*
 
-<ResponseField name="Test search" type="action">
-  Run a sample search with the current provider and key to confirm it's working before you rely on it.
-</ResponseField>
+How many results to read.
+
+### Search depth
+
+*Quick, Standard, Deep.*
+
+**Quick** for simple facts, **Standard** for most questions, **Deep** for hard ones.
+
+### Test search
+
+Run a sample search with the current provider and key to confirm it's working before you rely on it.
+

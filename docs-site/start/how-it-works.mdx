@@ -18,17 +18,31 @@ SpeakoFlow sits quietly in your system tray and does nothing until you press a s
 
 When you dictate, your audio flows through a local pipeline:
 
-```
-microphone → voice-activity detection → speech-to-text model (GPU or CPU) → text inserted into the active app
-```
+<Steps>
+  <Step title="Your microphone" icon="microphone">
+    Audio is captured from the input device you selected in [General settings](/settings/general).
+  </Step>
 
-Voice-activity detection filters out silence, the model runs on your own hardware, and text is inserted via the clipboard or direct typing. Nothing in that chain touches the network.
+  <Step title="Voice-activity detection" icon="filter">
+    Silence is filtered out, so pauses while you think don't become gaps in your text.
+  </Step>
+
+  <Step title="Speech-to-text, on your hardware" icon="microchip">
+    The model runs on your GPU, or your CPU if no GPU is available. See [Acceleration & GPU](/models/acceleration).
+  </Step>
+
+  <Step title="Text into the active app" icon="clipboard">
+    Inserted via the clipboard or typed directly. See [Output & pasting](/dictation/output).
+  </Step>
+</Steps>
+
+Nothing in that chain touches the network.
 
 ## Local-first, your choice
 
 Speech-to-text is always local. The assistant is where you choose your comfort level:
 
-<CardGroup cols={3}>
+<CardGroup cols={2}>
   <Card title="Built-in (offline)" icon="microchip">
     Download a small local model and run it fully on your machine. No key, no network.
   </Card>

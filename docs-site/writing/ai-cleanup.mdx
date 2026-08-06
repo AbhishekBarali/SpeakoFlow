@@ -16,35 +16,41 @@ Cleanup applies to dictation only (not the assistant chat) and runs on its **own
 
 ## Settings
 
-<ResponseField name="Cleanup strength" type="Light | Balanced | Aggressive">
-  How much the AI rewrites your words:
+### Cleanup strength
 
-  - **Light** — fixes only mistakes and filler.
-  - **Balanced** — also trims repeated points and false starts.
-  - **Aggressive** — tightens rambling into concise, well-structured text.
+*Light, Balanced, Aggressive.*
 
-  All levels keep your facts and meaning intact.
-</ResponseField>
+How much the AI rewrites your words:
 
-<ResponseField name="Fix misheard words" type="toggle">
-  When a word is clearly wrong for the sentence — a homophone or a near-miss pronunciation — replace it with the word you meant. Helpful for accents; the AI only corrects when the intended word is obvious.
-</ResponseField>
+- **Light** — fixes only mistakes and filler.
+- **Balanced** — also trims repeated points and false starts.
+- **Aggressive** — tightens rambling into concise, well-structured text.
 
-<ResponseField name="Style preset" type="None | Formal | Casual | Professional | Friendly | Concise">
-  Choose how the cleaned dictation should sound. "None" fixes the text without intentionally changing its voice. You can also create your own — see [Writing styles](/writing/writing-styles).
-</ResponseField>
+All levels keep your facts and meaning intact.
 
-<ResponseField name="Cleanup model & provider" type="Assistant model | Local | Cloud | Apple Intelligence">
-  By default cleanup uses your assistant's model. You can also run it privately on a downloaded local model, on a cloud provider, or on **Apple Intelligence** (macOS) — fully on-device, no key, requires an Apple Silicon Mac on macOS Tahoe 26.0+ with Apple Intelligence enabled.
-</ResponseField>
+### Fix misheard words
 
-<ResponseField name="Cleanup prompt" type="string">
-  Pick a template for cleaning up transcriptions or write your own. Your transcribed text is sent to the model automatically — just write instructions, e.g. *"Fix grammar and punctuation, then rewrite as a polished, professional message."*
-</ResponseField>
+When a word is clearly wrong for the sentence — a homophone or a near-miss pronunciation — replace it with the word you meant. Helpful for accents; the AI only corrects when the intended word is obvious.
 
-<ResponseField name="AI cleanup timeout" type="seconds">
-  How long to wait for the model before giving up and pasting your raw transcription instead. On the built-in local model, allow enough time for it to load on first use.
-</ResponseField>
+### Style preset
+
+*None, Formal, Casual, Professional, Friendly, Concise.*
+
+Choose how the cleaned dictation should sound. "None" fixes the text without intentionally changing its voice. You can also create your own — see [Writing styles](/writing/writing-styles).
+
+### Cleanup model & provider
+
+*Assistant model, Local, Cloud, Apple Intelligence.*
+
+By default cleanup uses your assistant's model. You can also run it privately on a downloaded local model, on a cloud provider, or on **Apple Intelligence** (macOS) — fully on-device, no key, requires an Apple Silicon Mac on macOS Tahoe 26.0+ with Apple Intelligence enabled.
+
+### Cleanup prompt
+
+Pick a template for cleaning up transcriptions or write your own. Your transcribed text is sent to the model automatically — just write instructions, e.g. *"Fix grammar and punctuation, then rewrite as a polished, professional message."*
+
+### AI cleanup timeout
+
+How long to wait for the model before giving up and pasting your raw transcription instead. On the built-in local model, allow enough time for it to load on first use.
 
 <Note>
   Cleanup is hidden until you turn on **Experimental features** in [Debug & advanced](/settings/debug).

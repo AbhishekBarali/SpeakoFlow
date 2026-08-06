@@ -6,25 +6,33 @@ icon: "clipboard"
 
 Fine control over exactly how transcribed text is inserted into the active app. Most people never need to touch these — the defaults just work.
 
-<ResponseField name="Paste method" type="Clipboard | Direct | None | External script" default="Clipboard">
-  How transcribed text is inserted. **Clipboard** pastes via `Ctrl/Cmd` + `V`, with `Ctrl+Shift+V` and `Shift+Insert` variants. **Direct** types it key by key. **External script** hands off to a script you point to.
-</ResponseField>
+## Paste method
 
-<ResponseField name="Typing tool" type="Auto | specific tool" default="Auto (recommended)">
-  **Linux only.** The tool used for the Direct paste method. Leave on Auto unless you have a reason to change it.
-</ResponseField>
+*Clipboard, Direct, None, External script. Default: Clipboard.*
 
-<ResponseField name="Clipboard handling" type="Don't modify clipboard | Copy to clipboard">
-  Whether the transcription stays in your clipboard after pasting. The default restores what you had before.
-</ResponseField>
+How transcribed text is inserted. **Clipboard** pastes via `Ctrl/Cmd` + `V`, with `Ctrl+Shift+V` and `Shift+Insert` variants. **Direct** types it key by key. **External script** hands off to a script you point to.
 
-<ResponseField name="Auto submit" type="Off | Enter | Cmd+Enter | Super+Enter | Ctrl+Enter" default="Off">
-  Send a key combination automatically after text is inserted. Handy for firing off chat messages hands-free.
-</ResponseField>
+## Typing tool
 
-<ResponseField name="Append trailing space" type="toggle">
-  Add a space after inserted text so consecutive dictations don't run together.
-</ResponseField>
+*Auto, specific tool. Default: Auto (recommended).*
+
+**Linux only.** The tool used for the Direct paste method. Leave on Auto unless you have a reason to change it.
+
+## Clipboard handling
+
+*Don't modify clipboard, Copy to clipboard.*
+
+Whether the transcription stays in your clipboard after pasting. The default restores what you had before.
+
+## Auto submit
+
+*Off, Enter, Cmd+Enter, Super+Enter, Ctrl+Enter. Default: Off.*
+
+Send a key combination automatically after text is inserted. Handy for firing off chat messages hands-free.
+
+## Append trailing space
+
+Add a space after inserted text so consecutive dictations don't run together.
 
 <Tip>
   If text is occasionally cut off or the wrong text pastes, the paste delay and extra recording buffer in [Debug settings](/settings/debug) usually fix it. For a specific app that misbehaves with clipboard paste, try the **Direct** paste method.
