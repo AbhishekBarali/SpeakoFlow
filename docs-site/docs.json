@@ -8,7 +8,11 @@
     "dark": "#075E57"
   },
   "fonts": {
-    "family": "Manrope"
+    "family": "Inter",
+    "heading": {
+      "family": "Manrope",
+      "weight": 700
+    }
   },
   "logo": {
     "light": "/logo/lockup.svg",
@@ -18,9 +22,6 @@
   "favicon": "/favicon.png",
   "appearance": {
     "default": "system"
-  },
-  "background": {
-    "decoration": "gradient"
   },
   "navbar": {
     "links": [
