@@ -146,18 +146,50 @@ transcribe-cpp = { version = "0.1.2", default-features = false, features = [
 [target.'cfg(all(windows, target_arch = "aarch64"))'.dependencies]
 transcribe-cpp = { version = "0.1.2", default-features = false }
 
+# Arch-independent macOS dependencies. The GPU/engine backends are NOT here —
+# they differ by architecture and live in the two tables below, because cargo
+# features are additive and unified: a feature enabled in this table could never
+# be turned back off for one architecture.
 [target.'cfg(target_os = "macos")'.dependencies]
 tauri-nspanel = { git = "https://github.com/ahkohd/tauri-nspanel", branch = "v2.1" }
-transcribe-rs = { version = "0.3.11", features = ["whisper-metal"] }
-# transcribe.cpp macOS: STATIC with the Metal GPU backend compiled in (Apple's
-# default posture). `metal` does NOT imply `shared`, so there are no runtime
-# libs to ship — build.rs staging is a no-op on macOS and nothing is bundled.
-transcribe-cpp = { version = "0.1.2", default-features = false, features = [
-  "metal",
-] }
 # Secure API-key storage via the macOS Keychain. `apple-native` uses the
 # system Security framework (no extra C/system build dependency).
 keyring = { version = "3", features = ["apple-native"] }
+
+# macOS aarch64 (Apple Silicon, M1+) — the shipping macOS target.
+# STATIC with the Metal GPU backend compiled in (Apple's default posture).
+# `metal` does NOT imply `shared`, so there are no runtime libs to ship —
+# build.rs staging is a no-op here and nothing extra is bundled.
+[target.'cfg(all(target_os = "macos", target_arch = "aarch64"))'.dependencies]
+transcribe-rs = { version = "0.3.11", features = ["whisper-metal"] }
+transcribe-cpp = { version = "0.1.2", default-features = false, features = [
+  "metal",
+] }
+
+# macOS x86_64 (Intel) — STATIC, CPU-only. Deliberately NO Metal on either
+# engine, for two independent reasons:
+#   * Correctness: ggml's Metal backend targets Apple Silicon. Upstream guidance
+#     for x86_64 macOS is to build with Metal OFF, and llama.cpp/whisper.cpp
+#     carry open reports of Metal (and MoltenVK-Vulkan) producing corrupted
+#     output or failing to build on Intel Macs with AMD/Intel GPUs. A GPU path
+#     that returns garbage transcripts is worse than a slower correct one.
+#   * Hardware spread: Intel Macs span ~2013-2020 with wildly different GPUs, so
+#     there is no single GPU posture that is safe across the fleet.
+# The CPU backend is the portable one, so Intel Macs transcribe on CPU. Small
+# Whisper models are usable; large ones are slow. This is documented in README.
+#
+# This table is explicit even though it matches the backend-less base
+# `[dependencies]` declaration (which already supplies `whisper-cpp` + `onnx`),
+# so the CPU-only posture is recorded and cannot drift silently — same rationale
+# as the Windows-on-ARM table above.
+#
+# NOTE: Intel macOS is also the ONE target where ONNX Runtime is linked
+# DYNAMICALLY rather than statically embedded, because pykeio/ort dropped
+# prebuilt x86_64-apple-darwin binaries. See BUILD.md and the
+# "Stage ONNX Runtime for Intel macOS" step in .github/workflows/build.yml.
+[target.'cfg(all(target_os = "macos", target_arch = "x86_64"))'.dependencies]
+transcribe-rs = { version = "0.3.11", features = ["whisper-cpp"] }
+transcribe-cpp = { version = "0.1.2", default-features = false }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 gtk-layer-shell = { version = "0.8", features = ["v0_6"] }

@@ -56,8 +56,12 @@ jobs:
           # Only targets proven green by test-build.yml belong here. Test Build #8
           # showed that Intel macOS, ubuntu-22.04, .rpm and windows-11-arm had all
           # been listed in this matrix without ever building once:
-          #   * Intel macOS — no Intel runner since 2025-12-04; build.yml has no
-          #     macOS cross-compile setup.
+          #   * Intel macOS — being proven in test-build.yml. NOT blocked by
+          #     tooling: GitHub replaced the retired macos-13 with
+          #     `macos-15-intel`, available until August 2027, so the earlier
+          #     "no Intel runner" reasoning here was wrong. Held back until the
+          #     test build is green and a tester confirms it on real Intel
+          #     hardware.
           #   * ubuntu-22.04 — xcap's pipewire/libspa cannot compile against
           #     22.04's older libspa headers (E0560 on spa_video_info_raw.flags).
           #     .deb is built on 24.04 instead.

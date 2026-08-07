@@ -25,8 +25,12 @@ name: "Release (unsigned)"
 # that release.yml had listed for months without ever building once.
 #
 # Deliberately absent, with reasons (see test-build.yml for the detail):
-#   * Intel macOS — no Intel runner exists since 2025-12-04; cross-compile is
-#     not set up in build.yml.
+#   * Intel macOS — being proven in test-build.yml right now. It is NOT blocked by
+#     tooling: GitHub replaced the retired macos-13 with `macos-15-intel`, which
+#     runs until August 2027 (the earlier "no Intel runner exists" note here was
+#     wrong). It stays out of this matrix until the test build is green AND a
+#     tester confirms the .dmg runs on a real Intel Mac, since no maintainer has
+#     Intel hardware to verify it on.
 #   * ubuntu-22.04 — cannot compile; xcap's pipewire/libspa needs newer libspa
 #     headers than 22.04 ships. The .deb is built on 24.04 instead, so it wants
 #     24.04-era glibc; older distros should use the AppImage.

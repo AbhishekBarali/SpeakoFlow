@@ -19,7 +19,15 @@ This guide covers how to set up the development environment and build SpeakoFlow
 
 ##### Intel Mac (x86_64)
 
-Prebuilt ONNX Runtime binaries are not available for Intel Macs. Install ONNX Runtime via Homebrew and link dynamically:
+Intel Macs build **CPU-only**. `Cargo.toml` arch-gates the Metal GPU backend to
+Apple Silicon, because ggml's Metal backend targets Apple Silicon and upstream
+whisper.cpp/llama.cpp carry open reports of it (and MoltenVK-Vulkan) producing
+corrupted output or failing to build on Intel Macs. Transcription still works;
+small Whisper models are usable, large ones are slow.
+
+Intel Macs also need one extra step. Prebuilt ONNX Runtime binaries are not
+available for `x86_64-apple-darwin`, because pykeio's `ort` dropped that target, so
+ONNX Runtime has to be installed separately and linked dynamically:
 
 ```bash
 brew install onnxruntime
@@ -31,6 +39,19 @@ The same environment variables apply for production builds:
 ```bash
 ORT_LIB_LOCATION=$(brew --prefix onnxruntime)/lib ORT_PREFER_DYNAMIC_LINK=1 bun run tauri build
 ```
+
+> **This produces an app that only runs on your machine.** Homebrew's dylib
+> records an absolute path into your Cellar as its install name, so the `.app`
+> will fail to start on any Mac without that exact formula installed. That is
+> fine for building for yourself, and it is why CI does it differently: the
+> "Stage ONNX Runtime for Intel macOS" step in
+> [.github/workflows/build.yml](.github/workflows/build.yml) copies the dylib
+> into `src-tauri/onnx-libs/`, rewrites its install name to `@rpath/...` _before_
+> linking, and ships it inside `SpeakoFlow.app/Contents/Frameworks`. Don't
+> distribute a locally built Intel `.dmg`; use a CI artifact.
+
+Intel macOS is currently built in `test-build.yml` only, and is not yet part of
+any release. See [issue #19](https://github.com/AbhishekBarali/SpeakoFlow/issues/19).
 
 #### Windows
 
