@@ -1,43 +1,47 @@
 ---
 title: "Live vs. batch transcription"
-description: "On a streaming-capable model SpeakoFlow shows your words in the overlay while you speak; every other model transcribes in one batch when you stop. Which models stream, and how the overlay style controls it."
+description: "Streaming models show your words in SpeakoFlow's overlay while you speak, but text is still inserted once after you stop. This page lists which transcription models stream and how the overlay style switches streaming on and off."
 icon: "tower-broadcast"
 ---
 
-Your words can appear in the overlay as you speak them, or only after you stop. Which one you get depends on the model you're running.
+Live transcription changes what you **see**, not when text lands. The transcript is inserted into your app exactly once, after you stop recording.
 
-The model shipped as the default — Parakeet Unified EN 0.6B — streams, so live transcription is active on a fresh install with no configuration. Every other kind of model transcribes in one batch when you finish, which stays accurate and simple.
-
-## What "live" actually changes
-
-Live transcription changes what you *see*, not when text lands. The transcript is still inserted into your app exactly once, after you stop recording. What streaming buys you is a running transcript in the overlay while you talk, and a final insert that's close to instant because most of the work is already done.
-
-If the streaming pass produces nothing, errors, or times out, SpeakoFlow falls back to transcribing the recorded audio in one batch. You never lose your words.
+What streaming buys you is a running transcript in the overlay while you talk, plus a final insert that is close to instant because most of the work is already done.
 
 ## Which models stream
 
-Streaming is strictly capability-gated: the streaming worker only ever starts for a model that natively supports it, so it can't be forced onto a model that would misbehave.
+| Model | Streams |
+| --- | --- |
+| Parakeet Unified EN 0.6B (default, English only) | Yes |
+| Nemotron Streaming 3.5 (English) | Yes |
+| Moonshine V2 Tiny / Small / Medium (English only) | Yes |
+| Whisper, Canary, Cohere, Sense Voice, GigaAM, Breeze, non-streaming Parakeet | No |
 
-| Model | Streams | Notes |
-| --- | --- | --- |
-| Parakeet Unified EN 0.6B | Yes | The recommended default model. English only |
-| Nemotron Streaming 3.5 | Yes | English |
-| Moonshine V2 Tiny / Small / Medium | Yes | English only |
-| Whisper, Canary, Cohere, Sense Voice, GigaAM, Breeze, non-streaming Parakeet | No | Batch |
+Streaming is capability-gated. The streaming worker only starts for a model that natively supports it, so it cannot be forced onto a model that would misbehave.
 
-Switching to a non-streaming model — Whisper Medium for its language coverage, say — moves you back to batch transcription automatically. Nothing to reconfigure. See [Transcription models](/models/transcription-models) for the full catalog.
+Switching to a non-streaming model, Whisper Medium for its language coverage for example, moves you back to batch transcription automatically. See [Transcription models](/models/transcription-models) for the full catalog.
 
-## How you turn it on and off
+## Turning it on and off
 
-There is no separate "live transcription" switch in Settings. It's driven by the overlay style in *Settings → General → Overlay*:
+There is no separate live transcription switch. It follows the overlay style in *Settings → General → Overlay*.
 
-- **Live** — turns streaming on. On a model that can't stream, the overlay falls back to the compact pill.
-- **Minimal** or **None** — turns streaming off.
+- **Live**. Streaming on. On a model that cannot stream, the overlay falls back to the compact pill.
+- **Minimal** or **None**. Streaming off.
 
-Until you pick one of those, the setting sits in an **Auto** state that streams whenever the selected model supports it and batches when it doesn't. Auto is the shipped default, which is why streaming is already running on a fresh install with the default model.
+Until you pick one, the setting sits in an `Auto` state that streams whenever the selected model supports it. `Auto` is the shipped default, which is why streaming already runs on a fresh install with the default model.
 
-<Note>
-  The running text renders in two shades in the overlay: the committed prefix is solid, and a still-revisable tail is dimmed. Not every engine reports a revisable tail, so on some models everything you see is already committed.
-</Note>
+## Good to know
+
+<AccordionGroup>
+  <Accordion title="Two shades of text in the overlay">
+    The running text renders in two shades. The committed prefix is solid, and a still-revisable tail is dimmed.
+
+    Not every engine reports a revisable tail, so on some models everything you see is already committed.
+  </Accordion>
+
+  <Accordion title="What happens if streaming fails">
+    If the streaming pass produces nothing, errors, or times out, SpeakoFlow falls back to transcribing the recorded audio in one batch. You never lose your words.
+  </Accordion>
+</AccordionGroup>
 
 See [The recording overlay](/dictation/overlay) for the full set of style and position options.

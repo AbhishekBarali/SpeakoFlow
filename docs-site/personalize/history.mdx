@@ -1,51 +1,58 @@
 ---
 title: "History"
-description: "Your recent dictations, Flow generations, and assistant chats, stored on your device to replay, copy, star, re-transcribe, continue, or delete."
+description: "History keeps your recent SpeakoFlow dictations, Flow generations, and assistant chats on your device so you can replay, copy, star, re-transcribe, continue, or delete them. Covers the retention settings and their defaults."
 icon: "clock-rotate-left"
 ---
 
-Your recent dictations, Flow generations, and assistant chats — stored on this device, and yours to reuse or delete.
+Your recent dictations, Flow generations, and assistant chats are kept on this device, and they are yours to reuse or delete.
 
-Find it in the *History* section. One feed, newest activity first, filtered by **All**, **Dictations**, **Flow**, or **Assistant chats**.
+Open the *History* section. It is one feed, newest first, filtered by **All**, **Dictations**, **Flow**, or **Assistant chats**. There is no search box, so use the filters and page through the feed.
 
 ## What each row shows
 
-- **Dictations** — the transcription. If it was cleaned with AI, the row shows both: *Original transcription* on top and *Final text* below it, so you can see exactly what cleanup changed.
-- **Flow** — *You said* (the spoken command as transcribed) and *Flow output* (the exact text that was pasted). A generation that failed or was cancelled still appears, marked as having produced no output.
-- **Assistant chats** — one row per conversation, labeled with a title taken from your first message. Expand it to read the whole thing rendered as it appeared in the panel.
-
-Messages that carried an image keep a small thumbnail inline — screen captures get a camera badge — and clicking one opens it full size. Only the compact thumbnail is stored; the full-resolution frame was sent to the model and never persisted.
+| Type | Contents |
+| --- | --- |
+| **Dictations** | The transcription. If it was cleaned with AI, the row shows *Original transcription* on top and *Final text* below, so you can see what cleanup changed. |
+| **Flow** | *You said*, the spoken command as transcribed, and *Flow output*, the exact text that was pasted. Failed and cancelled generations still appear, marked as having produced no output. |
+| **Assistant chats** | One row per conversation, titled from your first message. Expand it to read the whole thing as it appeared in the panel. |
 
 ## What you can do
 
-Each dictation and Flow row carries a player, so you can hear the original audio. The rest of the actions appear when you hover over a row.
+Each dictation and Flow row carries a player for the original audio. The rest of the actions appear when you hover over a row.
 
-- **Copy** the transcription, the Flow output, the cleaned final text, or a whole conversation.
-- **Star** a dictation or Flow recording to keep it — starred recordings are never auto-deleted.
-- **Re-transcribe** a recording with your current model, e.g. after switching to a more accurate one. The row updates in place.
-- **Continue** an assistant chat right where it left off; it reopens in the panel and keeps saving to the same row.
-- **Delete** individual entries, or open the recordings folder on disk.
+- **Copy.** The transcription, the Flow output, the cleaned final text, or a whole conversation.
+- **Star.** Keeps a dictation or Flow recording. Starred recordings are never auto-deleted.
+- **Re-transcribe.** Runs the recording through your current model, for example after switching to a more accurate one. The row updates in place.
+- **Continue.** Reopens an assistant chat in the panel, still saving to the same row.
+- **Delete.** Removes individual entries. You can also open the recordings folder on disk.
 
-Assistant chats can be copied, continued, and deleted, but not starred or re-transcribed — there is no audio behind them.
+Assistant chats can be copied, continued, and deleted, but not starred or re-transcribed, because there is no audio behind them.
 
-## Recording storage
+## Retention
 
-The storage controls sit above the feed, since a long history scrolls far enough to bury anything below it.
+The storage controls sit above the feed. Changes apply immediately.
+
+| Setting | Default | Options |
+| --- | --- | --- |
+| **Auto-delete recordings** | `Keep a set number` | `Never`, `Keep a set number`, `After 3 days`, `After 2 weeks`, `After 3 months` |
+| **Recording limit** | `20` | The maximum number of unstarred recordings to keep. Only shown when auto-delete is `Keep a set number`. |
+
+Starred recordings are always kept and do not count toward the limit.
 
 <Note>
   These controls affect **dictation and Flow recordings only**. Assistant chats have separate storage and are never counted or auto-deleted by these rules.
 </Note>
 
-### Auto-delete recordings
+<AccordionGroup>
+  <Accordion title="Images in a row">
+    Messages that carried an image keep a small thumbnail inline, and screen captures get a camera badge. Click one to open it full size.
 
-*Never, **Keep a set number** (default), After 3 days, After 2 weeks, After 3 months.*
+    Only the compact thumbnail is stored. The full-resolution frame was sent to the model and never saved.
+  </Accordion>
 
-How unstarred recordings are cleaned up. "Never" keeps everything forever. The policy is re-applied every time a new recording is saved, not just at startup, so the list always matches what you asked for. Changes apply immediately.
+  <Accordion title="When the audio file actually gets deleted">
+    Deleting an entry removes its audio file too, unless an older entry still points at the same file. In that case the file survives until the last reference to it is gone.
 
-### Recording limit
-
-*Default: 20.*
-
-The maximum number of unstarred dictation and Flow recordings to keep. This row only appears when *Auto-delete recordings* is set to "Keep a set number". Starred recordings are always kept and don't count toward the limit.
-
-Deleting an entry removes its audio file too — unless an older entry still points at the same file, in which case the file survives until the last reference is gone.
+    The auto-delete policy is re-applied every time a new recording is saved, not just at startup, so the list always matches what you asked for.
+  </Accordion>
+</AccordionGroup>

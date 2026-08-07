@@ -1,41 +1,51 @@
 ---
 title: "Behavior & memory"
-description: "Tune how the SpeakoFlow assistant carries a conversation: how much recent context it sends, whether long chats get summarized, and how long replies run."
+description: "Control how much conversation context the SpeakoFlow assistant sends each turn, whether long chats get summarized instead of dropped, and how long its replies run."
 icon: "sliders"
 ---
 
-Tune how the assistant carries a conversation and how long its answers run, in *Settings → Assistant → Behavior*.
+Tune how the assistant carries a conversation, in *Settings → Assistant → Behavior*.
+
+| Setting | Default | Options |
+| --- | --- | --- |
+| Conversation memory | `12` | 0 to 200 messages |
+| Summarize long chats | `On` | On, Off |
+| Response length | `No effect` | No effect, Short, Medium, Long |
 
 ## Conversation memory
 
-*Default: 12. Range 0–200.*
-
-How many recent messages are sent as context each turn. Higher keeps more of the thread in mind at the cost of a bigger prompt; **0** disables it and treats every message as standalone.
-
-Cloud providers get exactly the number you ask for. Azure and local engines (the built-in one, or an Ollama/LM Studio server on loopback) also get a character cap on top, because Azure's gateway rejects oversized request bodies and a local model runs a small context window — sending your full history there would fail rather than work slowly. Turns carrying a screenshot trim harder on those same providers, since the image already dominates the budget.
+How many recent messages are sent as context each turn. Higher keeps more of the thread in mind at the cost of a bigger prompt. `0` disables it and treats every message as standalone.
 
 ## Summarize long chats
 
-*Default: on.*
+On by default. Once the un-summarized part of a conversation grows past your Conversation memory window, the oldest of those messages are folded into a rolling summary instead of being dropped. The six most recent messages stay verbatim.
 
-Once the un-summarized part of a conversation grows past your Conversation memory window, the oldest of those messages are folded into a rolling summary instead of being dropped, keeping the six most recent turns verbatim. The summary is injected as a context note ahead of the history, so a long chat keeps its beginning in condensed form rather than forgetting it.
-
-The fold runs in the background after a reply finishes, so it never delays an answer, and a subtle indicator shows while it's working. If it fails, the summary is left alone and the next turn tries again.
-
-Turn it off and a long conversation simply loses its oldest messages once they fall outside the window.
-
-<Tip>
-  You can also compact a conversation on demand by typing `/summarize` in the panel. That one replaces the visible transcript with its summary, rather than working quietly in the background.
-</Tip>
+The summary is injected as a context note ahead of the history, so a long chat keeps its beginning in condensed form rather than forgetting it. Turn it off and a long conversation simply loses its oldest messages once they fall outside the window.
 
 ## Response length
 
-*No effect, Short, Medium, Long. Default: No effect.*
+`No effect` by default, which adds nothing and leaves your prompt exactly as written. The other three append a length instruction to the system prompt at request time.
 
-Appends a length instruction to the system prompt at request time. "No effect" adds nothing and leaves your prompt exactly as written.
+Each option tells the model to still match your intent, so a greeting gets a short friendly reply even on `Long` rather than a padded one. Individual [profiles](/personalize/profiles) can override this, and the profile's choice wins for its own turns.
 
-Each option tells the model to still match your intent, so a greeting gets a short friendly reply even on **Long** rather than a padded one. Individual [profiles](/personalize/profiles) can override this, and the profile's choice wins for its own turns.
+<AccordionGroup>
+  <Accordion title="Why some providers get less history than you asked for">
+    Cloud providers get exactly the number of messages you ask for. Azure and local engines (the built-in one, or an Ollama or LM Studio server on loopback) also get a character cap on top.
+
+    Azure's gateway rejects oversized request bodies, and a local model runs a small context window, so sending your full history there would fail rather than work slowly. Turns carrying a screenshot trim harder on those same providers, since the image already dominates the budget.
+  </Accordion>
+
+  <Accordion title="What triggers a summary, and when it runs">
+    The trigger is the message-history window above, not the model's context window.
+
+    The fold runs in the background after a reply finishes, so it never delays an answer, and a subtle indicator shows while it is working. If it fails, the summary is left alone and the next turn tries again.
+  </Accordion>
+</AccordionGroup>
+
+<Tip>
+  You can compact a conversation on demand by typing `/summarize` in the panel. That one replaces the visible transcript with its summary, rather than working quietly in the background.
+</Tip>
 
 <Note>
-  This is short-term, per-conversation context. For durable facts the assistant remembers *across* chats, see [Personal memory](/personalize/memory) — a separate, opt-in feature.
+  This is short-term, per-conversation context. For durable facts the assistant remembers across chats, see [Personal memory](/personalize/memory), a separate opt-in feature.
 </Note>

@@ -1,38 +1,42 @@
 ---
 title: "Writing styles"
-description: "Pick a built-in writing style for cleaned dictation, or save your own rules, separate from your cleanup prompt, so you can mix any prompt with any style."
+description: "A writing style controls how cleaned dictation sounds in SpeakoFlow. Compare the six built-in styles, including Formal, Casual, and Concise, and learn how to save your own."
 icon: "feather"
 ---
 
-A writing style controls how cleaned dictation *sounds*. It's applied on top of [AI cleanup](/writing/ai-cleanup) and stays separate from your cleanup prompt, so you can mix any prompt with any style. Pick one in *Settings → Dictation → AI cleanup → Writing style*.
+A writing style controls how cleaned dictation *sounds*. It sits on top of [AI cleanup](/writing/ai-cleanup) and is separate from your cleanup prompt, so you can mix any prompt with any style.
+
+Pick one in *Settings → Dictation → AI cleanup → Writing style*.
 
 ## Built-in styles
 
-*Default: None (cleanup only).*
+| Style | How it reads | What it will not do |
+| --- | --- | --- |
+| **None (cleanup only)** (default) | Fixed text, same voice. | Change your register on purpose. |
+| **Formal** | Polished, complete sentences. Slang becomes precise neutral wording. | Turn ceremonial or legalistic unless you already were. |
+| **Casual** | Relaxed and conversational, with ordinary contractions. | Invent slang, jokes, or familiarity that was not there. |
+| **Professional** | Direct, courteous, easy to act on, with rambling removed. | Run longer than the original, or read like sales copy. |
+| **Friendly** | Warm and approachable. | Add compliments, emoji, exclamation marks, or enthusiasm you did not express. |
+| **Concise** | As brief as possible. Repetition, hedging, and wordiness go. | Drop a material fact, condition, name, number, or deadline. |
 
-- **None (cleanup only)** (default) — fixes the text without intentionally changing its voice.
-- **Formal** — polished, grammatically complete sentences; slang and casual shorthand replaced with precise neutral wording. It won't become ceremonial or legalistic unless what you said already was.
-- **Casual** — relaxed and conversational, with everyday wording and ordinary contractions. It won't invent slang, jokes, or familiarity that wasn't there.
-- **Professional** — direct, courteous, and easy to act on, with rambling removed. Never longer than the original, and never sales-like.
-- **Friendly** — warm and approachable, without adding compliments, emoji, exclamation marks, or enthusiasm you didn't express.
-- **Concise** — as brief as possible, cutting repetition, hedging, and wordiness while keeping every material fact, condition, name, number, and deadline.
-
-Every built-in style preserves your meaning, facts, and point of view, and keeps the length close to what you said. The exception is Concise, which is explicitly allowed to shorten — but still not to drop a detail.
+Every built-in style preserves your meaning, facts, and point of view, and keeps the length close to what you said. Concise is the one exception, and it is allowed to shorten but still not to drop a detail.
 
 ## Creating your own
 
-The built-ins are fixed, but you can save any number of your own styles beside them. In the **Writing style** section, choose *Create style* and give it:
+The built-ins are fixed, but you can save any number of your own beside them. In the **Writing style** section, choose *Create style*.
 
-### Style name
+<Steps>
+  <Step title="Name it">
+    For example, "Calm and clean".
+  </Step>
 
-For example, "Calm and clean."
+  <Step title="Write the instructions">
+    Describe precisely how the wording should change. For example: *"Remove profanity and replace it with calm, neutral wording."*
+  </Step>
+</Steps>
 
-### Style instructions
-
-Describe precisely how the wording should change. For example: *"Remove profanity and replace it with calm, neutral wording."*
-
-Both fields are required. Your new style is selected as soon as you save it, and it appears in the same dropdown as the built-ins from then on. Select it and use *Edit* to change or delete it; built-in styles have no edit button, because there is nothing stored to edit.
+Both fields are required. Your new style is selected as soon as you save it, and it appears in the same dropdown as the built-ins from then on. Select it and use *Edit* to change or delete it. Built-in styles have no edit button, because there is nothing stored to edit.
 
 <Note>
-  Style instructions shape the wording *after* cleanup, and they never replace your cleanup prompt — both are sent to the model together. Cleanup strength is a third, independent dial: it decides how much of your rambling gets tidied away, while the style decides the register of whatever survives.
+  Your style never replaces your cleanup prompt. Both are sent to the model together. Cleanup strength is a third, independent dial: it decides how much of your rambling gets tidied away, while the style decides the register of whatever survives.
 </Note>

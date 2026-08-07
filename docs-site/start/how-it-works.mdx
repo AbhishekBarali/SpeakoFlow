@@ -1,26 +1,22 @@
 ---
 title: "How SpeakoFlow works"
-description: "The mental model behind SpeakoFlow: one hotkey layer over your real work, a fully local dictation pipeline, and an assistant you can run offline, on your own server, or in the cloud."
+description: "The mental model behind SpeakoFlow: one hotkey layer over the app you are already in, a dictation pipeline that runs entirely on your machine, and an assistant you can run offline, on your own server, or in the cloud."
 icon: "diagram-project"
 ---
 
-A quick mental model that makes the rest of the docs click into place.
+SpeakoFlow sits in your system tray and does nothing until you press a shortcut. You never switch to it to dictate. It is a layer over whatever app you are already in.
 
-## One hotkey layer over your real work
+Three jobs live under that layer.
 
-SpeakoFlow sits quietly in your system tray and does nothing until you press a shortcut. It's a layer over whatever app you're already in — you never switch to it to dictate. Three jobs live under that hotkey layer:
-
-- **[Dictation](/dictation/basics)** — local speech-to-text typed into the active app. Your audio never leaves the machine.
-- **[Generate with Flow](/writing/generate-with-flow)** — start a dictation with an activation phrase and the AI writes the finished result.
-- **[The assistant](/assistant/panel)** — a floating panel you summon to ask questions by voice or text, optionally with screen vision and spoken answers.
+- **[Dictation](/dictation/basics)**. Local speech-to-text, typed into the active app.
+- **[Generate with Flow](/writing/generate-with-flow)**. Start a dictation with an activation phrase and the AI writes the finished result.
+- **[The assistant](/assistant/panel)**. A floating panel you summon to ask questions by voice or text.
 
 ## The dictation pipeline
 
-When you dictate, your audio flows through a local pipeline:
-
 <Steps>
   <Step title="Your microphone" icon="microphone">
-    Audio is captured from the input device you selected in [General settings](/settings/general).
+    Audio is captured from the input device you picked in [General settings](/settings/general).
   </Step>
 
   <Step title="Voice-activity detection" icon="filter">
@@ -36,41 +32,22 @@ When you dictate, your audio flows through a local pipeline:
   </Step>
 </Steps>
 
-Nothing in that chain touches the network. The two things that can add a network hop after it are both opt-in and clearly marked: [AI cleanup](/writing/ai-cleanup) and [Generate with Flow](/writing/generate-with-flow) hand the text to whichever model provider you configured, which may be the fully local built-in engine.
+Nothing in that chain touches the network.
+
+Two things can add a network hop after it, and both are opt-in: [AI cleanup](/writing/ai-cleanup) and [Generate with Flow](/writing/generate-with-flow). They hand the text to whichever model provider you configured, which may be the fully local built-in engine.
 
 ## What the assistant does with a question
 
-An assistant turn isn't a single request. The model is given a small set of tools — web search and the current date and time — and decides for itself whether it needs them, up to a bounded number of rounds so a turn can't loop indefinitely. Web search is only offered as a tool when you've turned it on, so with it off the assistant simply answers from what it knows.
+An assistant turn is not a single request. The model gets a small set of tools, web search and the current date and time, and decides for itself whether it needs them. The loop is bounded, so a turn can't run away. With web search off, the tool isn't offered at all and the assistant answers from what it knows.
 
-Screen vision works the same way: nothing is captured unless you ask for it, and only the monitor under your mouse cursor is grabbed. The full-resolution frame goes to the model once; only a small thumbnail is kept locally so you can see what it looked at.
+[Screen vision](/assistant/screen-vision) works the same way. Nothing is captured unless you ask for it.
 
-## Local-first, your choice
+## Where things run
 
-Speech-to-text is always local. The assistant is where you choose your comfort level:
+Speech-to-text is always local. The assistant is where you choose your comfort level, in *Settings → Assistant*.
 
-<CardGroup cols={2}>
-  <Card title="Built-in (offline)" icon="microchip">
-    Download a small local model and run it fully on your machine. No key, no network.
-  </Card>
+- **Built-in**. A small local model, fully on your machine. No key, no network.
+- **Local server**. Ollama or LM Studio on your own machine.
+- **Cloud**. Your own API key for any OpenAI-compatible provider.
 
-  <Card title="Local server" icon="server">
-    Point SpeakoFlow at Ollama or LM Studio running on your own machine.
-  </Card>
-
-  <Card title="Cloud" icon="cloud">
-    Bring your own API key for any OpenAI-compatible provider.
-  </Card>
-</CardGroup>
-
-See [Brain: local or cloud](/assistant/brain) to set this up, and [Privacy](/reference/privacy) for exactly what is stored and where.
-
-## Settings, organized the same way
-
-The Settings window has five sections, and a sixth that only appears once you turn on debug mode:
-
-- **[General](/settings/general)** — shortcuts, microphone, appearance, language, and the Experimental features toggle
-- **Dictation** — the model, [AI cleanup](/writing/ai-cleanup), [Generate with Flow](/writing/generate-with-flow), and text handling
-- **Assistant** — [brain](/assistant/brain), [voice](/assistant/voice-output), [screen vision](/assistant/screen-vision), [web search](/assistant/web-search), plus [Profiles](/personalize/profiles) and [Memory](/personalize/memory) as drill-down pages
-- **[History](/personalize/history)** — past dictations, Flow generations, and assistant chats
-- **[About](/reference/about)** — version, update check, license, and where your data lives
-- **[Debug](/settings/debug)** — hidden until you press `Ctrl` + `Shift` + `D` (`Cmd` + `Shift` + `D` on macOS) with the settings window focused
+See [Models and providers](/assistant/providers) to set this up, and [Privacy](/reference/privacy) for exactly what is stored and where.

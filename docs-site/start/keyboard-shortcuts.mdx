@@ -1,10 +1,10 @@
 ---
 title: "Keyboard shortcuts"
-description: "Every SpeakoFlow keyboard shortcut and its default on Windows, macOS, and Linux, plus Hold vs. Tap recording, why the Windows defaults are modifier-only, and the current state of tap-to-lock."
+description: "Every SpeakoFlow keyboard shortcut and its default on Windows, macOS, and Linux, plus how Hold and Tap recording differ and why tap-to-lock currently does nothing."
 icon: "keyboard"
 ---
 
-Every shortcut is configurable in *Settings → General → Shortcuts*. These are the defaults out of the box.
+These are the defaults. Every shortcut is configurable in *Settings → General → Shortcuts*.
 
 | Action | Windows | macOS | Linux |
 | --- | --- | --- | --- |
@@ -12,35 +12,39 @@ Every shortcut is configurable in *Settings → General → Shortcuts*. These ar
 | **Dictate & clean up**<br />Dictate, then AI-clean before pasting | `Ctrl` + `Shift` + `Space` | `Option` + `Shift` + `Space` | `Ctrl` + `Shift` + `Space` |
 | **Ask the assistant**<br />Voice question into the panel | `Left Ctrl` + `Left Alt` | `Option` + `Ctrl` + `Space` | `Ctrl` + `Alt` + `Space` |
 | **Show / hide panel**<br />Toggle the floating assistant | `Ctrl` + `Shift` + `A` | `Option` + `Ctrl` + `A` | `Ctrl` + `Alt` + `A` |
-| **Cancel**<br />Stop a recording or streaming reply | Unset by default — bind any key (e.g. `Esc`) in Settings | | |
+| **Cancel**<br />Stop a recording or streaming reply | Unset. Bind any key (e.g. `Esc`) in Settings | | |
 | **Debug mode**<br />Reveal diagnostics | `Ctrl` + `Shift` + `D` | `Cmd` + `Shift` + `D` | `Ctrl` + `Shift` + `D` |
 
-Cancel is the only one that's unset out of the box. Bind it to whatever you like — it stops an active recording, a streaming assistant reply, or a Flow generation in progress.
+Cancel is the only one unset out of the box. Bind it to whatever you like. It stops an active recording, a streaming assistant reply, or a Flow generation in progress.
 
-Debug mode is the one entry that isn't a global shortcut: it only fires while the Settings window is focused, since it just reveals the Debug section in the sidebar.
+Debug mode is not a global shortcut. It only fires while the Settings window is focused, because all it does is reveal the Debug section in the sidebar.
 
-<Note>
-  **Why the modifier-only defaults on Windows?** Holding `Left Ctrl` + `Left Win` keeps every letter and the Space bar free, so the shortcut can't collide with text shortcuts inside your apps. Left-side keys specifically, so an international `AltGr` layout won't trigger the assistant by accident.
-</Note>
+## Hold or Tap
 
-## Recording behavior: Hold vs. Tap
+One setting in *Settings → General* controls all three recording shortcuts: dictation, dictation with cleanup, and the assistant.
 
-In *Settings → General* you choose how every recording shortcut behaves — dictation, dictation with cleanup, and the assistant all follow this one setting:
+- **Hold** (default). Records while you hold the shortcut, and types out when you let go.
+- **Tap**. One press starts recording, the next press stops it. This is how you record hands-free.
 
-- **Hold** (default) — records while the shortcut is held down, and types out when you let go.
-- **Tap** — one press starts recording, the next press stops it. No holding, so this is the way to record hands-free.
+Cancel works in both modes. The overlay's tick button finishes a hands-free recording without touching the keyboard.
 
-Cancel works in both modes, and the overlay's tick button finishes a hands-free recording without touching the keyboard.
+<AccordionGroup>
+  <Accordion title="Why the Windows defaults are modifier-only">
+    Holding `Left Ctrl` + `Left Win` keeps every letter and the Space bar free, so the shortcut can't collide with text shortcuts inside your apps.
 
-## Tap to lock
+    Left-side keys specifically, so an international `AltGr` layout won't trigger the assistant by accident.
+  </Accordion>
 
-<Warning>
-  **This gesture doesn't currently do anything.** The idea is that tapping a lock key mid-hold would flip the recording to hands-free so you could let go and keep talking. Three settings for it still exist in the settings file — a *Tap to lock* switch (on), a lock key for dictation, and a separate one for the assistant — but there is no control for any of them in Settings, and nothing arms the watcher during a hold recording. Tapping the key has no effect.
+  <Accordion title="Tap to lock does nothing in the current build">
+    The idea was that tapping a lock key mid-hold would flip the recording to hands-free, so you could let go and keep talking.
 
-  Until it comes back, switch the recording behavior to **Tap** if you want hands-free recording. It's the same outcome by a different route.
-</Warning>
+    **It is not wired up.** Three settings for it still exist in the settings file: a *Tap to lock* switch (on), a lock key for dictation, and a separate one for the assistant. But there is no control for any of them in Settings, and nothing arms the watcher during a hold recording. Tapping the key has no effect.
 
-For reference, the stored defaults are `Space` on Windows and `Shift` on macOS and Linux. `Space` on Windows because the Windows record shortcuts are modifier-only and leave Space free; `Shift` elsewhere because the default macOS and Linux shortcuts already hold Space, and a lock key that overlaps the record shortcut could never work anyway.
+    Use the **Tap** recording behavior instead. It is the same outcome by a different route.
+
+    For reference, the stored defaults are `Space` on Windows and `Shift` on macOS and Linux. `Space` on Windows because the Windows record shortcuts are modifier-only and leave Space free. `Shift` elsewhere because the default macOS and Linux shortcuts already hold Space, and a lock key that overlaps the record shortcut could never work anyway.
+  </Accordion>
+</AccordionGroup>
 
 <Tip>
   Prefer a hardware key or a window-manager binding? SpeakoFlow also accepts [command-line flags](/settings/cli) like `--toggle-transcription` that you can wire to anything.

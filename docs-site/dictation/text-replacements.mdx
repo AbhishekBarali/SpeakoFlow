@@ -1,33 +1,36 @@
 ---
-title: "Text replacements"
-description: "Map a spoken phrase to text you use often, with optional regex matching, whitespace trimming, capitalization, and magic tokens like [date] and [time]. Off by default."
+title: "Text replacements and spoken emoji"
+description: "Map a spoken phrase to text you use often, and say the name of an emoji to insert it. Covers rule options, magic tokens like [date] and [time], the emoji grammar, and where both passes sit in the dictation pipeline. Both are off by default."
 icon: "right-left"
 ---
 
-Swap a phrase you say for text you use often — like turning "my email" into your actual address.
+Two local passes rewrite your transcript before it is inserted. Both are off by default, and neither involves a model or the network.
 
-Rules live in *Settings → Dictation → Output options → Text replacements*, behind a master toggle that is **off by default**. Turn it on and the rule list appears; the whole list can be exported to and imported from a JSON file.
+| Pass | Where | What it does |
+| --- | --- | --- |
+| Text replacements | *Settings → Dictation → Output options → Text replacements* | Swaps a phrase you say for text you use often. |
+| Spoken emoji | *Settings → Dictation → Output options → Spoken emoji* | Turns "thumbs up emoji" into 👍. |
 
-The pass is fully local and deterministic — no model involved. It complements AI cleanup rather than duplicating it.
+## Text replacements
 
-## Each rule
+Turn on the master toggle and the rule list appears. Each rule has two fields on the row itself.
 
-The two fields on the row itself:
-
-- **Spoken phrase** — what to look for in the transcript, e.g. `my email`.
-- **Insert this text** — what to put there instead, e.g. `alex@example.com`.
+- **Spoken phrase**. What to look for in the transcript, for example `my email`.
+- **Insert this text**. What to put there instead, for example `alex@example.com`.
 
 Behind the chevron:
 
-- **Regex** — treat the spoken phrase as a regular expression instead of a literal string.
-- **Trim before** — also consume whitespace immediately before each match.
-- **Trim after** — also consume whitespace immediately after each match.
-- **Caps** — *None* (default), *UPPERCASE*, *lowercase*, or *Capitalize*, applied to this rule's output.
-- **Enabled** — on by default. Turn it off to park a rule without deleting it.
+- **Regex**. Treat the spoken phrase as a regular expression instead of a literal string.
+- **Trim before**. Also consume whitespace immediately before each match.
+- **Trim after**. Also consume whitespace immediately after each match.
+- **Caps**. `None` (default), `UPPERCASE`, `lowercase`, or `Capitalize`, applied to this rule's output.
+- **Enabled**. On by default. Turn it off to park a rule without deleting it.
 
-## Magic tokens
+The whole list exports to and imports from a JSON file.
 
-Use these inside the inserted text:
+### Magic tokens
+
+Use these inside the inserted text.
 
 | Token | Expands to |
 | --- | --- |
@@ -38,20 +41,46 @@ Use these inside the inserted text:
 | `[capitalize]` | Capitalizes the first character of the output |
 | `[nospace]` | Strips all whitespace from the output |
 
-The transform tokens act on the entire rule output no matter where you put them, and they're removed from the result. If a token and the **Caps** dropdown disagree, Caps is applied last and wins.
+Transform tokens act on the entire rule output no matter where you put them, and they are removed from the result. If a token and the **Caps** dropdown disagree, Caps is applied last and wins.
 
-## What to expect
+<AccordionGroup>
+  <Accordion title="Matching rules and edge cases">
+    **Rules run in order**, so a later rule sees the output of earlier ones.
 
-- **Rules run in order**, so a later rule sees the output of earlier ones.
-- **Literal matching is case-sensitive.** `my email` won't match "My email". Tick **Regex** and start the pattern with `(?i)` for a case-insensitive match.
-- **`$` is literal in the inserted text**, which means regex capture groups (`$1`) can't be referenced. Regex is for matching, not for templating.
-- **An invalid regex is skipped**, with a warning in the log. It won't break the rest of your rules.
-- **Empty spoken phrases are skipped**, so a half-finished rule is harmless.
+    **Literal matching is case-sensitive.** `my email` will not match "My email". Tick **Regex** and start the pattern with `(?i)` for a case-insensitive match.
 
-## Where it sits in the pipeline
+    **`$` is literal in the inserted text**, so regex capture groups such as `$1` cannot be referenced. Regex is for matching, not for templating.
 
-Replacements run **after** AI cleanup and after spoken-emoji expansion, and last before the text is inserted. That ordering is deliberate: hand-written, deterministic fix-ups should always win over whatever the model produced.
+    **An invalid regex is skipped**, with a warning in the log. It will not break the rest of your rules.
 
-<Note>
-  Importing a file only accepts the fields listed above; anything else in the JSON is dropped. An imported rule can never turn on a capability that isn't already a per-rule option.
-</Note>
+    **Empty spoken phrases are skipped**, so a half-finished rule is harmless.
+  </Accordion>
+
+  <Accordion title="What an imported JSON file can contain">
+    Importing only accepts the fields listed above. Anything else in the JSON is dropped, and an imported rule can never turn on a capability that is not already a per-rule option.
+  </Accordion>
+</AccordionGroup>
+
+## Spoken emoji
+
+Say "happy emoji" or "thumbs up emoji" to insert 😊 or 👍.
+
+A command is a known emoji name followed by the word "emoji". Both parts are required. The trailing "emoji" is what keeps ordinary words like "happy" or "fire" from silently turning into pictures.
+
+Anything it does not recognize is left exactly as transcribed, punctuation and spacing included.
+
+<AccordionGroup>
+  <Accordion title="How names are matched, and how much slop is tolerated">
+    A name can be one to five words, and longer names win over shorter ones. "Broken heart emoji" gives 💔 rather than matching just "heart".
+
+    The trailing keyword is accepted within one edit of "emoji", so "emojii" and "emoj" still work.
+
+    Names are matched exactly first, then fuzzily, so "smily", "thumps up", and "rokcet" all land. Fuzzy matching is skipped for names shorter than five characters, because short words are too easy to confuse ("bad" versus "sad"). An ambiguous match is rejected rather than guessed.
+  </Accordion>
+</AccordionGroup>
+
+## Pipeline order
+
+AI cleanup runs first, then spoken emoji, then text replacements, and the text is inserted last.
+
+Emoji expansion sitting after AI cleanup means it works on plain dictation too, not just cleaned-up text. Replacements come last because hand-written, deterministic fix-ups should always win over whatever the model produced.

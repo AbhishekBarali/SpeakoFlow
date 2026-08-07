@@ -82,82 +82,117 @@
   "search": {
     "prompt": "Search the docs..."
   },
+  "styling": {
+    "eyebrows": "breadcrumbs"
+  },
+  "redirects": [
+    { "source": "/dictation/translate", "destination": "/models/languages" },
+    { "source": "/dictation/spoken-emoji", "destination": "/dictation/text-replacements" },
+    { "source": "/assistant/brain", "destination": "/assistant/providers" },
+    { "source": "/assistant/appearance", "destination": "/assistant/panel" },
+    { "source": "/models/memory", "destination": "/models/acceleration" }
+  ],
   "navigation": {
-    "groups": [
+    "tabs": [
       {
-        "group": "Start here",
-        "pages": [
-          "index",
-          "start/install",
-          "start/getting-started",
-          "start/how-it-works",
-          "start/keyboard-shortcuts"
+        "tab": "Guides",
+        "icon": "book-open",
+        "groups": [
+          {
+            "group": "Start here",
+            "pages": [
+              "index",
+              "start/install",
+              "start/getting-started",
+              "start/keyboard-shortcuts",
+              "start/how-it-works"
+            ]
+          },
+          {
+            "group": "Dictation",
+            "pages": [
+              "dictation/basics",
+              "dictation/hands-free",
+              "dictation/live-transcription",
+              "dictation/output",
+              "dictation/overlay"
+            ]
+          },
+          {
+            "group": "Writing with AI",
+            "pages": [
+              "writing/generate-with-flow",
+              "writing/ai-cleanup",
+              "writing/writing-styles"
+            ]
+          }
         ]
       },
       {
-        "group": "Dictation",
-        "pages": [
-          "dictation/basics",
-          "dictation/hands-free",
-          "dictation/live-transcription",
-          "dictation/overlay",
-          "dictation/translate",
-          "dictation/custom-words",
-          "dictation/text-replacements",
-          "dictation/spoken-emoji",
-          "dictation/output"
+        "tab": "Assistant",
+        "icon": "messages-square",
+        "groups": [
+          {
+            "group": "The basics",
+            "pages": [
+              "assistant/panel",
+              "assistant/providers",
+              "assistant/behavior"
+            ]
+          },
+          {
+            "group": "What it can do",
+            "pages": [
+              "assistant/screen-vision",
+              "assistant/web-search",
+              "assistant/voice-output"
+            ]
+          },
+          {
+            "group": "Make it yours",
+            "pages": [
+              "personalize/profiles",
+              "personalize/memory",
+              "personalize/history"
+            ]
+          }
         ]
       },
       {
-        "group": "Models",
-        "pages": [
-          "models/transcription-models",
-          "models/languages",
-          "models/acceleration",
-          "models/custom-models",
-          "models/memory"
-        ]
-      },
-      {
-        "group": "Writing with AI",
-        "pages": [
-          "writing/generate-with-flow",
-          "writing/ai-cleanup",
-          "writing/writing-styles"
-        ]
-      },
-      {
-        "group": "The assistant",
-        "pages": [
-          "assistant/panel",
-          "assistant/brain",
-          "assistant/providers",
-          "assistant/behavior",
-          "assistant/screen-vision",
-          "assistant/web-search",
-          "assistant/voice-output",
-          "assistant/appearance"
-        ]
-      },
-      {
-        "group": "Personalization",
-        "pages": [
-          "personalize/profiles",
-          "personalize/memory",
-          "personalize/history"
-        ]
-      },
-      {
-        "group": "Settings & reference",
-        "pages": [
-          "settings/general",
-          "settings/debug",
-          "settings/cli",
-          "reference/privacy",
-          "reference/troubleshooting",
-          "reference/about"
+        "tab": "Reference",
+        "icon": "sliders-horizontal",
+        "groups": [
+          {
+            "group": "Accuracy",
+            "pages": [
+              "dictation/custom-words",
+              "dictation/text-replacements",
+              "models/languages"
+            ]
+          },
+          {
+            "group": "Models",
+            "pages": [
+              "models/transcription-models",
+              "models/acceleration",
+              "models/custom-models"
+            ]
+          },
+          {
+            "group": "Settings",
+            "pages": ["settings/general", "settings/debug", "settings/cli"]
+          },
+          {
+            "group": "Help",
+            "pages": [
+              "reference/troubleshooting",
+              "reference/privacy",
+              "reference/about"
+            ]
+          }
         ]
       }
     ]
   }
 }
+

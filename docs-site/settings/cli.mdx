@@ -1,49 +1,27 @@
 ---
 title: "Command-line flags"
-description: "Every command-line flag SpeakoFlow accepts on Windows, macOS, and Linux — for scripts, window managers, and autostart setups — including remote-controlling an already-running instance."
+description: "Every command-line flag and environment variable SpeakoFlow accepts on Windows, macOS, and Linux, including the remote-control flags that start, stop, or cancel a recording on an already-running instance."
 icon: "terminal"
 ---
 
-SpeakoFlow accepts command-line flags on all platforms, for scripts, window managers, and autostart setups. There are two kinds: startup flags that change how a new instance launches, and remote-control flags that act on the instance already running.
+SpeakoFlow accepts command-line flags on all platforms, for scripts, window managers, and autostart setups.
 
-## Startup flags
+## Flags
 
 | Flag | What it does |
 | --- | --- |
-| `--start-hidden` | Launch without showing the main window (tray icon visible). |
+| `--start-hidden` | Launch without showing the main window. The tray icon stays visible. |
 | `--no-tray` | Launch without a system tray icon. Closing the window then quits the app. |
-| `--debug` | Raise logging to Trace for this run. |
-
-<Note>
-  These are runtime-only overrides. They do **not** modify your saved settings, so removing the flag next launch returns you to whatever is configured in Settings.
-</Note>
-
-Because `--debug` is never written to your settings, it doesn't reveal the Debug settings section — that's the `Ctrl`/`Cmd` + `Shift` + `D` shortcut. What it does is turn the log file all the way up without you having to change and then change back a setting.
-
-`--start-hidden` and `--no-tray` interact: without a tray icon there'd be no way to reach the window again, so combining them still shows the window on launch. The same applies if you pass `--start-hidden` while *Show tray icon* is off in Settings.
-
-## Remote-control flags
-
-| Flag | What it does |
-| --- | --- |
+| `--debug` | Raise logging to `Trace` for this run. |
 | `--toggle-transcription` | Start recording, or stop and type out the current recording. |
 | `--toggle-post-process` | The same, but runs [AI cleanup](/writing/ai-cleanup) before the text is typed. |
-| `--cancel` | Cancel the current recording or an assistant reply that's still streaming. |
-
-These work by launching a second SpeakoFlow process. It hands its arguments to the running instance and exits immediately, so the command returns straight away and no second window or tray icon appears. Bind one to a hardware key, a stream deck, or a window-manager shortcut for a fully custom trigger.
-
-If SpeakoFlow **isn't** already running, these flags do nothing useful — the new instance becomes the primary one and just starts normally. And if you launch a second instance with no recognized flag at all, it brings the existing window to the front.
-
-## Diagnostics
-
-| Flag | What it does |
-| --- | --- |
+| `--cancel` | Cancel the current recording, or an assistant reply that is still streaming. |
 | `--list-devices` | Print the compute devices and available GPU backends, then exit without opening a window. |
 | `--probe-devices` | Internal. Print the same information as one line of JSON, then exit. |
 
-`--list-devices` is the one to reach for when you're not sure whether your GPU is visible to SpeakoFlow. It brings the native engine up, lists every device it found with its index and memory, and reports whether the Vulkan, Metal, and CPU backends actually loaded — which separates "my GPU isn't detected" from "the app is choosing not to use it".
-
-`--probe-devices` is hidden from `--help` because it isn't meant for you. It's the child half of the Linux crash-isolated device probe: on Linux the running app spawns itself with this flag so that a crash inside the vendored GPU code kills a throwaway process instead of your session. See [Acceleration & GPU](/models/acceleration) for why that's necessary.
+<Note>
+  Flags are runtime-only overrides. They do not modify your saved settings, so leaving the flag off next launch returns you to whatever is configured in Settings.
+</Note>
 
 ## Environment variables
 
@@ -53,8 +31,38 @@ If SpeakoFlow **isn't** already running, these flags do nothing useful — the n
 | `SPEAKOFLOW_ALLOW_WAYLAND` | **Linux.** Keep a native Wayland session instead of switching to XWayland. The recording overlay may then fail to stay on top. |
 | `SPEAKOFLOW_NO_GTK_LAYER_SHELL` | **Linux.** Skip GTK layer-shell initialization for the overlay. Try this if the overlay misbehaves under a layer-shell compositor. |
 
-On GNOME under Wayland, SpeakoFlow sets `GDK_BACKEND=x11` for itself so the overlay can float above other windows — GNOME's compositor implements neither `wlr-layer-shell` nor any way for an app to raise itself. If you've already set `GDK_BACKEND` yourself, your choice is respected and nothing is overridden.
+## Details
 
-## Portable mode
+<AccordionGroup>
+  <Accordion title="What --debug does and does not do">
+    It turns the log file all the way up without you having to change a setting and then change it back.
 
-Portable mode isn't a flag — it's triggered by a marker file next to the executable. See [General settings](/settings/general#portable-mode).
+    Because it is never written to your settings, it does not reveal the Debug settings section. Only the `Ctrl` or `Cmd` + `Shift` + `D` shortcut does that. See [Debug & advanced](/settings/debug).
+  </Accordion>
+
+  <Accordion title="How --start-hidden and --no-tray interact">
+    Without a tray icon there would be no way to reach the window again, so combining them still shows the window on launch.
+
+    The same applies if you pass `--start-hidden` while *Show tray icon* is off in Settings.
+  </Accordion>
+
+  <Accordion title="How the remote-control flags reach the running app">
+    They launch a second SpeakoFlow process. It hands its arguments to the running instance and exits immediately, so the command returns straight away and no second window or tray icon appears. Bind one to a hardware key, a stream deck, or a window-manager shortcut for a fully custom trigger.
+
+    If SpeakoFlow is not already running, these flags do nothing useful. The new instance becomes the primary one and just starts normally. Launching a second instance with no recognized flag at all brings the existing window to the front.
+  </Accordion>
+
+  <Accordion title="Reading --list-devices output, and why --probe-devices exists">
+    `--list-devices` is what to reach for when you are not sure whether your GPU is visible to SpeakoFlow. It brings the native engine up, lists every device it found with its index and memory, and reports whether the Vulkan, Metal, and CPU backends actually loaded. That separates "my GPU is not detected" from "the app is choosing not to use it".
+
+    `--probe-devices` is hidden from `--help` because it is not meant for you. It is the child half of the Linux crash-isolated device probe: on Linux the running app spawns itself with this flag so a crash inside the vendored GPU code kills a throwaway process instead of your session. See [Acceleration & GPU](/models/acceleration).
+  </Accordion>
+
+  <Accordion title="GDK_BACKEND on GNOME Wayland">
+    On GNOME under Wayland, SpeakoFlow sets `GDK_BACKEND=x11` for itself so the overlay can float above other windows. GNOME's compositor implements neither `wlr-layer-shell` nor any way for an app to raise itself.
+
+    If you have already set `GDK_BACKEND` yourself, your choice is respected and nothing is overridden.
+  </Accordion>
+</AccordionGroup>
+
+Portable mode is not a flag. It is triggered by a marker file next to the executable. See [General settings](/settings/general).

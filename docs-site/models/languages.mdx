@@ -1,49 +1,71 @@
 ---
-title: "Languages & accents"
-description: "Pick the right SpeakoFlow model for your languages and accent, and get non-Western names spelled correctly with Whisper plus custom words."
+title: "Languages and translation"
+description: "Choose the transcription language in SpeakoFlow, use autodetect, and translate speech to English on your own device. Includes which models cover which languages and which ones can translate."
 icon: "language"
 ---
 
-Getting names and non-English speech right comes down to the model you pick — and a couple of settings that reinforce it.
+Two settings control language, and both live with your model in *Settings → Dictation*.
 
-## Language
+| Setting | Default | What it does |
+| --- | --- | --- |
+| **Language** | `Auto` | Tells the model which language you are speaking. |
+| **Translate to English** | Off | Transcribes another language straight into English. |
 
-*Auto, or a specific language. Default: Auto.*
+Naming your language instead of leaving it on `Auto` can improve accuracy noticeably, because the model stops spending effort guessing. It helps most on short recordings.
 
-The language for speech recognition, in *Settings → Dictation*. Setting a specific language instead of Auto can improve accuracy noticeably, because the model stops spending effort guessing.
-
-Two things are worth knowing about how the setting is applied:
-
-- The row only appears for models that can take a language hint. English-only models and models that always auto-detect don't show it.
-- Your choice is passed to the model **only if that model claims to support the language**. If it doesn't, SpeakoFlow silently falls back to auto-detection rather than forcing a language the model can't handle. So picking Japanese while an English-only model is active changes nothing.
-
-Simplified and Traditional Chinese are both sent to the model as `zh` — the distinction is in the language list for filtering, not something the models treat separately.
+<Note>
+  Both rows only appear when your current model supports them. If you cannot find *Translate to English*, the model you are on cannot translate. The whole group is hidden for models with nothing to configure.
+</Note>
 
 ## Which model for which languages
 
 | Language need | Model |
 | --- | --- |
-| Widest coverage — 99 languages | **Whisper Medium**, or Whisper Large from the older set |
-| Real-time multilingual (28 languages) | **Nemotron Streaming 3.5** |
+| Widest coverage, 99 languages | **Whisper Medium**, or Whisper Large from the older set |
+| Real-time multilingual, 28 languages | **Nemotron Streaming 3.5** |
 | Highest accuracy across 14 languages | **Cohere Transcribe** |
-| English, German, Spanish, French — instantly | **Canary 180M Flash** |
+| English, German, Spanish, French, instantly | **Canary 180M Flash** |
 | English only, fastest | **Parakeet Unified EN 0.6B** (the default) |
 | 25 mostly-European languages | **Parakeet V3** or **Canary 1B v2** (both in Older models) |
 | Chinese, English, Japanese, Korean, Cantonese | **SenseVoice** (Older models) |
 | Russian | **GigaAM v3** (Older models) |
 | Taiwanese Mandarin with English code-switching | **Breeze ASR** (Older models) |
 
+## Which models translate to English
+
+| Model | Translates |
+| --- | --- |
+| Whisper Small, Medium, Large | Yes |
+| Whisper Turbo | No |
+| Canary 180M Flash, Canary 1B v2 | Yes |
+| Parakeet, Nemotron, Moonshine, Cohere, SenseVoice, GigaAM, Breeze | No |
+
+Whisper Turbo is the one that catches people out. It is a Whisper model, so translation looks like it should be there, but the model does not support the translation task.
+
+Leave translation off and you get a transcript in the language you spoke. Turn it on and you get English regardless.
+
 <Tip>
-  **Non-Western names.** Whisper models are particularly strong at names and words that trip up English-only models — for example Nepali, Indian, and other South Asian names that don't follow standard English spelling. If you dictate names like these often, use a Whisper model and add the tricky ones to [Custom words](/dictation/custom-words) so they're spelled your way every time.
+  **Non-Western names.** Whisper models are much better at names that trip up English-only models, including Nepali, Indian, and other South Asian names. Add the tricky ones to [Custom words](/dictation/custom-words) so they are spelled your way every time.
 </Tip>
 
-<Note>
-  Custom words are applied differently depending on the model family. Whisper-family models receive them as a recognition prompt, which biases the model before it decides. Every other family gets a fuzzy correction pass over the finished transcript instead. Both work; the Whisper route tends to be more accurate because nothing has to be guessed after the fact.
-</Note>
+<AccordionGroup>
+  <Accordion title="Your language choice is only a hint, and can be ignored">
+    Your choice is passed to the model **only if that model claims to support the language**. If it does not, SpeakoFlow falls back to autodetection rather than forcing a language the model cannot handle.
 
-Speaking a language and want English out? See [Translate to English](/dictation/translate). Only some models support it: **Whisper Medium** and **Canary 180M Flash** from the recommended set, plus **Whisper Small**, **Whisper Large**, and **Canary 1B v2** from the older set. Whisper Turbo, Parakeet, Nemotron, Moonshine, SenseVoice, GigaAM, Breeze ASR, and Cohere do not, and the *Translate to English* row tells you so when one of those is active.
+    So picking Japanese while an English-only model is active changes nothing.
+  </Accordion>
 
-<Info>
-  Language and translation support are declared by the model file itself. For current-engine models SpeakoFlow reads those capabilities out of the GGUF the first time the model actually loads and corrects its own catalog entry if it was wrong, so what a model card claims can change slightly after you first use it.
-</Info>
+  <Accordion title="Simplified and Traditional Chinese">
+    Both are sent to the model as `zh`. The distinction exists in the language list for filtering, not as something the models treat separately.
+  </Accordion>
 
+  <Accordion title="Why a model card's capabilities can change after first use">
+    Language and translation support are declared by the model file itself. For current-engine models, SpeakoFlow reads those capabilities out of the GGUF the first time the model actually loads and corrects its own catalog entry if it was wrong.
+  </Accordion>
+
+  <Accordion title="Custom words work differently per model family">
+    Whisper-family models receive them as a recognition prompt, which biases the model before it decides. Every other family gets a fuzzy correction pass over the finished transcript instead.
+
+    Both work. The Whisper route tends to be more accurate because nothing has to be guessed after the fact.
+  </Accordion>
+</AccordionGroup>
