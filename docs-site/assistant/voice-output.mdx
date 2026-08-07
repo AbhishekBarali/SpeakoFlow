@@ -1,0 +1,69 @@
+---
+title: "Voice output (TTS)"
+description: "Have the SpeakoFlow assistant read its replies aloud, free and local with Kokoro or through OpenAI-compatible, OpenRouter, ElevenLabs, or Azure AI Speech voices. Covers voices, precision, and playback speed."
+icon: "volume-high"
+---
+
+Off by default. Turn on *Speak responses aloud* in *Settings → Assistant → Voice output* and the assistant reads its replies out loud.
+
+It runs locally and free with Kokoro, or through a cloud voice with your own key. With it on, the assistant is also told to write speech-friendly prose: short sentences, no tables or headings, because a Markdown table read aloud is gibberish.
+
+## Engines
+
+| Engine | Runs | Needs |
+| --- | --- | --- |
+| **Kokoro** (default) | On your machine | A one-time voice model download, then fully private. Free. |
+| **OpenAI-compatible** | Cloud | Base URL, API key, model, voice. |
+| **OpenRouter** | Cloud | Your OpenRouter key. Base URL is fixed. |
+| **ElevenLabs** | Cloud | API key, model, voice ID. |
+| **Azure AI Speech** | Cloud | Speech URL, key, voice. |
+
+Each engine keeps its own endpoint, model, voice, and API key. Switching engines cannot overwrite or wipe the values you already entered for another one, and an OpenAI voice name cannot leak onto ElevenLabs and fail as `voice_not_found`.
+
+The voice-output API key is separate from your [assistant provider's key](/assistant/providers), even when both point at the same company.
+
+## Playback and quality
+
+| Setting | Default | Options |
+| --- | --- | --- |
+| Playback speed | `1x` | 0.25x to 4x |
+| Kokoro precision | `fp32` | fp32, fp16, q8, q4, q4f16 |
+| Stop speech when dictation starts | `Off` | On, Off |
+
+*Test voice* plays a short sample with the current settings. It is the fastest way to catch a bad key, a wrong voice name, or an output device pointed somewhere you are not listening.
+
+<Note>
+  Asking the assistant a new question always interrupts the previous answer, whatever *Stop speech when dictation starts* is set to. That setting only governs ordinary dictation.
+</Note>
+
+<AccordionGroup>
+  <Accordion title="Choosing a voice">
+    Kokoro ships eight built-in voices, with **Heart** as the default: Heart, Bella, Nicole, and Sky (US female), Adam and Michael (US male), Emma and George (UK).
+
+    Cloud engines let you load and pick from their own lists.
+
+    - **OpenAI-compatible**. `alloy`, `ash`, `ballad`, `coral`, `echo`, `fable`, `nova`, `onyx`, `sage`, `shimmer`, `verse`.
+    - **ElevenLabs**. A voice ID from the Voices tab in your ElevenLabs dashboard.
+    - **Azure**. A neural voice like `en-US-AvaMultilingualNeural`, or an HD voice such as `en-US-Ava:DragonHDLatestNeural`. Click *Load voices* to browse.
+  </Accordion>
+
+  <Accordion title="Why the model and voice fields start empty">
+    For the cloud engines, model and voice are loadable pickers. They begin blank, you press reload to fetch the engine's real list, then choose. A prefilled value would just be a name you never picked, and the wrong one returns 404.
+
+    Leave them blank and synthesis still works from a sensible fallback: `eleven_flash_v2_5` for ElevenLabs, `en-US-JennyNeural` for Azure.
+
+    Picking an ElevenLabs model: `eleven_v3` is the newest and most expressive, `eleven_multilingual_v2` is the consistent-quality choice across many languages, and `eleven_flash_v2_5` is the fastest. Model names are the API IDs, so type them exactly as shown.
+  </Accordion>
+
+  <Accordion title="Picking a Kokoro precision">
+    `fp32` is the highest quality and the right choice when WebGPU is available. If you have a weak GPU or none, a quantized option is dramatically faster on CPU. `q8` is the usual pick, `q4` the fastest. Changing this reloads the model.
+  </Accordion>
+
+  <Accordion title="Playback speed limits">
+    Presets run 0.5x to 3x, and you can type any value in the 0.25x to 4x range. Speed is applied locally for Kokoro and natively for remote engines that support it. ElevenLabs accepts 0.7x to 1.2x only, so values outside that are clamped for that engine.
+  </Accordion>
+
+  <Accordion title="Why stop-on-dictation is off by default">
+    Off means starting a plain dictation does not silence a reply that is still being read. With earphones in, people usually want to keep listening while they type or dictate something else. Turn it on if you would rather have the room go quiet the moment you start talking.
+  </Accordion>
+</AccordionGroup>

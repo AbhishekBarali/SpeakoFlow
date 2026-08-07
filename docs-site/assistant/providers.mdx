@@ -1,0 +1,101 @@
+---
+title: "Models and providers"
+description: "Choose what powers the SpeakoFlow assistant: a private offline model that needs no API key, your own Ollama or LM Studio server, or a cloud provider with your own key. Covers the curated local models and the full provider list."
+icon: "brain"
+---
+
+The assistant runs on whatever model you pick. This is the most important assistant setting. Set it in *Settings → Assistant → Assistant brain*.
+
+| Route | What it means | Key needed |
+| --- | --- | --- |
+| **Built-in (offline)** | Download a curated local model. It runs on this machine through the bundled llama.cpp engine and stays there. | No |
+| **Your own local server** | Point SpeakoFlow at Ollama or LM Studio on your machine. | No |
+| **Cloud provider** | Any OpenAI-compatible provider, using your own API key. | Yes |
+
+## Curated local models
+
+Three conversation-first choices: quickest, recommended, and more capable but slower. All three see images, so any of them can do [screen vision](/assistant/screen-vision).
+
+| Model | Download | Pick it when |
+| --- | --- | --- |
+| **Gemma 4 E2B** | ~4 GB | You want the quickest replies and can accept weaker answers on complex requests. |
+| **Gemma 4 E4B** (recommended) | ~5.9 GB | You want the best balance of quality and speed for conversation. |
+| **Gemma 4 12B** | ~6.8 GB | You want sharper answers on nuanced questions and have a strong GPU to absorb the latency. |
+
+Want a different size, a different family, or a non-vision model? Search Hugging Face for any GGUF from the same screen. See [Custom models](/models/custom-models).
+
+<AccordionGroup>
+  <Accordion title="What the catalog tells you about your GPU">
+    Before you pick, the catalog reports the GPU it detected and how much graphics memory it has: dedicated VRAM, shared memory, or a plain "graphics memory unavailable" when it cannot tell.
+
+    That last case is honest rather than reassuring. With no GPU information, response speed genuinely cannot be predicted, so expect CPU-speed replies.
+  </Accordion>
+
+  <Accordion title="Why each download is larger than the weights">
+    These models are multimodal, so each one downloads a companion projector file automatically alongside the weights. The sizes above already include it.
+  </Accordion>
+</AccordionGroup>
+
+## Providers
+
+Every provider is preconfigured. You pick it from a list and enter a key. The built-in local engine is pinned to the top, because it is the only option that needs no key at all.
+
+| Provider | Key | Base URL |
+| --- | --- | --- |
+| **Built-in (Local)** | Not needed | Fixed, on a loopback port |
+| **Local (Ollama / LM Studio)** | Not needed | Editable, defaults to `http://localhost:11434/v1` |
+| **Custom** | Whatever your endpoint wants | Editable |
+| **Azure OpenAI** | Yes | Editable |
+| OpenAI, Anthropic, Google Gemini, OpenRouter, Groq, Cerebras, xAI (Grok), DeepSeek, Mistral, Moonshot (Kimi), Z.AI, Together AI, Fireworks AI, Perplexity, AWS Bedrock (Mantle) | Yes | Fixed |
+
+Base URL is editable for `Custom`, `Local`, and `Azure OpenAI` only. Everything else is fixed, so there is nothing to get wrong. For LM Studio, use `http://localhost:1234/v1`.
+
+<Note>
+  Apple Intelligence appears in the provider list for [AI cleanup](/writing/ai-cleanup) on Apple Silicon Macs, but not for the assistant. The on-device Foundation model does not back a streaming chat turn here, so it is filtered out of the assistant's picker on purpose.
+</Note>
+
+## Keys and model names
+
+Your API key lives in your operating system's keychain, not a settings file. Each provider keeps its own key, so switching providers does not lose the one you already entered. The key is shared with [AI cleanup](/writing/ai-cleanup), since both features use the same chat client. See [Privacy](/reference/privacy).
+
+For the model, click *Load models* to fetch the provider's list, or type any name directly. The picker accepts values that are not in the list.
+
+<AccordionGroup>
+  <Accordion title="OpenRouter, Azure, and Perplexity quirks">
+    - **OpenRouter**. The only provider with built-in [web search](/assistant/web-search). It also sends `HTTP-Referer` and `X-Title` for app attribution.
+    - **Azure OpenAI**. The "model" is your deployment name. Whatever you paste from the portal is normalized to the v1 surface `https://{host}/openai/v1`, so a bare resource URL or an AI Foundry project endpoint both work instead of returning 404 on a missing path. The key is sent as both `Authorization: Bearer` and the `api-key` header, since gateways differ on which they honor. Requests use HTTP/1.1 and a smaller image budget, because Azure's gateway truncates large bodies.
+    - **Perplexity**. No model-list endpoint, so *Load models* does nothing. Type the model name.
+  </Accordion>
+
+  <Accordion title="Anthropic and the built-in engine">
+    - **Anthropic**. Authenticated with the native `x-api-key` header plus `anthropic-version`, which works on both the OpenAI-compatible layer and the classic API.
+    - **Built-in local engine**. Gemma-style chat templates reject a `system` role, so the system prompt is folded into the first user message. Thinking is disabled in the template so a small model spends its tokens on the answer.
+  </Accordion>
+</AccordionGroup>
+
+## Local engine tuning
+
+Two settings appear only for the built-in local engine. External providers, including Ollama and LM Studio, manage their own context and memory.
+
+| Setting | Default | Options |
+| --- | --- | --- |
+| Context window | `8192` | 512 to 32768 |
+| Unload from memory after | `5 minutes` | *Immediately* through *1 hour*, or *Never* |
+
+<AccordionGroup>
+  <Accordion title="How big a context window you want">
+    The context window holds everything at once: the system instructions, your chat history, any screenshot (a single image can eat a big chunk), and the reply. Bigger holds more and keeps screen vision and web search reliable, but uses more memory.
+
+    `16384` is a good step up if your machine has the RAM, and you can lower it later to save memory. The change applies when the engine starts.
+  </Accordion>
+
+  <Accordion title="Why the model unloads after five minutes">
+    Unloading frees RAM and VRAM once the model has been idle that long, and it reloads automatically on next use. Five minutes keeps it warm through a working session without holding memory overnight.
+  </Accordion>
+</AccordionGroup>
+
+## System prompt
+
+Sets the assistant's baseline behavior, in *Settings → Assistant → System prompt*. The default tells the model it is hearing transcribed speech, so it should expect the occasional mis-hear and infer intent, keep answers concise, and use plain text that reads well in a small panel.
+
+Individual [profiles](/personalize/profiles) override it entirely for their own turns. The system prompt is really the fallback persona rather than a global preamble.

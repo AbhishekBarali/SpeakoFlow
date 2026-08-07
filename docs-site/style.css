@@ -1,0 +1,337 @@
+/* ---------------------------------------------------------------------------
+   SpeakoFlow docs: readability layer
+
+   Mintlify auto-includes every .css file in the content directory, so this
+   file is not referenced from docs.json.
+
+   The goal is air. Documentation fails when a page looks like work before
+   you have read a word of it, so this file spends its budget on measure,
+   line height, and the space between sections rather than on decoration.
+
+   Selector hooks are Mintlify's documented ones (ID selectors such as
+   #content-area, element selectors such as mdx-content and callout). Those
+   are explicitly subject to change, so this file stays small and easy to
+   re-check after an upgrade. `!important` is used only where a Tailwind
+   utility on the same element would otherwise win.
+   --------------------------------------------------------------------------- */
+
+/* --- 1. Measure -----------------------------------------------------------
+   Prose caps at 65 characters-ish. Anything wider and the eye loses the line
+   on the return sweep. Applied to direct children of mdx-content only, so
+   tables, cards, and code blocks keep the full column width they need. */
+
+mdx-content > p,
+mdx-content > ul,
+mdx-content > ol,
+mdx-content > blockquote,
+mdx-content > h2,
+mdx-content > h3,
+mdx-content > h4 {
+  max-width: 65ch;
+}
+
+/* --- 2. Body text --------------------------------------------------------- */
+
+mdx-content {
+  font-size: 1.0625rem;
+  line-height: 1.8 !important;
+  letter-spacing: -0.009em;
+}
+
+mdx-content p {
+  line-height: 1.8 !important;
+  margin-block: 0 1.35em;
+}
+
+/* Neither pure black on white nor pure white on near-black is comfortable
+   for sustained reading. Pull both back slightly. */
+mdx-content p,
+mdx-content li {
+  color: #29332f;
+}
+
+.dark mdx-content p,
+.dark mdx-content li {
+  color: #ccd4d1;
+}
+
+/* --- 3. Section rhythm ---------------------------------------------------
+   A heading belongs to the text beneath it, so the space above a heading
+   must be clearly larger than the space below. Mintlify's defaults are more
+   even than that, which is what makes a long page read as one undivided
+   column. The hairline above each h2 is what turns a settings page into
+   scannable sections. */
+
+mdx-content h2 {
+  margin-top: 4.5rem !important;
+  margin-bottom: 1rem !important;
+  padding-top: 2rem;
+  border-top: 1px solid rgb(0 0 0 / 0.06);
+  font-size: 1.5rem;
+  line-height: 1.3;
+  letter-spacing: -0.021em;
+}
+
+.dark mdx-content h2 {
+  border-top-color: rgb(255 255 255 / 0.08);
+}
+
+/* The first h2 follows the page intro, not a previous section, so it needs
+   no divider. */
+mdx-content > h2:first-of-type {
+  border-top: none;
+  padding-top: 0;
+  margin-top: 2.75rem !important;
+}
+
+mdx-content h3 {
+  margin-top: 2.75rem !important;
+  margin-bottom: 0.7rem !important;
+  font-size: 1.15rem;
+  line-height: 1.4;
+  letter-spacing: -0.014em;
+}
+
+mdx-content h4 {
+  margin-top: 2rem !important;
+  margin-bottom: 0.5rem !important;
+  font-size: 1.02rem;
+}
+
+#page-title,
+mdx-content h2,
+mdx-content h3,
+mdx-content h4 {
+  text-wrap: balance;
+}
+
+#page-title {
+  letter-spacing: -0.027em;
+  line-height: 1.15;
+}
+
+/* The frontmatter description is the page's promise. Give it room to read as
+   a real sentence instead of fine print. */
+#page-title + p,
+#header p {
+  font-size: 1.09rem;
+  line-height: 1.65;
+  max-width: 58ch;
+  opacity: 0.82;
+}
+
+/* --- 4. Lists ------------------------------------------------------------
+   These docs lean on the "**Option** (default). What it does." pattern, and
+   default list spacing packs those so tightly that the bold labels stop
+   reading as separate entries. */
+
+mdx-content ul,
+mdx-content ol {
+  margin-block: 0 1.4em;
+}
+
+mdx-content li {
+  line-height: 1.75;
+  margin-block: 0.6em;
+  padding-left: 0.15em;
+}
+
+mdx-content li > p {
+  margin-block: 0 0.5em;
+}
+
+mdx-content li > ul,
+mdx-content li > ol {
+  margin-block: 0.5em 0.5em;
+}
+
+/* --- 5. Inline code ------------------------------------------------------
+   Key names and setting labels are marked up as inline code throughout, so a
+   single sentence can carry five of them. The default treatment is loud
+   enough to fragment the sentence, so keep it quiet. */
+
+mdx-content :not(pre) > code {
+  font-size: 0.875em;
+  padding: 0.13em 0.38em;
+  border-radius: 0.35rem;
+  font-weight: 450;
+  background-color: rgb(10 122 112 / 0.06);
+  border: 1px solid rgb(10 122 112 / 0.11);
+  white-space: nowrap;
+}
+
+.dark mdx-content :not(pre) > code {
+  background-color: rgb(45 212 191 / 0.09);
+  border-color: rgb(45 212 191 / 0.14);
+}
+
+/* --- 6. Tables -----------------------------------------------------------
+   Platform and default matrices carry multi-line cells, so they need top
+   alignment and real vertical padding rather than tight rows. */
+
+mdx-content table {
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  margin-block: 1.75rem;
+}
+
+mdx-content th,
+mdx-content td {
+  padding-block: 0.8rem;
+  padding-inline: 0.9rem;
+  vertical-align: top;
+}
+
+mdx-content th {
+  font-weight: 600;
+  letter-spacing: -0.004em;
+  white-space: nowrap;
+}
+
+mdx-content tbody tr:nth-child(even) {
+  background-color: rgb(0 0 0 / 0.015);
+}
+
+.dark mdx-content tbody tr:nth-child(even) {
+  background-color: rgb(255 255 255 / 0.02);
+}
+
+/* --- 7. Callouts and accordions -----------------------------------------
+   Accordions carry the deep detail on every page, so they are load-bearing
+   here. They need to look inviting to open and calm when closed. */
+
+callout {
+  margin-block: 1.9rem;
+  line-height: 1.7;
+}
+
+callout p {
+  margin-block: 0 0.6em;
+  line-height: 1.7 !important;
+}
+
+callout p:last-child {
+  margin-bottom: 0;
+}
+
+accordion,
+accordion-group {
+  margin-block: 1.5rem;
+}
+
+accordion {
+  line-height: 1.75;
+}
+
+/* Give the opened body of an accordion the same breathing room as the page. */
+accordion p {
+  line-height: 1.75 !important;
+  margin-block: 0 1em;
+}
+
+/* --- 8. Steps and cards ------------------------------------------------- */
+
+steps {
+  margin-block: 2rem;
+}
+
+step {
+  padding-bottom: 1rem;
+  line-height: 1.75;
+}
+
+step > :first-child {
+  margin-top: 0;
+}
+
+card {
+  line-height: 1.6;
+}
+
+card-group,
+columns {
+  margin-block: 2rem;
+}
+
+/* --- 9. Navigation chrome -----------------------------------------------
+   Ten small groups across three tabs, so the sidebar has room to breathe.
+   Spend it on line spacing between entries rather than on size. */
+
+#sidebar-content li {
+  line-height: 1.5;
+}
+
+sidebar-group {
+  margin-bottom: 0.5rem;
+}
+
+sidebar-group-header {
+  letter-spacing: 0.005em;
+}
+
+#table-of-contents {
+  font-size: 0.875rem;
+}
+
+toc-item {
+  line-height: 1.5;
+}
+
+/* Inline links: an underline is the accessible affordance, but a heavy solid
+   rule under every link in a dense paragraph is noise. Thin it and offset it,
+   then make hover unambiguous. */
+mdx-content p a,
+mdx-content li a,
+mdx-content td a {
+  text-underline-offset: 0.19em;
+  text-decoration-thickness: 1px;
+  text-decoration-color: rgb(10 122 112 / 0.4);
+}
+
+mdx-content p a:hover,
+mdx-content li a:hover,
+mdx-content td a:hover {
+  text-decoration-color: currentColor;
+}
+
+/* --- 10. Narrow screens -------------------------------------------------
+   The measure cap is a no-op below its own width, but the desktop section
+   rhythm wastes vertical space on a phone. */
+
+@media (max-width: 640px) {
+  mdx-content {
+    font-size: 1rem;
+    line-height: 1.75 !important;
+  }
+
+  mdx-content h2 {
+    margin-top: 3rem !important;
+    padding-top: 1.5rem;
+    font-size: 1.35rem;
+  }
+
+  mdx-content h3 {
+    margin-top: 2rem !important;
+  }
+
+  mdx-content table {
+    font-size: 0.875rem;
+  }
+
+  mdx-content :not(pre) > code {
+    /* Long setting names must wrap rather than force the page to scroll. */
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
+
+/* Respect a reduced-motion preference; Mintlify animates some reveals. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

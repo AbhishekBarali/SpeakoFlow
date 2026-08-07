@@ -1,0 +1,153 @@
+---
+title: "General settings"
+description: "Every setting in SpeakoFlow's General section with its default: recording shortcuts and microphone, theme and text size, feedback sounds, the recording overlay, startup and tray behavior, and the experimental toggles."
+icon: "gear"
+---
+
+Everything in *Settings → General*, grouped as you will find it in the app.
+
+## Recording
+
+| Setting | Default | What it does |
+| --- | --- | --- |
+| Dictate | Set per platform | The shortcut that starts and stops dictation. See [Keyboard shortcuts](/start/keyboard-shortcuts). |
+| Cancel | No binding | Stops the current recording, or interrupts an assistant reply that is still streaming. Hidden on Linux. |
+| Recording behavior | `Hold` | `Hold` records while you hold the shortcut. `Tap` starts on one press and stops on the next. |
+| Microphone | System default | Which input device to record from. |
+
+Recording behavior governs every recording shortcut, including the assistant. Pick `Tap` for [hands-free recording](/dictation/hands-free).
+
+## Appearance
+
+| Setting | Default | What it does |
+| --- | --- | --- |
+| Theme | `Light` | Theme for the app and the assistant panel. `Light`, `Dark`, or `System`. |
+| Text size | `Default` | Scales text and controls in the Settings window. `Small`, `Default`, `Large`, or `Extra large`. |
+
+## Sounds
+
+| Setting | Default | What it does |
+| --- | --- | --- |
+| Audio feedback | Off | Play a sound when recording starts and stops. The rest of this group stays disabled until you turn it on. |
+| Feedback sound | `Default` | The start and stop cue. `Default`, `Marimba`, `Pop`, or `Click`. The play button previews the pair. |
+| Output device | System default | Which device plays feedback sounds, independent of your system default. |
+| Volume | 100% | Volume of feedback sounds only. It does not affect the assistant's spoken replies. |
+| Mute while recording | Off | Mutes system audio while you record so playback does not bleed into your dictation. |
+
+## Overlay
+
+| Setting | Default | What it does |
+| --- | --- | --- |
+| Overlay | Automatic | How the recording overlay looks. `None` shows nothing, `Minimal` is a compact pill, `Live` is a card showing your words as you speak. |
+| Overlay position | `Bottom`, `None` on Linux | Where the overlay sits: `None`, `Top`, or `Bottom`. |
+
+`Live` is only honored by models that can stream. On any other model it falls back to `Minimal` even if you select it. More in [The recording overlay](/dictation/overlay).
+
+## Startup and tray
+
+| Setting | Default | What it does |
+| --- | --- | --- |
+| Launch on startup | Off | Open SpeakoFlow automatically when you sign in. |
+| Start hidden | Off | Launch straight to the tray without opening the window. |
+| Show tray icon | On | Keep SpeakoFlow in the system tray or menu bar. |
+| Quit when I close the window | Off | Off hides the window to the tray and keeps hotkeys working. On quits the app completely. |
+| Check for updates | On | Let SpeakoFlow check for new versions and offer to download them. |
+
+Turning off **Check for updates** also disables the tray menu's **Check for updates** item and the manual button on the About page.
+
+<Note>
+  If the tray icon is off, **Start hidden** shows the window anyway. Without a tray icon there would be no way back in.
+</Note>
+
+## System
+
+| Setting | Default | What it does |
+| --- | --- | --- |
+| Unload model | `After 5 minutes` | Frees the memory the speech-to-text model holds once it has been idle this long. `Never`, `Immediately`, after 2, 5, 10, or 15 minutes, or after 1 hour. See [Performance and memory](/models/acceleration). |
+| Experimental features | Off | Reveals the Experimental group below and changes no behavior by itself. With it off, the acceleration, keyboard-backend, and lazy-stream settings are not reachable at all. |
+
+## Experimental
+
+This group appears only when **Experimental features** is on.
+
+| Setting | Default | What it does |
+| --- | --- | --- |
+| Keyboard implementation | `Tauri` on Linux, `SpeakoFlow Keys` elsewhere | Which backend listens for global shortcuts. |
+| Whisper acceleration, ONNX acceleration | Auto | Which compute device transcription runs on. See [Acceleration & GPU](/models/acceleration). |
+| Keep mic open between transcriptions | Off | Leaves the audio stream open for faster back-to-back dictation. May affect Bluetooth audio quality. See [Performance and memory](/models/acceleration). |
+
+## Details
+
+<AccordionGroup>
+  <Accordion title="Why Cancel has no default binding, and why the row is hidden on Linux">
+    A global cancel key would swallow presses meant for other apps, so you record one yourself if you want it. The row is hidden on Linux because rebinding shortcuts at runtime is unstable enough there that it is not worth offering.
+  </Accordion>
+
+  <Accordion title="Why the theme default is Light">
+    Light is unusual for a developer tool and it is deliberate. The light palette is the tuned, higher-contrast "native settings" look, and system-dark can land on a duller read for some people. Dark and System are one click away.
+
+    Changing the theme also repaints the native window frame, so the title bar cannot stay dark while the interface goes light.
+  </Accordion>
+
+  <Accordion title="How text size scaling works">
+    Text size is applied as a webview zoom factor: 0.9, 1.0, 1.1, and 1.2 respectively. Everything scales together rather than only the type, and it takes effect immediately with no restart.
+
+    Only the main Settings window scales. The recording overlay and the floating assistant panel have their own purpose-built sizing and are unaffected.
+  </Accordion>
+
+  <Accordion title="Using your own start and stop sounds">
+    A fifth option, **Custom**, appears only once both `custom_start.wav` and `custom_stop.wav` exist in SpeakoFlow's app data folder. There is no file picker, so you drop the files in yourself. The path is shown under *Settings → About → Folders*.
+
+    A sixth sound ships alongside the themes: a theme-independent lock cue shared by every theme. You will not hear it in the current build, because the tap-to-lock gesture it belongs to is not active. See [Keyboard shortcuts](/start/keyboard-shortcuts).
+  </Accordion>
+
+  <Accordion title="What the automatic overlay default picks, and why Linux defaults to None">
+    The stored overlay default is "auto", which follows your model: `Live` when the active model supports live streaming, `Minimal` otherwise. Picking any option yourself overrides that permanently.
+
+    Overlay position defaults to `None` on Linux because a Linux compositor may not let the overlay float above other windows at all. See [Troubleshooting](/reference/troubleshooting).
+  </Accordion>
+
+  <Accordion title="What is in the tray menu">
+    The version, **Copy last transcript**, a submenu listing your downloaded models so you can switch the active one, **Unload model** (enabled only while a model is loaded), **Home**, **Check for updates**, and **Quit**. While a recording or transcription is in progress, the menu shows **Cancel** instead of the model items.
+  </Accordion>
+
+  <Accordion title="Why the keyboard engine default differs on Linux">
+    **SpeakoFlow Keys** reads input devices directly, which is what makes modifier-only combos like `Left Ctrl` + `Left Win` possible. That is why it is the default on Windows and macOS, where the default dictation shortcut is a modifier-only combo.
+
+    **Tauri Global Shortcut** uses the OS or compositor's own global-shortcut API and needs no special permissions. That is why it is the Linux default: SpeakoFlow Keys reads `/dev/input/event*` and requires your user to be in the `input` group.
+
+    Switching backends can invalidate shortcuts the new backend cannot express. Affected bindings are reset to their defaults and you get a warning telling you so.
+  </Accordion>
+
+  <Accordion title="Window size and position">
+    SpeakoFlow remembers how big you left the main window and reopens it that way. Only the size is remembered, never the position, so the window cannot reopen off-screen after you unplug a monitor.
+
+    The remembered size is clamped to your current display and re-centered on launch, so a size saved on a large screen still fits a small one. It is saved when you close or hide the window, not continuously while you drag.
+  </Accordion>
+
+  <Accordion title="Portable mode">
+    SpeakoFlow can keep settings, models, recordings, history, and logs next to the executable instead of in your user profile. Useful on a USB stick or a locked-down machine.
+
+    <Steps>
+      <Step title="Create a marker file">
+        In the same folder as the SpeakoFlow executable, create a file named `portable` (no extension) containing the line `SpeakoFlow Portable Mode`.
+      </Step>
+
+      <Step title="Launch SpeakoFlow">
+        On startup it detects the marker, creates a `Data/` folder beside the executable, and stores everything there. Logs go to `Data/logs`.
+      </Step>
+    </Steps>
+
+    An empty `portable` file is **not** enough, because the magic string has to be there. Some package managers create stray empty files, and an empty marker used to silently relocate a normal install's data.
+
+    One exception: if an empty marker sits next to an existing `Data/` folder, SpeakoFlow treats it as a real portable install and repairs the marker in place. Markers written under the project's old "Handy" branding also still work.
+  </Accordion>
+</AccordionGroup>
+
+## Not in this section
+
+| Setting | Where it lives |
+| --- | --- |
+| App language (the SpeakoFlow interface language) | *Settings → About* |
+| Speech-recognition language, Translate to English | *Settings → Dictation*. See [Languages & accents](/models/languages). |
+| Log level and other diagnostics | The hidden Debug section. See [Debug & advanced](/settings/debug). |

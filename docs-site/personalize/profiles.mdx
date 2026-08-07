@@ -1,0 +1,60 @@
+---
+title: "Profiles"
+description: "Profiles are task-focused assistant personas you switch between from the SpeakoFlow panel header. Compare the four built-in profiles and their reply lengths, and learn how to create, restore, and share your own."
+icon: "users"
+---
+
+A profile is a persona for the assistant. It sets the name, the role, the instructions behind it, how long replies run, and an optional greeting.
+
+Switch profiles anytime from the panel header. Manage them in *Settings → Assistant → Profiles*.
+
+## The four built-ins
+
+| Profile | What it is for | Reply length |
+| --- | --- | --- |
+| **Assistant** | Balanced, general-purpose help. | Your global setting |
+| **Companion** | Warm, empathetic support for talking something through. | Medium |
+| **Quick** | Fast and to the point, usually one or two sentences. | Short |
+| **Unfiltered** | Blunt, honest feedback with no sugar-coating. | Your global setting |
+
+All four are editable and can be duplicated. Only **Assistant** cannot be deleted, because the assistant always needs a base persona to fall back to.
+
+Edited a built-in and want it back? *Restore default* resets that one profile to the version shipped with the app. Deleted one? *Restore built-ins* in the "⋯" menu re-adds anything missing and leaves your own profiles alone.
+
+## Creating one
+
+Start from scratch, duplicate an existing profile, or use **Create with AI**.
+
+With **Create with AI** you describe the persona you want, such as "a concise release-notes writer" or "a patient tutor who explains every step", and SpeakoFlow drafts its name, instructions, and greeting. You can dictate the description straight into the box with the mic button.
+
+## What a profile contains
+
+| Field | Notes |
+| --- | --- |
+| **Name and role** | Shown on the card and in the panel. The role is a subtitle for your own benefit and never reaches the model. |
+| **Avatar** | Optional image upload. |
+| **Instructions** | The system prompt that shapes the personality. |
+| **Response length** | `Inherit global` (default), `Short`, `Medium`, or `Long`. |
+| **Greeting** | An optional opening line shown in an empty chat. |
+
+There is no per-profile voice setting.
+
+<AccordionGroup>
+  <Accordion title="How instructions and response length interact with your global settings">
+    A profile's **Instructions** replace the global assistant system prompt for that profile's turns.
+
+    **Response length** set to `Inherit global` follows your main [Assistant setting](/assistant/behavior). Anything else wins for that profile's turns, so a "Quick" persona can stay short while an in-depth one runs long.
+  </Accordion>
+
+  <Accordion title="Avatars, and the color your own profiles get">
+    Upload an image, or leave it empty. The built-ins each get a designed icon. Your own profiles get their initial on a color derived from the profile's ID, so each one keeps a consistent look.
+  </Accordion>
+
+  <Accordion title="Import and export">
+    Export the selected profile to a JSON file and import it on another machine. Useful for sharing a persona or backing one up.
+  </Accordion>
+</AccordionGroup>
+
+<Note>
+  Profiles apply to the assistant panel only. [Generate with Flow](/writing/generate-with-flow) and [AI cleanup](/writing/ai-cleanup) deliberately ignore them. Both are stateless single-shot passes that use only their own prompt, so a paste stays predictable no matter which persona is active.
+</Note>

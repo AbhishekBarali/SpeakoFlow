@@ -1,0 +1,73 @@
+---
+title: "Web search"
+description: "Let the SpeakoFlow assistant look things up when a question needs current facts. Covers the six snippet search providers, OpenRouter's built-in search, search depth, and how the model decides to search."
+icon: "magnifying-glass"
+---
+
+Off by default. Turn it on in *Settings → Assistant → Web search* and the assistant can look things up when a question needs current, factual information.
+
+The model decides when to search. You do not have to ask, and there is no keyword rule or separate planner to configure. Everything below only appears once web search is on.
+
+## Search provider
+
+`Serper` by default. All six return titles and snippets, each needs one API key, and every one has a free tier.
+
+| Provider | What you get |
+| --- | --- |
+| **Serper** (default) | Google results, fast, about 1 to 2 seconds. |
+| **Brave Search** | An independent index. |
+| **Tavily** | AI-oriented search. Returns a synthesized answer alongside results. |
+| **Exa** | Neural, semantic search. |
+| **SerpAPI** | Google SERP. |
+| **TinyFish** | Its own index, built for agents. Free with no credit card. |
+
+Keys are stored in your OS keychain, and each provider keeps its own, so switching does not wipe one you already entered. *Test search* runs a sample query and reports how many results came back, so you find a bad key here rather than mid-conversation.
+
+<Tip>
+  Serper stays the default because it is fast and its free tier is generous. TinyFish asks for no payment details at all, if you would rather not hand over a card just to try search out.
+</Tip>
+
+## OpenRouter's built-in search
+
+On by default, and shown only when your assistant provider is OpenRouter. OpenRouter runs the search itself in its `:online` mode, billed to your OpenRouter credits, with no separate search API key needed.
+
+This is the one provider with native search. Every other provider, cloud or local, searches through the tool path. Turn it off to use your own search provider instead.
+
+It also steps aside automatically on a turn that carries an image, because OpenRouter's server-side search cannot be paired with an inline screenshot. Those turns use the tool path like everyone else.
+
+## Search depth
+
+`Standard` by default. One dial sets how many of the model's queries actually run, how many results come back per query, how many sources reach the model, and how much of that text fits in the prompt.
+
+| Depth | Queries | Sources | Use it for |
+| --- | --- | --- | --- |
+| **Quick** | 1 | 5 | Simple facts. |
+| **Standard** (default) | Up to 3 | 8 | Most questions. |
+| **Deep** | Up to 4 | 10 | Hard or multi-part questions. Largest context budget. |
+
+<AccordionGroup>
+  <Accordion title="How the model decides to search">
+    Turning web search on gives the model two tools, which it calls while writing its reply.
+
+    - **`web_search(query, freshness, news)`**. Runs a live search and hands back titles and short snippets. The model writes the query itself, and can ask for a freshness window (`day`, `week`, `month`, `year`, or none) and flag the topic as news.
+    - **`get_current_datetime()`**. Your current local date and time, with a UTC offset. Models have no clock, so this is how "what is today's date" and "how long until X" stay correct, and how a relative phrase becomes a concrete date before a search query is built.
+
+    A turn runs at most three model rounds, so the assistant can search, read what came back, and search once more before it has to answer with what it has.
+
+    The system prompt also tells the model not to claim it cannot access the internet. Without that, a model would confidently refuse on the turns where it decided not to search, the worst possible answer when the tool was right there.
+  </Accordion>
+
+  <Accordion title="Why a search takes about a second, not a minute">
+    Each search is a single retrieval pass that returns titles and snippets. Result pages are never fetched. All three depth tiers run that one pass with heavy parallelism and tight timeouts, so this is "answer with search in a couple of seconds", not minutes-long deep research.
+
+    Results from multiple queries are merged round-robin, de-duplicated by URL, and reranked locally on keyword overlap plus a recency boost for news. No extra model call is involved.
+
+    If a search fails or returns nothing, the assistant answers without web context instead of leaving you waiting, and the panel shows a short "no web results" notice.
+  </Accordion>
+
+  <Accordion title="Smart search decisions, which has no effect">
+    This toggle appears only when your assistant brain is the built-in local model, and it currently does nothing.
+
+    It predates model-decided search, when it picked between an LLM planner and a fast keyword check for the built-in model. Now that the built-in engine calls the `web_search` tool like every other provider, nothing reads the setting. It is still in the interface, but changing it will not change behavior.
+  </Accordion>
+</AccordionGroup>

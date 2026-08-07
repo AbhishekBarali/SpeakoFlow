@@ -1,0 +1,74 @@
+---
+title: "Debug & advanced"
+description: "How to reveal SpeakoFlow's hidden Debug section, plus every setting in it: log level and where the log file is written, the word correction threshold, paste delay, and the extra recording buffer."
+icon: "bug"
+---
+
+Press `Ctrl` + `Shift` + `D` (`Cmd` + `Shift` + `D` on macOS) with the Settings window focused. A **Debug** item appears in the sidebar. Press it again to hide the section.
+
+Most people never need anything in here.
+
+## What is in the Debug section
+
+| Setting | Range | Default | What it does |
+| --- | --- | --- | --- |
+| Log level | `Error` to `Trace` | `Debug` | How much detail goes into the log file. |
+| Word correction threshold | 0.0 to 1.0 | 0.18 | How aggressively near-misses are snapped to your [custom words](/dictation/custom-words). |
+| Paste delay | 10 to 200 ms | 60 ms | How long to wait before pasting the transcript into the active app. |
+| Extra recording buffer | 0 to 1500 ms | 0 ms | Keeps recording for this long after you release the shortcut. |
+| Feedback sound | Themes | `Default` | The same picker as *Settings → General → Sounds*, repeated here for testing. |
+| Check for updates | On or off | On | The same toggle as *Settings → General → Startup and tray*. |
+| Clamshell microphone | Your input devices | System default | **macOS laptops only.** Which microphone to use when the lid is closed. |
+
+<Note>
+  Turning debug mode on does not change how SpeakoFlow behaves, with one exception. It adds an extra **After 15 seconds (Debug)** choice to the model-unload dropdowns so reload behavior is quick to test.
+</Note>
+
+## When to change these
+
+- **Log level**. Raise it to `Trace` when reproducing a bug you are about to report. `Debug` is already fairly verbose, so most reports do not need it changed at all.
+- **Paste delay**. Raise it if the wrong text is occasionally pasted. That is usually the target app not having finished processing the clipboard change before the paste keystroke arrives.
+- **Extra recording buffer**. Raise it if you consistently lose the last word or two. It is zero by default because voice-activity detection normally handles the tail.
+- **Word correction threshold**. Raise it if custom words are still mistranscribed. Higher is more willing to treat a loosely similar word as a match, which risks rewriting words you actually said. The default is deliberately conservative.
+
+## Details
+
+<AccordionGroup>
+  <Accordion title="Where the log file is">
+    The log file is named `speakoflow` and lives in your platform's standard application log directory, or in `Data/logs` next to the executable in portable mode.
+
+    Rather than documenting a path that varies by OS and install method, SpeakoFlow shows you the real one. *Settings → About → Folders* has both the log directory and the app data directory, each with a button that opens it in your file manager.
+
+    Logs rotate at 500 KB and one previous file is kept, so they cannot grow without bound. A long session can therefore push out earlier detail, so capture the log soon after reproducing a problem.
+  </Accordion>
+
+  <Accordion title="Log level versus RUST_LOG and --debug">
+    Console output is filtered separately by the `RUST_LOG` environment variable. Running SpeakoFlow from a terminal with `RUST_LOG=trace` gives you a live firehose without touching this setting.
+
+    Launching with the `--debug` flag raises logging to `Trace` for that run only, without writing anything to your saved settings. It does not reveal this section, because only the keyboard shortcut does that. See [Command-line flags](/settings/cli).
+  </Accordion>
+
+  <Accordion title="Which models the word correction threshold affects">
+    It only affects the fuzzy correction pass, which is what non-Whisper models rely on.
+
+    Whisper-family models get your custom words as a recognition prompt instead, so the threshold matters less to them.
+  </Accordion>
+
+  <Accordion title="Why the clamshell microphone row is sometimes missing">
+    The row appears only when SpeakoFlow detects an internal battery, so it never shows on a desktop Mac, Windows, or Linux.
+
+    SpeakoFlow reads the lid state from the system and switches to this device automatically when the lid is shut. That is useful when your normal choice is the built-in microphone, which is unusable in clamshell mode.
+  </Accordion>
+
+  <Accordion title="Settings that used to be here">
+    Several rows moved out of Debug as the app was reorganized.
+
+    | Setting | Where it is now |
+    | --- | --- |
+    | Keyboard implementation, Whisper and ONNX acceleration, Keep mic open between transcriptions | *Settings → General → Experimental* |
+    | Mute while recording | *Settings → General → Sounds* |
+    | Experimental features | *Settings → General → System* |
+    | Always-on microphone | *Settings → Dictation → Output* |
+    | Log directory, App data directory | *Settings → About → Folders* |
+  </Accordion>
+</AccordionGroup>

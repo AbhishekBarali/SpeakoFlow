@@ -1,0 +1,97 @@
+---
+title: "Install SpeakoFlow"
+description: "How to install SpeakoFlow on Windows, macOS, or Linux, including which Linux package to pick and the one-time Terminal command that clears the macOS \"app is damaged\" message on unsigned builds."
+icon: "download"
+---
+
+Download SpeakoFlow for your operating system from the [Releases page](https://github.com/AbhishekBarali/SpeakoFlow/releases), then follow the section for your platform.
+
+| Platform | Files |
+| --- | --- |
+| **Windows** | `.exe` installer and `.msi`, x86_64 |
+| **macOS** | `.dmg`, Apple Silicon |
+| **Linux** | AppImage and `.deb`, each in x86_64 and ARM64 |
+
+## Windows
+
+Run the `.exe` installer. Use the `.msi` instead if you deploy with one.
+
+<Note>
+  Windows code signing isn't in place yet, so SmartScreen may warn that the installer isn't from a known publisher. Choose **More info → Run anyway**.
+</Note>
+
+## macOS
+
+<Steps>
+  <Step title="Drag SpeakoFlow into Applications">
+    Open the `.dmg` and drag the app across, as usual.
+  </Step>
+
+  <Step title="Clear the quarantine flag">
+    Open Terminal (press `Cmd` + `Space`, type *Terminal*) and run:
+
+    ```bash
+    xattr -dr com.apple.quarantine /Applications/SpeakoFlow.app
+    ```
+  </Step>
+
+  <Step title="Open it from Launchpad, Spotlight, or Applications">
+    macOS then asks for **Microphone** and **Accessibility** permission. Grant both.
+  </Step>
+</Steps>
+
+You do this once per version you install, not once per launch.
+
+<AccordionGroup>
+  <Accordion title="Why macOS says the app is damaged">
+    **The app is not damaged.** That wording is what macOS shows for any app it can't trace to a paid Apple Developer account. Signing costs $99/year, which this project doesn't have yet.
+
+    The `xattr` command removes the "downloaded from the internet" tag macOS puts on the file. SpeakoFlow can't auto-update while unsigned, so you repeat the command each time you download a new version.
+
+    There is no button to click instead. macOS 15 and later removed the old right-click → *Open* bypass, and "damaged" is the one case where no *Open Anyway* button appears in *System Settings → Privacy & Security*. Apple code signing and notarization is on the roadmap and removes this step entirely.
+  </Accordion>
+
+  <Accordion title="Apple Silicon only, and what to do on an Intel Mac">
+    Builds cover M1 and newer. GitHub retired its Intel build machines in December 2025, so there is currently no way to produce and test an Intel build.
+
+    On an Intel Mac you can still [build from source](https://github.com/AbhishekBarali/SpeakoFlow#build-from-source).
+  </Accordion>
+
+  <Accordion title="What the two permissions are for">
+    **Microphone** (*System Settings → Privacy & Security → Microphone*). So it can hear you.
+
+    **Accessibility** (*System Settings → Privacy & Security → Accessibility*). So it can type into other apps.
+  </Accordion>
+</AccordionGroup>
+
+## Linux
+
+| Your distro | Install |
+| --- | --- |
+| Arch and derivatives | `yay -S speakoflow-bin` (or `paru -S speakoflow-bin`) |
+| Debian, Ubuntu 24.04+, Mint 22+, Pop!\_OS, Tuxedo OS | `sudo apt install ./SpeakoFlow_*_amd64.deb` |
+| Everything else, including Fedora and openSUSE | `chmod +x SpeakoFlow_*.AppImage`, then run it |
+
+Prefer the `.deb` where there is one. It registers the app icon and menu entry, which the AppImage can't do on its own.
+
+<AccordionGroup>
+  <Accordion title="On an older release than Ubuntu 24.04">
+    The `.deb` is built on Ubuntu 24.04, so it needs that era of glibc. Use the AppImage instead.
+  </Accordion>
+
+  <Accordion title="Why there is no .rpm">
+    The packaging doesn't bundle the speech engine correctly. Shipping an `.rpm` that installs but can't transcribe would be worse than not shipping one.
+  </Accordion>
+
+  <Accordion title="Why the AppImage has no icon or menu entry">
+    That's normal AppImage behavior, not a SpeakoFlow bug. The icon appears once the app is running, and the file in your file manager stays generic. Gear Lever or AppImageLauncher adds a menu entry if you want one.
+  </Accordion>
+</AccordionGroup>
+
+## After installing
+
+A short setup wizard runs on first launch. Next: [dictate your first sentence](/start/getting-started).
+
+<Tip>
+  The download buttons on [speakoflow.com](https://www.speakoflow.com) pick the right file for the machine you're on. Installing on a different computer? Add `?os=mac`, `?os=linux`, or `?os=linux&arch=arm64` to the homepage URL.
+</Tip>

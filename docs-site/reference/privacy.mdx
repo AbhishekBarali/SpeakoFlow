@@ -1,0 +1,71 @@
+---
+title: "Privacy"
+description: "What SpeakoFlow sends and what it keeps on your device: speech-to-text runs locally, there is no telemetry and no account, web search and personal memory are off by default, and API keys go to your OS credential store."
+icon: "shield-halved"
+---
+
+Four things are true no matter how you configure SpeakoFlow.
+
+- **Your voice is transcribed on your device.** Speech-to-text always runs locally, on your GPU or CPU, and audio is never uploaded.
+- **The assistant only contacts the provider you chose.** That can be the fully offline built-in llama.cpp engine, a local server like Ollama or LM Studio, or a cloud provider with your own key.
+- **No telemetry and no account.** SpeakoFlow does not phone home.
+- **Optional features stay off until you turn them on.** [Web search](/assistant/web-search) and [personal memory](/personalize/memory) are both off by default.
+
+## What leaves your machine, and when
+
+| What | When | Where it goes |
+| --- | --- | --- |
+| Assistant, [AI cleanup](/writing/ai-cleanup), [Generate with Flow](/writing/generate-with-flow), spoken answers | Only when you use them, and only if you configured a remote provider | The provider you chose, and nowhere else |
+| [Web search](/assistant/web-search) | Off by default. When on, only when the assistant decides a search would help | Your chosen search backend |
+| Screen captures | Only when you ask for them | The provider you chose |
+| Model downloads | When you download a transcription or local assistant model | The model host |
+| Update checks | **On by default.** Toggle in *Settings → General* | This project's GitHub releases page |
+
+Pick a local provider for the first three rows and the app never opens a connection at all.
+
+## What is stored on this device
+
+<AccordionGroup>
+  <Accordion title="Screen captures">
+    Screen vision captures nothing unless you ask it to, and then only the monitor under your mouse cursor.
+
+    The full-resolution frame is sent once to the model provider you chose and is not kept. What persists locally is a small thumbnail attached to the message, so you can see later what the assistant was looking at. Details in [Screen vision](/assistant/screen-vision).
+  </Accordion>
+
+  <Accordion title="Personal memory">
+    Off by default. When you turn it on, everything is stored on this device in your settings file. *Settings → Assistant → Memory* lets you read, edit, export, or erase every note.
+
+    Memory is advisory only, so injected memory never overrides what you asked for in the current message. It actively refuses to keep secrets, personal identifiers, or instruction-shaped text at capture, consolidation, and injection time.
+
+    An Incognito toggle skips both using and learning memory for a single conversation.
+  </Accordion>
+
+  <Accordion title="History and recordings">
+    *Settings → History* keeps your recent dictations, Flow generations, and assistant chats on this device. Two settings control how much is kept:
+
+    - **Recording limit**. How many recordings to keep. Default 20.
+    - **Auto-delete recordings**. `Keep a set number` (the default, which means the recording limit above does the trimming), `Never`, `After 3 days`, `After 2 weeks`, or `After 3 months`.
+
+    Both apply only to unstarred dictation and Flow recordings. Starred recordings are always kept, and assistant chats are never counted or auto-deleted.
+
+    Changes apply immediately, so lowering the limit deletes the excess right away.
+  </Accordion>
+
+  <Accordion title="API keys">
+    Provider API keys go into the OS credential store, not into a plain-text settings file: Windows Credential Manager, the macOS Keychain, or the Linux Secret Service, under the service name `com.abhishekbarali.speakoflow`.
+
+    They are read back into memory once at load and cached there, so the keychain is never touched in the hot path.
+
+    <Note>
+      If the platform store is not available, a headless Linux box with no Secret Service for example, the app keeps the key in its settings file rather than losing it. On such a machine the key is on disk in plain text, so it is worth knowing.
+    </Note>
+  </Accordion>
+
+  <Accordion title="Keyboard access">
+    Global shortcuts have to observe your keyboard to know when you pressed one. Nothing logs or stores what you type.
+
+    On Linux the handy-keys engine reads `/dev/input/event*` directly, which is why it needs your user in the `input` group. The Tauri engine, the default on Linux, uses the compositor's global-shortcut API and reads nothing.
+  </Accordion>
+</AccordionGroup>
+
+See [How SpeakoFlow works](/start/how-it-works) for the full data flow, and [Providers & keys](/assistant/providers) for what gets sent where when you use a cloud model.

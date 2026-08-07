@@ -1,0 +1,82 @@
+---
+title: "Dictation basics"
+description: "Press a hotkey and talk, and SpeakoFlow types your words into any app on your machine. This page covers the dictation loop, the default Dictate shortcut on each platform, and the choice between Hold and Tap recording."
+icon: "microphone"
+---
+
+Press a hotkey and talk. Your words type into any app: email, editor, chat, anywhere you can put a cursor.
+
+## The loop
+
+<Steps>
+  <Step title="Put your cursor where you want the text">
+    Any text field in any application.
+  </Step>
+
+  <Step title="Hold the Dictate shortcut and speak naturally">
+    `Left Ctrl` + `Win` on Windows, `Option` + `Space` on macOS, `Ctrl` + `Space` on Linux.
+  </Step>
+
+  <Step title="Release">
+    SpeakoFlow transcribes and inserts your words into the active app.
+  </Step>
+</Steps>
+
+Voice-activity detection filters non-speech audio out of the recording, so pausing to think does not leave gaps.
+
+<Tip>
+  Most people speak around 150 words a minute and type around 45. Dictation is roughly three times faster.
+</Tip>
+
+## Hold or Tap
+
+*Settings → General → Recording → Recording behavior.*
+
+- **Hold** (default). Records while you hold the Dictate shortcut, and stops when you release.
+- **Tap**. One press starts recording, the next press stops it.
+
+Tap is how you dictate with your hands off the keyboard. See [Hands-free recording](/dictation/hands-free).
+
+## Good to know
+
+<AccordionGroup>
+  <Accordion title="Why the overlay says 'Getting mic ready'">
+    The overlay shows *Getting mic ready…* until the microphone actually starts delivering audio, then switches to a live waveform.
+
+    That cue is driven by real audio frames rather than a fixed delay. Once the wave moves, your words are being captured.
+  </Accordion>
+
+  <Accordion title="A recording stops itself after 30 minutes">
+    A single recording is capped at 30 minutes. At the cap SpeakoFlow finalizes it automatically: it stops, saves the audio, and transcribes.
+
+    Audio is only written to disk after a recording stops, so the cap means a forgotten session still produces a transcript instead of losing everything.
+  </Accordion>
+
+  <Accordion title="Start and stop sounds are off by default">
+    Turn on *Audio feedback* in *Settings → General → Sounds* if you want cues, then pick a **Feedback sound**: `Default`, `Marimba`, `Pop`, or `Click`. A `Custom` option appears only if you have supplied your own sound files. See [General settings](/settings/general).
+
+    *Mute while recording* silences system audio for the length of a recording. It is also off by default.
+  </Accordion>
+
+  <Accordion title="Choosing a microphone">
+    Pick your input in *Settings → General → Recording*. Two related options live elsewhere.
+
+    **Always-on microphone** (*Settings → Dictation → Output options*, off by default) keeps the mic warm so the first words are never clipped, at the cost of a little battery.
+
+    **Clamshell microphone** (*Settings → Debug*) picks a different input for when a laptop lid is closed.
+  </Accordion>
+</AccordionGroup>
+
+<CardGroup cols={3}>
+  <Card title="Hands-free" icon="hand" href="/dictation/hands-free">
+    Record without holding the keys down.
+  </Card>
+
+  <Card title="Output and pasting" icon="clipboard" href="/dictation/output">
+    Control how text is inserted.
+  </Card>
+
+  <Card title="Custom words" icon="book" href="/dictation/custom-words">
+    Spell names and terms your way.
+  </Card>
+</CardGroup>

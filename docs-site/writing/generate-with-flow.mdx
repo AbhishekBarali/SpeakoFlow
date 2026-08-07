@@ -1,0 +1,88 @@
+---
+title: "Generate with Flow"
+description: "Begin a dictation with the words Hey Flow and SpeakoFlow writes the finished email, reply, or draft and pastes it where you are typing. Covers turning it on, renaming the phrase, screen access, and what happens when generation fails."
+icon: "wand-magic-sparkles"
+---
+
+Start a dictation with "Hey Flow" and describe what you want. SpeakoFlow writes the finished thing and pastes it, instead of typing your words.
+
+<Steps>
+  <Step title="Turn it on">
+    *Settings → Dictation → Generate with Flow*. It is off by default.
+  </Step>
+
+  <Step title="Hold your Dictate shortcut and lead with the phrase">
+    "Hey Flow, write a polite email asking to reschedule Friday's call to Monday."
+  </Step>
+
+  <Step title="Let go">
+    The finished email is pasted where your cursor is.
+  </Step>
+</Steps>
+
+The phrase only counts at the very start of a dictation. Say it anywhere else and the words paste as ordinary dictation, so Flow never gets in the way of normal use.
+
+Flow runs on your ordinary *Dictate* shortcut only. *Dictate and clean up* keeps doing exactly what it did before, and [AI cleanup](/writing/ai-cleanup) never runs over Flow output.
+
+## The three settings
+
+| Setting | Default | What it does |
+| --- | --- | --- |
+| **Generate with Flow** | Off | The feature itself. |
+| **Activation phrase** | `Hey Flow` | Rename it to anything. Leave the field empty to reset it. |
+| **Allow screen access** | Off | Lets Flow look at your screen once, when your command clearly refers to it. |
+
+<Note>
+  Flow needs an assistant model configured. Without one, your words paste as ordinary dictation and the overlay tells you why. Set one up in [Models and providers](/assistant/providers).
+</Note>
+
+## If nothing gets pasted
+
+Flow is all or nothing. It pastes a complete result or it pastes nothing at all. You never get partial output, error text, or your raw spoken command.
+
+| What happened | What you get |
+| --- | --- |
+| No assistant model configured | Ordinary dictation, plus an overlay notice |
+| You said the phrase and no command | Nothing pasted. The overlay asks for a command |
+| Generation failed, timed out, or came back empty | Nothing pasted. The overlay says Flow could not generate |
+| You cancelled it | Nothing pasted |
+
+Every Flow recording is saved under the **Flow** filter in [History](/personalize/history), including failed and cancelled ones, so a lost generation never costs you the thought.
+
+## How it works underneath
+
+<AccordionGroup>
+  <Accordion title="Why Hey Flo activates it too">
+    Matching ignores case and punctuation, and it tolerates the spellings speech-to-text actually produces. "Hey Flo", "hey FLO", and "Hey, Flow:" all activate, because a wake word should match by sound rather than by whichever spelling the model picked that second.
+
+    The tolerance is bounded. A candidate word has to share the first letter, share the same Soundex code, be close to the same length, and be within an edit distance of 2. So "Hey follow the instructions", "Hey floor plans are ready", and "Hey blow out the candles" do not trigger Flow.
+
+    Two things help recognition once Flow is on. Whisper-family models get the phrase as a decoder prompt, which biases them toward hearing it correctly in the first place. And in the live overlay, a leading phrase heard in any tolerated spelling is rewritten to your configured spelling as you speak, so "Hey Flo," reads back as "Hey Flow,". That rewrite replaces exactly that byte range and can never absorb a neighboring word.
+  </Accordion>
+
+  <Accordion title="What Flow sends to the model">
+    Flow reuses your assistant's provider, model, and API key. There is no second provider to configure.
+
+    Beyond that it shares nothing with the assistant. Each command is a fresh, stateless turn made of one system prompt plus your spoken words. Your conversation history, your active [profile](/personalize/profiles), your [personal memory](/personalize/memory), and your assistant response-length setting all sit this one out. That keeps a Flow paste predictable: the same command produces the same kind of artifact whatever the assistant happens to be doing.
+
+    The system prompt tells the model that its entire response is pasted verbatim. No greetings, no "Sure, here's...", no explanations, and no placeholders like `[Your Name]`. Before pasting, SpeakoFlow strips leaked reasoning blocks and a lone Markdown fence wrapped around the whole answer. Real interior formatting is left alone.
+
+    Flow output is pasted as-is. The *Append trailing space* and *Auto-submit* options from [Output](/dictation/output) are deliberately skipped, because a generated email should not send itself.
+  </Accordion>
+
+  <Accordion title="Screen access, and why it is separate from the assistant">
+    With **Allow screen access** on, Flow can take one screenshot when a command clearly refers to your screen, like "look at this email and draft a reply". The model decides whether it needs the capture, using a `capture_screen` tool it may call at most once per command. For a self-contained command it writes directly and never looks. The overlay tells you when it is looking.
+
+    Flow captures the monitor your mouse pointer is on, so a multi-monitor setup gets the screen you are actually working on.
+
+    This is permissioned separately from the assistant's screen access on purpose. Turning on screen vision for chat does not give Flow a camera on your desktop, and the reverse holds too. See [Screen vision](/assistant/screen-vision) for the assistant's own controls.
+  </Accordion>
+
+  <Accordion title="Timeouts, preloading, and cancelling">
+    One generation gets 90 seconds. Starting the built-in local engine and loading its model has its own separate 150-second budget on top of that, so a cold multi-gigabyte load on first use cannot eat the writing time and fail the command before a single word is written.
+
+    On the built-in provider, Flow gets a head start. When the activation phrase is heard in the live transcript, the model begins loading while you are still speaking, and stays resident long enough to bridge into the generation turn. This only applies to transcription models that stream live text, and nothing loads on an ordinary dictation, because the watcher only fires on the phrase.
+
+    To stop a generation in progress, press your *Cancel* shortcut. It is unbound by default, since a global `Esc` would swallow presses meant for other apps, so record a key for it under *Settings → General → Recording*. That row is not offered on Linux, where dynamically re-registering a global shortcut proved unstable.
+  </Accordion>
+</AccordionGroup>

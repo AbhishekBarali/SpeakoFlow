@@ -1,0 +1,83 @@
+---
+title: "Assistant panel"
+description: "The SpeakoFlow assistant panel is a floating always-on-top chat you open with a hotkey. Learn its shortcuts, how to ask by voice or text, attach images and screen regions, and resize the panel."
+icon: "comments"
+---
+
+A floating always-on-top chat you open with a hotkey. Ask by voice or by typing, get streaming answers, and have them read back aloud without leaving the app you are in.
+
+## Shortcuts
+
+| Action | Windows | macOS | Linux |
+| --- | --- | --- | --- |
+| Ask the assistant | `Left Ctrl` + `Left Alt` | `Option` + `Ctrl` + `Space` | `Ctrl` + `Alt` + `Space` |
+| Show or hide the panel | `Ctrl` + `Shift` + `A` | `Option` + `Ctrl` + `A` | `Ctrl` + `Alt` + `A` |
+
+Both are rebindable in *Settings → Assistant → Shortcuts*.
+
+<AccordionGroup>
+  <Accordion title="How the ask hotkey handles push to talk">
+    The assistant hotkey follows the same *Push to talk* setting as dictation. It is on by default, so you hold the hotkey while you talk.
+
+    Add `Shift` for the opposite mode. Or tap the assistant's lock key mid-recording (`Space` on Windows, `Shift` elsewhere) to go hands-free and let go of the hotkey. See [Hands-free](/dictation/hands-free).
+  </Accordion>
+</AccordionGroup>
+
+## What you can do
+
+| Control | What it does |
+| --- | --- |
+| **Ask by voice** | Hold *Ask the assistant* and talk. Your transcript appears, then the answer streams in token by token. |
+| **Ask by text** | Type in the message box. |
+| **Attach** | Add an image or file, or snip a region of your screen to ask about. Text-like files are inlined as context. Images are sent to the model. |
+| **Collapse to a pill** | Shrink the panel to a small pill you click to talk, then expand it again when you want the full view. |
+| **Regenerate** | Re-ask for a fresh answer. The old one stays in [History](/personalize/history). |
+| **Copy** | Copy any reply, or a single code block. |
+| **Stop** | Interrupt a reply mid-stream. Whatever was generated so far is kept. It also silences a spoken reply that is still playing. |
+| **Clear conversation** | Start fresh. Hiding the panel keeps the conversation. Clearing it does not. |
+
+Images in the conversation, both screen captures and files you attached, appear as inline thumbnails you can click to enlarge.
+
+<Tip>
+  Type `/summarize` to compact the whole conversation into a summary that replaces the transcript. It is the one slash command.
+</Tip>
+
+## Header controls
+
+The header carries a persona switcher (see [Profiles](/personalize/profiles)) plus quick toggles for [screen vision](/assistant/screen-vision), [web search](/assistant/web-search), and [voice replies](/assistant/voice-output). Each toggle applies to the conversation you are in, so you can turn one on without opening Settings.
+
+The screen-vision toggle is sticky. Once it is on, your screen is attached to every message until you turn it off. It is hidden entirely when screen access is set to `Off`.
+
+## Appearance
+
+Three knobs in *Settings → Assistant → Panel appearance*, with a live preview as you change them.
+
+| Setting | Options | Default |
+| --- | --- | --- |
+| Text size | Small, Medium, Large | `Medium` |
+| Panel size | Small, Compact, Standard, Large | `Standard` |
+| Panel opacity | 50% to 100% | `100%` |
+
+The panel is dark only. There is no accent color and no light option, so those three settings are the whole surface. App-wide theme and text size for the settings window live in [General settings](/settings/general).
+
+<AccordionGroup>
+  <Accordion title="Resizing by hand, and small screens">
+    You can drag the panel's edges to resize it. A manual resize wins for the rest of the session, and the next app start goes back to the preset.
+
+    Whichever size you pick is clamped to the monitor the panel is on, so a large preset shrinks to fit a small display instead of running off the edge or hiding under the taskbar.
+  </Accordion>
+
+  <Accordion title="When to lower the opacity">
+    At `100%` the panel is fully solid. Lower values let the desktop show through, which helps when you are reading an answer against the thing you asked about.
+  </Accordion>
+</AccordionGroup>
+
+<CardGroup cols={2}>
+  <Card title="Models and providers" icon="brain" href="/assistant/providers">
+    Run it offline, on your own server, or on a cloud key.
+  </Card>
+
+  <Card title="Behavior and memory" icon="sliders" href="/assistant/behavior">
+    Conversation context and reply length.
+  </Card>
+</CardGroup>

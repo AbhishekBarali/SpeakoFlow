@@ -133,6 +133,16 @@ work. It's off until you turn it on, and you can edit or erase it at any time.
 
 Everything lives in Settings, and every hotkey is rebindable.
 
+Full documentation for each: [Generate with Flow](https://www.speakoflow.com/docs/writing/generate-with-flow),
+[screen vision](https://www.speakoflow.com/docs/assistant/screen-vision),
+[dictation](https://www.speakoflow.com/docs/dictation/basics),
+[the assistant panel](https://www.speakoflow.com/docs/assistant/panel),
+[languages and translation](https://www.speakoflow.com/docs/models/languages),
+[AI cleanup](https://www.speakoflow.com/docs/writing/ai-cleanup),
+[web search](https://www.speakoflow.com/docs/assistant/web-search),
+[profiles](https://www.speakoflow.com/docs/personalize/profiles), and
+[memory](https://www.speakoflow.com/docs/personalize/memory).
+
 ## Default hotkeys
 
 | Action            | Windows                  | macOS                   | Linux                |
@@ -140,7 +150,9 @@ Everything lives in Settings, and every hotkey is rebindable.
 | Dictate           | `Left Ctrl + Left Super` | `Option + Space`        | `Ctrl + Space`       |
 | Ask the assistant | `Left Ctrl + Left Alt`   | `Option + Ctrl + Space` | `Ctrl + Alt + Space` |
 
-Hold to talk, or tap `Space` while holding to keep recording hands-free. All shortcuts are configurable in Settings.
+Hold the shortcut to talk and release to type it out, or switch **Recording behavior** to Tap in Settings so one press starts and the next press stops. Tap is the hands-free option. The choice applies to every recording shortcut, and all shortcuts are rebindable.
+
+Every shortcut and its default, on all three platforms: [Keyboard shortcuts](https://www.speakoflow.com/docs/start/keyboard-shortcuts).
 
 ## Install
 
@@ -187,7 +199,7 @@ Security_) so SpeakoFlow can hear you and type into other apps.
 
 Because the app isn't Apple-signed yet, macOS blocks the first launch and needs
 one Terminal command to clear it. Full explanation below, or in the
-[install docs](https://www.speakoflow.com/docs).
+[install docs](https://www.speakoflow.com/docs/start/install#macos).
 
 <details>
 <summary><b>Why macOS says "SpeakoFlow is damaged", and the one-line fix</b></summary>
@@ -274,12 +286,12 @@ See [BUILD.md](BUILD.md) for platform-specific setup.
 
 Your voice is transcribed on your device and never uploaded. The assistant only contacts the model provider you choose, which can be a fully local one. There is no telemetry and no account. Optional features like web search and personal memory are off until you turn them on, and memory is stored on your device where you can view, edit, or erase it.
 
-Full detail on what is stored and where: [the privacy section of the docs](https://www.speakoflow.com/docs).
+Full detail on what is stored and where: [the privacy page](https://www.speakoflow.com/docs/reference/privacy).
 
 ## Troubleshooting
 
 Common issues are collapsed below. For anything not covered here, see
-[the documentation](https://www.speakoflow.com/docs) or
+[the troubleshooting docs](https://www.speakoflow.com/docs/reference/troubleshooting) or
 [open an issue](https://github.com/AbhishekBarali/SpeakoFlow/issues).
 
 <details>

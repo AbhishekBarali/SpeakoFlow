@@ -1,0 +1,200 @@
+{
+  "theme": "maple",
+  "name": "SpeakoFlow",
+  "description": "Documentation for SpeakoFlow, the free and open-source local voice layer for your desktop: dictation, Generate with Flow, AI cleanup, the assistant, screen vision, memory, profiles, settings, and shortcuts for Windows, macOS, and Linux.",
+  "colors": {
+    "primary": "#0A7A70",
+    "light": "#2DD4BF",
+    "dark": "#0D9488"
+  },
+  "fonts": {
+    "family": "Inter",
+    "heading": {
+      "family": "Manrope",
+      "weight": 700
+    }
+  },
+  "logo": {
+    "light": "/logo/lockup.svg",
+    "dark": "/logo/lockup-dark.svg",
+    "href": "https://www.speakoflow.com"
+  },
+  "favicon": "/favicon.png",
+  "appearance": {
+    "default": "system"
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "Download",
+        "href": "https://www.speakoflow.com"
+      }
+    ],
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/AbhishekBarali/SpeakoFlow"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/AbhishekBarali/SpeakoFlow",
+      "website": "https://www.speakoflow.com"
+    },
+    "links": [
+      {
+        "header": "SpeakoFlow",
+        "items": [
+          { "label": "Download", "href": "https://www.speakoflow.com" },
+          { "label": "Releases", "href": "https://github.com/AbhishekBarali/SpeakoFlow/releases" },
+          { "label": "Repository", "href": "https://github.com/AbhishekBarali/SpeakoFlow" }
+        ]
+      },
+      {
+        "header": "Help",
+        "items": [
+          { "label": "Troubleshooting", "href": "/docs/reference/troubleshooting" },
+          { "label": "Privacy", "href": "/docs/reference/privacy" },
+          { "label": "Report an issue", "href": "https://github.com/AbhishekBarali/SpeakoFlow/issues" }
+        ]
+      }
+    ]
+  },
+  "contextual": {
+    "options": ["copy", "view", "chatgpt", "claude", "cursor", "mcp"]
+  },
+  "metadata": {
+    "timestamp": true
+  },
+  "seo": {
+    "indexing": "navigable",
+    "metatags": {
+      "canonical": "https://www.speakoflow.com/docs",
+      "og:site_name": "SpeakoFlow Documentation",
+      "og:type": "website",
+      "og:url": "https://www.speakoflow.com/docs",
+      "twitter:card": "summary_large_image"
+    },
+    "organization": {
+      "name": "SpeakoFlow",
+      "url": "https://www.speakoflow.com",
+      "logo": "https://www.speakoflow.com/assets/img/logo/lockup.svg",
+      "sameAs": ["https://github.com/AbhishekBarali/SpeakoFlow"]
+    }
+  },
+  "search": {
+    "prompt": "Search the docs..."
+  },
+  "styling": {
+    "eyebrows": "breadcrumbs"
+  },
+  "redirects": [
+    { "source": "/dictation/translate", "destination": "/models/languages" },
+    { "source": "/dictation/spoken-emoji", "destination": "/dictation/text-replacements" },
+    { "source": "/assistant/brain", "destination": "/assistant/providers" },
+    { "source": "/assistant/appearance", "destination": "/assistant/panel" },
+    { "source": "/models/memory", "destination": "/models/acceleration" }
+  ],
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Guides",
+        "icon": "book-open",
+        "groups": [
+          {
+            "group": "Start here",
+            "pages": [
+              "index",
+              "start/install",
+              "start/getting-started",
+              "start/keyboard-shortcuts",
+              "start/how-it-works"
+            ]
+          },
+          {
+            "group": "Dictation",
+            "pages": [
+              "dictation/basics",
+              "dictation/hands-free",
+              "dictation/live-transcription",
+              "dictation/output",
+              "dictation/overlay"
+            ]
+          },
+          {
+            "group": "Writing with AI",
+            "pages": [
+              "writing/generate-with-flow",
+              "writing/ai-cleanup",
+              "writing/writing-styles"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Assistant",
+        "icon": "messages-square",
+        "groups": [
+          {
+            "group": "The basics",
+            "pages": [
+              "assistant/panel",
+              "assistant/providers",
+              "assistant/behavior"
+            ]
+          },
+          {
+            "group": "What it can do",
+            "pages": [
+              "assistant/screen-vision",
+              "assistant/web-search",
+              "assistant/voice-output"
+            ]
+          },
+          {
+            "group": "Make it yours",
+            "pages": [
+              "personalize/profiles",
+              "personalize/memory",
+              "personalize/history"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Reference",
+        "icon": "sliders-horizontal",
+        "groups": [
+          {
+            "group": "Accuracy",
+            "pages": [
+              "dictation/custom-words",
+              "dictation/text-replacements",
+              "models/languages"
+            ]
+          },
+          {
+            "group": "Models",
+            "pages": [
+              "models/transcription-models",
+              "models/acceleration",
+              "models/custom-models"
+            ]
+          },
+          {
+            "group": "Settings",
+            "pages": ["settings/general", "settings/debug", "settings/cli"]
+          },
+          {
+            "group": "Help",
+            "pages": [
+              "reference/troubleshooting",
+              "reference/privacy",
+              "reference/about"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
+

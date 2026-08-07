@@ -1,0 +1,85 @@
+---
+title: "Transcription models"
+description: "The full catalog of speech-to-text models SpeakoFlow can download and run locally, with size, language coverage, streaming, and translation for each. Also covers older models, downloads, and deleting models."
+icon: "microchip"
+---
+
+Every model runs on your machine. They trade accuracy for speed, so pick the one that fits your hardware and languages.
+
+Open the catalog from *Settings → Dictation → Change model*.
+
+## Recommended models
+
+These five run on SpeakoFlow's current engine, a native ggml/GGUF build. Sizes are the exact download.
+
+| Model | Size | Languages | Streams | Translates |
+| --- | --- | --- | --- | --- |
+| **Parakeet Unified EN 0.6B** (default) | 697 MB | English only | Yes | No |
+| **Nemotron Streaming 3.5** | 716 MB | 28 | Yes | No |
+| **Canary 180M Flash** | 208 MB | 4 | No | Yes |
+| **Cohere Transcribe** | 1.7 GB | 14 | No | No |
+| **Whisper Medium** | 793 MB | 99 | No | Yes |
+
+Pick **Parakeet Unified EN 0.6B** for fast everyday English, **Canary 180M Flash** on a weak machine, **Whisper Medium** for the widest language coverage, and **Cohere Transcribe** when accuracy matters more than speed. Canary covers English, German, Spanish, and French.
+
+Only catalog entries flagged `recommended` appear in this list. Everything else lives under **Older models**.
+
+<Note>
+  Streaming models can transcribe as you speak, which is what [live transcription](/dictation/live-transcription) needs. Everything else transcribes in one pass when you stop talking.
+</Note>
+
+## Managing models
+
+The catalog splits into **Downloaded models**, **Available to download**, and **Older models**. Your active model sorts first, then the recommended order.
+
+- **Search by name** to filter the list. Searching also reveals the older models.
+- **Filter by language** with the globe dropdown. It lists only models that claim support for the language you pick.
+- **Delete** a model to free disk space. You get a confirmation, and a stronger one if it is your active model.
+- **Switch from the tray.** The system tray menu has a model submenu, so you can change models without opening Settings.
+
+A brand-new install is seeded with **Parakeet Unified EN 0.6B**. If it is not on disk yet, SpeakoFlow falls back to any other transcription model you have downloaded, so the app is never stranded without a working model.
+
+<AccordionGroup>
+  <Accordion title="Older models: the full list">
+    These run on the previous engine (ONNX and whisper.cpp via transcribe-rs) rather than the current one. They are still fully supported and were never removed. They are just no longer the first suggestion.
+
+    - **Whisper Small, Medium, Turbo, Large.** Nearly 100 languages. Small, Medium, and Large translate to English. Turbo does not.
+    - **Parakeet V2** (English only) and **Parakeet V3** (25 languages, mostly European, plus Russian and Ukrainian).
+    - **Moonshine Base** and **Moonshine V2 Tiny, Small, Medium.** English only, extremely fast, good with accents. The V2 variants stream.
+    - **Canary 180M Flash** (English, German, Spanish, French) and **Canary 1B v2** (25 European languages). Both translate to English.
+    - **Cohere.** Large and slower, very accurate across 14 languages.
+    - **SenseVoice.** Chinese, English, Japanese, Korean, and Cantonese. Very fast.
+    - **GigaAM v3.** Russian only.
+    - **Breeze ASR.** Tuned for Taiwanese Mandarin with English code-switching.
+
+    The group stays folded so a first-timer only sees the recommended few. It opens automatically as soon as you type in the search box.
+  </Accordion>
+
+  <Accordion title="Downloads survive a bad connection">
+    Progress is written to a `.partial` file next to the model, and every retry resumes from where it stopped using an HTTP `Range` request. If the server ignores the range and sends the whole file again, SpeakoFlow notices and restarts cleanly rather than appending garbage.
+
+    Each source is retried up to four times with exponential backoff. A server error, a timeout, or a dropped connection is treated as worth retrying. A permanent client error such as a 404 is not, and moves straight on.
+
+    Cancelling keeps the partial file, so resuming later picks up where you left off.
+  </Accordion>
+
+  <Accordion title="Which downloads are checksum-verified">
+    Older-engine models ship with a SHA-256 checksum and are verified after download.
+
+    The current GGUF catalog carries no per-file hashes, so those models are **not** checksum-verified.
+  </Accordion>
+</AccordionGroup>
+
+<Tip>
+  If a download looks stuck at 0%, it is usually still negotiating the redirect to Hugging Face's CDN. Give it a few seconds before cancelling.
+</Tip>
+
+<CardGroup cols={2}>
+  <Card title="Languages and translation" icon="language" href="/models/languages">
+    Which model to pick for which languages.
+  </Card>
+
+  <Card title="Performance and memory" icon="bolt" href="/models/acceleration">
+    GPU acceleration, idle unloading, and context size.
+  </Card>
+</CardGroup>

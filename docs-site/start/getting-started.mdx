@@ -1,0 +1,59 @@
+---
+title: "Getting started"
+description: "A two-minute SpeakoFlow quickstart: grant microphone and accessibility permissions, pick a local speech-to-text model, optionally add a local assistant model, and dictate your first sentence."
+icon: "rocket"
+---
+
+[Install SpeakoFlow](/start/install), then run the setup wizard. It takes about two minutes.
+
+<Steps>
+  <Step title="Grant permissions" icon="lock">
+    The wizard opens with a permissions screen, which it does not count in its own step numbering. The screen skips itself if you have already granted them, and it does not appear on Linux.
+
+    - **Microphone** (macOS and Windows). So SpeakoFlow can hear you.
+    - **Accessibility** (macOS only). So it can type into your other apps.
+
+    Skip them and you'll be asked again the next time SpeakoFlow starts. See [Troubleshooting](/reference/troubleshooting) if a permission gets stuck.
+  </Step>
+
+  <Step title="Pick a voice model" icon="microphone">
+    This is the model that turns your voice into text, and it runs entirely on your machine. A fast English model or a real-time multilingual model are both good starting points.
+
+    The download runs in the background, so you don't wait here. You can switch models anytime in *Settings → Dictation*, and the full catalog is in [Transcription models](/models/transcription-models).
+  </Step>
+
+  <Step title="Give it a brain (optional)" icon="brain">
+    Download a local model for the assistant and AI cleanup, or choose *Skip for now*. Three Gemma 4 sizes are offered:
+
+    - **Quick** (E2B). Responds fastest, less capable on complex requests.
+    - **Balanced** (E4B, recommended). The best conversational quality-to-latency tradeoff.
+    - **Capable** (12B). More capable, but noticeably slower.
+
+    You can add or change this later in *Settings → Assistant*, including pointing at a local server or a cloud provider instead. See [Models and providers](/assistant/providers).
+  </Step>
+
+  <Step title="You're ready" icon="keyboard">
+    The last screen shows your two shortcuts as keycaps, plus a status line for anything still downloading. Your hotkeys are already live.
+  </Step>
+</Steps>
+
+## Say your first sentence
+
+Open any text field, hold your Dictate shortcut, and talk. Let go, and your words type themselves.
+
+| Action | Windows | macOS | Linux |
+| --- | --- | --- | --- |
+| Dictate | `Left Ctrl` + `Left Win` | `Option` + `Space` | `Ctrl` + `Space` |
+| Ask the assistant | `Left Ctrl` + `Left Alt` | `Option` + `Ctrl` + `Space` | `Ctrl` + `Alt` + `Space` |
+
+Every shortcut is rebindable in *Settings → General → Shortcuts*.
+
+<AccordionGroup>
+  <Accordion title="How the size badges are chosen, and what happens if a download fails">
+    The **Quick**, **Balanced**, and **Capable** labels are editorial. They are not inferred from your hardware.
+
+    Tapping a card starts the download and flips the footer straight to *Continue*, so you can move on while it finishes. The built-in assistant provider is only pointed at the model once the weights are actually on disk, so a failed or cancelled download can't leave the assistant set to a model you don't have.
+  </Accordion>
+</AccordionGroup>
+
+Next: [how SpeakoFlow works](/start/how-it-works).

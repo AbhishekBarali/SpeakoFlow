@@ -1,0 +1,62 @@
+---
+title: "Custom words"
+description: "Teach SpeakoFlow to spell names, products, and phrases your way so dictation stops writing \"Coco row\" when you say Kokoro. Covers where to add custom words and how to tune the correction threshold."
+icon: "book"
+---
+
+Teach SpeakoFlow to spell names, products, and phrases your way.
+
+Add them in *Settings → Dictation → Output options → Custom words*. Type a name, term, or short phrase and press Add. Add `Kokoro` if it keeps writing "Coco row."
+
+Entries are capped at 50 characters. The characters `<`, `>`, `"` and `'` are stripped, and duplicates are rejected regardless of case.
+
+## Two ways it gets applied
+
+Which mechanism you get depends on the engine behind your model.
+
+| Model family | How custom words are used |
+| --- | --- |
+| Whisper family | Sent as the decoder's initial prompt, biasing recognition while you speak. Nothing is rewritten afterward. |
+| Every other engine | A fuzzy correction pass over the finished transcript. |
+
+The Whisper route tends to be more accurate, because nothing has to be guessed after the fact.
+
+<Tip>
+  Custom words are strongest for non-Western names and specialized vocabulary. If you dictate Nepali, Indian, or other South Asian names often, pair a Whisper model with a custom-word list.
+</Tip>
+
+## Sensitivity
+
+*Settings → Debug → Word correction threshold. Range 0.0 to 1.0. Default: 0.18.*
+
+This is the highest score a fuzzy match may have and still be accepted, so **lower is stricter**. Raise it if a term you added is being ignored. Lower it if unrelated words are being replaced.
+
+The Debug section only appears once debug mode is on: `Ctrl+Shift+D`, or `Cmd+Shift+D` on macOS.
+
+<AccordionGroup>
+  <Accordion title="Why 0.18 is the default">
+    An over-eager threshold rewrites ordinary words into your custom vocabulary. That is far more annoying than an occasional miss, so the default is deliberately tight.
+  </Accordion>
+
+  <Accordion title="How the fuzzy pass decides on a match">
+    It combines Levenshtein edit distance with Soundex phonetic matching, and checks runs of one, two, and three words at a time. That is how "Charge B" becomes `ChargeBee`.
+
+    A candidate has to be within about 25% of the custom word's length before it is even considered, so `openai` cannot swallow "openaigpt".
+
+    The pass keeps what surrounds the match. The case pattern of the first word carries over (`HELLO` gives `WORLD`, `Hello` gives `World`), and leading or trailing punctuation is preserved.
+
+    A word containing `&` gets a second matching form with the ampersand spelled out, so `R&D` matches whether you say "R and D" or it comes back as "R&D".
+  </Accordion>
+
+  <Accordion title="Filler removal always runs, and has no setting">
+    Fillers such as "um", "uh", and "hmm" are stripped, and a word stuttered three or more times is collapsed to one.
+
+    The filler list is chosen from your app language, because some of those tokens are real words elsewhere. Portuguese "um" means "a" and Spanish "ha" means "has", so they are only treated as fillers in languages where they genuinely are.
+  </Accordion>
+
+  <Accordion title="What Generate with Flow adds">
+    When Generate with Flow is enabled, `SpeakoFlow` is added to the recognition list automatically.
+
+    The activation phrase itself is left out of the fuzzy pass on purpose. Correction runs over the whole transcript, and "Hey Flow" would rewrite ordinary speech like "hey flaw". Flow matches its own leading phrase separately.
+  </Accordion>
+</AccordionGroup>

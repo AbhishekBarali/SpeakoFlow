@@ -1,0 +1,56 @@
+---
+title: "About & license"
+description: "What SpeakoFlow's About section shows, where it keeps your data and logs, the current known limitations including Apple Silicon only builds and no Linux .rpm, the roadmap, and the MIT license and credits."
+icon: "circle-info"
+---
+
+*Settings → About* is the small housekeeping page.
+
+| Row | What it gives you |
+| --- | --- |
+| Version | The build you are running. |
+| Check for updates | A manual check, the same one the tray item runs. Disabled if you turned automatic update checks off in *Settings → General*, which are on by default. |
+| App language | The language of the SpeakoFlow interface. |
+| Source code, License | Links to the repository and the license file. |
+| Folders | Your app data folder (models, history, settings) and your log directory, each with a button to open it. |
+
+## Known limitations
+
+- **macOS builds are Apple Silicon only.** GitHub retired its Intel build machines in December 2025, so there is currently no way to produce and test an Intel build. Intel Mac users can build from source.
+- **There is no Linux `.rpm`.** The packaging does not bundle the speech engine correctly, and shipping an `.rpm` that installs but cannot transcribe would be worse than shipping none. Fedora and openSUSE users should use the AppImage.
+- **Builds are not code signed yet.** On macOS that means one Terminal command on first install. On Windows, SmartScreen may warn you the first time you run the installer.
+- **Unsigned builds cannot auto-update on macOS.** Updating means downloading the new `.dmg` and repeating the one-time command.
+
+<Note>
+  The release pipeline is already wired for signing. It needs the paid Apple Developer membership and a Windows certificate. Steps for the macOS command are in [Install](/start/install).
+</Note>
+
+## Roadmap
+
+- Code signing for Windows and macOS
+- A wider model catalog and more one-click local models
+- More community translations
+- Voice-to-text tuned for agentic coding
+- Prompt-engineering help: describe what you want to build and get a solid prompt back
+- Voice commands: trigger actions and complete tasks by voice
+
+## License and credits
+
+SpeakoFlow is open source under the **MIT License**.
+
+Its dictation core comes from [Handy](https://github.com/cjpais/Handy) by CJ Pais, used under the MIT license. The Whisper and Parakeet pipeline, VAD, overlay, and settings architecture all trace back to that project. Thanks to CJ for making it open.
+
+The assistant, screen vision, Generate with Flow, translation, text-to-speech, and memory layers are SpeakoFlow's own. Thanks also to [Tauri](https://tauri.app), whisper.cpp, llama.cpp, Silero VAD, and [Kokoro](https://github.com/hexgrad/kokoro).
+
+<AccordionGroup>
+  <Accordion title="Tech stack">
+    | Layer | What it uses |
+    | --- | --- |
+    | App | Tauri 2, with a Rust backend and a React and TypeScript frontend. |
+    | Speech-to-text | whisper.cpp and Parakeet with GPU acceleration, plus Silero VAD for voice detection. |
+    | Assistant | A built-in llama.cpp engine, or any OpenAI-compatible provider you configure. |
+    | Text-to-speech | Kokoro locally, with OpenAI-compatible, ElevenLabs, and Azure options. |
+  </Accordion>
+</AccordionGroup>
+
+Have an idea, or hit a bug not covered here? Open an [issue](https://github.com/AbhishekBarali/SpeakoFlow/issues) or browse the [repository](https://github.com/AbhishekBarali/SpeakoFlow).

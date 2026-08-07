@@ -1,0 +1,109 @@
+---
+title: "Performance and memory"
+description: "How SpeakoFlow uses your GPU for transcription and how long it keeps models in memory. Covers Metal, Vulkan, the ONNX backend setting, idle model unloading, the local assistant's context size, and keeping the microphone warm."
+icon: "bolt"
+---
+
+SpeakoFlow uses your GPU when it can and falls back to the CPU otherwise. The defaults pick the best available device on every platform, so you rarely need to change anything here.
+
+| Setting | Default | Where |
+| --- | --- | --- |
+| Whisper acceleration | `Auto` | *Settings → General → Experimental* |
+| ONNX acceleration | `Auto` | *Settings → General → Experimental* |
+| Unload model | `After 5 minutes` | *Settings → General → System* |
+| Always-on microphone | Off | *Settings → Dictation → Output* |
+
+| Platform | GPU backend used |
+| --- | --- |
+| macOS | Metal |
+| Windows | Vulkan, and DirectML for ONNX models |
+| Linux | Vulkan, with OpenBLAS for CPU math |
+
+## Whisper acceleration
+
+The acceleration controls sit under *Settings → General → Experimental*, so you have to turn **Experimental features** on to see them. Choosing a backend by hand is a diagnostic tool, not a tuning knob.
+
+One dropdown covers both the backend and the device. There is no separate GPU device dropdown. It lists `Auto`, then every compute device SpeakoFlow detected with its reported memory (for example `NVIDIA GeForce RTX 4070 (12.0 GB)`), then `CPU`.
+
+- **Auto** (default). Use the best available GPU, falling back to the CPU when there is none.
+- **A specific device**. Pin inference to that GPU. Useful when you want transcription off the GPU your game or render job is using.
+- **CPU**. Force strict CPU inference. Slower, but it sidesteps every driver problem.
+
+This setting drives both transcription engines.
+
+## Unload model
+
+*Never, Immediately, After 2 / 5 / 10 / 15 minutes, After 1 hour. Default: After 5 minutes.*
+
+Frees the memory the speech-to-text model is holding once it has been idle for this long. The model reloads automatically the next time you dictate, which costs a second or two on the first press.
+
+- **Never**. Keep the model resident. Fastest first word, highest idle memory.
+- **Immediately**. Unload after every transcription. Lowest idle memory, a reload cost on every single press.
+
+You can also unload on demand from the system tray menu, which is enabled only while a model is actually loaded.
+
+## The assistant's local model
+
+The built-in local engine has its own settings in *Settings → Assistant*. They apply only to the built-in provider. Ollama, LM Studio, and cloud providers manage their own memory.
+
+- **Unload timeout.** Same choices as above, also **After 5 minutes**. The engine is pre-warmed when you start a recording, so most reloads stay invisible.
+- **Context size.** How large a context window the local engine launches with, in tokens. Default **8192**, adjustable from 512 to 32768 in steps of 512.
+
+## Microphone warmth
+
+Two independent settings, both off by default.
+
+- **Always-on microphone**. In *Settings → Dictation → Output*. Keeps the microphone stream warm so the first words are never clipped by the moment it takes to open the device. Uses a little more battery, and on some systems keeps the microphone-in-use indicator lit.
+- **Keep mic open between transcriptions**. In *Settings → General → Experimental*. Leaves the audio stream open after a transcription finishes instead of closing it, which makes back-to-back dictation faster. It can affect Bluetooth audio quality, since the headset never gets to leave its microphone profile.
+
+The first warms the microphone up before recording. The second avoids tearing it down afterward. They can be used together.
+
+<AccordionGroup>
+  <Accordion title="ONNX acceleration: Auto, Cpu, Cuda, DirectMl, Rocm">
+    This applies only to the older-engine models that run on ONNX Runtime: Parakeet, Canary, Moonshine, SenseVoice, GigaAM, and Cohere. The dropdown is hidden entirely unless your build has more than one option compiled in, so most Linux and macOS users never see it.
+
+    **On Windows, `Auto` resolves to DirectML** when DirectML is compiled in, which it is in the official build. That is not what the underlying library does by default: its own "Auto" deliberately skips DirectML, which would silently pin every ONNX model to the CPU and make Parakeet feel inexplicably slow. SpeakoFlow overrides that. CPU remains the final fallback, so a machine without a DirectX 12 capable GPU still works.
+
+    On macOS and Linux the official builds compile no ONNX GPU provider at all, so ONNX models run on the CPU there regardless of this setting.
+  </Accordion>
+
+  <Accordion title="How Auto chooses between two GPUs">
+    A dedicated GPU always wins over an integrated one, even when the integrated one reports a larger shared-memory budget.
+
+    For the current ggml/GGUF engine, `Auto` and a specific GPU both resolve to an automatic backend with a guaranteed CPU fallback. Neither can leave you unable to transcribe on a machine with no usable GPU.
+  </Accordion>
+
+  <Accordion title="Checking what your machine can actually use">
+    Run the app from a terminal with `--list-devices`. It initializes the native engine, prints every compute device it can see with its memory, prints which backends (Vulkan, Metal, CPU) are actually available at runtime, and exits without opening a window.
+
+    That distinguishes "my GPU is not detected" from "the app is choosing not to use it".
+  </Accordion>
+
+  <Accordion title="Why Linux enumerates GPUs in a separate process">
+    On Linux only, SpeakoFlow enumerates compute devices by launching a short-lived copy of itself rather than doing it in-process. Windows and macOS keep the direct in-process call.
+
+    The vendored, statically linked whisper.cpp/ggml is compiled with ggml's default `-march=native`, meaning it targets the exact instruction set of the machine that built it. On Linux, packages are routinely built on one machine and run on another, so loading ggml's Vulkan backend on a CPU narrower than the build machine's can raise `SIGILL`. That is an illegal-instruction crash which cannot be caught and would take the whole app down at launch.
+
+    Running the probe in a child process turns "the app will not start" into "no GPU is listed". If the child crashes, hangs (it is killed after 30 seconds), or produces nothing parsable, SpeakoFlow logs a warning and carries on with CPU transcription.
+
+    There is a second, related guard on every platform. If your x86-64 CPU lacks FMA3 support, as some older Xeons do, GPU enumeration is skipped outright, because ggml's Vulkan backend uses FMA3 internally and GPU acceleration would not work there anyway.
+  </Accordion>
+
+  <Accordion title="Why five minutes, and the debug-only option">
+    Five minutes covers a normal working rhythm. Several dictations in a row keep the model warm, and the memory still comes back when you walk away.
+
+    With [debug mode](/settings/debug) on, an extra **After 15 seconds (Debug)** option appears. It exists to make reload behavior easy to test and is not meant for daily use.
+  </Accordion>
+
+  <Accordion title="Why context size defaults to 8192">
+    Context is the single biggest driver of how much memory the local engine holds, and the small models this feature targets do not need more. Raising it raises memory use even when your conversations are short.
+
+    A vision-capable model loads a second file, its multimodal projector, alongside the weights. Budget for more than the model size alone suggests.
+  </Accordion>
+
+  <Accordion title="Your detected hardware is shown, not enforced">
+    The assistant's model list shows what SpeakoFlow detected about your machine: your GPU and its memory, or your total system RAM when no GPU is found.
+
+    That is information to help you choose, not a filter. Nothing is hidden or blocked based on your hardware, so a model larger than your memory will still let you download it.
+  </Accordion>
+</AccordionGroup>

@@ -1,0 +1,53 @@
+---
+title: "How SpeakoFlow works"
+description: "The mental model behind SpeakoFlow: one hotkey layer over the app you are already in, a dictation pipeline that runs entirely on your machine, and an assistant you can run offline, on your own server, or in the cloud."
+icon: "diagram-project"
+---
+
+SpeakoFlow sits in your system tray and does nothing until you press a shortcut. You never switch to it to dictate. It is a layer over whatever app you are already in.
+
+Three jobs live under that layer.
+
+- **[Dictation](/dictation/basics)**. Local speech-to-text, typed into the active app.
+- **[Generate with Flow](/writing/generate-with-flow)**. Start a dictation with an activation phrase and the AI writes the finished result.
+- **[The assistant](/assistant/panel)**. A floating panel you summon to ask questions by voice or text.
+
+## The dictation pipeline
+
+<Steps>
+  <Step title="Your microphone" icon="microphone">
+    Audio is captured from the input device you picked in [General settings](/settings/general).
+  </Step>
+
+  <Step title="Voice-activity detection" icon="filter">
+    Silero VAD filters out silence, so pauses while you think don't become gaps in your text.
+  </Step>
+
+  <Step title="Speech-to-text, on your hardware" icon="microchip">
+    whisper.cpp or Parakeet runs the model on your GPU, or your CPU if no GPU is available. See [Acceleration & GPU](/models/acceleration).
+  </Step>
+
+  <Step title="Text into the active app" icon="clipboard">
+    Inserted via the clipboard or typed directly. See [Output & pasting](/dictation/output).
+  </Step>
+</Steps>
+
+Nothing in that chain touches the network.
+
+Two things can add a network hop after it, and both are opt-in: [AI cleanup](/writing/ai-cleanup) and [Generate with Flow](/writing/generate-with-flow). They hand the text to whichever model provider you configured, which may be the fully local built-in engine.
+
+## What the assistant does with a question
+
+An assistant turn is not a single request. The model gets a small set of tools, web search and the current date and time, and decides for itself whether it needs them. The loop is bounded, so a turn can't run away. With web search off, the tool isn't offered at all and the assistant answers from what it knows.
+
+[Screen vision](/assistant/screen-vision) works the same way. Nothing is captured unless you ask for it.
+
+## Where things run
+
+Speech-to-text is always local. The assistant is where you choose your comfort level, in *Settings → Assistant*.
+
+- **Built-in**. A small local model, fully on your machine. No key, no network.
+- **Local server**. Ollama or LM Studio on your own machine.
+- **Cloud**. Your own API key for any OpenAI-compatible provider.
+
+See [Models and providers](/assistant/providers) to set this up, and [Privacy](/reference/privacy) for exactly what is stored and where.

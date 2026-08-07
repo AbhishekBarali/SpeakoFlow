@@ -1,0 +1,47 @@
+---
+title: "Live vs. batch transcription"
+description: "Streaming models show your words in SpeakoFlow's overlay while you speak, but text is still inserted once after you stop. This page lists which transcription models stream and how the overlay style switches streaming on and off."
+icon: "tower-broadcast"
+---
+
+Live transcription changes what you **see**, not when text lands. The transcript is inserted into your app exactly once, after you stop recording.
+
+What streaming buys you is a running transcript in the overlay while you talk, plus a final insert that is close to instant because most of the work is already done.
+
+## Which models stream
+
+| Model | Streams |
+| --- | --- |
+| Parakeet Unified EN 0.6B (default, English only) | Yes |
+| Nemotron Streaming 3.5 (English) | Yes |
+| Moonshine V2 Tiny / Small / Medium (English only) | Yes |
+| Whisper, Canary, Cohere, Sense Voice, GigaAM, Breeze, non-streaming Parakeet | No |
+
+Streaming is capability-gated. The streaming worker only starts for a model that natively supports it, so it cannot be forced onto a model that would misbehave.
+
+Switching to a non-streaming model, Whisper Medium for its language coverage for example, moves you back to batch transcription automatically. See [Transcription models](/models/transcription-models) for the full catalog.
+
+## Turning it on and off
+
+There is no separate live transcription switch. It follows the overlay style in *Settings → General → Overlay*.
+
+- **Live**. Streaming on. On a model that cannot stream, the overlay falls back to the compact pill.
+- **Minimal** or **None**. Streaming off.
+
+Until you pick one, the setting sits in an `Auto` state that streams whenever the selected model supports it. `Auto` is the shipped default, which is why streaming already runs on a fresh install with the default model.
+
+## Good to know
+
+<AccordionGroup>
+  <Accordion title="Two shades of text in the overlay">
+    The running text renders in two shades. The committed prefix is solid, and a still-revisable tail is dimmed.
+
+    Not every engine reports a revisable tail, so on some models everything you see is already committed.
+  </Accordion>
+
+  <Accordion title="What happens if streaming fails">
+    If the streaming pass produces nothing, errors, or times out, SpeakoFlow falls back to transcribing the recorded audio in one batch. You never lose your words.
+  </Accordion>
+</AccordionGroup>
+
+See [The recording overlay](/dictation/overlay) for the full set of style and position options.
