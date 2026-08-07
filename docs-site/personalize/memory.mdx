@@ -6,37 +6,61 @@ icon: "note-sticky"
 
 Optional, on-device memory so the assistant learns how you like to work and remembers useful facts between chats. Off until you turn it on.
 
-Everything here is stored on your device and fully editable in *Settings → Memory*.
+Everything here is stored on your device and fully editable in *Settings → Assistant → Memory*.
 
 ## Remember me
 
 *Default: off.*
 
-Let the assistant keep and use a personal memory.
+Let the assistant keep and use a personal memory. With it off, nothing is stored and nothing is learned.
 
 ## Incognito chat
 
-For the current conversation, don't use memory and don't learn anything new.
+For the current conversation, don't use memory and don't learn anything new. It blocks both directions at once, so a private chat leaves no trace either way.
 
 ## Memory detail
 
-*Light, Balanced, Detailed.*
+*Light, **Balanced** (default), Detailed.*
 
-How much memory to add to each reply. More detail is richer but a little slower.
+A budget dial, not a quality dial. Each turn, memory is packed into a fixed character budget — roughly 150, 400, and 800 tokens respectively — so the cost of having memory on stays flat no matter how much you've accumulated. The summary is reserved first and whatever remains goes to notes, so Light has room for little beyond the summary, Balanced fits a few relevant notes, and Detailed fits more.
 
 ## What it stores
 
-- **About you** — a short, always-on summary the assistant keeps in mind (e.g. "Prefers short, direct answers. Works in Rust and TypeScript.").
+- **About you** — a short, always-on summary the assistant keeps in mind (e.g. "Prefers short, direct answers. Works in Rust and TypeScript."). Kept to a few sentences and included in every reply while memory is on.
 - **Notes** — specific things worth remembering, either learned from your chats or added by you. Each note shows a confidence level and whether it was learned or added by you.
+
+Notes are never all sent at once. For each message, SpeakoFlow scores every note by keyword overlap with what you just said and packs the best-matching ones into the remaining budget, filling any leftover space with your most recent high-confidence notes. That keeps the assistant feeling personal on small talk without paying for the whole store on every turn.
+
+## How learning works
+
+Learning never runs while you're waiting for a reply. Instead, one offline pass reads the finished conversation and extracts what's worth keeping. It runs when
+
+- you hide the assistant panel,
+- you clear the conversation, or
+- you click **Update memory** in *Settings → Assistant → Memory*.
+
+A conversation needs at least two of your own turns before it's worth a pass, and a pass only runs if the conversation grew since the last one — so opening and closing the panel repeatedly never burns a model call on unchanged content. The pass reuses your active assistant provider and model, which can be the fully offline built-in engine.
+
+The extractor is told to save only facts that are durable, actionable, and explicitly stated: stable preferences, tools and languages you use, ongoing projects, your role, recurring constraints. One-off details, the assistant's own words, and anything it had to guess at are left out.
 
 ## Managing memory
 
-- **Learn from this chat now** — pull durable facts from the current conversation into memory on demand. Otherwise, learning happens quietly at the end of a conversation.
-- **Export / Import** — back up or move your memory.
+- **Learn from this chat now** — the **Update memory** button pulls durable facts from the current conversation immediately, instead of waiting for it to end. It needs memory on, incognito off, and a conversation with at least two of your turns.
+- **Export / Import** — back up or move your memory as a readable JSON file. Imported memory replaces what's there and is filtered on the way in, so a hand-edited file can't smuggle anything past the guardrails.
 - **Wipe memory** — delete everything the assistant remembers.
 
+Every note is a plain text field you can edit or delete, and the summary has its own editor. Nothing is hidden from you.
+
+## Housekeeping
+
+Memory prunes itself so it stays useful rather than just large:
+
+- **Dedupe and merge** — a new fact that substantially overlaps an existing note updates that note instead of piling up beside it, taking the newer phrasing and the higher confidence. So "switched to Go" replaces "works in Rust" rather than contradicting it.
+- **Decay** — auto-learned, low-confidence notes that haven't been re-confirmed in about 45 days are forgotten. Notes you added yourself, and anything at medium or high confidence, never decay.
+- **Hard cap** — the store tops out at 80 notes, dropping the weakest (lowest confidence, then oldest) first.
+
 <Note>
-  **Safety by design.** Memory refuses to store secrets, passwords, and personal identifiers, and never lets remembered text override your current message. It's advisory only, stored on-device, and you can view, edit, or erase all of it. Learning runs off the hot path so it never slows a reply.
+  **Safety by design.** The same filter runs at capture, at consolidation, and on import: text mentioning passwords, keys, tokens, card or ID numbers, and similar secrets is refused outright, as is instruction-shaped text like "ignore previous instructions" or "always reply..." — memory is injected into the system prompt, so a stored instruction would be a prompt-injection foothold. What does get injected is wrapped in an explicit delimiter and labeled advisory: the model is told to use it only when relevant, never to let it override your current message, and not to repeat it back unless you ask.
 </Note>
 
 For short-term, per-conversation context instead, see [Behavior & memory](/assistant/behavior).

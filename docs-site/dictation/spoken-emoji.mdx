@@ -1,6 +1,6 @@
 ---
 title: "Spoken emoji"
-description: "Say the name of an emoji and SpeakoFlow inserts the emoji, handling common aliases and minor speech-to-text errors on your device."
+description: "Say the name of an emoji followed by the word \"emoji\" and SpeakoFlow inserts it, handling common aliases and minor speech-to-text errors entirely on your device. Off by default."
 icon: "face-smile"
 ---
 
@@ -8,7 +8,21 @@ Say the name of an emoji and get the emoji.
 
 ## Spoken emoji
 
-*Default: off.*
+*Settings → Dictation → Output options → Spoken emoji. Default: off.*
 
-Say "happy emoji" or "thumbs up emoji" to insert 😊 or 👍. Common aliases and minor speech-to-text errors are handled on your device; unknown names stay as plain text.
+Say "happy emoji" or "thumbs up emoji" to insert 😊 or 👍. The pass is fully local and deterministic — no model call, no network — and it's opt-in so the same words stay literal until you ask for this.
 
+## The grammar
+
+A command is a known emoji name followed by the word "emoji". Both parts are required:
+
+- **The name** can be one to five words, and longer names win over shorter ones — "broken heart emoji" gives 💔 rather than matching just "heart".
+- **The trailing "emoji" is mandatory.** That's what keeps ordinary words like "happy" or "fire" from silently turning into pictures, and it's why the feature can be on without surprising you mid-sentence.
+
+Both halves tolerate speech-to-text slips. The trailing keyword is accepted within one edit of "emoji", so "emojii" and "emoj" still work. Names are matched exactly first, then fuzzily — "smily", "thumps up" and "rokcet" all land — but fuzzy matching is skipped for names shorter than five characters, because short words are too easy to confuse ("bad" versus "sad"), and an ambiguous match is rejected rather than guessed.
+
+Anything it doesn't recognize is left exactly as transcribed, punctuation and spacing included.
+
+## Where it sits in the pipeline
+
+Emoji expansion runs **after** AI cleanup — so it works on plain dictation too, not just cleaned-up text — and **before** [text replacements](/dictation/text-replacements), which stay the final authority over your transcript.

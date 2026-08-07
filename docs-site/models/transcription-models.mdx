@@ -1,39 +1,65 @@
 ---
 title: "Transcription models"
-description: "Every speech-to-text model SpeakoFlow can run locally — Parakeet, Nemotron, Canary, Whisper, Moonshine, Cohere, SenseVoice, GigaAM, Breeze — and how to pick one for your hardware and languages."
+description: "Every speech-to-text model SpeakoFlow can download and run locally, from the recommended five to the older engine's full set, and how to pick one for your hardware and languages."
 icon: "microchip"
 ---
 
-The model is what turns your voice into text. Every model runs on your machine — they trade accuracy for speed, so pick the one that fits your hardware and languages. Manage them in *Settings → Dictation* and the model catalog.
+The model is what turns your voice into text. Every model runs on your machine — they trade accuracy for speed, so pick the one that fits your hardware and languages. Open the catalog from *Settings → Dictation → Change model*.
 
-## Current models
+## Recommended models
 
-| Model | Best for | Notes |
-| --- | --- | --- |
-| **Parakeet** (V2 / V3 / unified) | Fast everyday dictation | V2 English-only; V3 covers 25 European languages. Blazingly fast. |
-| **Nemotron streaming** | Real-time multilingual | Streams as you speak. 28 languages. |
-| **Canary** (180M Flash / 1B v2) | Speed + translation | 180M is tiny and instant; 1B covers 25 European languages. Both translate to English. |
-| **Whisper** (Small / Medium / Turbo / Large) | Broad multilingual accuracy | Medium supports nearly 100 languages. The most versatile family. |
-| **Moonshine** (Base / V2 Tiny·Small·Medium) | Ultra-fast English | English only; handles accents well. V2 variants stream. |
-| **Cohere** | Highest accuracy | Large and slower, but the most accurate. Many languages. |
-| **SenseVoice** | East Asian languages | Very fast. Chinese, English, Japanese, Korean, and Cantonese. |
-| **GigaAM v3** | Russian | Russian only. Fast and accurate. |
-| **Breeze ASR** | Taiwanese Mandarin | Tuned for Taiwanese Mandarin with English code-switching. |
+These five lead the catalog. They run on SpeakoFlow's current engine (a native ggml/GGUF build), and the sizes below are the exact download.
 
-<Note>
-  **Streaming models.** Nemotron streaming and the Moonshine V2 variants can transcribe as you speak. They're the right choice if you want [live transcription](/dictation/live-transcription).
-</Note>
+| Model | Size | Languages | Best for |
+| --- | --- | --- | --- |
+| **Parakeet Unified EN 0.6B** (default) | 697 MB | English only | Blazingly fast everyday dictation. Streams as you speak. |
+| **Nemotron Streaming 3.5** | 716 MB | 28 | Real-time multilingual dictation. Streams as you speak. |
+| **Canary 180M Flash** | 208 MB | 4 (English, German, Spanish, French) | Tiny and instant — runs well on any machine. Translates to English. |
+| **Cohere Transcribe** | 1.7 GB | 14 | The most accurate of the set, and the slowest. |
+| **Whisper Medium** | 793 MB | 99 | The widest language coverage. Translates to English. |
+
+A brand-new install is seeded with **Parakeet Unified EN 0.6B**. If it isn't on disk yet, SpeakoFlow falls back to any other transcription model you have downloaded, so the app is never stranded without a working model.
 
 <Note>
-  **Older models** run on the previous engine and are grouped separately in the catalog. They're still fully supported, but most people won't need them.
+  **Streaming models.** Parakeet Unified and Nemotron Streaming can transcribe as you speak, which is what [live transcription](/dictation/live-transcription) needs. Everything else transcribes in one pass when you stop talking.
 </Note>
+
+## Older models
+
+Below the recommended list is a collapsed **Older models** group. These run on the previous engine (ONNX and whisper.cpp via transcribe-rs) rather than the current one. They're still fully supported and were never removed — they're just no longer the first suggestion:
+
+- **Whisper Small / Medium / Turbo / Large** — nearly 100 languages. Small, Medium, and Large translate to English; Turbo does not.
+- **Parakeet V2** (English only) and **Parakeet V3** (25 languages — mostly European, plus Russian and Ukrainian).
+- **Moonshine Base** and **Moonshine V2 Tiny / Small / Medium** — English only, extremely fast, good with accents. The V2 variants stream.
+- **Canary 180M Flash** (English, German, Spanish, French) and **Canary 1B v2** (25 European languages). Both translate to English.
+- **Cohere** — large, slower, very accurate across 14 languages.
+- **SenseVoice** — Chinese, English, Japanese, Korean, and Cantonese. Very fast.
+- **GigaAM v3** — Russian only.
+- **Breeze ASR** — tuned for Taiwanese Mandarin with English code-switching.
+
+The group stays folded so a first-timer only sees the recommended few, and it opens automatically as soon as you type in the search box.
 
 ## Managing models
 
-- Browse **Downloaded models** and **Available to download** in the catalog.
-- Filter by **All**, **Multi-language**, **Translation**, or search by name.
-- Downloads resume automatically if interrupted, and retry on flaky connections.
-- Delete a model to free disk space; you'll be warned if it's your active model.
+The catalog splits into **Downloaded models**, **Available to download**, and **Older models**. Your active model sorts first, then the recommended order.
+
+- **Search by name** to filter the list. Searching also reveals the older models.
+- **Filter by language** with the globe dropdown — it lists only models that claim support for the language you pick.
+- **Delete** a model to free disk space. You'll get a confirmation, and a stronger one if it's your active model.
+- The system tray menu also has a model submenu, so you can switch between downloaded models without opening Settings.
+
+### Downloads that survive a bad connection
+
+Model files are large, and a half-finished download used to mean starting over. It doesn't:
+
+- Progress is written to a `.partial` file next to the model, and every retry resumes from where it stopped using an HTTP `Range` request. If the server ignores the range and sends the whole file again, SpeakoFlow notices and restarts cleanly rather than appending garbage.
+- Each source is retried up to four times with exponential backoff. A server error, a timeout, or a dropped connection is treated as worth retrying; a permanent client error like a 404 is not, and moves straight on.
+- Cancelling keeps the partial file, so resuming later picks up where you left off.
+- Older-engine models ship with a SHA-256 checksum and are verified after download. The current GGUF catalog carries no per-file hashes, so those are not checksum-verified.
+
+<Tip>
+  The download UI shows live speed and percentage. If a download looks stuck at 0%, it's usually still negotiating the redirect to Hugging Face's CDN — give it a few seconds before cancelling.
+</Tip>
 
 ## Related
 
@@ -47,7 +73,7 @@ The model is what turns your voice into text. Every model runs on your machine �
   </Card>
 
   <Card title="Custom models" icon="box" href="/models/custom-models">
-    Pull GGUF models straight from Hugging Face.
+    Pull GGUF assistant models straight from Hugging Face.
   </Card>
 
   <Card title="Memory & the microphone" icon="memory" href="/models/memory">

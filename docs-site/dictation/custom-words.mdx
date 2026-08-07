@@ -1,15 +1,41 @@
 ---
 title: "Custom words"
-description: "Teach SpeakoFlow to spell names, products, and phrases your way, so the model stops writing \"Coco row\" when you say Kokoro."
+description: "Teach SpeakoFlow to spell names, products, and phrases your way, so the model stops writing \"Coco row\" when you say Kokoro. How the correction works, and how to tune its sensitivity."
 icon: "book"
 ---
 
 Teach SpeakoFlow to spell names, products, and phrases your way.
 
-Add names, terms, or short phrases that the model tends to get wrong, and SpeakoFlow will correct them in your transcripts. For example, add `Kokoro` if it keeps writing "Coco row."
+Add them in *Settings → Dictation → Output options → Custom words*. Type a name, term, or short phrase and press Add. For example, add `Kokoro` if it keeps writing "Coco row."
+
+Entries are capped at 50 characters, `<`, `>`, `"` and `'` are stripped, and duplicates are rejected regardless of case.
+
+## How the correction works
+
+There are two mechanisms, and which one you get depends on the engine behind your model:
+
+- **Whisper-family models** receive your list as the decoder's initial prompt. That biases recognition toward those spellings while you're being transcribed, so nothing gets rewritten afterwards.
+- **Every other engine** gets a fuzzy correction pass over the finished transcript. It combines Levenshtein edit distance with Soundex phonetic matching, and checks runs of one, two, and three words at a time — which is how "Charge B" becomes `ChargeBee`.
+
+The fuzzy pass is deliberately conservative. A candidate has to be within about 25% of the custom word's length before it's even considered, so `openai` can't swallow "openaigpt". It also keeps what surrounds the match: the case pattern of the first word carries over (`HELLO` → `WORLD`, `Hello` → `World`), and leading or trailing punctuation is preserved.
+
+A word containing `&` gets a second matching form with the ampersand spelled out, so `R&D` matches whether you say "R and D" or it comes back as "R&D".
 
 <Tip>
   Custom words shine for non-Western names and specialized vocabulary — great for names from Nepali, Indian, and other languages that generic models spell phonetically. Pair them with a strong multilingual model like Whisper for the best results.
 </Tip>
 
-The sensitivity of custom-word correction can be tuned with the [word correction threshold](/settings/debug) in Debug settings.
+## Sensitivity
+
+*Settings → Debug → Word correction threshold. Range 0.0–1.0, default 0.18.*
+
+This is the maximum score a fuzzy match may have and still be accepted, so **lower is stricter**. The 0.18 default is tight on purpose: an over-eager threshold rewrites ordinary words into your custom vocabulary, which is far more annoying than an occasional miss. Raise it if a term you added is being ignored; lower it if unrelated words are being replaced.
+
+The Debug section only appears once debug mode is on — `Ctrl+Shift+D`, or `Cmd+Shift+D` on macOS.
+
+## Related passes
+
+Two other things happen to your transcript that aren't controlled here:
+
+- **Filler removal** always runs. It strips fillers ("um", "uh", "hmm" and friends) and collapses a word stuttered three or more times down to one. The list is chosen from your app language, because some of those tokens are real words elsewhere — Portuguese "um" means "a", Spanish "ha" means "has" — so they're only treated as fillers in languages where they genuinely are. There's no control for this in Settings.
+- **Generate with Flow**, when enabled, adds `SpeakoFlow` to the recognition list automatically. The activation phrase itself is deliberately left out of the fuzzy pass, because correction runs over the whole transcript and "Hey Flow" would rewrite ordinary speech like "hey flaw". Flow matches its own leading phrase separately.

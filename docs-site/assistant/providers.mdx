@@ -1,48 +1,79 @@
 ---
 title: "Providers & keys"
-description: "SpeakoFlow speaks the OpenAI-compatible API, so it works with OpenAI, Anthropic, Azure OpenAI, OpenRouter, custom endpoints, and local servers like Ollama and LM Studio."
+description: "SpeakoFlow speaks the OpenAI-compatible API, so the assistant works with OpenAI, Anthropic, Gemini, Groq, OpenRouter, Azure, and local servers like Ollama and LM Studio."
 icon: "key"
 ---
 
-For cloud or local-server brains, SpeakoFlow speaks the OpenAI-compatible API, so it works with most providers.
+For cloud or local-server brains, SpeakoFlow speaks the OpenAI-compatible API, so it works with most providers. Pick one in *Settings → Assistant → Assistant brain*.
 
 ## Supported providers
 
-OpenAI, Anthropic, Azure OpenAI, OpenRouter, any custom OpenAI-compatible endpoint, and local servers like Ollama or LM Studio. Provider quirks are handled for you — Anthropic's `x-api-key`, Azure's `api-key` and base-URL normalization, and OpenRouter's headers.
+Every provider below is preconfigured — you choose it from a list and enter a key. The built-in local engine is pinned to the top of that list, because it's the only option that needs no key at all.
 
-### Provider
+**No key needed.** These three point at something you run yourself:
 
-*OpenAI, Anthropic, Azure, OpenRouter, Custom, Local.*
+| Provider | Notes |
+| --- | --- |
+| **Built-in (Local)** | The bundled llama.cpp engine on a loopback port. See [Brain](/assistant/brain). |
+| **Local (Ollama / LM Studio)** | Base URL editable; defaults to `http://localhost:11434/v1`. |
+| **Custom** | Any other OpenAI-compatible endpoint. Base URL editable. |
 
-The provider that answers assistant questions.
+**Bring your own key.** OpenAI, Anthropic, Google Gemini, OpenRouter, Groq, Cerebras, xAI (Grok), DeepSeek, Mistral, Moonshot (Kimi), Z.AI, Together AI, Fireworks AI, Perplexity, AWS Bedrock (Mantle), and Azure OpenAI. Three of them have quirks worth knowing:
+
+| Provider | Worth knowing |
+| --- | --- |
+| **OpenRouter** | The only provider with built-in [web search](/assistant/web-search). |
+| **Azure OpenAI** | Base URL is editable, and the "model" is your deployment name. |
+| **Perplexity** | No model-list endpoint, so *Load models* does nothing — type the model name. |
+
+<Note>
+  Apple Intelligence appears in the provider list for [AI cleanup](/writing/ai-cleanup) on Apple Silicon Macs, but not for the assistant — the on-device Foundation model doesn't back a streaming chat turn here, so it's filtered out of the assistant's picker on purpose.
+</Note>
 
 ### Base URL
 
-The OpenAI-compatible base URL. Editable for Custom, Local, and Azure. Azure URLs are normalized automatically (e.g. to `/openai/v1`). For a local server, point it at your machine, e.g. `http://localhost:11434/v1`.
+Editable for **Custom**, **Local**, and **Azure OpenAI** only. Everything else is fixed, so there's nothing to get wrong.
+
+For a local server, point it at your machine, e.g. `http://localhost:11434/v1` for Ollama or `http://localhost:1234/v1` for LM Studio.
 
 ### API key
 
-The key for the selected provider, stored securely in your OS keychain. Shared with [AI cleanup](/writing/ai-cleanup), since both use the same chat client.
+The key for the selected provider, stored in your OS keychain rather than a settings file. Each provider keeps its own key, so switching providers doesn't lose the one you already entered. Shared with [AI cleanup](/writing/ai-cleanup), since both features use the same chat client.
 
 ### Model
 
-The model or deployment name to use for answers, e.g. `gpt-5-mini`. Load the provider's model list, or type a name directly.
+The model or deployment name used for answers. Click *Load models* to fetch the provider's list, or type any name directly — the picker accepts values that aren't in the list.
+
+<AccordionGroup>
+  <Accordion title="Provider quirks SpeakoFlow handles for you" icon="plug">
+    - **Anthropic** — authenticated with the native `x-api-key` header plus `anthropic-version`, which works on both the OpenAI-compatible layer and the classic API.
+    - **Azure OpenAI** — whatever you paste from the portal is normalized to the v1 surface `https://{host}/openai/v1`, so a bare resource URL or an AI Foundry project endpoint both work instead of 404ing on a missing path. The key is sent as both `Authorization: Bearer` and the `api-key` header, since gateways differ on which they honor. Requests use HTTP/1.1 and a smaller image budget, because Azure's gateway truncates large bodies.
+    - **OpenRouter** — sends `HTTP-Referer` and `X-Title` for app attribution.
+    - **Built-in local engine** — Gemma-style chat templates reject a `system` role, so the system prompt is folded into the first user message. Thinking is disabled in the template so a small model spends its tokens on the answer.
+  </Accordion>
+</AccordionGroup>
 
 ## Local model tuning
 
+These two only appear for the built-in local engine. External providers, including Ollama and LM Studio, manage their own context and memory.
+
 ### Context window
 
-*Default: 8192.*
+*Default: 8192. Range 512–32768.*
 
-How much the local model can keep in mind at once — the system instructions, your chat history, any screenshot (a single image can eat a big chunk), and its reply. Bigger holds more and keeps screen vision and web search reliable, but uses more memory. **16384** is a good step up if your machine has the RAM; you can lower it later to save memory.
+How much the local model can keep in mind at once — the system instructions, your chat history, any screenshot (a single image can eat a big chunk), and its reply. Bigger holds more and keeps screen vision and web search reliable, but uses more memory. **16384** is a good step up if your machine has the RAM; you can lower it later to save memory. Applied when the engine starts.
 
 ### Unload from memory after
 
-Free memory by unloading the local model after it's been idle this long. It reloads automatically on next use.
+*Default: 5 minutes.*
 
-### System prompt
+Frees RAM and VRAM by unloading the local model after it's been idle this long, and it reloads automatically on next use. Five minutes keeps it warm through a working session while not holding memory overnight. Other options run from *Immediately* to *1 hour*, or *Never*.
 
-Sets the assistant's baseline behavior. Profiles can override this per-persona (see [Profiles](/personalize/profiles)).
+## System prompt
+
+Sets the assistant's baseline behavior, in *Settings → Assistant → System prompt*. The default tells the model it's hearing transcribed speech, so it should expect the occasional mis-hear and infer intent, keep answers concise, and use plain text that reads well in a small panel.
+
+Individual [profiles](/personalize/profiles) override it entirely for their own turns, so the system prompt is really the fallback persona rather than a global preamble.
 
 <Note>
   API keys live in your operating system's keychain, not in a plain settings file. The assistant only ever contacts the provider you choose — which can be a fully local one. See [Privacy](/reference/privacy).

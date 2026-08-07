@@ -1,60 +1,55 @@
 ---
 title: "General settings"
-description: "Shortcuts, microphone, sounds, startup, tray, and appearance — everything in the SpeakoFlow General settings section, grouped as you'll find it in the app."
+description: "Shortcuts, microphone, sounds, the overlay, startup and tray behavior, appearance, and the experimental toggles — everything in the SpeakoFlow General settings section, grouped as you'll find it in the app."
 icon: "gear"
 ---
 
-Shortcuts, your microphone, sounds, startup, and how the app looks. Everything in the *General* section, grouped as you'll find it.
+Shortcuts, your microphone, sounds, the overlay, startup, and how the app looks. Everything in the *General* section, grouped as you'll find it.
 
 <Frame caption="The main Settings window — General section.">
   <img src="https://www.speakoflow.com/general-dark.png" alt="The SpeakoFlow Settings window open to the General section, shown in dark mode, with Recording, Appearance, Sounds, and Overlay groups." />
 </Frame>
 
-## Appearance
+## Recording
 
-### Theme
+### Dictate
 
-*Light, Dark, System.*
+The shortcut that starts and stops dictation. See [Keyboard shortcuts](/start/keyboard-shortcuts) for every binding and its per-platform default.
 
-A theme for the app and the assistant panel.
+### Cancel
 
-### Text size
-
-*Small, Default, Large, Extra large.*
-
-Scale text and controls across the app.
-
-### App language
-
-Change the language of the SpeakoFlow interface. This is separate from your speech-recognition language.
-
-## Recording & input
-
-### Shortcuts
-
-The keyboard shortcuts that start and stop recording and open the assistant. See [Keyboard shortcuts](/start/keyboard-shortcuts) for the full list and defaults.
+A shortcut that stops the current recording, or interrupts an assistant reply that's still streaming. **It has no default binding** — a global cancel key would swallow presses meant for other apps, so you record one yourself if you want it. This row is hidden on Linux, where rebinding shortcuts at runtime is unstable enough that it's not worth offering.
 
 ### Recording behavior
 
 *Hold, Tap. Default: Hold.*
 
-**Hold** records while the shortcut is pressed; **Tap** starts with one press and stops with the next.
+- **Hold** (default) — records while the Dictate shortcut is held down.
+- **Tap** — one press starts recording, the next stops it.
 
-### Tap to lock
-
-*Default: Space.*
-
-The key you tap mid-hold to go hands-free. See [Hands-free & tap-to-lock](/dictation/hands-free).
-
-### Language
-
-*Auto, specific language. Default: Auto.*
-
-Speech-recognition language. A specific language can improve accuracy. See [Languages & accents](/models/languages).
+This one setting governs every recording shortcut, including the assistant. For hands-free recording, **Tap** is the route — see [Hands-free recording](/dictation/hands-free).
 
 ### Microphone
 
-Select your preferred microphone device.
+Which input device to record from. Leave it on the system default unless you have a specific microphone you always want used.
+
+## Appearance
+
+### Theme
+
+*Light, Dark, System. Default: Light.*
+
+A theme for the app and the assistant panel. **Light is the default**, which is unusual for a developer tool and deliberate: the light palette is the tuned, higher-contrast "native settings" look, and system-dark can land on a duller read for some people. Dark and System are one click away.
+
+Changing this also repaints the native window frame to match, so the title bar doesn't stay dark while the interface goes light.
+
+### Text size
+
+*Small, Default, Large, Extra large. Default: Default.*
+
+Scales text and controls across the app. It's applied as a webview zoom factor — 0.9, 1.0, 1.1, and 1.2 respectively — so everything scales together rather than only the type. It takes effect immediately, with no restart.
+
+Only the main Settings window scales. The recording overlay and the floating assistant panel have their own purpose-built sizing and are unaffected.
 
 ## Sounds
 
@@ -62,39 +57,147 @@ Select your preferred microphone device.
 
 *Default: off.*
 
-Play a sound when recording starts and stops.
+Play a sound when recording starts and stops. The rest of this group is disabled until you turn it on.
 
 ### Feedback sound
 
-*Default, Marimba, Pop, Click, more.*
+*Default, Marimba, Pop, Click. Default: Default.*
 
-Choose the start/stop cue — several themes are bundled, with a preview button.
+The start/stop cue. The play button next to the dropdown previews it — it plays the start sound, then the stop sound, so you hear the pair.
+
+A fifth option, **Custom**, appears only once both `custom_start.wav` and `custom_stop.wav` exist in SpeakoFlow's app data folder. There's no file picker for this; you drop the files in yourself. The path is shown under *Settings → About → Folders*.
+
+A sixth sound ships alongside the themes: a theme-independent lock cue, shared by every theme. You won't hear it in the current build, because the tap-to-lock gesture it belongs to isn't active — see [Keyboard shortcuts](/start/keyboard-shortcuts).
 
 ### Output device
 
-Which device plays feedback sounds.
+Which device plays feedback sounds. Independent of your system default, so you can keep the cues in your headset while audio plays through speakers.
 
 ### Volume
 
-Adjust the volume of audio feedback sounds.
+*Default: 100%.*
 
-## Startup & tray
+The volume of feedback sounds only. It doesn't affect the assistant's spoken replies.
+
+### Mute while recording
+
+*Default: off.*
+
+Mutes system audio while you're recording so playback doesn't bleed into your dictation.
+
+## Overlay
+
+### Overlay
+
+*None, Minimal, Live. Default: automatic.*
+
+How the recording overlay looks while you dictate. The stored default is "auto", which follows your model: **Live** when the active model supports live streaming, **Minimal** otherwise. Picking any option here overrides that permanently.
+
+- **None** — no overlay at all.
+- **Minimal** — the compact pill.
+- **Live** — a readable card showing your words as you speak. Only honored for models that can stream; on any other model it falls back to Minimal even if you select it, because there'd be no running text to fill the card.
+
+### Overlay position
+
+*None, Top, Bottom. Default: Bottom, except None on Linux.*
+
+Where the overlay sits. It defaults to **None on Linux** because a Linux compositor may not let the overlay float above other windows at all — see [Troubleshooting](/reference/troubleshooting) for the detail on that.
+
+More on both settings in [The recording overlay](/dictation/overlay).
+
+## Startup and tray
 
 ### Launch on startup
+
+*Default: off.*
 
 Open SpeakoFlow automatically when you sign in.
 
 ### Start hidden
 
-Launch to the tray without opening the window.
+*Default: off.*
+
+Launch straight to the tray without opening the window. If the tray icon is also turned off, SpeakoFlow shows the window anyway — without a tray icon there'd be no way back in.
 
 ### Show tray icon
 
-Keep SpeakoFlow in your system tray. The tray menu offers Home, Check for updates, Copy last transcript, Unload model, and Quit.
+*Default: on.*
 
-## Updates
+Keep SpeakoFlow in the system tray or menu bar. The menu holds the version, **Copy last transcript**, a submenu listing your downloaded models so you can switch the active one, **Unload model** (enabled only while a model is loaded), **Home**, **Check for updates**, and **Quit**. While a recording or transcription is in progress, the menu shows **Cancel** instead of the model items.
+
+### Quit when I close the window
+
+*Default: off.*
+
+Off means closing the window hides it to the tray and SpeakoFlow keeps running, so your global hotkeys still work. On means closing the window quits the app completely. This was added for people who genuinely don't want a background process, and defaults to off so the long-standing behavior is unchanged for everyone else.
 
 ### Check for updates
 
-Let SpeakoFlow check for new versions and offer to download them. Turn off to disable automatic checks.
+*Default: on.*
 
+Let SpeakoFlow check for new versions and offer to download them. Turning it off also disables the tray menu's **Check for updates** item and the manual button on the About page.
+
+## System
+
+### Unload model
+
+*Never, Immediately, After 2 / 5 / 10 / 15 minutes, After 1 hour. Default: After 5 minutes.*
+
+Frees the memory the speech-to-text model is holding once it's been idle this long. Covered in full on [Memory & the microphone](/models/memory).
+
+### Experimental features
+
+*Default: off.*
+
+Reveals in-development features rather than enabling them. With it off, the Experimental group below doesn't exist and the acceleration, keyboard-backend, and lazy-stream settings are simply not reachable. Turning it on doesn't change any behavior by itself.
+
+## Experimental
+
+This group only appears when **Experimental features** is on.
+
+### Keyboard implementation
+
+*Tauri Global Shortcut, SpeakoFlow Keys. Default: Tauri on Linux, SpeakoFlow Keys elsewhere.*
+
+Which backend listens for global shortcuts.
+
+- **SpeakoFlow Keys** — reads input devices directly, which is what makes modifier-only combos like `Left Ctrl` + `Left Win` possible. That's why it's the default on Windows and macOS, where the default dictation shortcut *is* a modifier-only combo.
+- **Tauri Global Shortcut** — uses the OS/compositor's own global-shortcut API. It needs no special permissions, which is why it's the Linux default: SpeakoFlow Keys reads `/dev/input/event*` and requires your user to be in the `input` group.
+
+Switching backends can invalidate shortcuts the new backend can't express. When that happens the affected bindings are reset to their defaults and you get a warning telling you so.
+
+### Whisper acceleration and ONNX acceleration
+
+Which compute device transcription runs on. See [Acceleration & GPU](/models/acceleration).
+
+### Keep mic open between transcriptions
+
+*Default: off.*
+
+Leaves the audio stream open after a transcription for faster back-to-back dictation. May affect Bluetooth audio quality. See [Memory & the microphone](/models/memory).
+
+## Things that aren't in this section
+
+- **App language** — the language of the SpeakoFlow interface (separate from your speech-recognition language) is under *Settings → About*.
+- **Speech-recognition language** and **Translate to English** are under *Settings → Dictation*, next to the active model. See [Languages & accents](/models/languages).
+- **Log level** and the other diagnostics live in the hidden Debug section. See [Debug & advanced](/settings/debug).
+
+## Window size
+
+SpeakoFlow remembers how big you left the main window and reopens it that way. Only the **size** is remembered, never the position — that way the window can't reopen off-screen after you unplug a monitor. The remembered size is clamped to your current display and re-centered on launch, so a size saved on a large screen still fits a small one. It's saved when you close or hide the window, not continuously while you drag, so resizing doesn't churn your settings file.
+
+## Portable mode
+
+SpeakoFlow can keep everything — settings, models, recordings, history, and logs — next to the executable instead of in your user profile. Useful on a USB stick or a locked-down machine.
+
+<Steps>
+  <Step title="Create a marker file">
+    In the same folder as the SpeakoFlow executable, create a file named `portable` (no extension) containing the line `SpeakoFlow Portable Mode`.
+  </Step>
+
+  <Step title="Launch SpeakoFlow">
+    On startup it detects the marker, creates a `Data/` folder beside the executable, and stores everything there. Logs go to `Data/logs`.
+  </Step>
+</Steps>
+
+An empty `portable` file is **not** enough — the magic string has to be there. That's intentional: some package managers create stray empty files, and an empty marker used to silently relocate a normal install's data. The one exception is an existing portable install: if an empty marker sits next to an existing `Data/` folder, SpeakoFlow treats it as a real portable install and repairs the marker in place. Markers written under the project's old "Handy" branding also still work.

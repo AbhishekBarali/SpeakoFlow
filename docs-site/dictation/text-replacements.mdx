@@ -1,43 +1,57 @@
 ---
 title: "Text replacements"
-description: "Map a spoken phrase to text you use often, with regex matching, trimming, capitalization, and magic tokens like [date] and [time]."
+description: "Map a spoken phrase to text you use often, with optional regex matching, whitespace trimming, capitalization, and magic tokens like [date] and [time]. Off by default."
 icon: "right-left"
 ---
 
 Swap a phrase you say for text you use often — like turning "my email" into your actual address.
 
-Create rules that map a spoken phrase to inserted text. Say "my email" and SpeakoFlow inserts `alex@example.com`. Rules are managed in *Settings → Dictation* (Advanced → Text replacements) and can be imported and exported as a list.
+Rules live in *Settings → Dictation → Output options → Text replacements*, behind a master toggle that is **off by default**. Turn it on and the rule list appears; the whole list can be exported to and imported from a JSON file.
 
-## Each rule has
+The pass is fully local and deterministic — no model involved. It complements AI cleanup rather than duplicating it.
 
-### Spoken phrase
+## Each rule
 
-What SpeakoFlow hears, for example "my email".
+The two fields on the row itself:
 
-### Insert this text
+- **Spoken phrase** — what to look for in the transcript, e.g. `my email`.
+- **Insert this text** — what to put there instead, e.g. `alex@example.com`.
 
-What it types instead.
+Behind the chevron:
 
-### Enabled
+- **Regex** — treat the spoken phrase as a regular expression instead of a literal string.
+- **Trim before** — also consume whitespace immediately before each match.
+- **Trim after** — also consume whitespace immediately after each match.
+- **Caps** — *None* (default), *UPPERCASE*, *lowercase*, or *Capitalize*, applied to this rule's output.
+- **Enabled** — on by default. Turn it off to park a rule without deleting it.
 
-Toggle a rule on or off without deleting it.
+## Magic tokens
 
-## Advanced options
+Use these inside the inserted text:
 
-### Regex
+| Token | Expands to |
+| --- | --- |
+| `[date]` | Today's local date as `YYYY-MM-DD` |
+| `[time]` | The current local time as `HH:MM` |
+| `[uppercase]` | UPPERCASES the whole rule output (alias: `[upper]`) |
+| `[lowercase]` | lowercases the whole rule output (alias: `[lower]`) |
+| `[capitalize]` | Capitalizes the first character of the output |
+| `[nospace]` | Strips all whitespace from the output |
 
-Match with a regular expression instead of a literal phrase.
+The transform tokens act on the entire rule output no matter where you put them, and they're removed from the result. If a token and the **Caps** dropdown disagree, Caps is applied last and wins.
 
-### Trim before / Trim after
+## What to expect
 
-Remove surrounding whitespace around the match.
+- **Rules run in order**, so a later rule sees the output of earlier ones.
+- **Literal matching is case-sensitive.** `my email` won't match "My email". Tick **Regex** and start the pattern with `(?i)` for a case-insensitive match.
+- **`$` is literal in the inserted text**, which means regex capture groups (`$1`) can't be referenced. Regex is for matching, not for templating.
+- **An invalid regex is skipped**, with a warning in the log. It won't break the rest of your rules.
+- **Empty spoken phrases are skipped**, so a half-finished rule is harmless.
 
-### Caps
+## Where it sits in the pipeline
 
-*None, UPPERCASE, lowercase, Capitalize.*
-
-Force the inserted text into a specific case.
+Replacements run **after** AI cleanup and after spoken-emoji expansion, and last before the text is inserted. That ordering is deliberate: hand-written, deterministic fix-ups should always win over whatever the model produced.
 
 <Note>
-  **Magic tokens.** Use `[date]`, `[time]`, `[uppercase]`, `[lowercase]`, `[capitalize]`, or `[nospace]` inside the inserted text for dynamic values and formatting.
+  Importing a file only accepts the fields listed above; anything else in the JSON is dropped. An imported rule can never turn on a capability that isn't already a per-rule option.
 </Note>

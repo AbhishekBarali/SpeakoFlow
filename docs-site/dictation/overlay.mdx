@@ -1,27 +1,59 @@
 ---
 title: "The recording overlay"
-description: "The small on-screen indicator that shows SpeakoFlow is listening, its style and position options, and the Linux compositor caveat on GNOME/Wayland."
+description: "The small on-screen indicator that shows SpeakoFlow is listening. Its style and position options, what each state means, and why it is hidden by default on Linux."
 icon: "window-maximize"
 ---
 
-A small on-screen indicator that shows SpeakoFlow is listening, so you're never guessing whether it heard you.
+A small on-screen indicator that shows SpeakoFlow is listening, so you're never guessing whether it heard you. It appears on the monitor your mouse cursor is on, and is re-centered for whichever size the current state needs before it's shown, so it never flashes in the wrong place.
 
 ## Overlay style
 
-Set in *Settings → General → Overlay*. Controls how the recording overlay looks while you dictate:
+*Settings → General → Overlay → Overlay.*
 
 - **None** — hides the overlay entirely.
-- **Minimal** — a compact pill that shows recording state.
-- **Live** — a readable card that shows your words as you speak (for models that support it).
+- **Minimal** — the compact pill: a waveform while you speak, a spinner while it works.
+- **Live** — an enlarged, readable card (400 × 120) showing the running transcript.
+
+Out of the box the setting is neither of the three: it starts in an **Auto** state that follows the model — Live when the selected model supports streaming transcription, Minimal when it doesn't. That's why a fresh install gets the live card without you configuring anything. Auto isn't offered in the dropdown; the dropdown shows you which option Auto currently resolves to, and picking anything writes a concrete value that overrides Auto from then on.
+
+**Live** is only honored on a model that natively streams. On any other model it degrades to **Minimal**, so a batch model never shows an empty live window even if Live was explicitly chosen. Choosing **Live** also switches streaming transcription on, and **Minimal** or **None** switches it back off. See [Live vs. batch transcription](/dictation/live-transcription).
+
+<Note>
+  This one style setting governs the overlay for assistant voice turns too. A separate assistant overlay style exists in the settings file, but nothing reads it in the current build and there's no control for it, so changing it has no effect.
+</Note>
 
 ## Overlay position
 
-Where the overlay sits on your screen: **Bottom** (default), **Top**, or **None**.
+*Settings → General → Overlay → Overlay position.*
+
+Where the overlay sits: **Bottom**, **Top**, or **None**. Defaults differ by platform:
+
+| Platform | Default position |
+| --- | --- |
+| Windows | Bottom |
+| macOS | Bottom |
+| Linux | None (overlay hidden) |
+
+Linux defaults to None because a native GNOME/Wayland session gives an app no reliable way to float a window above everything else — see the warning below. Set it to Bottom or Top if your compositor handles it.
+
+Setting *either* the style or the position to **None** hides the overlay; they're checked independently.
 
 ## Status while you work
 
-The overlay also surfaces status as things happen — *Getting mic ready*, *Recording*, *Transcribing*, *Writing with Flow*, or *Looking at your screen* — and lets you cancel in progress.
+The overlay reports what SpeakoFlow is doing:
+
+| State | What it means |
+| --- | --- |
+| *Getting mic ready…* | The recording started but no audio has arrived yet. Wait for the waveform before speaking. |
+| Waveform | Recording. A calmer, larger wave means the recording is hands-free. |
+| *Transcribing…* | Recording stopped; the model is running. |
+| *Processing…* | AI cleanup or another post-transcription step is running. |
+| *Writing with Flow…* | A Generate with Flow command is being generated. |
+| *Looking at your screen…* | A screen capture is being taken for Flow. |
+| A short notice | Something didn't work — e.g. *"Flow needs an assistant model — pasted as dictation."* Auto-hides after a moment. |
+
+There is no cancel button on the overlay. To abandon a recording, use the Cancel shortcut — which has **no default binding**, because a global `Esc` would swallow `Esc` presses meant for other apps. Bind a key for it in *Settings → General → Recording*.
 
 <Warning>
-  **Linux.** On native GNOME/Wayland the overlay can't always stay on top of other windows. SpeakoFlow works around this automatically — see [Troubleshooting](/reference/troubleshooting).
+  **Linux.** On a native GNOME/Wayland session the overlay cannot stay on top of other windows: Mutter doesn't implement `wlr-layer-shell`, and Wayland gives apps no way to raise themselves. SpeakoFlow detects GNOME on Wayland and runs under XWayland, where "keep above" works — that's automatic and needs no setup. X11 and KDE/wlroots Wayland sessions already work. To force native Wayland anyway, launch with `SPEAKOFLOW_ALLOW_WAYLAND=1`; to disable GTK layer shell under a layer-shell compositor, use `SPEAKOFLOW_NO_GTK_LAYER_SHELL=1`. More in [Troubleshooting](/reference/troubleshooting).
 </Warning>

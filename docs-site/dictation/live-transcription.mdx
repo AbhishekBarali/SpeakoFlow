@@ -1,27 +1,43 @@
 ---
 title: "Live vs. batch transcription"
-description: "SpeakoFlow streams text as you speak on streaming-capable models and transcribes in a single batch on the rest. Which models stream, and how to change the behavior."
+description: "On a streaming-capable model SpeakoFlow shows your words in the overlay while you speak; every other model transcribes in one batch when you stop. Which models stream, and how the overlay style controls it."
 icon: "tower-broadcast"
 ---
 
-Your words can land as you speak them, or all at once when you stop. Which one you get depends on the model you're running.
+Your words can appear in the overlay as you speak them, or only after you stop. Which one you get depends on the model you're running.
 
-On a streaming-capable model, live transcription is on out of the box — text appears while you're still talking. Every other model transcribes in one batch when you finish, which stays accurate and simple.
+The model shipped as the default — Parakeet Unified EN 0.6B — streams, so live transcription is active on a fresh install with no configuration. Every other kind of model transcribes in one batch when you finish, which stays accurate and simple.
 
-## Live transcription
+## What "live" actually changes
 
-*Default: on for streaming models, off for the rest.*
+Live transcription changes what you *see*, not when text lands. The transcript is still inserted into your app exactly once, after you stop recording. What streaming buys you is a running transcript in the overlay while you talk, and a final insert that's close to instant because most of the work is already done.
 
-Transcribe speech as you talk instead of all at once when you stop. This only takes effect on a model that supports streaming — on any other model SpeakoFlow batches regardless of the setting, so there's no harm in leaving it on.
+If the streaming pass produces nothing, errors, or times out, SpeakoFlow falls back to transcribing the recorded audio in one batch. You never lose your words.
 
-## Live transcription window
+## Which models stream
 
-*Default: off.*
+Streaming is strictly capability-gated: the streaming worker only ever starts for a model that natively supports it, so it can't be forced onto a model that would misbehave.
 
-While live transcription runs, show a larger overlay card with the running text instead of the compact pill. Requires live transcription.
+| Model | Streams | Notes |
+| --- | --- | --- |
+| Parakeet Unified EN 0.6B | Yes | The recommended default model. English only |
+| Nemotron Streaming 3.5 | Yes | English |
+| Moonshine V2 Tiny / Small / Medium | Yes | English only |
+| Whisper, Canary, Cohere, Sense Voice, GigaAM, Breeze, non-streaming Parakeet | No | Batch |
+
+Switching to a non-streaming model — Whisper Medium for its language coverage, say — moves you back to batch transcription automatically. Nothing to reconfigure. See [Transcription models](/models/transcription-models) for the full catalog.
+
+## How you turn it on and off
+
+There is no separate "live transcription" switch in Settings. It's driven by the overlay style in *Settings → General → Overlay*:
+
+- **Live** — turns streaming on. On a model that can't stream, the overlay falls back to the compact pill.
+- **Minimal** or **None** — turns streaming off.
+
+Until you pick one of those, the setting sits in an **Auto** state that streams whenever the selected model supports it and batches when it doesn't. Auto is the shipped default, which is why streaming is already running on a fresh install with the default model.
 
 <Note>
-  The streaming-capable models are the Moonshine V2 variants and the Nemotron streaming model. See [Transcription models](/models/transcription-models) for the full catalog and what each one is good at.
+  The running text renders in two shades in the overlay: the committed prefix is solid, and a still-revisable tail is dimmed. Not every engine reports a revisable tail, so on some models everything you see is already committed.
 </Note>
 
-Switching to a non-streaming model, like Whisper Large for its accuracy, moves you back to batch transcription automatically. Nothing to reconfigure.
+See [The recording overlay](/dictation/overlay) for the full set of style and position options.

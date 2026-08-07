@@ -21,7 +21,7 @@ Download SpeakoFlow for your operating system from the [Releases page](https://g
     Download the `.exe` installer and run it, or the `.msi` if you deploy with one.
 
     <Note>
-      Windows code signing isn't in place yet, so SmartScreen may warn you the first time you run the installer.
+      Windows code signing isn't in place yet, so SmartScreen may show a notice the first time you run the installer because it isn't signed by a known publisher. Choose **More info → Run anyway**.
     </Note>
   </Tab>
 
@@ -54,8 +54,13 @@ Download SpeakoFlow for your operating system from the [Releases page](https://g
 
     There's no button to click instead: macOS 15 and later removed the old right-click → *Open* bypass, and "damaged" is the one case where no *Open Anyway* button appears in *System Settings → Privacy & Security*. Apple code signing and notarization is on the roadmap and removes this step entirely.
 
+    On first launch macOS also asks for two permissions, both of which SpeakoFlow needs to do its job:
+
+    - **Microphone** (*System Settings → Privacy & Security → Microphone*) — so it can hear you.
+    - **Accessibility** (*System Settings → Privacy & Security → Accessibility*) — so it can type into other apps.
+
     <Note>
-      Builds are Apple Silicon only. GitHub retired its Intel build machines in December 2025, so there's no way to produce and test an Intel build right now.
+      Builds are Apple Silicon only, M1 and newer. GitHub retired its Intel build machines in December 2025, so there's currently no way to produce and test an Intel build. On an Intel Mac you can still [build from source](https://github.com/AbhishekBarali/SpeakoFlow#build-from-source).
     </Note>
   </Tab>
 
@@ -72,7 +77,7 @@ Download SpeakoFlow for your operating system from the [Releases page](https://g
       ```
     </CodeGroup>
 
-    **Ubuntu 24.04+, Mint 22+, Pop!\_OS, Tuxedo OS, Debian 13** — the `.deb`:
+    **Debian, Ubuntu 24.04+, Mint 22+, Pop!\_OS, Tuxedo OS** — the `.deb`. This registers the app icon and menu entry properly, which the AppImage can't do on its own:
 
     ```bash
     sudo apt install ./SpeakoFlow_*_amd64.deb
@@ -86,12 +91,20 @@ Download SpeakoFlow for your operating system from the [Releases page](https://g
     ```
 
     <Note>
-      **Two things worth knowing.** The `.deb` is built on Ubuntu 24.04 and needs that era of glibc — on Ubuntu 22.04 or Debian 12, use the AppImage. And there's no `.rpm`: its packaging doesn't yet bundle the speech engine, and an `.rpm` that installs but can't transcribe is worse than none.
+      **Two things worth knowing.** The `.deb` is built on Ubuntu 24.04 and needs that era of glibc — on an older release, use the AppImage instead. And there's no `.rpm`: the packaging doesn't bundle the speech engine correctly, and shipping one that installs but can't transcribe would be worse than not shipping it.
     </Note>
 
-    The AppImage can't register its own icon or app-menu entry — that's normal AppImage behaviour, not a SpeakoFlow bug, and it's why the `.deb` is the better choice where there is one. The icon appears once the app is running; the file in your file manager stays generic. A helper like Gear Lever or AppImageLauncher adds a menu entry if you want one.
+    The AppImage can't register its own icon or app-menu entry — that's normal AppImage behavior, not a SpeakoFlow bug, and it's why the `.deb` is the better choice where there is one. The icon appears once the app is running; the file in your file manager stays generic. A helper like Gear Lever or AppImageLauncher adds a menu entry if you want one.
   </Tab>
 </Tabs>
+
+Both the AppImage and the `.deb` are built for x86_64 and ARM64. Windows is x86_64 only, and macOS is Apple Silicon only.
+
+A short setup wizard runs on first launch to help you pick a transcription model and, optionally, a local model for the assistant. If you'd rather use a different brain, all three options live in *Settings → Assistant*:
+
+- **Built-in (offline)** — download a small local model and run it fully on your machine, no key needed.
+- **Local server** — point SpeakoFlow at Ollama or LM Studio.
+- **Cloud** — bring your own API key for any OpenAI-compatible provider.
 
 ## Next steps
 

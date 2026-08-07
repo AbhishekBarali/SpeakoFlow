@@ -4,18 +4,41 @@ description: "A floating chat you summon with a hotkey. Ask by voice or text, ge
 icon: "comments"
 ---
 
-A floating chat you summon with a hotkey. Ask by voice or text, get streaming answers, and have them read back aloud — without leaving the app you're in.
+A floating always-on-top chat you summon with a hotkey. Ask by voice or text, get streaming answers, and have them read back aloud — without leaving the app you're in.
+
+## Shortcuts
+
+| Action | Windows | macOS | Linux |
+| --- | --- | --- | --- |
+| Ask the assistant | `Left Ctrl` + `Left Alt` | `Option` + `Ctrl` + `Space` | `Ctrl` + `Alt` + `Space` |
+| Show / hide the panel | `Ctrl` + `Shift` + `A` | `Option` + `Ctrl` + `A` | `Ctrl` + `Alt` + `A` |
+
+Both are rebindable in *Settings → Assistant → Shortcuts*.
+
+The assistant hotkey follows the same *Push to talk* setting as dictation: on by default, so you hold it while you talk. Add `Shift` for the opposite mode, or tap the assistant's lock key mid-recording (`Space` on Windows, `Shift` elsewhere) to go hands-free and let go of the hotkey. See [Hands-free](/dictation/hands-free).
 
 ## Using the panel
 
-- **Ask by voice** — hold *Ask the assistant* and talk; the answer streams into the panel.
+- **Ask by voice** — hold *Ask the assistant* and talk. The transcript appears, then the answer streams in token by token.
 - **Ask by text** — type in the message box.
-- **Show / hide** — toggle the panel with its shortcut. It remembers the conversation while open.
-- **Collapse to a pill** — shrink the panel to a small pill you click to talk, then expand again when you want the full view.
-- **Attach** — add an image or file, or snip a region of your screen to ask about.
-- **Regenerate** — re-ask for a fresh answer; the old one stays in [History](/personalize/history).
+- **Collapse to a pill** — shrink the panel to a small pill you click to talk, then expand again when you want the full view. Handy while you're working in another window.
+- **Attach** — add an image or file, or snip a region of your screen to ask about. Text-like files are inlined as context; images are sent to the model.
+- **Regenerate** — re-ask for a fresh answer. The old one stays in [History](/personalize/history).
+- **Copy** — copy any reply, or an individual code block.
+- **Stop** — interrupt a reply mid-stream. Whatever was generated so far is kept, like a cancelled chat. It also silences a spoken reply that's still playing.
+- **Clear conversation** — start fresh. Hiding the panel keeps the conversation; clearing it doesn't.
 
-The panel also exposes quick toggles for [screen vision](/assistant/screen-vision), [web search](/assistant/web-search), and [voice replies](/assistant/voice-output), and a persona switcher in its header (see [Profiles](/personalize/profiles)).
+Images in the conversation — both screen captures and files you attached — appear as inline thumbnails you can click to enlarge.
+
+<Tip>
+  Type `/summarize` to compact the whole conversation into a summary that replaces the transcript. It's the one slash command.
+</Tip>
+
+## Header controls
+
+The panel header carries a persona switcher (see [Profiles](/personalize/profiles)) plus quick toggles for [screen vision](/assistant/screen-vision), [web search](/assistant/web-search), and [voice replies](/assistant/voice-output) — so you can turn each on for a single conversation without opening Settings.
+
+The screen-vision toggle is sticky: once it's on, your screen is attached to every message until you turn it off. It's hidden entirely when screen access is set to Off.
 
 ## Set it up
 
@@ -25,7 +48,7 @@ The panel also exposes quick toggles for [screen vision](/assistant/screen-visio
   </Card>
 
   <Card title="Providers & keys" icon="key" href="/assistant/providers">
-    OpenAI, Anthropic, Azure, OpenRouter, Ollama, LM Studio.
+    OpenAI, Anthropic, Gemini, Groq, OpenRouter, Azure, Ollama, LM Studio.
   </Card>
 
   <Card title="Behavior & memory" icon="sliders" href="/assistant/behavior">

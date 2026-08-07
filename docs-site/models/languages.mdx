@@ -8,19 +8,42 @@ Getting names and non-English speech right comes down to the model you pick — 
 
 ## Language
 
-*Auto, specific language. Default: Auto.*
+*Auto, or a specific language. Default: Auto.*
 
-The language for speech recognition. Setting a specific language (instead of Auto) can improve accuracy noticeably. Some models detect the language automatically and don't expose this setting.
+The language for speech recognition, in *Settings → Dictation*. Setting a specific language instead of Auto can improve accuracy noticeably, because the model stops spending effort guessing.
+
+Two things are worth knowing about how the setting is applied:
+
+- The row only appears for models that can take a language hint. English-only models and models that always auto-detect don't show it.
+- Your choice is passed to the model **only if that model claims to support the language**. If it doesn't, SpeakoFlow silently falls back to auto-detection rather than forcing a language the model can't handle. So picking Japanese while an English-only model is active changes nothing.
+
+Simplified and Traditional Chinese are both sent to the model as `zh` — the distinction is in the language list for filtering, not something the models treat separately.
 
 ## Which model for which languages
 
-- **Whisper Medium/Large** — the widest coverage, nearly 100 languages. The best all-rounder for mixed or non-Western speech.
-- **Nemotron streaming** — 28 languages in real time.
-- **Parakeet V3 / Canary 1B** — 25 European languages.
-- **SenseVoice** — Chinese, English, Japanese, Korean, Cantonese.
+| Language need | Model |
+| --- | --- |
+| Widest coverage — 99 languages | **Whisper Medium**, or Whisper Large from the older set |
+| Real-time multilingual (28 languages) | **Nemotron Streaming 3.5** |
+| Highest accuracy across 14 languages | **Cohere Transcribe** |
+| English, German, Spanish, French — instantly | **Canary 180M Flash** |
+| English only, fastest | **Parakeet Unified EN 0.6B** (the default) |
+| 25 mostly-European languages | **Parakeet V3** or **Canary 1B v2** (both in Older models) |
+| Chinese, English, Japanese, Korean, Cantonese | **SenseVoice** (Older models) |
+| Russian | **GigaAM v3** (Older models) |
+| Taiwanese Mandarin with English code-switching | **Breeze ASR** (Older models) |
 
 <Tip>
   **Non-Western names.** Whisper models are particularly strong at names and words that trip up English-only models — for example Nepali, Indian, and other South Asian names that don't follow standard English spelling. If you dictate names like these often, use a Whisper model and add the tricky ones to [Custom words](/dictation/custom-words) so they're spelled your way every time.
 </Tip>
 
-Speaking a language and want English out? See [Translate to English](/dictation/translate).
+<Note>
+  Custom words are applied differently depending on the model family. Whisper-family models receive them as a recognition prompt, which biases the model before it decides. Every other family gets a fuzzy correction pass over the finished transcript instead. Both work; the Whisper route tends to be more accurate because nothing has to be guessed after the fact.
+</Note>
+
+Speaking a language and want English out? See [Translate to English](/dictation/translate). Only some models support it: **Whisper Medium** and **Canary 180M Flash** from the recommended set, plus **Whisper Small**, **Whisper Large**, and **Canary 1B v2** from the older set. Whisper Turbo, Parakeet, Nemotron, Moonshine, SenseVoice, GigaAM, Breeze ASR, and Cohere do not, and the *Translate to English* row tells you so when one of those is active.
+
+<Info>
+  Language and translation support are declared by the model file itself. For current-engine models SpeakoFlow reads those capabilities out of the GGUF the first time the model actually loads and corrects its own catalog entry if it was wrong, so what a model card claims can change slightly after you first use it.
+</Info>
+

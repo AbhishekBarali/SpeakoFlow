@@ -1,6 +1,6 @@
 ---
 title: "Web search"
-description: "Let the SpeakoFlow assistant look things up when a question needs current facts. The model decides when to search, across six snippet providers or OpenRouter's built-in search."
+description: "Let the SpeakoFlow assistant look things up when a question needs current facts. The model itself decides when to search, across six snippet providers or OpenRouter's built-in search."
 icon: "magnifying-glass"
 ---
 
@@ -12,21 +12,32 @@ Enable it in *Settings → Assistant → Web search*. Off until you turn it on.
 
 *Default: off.*
 
-Let the assistant search the web when a question needs current information.
+Lets the assistant search the web when a question needs current information. Everything below only appears once this is on.
 
 ## How it decides to search
 
-The model itself decides, by calling a `web_search` tool while it writes its reply. There's no keyword check and no separate planner to configure — if the question needs fresh facts, it searches; if it doesn't, it just answers.
+The model decides, by calling tools while it writes its reply. There is no keyword check and no separate planner to configure. Turning web search on gives the model two tools:
 
-Each search is a single round-trip that returns titles and snippets. Result pages are never fetched, so a search costs about a second, not a browsing delay. If a search fails or is slow, the assistant answers without web context rather than leaving you waiting.
+- **`web_search(query, freshness, news)`** — runs a live search and hands back titles and short snippets. The model writes the query itself, and can ask for a freshness window (`day`, `week`, `month`, `year`, or none) and flag the topic as news.
+- **`get_current_datetime()`** — your current local date and time, with a UTC offset. Models have no clock, so this is how "what's today's date" and "how long until X" stay correct, and how a relative phrase becomes a concrete date before a search query is built.
+
+A turn runs at most three model rounds, so the assistant can search, read what came back, and search once more before it has to answer with what it has.
+
+Each search is a single retrieval pass that returns titles and snippets. Result pages are never fetched, so a search costs about a second rather than a browsing delay. If a search fails or returns nothing, the assistant answers without web context instead of leaving you waiting, and the panel shows a short "no web results" notice.
+
+<Note>
+  The system prompt also tells the model not to claim it can't access the internet. Without that, a model would confidently refuse on the turns where it decided not to search — the worst possible answer when the tool was right there.
+</Note>
 
 ## Two ways to search
 
 ### Use OpenRouter's built-in search
 
-*Default: off.*
+*Default: on. Only shown when your assistant provider is OpenRouter.*
 
-If you use OpenRouter, turn this on to let OpenRouter run the search itself (its `:online` mode) using your OpenRouter credits — **no separate search API key needed**. When off, the app searches with your own search provider below.
+Lets OpenRouter run the search itself — its `:online` mode — billed to your OpenRouter credits, with **no separate search API key needed**. This is the one provider with native search, so it's the one exception to the tool path; every other provider, cloud or local, searches through the tools above.
+
+Turn it off to use your own search provider instead. It also steps aside automatically on a turn that carries an image, since OpenRouter's server-side search can't be paired with an inline screenshot — those turns use the tool path like everyone else.
 
 ### Search provider
 
@@ -36,36 +47,39 @@ All six return titles and snippets, and each needs one API key. Every one has a 
 
 | Provider | What you get |
 | --- | --- |
-| **Serper** | Google results, fast. The default. |
+| **Serper** | Google results, fast (~1–2 s). The default. |
 | **Brave Search** | An independent index. |
-| **Tavily** | LLM-optimized; returns a synthesized answer. |
+| **Tavily** | AI-oriented search; returns a synthesized answer alongside results. |
 | **Exa** | Neural, semantic search. |
 | **SerpAPI** | Google SERP. |
-| **TinyFish** | Its own index, built for agents. Free with no credit card, 30 queries a minute, sub-second latency. |
+| **TinyFish** | Its own index, built for agents. Free with no credit card. |
 
 <Tip>
-  Serper stays the default. TinyFish is the most generous free tier of the six — no card required — if you'd rather not hand over payment details to try search out.
+  Serper stays the default because it's fast and its free tier is generous. TinyFish asks for no payment details at all, if you'd rather not hand over a card just to try search out.
 </Tip>
 
 ### API key
 
-Key for the selected search provider. Not needed when using OpenRouter's built-in search.
-
-## Quality controls
-
-### Sources to use
-
-*1–10.*
-
-How many results to read.
-
-### Search depth
-
-*Quick, Standard, Deep.*
-
-**Quick** for simple facts, **Standard** for most questions, **Deep** for hard ones.
+Key for the selected search provider, stored in your OS keychain. Each provider keeps its own key, so switching providers doesn't wipe the one you already entered. Not needed when you're using OpenRouter's built-in search.
 
 ### Test search
 
-Run a sample search with the current provider and key to confirm it's working before you rely on it.
+Runs a sample search with the current provider and key and reports how many results came back, so you find a bad key here rather than mid-conversation.
 
+## Search depth
+
+*Quick, Standard, Deep. Default: Standard.*
+
+The single dial for how thorough a search is. It sets how many of the model's queries actually run, how many results come back per query, how many sources reach the model, and how much of that text fits in the prompt.
+
+- **Quick** — one query, 5 sources, a small context budget. Simple facts.
+- **Standard** (default) — up to 3 queries, 8 sources. The right answer for most questions.
+- **Deep** — up to 4 queries, 10 sources, the largest context budget. Hard or multi-part questions.
+
+All three tiers are one retrieval pass with heavy parallelism and tight timeouts. This is "answer with search in a couple of seconds", not minutes-long deep research. Results from multiple queries are merged round-robin, de-duplicated by URL, and reranked locally on keyword overlap plus a recency boost for news — no extra model call.
+
+## Smart search decisions (local model)
+
+*Shown only when your assistant brain is the built-in local model. Currently has no effect.*
+
+This toggle predates model-decided search: it used to pick between an LLM planner and a fast keyword check for the built-in model. Now that the built-in engine calls the `web_search` tool like every other provider, nothing reads the setting. It's still in the interface, but changing it won't change behavior.

@@ -1,39 +1,101 @@
 ---
 title: "Output & pasting"
-description: "Control exactly how SpeakoFlow inserts transcribed text: clipboard or direct typing, clipboard handling, auto submit, and trailing spaces."
+description: "Control exactly how SpeakoFlow inserts transcribed text: paste method, clipboard handling, auto submit, trailing spaces, Linux typing tools, and the external-script escape hatch."
 icon: "clipboard"
 ---
 
-Fine control over exactly how transcribed text is inserted into the active app. Most people never need to touch these — the defaults just work.
+Fine control over exactly how transcribed text is inserted into the active app. These all live in *Settings → Dictation → Output options*, and most people never need to touch them — the defaults just work.
 
 ## Paste method
 
-*Clipboard, Direct, None, External script. Default: Clipboard.*
+*How transcribed text is inserted. Default: Clipboard on Windows and macOS, Direct on Linux.*
 
-How transcribed text is inserted. **Clipboard** pastes via `Ctrl/Cmd` + `V`, with `Ctrl+Shift+V` and `Shift+Insert` variants. **Direct** types it key by key. **External script** hands off to a script you point to.
+- **Clipboard (`Ctrl+V`, or `Cmd+V` on macOS)** — writes the text to the clipboard, sends the paste combo, then puts your previous clipboard contents back. Fast and reliable in almost every app.
+- **Direct** — types the text key by key. Slower, but works in apps that block or ignore synthetic paste. This is the Linux default because clipboard paste is less dependable across compositors.
+- **None** — inserts nothing. Useful with *Copy to clipboard* below when you'd rather paste manually.
+- **Clipboard (`Ctrl+Shift+V`)** — Windows and Linux only. The paste-as-plain-text combo in many terminals and editors.
+- **Clipboard (`Shift+Insert`)** — Windows and Linux only. For apps that only accept the legacy combo.
+- **External script** — Linux only. Runs a script you point to, passing the text as its single argument. The path field appears under the dropdown once you select this.
+
+On Linux, clipboard writes prefer `wl-copy` under Wayland (better with umlauts and other non-ASCII text), and the paste keystroke is sent by whichever native tool is available — `wtype` on non-KDE Wayland, then `dotool`, then `ydotool`; `xdotool` then `ydotool` on X11 — falling back to SpeakoFlow's own key synthesis if none is installed.
+
+<Note>
+  Any method that synthesizes keystrokes releases every modifier afterwards, even if the combo was interrupted partway through. That's the guard against the classic failure where `Ctrl` or `Shift` appears stuck down after a paste.
+</Note>
 
 ## Typing tool
 
-*Auto, specific tool. Default: Auto (recommended).*
+*Linux only. Default: Auto (recommended).*
 
-**Linux only.** The tool used for the Direct paste method. Leave on Auto unless you have a reason to change it.
+Which tool types the text for the **Direct** paste method. The row only appears on Linux, and only while the paste method is Direct. The dropdown lists just the tools actually present on your system — `wtype`, `kwtype`, `dotool`, `ydotool`, `xdotool` — so you can't select one that isn't installed. Leave it on Auto unless a specific tool misbehaves for you.
 
 ## Clipboard handling
 
-*Don't modify clipboard, Copy to clipboard.*
+*Default: Don't modify clipboard.*
 
-Whether the transcription stays in your clipboard after pasting. The default restores what you had before.
-
-## Auto submit
-
-*Off, Enter, Cmd+Enter, Super+Enter, Ctrl+Enter. Default: Off.*
-
-Send a key combination automatically after text is inserted. Handy for firing off chat messages hands-free.
+- **Don't modify clipboard** (default) — whatever you had copied is still there when the paste is done. Clipboard-based paste saves and restores it around the insert.
+- **Copy to clipboard** — leaves the transcription in your clipboard afterwards, so you can paste it again elsewhere.
 
 ## Append trailing space
 
-Add a space after inserted text so consecutive dictations don't run together.
+*Default: off.*
+
+Adds a single space after the inserted text, so back-to-back dictations don't run together. Off by default because it's wrong as often as it's right — mid-sentence dictation into an editor that already handles spacing ends up with doubles.
+
+Generate with Flow never appends the space, so a generated draft lands exactly as produced.
+
+## Auto submit
+
+*Default: Off.*
+
+Sends a key combination automatically once the text is in. Handy for firing off chat messages hands-free.
+
+- **Off** (default)
+- **Enter**
+- **Ctrl+Enter**
+- **Cmd+Enter** on macOS, **Super+Enter** elsewhere — the same Meta key either way
+
+Auto submit is skipped when the paste method is **None** (there'd be nothing to submit), and when the paste itself failed. It waits 50 ms after the insert before sending the key. Generate with Flow doesn't auto-submit either.
+
+## Always-on microphone
+
+*Default: off.*
+
+Keeps the microphone warm so the first words of a recording are never clipped, at the cost of a little battery. It sits in this group because it's about output quality in practice, even though it's a capture setting.
+
+## Timing knobs in Debug
+
+Two settings in *Settings → Debug* affect insertion. Debug only appears once debug mode is on (`Ctrl+Shift+D`, `Cmd+Shift+D` on macOS).
+
+- **Paste delay** — default 60 ms. How long to wait after writing the clipboard before sending the paste combo. Only applies to the clipboard-based methods. Increase it if the *wrong* text pastes, which means the app read the clipboard before SpeakoFlow finished writing it.
+- **Extra recording buffer** — default 0 ms. How much longer to keep recording after you release the key. Increase it if your last word or two gets cut off.
+
+## The order things happen in
+
+Once a recording is transcribed, the transcript passes through these stages before it's inserted:
+
+<Steps>
+  <Step title="Transcription">
+    Custom-word correction and filler removal — see [Custom words](/dictation/custom-words).
+  </Step>
+
+  <Step title="AI cleanup">
+    Optional, and only on its own shortcut. See [AI cleanup](/writing/ai-cleanup).
+  </Step>
+
+  <Step title="Spoken emoji">
+    Opt-in. See [Spoken emoji](/dictation/spoken-emoji).
+  </Step>
+
+  <Step title="Text replacements">
+    Opt-in, and last, so your own rules always win. See [Text replacements](/dictation/text-replacements).
+  </Step>
+
+  <Step title="Insert">
+    Trailing space, paste method, then auto submit.
+  </Step>
+</Steps>
 
 <Tip>
-  If text is occasionally cut off or the wrong text pastes, the paste delay and extra recording buffer in [Debug settings](/settings/debug) usually fix it. For a specific app that misbehaves with clipboard paste, try the **Direct** paste method.
+  If a specific app misbehaves with clipboard paste, try **Direct**. If text is occasionally cut off, raise the extra recording buffer; if the wrong text pastes, raise the paste delay.
 </Tip>

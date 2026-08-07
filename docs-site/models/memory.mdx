@@ -1,29 +1,54 @@
 ---
 title: "Memory & the microphone"
-description: "Settings that trade a little memory or battery for faster, more reliable dictation: model unloading, always-on microphone, and keeping the mic open between transcriptions."
+description: "Settings that trade a little memory or battery for faster, more reliable dictation: idle model unloading for both the speech and assistant models, context size, and keeping the microphone warm."
 icon: "memory"
 ---
 
-Settings that trade a little memory or battery for speed and reliability.
+A loaded model sits in RAM (or VRAM, when it's on the GPU) so it can answer instantly. These settings decide how long it stays there, and how eagerly the microphone is kept ready.
 
 ## Unload model
 
-*Never, Immediately, 2–15 min, 1 hour. Default: idle timeout.*
+*Never, Immediately, After 2 / 5 / 10 / 15 minutes, After 1 hour. Default: After 5 minutes.*
 
-Free memory when the model has been idle for a while. The model reloads automatically the next time you dictate.
+In *Settings → General → System*. Frees the memory the speech-to-text model is holding once it has been idle for this long. The model reloads automatically the next time you dictate, which costs a second or two on the first press.
+
+Five minutes is the default because it covers a normal working rhythm — several dictations in a row keep the model warm — while still handing the memory back when you walk away.
+
+- **Never** — keep the model resident. Fastest first word, highest idle memory.
+- **Immediately** — unload after every transcription. Lowest idle memory, a reload cost on every single press.
+
+You can also unload on demand from the system tray menu, which is enabled only while a model is actually loaded.
+
+<Note>
+  With [debug mode](/settings/debug) on, an extra **After 15 seconds (Debug)** option appears. It exists to make reload behavior easy to test and isn't meant for daily use.
+</Note>
+
+## The assistant's local model
+
+The built-in local assistant engine has its own separate settings, in *Settings → Assistant*. They only apply to the built-in provider — Ollama, LM Studio, and cloud providers manage their own memory.
+
+**Unload timeout** offers the same choices as above and also defaults to **After 5 minutes**, for the same reason. The engine is pre-warmed when you start a recording, so most reloads stay invisible.
+
+**Context size** is how large a context window the local engine launches with, in tokens. The default is **8192**, and you can set anything from 512 to 32768 in steps of 512. It's kept modest on purpose: the small models this feature targets don't need more, and context is the single biggest driver of how much memory the engine holds. Raising it raises memory use even when your conversations are short.
+
+A vision-capable model loads a second file (its multimodal projector) alongside the weights, so budget for more than the model size alone suggests.
+
+<Tip>
+  The assistant's model list shows what SpeakoFlow detected about your machine — your GPU and its memory, or your total system RAM when no GPU is found. That's information to help you choose, not a filter: nothing is hidden or blocked based on your hardware, so a model larger than your memory will still let you download it.
+</Tip>
 
 ## Always-on microphone
 
 *Default: off.*
 
-Keep the mic warm so the first words are never clipped. Uses a little more battery.
+In *Settings → Dictation → Output*. Keeps the microphone stream warm so the first words are never clipped by the moment it takes to open the device. Uses a little more battery, and on some systems keeps the microphone-in-use indicator lit.
 
 ## Keep mic open between transcriptions
 
 *Default: off.*
 
-Faster back-to-back dictation by leaving the audio stream open. May affect Bluetooth audio quality.
+In *Settings → General → Experimental*, so **Experimental features** has to be on to see it. Leaves the audio stream open after a transcription finishes instead of closing it, which makes back-to-back dictation faster. It can affect Bluetooth audio quality, since the headset never gets to leave its microphone profile.
 
 <Note>
-  The assistant's local model has its own separate unload setting. See [Brain: local or cloud](/assistant/brain).
+  This is a different setting from *Always-on microphone*: that one warms the microphone up before recording, this one avoids tearing it down afterwards. They're independent and can be used together.
 </Note>

@@ -1,6 +1,6 @@
 ---
 title: "Translate to English"
-description: "Speak another language and get clean English out, transcribed and translated on your own device by a translation-capable model like Whisper, Canary, or Cohere."
+description: "Speak another language and get clean English out, transcribed and translated on your own device by a translation-capable model such as Whisper or Canary."
 icon: "language"
 ---
 
@@ -8,8 +8,25 @@ Speak another language and get clean English out — on your device, with a capa
 
 ## Translate to English
 
-*Default: off.*
+*Settings → Dictation → the model's own settings group. Default: off.*
 
-Translate speech from other languages to English as it's transcribed. Availability depends on the model — translation-capable models include Whisper, Canary, and Cohere. If your current model doesn't support it, the setting notes that and you can switch models.
+Translate speech from other languages to English as it's transcribed. The row only appears when your current transcription model supports translation, so if you can't find it, the model you're on can't do it. That group is also hidden entirely for models with nothing to configure.
+
+Translation-capable models today:
+
+| Model | Translates to English |
+| --- | --- |
+| Whisper Small / Medium / Large | Yes |
+| Whisper Turbo | No |
+| Canary 180M Flash, Canary 1B v2 | Yes |
+| Parakeet, Nemotron, Moonshine, Cohere, Sense Voice, GigaAM, Breeze | No |
+
+Whisper Turbo is the one that catches people out — it's a Whisper model, so translation looks like it should be there, but the model doesn't support the translation task.
+
+## Picking the spoken language
+
+The same group carries a **Language** row on multilingual models, defaulting to **Auto** (detect it from what you say). Naming the language explicitly usually beats auto-detection on a short recording, and it applies whether or not translation is on.
+
+Leave translation off and you get a transcript in the language you spoke. Turn it on and you get English regardless.
 
 See [Languages & accents](/models/languages) for which model to pick for which languages, and [Transcription models](/models/transcription-models) for the full catalog.

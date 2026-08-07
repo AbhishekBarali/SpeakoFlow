@@ -1,21 +1,32 @@
 ---
-title: "Hands-free & tap-to-lock"
-description: "Tap a key mid-hold to lock SpeakoFlow into hands-free recording, so you can release the shortcut and keep talking through long dictation."
+title: "Hands-free recording"
+description: "Switch SpeakoFlow's recording behavior from Hold to Tap so one press starts recording and the next stops it, letting your hands leave the keyboard during long dictation."
 icon: "hand"
 ---
 
-Lock recording so you can let go of the keys and keep talking — useful for long dictation or when your hands leave the keyboard.
+Record without holding the keys down — useful for long dictation, or when your hands leave the keyboard.
 
-While you're *holding* your record shortcut, tap the **tap-to-lock key** (`Space` by default) once. Recording locks hands-free, so you can release the shortcut and keep talking. Press the shortcut again to stop and type it out.
+Set *Settings → General → Recording → Recording behavior* to **Tap**. One press of your record shortcut starts recording; the next press stops it and types the transcript out. Releases are ignored, so nothing depends on how long you hold the keys.
 
-## Tap to lock
+## Hold vs. Tap
 
-*Default: Space.*
+- **Hold** (default) — records while the shortcut is held, stops on release. Best for short bursts, and it can't leave a recording running by accident.
+- **Tap** — press once to start, press again to stop. Best for long-form dictation.
 
-Pick any key that isn't part of your record shortcut, or clear it to turn the feature off. The assistant shortcut has its own separate tap-to-lock key.
+The setting is global: it applies to the Dictate shortcut, the AI-cleanup shortcut, and the Assistant shortcut alike.
 
-The overlay shows *"Recording hands-free — press the hotkey again to stop"* once you're locked, so you always know which mode you're in.
+When a hands-free recording starts, the overlay pill switches to a calmer, slightly larger waveform, and screen readers announce *"Recording hands-free — press the hotkey again to stop."* There is no stop button on the overlay: press the shortcut again.
 
 <Note>
-  Tap-to-lock is separate from the **Tap** recording behavior in [General settings](/settings/general). Tap-to-lock works while you're in Hold mode, so you don't have to switch modes to go hands-free once.
+  In the assistant panel, a voice turn can also be ended with the **Finish & send** button, so a hands-free question can be committed without touching the keyboard.
 </Note>
+
+## Stopping and cancelling
+
+- **Press the shortcut again** — stops recording and inserts the text.
+- **Cancel shortcut** — throws the recording away. It has **no default binding**, because a global `Esc` would swallow `Esc` presses meant for other apps whenever a recording is active. Record a key for it in *Settings → General → Recording* if you want one. The row is hidden on Linux, where re-registering a dynamic shortcut is unreliable.
+- **Nothing at all** — a recording is force-finalized after 30 minutes.
+
+<Warning>
+  A mid-recording "tap to lock" gesture — tapping `Shift` or `Space` while holding the shortcut to convert a held recording to hands-free — is not active in the current build. The settings keys for it still exist in the settings file, but nothing arms the watcher, so the gesture does nothing and there is no control for it in Settings. Use the **Tap** recording behavior above instead.
+</Warning>

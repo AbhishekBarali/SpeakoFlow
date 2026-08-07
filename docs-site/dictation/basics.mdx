@@ -1,6 +1,6 @@
 ---
 title: "Dictation basics"
-description: "Press a hotkey and talk, and SpeakoFlow types your words into any app on your machine. How the dictation loop works, and why voice-activity detection means pauses don't leave gaps."
+description: "Press a hotkey and talk, and SpeakoFlow types your words into any app on your machine. How the dictation loop works, what the overlay is telling you, and why voice-activity detection means pauses don't leave gaps."
 icon: "microphone"
 ---
 
@@ -14,7 +14,7 @@ Press a hotkey and talk. Your words type into any app — email, editor, chat, a
   </Step>
 
   <Step title="Hold the Dictate shortcut and speak naturally">
-    `Left Ctrl` + `Left Win` on Windows, `Option` + `Space` on macOS, `Ctrl` + `Space` on Linux by default.
+    `Left Ctrl` + `Win` on Windows, `Option` + `Space` on macOS, `Ctrl` + `Space` on Linux by default.
   </Step>
 
   <Step title="Release">
@@ -22,21 +22,45 @@ Press a hotkey and talk. Your words type into any app — email, editor, chat, a
   </Step>
 </Steps>
 
-Voice-activity detection trims silence automatically, so brief pauses while you think won't add gaps. If you prefer tap-to-start over hold, switch **Recording behavior** to Tap in [General settings](/settings/general).
+The overlay shows *Getting mic ready…* until the microphone actually starts delivering audio, then switches to a live waveform. That cue is driven by real audio frames rather than a fixed delay, so once the wave moves you know your words are being captured.
+
+Voice-activity detection filters non-speech audio out of the recording, so brief pauses while you think won't add gaps.
 
 <Tip>
   Talking is roughly **3× faster than typing** — around 150 words a minute spoken versus 45 typed. The speed adds up fast across a day of messages and notes.
 </Tip>
 
+## Recording behavior
+
+*Settings → General → Recording → Recording behavior.*
+
+- **Hold** (default) — records while the Dictate shortcut is held, and stops on release.
+- **Tap** — one press starts recording, the next press stops it. This is how you record hands-free.
+
+See [Hands-free recording](/dictation/hands-free) for the details, including how to end a hands-free recording.
+
+<Note>
+  A single recording is capped at 30 minutes. When it hits the cap, SpeakoFlow finalizes it automatically — stops, saves the audio, and transcribes — rather than recording indefinitely. Audio is only written to disk after a recording stops, so the cap guarantees a forgotten session still produces a transcript instead of losing everything.
+</Note>
+
+## Sounds and microphone
+
+Start and stop cues are **off by default** — turn on *Audio feedback* in *Settings → General → Sounds* if you want them, then pick a **Feedback sound**: Default, Marimba, Pop, or Click, plus a **Custom** option that appears only if you've supplied your own sound files (see [General settings](/settings/general)). *Mute while recording* silences system audio for the duration of a recording, and is also off by default.
+
+The microphone is chosen in *Settings → General → Recording*. Two related options live elsewhere:
+
+- **Always-on microphone** (*Settings → Dictation → Output options*, off by default) keeps the mic warm so the first words are never clipped, at the cost of a little battery.
+- **Clamshell microphone** (*Settings → Debug*) picks a different input for when a laptop lid is closed.
+
 ## Where to go from here
 
 <CardGroup cols={2}>
-  <Card title="Hands-free & tap-to-lock" icon="hand" href="/dictation/hands-free">
-    Lock recording so you can let go of the keys and keep talking.
+  <Card title="Hands-free recording" icon="hand" href="/dictation/hands-free">
+    Record without holding the keys down.
   </Card>
 
   <Card title="Live vs. batch" icon="tower-broadcast" href="/dictation/live-transcription">
-    Words as you speak, or all at once when you stop.
+    Watch the words arrive as you speak, on models that stream.
   </Card>
 
   <Card title="Output & pasting" icon="clipboard" href="/dictation/output">

@@ -6,28 +6,47 @@ icon: "eye"
 
 Ask about what's on your screen and the assistant answers with that context. It only looks when you let it.
 
-Screen vision needs a vision-capable model (many Gemma and Qwen models qualify). Set it up in *Settings → Assistant → Screen vision*.
+Screen vision needs a vision-capable model. Most of the curated local models qualify (the catalog marks them "Vision"), as do the mainstream cloud multimodal models. Set it up in *Settings → Assistant → Screen vision*.
 
 ## Screen access
 
-*Off, Manual, Agent decides. Default: Off.*
+*Off, Manual, Agent decides. Default: Manual.*
 
-- **Off** — screen capture is disabled; camera and region controls are hidden.
-- **Manual** — you choose when to attach the full screen or a region.
-- **Agent decides** — the model may request a capture when it needs current visual context.
+- **Off** — screen capture is disabled. The panel's camera and region controls are hidden.
+- **Manual** (default) — you decide. Click the camera in the panel to turn screen vision on, and it attaches your screen to every message until you turn it off again; or snip just a region.
+- **Agent decides** — the model gets a `capture_screen` tool and may take one screenshot per message when your question clearly refers to something on screen. It's told not to capture for self-contained questions.
 
-Every screenshot sent is shown in the conversation.
+Every screenshot that goes to the model is shown in the conversation, in both modes, so there's always a visible record of when the assistant looked.
 
 ## When to capture
 
-*When I ask, When the message sends. Default: When I ask.*
+*When I ask, When the message sends. Default: When I ask. Only shown in Manual mode.*
 
-For voice questions: capture the moment you start asking, or wait until the message is sent. Typed messages always capture on send.
+This changes the timing for **voice** questions only, where there's a real gap between starting to ask and finishing:
+
+- **When I ask** (default) — grabs the frame the moment you press the hotkey, so it captures what you were looking at when you started talking, not whatever is on screen after you finish.
+- **When the message sends** — grabs it after you stop talking and the speech is transcribed.
+
+Typed messages always capture on send, since the panel is already in front of you either way.
 
 <Warning>
   **macOS.** Screen vision needs macOS Screen Recording permission. Grant it in *System Settings → Privacy & Security → Screen Recording*, then restart SpeakoFlow for it to take effect.
 </Warning>
 
+## What actually gets sent
+
+SpeakoFlow captures the monitor under your mouse cursor, so on a multi-monitor desk you get the screen you're actually working on.
+
+The frame is then JPEG-compressed down to a budget picked from your provider, because "send the sharpest possible image" and "the request succeeds" are not the same goal:
+
+| Provider | Budget | Why |
+| --- | --- | --- |
+| Azure | Smallest | Azure's gateway rejects oversized request bodies outright. |
+| Built-in or a local server | Middle | Keeps on-screen text legible without spending a huge share of a small local context on vision tokens. |
+| Other cloud providers | Largest | Sharpest, so fine text, code, and error messages stay readable. |
+
 <Note>
-  SpeakoFlow captures the monitor under your mouse cursor, so multi-monitor users get the screen they're actually working on. Only a compact thumbnail is stored in history; the full-resolution frame is sent once to the model and not kept.
+  Only a compact thumbnail is stored in the conversation and in [History](/personalize/history). The full-resolution frame is sent to the model once and never written to disk. Thumbnails are shown inline in the panel and can be clicked to enlarge.
 </Note>
+
+If the model you picked can't read images, the panel says so and names the problem rather than silently dropping the screenshot. Switch to a vision-capable model, or ask again with screen vision off.

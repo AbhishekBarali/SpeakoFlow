@@ -12,31 +12,47 @@ Set up in *Settings → Assistant → Voice output*.
 
 *Default: off.*
 
-Read the assistant's replies out loud.
+Reads the assistant's replies out loud. When it's on, the assistant is also told to write speech-friendly prose — short sentences, no tables or headings — because a Markdown table read aloud is gibberish.
 
 ## Stop speech when dictation starts
 
-Stop any reply that's still playing when you start dictating, so you never talk over it.
+*Default: off.*
+
+Off means starting a plain dictation does **not** silence a reply that's still being read. That's deliberate: with earphones in, people usually want to keep listening while they type or dictate something else. Turn it on if you'd rather have the room go quiet the moment you start talking.
+
+Either way, asking the assistant a **new** question always interrupts the previous answer. This setting only governs ordinary dictation.
 
 ## Engines
 
 | Engine | Runs | Needs |
 | --- | --- | --- |
-| **Kokoro** (local) | On your machine | One-time voice model download, then fully private. Free. |
-| **OpenAI-compatible** | Cloud | Base URL, API key, model (e.g. `gpt-4o-mini-tts`), voice (e.g. `alloy`, `coral`, `sage`). |
-| **OpenRouter** | Cloud | Your OpenRouter key. |
-| **ElevenLabs** | Cloud | API key, model (e.g. `eleven_v3`, `eleven_multilingual_v2`, or `eleven_flash_v2_5`), voice ID. |
-| **Azure AI Speech** | Cloud | Speech URL, key, voice (e.g. `en-US-AvaMultilingualNeural`). |
+| **Kokoro** (default) | On your machine | One-time voice model download, then fully private. Free. |
+| **OpenAI-compatible** | Cloud | Base URL, API key, model, voice. |
+| **OpenRouter** | Cloud | Your OpenRouter key. Base URL is fixed. |
+| **ElevenLabs** | Cloud | API key, model, voice ID. |
+| **Azure AI Speech** | Cloud | Speech URL, key, voice. |
+
+<Note>
+  Each engine keeps its **own** endpoint, model, voice, and API key. Switching engines doesn't overwrite or wipe the settings you already entered for another one, and an OpenAI voice name can't leak onto ElevenLabs and fail as `voice_not_found`.
+</Note>
+
+The voice-output API key is separate from your [assistant provider's key](/assistant/providers), even when both point at the same company.
+
+### Model and voice start empty on purpose
+
+For the cloud engines, the model and voice fields are loadable pickers: they begin blank, you press reload to fetch the engine's real list, then choose. A prefilled value would just be a name you never picked, and the wrong one 404s.
+
+If you leave them blank, synthesis still works from a sensible fallback — `eleven_flash_v2_5` for ElevenLabs, `en-US-JennyNeural` for Azure.
 
 <Tip>
-  **Picking an ElevenLabs model.** `eleven_v3` is the newest and most expressive, `eleven_multilingual_v2` is the consistent-quality choice across 29 languages, and `eleven_flash_v2_5` is the fastest (ultra-low latency, around 75 ms). Model names are the API IDs — type them exactly as shown.
+  **Picking an ElevenLabs model.** `eleven_v3` is the newest and most expressive, `eleven_multilingual_v2` is the consistent-quality choice across many languages, and `eleven_flash_v2_5` is the fastest. Model names are the API IDs — type them exactly as shown.
 </Tip>
 
 ## Voice settings
 
 ### Voice
 
-The voice used for spoken replies. Kokoro has its own set; cloud engines let you load and pick from their available voices.
+Kokoro ships eight built-in voices — Heart, Bella, Nicole, and Sky (US female), Adam and Michael (US male), Emma and George (UK) — with Heart as the default. Cloud engines let you load and pick from their own lists:
 
 - **OpenAI-compatible** — `alloy`, `ash`, `ballad`, `coral`, `echo`, `fable`, `nova`, `onyx`, `sage`, `shimmer`, `verse`.
 - **ElevenLabs** — a voice ID from the Voices tab in your ElevenLabs dashboard.
@@ -44,17 +60,16 @@ The voice used for spoken replies. Kokoro has its own set; cloud engines let you
 
 ### Kokoro precision
 
-*fp32, q8.*
+*fp32, fp16, q8, q4, q4f16. Default: fp32.*
 
-**fp32** is highest quality; **q8** is faster on CPU. Changing this reloads the model.
+fp32 is the highest quality and the right choice when WebGPU is available. If you have a weak GPU or none, a quantized option is dramatically faster on CPU — **q8** is the usual pick, **q4** the fastest. Changing this reloads the model.
 
 ### Playback speed
 
-*Default: 1×.*
+*Default: 1×. Range 0.25×–4×.*
 
-Adjust faster or slower to taste. ElevenLabs supports 0.7×–1.2× only.
+Presets run 0.5× to 3×, and you can type any value in between. Applied locally for Kokoro and natively for remote engines that support it. ElevenLabs accepts 0.7×–1.2× only, so values outside that are clamped for that engine.
 
 ### Test voice
 
-Play a short sample with the current settings before you commit.
-
+Plays a short sample with the current settings before you commit — the fastest way to catch a bad key, a wrong voice name, or an output device pointed somewhere you're not listening.

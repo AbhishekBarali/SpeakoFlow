@@ -4,21 +4,37 @@ description: "Tune how the SpeakoFlow assistant carries a conversation: how much
 icon: "sliders"
 ---
 
-Tune how the assistant carries a conversation and how long its answers run.
+Tune how the assistant carries a conversation and how long its answers run, in *Settings → Assistant → Behavior*.
 
 ## Conversation memory
 
-How many recent messages are sent as context each turn. Higher keeps more of the thread in mind; **0** disables it and treats every message as standalone.
+*Default: 12. Range 0–200.*
+
+How many recent messages are sent as context each turn. Higher keeps more of the thread in mind at the cost of a bigger prompt; **0** disables it and treats every message as standalone.
+
+Cloud providers get exactly the number you ask for. Azure and local engines (the built-in one, or an Ollama/LM Studio server on loopback) also get a character cap on top, because Azure's gateway rejects oversized request bodies and a local model runs a small context window — sending your full history there would fail rather than work slowly. Turns carrying a screenshot trim harder on those same providers, since the image already dominates the budget.
 
 ## Summarize long chats
 
-When a conversation grows past the model's context window, automatically condense older messages into a running summary so the chat keeps its context instead of forgetting the start. A subtle indicator shows while it runs.
+*Default: on.*
+
+Once the un-summarized part of a conversation grows past your Conversation memory window, the oldest of those messages are folded into a rolling summary instead of being dropped, keeping the six most recent turns verbatim. The summary is injected as a context note ahead of the history, so a long chat keeps its beginning in condensed form rather than forgetting it.
+
+The fold runs in the background after a reply finishes, so it never delays an answer, and a subtle indicator shows while it's working. If it fails, the summary is left alone and the next turn tries again.
+
+Turn it off and a long conversation simply loses its oldest messages once they fall outside the window.
+
+<Tip>
+  You can also compact a conversation on demand by typing `/summarize` in the panel. That one replaces the visible transcript with its summary, rather than working quietly in the background.
+</Tip>
 
 ## Response length
 
-*No effect, Short, Medium, Long.*
+*No effect, Short, Medium, Long. Default: No effect.*
 
-Preferred reply length. "No effect" leaves your prompt untouched. Individual [profiles](/personalize/profiles) can override this.
+Appends a length instruction to the system prompt at request time. "No effect" adds nothing and leaves your prompt exactly as written.
+
+Each option tells the model to still match your intent, so a greeting gets a short friendly reply even on **Long** rather than a padded one. Individual [profiles](/personalize/profiles) can override this, and the profile's choice wins for its own turns.
 
 <Note>
   This is short-term, per-conversation context. For durable facts the assistant remembers *across* chats, see [Personal memory](/personalize/memory) — a separate, opt-in feature.

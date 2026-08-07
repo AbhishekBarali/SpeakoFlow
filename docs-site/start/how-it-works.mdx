@@ -24,11 +24,11 @@ When you dictate, your audio flows through a local pipeline:
   </Step>
 
   <Step title="Voice-activity detection" icon="filter">
-    Silence is filtered out, so pauses while you think don't become gaps in your text.
+    Silero VAD filters out silence, so pauses while you think don't become gaps in your text.
   </Step>
 
   <Step title="Speech-to-text, on your hardware" icon="microchip">
-    The model runs on your GPU, or your CPU if no GPU is available. See [Acceleration & GPU](/models/acceleration).
+    whisper.cpp or Parakeet runs the model on your GPU, or your CPU if no GPU is available. See [Acceleration & GPU](/models/acceleration).
   </Step>
 
   <Step title="Text into the active app" icon="clipboard">
@@ -36,7 +36,13 @@ When you dictate, your audio flows through a local pipeline:
   </Step>
 </Steps>
 
-Nothing in that chain touches the network.
+Nothing in that chain touches the network. The two things that can add a network hop after it are both opt-in and clearly marked: [AI cleanup](/writing/ai-cleanup) and [Generate with Flow](/writing/generate-with-flow) hand the text to whichever model provider you configured, which may be the fully local built-in engine.
+
+## What the assistant does with a question
+
+An assistant turn isn't a single request. The model is given a small set of tools — web search and the current date and time — and decides for itself whether it needs them, up to a bounded number of rounds so a turn can't loop indefinitely. Web search is only offered as a tool when you've turned it on, so with it off the assistant simply answers from what it knows.
+
+Screen vision works the same way: nothing is captured unless you ask for it, and only the monitor under your mouse cursor is grabbed. The full-resolution frame goes to the model once; only a small thumbnail is kept locally so you can see what it looked at.
 
 ## Local-first, your choice
 
@@ -60,9 +66,11 @@ See [Brain: local or cloud](/assistant/brain) to set this up, and [Privacy](/ref
 
 ## Settings, organized the same way
 
-The Settings window mirrors this guide:
+The Settings window has five sections, and a sixth that only appears once you turn on debug mode:
 
-- **[General](/settings/general)** — shortcuts, microphone, appearance
-- **Dictation** — the model and how text is cleaned up
-- **Assistant** — [brain](/assistant/brain), [voice](/assistant/voice-output), [screen vision](/assistant/screen-vision), [web search](/assistant/web-search)
-- **[Profiles](/personalize/profiles)**, **[Memory](/personalize/memory)**, **[History](/personalize/history)**, and **[Debug](/settings/debug)**
+- **[General](/settings/general)** — shortcuts, microphone, appearance, language, and the Experimental features toggle
+- **Dictation** — the model, [AI cleanup](/writing/ai-cleanup), [Generate with Flow](/writing/generate-with-flow), and text handling
+- **Assistant** — [brain](/assistant/brain), [voice](/assistant/voice-output), [screen vision](/assistant/screen-vision), [web search](/assistant/web-search), plus [Profiles](/personalize/profiles) and [Memory](/personalize/memory) as drill-down pages
+- **[History](/personalize/history)** — past dictations, Flow generations, and assistant chats
+- **[About](/reference/about)** — version, update check, license, and where your data lives
+- **[Debug](/settings/debug)** — hidden until you press `Ctrl` + `Shift` + `D` (`Cmd` + `Shift` + `D` on macOS) with the settings window focused

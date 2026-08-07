@@ -1,35 +1,48 @@
 ---
 title: "Getting started"
-description: "Install SpeakoFlow, pick a speech-to-text model, grant microphone and accessibility permissions, and dictate your first sentence. The whole thing takes a couple of minutes."
+description: "Install SpeakoFlow, grant microphone and accessibility permissions, pick a speech-to-text model, optionally add a local assistant model, and dictate your first sentence."
 icon: "rocket"
 ---
 
-Install the app, pick a model, and dictate your first sentence. The whole thing takes a couple of minutes.
+Install the app, run the three-step wizard, and dictate your first sentence. The whole thing takes a couple of minutes.
 
 <Steps>
   <Step title="Install" icon="download">
     Download SpeakoFlow for your platform and install it. Full per-platform instructions, including the one-time macOS Terminal command, are on [Install SpeakoFlow](/start/install).
   </Step>
 
-  <Step title="Run the setup wizard" icon="wand-magic-sparkles">
-    On first launch, a short wizard walks you through two steps:
-
-    1. **Hear you.** Choose a speech-to-text model. This turns your voice into text right on your machine. Pick one now — you can switch anytime in Settings. A fast English model or a real-time multilingual model are good starting points.
-    2. **Give it a brain (optional).** Optionally download a small local model for the assistant and AI cleanup. You can skip this and set it up later under *Settings → Assistant → On my device*.
-
-    Models download in the background. You can start using the app right away, and any other model is one click away in Settings. See [Transcription models](/models/transcription-models) for the full catalog.
-  </Step>
-
   <Step title="Grant permissions" icon="lock">
-    SpeakoFlow needs two permissions to work:
+    On macOS and Windows the wizard opens with a permissions screen, because nothing else works until these are granted. It skips itself if you've already granted them, and it doesn't appear on Linux.
 
-    - **Microphone access** — required to hear your voice for transcription.
-    - **Accessibility access** (macOS) — required to type transcribed text into your applications.
+    - **Microphone access** (macOS and Windows) — required to hear your voice.
+    - **Accessibility access** (macOS only) — required to type transcribed text into your applications.
 
-    If you skip these during setup, you'll be prompted again the first time they're needed. See [Troubleshooting](/reference/troubleshooting) if a permission gets stuck.
+    If you skip these, you'll be prompted again the next time SpeakoFlow starts and finds them missing. See [Troubleshooting](/reference/troubleshooting) if a permission gets stuck.
   </Step>
 
-  <Step title="Say your first sentence" icon="microphone">
+  <Step title="Step 1 — pick a voice model" icon="microphone">
+    Choose a speech-to-text model. This is the part that turns your voice into text, and it runs entirely on your machine. Pick one now — you can switch anytime in *Settings → Dictation*. A fast English model or a real-time multilingual model are both good starting points.
+
+    The download runs in the background, so you don't have to wait here. See [Transcription models](/models/transcription-models) for the full catalog.
+  </Step>
+
+  <Step title="Step 2 — give it a brain (optional)" icon="brain">
+    Optionally download a local model for the assistant and AI cleanup. Three Gemma 4 sizes are offered, and the badge is editorial rather than inferred from your hardware:
+
+    - **Quick** (E2B) — responds fastest, less capable on complex requests.
+    - **Balanced** (E4B, recommended) — the best conversational quality-to-latency tradeoff.
+    - **Capable** (12B) — more capable, but noticeably slower.
+
+    Tapping a card starts the download and immediately flips the footer to *Continue*, so you can move on while it finishes. The built-in assistant provider is only pointed at the model once the weights are actually on disk, which means a failed or cancelled download can't leave the assistant set to a model you don't have.
+
+    *Skip for now* is always available. You can add or change this later under *Settings → Assistant*, including pointing at a local server or a cloud provider instead — see [Brain: local or cloud](/assistant/brain).
+  </Step>
+
+  <Step title="Step 3 — you're ready" icon="keyboard">
+    The last screen shows your two shortcuts as real keycaps and a status line for anything still downloading. Your hotkeys are already live at this point.
+  </Step>
+
+  <Step title="Say your first sentence" icon="comment">
     Open any text field — an email, an editor, a chat box — then hold your Dictate shortcut and talk. Let go, and your words type themselves. That's the whole loop.
 
     | Action | Windows | macOS | Linux |

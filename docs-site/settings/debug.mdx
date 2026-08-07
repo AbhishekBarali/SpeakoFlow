@@ -1,44 +1,67 @@
 ---
 title: "Debug & advanced"
-description: "SpeakoFlow diagnostics and fine-grained settings: logs, word correction threshold, paste delay, extra recording buffer, keyboard backend, and the experimental features toggle."
+description: "SpeakoFlow's hidden Debug section: how to reveal it, the log level and where logs are written, and the fine-grained word-correction, paste-delay, and recording-buffer sliders."
 icon: "bug"
 ---
 
-Diagnostics and fine-grained knobs. Open the Debug section with `Ctrl` + `Shift` + `D` (`Cmd` + `Shift` + `D` on macOS). Most people never need these.
+Press `Ctrl` + `Shift` + `D` (`Cmd` + `Shift` + `D` on macOS) with the Settings window focused. That toggles debug mode, which adds a **Debug** item to the sidebar. Press it again to hide the section. Most people never need anything in here.
 
-## Log directory & log level
+Turning debug mode on doesn't change how SpeakoFlow behaves, with one exception: it adds an extra **After 15 seconds (Debug)** choice to the model-unload dropdowns so reload behavior is quick to test.
 
-Where logs are written, and how verbose they are. Raise the level when reporting a bug.
+## Log level
+
+*Error, Warn, Info, Debug, Trace. Default: Debug.*
+
+How much detail goes into the log **file**. Raise it to Trace when reproducing a bug you're about to report; Debug is already fairly verbose, so most reports don't need changing this at all.
+
+Console output is filtered separately by the `RUST_LOG` environment variable, so running SpeakoFlow from a terminal with `RUST_LOG=trace` gives you a live firehose without touching this setting.
+
+Launching with the `--debug` flag raises logging to Trace for that run only, without writing anything to your saved settings. It doesn't reveal this section — the keyboard shortcut does that. See [Command-line flags](/settings/cli).
+
+### Where the logs are
+
+The log file is named `speakoflow` and lives in your platform's standard application log directory — or in `Data/logs` next to the executable when you're running in portable mode. Rather than documenting a path that varies by OS and install method, SpeakoFlow shows you the real one: *Settings → About → Folders* has both the log directory and the app data directory, each with a button that opens it in your file manager.
+
+Logs rotate at 500 KB and one previous file is kept, so they can't grow without bound. That also means a long session can push out earlier detail — capture the log soon after reproducing a problem.
 
 ## Word correction threshold
 
-Sensitivity for custom-word corrections — how aggressively SpeakoFlow snaps near-misses to your [custom words](/dictation/custom-words).
+*0.0 to 1.0. Default: 0.18.*
 
-## Clamshell microphone
+How aggressively SpeakoFlow snaps near-misses in the transcript to your [custom words](/dictation/custom-words). Higher is more willing to treat a loosely similar word as a match, which fixes more mishearings but risks rewriting words you actually said. The default is deliberately conservative.
 
-**macOS only.** Which microphone to use when the laptop lid is closed.
-
-## Mute while recording
-
-Mute system audio during recording so playback doesn't bleed into your dictation.
-
-## Keyboard implementation
-
-*handy-keys, Tauri global-shortcut.*
-
-Choose the shortcut backend. **handy-keys** supports modifier-only combos like `Ctrl`+`Super`. If a switch makes your shortcuts incompatible, they reset to defaults.
+This only affects the fuzzy correction pass, which is what non-Whisper models rely on. Whisper-family models get your custom words as a recognition prompt instead, so the threshold matters less to them.
 
 ## Paste delay
 
-How long to wait before pasting. Increase if the wrong text is occasionally pasted.
+*10–200 ms. Default: 60 ms.*
+
+How long to wait before pasting the transcript into the active app. Increase it if the wrong text is occasionally pasted — that's usually the target app not having finished processing the clipboard change before the paste keystroke arrives.
 
 ## Extra recording buffer
 
-How long to keep recording after you release the key, so trailing words aren't clipped.
+*0–1500 ms. Default: 0 ms.*
 
-## Experimental features
+Keeps recording for this long after you release the shortcut, so trailing words aren't clipped. Zero by default because voice-activity detection normally handles the tail; raise it if you consistently lose the last word or two.
 
-*Default: off.*
+## Feedback sound
 
-Reveal in-development features, like [AI cleanup](/writing/ai-cleanup).
+The same sound-theme picker as *Settings → General → Sounds*, repeated here for convenience while testing. See [General settings](/settings/general).
 
+## Check for updates
+
+The same toggle as *Settings → General → Startup and tray*, repeated here.
+
+## Clamshell microphone
+
+**macOS laptops only.** Which microphone to use when the lid is closed. The row appears only when SpeakoFlow detects an internal battery, so it never shows on a desktop Mac, Windows, or Linux. SpeakoFlow reads the lid state from the system and switches to this device automatically when the lid is shut — useful when your normal choice is the built-in microphone but that's unusable in clamshell mode.
+
+## Settings that used to be here
+
+Several rows moved out of Debug as the app was reorganized:
+
+- **Keyboard implementation**, **Whisper/ONNX acceleration**, and **Keep mic open between transcriptions** are now in *Settings → General → Experimental*, which requires **Experimental features** to be on.
+- **Mute while recording** is in *Settings → General → Sounds*.
+- **Experimental features** itself is in *Settings → General → System*.
+- **Always-on microphone** is in *Settings → Dictation → Output*.
+- **Log directory** and **App data directory** are in *Settings → About → Folders*.

@@ -1,6 +1,6 @@
 ---
 title: "Troubleshooting"
-description: "Fixes for the most common SpeakoFlow issues: the macOS \"app is damaged\" message, blocked microphone access, text that won't type, the Linux overlay, and clipped or wrong pastes."
+description: "Fixes for the most common SpeakoFlow issues: the macOS \"app is damaged\" message, blocked microphone access, text that won't type, Linux hotkey permissions and the floating overlay, and clipped or wrong pastes."
 icon: "life-ring"
 ---
 
@@ -22,7 +22,7 @@ Fixes for the issues people hit most often.
   <Accordion title="The AppImage has no icon or menu entry" icon="linux">
     Expected. An AppImage is one self-contained file and can't register an icon or app-menu entry with your desktop, so the file stays generic in your file manager. The icon does appear once the app is running.
 
-    Install the `.deb` instead if you're on Ubuntu 24.04+ or Debian 13, or use a helper like Gear Lever or AppImageLauncher. Details in [Install → Linux](/start/install).
+    Install the `.deb` instead if you're on Debian, Ubuntu 24.04+, Mint 22+, Pop!\_OS, or Tuxedo OS, or use a helper like Gear Lever or AppImageLauncher. Details in [Install → Linux](/start/install).
   </Accordion>
 
   <Accordion title="Microphone access is blocked" icon="microphone-slash">
@@ -40,12 +40,38 @@ Fixes for the issues people hit most often.
   </Accordion>
 
   <Accordion title="The recording overlay won't stay on top (Linux)" icon="window-restore">
-    The overlay has to float above every other window, which on Linux requires either the `wlr-layer-shell` protocol (wlroots compositors like Sway and Hyprland, and KDE Plasma) or classic X11 "keep above" stacking. Native GNOME/Wayland supports neither.
+    The overlay has to float above every other window, which on Linux requires either the `wlr-layer-shell` protocol (wlroots compositors like Sway and Hyprland, and KDE Plasma) or classic X11 "keep above" stacking. **Native GNOME/Wayland supports neither** — Mutter deliberately doesn't implement `wlr-layer-shell`, and Wayland gives apps no way to raise themselves above others.
 
-    SpeakoFlow handles this automatically: when it detects GNOME on Wayland it runs under XWayland, where "keep above" works. If you need to override the behavior:
+    SpeakoFlow handles this automatically: when it detects GNOME on Wayland it runs under XWayland, where "keep above" works and the overlay floats normally. This is on by default and needs no setup. X11 sessions and KDE/wlroots Wayland already work out of the box and are left on native Wayland.
 
-    - Force native Wayland anyway (overlay may not stay on top): launch with `SPEAKOFLOW_ALLOW_WAYLAND=1`.
-    - If the overlay misbehaves under a layer-shell compositor, disable layer shell with `SPEAKOFLOW_NO_GTK_LAYER_SHELL=1`.
+    Two escape hatches, if you need them:
+
+    - **Force native Wayland anyway** (the overlay may not stay on top): launch with `SPEAKOFLOW_ALLOW_WAYLAND=1`.
+    - **Disable layer shell**, if the overlay misbehaves under a layer-shell compositor: `SPEAKOFLOW_NO_GTK_LAYER_SHELL=1`.
+
+    Setting `GDK_BACKEND` yourself always wins — SpeakoFlow never overrides an explicit choice.
+  </Accordion>
+
+  <Accordion title="Hotkeys do nothing, and the log repeats &quot;PermissionDenied&quot; (Linux)" icon="key">
+    If dictation and the assistant hotkeys don't respond and your log repeats `rdev grab error: ... PermissionDenied` (errno 13), the app can't read your input devices. This affects the **handy-keys** keyboard engine, which reads `/dev/input/event*` and needs your user in the `input` group.
+
+    Two ways to fix it. Either grant access:
+
+    ```bash
+    sudo usermod -aG input $USER
+    ```
+
+    Then log out and back in — group membership only applies to new sessions.
+
+    Or switch the keyboard engine to **Tauri** in [Debug settings](/settings/debug), which uses the compositor's global-shortcut API and needs no special permissions. Tauri is already the default engine on Linux, so this only affects you if you switched to handy-keys.
+  </Accordion>
+
+  <Accordion title="The app crashes when you pinch-to-zoom on a touchpad (Linux)" icon="hand">
+    On some Linux setups a trackpad pinch-to-zoom gesture crashes the window, with `Received invalid message: 'DrawingArea_CommitTransientZoom'` in the logs.
+
+    This is a bug in **WebKitGTK**, the Linux web engine Tauri uses, not in SpeakoFlow, and it affects many WebKitGTK-based apps. It's tracked upstream in [tauri#13115](https://github.com/tauri-apps/tauri/issues/13115) and [wry#544](https://github.com/tauri-apps/wry/issues/544).
+
+    Until there's an upstream fix, avoid pinch-to-zoom inside the app window. Updating your system's `webkit2gtk-4.1` packages to the latest version can also help, since newer releases handle the gesture more gracefully.
   </Accordion>
 
   <Accordion title="The wrong text pastes, or words get clipped" icon="clipboard">

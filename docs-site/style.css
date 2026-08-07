@@ -1,0 +1,311 @@
+/* ---------------------------------------------------------------------------
+   SpeakoFlow docs — readability layer
+   ---------------------------------------------------------------------------
+   Mintlify auto-includes every .css file in the content directory on every
+   page; this file is not referenced from docs.json.
+
+   Scope: typography and spacing only. No colors are redefined beyond text
+   tone, so the `maple` theme and the #0A7A70 primary in docs.json stay in
+   charge of brand.
+
+   Selector hooks are Mintlify's documented ones (ID selectors like
+   #content-area, element selectors like mdx-content / callout / step).
+   Those are explicitly "subject to change", so keep this file small and
+   easy to re-check after a Mintlify upgrade.
+
+   `!important` appears on a handful of properties only, where a Tailwind
+   utility class on the same element would otherwise win.
+   --------------------------------------------------------------------------- */
+
+/* --- 1. Measure -----------------------------------------------------------
+   The single biggest readability win. Unconstrained prose on a wide monitor
+   runs past 120 characters per line, which makes the eye lose its place on
+   the return sweep. 68ch lands around 75-80 characters at this font size.
+
+   Applied to DIRECT children of mdx-content only, so tables, cards, code
+   blocks, frames, and step bodies keep the full column width they need. */
+
+mdx-content > p,
+mdx-content > ul,
+mdx-content > ol,
+mdx-content > blockquote,
+mdx-content > h1,
+mdx-content > h2,
+mdx-content > h3,
+mdx-content > h4 {
+  max-width: 68ch;
+}
+
+/* --- 2. Body text -------------------------------------------------------- */
+
+mdx-content {
+  font-size: 1.0625rem; /* 17px — Inter runs small at 16px */
+  line-height: 1.7 !important;
+  /* Inter reads better with a touch of negative tracking at body size. */
+  letter-spacing: -0.011em;
+}
+
+mdx-content p {
+  line-height: 1.7 !important;
+  margin-block: 0 1.1em;
+}
+
+/* Paragraph colour: pure black on white and pure white on near-black are both
+   harsher than they need to be for long reading. Pull each back slightly. */
+mdx-content p,
+mdx-content li {
+  color: #26312f;
+}
+
+.dark mdx-content p,
+.dark mdx-content li {
+  color: #c9d1cf;
+}
+
+/* --- 3. Heading rhythm ---------------------------------------------------
+   Headings should sit close to the text they introduce and far from the text
+   they follow. Mintlify's defaults are more symmetrical than that, which
+   makes long pages read as one undifferentiated column.
+
+   The hairline above each h2 is what actually makes a dense settings page
+   scannable — it turns "one long page" into visible sections. */
+
+mdx-content h2 {
+  margin-top: 3.25rem !important;
+  margin-bottom: 0.85rem !important;
+  padding-top: 1.6rem;
+  border-top: 1px solid rgb(0 0 0 / 0.07);
+  font-size: 1.5rem;
+  line-height: 1.3;
+  letter-spacing: -0.02em;
+}
+
+.dark mdx-content h2 {
+  border-top-color: rgb(255 255 255 / 0.09);
+}
+
+/* First h2 on a page follows the intro paragraph, not a previous section, so
+   it doesn't need the divider. */
+mdx-content > h2:first-of-type {
+  border-top: none;
+  padding-top: 0;
+  margin-top: 2.25rem !important;
+}
+
+mdx-content h3 {
+  margin-top: 2.25rem !important;
+  margin-bottom: 0.6rem !important;
+  font-size: 1.175rem;
+  line-height: 1.35;
+  letter-spacing: -0.015em;
+}
+
+mdx-content h4 {
+  margin-top: 1.75rem !important;
+  margin-bottom: 0.5rem !important;
+}
+
+/* Avoid single-word last lines in headings. */
+#page-title,
+mdx-content h2,
+mdx-content h3,
+mdx-content h4 {
+  text-wrap: balance;
+}
+
+#page-title {
+  letter-spacing: -0.025em;
+}
+
+/* The frontmatter description under the page title is the page's promise —
+   give it a readable size instead of fine print. */
+#page-title + p,
+#header p {
+  font-size: 1.0625rem;
+  line-height: 1.6;
+  max-width: 64ch;
+}
+
+/* --- 4. Lists -----------------------------------------------------------
+   These docs lean hard on the "- **Option** (default) — what it does"
+   pattern. Default list spacing packs those together so the bold labels
+   stop functioning as separate entries. */
+
+mdx-content ul,
+mdx-content ol {
+  margin-block: 0 1.2em;
+}
+
+mdx-content li {
+  line-height: 1.65;
+  margin-block: 0.4em;
+}
+
+mdx-content li > p {
+  margin-block: 0 0.5em;
+}
+
+/* Nested lists sit tighter than top-level ones. */
+mdx-content li > ul,
+mdx-content li > ol {
+  margin-block: 0.45em 0.45em;
+}
+
+/* --- 5. Inline code -----------------------------------------------------
+   Key names and setting fields are marked up as inline code throughout, so a
+   single paragraph can carry six or seven of them. The default treatment is
+   loud enough that they fragment the sentence. Quieter background, no
+   colour shift, slightly smaller. */
+
+mdx-content :not(pre) > code {
+  font-size: 0.885em;
+  padding: 0.12em 0.36em;
+  border-radius: 0.3rem;
+  font-weight: 450;
+  background-color: rgb(10 122 112 / 0.07);
+  border: 1px solid rgb(10 122 112 / 0.13);
+  white-space: nowrap;
+}
+
+.dark mdx-content :not(pre) > code {
+  background-color: rgb(45 212 191 / 0.1);
+  border-color: rgb(45 212 191 / 0.16);
+}
+
+/* --- 6. Tables ---------------------------------------------------------
+   The shortcut and platform-default matrices use <br /> inside cells, so
+   cells are multi-line and need top alignment and real vertical padding. */
+
+mdx-content table {
+  font-size: 0.9375rem;
+  line-height: 1.55;
+}
+
+mdx-content th,
+mdx-content td {
+  padding-block: 0.7rem;
+  padding-inline: 0.85rem;
+  vertical-align: top;
+}
+
+mdx-content th {
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+}
+
+/* Zebra striping reads better than borders alone once rows get tall. */
+mdx-content tbody tr:nth-child(even) {
+  background-color: rgb(0 0 0 / 0.018);
+}
+
+.dark mdx-content tbody tr:nth-child(even) {
+  background-color: rgb(255 255 255 / 0.022);
+}
+
+/* --- 7. Callouts -------------------------------------------------------
+   Note / Tip / Warning are used often. Keep them clearly set apart but stop
+   them shouting over the prose around them. */
+
+callout {
+  margin-block: 1.5rem;
+  line-height: 1.65;
+}
+
+callout p {
+  margin-block: 0 0.6em;
+  line-height: 1.65 !important;
+}
+
+callout p:last-child {
+  margin-bottom: 0;
+}
+
+/* --- 8. Steps and cards ------------------------------------------------ */
+
+step {
+  padding-bottom: 0.4rem;
+}
+
+step > :first-child {
+  margin-top: 0;
+}
+
+card {
+  line-height: 1.55;
+}
+
+/* --- 9. Chrome ---------------------------------------------------------
+   Slightly quieter, slightly roomier navigation. The sidebar has 7 groups
+   and 39 entries, so line spacing matters more than size here. */
+
+#sidebar-content li {
+  line-height: 1.45;
+}
+
+#table-of-contents {
+  font-size: 0.875rem;
+}
+
+toc-item {
+  line-height: 1.45;
+}
+
+/* Links inside prose: underline is the accessible affordance, but a solid
+   underline under every inline link in a dense paragraph is noisy. Offset it
+   and thin it, and keep the hover state obvious. */
+mdx-content p a,
+mdx-content li a,
+mdx-content td a {
+  text-underline-offset: 0.18em;
+  text-decoration-thickness: 1px;
+  text-decoration-color: rgb(10 122 112 / 0.45);
+}
+
+mdx-content p a:hover,
+mdx-content li a:hover,
+mdx-content td a:hover {
+  text-decoration-color: currentColor;
+}
+
+/* --- 10. Narrow screens ------------------------------------------------
+   The measure cap is a no-op below its own width, but the heading rhythm
+   above is tuned for desktop and wastes vertical space on a phone. */
+
+@media (max-width: 640px) {
+  mdx-content {
+    font-size: 1rem;
+  }
+
+  mdx-content h2 {
+    margin-top: 2.5rem !important;
+    padding-top: 1.25rem;
+    font-size: 1.375rem;
+  }
+
+  mdx-content h3 {
+    margin-top: 1.75rem !important;
+  }
+
+  mdx-content table {
+    font-size: 0.875rem;
+  }
+
+  mdx-content :not(pre) > code {
+    /* Long setting names must be allowed to wrap rather than force a
+       horizontal scroll on the whole page. */
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
+
+/* Respect users who ask for less motion; Mintlify animates some reveals. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

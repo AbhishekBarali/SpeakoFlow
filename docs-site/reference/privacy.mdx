@@ -1,16 +1,56 @@
 ---
 title: "Privacy"
-description: "SpeakoFlow is private by default: speech-to-text runs on your device, there is no telemetry or account, optional features stay off, and API keys live in your OS keychain."
+description: "Exactly what SpeakoFlow stores and where: speech-to-text runs on your device, there is no telemetry or account, optional features stay off, and API keys live in your OS keychain."
 icon: "shield-halved"
 ---
 
 Private by default, and honest about it.
 
-- **Your voice is transcribed on your device** and never uploaded. Speech-to-text always runs locally.
-- **The assistant only contacts the model provider you choose** — which can be a fully local one, with no network at all.
+- **Your voice is transcribed on your device** and never uploaded. Speech-to-text always runs locally, on your GPU or CPU.
+- **The assistant only contacts the model provider you choose** — which can be the fully offline built-in llama.cpp engine, a local server like Ollama or LM Studio, or a cloud provider with your own key.
 - **No telemetry, no account.** SpeakoFlow doesn't phone home.
-- **Optional features stay off until you turn them on** — [web search](/assistant/web-search) and [personal memory](/personalize/memory) are opt-in.
-- **Memory is stored on your device**, where you can view, edit, or erase it, and it refuses to keep secrets or personal identifiers.
-- **API keys live in your OS keychain**, not a plain-text file.
+- **Optional features stay off until you turn them on** — [web search](/assistant/web-search) and [personal memory](/personalize/memory) are both off by default.
+
+## What leaves your machine, and when
+
+Nothing leaves your machine unless a feature you enabled needs it to. The things that can make a network request are:
+
+| What | When | Where it goes |
+| --- | --- | --- |
+| Assistant, [AI cleanup](/writing/ai-cleanup), [Generate with Flow](/writing/generate-with-flow), spoken answers | Only when you use them, and only if you configured a remote provider | The provider you chose, and nowhere else |
+| [Web search](/assistant/web-search) | Off by default. When on, only when the assistant decides a search would help | Your chosen search backend |
+| Model downloads | When you download a transcription or local assistant model | The model host |
+| Update checks | On by default, toggleable in *Settings → General* | The GitHub releases page for this project |
+
+Pick a local provider for everything in the first two rows and the app never opens a connection at all.
+
+## Screen captures
+
+Screen vision captures nothing unless you ask it to, and then only the monitor under your mouse cursor. The full-resolution frame is sent once to the model provider you chose and is not kept. What persists locally is a small thumbnail attached to the message, so you can see later what the assistant was looking at. Details in [Screen vision](/assistant/screen-vision).
+
+## Personal memory
+
+Off by default. When you turn it on, everything is stored on this device in your settings file, and *Settings → Assistant → Memory* lets you read, edit, export, or erase every note. It's advisory only — injected memory never overrides what you asked for in the current message — and it actively refuses to keep secrets, personal identifiers, or instruction-shaped text at capture, consolidation, and injection time. An Incognito toggle skips both using and learning memory for a single conversation.
+
+## History and recordings
+
+*Settings → History* keeps your recent dictations, Flow generations, and assistant chats on this device. Two settings control how much is kept, and both apply to unstarred dictation and Flow recordings — starred recordings are always kept, and assistant chats are never counted or auto-deleted:
+
+- **Recording limit** — how many recordings to keep. Default 20.
+- **Auto-delete recordings** — *Keep a set number* (the default, which means the recording limit above does the trimming), *Never*, *After 3 days*, *After 2 weeks*, or *After 3 months*.
+
+Changes apply immediately, so lowering the limit deletes the excess right away.
+
+## API keys
+
+Provider API keys go into the OS credential store — Windows Credential Manager, the macOS Keychain, or the Linux Secret Service — under the service name `com.abhishekbarali.speakoflow`, not into a plain-text settings file. They're read back into memory once at load and cached there so the keychain is never touched in the hot path.
+
+<Note>
+  If the platform store isn't available — a headless Linux box with no Secret Service, for example — the app degrades to keeping the key in its settings file rather than losing it. On such a machine the key is on disk in plain text, so it's worth knowing.
+</Note>
+
+## Keyboard access
+
+Global shortcuts have to observe your keyboard to know when you pressed one. Nothing logs or stores what you type. On Linux the handy-keys engine reads `/dev/input/event*` directly, which is why it needs your user in the `input` group; the Tauri engine, the default on Linux, uses the compositor's global-shortcut API and reads nothing.
 
 See [How SpeakoFlow works](/start/how-it-works) for the full data flow, and [Providers & keys](/assistant/providers) for what gets sent where when you use a cloud model.

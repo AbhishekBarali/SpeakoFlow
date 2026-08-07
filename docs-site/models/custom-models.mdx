@@ -1,19 +1,41 @@
 ---
 title: "Custom models"
-description: "Search Hugging Face from inside SpeakoFlow and download GGUF models directly, including vision-capable assistant models and quantization choices like Q4_K_M."
+description: "Search Hugging Face from inside SpeakoFlow and download any GGUF assistant model directly, including vision-capable ones, and pick the quantization yourself."
 icon: "box"
 ---
 
-Beyond the built-in catalog, you can pull GGUF models straight from Hugging Face.
+Beyond the built-in catalog, you can pull any GGUF model from Hugging Face and run it as your local assistant model.
 
-In the model catalog, choose **Search Hugging Face** to find a GGUF model, pick a version, and download it directly to your device.
+<Note>
+  This is for **assistant** models only, not transcription models. Speech-to-text uses the curated catalog described in [Transcription models](/models/transcription-models); there's no equivalent search for it.
+</Note>
+
+Go to *Settings → Assistant → Browse and download models*, then choose **Browse Hugging Face**.
 
 <Warning>
-  This is an advanced option. Hardware needs and compatibility can vary, and custom models aren't officially supported.
+  This is an advanced option. Hardware needs and compatibility vary from model to model, and custom models aren't officially supported. A model that downloads fine can still fail to load or answer badly.
 </Warning>
 
-- Search by model or creator, or browse popular GGUF models.
-- Choose a quantization — **Q4_K_M** is usually the best balance of quality, speed, and memory.
-- For assistant models, optionally **include screen vision**, which downloads an extra file so the model can understand images.
+<Steps>
+  <Step title="Find a repository">
+    The dialog opens on the most-downloaded GGUF repositories on Hugging Face. Type to search by model or creator — results are ordered by downloads and capped at 25. Each result shows download and like counts, plus a **Vision** badge when the repository's tags mark it as multimodal.
+  </Step>
 
-See [Brain: local or cloud](/assistant/brain) for how custom models fit into the assistant, and [Screen vision](/assistant/screen-vision) for what vision-capable models unlock.
+  <Step title="Choose a quantization">
+    Open a repository and SpeakoFlow lists its downloadable `.gguf` files, smallest first, with the quantization label pulled out of each filename. **Q4_K_M** is flagged as recommended — it's usually the best balance of quality, speed, and memory.
+
+    Only files at the top level of the repository are offered, since those are the ones that can be downloaded directly. Importance-matrix files are filtered out because they aren't loadable models.
+  </Step>
+
+  <Step title="Optionally include screen vision">
+    If the repository ships a multimodal projector (`mmproj-*.gguf`), an **Include screen vision** toggle appears, on by default. It downloads that extra file alongside the weights so the model can read images — which is what [Screen vision](/assistant/screen-vision) needs. The toggle doesn't appear at all when the repository has no projector, and higher-precision projectors are preferred automatically.
+  </Step>
+
+  <Step title="Download">
+    The model is added to your catalog immediately and the download starts in the background, so you can close the dialog and watch progress on the model card. It uses the same resumable, retrying download path as the built-in models.
+  </Step>
+</Steps>
+
+Downloaded custom models appear under **Your models** in the assistant's model list, and are deletable like any other. SpeakoFlow remembers where each one came from — repository, download URL, and projector — in a `custom_models.json` file next to the models, so it can re-download one later instead of leaving you with an anonymous `.gguf` on disk.
+
+See [Brain: local or cloud](/assistant/brain) for how a local model fits into the assistant.

@@ -1,14 +1,20 @@
 ---
 title: "About & license"
-description: "Where SpeakoFlow keeps your data, the tech stack behind it, known limitations around code signing, and the MIT license and credits including Handy by CJ Pais."
+description: "What the About section shows, where SpeakoFlow keeps your data, the tech stack behind it, the roadmap, and the MIT license and credits including Handy by CJ Pais."
 icon: "circle-info"
 ---
 
 Where things live, and the people this is built on.
 
-## Folders
+## The About section
 
-The *About* section shows your app-data folder, where SpeakoFlow keeps your models, history, and settings, plus quick links to the model and settings locations.
+*Settings → About* is the small housekeeping page:
+
+- **Version** — the build you're running.
+- **Check for updates** — a manual check, the same one the tray item runs. The button is disabled if you turned automatic update checks off in *Settings → General*, which are on by default.
+- **App language** — the interface language.
+- **Source code** and **License** — links to the repository and the license file.
+- **Folders** — your app data folder (models, history, settings) and your log directory, each with a button to open it.
 
 ## Tech stack
 
@@ -21,9 +27,24 @@ The *About* section shows your app-data folder, where SpeakoFlow keeps your mode
 
 - **Code signing for Windows and macOS** is on the roadmap and not done yet. On macOS that means one Terminal command on first install ([steps here](/start/install)); on Windows it means SmartScreen may warn you the first time you run the installer. The release pipeline is already wired for signing — it needs the paid Apple Developer membership and a Windows certificate.
 - **Unsigned builds can't auto-update on macOS**, so updating means downloading the new `.dmg` and repeating the one-time command.
+- **macOS builds are Apple Silicon only.** GitHub retired its Intel build machines in December 2025, so there's currently no way to produce and test an Intel build. Intel Mac users can build from source.
+- **There's no Linux `.rpm`.** The packaging doesn't bundle the speech engine correctly, and shipping an `.rpm` that installs but can't transcribe would be worse than not shipping one. Fedora and openSUSE users should use the AppImage.
+
+## Roadmap
+
+- Code signing for Windows and macOS
+- A wider model catalog and more one-click local models
+- More community translations
+- Voice-to-text tuned for agentic coding
+- Prompt-engineering help: describe what you want to build and get a solid prompt back
+- Voice commands: trigger actions and complete tasks by voice
 
 ## License & credits
 
-SpeakoFlow is open source under the **MIT License**. It started as a fork of [Handy](https://github.com/cjpais/Handy) by CJ Pais (also MIT), which provides the local dictation core. Thanks also to Tauri, whisper.cpp, llama.cpp, Silero VAD, and Kokoro.
+SpeakoFlow is open source under the **MIT License**.
+
+Its dictation core comes from [Handy](https://github.com/cjpais/Handy) by CJ Pais, used under the MIT license — the Whisper/Parakeet pipeline, VAD, overlay, and settings architecture all trace back to that project. Thanks to CJ for making it open. The assistant, screen vision, Generate with Flow, translation, text-to-speech, and memory layers are SpeakoFlow's own.
+
+Thanks also to [Tauri](https://tauri.app), whisper.cpp, llama.cpp, Silero VAD, and [Kokoro](https://github.com/hexgrad/kokoro).
 
 Have an idea or hit a bug not covered here? Open an [issue](https://github.com/AbhishekBarali/SpeakoFlow/issues) or check the [repository](https://github.com/AbhishekBarali/SpeakoFlow).

@@ -6,31 +6,42 @@ icon: "users"
 
 Task-focused personas you switch between. Each profile sets the assistant's name, role, instructions, and how long its replies run. Switch anytime from the panel header.
 
-Manage them in *Settings → Profiles*.
+Manage them in *Settings → Assistant → Profiles*.
+
+## The built-in profiles
+
+Four ship with the app. All of them are editable and duplicatable; only **Assistant** can't be deleted, because the assistant always needs a base persona to fall back to.
+
+- **Assistant** — balanced, general-purpose help. Uses your global reply length.
+- **Companion** — warm, empathetic support for talking something through. Medium-length replies.
+- **Quick** — fast, friendly, to the point, usually one or two sentences. Short replies.
+- **Unfiltered** — blunt, honest feedback with no sugar-coating. Uses your global reply length.
+
+Edited a built-in and want it back? *Restore default* resets that one profile to the version shipped with the app. Deleted one? *Restore built-ins* in the "⋯" menu re-adds any that are missing and leaves your own profiles alone.
 
 ## Creating a profile
 
-Start from scratch, duplicate an existing one, or use **Create with AI** — describe the persona you want (e.g. "a concise release-notes writer" or "a patient tutor who explains every step") and SpeakoFlow drafts it. You can even dictate the description.
+Start from scratch, duplicate an existing one, or use **Create with AI** — describe the persona you want (e.g. "a concise release-notes writer" or "a patient tutor who explains every step") and SpeakoFlow drafts its name, instructions, and greeting. You can dictate the description straight into the box with the mic button.
 
 ## Each profile has
 
 ### Name & role
 
-Shown on the card and in the panel.
+Shown on the card and in the panel. The role is a one-line subtitle for your own benefit — it's cosmetic and never reaches the model.
 
 ### Avatar
 
-Upload an image or use the default.
+Upload an image, or leave it empty. The built-ins each get a designed icon; your own profiles get their initial on a color picked from the profile's ID, so each one keeps a consistent look.
 
 ### Instructions
 
-The system prompt that shapes its personality.
+The system prompt that shapes its personality. This replaces the global assistant system prompt for that profile's turns.
 
 ### Response length
 
-*Short, Medium, Long, Inherit global.*
+*Inherit global (default), Short, Medium, Long.*
 
-Choose *Inherit global* to follow your main [Assistant setting](/assistant/behavior).
+*Inherit global* follows your main [Assistant setting](/assistant/behavior). Anything else wins for this profile's turns, so a "Quick" persona can stay short while an in-depth one runs long.
 
 ### Greeting
 
@@ -38,8 +49,8 @@ An optional opening line shown in an empty chat.
 
 ## Import & export
 
-Share profiles or back them up. Export a profile to a file and import it on another machine. You can restore the built-in profiles at any time.
+Share profiles or back them up. Export the selected profile to a JSON file and import it on another machine.
 
-<Tip>
-  There's a built-in **Cat** profile that ignores the AI entirely and just meows. Nothing to configure — it's there for fun.
-</Tip>
+<Note>
+  Profiles apply to the assistant panel only. [Generate with Flow](/writing/generate-with-flow) and [AI cleanup](/writing/ai-cleanup) deliberately ignore them — both are stateless single-shot passes that use only their own prompt, so a paste stays predictable no matter which persona is active.
+</Note>
