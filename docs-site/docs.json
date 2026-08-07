@@ -52,8 +52,8 @@
       {
         "header": "Help",
         "items": [
-          { "label": "Troubleshooting", "href": "/reference/troubleshooting" },
-          { "label": "Privacy", "href": "/reference/privacy" },
+          { "label": "Troubleshooting", "href": "/docs/reference/troubleshooting" },
+          { "label": "Privacy", "href": "/docs/reference/privacy" },
           { "label": "Report an issue", "href": "https://github.com/AbhishekBarali/SpeakoFlow/issues" }
         ]
       }
