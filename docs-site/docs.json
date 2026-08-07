@@ -68,8 +68,10 @@
   "seo": {
     "indexing": "navigable",
     "metatags": {
+      "canonical": "https://www.speakoflow.com/docs",
       "og:site_name": "SpeakoFlow Documentation",
       "og:type": "website",
+      "og:url": "https://www.speakoflow.com/docs",
       "twitter:card": "summary_large_image"
     },
     "organization": {
