@@ -76,10 +76,15 @@ if [[ "$(uname -s)" != Linux ]] || ! command -v pacman >/dev/null 2>&1; then
   exit 1
 fi
 
+# Pacman-installable build dependencies only. `bun` and the Rust toolchain are
+# deliberately absent: bun ships through the AUR (bun-bin), not the official
+# repositories, so `pacman -S bun` aborts the whole install with "target not
+# found" — including for people who installed bun from bun.sh, as BUILD.md
+# tells them to. Rust is likewise usually installed through rustup.rs rather
+# than pacman. Both are verified as runnable commands further down instead.
 arch_dependencies=(
   alsa-lib
   base-devel
-  bun
   cmake
   glslang
   gtk-layer-shell
@@ -95,7 +100,6 @@ arch_dependencies=(
   patchelf
   pipewire
   pkgconf
-  rustup
   shaderc
   spirv-headers
   vulkan-headers
@@ -115,6 +119,10 @@ fi
 for command_name in bun cargo cmake pkg-config; do
   if ! command -v "$command_name" >/dev/null 2>&1; then
     echo "ERROR: required build command is unavailable: $command_name" >&2
+    case "$command_name" in
+      bun) echo "Install it from https://bun.sh, or from the AUR: bun-bin" >&2 ;;
+      cargo) echo "Install Rust from https://rustup.rs, or: sudo pacman -S rustup" >&2 ;;
+    esac
     exit 1
   fi
 done

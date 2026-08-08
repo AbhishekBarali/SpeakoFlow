@@ -469,6 +469,14 @@ const AssistantPanel: React.FC = () => {
   const tts = useKokoroTts(ttsEnabled, ttsVoice, ttsDtype, ttsSpeed);
   const speakRef = useRef(tts.speak);
   speakRef.current = tts.speak;
+  // The event listeners are registered once on mount, so the streaming calls are
+  // reached through refs that always point at the latest closures.
+  const beginStreamRef = useRef(tts.beginStream);
+  beginStreamRef.current = tts.beginStream;
+  const pushTextRef = useRef(tts.pushText);
+  pushTextRef.current = tts.pushText;
+  const endStreamRef = useRef(tts.endStream);
+  endStreamRef.current = tts.endStream;
 
   useEffect(() => setMounted(true), []);
 
@@ -722,6 +730,29 @@ const AssistantPanel: React.FC = () => {
           // Ignore a reply that was emitted just before a Stop.
           if (suppressTtsRef.current) return;
           void speakRef.current(e.payload);
+        }),
+      );
+
+      // Streamed speech: the backend opens a reply, feeds sentences as the model
+      // writes them, then closes it. Kokoro keeps one splitter open across the
+      // whole reply so it reads a continuous answer rather than isolated clips.
+      track(
+        await listen<number>("assistant-tts-begin", (e) => {
+          if (suppressTtsRef.current) return;
+          void beginStreamRef.current(e.payload);
+        }),
+      );
+
+      track(
+        await listen<string>("assistant-tts-chunk", (e) => {
+          if (suppressTtsRef.current) return;
+          pushTextRef.current(e.payload);
+        }),
+      );
+
+      track(
+        await listen("assistant-tts-end", () => {
+          endStreamRef.current();
         }),
       );
 

@@ -507,6 +507,13 @@ pub fn take_transcribe_redirect() -> bool {
     TRANSCRIBE_REDIRECT.swap(false, Ordering::SeqCst)
 }
 
+/// Whether the recording in progress is destined for the assistant. A read-only
+/// peek — `take_transcribe_redirect` consumes the flag — so cancellation can
+/// tell an assistant voice turn apart from a plain dictation.
+pub fn is_transcribe_redirected() -> bool {
+    TRANSCRIBE_REDIRECT.load(Ordering::SeqCst)
+}
+
 /// One-shot "deliver this dictation's transcript to the app's own UI as an
 /// event, instead of pasting it into the focused OS window" flag. Set when an
 /// in-app dictation (source `"in-app"`, e.g. the Create-with-AI persona
@@ -1060,8 +1067,34 @@ pub fn show_assistant_voice_overlay(app: &AppHandle) {
         return;
     }
 
-    set_panel_collapsed(app, true);
+    // Don't fight a panel the user opened deliberately: when the full chat is
+    // already on screen, leave it expanded and let the turn stream into it.
+    // Only an absent or already-collapsed panel is forced into the compact
+    // overlay form.
+    if is_panel_collapsed() || !panel_is_visible(app) {
+        set_panel_collapsed(app, true);
+    }
     show_assistant_panel(app);
+}
+
+/// Dismiss the transient collapsed voice overlay, if it is actually on screen.
+/// A no-op when the panel is hidden or expanded, so a cancellation never ends
+/// the conversation — `hide_assistant_panel` triggers memory distillation — for
+/// a surface the user cannot even see.
+pub fn dismiss_voice_overlay(app: &AppHandle) {
+    if !is_panel_collapsed() {
+        return;
+    }
+    if panel_is_visible(app) {
+        hide_assistant_panel(app);
+    }
+}
+
+/// Whether the assistant panel window exists and is currently on screen.
+fn panel_is_visible(app: &AppHandle) -> bool {
+    app.get_webview_window(PANEL_LABEL)
+        .and_then(|window| window.is_visible().ok())
+        .unwrap_or(false)
 }
 
 /// Whether the assistant panel is currently collapsed to the pill. Lets the
@@ -2337,6 +2370,34 @@ pub async fn run_assistant_turn(
     // Accumulate streamed tokens so a cancelled turn can keep the partial reply.
     let partial = Arc::new(Mutex::new(String::new()));
 
+    // Speak while the model is still writing. Without this the reply is
+    // generated in full, *then* synthesized, *then* played — three waits in a
+    // row, and several seconds of silence before the first word. Feeding
+    // completed sentences to the voice engine as they appear removes the first
+    // two, so speech starts about as soon as the first sentence exists.
+    //
+    // The epoch is captured here, before generation, so a Stop pressed mid-reply
+    // supersedes every chunk including ones still being synthesized.
+    let speech = if settings.assistant_tts_enabled {
+        // Supersede any reply still being spoken. Asking a follow-up while the
+        // previous answer is still talking should replace it, not talk over it or
+        // queue behind it — and bumping the epoch first also guarantees this
+        // reply gets an epoch of its own, so its chunks can be told apart from
+        // the ones being abandoned. (A voice turn has already done this when
+        // recording started; doing it twice is harmless.)
+        crate::tts::stop_remote();
+        let epoch = crate::tts::current_epoch();
+        Some((
+            Arc::new(Mutex::new(crate::speech_stream::SpeechPipeline::start(
+                &app, &settings, epoch,
+            ))),
+            epoch,
+        ))
+    } else {
+        None
+    };
+    let speech_sink = speech.as_ref().map(|(pipeline, _)| pipeline.clone());
+
     // Generation. On the tool-calling path the model may call our `web_search`
     // tool; we run it, feed the results back, and let it continue (up to a few
     // rounds). Otherwise it's a plain stream (which, for OpenRouter, may carry
@@ -2366,6 +2427,7 @@ pub async fn run_assistant_turn(
 
     let outcome = if let Some(tools) = tool_capabilities {
         let partial_cb = partial.clone();
+        let speech_cb = speech_sink.clone();
         let app_tokens = app.clone();
         let app_state = app.clone();
         let provider_c = provider.clone();
@@ -2392,13 +2454,22 @@ pub async fn run_assistant_turn(
                     tool_choice,
                     None,
                     None,
-                    assistant_token_sink(app_tokens.clone(), partial_cb.clone()),
+                    assistant_token_sink(app_tokens.clone(), partial_cb.clone(), speech_cb.clone()),
                 )
                 .await?;
                 let round_policy = tool_round_policy(&round_out, round_index);
                 if round_policy == ToolRoundPolicy::FinalResponse {
                     answer = round_out.text;
                     break;
+                }
+                // This round's text is about to be replaced by the next round's,
+                // so drop whatever it buffered but has not spoken. Anything
+                // already spoken was a preamble the panel also displayed live
+                // ("Let me look that up"), which is fine to have voiced.
+                if let Some(pipeline) = &speech_cb {
+                    if let Ok(mut pipeline) = pipeline.lock() {
+                        pipeline.reset();
+                    }
                 }
                 // Reflect tool use in the panel: "searching" only when the
                 // model actually called web_search (a get_current_datetime call
@@ -2533,7 +2604,7 @@ pub async fn run_assistant_turn(
             messages,
             None,
             None,
-            assistant_token_sink(app.clone(), partial.clone()),
+            assistant_token_sink(app.clone(), partial.clone(), speech_sink.clone()),
         );
         tokio::pin!(stream_fut);
         // Race the stream against a Stop request. notify_waiters wakes this select.
@@ -2547,11 +2618,24 @@ pub async fn run_assistant_turn(
     // "speaking" UI state rather than idle, so the panel/pill doesn't flash its
     // idle "Assistant" affordance in the gap before audio begins.
     let mut speaking = false;
+    // Close out streamed speech on whichever path this turn took. Flushes the
+    // trailing sentence, ends the synthesis task and releases the audio device;
+    // a superseded epoch makes it silent rather than skipping the cleanup.
+    let close_speech = || {
+        if let Some((pipeline, _)) = &speech {
+            if let Ok(mut pipeline) = pipeline.lock() {
+                pipeline.finish();
+                return pipeline.spoke();
+            }
+        }
+        false
+    };
     match outcome {
         None => {
             // User pressed Stop. Silence any spoken summary already playing and
             // keep whatever text was generated so far (like a cancelled chat).
             crate::tts::stop_remote();
+            close_speech();
             let partial_text = partial
                 .lock()
                 .map(|b| b.trim().to_string())
@@ -2575,7 +2659,7 @@ pub async fn run_assistant_turn(
                 let mut history = conversation.messages.lock().unwrap();
                 history.push(ChatMessage {
                     role: "assistant".to_string(),
-                    content: full_text.clone(),
+                    content: full_text,
                     images: Vec::new(),
                 });
             }
@@ -2590,12 +2674,15 @@ pub async fn run_assistant_turn(
             // here must still suppress the spoken reply.
             if app.state::<AssistantConversation>().is_cancelled() {
                 crate::tts::stop_remote();
-            } else if settings.assistant_tts_enabled {
-                spawn_tts_speak(&app, &settings, full_text);
-                speaking = true;
             }
+            // Most of the reply has usually been spoken already; this flushes the
+            // closing sentence. `spoke` is false when there was nothing sayable
+            // (a reply that was only code), so the UI isn't left waiting on audio
+            // that will never arrive.
+            speaking = close_speech();
         }
         Some(Err(e)) => {
+            close_speech();
             error!("Assistant request failed: {}", e);
             if e.contains("Unterminated string") && has_visual {
                 emit_error(&app, "screenshot_too_large", e);
@@ -2817,7 +2904,8 @@ pub async fn run_summarize_turn(app: AppHandle) {
         messages,
         None,
         None,
-        assistant_token_sink(app.clone(), partial.clone()),
+        // The summarize turn is text-only; it is never spoken aloud.
+        assistant_token_sink(app.clone(), partial.clone(), None),
     );
     tokio::pin!(stream_fut);
 
@@ -3376,7 +3464,11 @@ mod tests {
 /// turn ends by emitting the authoritative full conversation
 /// (`emit_conversation`), which the panel uses to replace the streamed text and
 /// reset its stream buffer.
-fn assistant_token_sink(app: tauri::AppHandle, partial: Arc<Mutex<String>>) -> impl FnMut(&str) {
+fn assistant_token_sink(
+    app: tauri::AppHandle,
+    partial: Arc<Mutex<String>>,
+    speech: Option<Arc<Mutex<crate::speech_stream::SpeechPipeline>>>,
+) -> impl FnMut(&str) {
     use std::time::Instant;
     const FLUSH_INTERVAL_MS: u128 = 40;
     let mut pending = String::new();
@@ -3384,6 +3476,14 @@ fn assistant_token_sink(app: tauri::AppHandle, partial: Arc<Mutex<String>>) -> i
     move |token: &str| {
         if let Ok(mut buf) = partial.lock() {
             buf.push_str(token);
+        }
+        // Speech is fed every token immediately, not on the 40ms display cadence:
+        // the pipeline decides for itself when a sentence is complete, and
+        // holding tokens back here would only add latency to the first word.
+        if let Some(pipeline) = &speech {
+            if let Ok(mut pipeline) = pipeline.lock() {
+                pipeline.push(token);
+            }
         }
         pending.push_str(token);
         if last_flush.elapsed().as_millis() >= FLUSH_INTERVAL_MS {

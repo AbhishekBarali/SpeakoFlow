@@ -1,10 +1,14 @@
 use crate::settings::PostProcessProvider;
 use futures_util::StreamExt;
 use log::debug;
+use once_cell::sync::Lazy;
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE, REFERER, USER_AGENT};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use specta::Type;
+use std::collections::HashMap;
+use std::hash::{DefaultHasher, Hash, Hasher};
+use std::sync::Mutex;
 
 #[derive(Debug, Serialize, Deserialize, Clone, Type)]
 pub struct ChatMessage {
@@ -193,10 +197,40 @@ fn build_headers(provider: &PostProcessProvider, api_key: &str) -> Result<Header
     Ok(headers)
 }
 
-/// Create an HTTP client with provider-specific headers
+/// Configured clients, keyed by the provider/auth fingerprint that decides the
+/// default headers.
+///
+/// A `reqwest::Client` owns its connection pool, so building a fresh one per
+/// request throws that pool away and re-pays DNS + TCP + TLS on every call —
+/// easily 100–300ms against a cloud provider, and more on a slow link. Cloning
+/// a cached client is cheap and shares the pool, so a warm keep-alive
+/// connection is reused across turns. Bounded to a handful of entries because
+/// the key only varies with provider/base URL/key, not per request.
+static CLIENT_CACHE: Lazy<Mutex<HashMap<u64, reqwest::Client>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
+
+/// Fingerprint the inputs that affect a client's default headers. The API key
+/// is hashed rather than stored so the long-lived cache key holds no secret.
+fn client_cache_key(provider: &PostProcessProvider, api_key: &str) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    provider.id.hash(&mut hasher);
+    provider.base_url.hash(&mut hasher);
+    api_key.hash(&mut hasher);
+    hasher.finish()
+}
+
+/// Get an HTTP client with provider-specific headers, reusing a cached one (and
+/// therefore its live connections) whenever the provider and key are unchanged.
 fn create_client(provider: &PostProcessProvider, api_key: &str) -> Result<reqwest::Client, String> {
+    let key = client_cache_key(provider, api_key);
+    if let Ok(cache) = CLIENT_CACHE.lock() {
+        if let Some(client) = cache.get(&key) {
+            return Ok(client.clone());
+        }
+    }
+
     let headers = build_headers(provider, api_key)?;
-    reqwest::Client::builder()
+    let client = reqwest::Client::builder()
         .default_headers(headers)
         // HTTP/1.1 avoids h2 flow-control issues seen with some gateways
         // (Azure) on large bodies, e.g. multi-hundred-KB image payloads
@@ -208,8 +242,20 @@ fn create_client(provider: &PostProcessProvider, api_key: &str) -> Result<reqwes
         // overall `.timeout()`: that would abort long, legitimate streaming
         // generations. Per-chunk stall detection lives in `read_sse_round`.
         .connect_timeout(std::time::Duration::from_secs(30))
+        // Keep idle sockets around between turns so a follow-up question reuses
+        // the handshake instead of repeating it.
+        .pool_idle_timeout(std::time::Duration::from_secs(90))
         .build()
-        .map_err(|e| format!("Failed to build HTTP client: {}", e))
+        .map_err(|e| format!("Failed to build HTTP client: {}", e))?;
+
+    if let Ok(mut cache) = CLIENT_CACHE.lock() {
+        // Guard against unbounded growth if a caller ever varies the key wildly.
+        if cache.len() >= 8 {
+            cache.clear();
+        }
+        cache.insert(key, client.clone());
+    }
+    Ok(client)
 }
 
 /// If `raw` points at an Azure OpenAI–style host, return just the host. Covers
