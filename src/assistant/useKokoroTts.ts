@@ -20,7 +20,7 @@ export interface KokoroError {
 interface KokoroModel {
   stream(
     splitter: TextSplitter,
-    options: { voice?: string },
+    options: { voice?: string; speed?: number },
   ): AsyncIterable<{ text: string; audio: { toBlob(): Blob } }>;
 }
 
@@ -81,8 +81,8 @@ export function useKokoroTts(
   const modelRef = useRef<KokoroModel | null>(null);
   const loadingRef = useRef<Promise<KokoroModel> | null>(null);
   const dtypeRef = useRef(dtype);
-  // Latest playback speed, read when each audio chunk starts so changes apply
-  // to the next clip without re-creating the playback callbacks.
+  // Latest speaking speed, read when a reply starts streaming so a change
+  // applies to the next reply without re-creating the playback callbacks.
   const speedRef = useRef(speed);
   speedRef.current = speed;
   const [status, setStatus] = useState<TtsStatus>("off");
@@ -306,12 +306,6 @@ export function useKokoroTts(
     }
 
     const el = new Audio(url);
-    // Pitch-preserved time-stretch so faster/slower speech still sounds natural
-    // (preservesPitch defaults to true in Chromium, set explicitly for clarity).
-    // Clamp defensively: the setting is already clamped to 0.25–4 on write, but
-    // playbackRate throws for out-of-range values (e.g. a hand-edited config).
-    el.playbackRate = Math.min(4, Math.max(0.25, speedRef.current || 1));
-    el.preservesPitch = true;
     playingRef.current = el;
 
     // Guard against double-advancing if both the promise and an element event
@@ -379,7 +373,14 @@ export function useKokoroTts(
 
         const { TextSplitterStream } = await import("kokoro-js");
         const splitter = new TextSplitterStream();
-        const stream = model.stream(splitter, { voice });
+        // Ask Kokoro itself for the requested pace rather than time-stretching
+        // the finished clip: the model adjusts its own phoneme durations, so the
+        // result keeps the voice's pitch and natural pauses, and the speed
+        // setting is honoured whichever backend plays the audio (native
+        // playback has no `playbackRate` equivalent). Clamped because a
+        // hand-edited config could carry anything.
+        const speed = Math.min(4, Math.max(0.25, speedRef.current || 1));
+        const stream = model.stream(splitter, { voice, speed });
         splitter.push(text);
         splitter.close();
 
