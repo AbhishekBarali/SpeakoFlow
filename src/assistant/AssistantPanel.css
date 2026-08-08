@@ -498,6 +498,7 @@
 }
 
 .alive-phase {
+  flex: 1;
   min-width: 0;
   gap: 7px;
   color: var(--as-muted);
@@ -512,8 +513,12 @@
 }
 
 .alive-actions {
+  position: relative;
+  z-index: 2;
   gap: 2px;
   flex-shrink: 0;
+  -webkit-app-region: no-drag;
+  cursor: default;
 }
 
 .alive-button {
@@ -526,6 +531,8 @@
   color: var(--as-muted);
   background: transparent;
   cursor: pointer;
+  pointer-events: auto;
+  -webkit-app-region: no-drag;
 }
 
 .alive-button:hover,
@@ -748,6 +755,15 @@
   font-weight: 600;
   letter-spacing: -0.005em;
   color: var(--as-ink);
+  -webkit-app-region: no-drag;
+  cursor: default;
+}
+
+.assistant-header-drag {
+  align-self: stretch;
+  flex: 1;
+  min-width: 12px;
+  cursor: grab;
 }
 
 .assistant-status-dot {
@@ -803,10 +819,14 @@
 }
 
 .assistant-header-actions {
+  position: relative;
+  z-index: 2;
   display: flex;
   align-items: center;
   gap: 1px;
   flex-shrink: 0;
+  -webkit-app-region: no-drag;
+  cursor: default;
 }
 
 .assistant-icon-button {
@@ -820,6 +840,8 @@
   background: transparent;
   color: var(--as-muted);
   cursor: pointer;
+  pointer-events: auto;
+  -webkit-app-region: no-drag;
   transition:
     background 0.15s ease,
     color 0.15s ease;
