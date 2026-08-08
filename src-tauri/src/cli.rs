@@ -19,6 +19,10 @@ pub struct CliArgs {
     #[arg(long)]
     pub toggle_post_process: bool,
 
+    /// Toggle the voice assistant on/off (sent to running instance)
+    #[arg(long)]
+    pub toggle_assistant: bool,
+
     /// Cancel the current operation (sent to running instance)
     #[arg(long)]
     pub cancel: bool,
@@ -42,4 +46,17 @@ pub struct CliArgs {
     /// it is an implementation detail, not a user-facing switch.
     #[arg(long, hide = true)]
     pub probe_devices: bool,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::CliArgs;
+    use clap::Parser;
+
+    #[test]
+    fn parses_toggle_assistant() {
+        let args = CliArgs::try_parse_from(["speakoflow", "--toggle-assistant"])
+            .expect("--toggle-assistant should be a supported background command");
+        assert!(args.toggle_assistant);
+    }
 }

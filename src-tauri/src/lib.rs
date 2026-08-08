@@ -718,6 +718,8 @@ pub fn run(cli_args: CliArgs) {
             commands::assistant::redirect_transcription_to_assistant,
             commands::assistant::set_assistant_panel_collapsed,
             commands::assistant::get_assistant_panel_collapsed,
+            commands::assistant::assistant_play_local_tts_chunk,
+            commands::assistant::assistant_stop_local_tts,
             commands::assistant::set_assistant_screen_armed,
             commands::assistant::get_assistant_screen_armed,
             commands::assistant::assistant_toggle_voice,
@@ -957,9 +959,19 @@ pub fn run(cli_args: CliArgs) {
             FILE_LOG_LEVEL.store(file_log_level.to_level_filter() as u8, Ordering::Relaxed);
             let app_handle = app.handle().clone();
             app.manage(TranscriptionCoordinator::new(app_handle.clone()));
-            // Tap-to-lock: watches for a Shift tap to flip a hold recording to
-            // hands-free. Spawns its own global keyboard listener thread.
-            app.manage(lock_watch::LockWatch::new(app_handle.clone()));
+            // Tap-to-lock needs a raw global keyboard listener. On Linux, only
+            // start it when the user explicitly selected the raw handy-keys
+            // backend; the normal Tauri/Hyprland path must never open
+            // /dev/input devices merely because the app is running. Other
+            // platforms keep their existing permission-gated behavior.
+            let should_start_lock_watch = !cfg!(target_os = "linux")
+                || matches!(
+                    settings.keyboard_implementation,
+                    settings::KeyboardImplementation::HandyKeys
+                );
+            if should_start_lock_watch {
+                app.manage(lock_watch::LockWatch::new(app_handle.clone()));
+            }
             app.manage(assistant::AssistantConversation::new());
 
             initialize_core_logic(&app_handle);

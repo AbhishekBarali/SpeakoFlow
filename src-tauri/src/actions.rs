@@ -1136,7 +1136,7 @@ impl ShortcutAction for TranscribeAction {
                             if crate::assistant::take_transcribe_redirect() {
                                 utils::hide_recording_overlay(&ah);
                                 change_tray_icon(&ah, TrayIconState::Idle);
-                                crate::assistant::show_assistant_panel(&ah);
+                                crate::assistant::show_assistant_voice_overlay(&ah);
                                 crate::assistant::run_voice_turn(ah.clone(), transcription).await;
                                 return;
                             }
@@ -1503,8 +1503,9 @@ impl ShortcutAction for AssistantAction {
             }
         }
 
-        // Show the panel right away so the user sees the listening state.
-        crate::assistant::show_assistant_panel(app);
+        // Show the configured non-focus-stealing overlay right away so the user
+        // sees the listening state without opening the full assistant window.
+        crate::assistant::show_assistant_voice_overlay(app);
         crate::assistant::emit_state(app, "listening");
         // Tell the floating panel whether this turn will capture the screen
         // so it can show a "vision" indicator. The actual capture decision is

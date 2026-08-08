@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { invoke, isTauri } from "@tauri-apps/api/core";
 
 export type TtsStatus = "off" | "loading" | "ready" | "speaking" | "error";
 
@@ -94,6 +95,10 @@ export function useKokoroTts(
   // Playback queue state (refs: updated from async generators)
   const queueRef = useRef<Blob[]>([]);
   const playingRef = useRef<HTMLAudioElement | null>(null);
+  // Tauri desktop builds send Kokoro's WAV chunks to Rust/rodio. This remains
+  // true while an awaited native chunk is playing so synthesis cannot start a
+  // second pump in parallel.
+  const nativePlayingRef = useRef(false);
   const generationRef = useRef(0);
 
   const ensureLoaded = useCallback(async (): Promise<KokoroModel> => {
@@ -105,7 +110,15 @@ export function useKokoroTts(
       loadingRef.current = (async () => {
         const { KokoroTTS } = await import("kokoro-js");
         const useGpu = hasWebGpu();
-        const chosenDtype = dtypeRef.current;
+        const requestedDtype = dtypeRef.current;
+        // WebKitGTK commonly has no WebGPU. Loading the 325 MB fp32 graph into
+        // WASM can appear to hang after the text answer is already visible;
+        // use the cached 92 MB q8 graph directly on CPU instead of waiting for
+        // fp32 initialization to fail first.
+        const chosenDtype =
+          !useGpu && (requestedDtype === "fp32" || requestedDtype === "fp16")
+            ? "q8"
+            : requestedDtype;
         // Track download progress of the (largest) onnx weights file.
         const progress_callback = (event: ProgressEvent) => {
           if (
@@ -184,6 +197,12 @@ export function useKokoroTts(
     generationRef.current += 1; // invalidate in-flight generation
     queueRef.current = [];
     const el = playingRef.current;
+    nativePlayingRef.current = false;
+    if (isTauri()) {
+      // Native playback polls the same cancellation epoch and stops within one
+      // 50 ms tick. Fire-and-forget here so React cleanup stays synchronous.
+      void invoke("assistant_stop_local_tts").catch(() => {});
+    }
     if (el) {
       el.pause();
       // Revoke the in-flight clip's object URL. onended/onerror (which normally
@@ -228,6 +247,10 @@ export function useKokoroTts(
       generationRef.current += 1;
       queueRef.current = [];
       const el = playingRef.current;
+      nativePlayingRef.current = false;
+      if (isTauri()) {
+        void invoke("assistant_stop_local_tts").catch(() => {});
+      }
       if (el) {
         el.pause();
         if (el.src) {
@@ -255,6 +278,33 @@ export function useKokoroTts(
       return;
     }
     const url = URL.createObjectURL(next);
+
+    if (isTauri()) {
+      // The HUD is deliberately non-focus-stealing. Route generated speech to
+      // the native audio backend so Linux WebKit cannot suppress it as
+      // background autoplay and so the configured output device is respected.
+      URL.revokeObjectURL(url);
+      nativePlayingRef.current = true;
+      void next
+        .arrayBuffer()
+        .then((buffer) =>
+          invoke("assistant_play_local_tts_chunk", {
+            audio: Array.from(new Uint8Array(buffer)),
+          }),
+        )
+        .then(() => {
+          nativePlayingRef.current = false;
+          if (generation === generationRef.current) pump(generation);
+        })
+        .catch(() => {
+          nativePlayingRef.current = false;
+          if (generation !== generationRef.current) return;
+          setError({ reason: "playback" });
+          pump(generation);
+        });
+      return;
+    }
+
     const el = new Audio(url);
     // Pitch-preserved time-stretch so faster/slower speech still sounds natural
     // (preservesPitch defaults to true in Chromium, set explicitly for clarity).
@@ -340,7 +390,7 @@ export function useKokoroTts(
           if (!started) {
             started = true;
             pump(generation);
-          } else if (!playingRef.current) {
+          } else if (!playingRef.current && !nativePlayingRef.current) {
             pump(generation); // queue drained while synthesizing; resume
           }
         }
