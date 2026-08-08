@@ -976,7 +976,8 @@ pub fn create_assistant_panel(app: &AppHandle) {
     let (x, y) = saved_position(app).unwrap_or_else(|| default_position(app));
     // Build at whichever size matches the current mode (pill by default) so the
     // first show doesn't briefly flash the large panel before collapsing.
-    let (init_w, init_h) = if PILL_MODE.load(Ordering::SeqCst) {
+    let initially_collapsed = PILL_MODE.load(Ordering::SeqCst);
+    let (init_w, init_h) = if initially_collapsed {
         collapsed_size(app)
     } else {
         expanded_size(app)
@@ -1003,6 +1004,11 @@ pub fn create_assistant_panel(app: &AppHandle) {
     .shadow(false)
     .always_on_top(true)
     .skip_taskbar(true)
+    // The compact voice HUD accepts pointer controls without taking keyboard
+    // focus from the app underneath. Expanding restores focusability for the
+    // prompt input and the rest of the full assistant UI.
+    .focusable(!initially_collapsed)
+    .accept_first_mouse(true)
     .focused(false)
     .visible(false);
 
@@ -1042,6 +1048,7 @@ pub fn show_assistant_panel(app: &AppHandle) {
         // window (showing only the header bar). Re-assert the pill size when
         // collapsed, and always tell the webview which mode to render.
         let collapsed = PILL_MODE.load(Ordering::SeqCst);
+        let _ = window.set_focusable(!collapsed);
         if collapsed {
             let (width, height) = collapsed_size(app);
             let _ = window.set_size(tauri::LogicalSize::new(width, height));
@@ -1166,6 +1173,7 @@ pub fn set_panel_collapsed(app: &AppHandle, collapsed: bool) {
             }
         }
         PILL_MODE.store(collapsed, Ordering::SeqCst);
+        let _ = window.set_focusable(!collapsed);
 
         let (new_w, new_h) = if collapsed {
             collapsed_size(app)

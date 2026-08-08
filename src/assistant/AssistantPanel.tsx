@@ -1273,14 +1273,14 @@ const AssistantPanel: React.FC = () => {
       const answer = capturing ? "" : stream || latestAssistant?.content || "";
 
       return (
-        <div className={`${shellClass} live-overlay`} data-tauri-drag-region>
+        <div className={`${shellClass} live-overlay`}>
           <section
             className={`alive-card${isListening ? " listening" : ""}${
               error ? " error" : ""
             }`}
             aria-live="polite"
           >
-            <header className="alive-header" data-tauri-drag-region>
+            <header className="alive-header">
               <div className="alive-phase" data-tauri-drag-region>
                 {isListening ? (
                   <AudioWaveform
@@ -1299,8 +1299,9 @@ const AssistantPanel: React.FC = () => {
                 )}
                 <span data-tauri-drag-region>{pillStatus}</span>
               </div>
-              <div className="alive-actions">
+              <div className="alive-actions" onMouseDown={stopDrag}>
                 <button
+                  type="button"
                   className={`alive-button${ttsEnabled ? " active" : ""}`}
                   onClick={toggleTts}
                   onMouseDown={stopDrag}
@@ -1311,6 +1312,7 @@ const AssistantPanel: React.FC = () => {
                 </button>
                 {locked && isListening && (
                   <button
+                    type="button"
                     className="alive-button"
                     onClick={finishVoice}
                     onMouseDown={stopDrag}
@@ -1322,6 +1324,7 @@ const AssistantPanel: React.FC = () => {
                 )}
                 {showStop && (
                   <button
+                    type="button"
                     className="alive-button danger"
                     onClick={capturing ? cancelVoice : stopTurn}
                     onMouseDown={stopDrag}
@@ -1340,6 +1343,7 @@ const AssistantPanel: React.FC = () => {
                   </button>
                 )}
                 <button
+                  type="button"
                   className="alive-button"
                   onClick={() => collapse(false)}
                   onMouseDown={stopDrag}
@@ -1349,6 +1353,7 @@ const AssistantPanel: React.FC = () => {
                   <Maximize2 size={13} />
                 </button>
                 <button
+                  type="button"
                   className="alive-button danger"
                   onClick={hidePanel}
                   onMouseDown={stopDrag}
@@ -1644,8 +1649,8 @@ const AssistantPanel: React.FC = () => {
             {t("assistant.attach.dropHint")}
           </div>
         )}
-        <div className="assistant-header" data-tauri-drag-region>
-          <div className="assistant-title" data-tauri-drag-region>
+        <div className="assistant-header">
+          <div className="assistant-title">
             <span
               className={`assistant-status-dot${busy ? " busy" : ""}`}
               data-tauri-drag-region
@@ -1688,33 +1693,46 @@ const AssistantPanel: React.FC = () => {
               )}
             </div>
           </div>
+          <div
+            className="assistant-header-drag"
+            data-tauri-drag-region
+            aria-hidden="true"
+          />
           <div className="assistant-header-actions">
             <button
+              type="button"
               className={`assistant-icon-button${ttsEnabled ? " active" : ""}${
                 tts.status === "loading" ? " pulsing" : ""
               }`}
               onClick={toggleTts}
+              onMouseDown={stopDrag}
               title={ttsTitle}
             >
               {ttsEnabled ? <Volume2 size={14} /> : <VolumeX size={14} />}
             </button>
             <button
+              type="button"
               className="assistant-icon-button"
               onClick={clearConversation}
+              onMouseDown={stopDrag}
               title={t("assistant.clear")}
             >
               <Eraser size={14} />
             </button>
             <button
+              type="button"
               className="assistant-icon-button"
               onClick={() => collapse(true)}
+              onMouseDown={stopDrag}
               title={t("assistant.pill.collapse")}
             >
               <Minimize2 size={14} />
             </button>
             <button
+              type="button"
               className="assistant-icon-button close"
               onClick={hidePanel}
+              onMouseDown={stopDrag}
               title={t("assistant.hide")}
             >
               <X size={15} />
