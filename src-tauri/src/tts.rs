@@ -1139,7 +1139,7 @@ fn xml_escape(s: &str) -> String {
 
 /// Decode and play audio bytes (mp3/wav/ogg) on the selected output device.
 /// Polls the playback epoch so a `stop_remote()` cancels playback promptly.
-fn play_audio_bytes(
+pub(crate) fn play_audio_bytes(
     bytes: Vec<u8>,
     selected_device: Option<String>,
     volume: f32,

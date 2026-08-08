@@ -457,6 +457,7 @@ const AssistantPanel: React.FC = () => {
   const ttsVoice = settings?.assistant_tts_voice ?? "af_heart";
   const ttsDtype = settings?.assistant_tts_kokoro_dtype ?? "fp32";
   const ttsSpeed = settings?.assistant_tts_speed ?? 1;
+  const liveOverlay = settings?.assistant_overlay_style === "live";
   const screenAccessMode = settings?.assistant_screen_access_mode ?? "manual";
   const manualScreenAccess = screenAccessMode === "manual";
   const webSearchEnabled = settings?.assistant_web_search_enabled ?? false;
@@ -1011,6 +1012,25 @@ const AssistantPanel: React.FC = () => {
     return () => window.clearTimeout(timer);
   }, [collapsed, state, error, notice, ttsActive]);
 
+  // A Live voice overlay is transient: keep it on screen while recording,
+  // generating, and speaking, then dismiss it shortly after the completed
+  // reply. The expanded chat panel remains persistent and is never affected.
+  useEffect(() => {
+    const shouldAutoHide =
+      collapsed &&
+      liveOverlay &&
+      state === "idle" &&
+      !ttsActive &&
+      !error &&
+      history.length > 0;
+    if (!shouldAutoHide) return;
+
+    const timer = window.setTimeout(() => {
+      void commands.hideAssistantPanel();
+    }, 2500);
+    return () => window.clearTimeout(timer);
+  }, [collapsed, liveOverlay, state, ttsActive, error, history.length]);
+
   const sendText = useCallback(async () => {
     const text = input.trim();
     if (!text || sendingRef.current || busy) return;
@@ -1209,6 +1229,168 @@ const AssistantPanel: React.FC = () => {
       : ttsAudible
         ? "flow"
         : "shimmer";
+
+    if (liveOverlay) {
+      const latestUser = [...history]
+        .reverse()
+        .find((message) => message.role === "user");
+      const latestAssistant = [...history]
+        .reverse()
+        .find((message) => message.role === "assistant");
+      const capturing = state === "listening" || state === "transcribing";
+      const question = capturing ? "" : (latestUser?.content ?? "");
+      const answer = capturing ? "" : stream || latestAssistant?.content || "";
+
+      return (
+        <div className={`${shellClass} live-overlay`} data-tauri-drag-region>
+          <section
+            className={`alive-card${isListening ? " listening" : ""}${
+              error ? " error" : ""
+            }`}
+            aria-live="polite"
+          >
+            <header className="alive-header" data-tauri-drag-region>
+              <div className="alive-phase" data-tauri-drag-region>
+                {isListening ? (
+                  <AudioWaveform
+                    levels={micLevels}
+                    size="sm"
+                    barCount={10}
+                    mode="reactive"
+                    active
+                  />
+                ) : ttsAudible ? (
+                  <Volume2 size={14} strokeWidth={2} />
+                ) : busy || tts.status === "loading" ? (
+                  <Loader2 size={14} strokeWidth={2.4} className="apill-spin" />
+                ) : (
+                  <Sparkles size={14} strokeWidth={2} />
+                )}
+                <span data-tauri-drag-region>{pillStatus}</span>
+              </div>
+              <div className="alive-actions">
+                <button
+                  className={`alive-button${ttsEnabled ? " active" : ""}`}
+                  onClick={toggleTts}
+                  onMouseDown={stopDrag}
+                  title={ttsTitle}
+                  aria-label={ttsTitle}
+                >
+                  {ttsEnabled ? <Volume2 size={14} /> : <VolumeX size={14} />}
+                </button>
+                {locked && isListening && (
+                  <button
+                    className="alive-button"
+                    onClick={finishVoice}
+                    onMouseDown={stopDrag}
+                    title={t("assistant.status.locked")}
+                    aria-label={t("assistant.status.locked")}
+                  >
+                    <Check size={14} strokeWidth={2.5} />
+                  </button>
+                )}
+                {showStop && (
+                  <button
+                    className="alive-button danger"
+                    onClick={capturing ? cancelVoice : stopTurn}
+                    onMouseDown={stopDrag}
+                    title={
+                      capturing ? t("assistant.cancel") : t("assistant.stop")
+                    }
+                    aria-label={
+                      capturing ? t("assistant.cancel") : t("assistant.stop")
+                    }
+                  >
+                    {capturing ? (
+                      <X size={14} strokeWidth={2.5} />
+                    ) : (
+                      <Square size={12} strokeWidth={2.5} />
+                    )}
+                  </button>
+                )}
+                <button
+                  className="alive-button"
+                  onClick={() => collapse(false)}
+                  onMouseDown={stopDrag}
+                  title={t("assistant.pill.expand")}
+                  aria-label={t("assistant.pill.expand")}
+                >
+                  <Maximize2 size={13} />
+                </button>
+                <button
+                  className="alive-button danger"
+                  onClick={hidePanel}
+                  onMouseDown={stopDrag}
+                  title={t("assistant.pill.close")}
+                  aria-label={t("assistant.pill.close")}
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            </header>
+
+            <div className="alive-content">
+              {error ? (
+                <div className="alive-error" role="alert">
+                  <AlertCircle size={15} />
+                  <span>{errorPrimary(error)}</span>
+                </div>
+              ) : capturing ? (
+                <div className="alive-capture">
+                  <AudioWaveform
+                    levels={isListening ? micLevels : []}
+                    size="md"
+                    barCount={18}
+                    mode={isListening ? "reactive" : "shimmer"}
+                    active={isListening}
+                  />
+                  <span>
+                    {locked && isListening
+                      ? t("assistant.status.locked")
+                      : t(`assistant.status.${state}`)}
+                  </span>
+                </div>
+              ) : (
+                <>
+                  {question && (
+                    <div className="alive-row user">
+                      <Mic size={13} strokeWidth={2} aria-hidden="true" />
+                      <p>{question}</p>
+                    </div>
+                  )}
+                  <div className="alive-row assistant">
+                    <Sparkles size={13} strokeWidth={2} aria-hidden="true" />
+                    <div className="alive-answer">
+                      {answer ? (
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm]}
+                          components={MD_COMPONENTS}
+                        >
+                          {answer}
+                        </ReactMarkdown>
+                      ) : showTypingDots || engineSetupActive ? (
+                        <span className="alive-working">
+                          <Loader2 className="apill-spin" size={12} />
+                          {engineSetupActive
+                            ? engineSetupLabel
+                            : t(`assistant.status.${state}`)}
+                        </span>
+                      ) : (
+                        <span className="alive-placeholder">
+                          {activeCharacter?.greeting?.trim()
+                            ? activeCharacter.greeting
+                            : t("assistant.empty")}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </section>
+        </div>
+      );
+    }
 
     return (
       <div className={shellClass} data-tauri-drag-region>

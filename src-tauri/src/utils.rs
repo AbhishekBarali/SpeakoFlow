@@ -53,6 +53,11 @@ pub fn cancel_current_operation(app: &AppHandle) {
     // the "I pressed cancel and nothing happened" bug. Safe/idempotent when the
     // panel is hidden or already idle.
     crate::assistant::emit_state(app, "idle");
+    // The compact voice overlay is transient. Cancellation must dismiss it
+    // immediately; an explicitly expanded chat panel remains open.
+    if crate::assistant::is_panel_collapsed() {
+        crate::assistant::hide_assistant_panel(app);
+    }
 
     // Update tray icon and hide overlay
     change_tray_icon(app, crate::tray::TrayIconState::Idle);

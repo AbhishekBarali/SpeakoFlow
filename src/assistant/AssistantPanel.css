@@ -438,6 +438,184 @@
 }
 
 /* =========================================================================
+ * Live voice overlay — compact transcript + streamed answer.
+ * ========================================================================= */
+
+.alive-card {
+  width: calc(100% - 8px);
+  height: calc(100% - 8px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  color: var(--as-ink);
+  background: var(--as-panel-surface);
+  border: 1px solid var(--as-hairline);
+  border-radius: 18px;
+  box-shadow: var(--as-inner);
+  backdrop-filter: blur(22px) saturate(1.4);
+  -webkit-backdrop-filter: blur(22px) saturate(1.4);
+  opacity: 0;
+  transform: translateY(-3px) scale(0.985);
+  transition:
+    opacity 180ms ease-out,
+    transform 210ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.assistant-shell.fade-in .alive-card {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.alive-card.listening {
+  border-color: color-mix(in srgb, var(--as-live) 28%, var(--as-hairline));
+}
+
+.alive-card.error {
+  border-color: color-mix(in srgb, var(--as-error) 32%, var(--as-hairline));
+}
+
+.alive-header {
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 5px 7px 5px 12px;
+  border-bottom: 1px solid var(--as-hairline);
+  cursor: grab;
+  user-select: none;
+}
+
+.alive-phase,
+.alive-actions,
+.alive-button,
+.alive-row,
+.alive-working,
+.alive-error,
+.alive-capture {
+  display: flex;
+  align-items: center;
+}
+
+.alive-phase {
+  min-width: 0;
+  gap: 7px;
+  color: var(--as-muted);
+  font-size: 11.5px;
+  font-weight: 500;
+}
+
+.alive-phase > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.alive-actions {
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.alive-button {
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  color: var(--as-muted);
+  background: transparent;
+  cursor: pointer;
+}
+
+.alive-button:hover,
+.alive-button.active {
+  color: var(--as-ink);
+  background: var(--as-raise);
+}
+
+.alive-button.danger:hover {
+  color: var(--as-error);
+  background: var(--as-error-bg);
+}
+
+.alive-content {
+  min-height: 0;
+  flex: 1;
+  padding: 8px 12px 10px;
+  overflow: hidden;
+}
+
+.alive-row {
+  align-items: flex-start;
+  gap: 8px;
+  min-height: 0;
+  color: var(--as-muted);
+}
+
+.alive-row + .alive-row {
+  margin-top: 7px;
+  padding-top: 7px;
+  border-top: 1px solid var(--as-hairline);
+}
+
+.alive-row > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.alive-row.user p,
+.alive-answer,
+.alive-answer p {
+  margin: 0;
+}
+
+.alive-row.user p,
+.alive-answer {
+  min-width: 0;
+  color: var(--as-body);
+  font-size: var(--as-msg-font, 13px);
+  line-height: 1.38;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.alive-row.user p {
+  -webkit-line-clamp: 2;
+  color: var(--as-ink);
+}
+
+.alive-answer ul,
+.alive-answer ol {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.alive-working {
+  gap: 6px;
+  color: var(--as-muted);
+}
+
+.alive-placeholder {
+  color: var(--as-faint);
+}
+
+.alive-error,
+.alive-capture {
+  justify-content: center;
+  height: 100%;
+  gap: 9px;
+  color: var(--as-muted);
+  font-size: 12.5px;
+}
+
+.alive-error {
+  color: var(--as-error);
+}
+
+/* =========================================================================
  * The expanded panel — one quiet chat card.
  * ========================================================================= */
 

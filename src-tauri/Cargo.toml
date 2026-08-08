@@ -7,6 +7,12 @@ edition = "2021"
 license = "MIT"
 default-run = "speakoflow"
 
+[features]
+# Tauri serves `build.devUrl` unless its production custom protocol is enabled.
+# The CLI enables this for packaged builds; source installers and other direct
+# Cargo release builds must opt in explicitly.
+custom-protocol = ["tauri/custom-protocol"]
+
 [profile.dev]
 incremental = true # Compile your binary in smaller steps.
 

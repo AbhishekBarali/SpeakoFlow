@@ -79,7 +79,7 @@ any release. See [issue #19](https://github.com/AbhishekBarali/SpeakoFlow/issues
 
   # Arch Linux
   sudo pacman -S base-devel alsa-lib pkgconf openssl vulkan-devel \
-    gtk3 webkit2gtk-4.1 libappindicator-gtk3 librsvg gtk-layer-shell \
+    gtk3 webkit2gtk-4.1 libappindicator librsvg gtk-layer-shell \
     cmake
   ```
 
@@ -115,6 +115,34 @@ This compiles a release binary and generates platform-specific bundles (deb, rpm
 ## Linux Install (from source)
 
 The raw binary (`src-tauri/target/release/speakoflow`) cannot run standalone — it needs Tauri resource files (tray icons, sounds, VAD model) to be co-located at the expected path.
+
+### Arch Linux
+
+From the repository root, run the Arch installer:
+
+```bash
+bun run install:arch
+```
+
+It installs any missing build dependencies with `pacman`, builds the current
+checkout, and installs a self-contained copy for the current user under
+`~/.local`. It also creates the `speak` and `speakoflow` terminal commands and a
+desktop application entry. `~/.local/bin` must be on `PATH` to use the terminal
+commands (it is by default on most Arch desktop setups).
+
+To install an existing release build without recompiling, or to use another
+prefix:
+
+```bash
+./scripts/install-arch.sh --skip-build
+./scripts/install-arch.sh --prefix /absolute/path
+```
+
+The installer keeps the bundled `libtranscribe`/`libggml` speech-engine files in
+an app-private directory instead of copying their generic library names into
+`/usr/lib`.
+
+### Debian bundle extraction
 
 **Install from the deb bundle** (works on any Linux distro):
 

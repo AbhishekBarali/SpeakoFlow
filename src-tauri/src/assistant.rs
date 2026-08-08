@@ -6,7 +6,7 @@
 //! system prompt first, then append-only history, newest user message last.
 
 use crate::llm_client::{self, ChatMessage};
-use crate::settings::{get_settings, write_settings, AssistantScreenAccessMode};
+use crate::settings::{get_settings, write_settings, AssistantScreenAccessMode, OverlayStyle};
 use crate::web_search;
 use log::{debug, error, warn};
 use serde::Serialize;
@@ -29,6 +29,19 @@ const PANEL_POSITION_EXPANDED_KEY: &str = "assistant_panel_position_expanded";
 /// and hugs its content, like the STT recording overlay (128×40 there).
 const PILL_WIDTH: f64 = 240.0;
 const PILL_HEIGHT: f64 = 44.0;
+
+/// Readable voice HUD used by the assistant's `Live` overlay style. It stays
+/// much smaller than the full chat panel while leaving enough room for the
+/// recognized question and streamed answer.
+const LIVE_WIDTH: f64 = 560.0;
+const LIVE_HEIGHT: f64 = 188.0;
+
+fn collapsed_size(app: &AppHandle) -> (f64, f64) {
+    match get_settings(app).assistant_overlay_style {
+        OverlayStyle::Live => (LIVE_WIDTH, LIVE_HEIGHT),
+        _ => (PILL_WIDTH, PILL_HEIGHT),
+    }
+}
 
 /// The default expanded panel size (the "standard" preset — a comfortable
 /// middle size). The window stays user-resizable; the size preset chosen in
@@ -957,7 +970,7 @@ pub fn create_assistant_panel(app: &AppHandle) {
     // Build at whichever size matches the current mode (pill by default) so the
     // first show doesn't briefly flash the large panel before collapsing.
     let (init_w, init_h) = if PILL_MODE.load(Ordering::SeqCst) {
-        (PILL_WIDTH, PILL_HEIGHT)
+        collapsed_size(app)
     } else {
         expanded_size(app)
     };
@@ -995,8 +1008,17 @@ pub fn create_assistant_panel(app: &AppHandle) {
             // Persist position while the user drags the panel around.
             let app_handle = app.clone();
             window.on_window_event(move |event| {
-                if matches!(event, tauri::WindowEvent::Moved(_)) {
-                    save_position(&app_handle);
+                match event {
+                    tauri::WindowEvent::Moved(_) => save_position(&app_handle),
+                    tauri::WindowEvent::CloseRequested { api, .. } => {
+                        // Treat a window-manager close request like dismissing
+                        // the HUD: keep the reusable webview alive and cancel
+                        // any active turn or speech before hiding it.
+                        api.prevent_close();
+                        crate::utils::cancel_current_operation(&app_handle);
+                        hide_assistant_panel(&app_handle);
+                    }
+                    _ => {}
                 }
             });
             debug!("Assistant panel window created (hidden)");
@@ -1014,7 +1036,8 @@ pub fn show_assistant_panel(app: &AppHandle) {
         // collapsed, and always tell the webview which mode to render.
         let collapsed = PILL_MODE.load(Ordering::SeqCst);
         if collapsed {
-            let _ = window.set_size(tauri::LogicalSize::new(PILL_WIDTH, PILL_HEIGHT));
+            let (width, height) = collapsed_size(app);
+            let _ = window.set_size(tauri::LogicalSize::new(width, height));
         }
         let _ = app.emit("assistant-collapsed", collapsed);
 
@@ -1023,6 +1046,22 @@ pub fn show_assistant_panel(app: &AppHandle) {
         force_panel_topmost(&window);
         let _ = app.emit("assistant-panel-shown", ());
     }
+}
+
+/// Show the non-focus-stealing surface for a voice-assistant turn. Unlike the
+/// manual panel toggle, a hotkey turn always starts in the configured overlay
+/// form: hidden for None, the compact pill for Minimal/Auto, or the readable
+/// question-and-answer HUD for Live.
+pub fn show_assistant_voice_overlay(app: &AppHandle) {
+    if matches!(
+        get_settings(app).assistant_overlay_style,
+        OverlayStyle::None
+    ) {
+        return;
+    }
+
+    set_panel_collapsed(app, true);
+    show_assistant_panel(app);
 }
 
 /// Whether the assistant panel is currently collapsed to the pill. Lets the
@@ -1096,7 +1135,7 @@ pub fn set_panel_collapsed(app: &AppHandle, collapsed: bool) {
         PILL_MODE.store(collapsed, Ordering::SeqCst);
 
         let (new_w, new_h) = if collapsed {
-            (PILL_WIDTH, PILL_HEIGHT)
+            collapsed_size(app)
         } else {
             expanded_size(app)
         };

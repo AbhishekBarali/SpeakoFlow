@@ -273,6 +273,17 @@ curl -o src-tauri/resources/models/silero_vad_v4.onnx https://blob.handy.compute
 bun run tauri dev
 ```
 
+On Arch Linux and Arch-based distributions, build and install the current
+checkout with:
+
+```bash
+bun run install:arch
+speak
+```
+
+This installs the app for the current user under `~/.local`, including its
+speech-engine libraries, desktop entry, and `speak` terminal command.
+
 See [BUILD.md](BUILD.md) for platform-specific setup.
 
 ## Tech stack
