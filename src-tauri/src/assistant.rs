@@ -507,6 +507,13 @@ pub fn take_transcribe_redirect() -> bool {
     TRANSCRIBE_REDIRECT.swap(false, Ordering::SeqCst)
 }
 
+/// Whether the recording in progress is destined for the assistant. A read-only
+/// peek — `take_transcribe_redirect` consumes the flag — so cancellation can
+/// tell an assistant voice turn apart from a plain dictation.
+pub fn is_transcribe_redirected() -> bool {
+    TRANSCRIBE_REDIRECT.load(Ordering::SeqCst)
+}
+
 /// One-shot "deliver this dictation's transcript to the app's own UI as an
 /// event, instead of pasting it into the focused OS window" flag. Set when an
 /// in-app dictation (source `"in-app"`, e.g. the Create-with-AI persona
@@ -1060,8 +1067,34 @@ pub fn show_assistant_voice_overlay(app: &AppHandle) {
         return;
     }
 
-    set_panel_collapsed(app, true);
+    // Don't fight a panel the user opened deliberately: when the full chat is
+    // already on screen, leave it expanded and let the turn stream into it.
+    // Only an absent or already-collapsed panel is forced into the compact
+    // overlay form.
+    if is_panel_collapsed() || !panel_is_visible(app) {
+        set_panel_collapsed(app, true);
+    }
     show_assistant_panel(app);
+}
+
+/// Dismiss the transient collapsed voice overlay, if it is actually on screen.
+/// A no-op when the panel is hidden or expanded, so a cancellation never ends
+/// the conversation — `hide_assistant_panel` triggers memory distillation — for
+/// a surface the user cannot even see.
+pub fn dismiss_voice_overlay(app: &AppHandle) {
+    if !is_panel_collapsed() {
+        return;
+    }
+    if panel_is_visible(app) {
+        hide_assistant_panel(app);
+    }
+}
+
+/// Whether the assistant panel window exists and is currently on screen.
+fn panel_is_visible(app: &AppHandle) -> bool {
+    app.get_webview_window(PANEL_LABEL)
+        .and_then(|window| window.is_visible().ok())
+        .unwrap_or(false)
 }
 
 /// Whether the assistant panel is currently collapsed to the pill. Lets the

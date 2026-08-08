@@ -34,6 +34,15 @@ pub fn cancel_current_operation(app: &AppHandle) {
     // vision timing) so a cancelled capture never rides along with a later turn.
     crate::assistant::clear_immediate_capture();
 
+    // Whether this cancellation belongs to the assistant: either a turn is in
+    // flight, or the recording being cancelled was routed to the assistant.
+    // Read before `request_cancel()` below, while the turn still reports busy.
+    let assistant_owns_cancel = app
+        .try_state::<crate::assistant::AssistantConversation>()
+        .map(|conversation| conversation.is_busy())
+        .unwrap_or(false)
+        || crate::assistant::is_transcribe_redirected();
+
     // Abort any in-flight assistant turn (streaming LLM answer) and silence a
     // spoken reply that's playing or about to play, so cancel (Esc / the pill's
     // stop button) stops a reply mid-generation — not only a recording. All of
@@ -53,10 +62,12 @@ pub fn cancel_current_operation(app: &AppHandle) {
     // the "I pressed cancel and nothing happened" bug. Safe/idempotent when the
     // panel is hidden or already idle.
     crate::assistant::emit_state(app, "idle");
-    // The compact voice overlay is transient. Cancellation must dismiss it
-    // immediately; an explicitly expanded chat panel remains open.
-    if crate::assistant::is_panel_collapsed() {
-        crate::assistant::hide_assistant_panel(app);
+    // The compact voice overlay is transient, so cancelling an assistant turn
+    // dismisses it. Cancelling a plain dictation leaves it alone: `Esc` during
+    // dictation shouldn't close the assistant, and `hide_assistant_panel` ends
+    // the conversation for memory distillation.
+    if assistant_owns_cancel {
+        crate::assistant::dismiss_voice_overlay(app);
     }
 
     // Update tray icon and hide overlay
