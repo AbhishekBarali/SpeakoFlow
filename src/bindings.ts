@@ -1704,6 +1704,22 @@ async getAssistantPanelCollapsed() : Promise<boolean> {
     return await TAURI_INVOKE("get_assistant_panel_collapsed");
 },
 /**
+ * Signal that the reply identified by `epoch` has no more chunks, so the sink
+ * can drain and release the audio device. Closing a reply that has already been
+ * superseded is a no-op, so this cannot cut a newer reply short.
+ */
+async assistantFinishLocalTts(epoch: number | null) : Promise<void> {
+    await TAURI_INVOKE("assistant_finish_local_tts", { epoch });
+},
+/**
+ * Stop a Kokoro chunk currently playing through the native backend. This is
+ * deliberately separate from the panel event so calling it from the hook's
+ * local `stop()` cannot recursively emit another stop event.
+ */
+async assistantStopLocalTts() : Promise<void> {
+    await TAURI_INVOKE("assistant_stop_local_tts");
+},
+/**
  * Arm or disarm sticky Manual screen capture. Disarming is always accepted for
  * cleanup; arming is rejected unless the persisted mode is Manual.
  */

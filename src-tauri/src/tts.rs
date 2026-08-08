@@ -23,7 +23,7 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::io::Cursor;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::time::Duration;
 use tauri::AppHandle;
 
@@ -76,6 +76,12 @@ pub fn current_epoch() -> u64 {
 /// ~50ms and any superseded request aborts before it can play.
 pub fn stop_remote() {
     PLAYBACK_EPOCH.fetch_add(1, Ordering::SeqCst);
+    // Release the streaming sink too. Its thread already stops on the epoch
+    // change; dropping the sender here means queued chunks are discarded
+    // immediately instead of waiting for the next reply to displace them.
+    if let Ok(mut guard) = PLAYBACK_SESSION.lock() {
+        *guard = None;
+    }
 }
 
 /// Stop ALL assistant speech — remote playback and the in-webview Kokoro
@@ -85,6 +91,331 @@ pub fn stop_all(app: &AppHandle) {
     stop_remote();
     use tauri::Emitter;
     let _ = app.emit("assistant-tts-stop", ());
+}
+
+// ---------------------------------------------------------------------------
+// Streaming playback: one output stream per spoken reply
+// ---------------------------------------------------------------------------
+
+/// How long the playback thread lingers with an empty sink before releasing the
+/// audio device. Purely a safety net for a caller that never signals the end of
+/// a reply (a closed panel, a failed synthesis); a later chunk simply opens a
+/// fresh session. Generous because a slow local synthesis on CPU can leave a
+/// real gap between sentences, and tearing down mid-reply would cost a
+/// device-open right when the next chunk arrives.
+const PLAYBACK_IDLE_TIMEOUT: Duration = Duration::from_secs(10);
+
+/// Queue depth before [`enqueue_speech_chunk`] applies backpressure. Bounded so
+/// a long reply cannot accumulate unbounded decoded audio in memory; synthesis
+/// waits instead, which is harmless because playback is the slower side.
+const PLAYBACK_QUEUE_DEPTH: usize = 16;
+
+/// A live playback session: one output stream and one sink serving every chunk
+/// of a single spoken reply.
+///
+/// Streamed speech arrives as a series of clips. Playing each one through
+/// [`play_audio_bytes`] would open and close the audio device per sentence,
+/// which costs latency and inserts an audible gap exactly where the sentences
+/// should flow together. A rodio `Sink` plays appended sources back-to-back
+/// without a break, so the sink is kept alive for the whole reply and chunks are
+/// appended as they are synthesized.
+struct PlaybackSession {
+    /// Chunks are handed to the playback thread; `Sink`/`OutputStream` are not
+    /// `Send`, so they never leave that thread.
+    tx: std::sync::mpsc::SyncSender<Vec<u8>>,
+    /// The cancellation epoch this session belongs to. A chunk from a newer
+    /// epoch replaces the session; one from an older epoch is dropped.
+    epoch: u64,
+}
+
+static PLAYBACK_SESSION: Lazy<std::sync::Mutex<Option<PlaybackSession>>> =
+    Lazy::new(|| std::sync::Mutex::new(None));
+
+/// Number of playback sessions currently producing audio.
+///
+/// The panel's "audio is playing" flag is a single boolean, but sessions overlap:
+/// a follow-up question starts its session while the previous one is still
+/// winding down. Emitting `true`/`false` per session let a stale `false` land
+/// after a fresh `true` and strand the panel showing silence during playback (or
+/// the reverse). Counting instead means the event is emitted only on the real
+/// 0↔1 transitions, so the flag always ends up matching reality.
+static PLAYING_SESSIONS: AtomicUsize = AtomicUsize::new(0);
+
+/// Announce that this session has begun producing audio, emitting the event only
+/// if nothing else was already playing.
+///
+/// Returns a guard that balances the count on drop, so an early return — or a
+/// panic in the playback thread — cannot leave the count above zero and strand
+/// the panel showing a Stop button for audio that is not playing.
+#[must_use = "the count is only balanced when the guard is dropped"]
+fn announce_playing(app: &AppHandle) -> PlayingGuard {
+    use tauri::Emitter;
+    if PLAYING_SESSIONS.fetch_add(1, Ordering::SeqCst) == 0 {
+        let _ = app.emit("assistant-tts-playing", true);
+    }
+    PlayingGuard { app: app.clone() }
+}
+
+/// Balances [`announce_playing`]; emits the event once the last session ends.
+struct PlayingGuard {
+    app: AppHandle,
+}
+
+impl Drop for PlayingGuard {
+    fn drop(&mut self) {
+        use tauri::Emitter;
+        if PLAYING_SESSIONS.fetch_sub(1, Ordering::SeqCst) == 1 {
+            let _ = self.app.emit("assistant-tts-playing", false);
+        }
+    }
+}
+
+/// Queue one synthesized clip for gapless playback.
+///
+/// Chunks play strictly in the order they are enqueued, so callers must enqueue
+/// in reading order. Returns once the clip is *queued*, not once it has been
+/// heard — that is what lets synthesis of the next sentence overlap playback of
+/// this one. Blocks only when playback has fallen [`PLAYBACK_QUEUE_DEPTH`] clips
+/// behind, so callers must not hold a lock across it.
+pub(crate) fn enqueue_speech_chunk(
+    app: &AppHandle,
+    bytes: Vec<u8>,
+    device: Option<String>,
+    volume: f32,
+    epoch: u64,
+) -> Result<(), String> {
+    if bytes.is_empty() {
+        return Ok(());
+    }
+    // Superseded by a Stop while this chunk was being synthesized.
+    if current_epoch() != epoch {
+        debug!("speech chunk superseded before playback; dropping");
+        return Ok(());
+    }
+
+    // The sender is cloned out and the lock released before sending. Sending can
+    // block when playback is far behind, and holding the lock across that would
+    // make `stop_remote` wait on it — Stop has to stay immediate.
+    let tx = session_sender(app, &device, volume, epoch)?;
+    let payload = match tx.send(bytes) {
+        Ok(()) => return Ok(()),
+        // The thread retired on its idle timeout since the last chunk, so this
+        // channel is dead. Start a fresh session and retry once.
+        Err(std::sync::mpsc::SendError(payload)) => payload,
+    };
+
+    debug!("playback session had retired; starting a new one");
+    // A send can also fail because a Stop dropped the receiver. Re-check before
+    // respawning, or Stop would pointlessly reopen the audio device — audible as
+    // a click on some hardware, and a profile switch on a Bluetooth headset.
+    if current_epoch() != epoch {
+        return Ok(());
+    }
+    if let Ok(mut guard) = PLAYBACK_SESSION.lock() {
+        *guard = None;
+    }
+    let tx = session_sender(app, &device, volume, epoch)?;
+    tx.send(payload)
+        .map_err(|_| "playback thread stopped unexpectedly".to_string())
+}
+
+/// Get the sender for the current reply's playback session, starting one if
+/// needed. Holds the session lock only long enough to look up or create it.
+fn session_sender(
+    app: &AppHandle,
+    device: &Option<String>,
+    volume: f32,
+    epoch: u64,
+) -> Result<std::sync::mpsc::SyncSender<Vec<u8>>, String> {
+    let mut guard = PLAYBACK_SESSION
+        .lock()
+        .map_err(|_| "playback session lock poisoned".to_string())?;
+
+    // A new reply supersedes the previous session's thread, which notices the
+    // epoch change and stops within one poll interval.
+    if guard.as_ref().is_some_and(|s| s.epoch != epoch) {
+        *guard = None;
+    }
+    if guard.is_none() {
+        *guard = Some(spawn_playback_session(
+            app.clone(),
+            device.clone(),
+            volume,
+            epoch,
+        )?);
+    }
+    Ok(guard.as_ref().expect("session just created").tx.clone())
+}
+
+/// Signal that no further chunks belong to the current reply, so the sink can
+/// drain and release the audio device.
+///
+/// Safe to call more than once, and safe to call for an epoch that has already
+/// been superseded — both are no-ops.
+pub(crate) fn finish_speech_stream(epoch: u64) {
+    if let Ok(mut guard) = PLAYBACK_SESSION.lock() {
+        if guard.as_ref().is_some_and(|s| s.epoch == epoch) {
+            // Dropping the sender closes the channel; the thread then plays out
+            // whatever is queued and exits.
+            *guard = None;
+        }
+    }
+}
+
+/// Start the dedicated playback thread for one reply.
+fn spawn_playback_session(
+    app: AppHandle,
+    device: Option<String>,
+    volume: f32,
+    epoch: u64,
+) -> Result<PlaybackSession, String> {
+    let (tx, rx) = std::sync::mpsc::sync_channel::<Vec<u8>>(PLAYBACK_QUEUE_DEPTH);
+    // A plain OS thread, not a runtime worker: this thread owns non-`Send` audio
+    // handles and blocks for the length of the reply.
+    std::thread::Builder::new()
+        .name("assistant-speech".into())
+        .spawn(move || run_playback_session(app, rx, device, volume, epoch))
+        .map_err(|e| format!("Failed to start speech playback thread: {}", e))?;
+    Ok(PlaybackSession { tx, epoch })
+}
+
+/// Playback thread body: append every chunk to a single sink, then drain.
+fn run_playback_session(
+    app: AppHandle,
+    rx: std::sync::mpsc::Receiver<Vec<u8>>,
+    device: Option<String>,
+    volume: f32,
+    epoch: u64,
+) {
+    use std::sync::mpsc::RecvTimeoutError;
+
+    let stream_handle = match open_output_stream(device) {
+        Ok(handle) => handle,
+        Err(e) => {
+            error!("TTS playback device unavailable: {}", e);
+            if current_epoch() == epoch {
+                crate::assistant::emit_error(
+                    &app,
+                    "tts",
+                    format!("Couldn't play the voice on your output device: {}", e),
+                );
+            }
+            return;
+        }
+    };
+    let sink = rodio::Sink::connect_new(stream_handle.mixer());
+    sink.set_volume(volume.max(0.1));
+
+    // "Playing" is announced when audio actually starts, not when the device
+    // opens, so a session that is superseded before its first chunk never makes
+    // the panel flash a Stop affordance for silence. The guard balances the
+    // announcement however this thread exits.
+    let mut playing: Option<PlayingGuard> = None;
+    let mut idle_since: Option<std::time::Instant> = None;
+    let mut decode_failures = 0usize;
+
+    loop {
+        if current_epoch() != epoch {
+            sink.stop();
+            break;
+        }
+        match rx.recv_timeout(Duration::from_millis(50)) {
+            Ok(bytes) => {
+                idle_since = None;
+                match rodio::Decoder::new(Cursor::new(bytes)) {
+                    Ok(source) => {
+                        sink.append(source);
+                        if playing.is_none() {
+                            playing = Some(announce_playing(&app));
+                        }
+                    }
+                    Err(e) => {
+                        // Skip the bad clip rather than abandoning the reply; one
+                        // truncated response shouldn't silence the rest.
+                        decode_failures += 1;
+                        error!("Failed to decode speech chunk: {}", e);
+                    }
+                }
+            }
+            Err(RecvTimeoutError::Timeout) => {
+                if sink.empty() {
+                    let since = idle_since.get_or_insert_with(std::time::Instant::now);
+                    if since.elapsed() >= PLAYBACK_IDLE_TIMEOUT {
+                        debug!("speech playback idle; releasing the output device");
+                        break;
+                    }
+                } else {
+                    idle_since = None;
+                }
+            }
+            Err(RecvTimeoutError::Disconnected) => {
+                // The reply is complete: play out what is queued, still honouring
+                // a Stop.
+                while !sink.empty() {
+                    if current_epoch() != epoch {
+                        sink.stop();
+                        break;
+                    }
+                    std::thread::sleep(Duration::from_millis(50));
+                }
+                break;
+            }
+        }
+    }
+
+    // Dropping the guard emits the balancing event once no session is left
+    // playing, on every exit path including an unexpected panic.
+    drop(playing);
+    if decode_failures > 0 && current_epoch() == epoch {
+        crate::assistant::emit_error(
+            &app,
+            "tts",
+            "Part of the spoken reply couldn't be played.".to_string(),
+        );
+    }
+}
+
+/// One synthesis request, plus the context needed to make it sound like a
+/// continuation rather than a fresh utterance.
+pub(crate) struct SpeechRequest<'a> {
+    pub text: &'a str,
+    /// ElevenLabs request ids from earlier chunks of the same reply, oldest
+    /// first. Empty for a one-shot request.
+    pub previous_request_ids: &'a [String],
+}
+
+/// Audio for one chunk, plus anything later chunks need from it.
+pub(crate) struct SynthesizedSpeech {
+    pub bytes: Vec<u8>,
+    /// ElevenLabs `request-id`, carried into the next chunk so the voice keeps
+    /// its prosody across the seam. `None` for every other engine.
+    pub request_id: Option<String>,
+}
+
+/// Synthesize one piece of speech with the configured engine.
+///
+/// This is the single place that maps the engine setting onto a provider call,
+/// used both for whole replies and for individual streamed chunks.
+pub(crate) async fn synthesize_speech(
+    settings: &AppSettings,
+    request: SpeechRequest<'_>,
+) -> Result<SynthesizedSpeech, String> {
+    match settings.assistant_tts_engine.as_str() {
+        "openai" | "openrouter" => fetch_openai_speech(settings, request.text)
+            .await
+            .map(|bytes| SynthesizedSpeech {
+                bytes,
+                request_id: None,
+            }),
+        "elevenlabs" => fetch_elevenlabs_speech(settings, &request).await,
+        "azure" => fetch_azure_speech(settings, request.text)
+            .await
+            .map(|bytes| SynthesizedSpeech {
+                bytes,
+                request_id: None,
+            }),
+        other => Err(format!("Unknown TTS engine: {}", other)),
+    }
 }
 
 /// Fetch speech audio for `text` using the configured remote engine and play
@@ -103,12 +434,15 @@ pub async fn speak_remote_epoch(app: &AppHandle, settings: &AppSettings, text: S
         return;
     }
 
-    let result = match settings.assistant_tts_engine.as_str() {
-        "openai" | "openrouter" => fetch_openai_speech(settings, &text).await,
-        "elevenlabs" => fetch_elevenlabs_speech(settings, &text).await,
-        "azure" => fetch_azure_speech(settings, &text).await,
-        other => Err(format!("Unknown TTS engine: {}", other)),
-    };
+    let result = synthesize_speech(
+        settings,
+        SpeechRequest {
+            text: &text,
+            previous_request_ids: &[],
+        },
+    )
+    .await
+    .map(|speech| speech.bytes);
 
     match result {
         Ok(audio_bytes) => {
@@ -121,9 +455,9 @@ pub async fn speak_remote_epoch(app: &AppHandle, settings: &AppSettings, text: S
             let volume = settings.audio_feedback_volume;
             let device = settings.selected_output_device.clone();
             // Let the panel know audio is playing so it can show a Stop button
-            // even though the turn itself is already idle.
-            use tauri::Emitter;
-            let _ = app.emit("assistant-tts-playing", true);
+            // even though the turn itself is already idle. Counted, so a
+            // one-shot clip and a streamed reply can't leave the flag wrong.
+            let playing = announce_playing(app);
             // rodio playback blocks; run it off the async runtime. Map the
             // error to a String so it can cross the spawn_blocking boundary
             // (the boxed error isn't Send).
@@ -131,10 +465,9 @@ pub async fn speak_remote_epoch(app: &AppHandle, settings: &AppSettings, text: S
                 play_audio_bytes(audio_bytes, device, volume, epoch).map_err(|e| e.to_string())
             })
             .await;
-            let _ = app.emit("assistant-tts-playing", false);
-            // Surface a real playback failure (bad/removed output device, decode
-            // error) instead of failing silently — but stay quiet when the clip
-            // was simply superseded by a Stop (which returns Ok, not Err).
+            drop(playing); // Surface a real playback failure (bad/removed output device, decode
+                           // error) instead of failing silently — but stay quiet when the clip
+                           // was simply superseded by a Stop (which returns Ok, not Err).
             if let Ok(Err(e)) = play_result {
                 error!("TTS playback failed: {}", e);
                 if current_epoch() == epoch {
@@ -157,13 +490,26 @@ pub async fn speak_remote_epoch(app: &AppHandle, settings: &AppSettings, text: S
 /// proxies emit "upstream connect error / reset before headers / protocol
 /// error" during HTTP/2 negotiation (the same reason the LLM client pins h1) —
 /// and sets connect/overall timeouts so a stalled upstream can't wedge playback.
-fn tts_client() -> Result<reqwest::Client, String> {
+///
+/// Built once and shared. A `reqwest::Client` owns its connection pool, so
+/// building one per request re-paid DNS + TCP + TLS every time; that was
+/// tolerable when a reply was a single request, but streaming speech sends one
+/// request per sentence, where a fresh handshake per chunk would show up as
+/// audible stalling. Clones are cheap and share the pool.
+static TTS_CLIENT: Lazy<Result<reqwest::Client, String>> = Lazy::new(|| {
     reqwest::Client::builder()
         .http1_only()
         .connect_timeout(Duration::from_secs(10))
         .timeout(Duration::from_secs(60))
+        // Hold sockets open between sentences so only the first chunk of a reply
+        // pays for connection setup.
+        .pool_idle_timeout(Duration::from_secs(90))
         .build()
         .map_err(|e| format!("Failed to build TTS HTTP client: {}", e))
+});
+
+fn tts_client() -> Result<reqwest::Client, String> {
+    TTS_CLIENT.clone()
 }
 
 /// Send a TTS request with a few retries. Transient upstream hiccups — 5xx
@@ -445,8 +791,29 @@ fn pcm_to_wav(pcm: &[u8], sample_rate: u32, channels: u16, bits_per_sample: u16)
     out
 }
 
+/// Most recent ElevenLabs request ids to condition a chunk on. ElevenLabs
+/// accepts at most three, and only ids from the last two hours.
+const ELEVENLABS_MAX_STITCH_IDS: usize = 3;
+
+/// Whether this ElevenLabs model supports Request Stitching. The `eleven_v3`
+/// family does not, and sending the field there is pointless, so it is skipped.
+fn elevenlabs_supports_stitching(model: &str) -> bool {
+    !model.to_ascii_lowercase().contains("v3")
+}
+
 /// POST https://api.elevenlabs.io/v1/text-to-speech/{voice_id}
-async fn fetch_elevenlabs_speech(settings: &AppSettings, text: &str) -> Result<Vec<u8>, String> {
+///
+/// When earlier chunks of the same reply are supplied via
+/// [`SpeechRequest::previous_request_ids`], ElevenLabs' Request Stitching is
+/// used: the model conditions on what it already generated, so a reply split
+/// into sentences keeps one continuous voice and intonation instead of restarting
+/// its delivery at every seam. This is the main defence against streamed speech
+/// sounding choppier than a single-shot reply.
+async fn fetch_elevenlabs_speech(
+    settings: &AppSettings,
+    request: &SpeechRequest<'_>,
+) -> Result<SynthesizedSpeech, String> {
+    let text = request.text;
     let voice_id = settings.assistant_tts_remote_voice.trim();
     if voice_id.is_empty() {
         return Err("No ElevenLabs voice ID configured".to_string());
@@ -477,11 +844,23 @@ async fn fetch_elevenlabs_speech(settings: &AppSettings, text: &str) -> Result<V
     if (speed - 1.0).abs() > f64::EPSILON {
         body["voice_settings"] = serde_json::json!({ "speed": speed });
     }
-    let request = client
+    if !request.previous_request_ids.is_empty() && elevenlabs_supports_stitching(&model) {
+        let ids: Vec<&String> = request
+            .previous_request_ids
+            .iter()
+            .rev()
+            .take(ELEVENLABS_MAX_STITCH_IDS)
+            .collect::<Vec<_>>()
+            .into_iter()
+            .rev()
+            .collect();
+        body["previous_request_ids"] = serde_json::json!(ids);
+    }
+    let request_builder = client
         .post(&url)
         .header("xi-api-key", settings.assistant_tts_api_key.0.trim())
         .json(&body);
-    let response = send_tts_with_retries(request).await?;
+    let response = send_tts_with_retries(request_builder).await?;
 
     let status = response.status();
     if !status.is_success() {
@@ -489,11 +868,20 @@ async fn fetch_elevenlabs_speech(settings: &AppSettings, text: &str) -> Result<V
         return Err(format!("{}: {}", status, truncate(&body, 300)));
     }
 
-    response
+    // Captured before the body is consumed; conditioning the next chunk needs it.
+    let request_id = response
+        .headers()
+        .get("request-id")
+        .and_then(|v| v.to_str().ok())
+        .map(|v| v.to_string())
+        .filter(|v| !v.is_empty());
+
+    let bytes = response
         .bytes()
         .await
         .map(|b| b.to_vec())
-        .map_err(|e| format!("Failed to read audio: {}", e))
+        .map_err(|e| format!("Failed to read audio: {}", e))?;
+    Ok(SynthesizedSpeech { bytes, request_id })
 }
 
 /// Resolve the Azure Speech regional TTS host from a user-provided endpoint.
@@ -1113,12 +1501,15 @@ async fn fetch_azure_speech(settings: &AppSettings, text: &str) -> Result<Vec<u8
 /// show them inline) instead of being emitted as assistant errors.
 pub async fn test_remote(settings: &AppSettings, text: String) -> Result<(), String> {
     let epoch = current_epoch();
-    let audio_bytes = match settings.assistant_tts_engine.as_str() {
-        "openai" | "openrouter" => fetch_openai_speech(settings, &text).await?,
-        "elevenlabs" => fetch_elevenlabs_speech(settings, &text).await?,
-        "azure" => fetch_azure_speech(settings, &text).await?,
-        other => return Err(format!("Unknown TTS engine: {}", other)),
-    };
+    let audio_bytes = synthesize_speech(
+        settings,
+        SpeechRequest {
+            text: &text,
+            previous_request_ids: &[],
+        },
+    )
+    .await?
+    .bytes;
     let volume = settings.audio_feedback_volume;
     let device = settings.selected_output_device.clone();
     tauri::async_runtime::spawn_blocking(move || {
@@ -1137,14 +1528,12 @@ fn xml_escape(s: &str) -> String {
         .replace('\'', "&apos;")
 }
 
-/// Decode and play audio bytes (mp3/wav/ogg) on the selected output device.
-/// Polls the playback epoch so a `stop_remote()` cancels playback promptly.
-pub(crate) fn play_audio_bytes(
-    bytes: Vec<u8>,
+/// Open an output stream on the user's selected device, falling back to the
+/// system default when the named device is gone (unplugged headset, changed
+/// profile) so playback degrades to "wrong speaker" rather than silence.
+fn open_output_stream(
     selected_device: Option<String>,
-    volume: f32,
-    epoch: u64,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<rodio::OutputStream, Box<dyn std::error::Error>> {
     use cpal::traits::{DeviceTrait, HostTrait};
     use rodio::OutputStreamBuilder;
 
@@ -1161,8 +1550,23 @@ pub(crate) fn play_audio_bytes(
         }
         _ => OutputStreamBuilder::from_default_device()?,
     };
+    Ok(stream_builder.open_stream()?)
+}
 
-    let stream_handle = stream_builder.open_stream()?;
+/// Decode and play audio bytes (mp3/wav/ogg) on the selected output device.
+/// Polls the playback epoch so a `stop_remote()` cancels playback promptly.
+///
+/// One-shot: opens a stream, plays a single clip, returns when it finishes. Used
+/// where that is exactly the intent (the settings "Test voice" button, replaying
+/// a saved reply). Streamed replies use [`enqueue_speech_chunk`] instead, which
+/// keeps one stream open across every chunk of the reply.
+pub(crate) fn play_audio_bytes(
+    bytes: Vec<u8>,
+    selected_device: Option<String>,
+    volume: f32,
+    epoch: u64,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let stream_handle = open_output_stream(selected_device)?;
     let sink = rodio::play(stream_handle.mixer(), Cursor::new(bytes))?;
     sink.set_volume(volume.max(0.1));
 
@@ -1212,12 +1616,32 @@ fn truncate(s: &str, max: usize) -> &str {
 /// when it still contains pronounceable characters, otherwise an empty string so
 /// the caller can skip playback instead of voicing garbage.
 pub fn sanitize_for_speech(input: &str) -> String {
+    sanitize_speech_inner(input, true)
+}
+
+/// [`sanitize_for_speech`] for a single streamed chunk rather than a whole reply.
+///
+/// The only difference is the raw-text fallback: whole replies keep it, because a
+/// reply that cleans away to nothing is better spoken imperfectly than not at
+/// all. A *chunk* that cleans away to nothing is usually a fenced code block or
+/// a divider, and falling back would read the code aloud — exactly what the
+/// filter exists to prevent. Callers skip empty results instead.
+pub fn sanitize_for_speech_chunk(input: &str) -> String {
+    sanitize_speech_inner(input, false)
+}
+
+fn sanitize_speech_inner(input: &str, allow_raw_fallback: bool) -> String {
     // Fenced code blocks (``` … ``` or ~~~ … ~~~), including the info string.
     static FENCED_CODE: Lazy<Regex> =
         Lazy::new(|| Regex::new(r"(?s)```[^\n]*\n?.*?```|~~~[^\n]*\n?.*?~~~").unwrap());
-    // Images first (drop alt + url), then links (keep the visible text).
-    static IMAGE: Lazy<Regex> = Lazy::new(|| Regex::new(r"!\[[^\]]*\]\([^)]*\)").unwrap());
-    static LINK: Lazy<Regex> = Lazy::new(|| Regex::new(r"\[([^\]]+)\]\([^)]*\)").unwrap());
+    // Images first (drop alt + url), then links (keep the visible text). The URL
+    // half allows one level of nested parentheses, so Wikipedia-style targets
+    // (`.../Foo_(bar)`) are consumed whole instead of leaving a stray `)` to be
+    // read aloud.
+    static IMAGE: Lazy<Regex> =
+        Lazy::new(|| Regex::new(r"!\[[^\]]*\]\((?:[^()]|\([^()]*\))*\)").unwrap());
+    static LINK: Lazy<Regex> =
+        Lazy::new(|| Regex::new(r"\[([^\]]+)\]\((?:[^()]|\([^()]*\))*\)").unwrap());
     static URL: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)\b(?:https?://|www\.)\S+").unwrap());
     // Inline code: keep the inner text, drop the backticks.
     static INLINE_CODE: Lazy<Regex> = Lazy::new(|| Regex::new(r"`+([^`]*)`+").unwrap());
@@ -1274,7 +1698,7 @@ pub fn sanitize_for_speech(input: &str) -> String {
     if cleaned.is_empty() {
         // Over-aggressive strip: only fall back to the raw text if it actually
         // contains something pronounceable, otherwise let the caller skip.
-        if input.chars().any(|c| c.is_alphanumeric()) {
+        if allow_raw_fallback && input.chars().any(|c| c.is_alphanumeric()) {
             return WS.replace_all(input.trim(), " ").into_owned();
         }
         return String::new();
@@ -1484,5 +1908,33 @@ mod tests {
         let wrapped = maybe_wrap_pcm("audio/pcm", pcm.clone());
         assert_eq!(&wrapped[0..4], b"RIFF");
         assert_eq!(wrapped.len(), 44 + pcm.len());
+    }
+
+    #[test]
+    fn chunk_sanitizer_never_falls_back_to_raw_code() {
+        // A streamed chunk can be nothing but a code block. The whole-reply
+        // sanitizer keeps a raw fallback so a reply is spoken imperfectly rather
+        // than not at all; for a chunk that fallback would read code aloud, so it
+        // must return empty and let the caller skip it.
+        let code_only = "```rust\nlet x = 1;\n```";
+        assert_eq!(super::sanitize_for_speech_chunk(code_only), "");
+        assert!(!super::sanitize_for_speech(code_only).is_empty());
+
+        // Ordinary prose is treated identically by both.
+        let prose = "This is a normal sentence.";
+        assert_eq!(super::sanitize_for_speech_chunk(prose), prose);
+        assert_eq!(super::sanitize_for_speech(prose), prose);
+    }
+
+    #[test]
+    fn request_stitching_is_skipped_for_models_that_reject_it() {
+        use super::elevenlabs_supports_stitching;
+        // ElevenLabs documents Request Stitching as unavailable on eleven_v3.
+        assert!(!elevenlabs_supports_stitching("eleven_v3"));
+        assert!(!elevenlabs_supports_stitching("eleven_v3_alpha"));
+        // Everything else supports it.
+        assert!(elevenlabs_supports_stitching("eleven_flash_v2_5"));
+        assert!(elevenlabs_supports_stitching("eleven_multilingual_v2"));
+        assert!(elevenlabs_supports_stitching("eleven_turbo_v2_5"));
     }
 }

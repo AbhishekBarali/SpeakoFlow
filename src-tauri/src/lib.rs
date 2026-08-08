@@ -23,6 +23,7 @@ mod secret_store;
 mod settings;
 mod shortcut;
 mod signal_handle;
+mod speech_stream;
 mod transcription_coordinator;
 mod tray;
 mod tray_i18n;
@@ -718,7 +719,7 @@ pub fn run(cli_args: CliArgs) {
             commands::assistant::redirect_transcription_to_assistant,
             commands::assistant::set_assistant_panel_collapsed,
             commands::assistant::get_assistant_panel_collapsed,
-            commands::assistant::assistant_play_local_tts_chunk,
+            commands::assistant::assistant_finish_local_tts,
             commands::assistant::assistant_stop_local_tts,
             commands::assistant::set_assistant_screen_armed,
             commands::assistant::get_assistant_screen_armed,
@@ -764,7 +765,28 @@ pub fn run(cli_args: CliArgs) {
         )
         .expect("Failed to export typescript bindings");
 
-    let invoke_handler = specta_builder.invoke_handler();
+    // Almost every command is typed and registered through tauri-specta. The one
+    // exception streams Kokoro's audio in as a *raw* binary body, which the
+    // bindings generator cannot describe (`tauri::ipc::Request` has no
+    // `specta::Type`). Tauri allows a single invoke handler, so the two are
+    // composed by command name: each invocation goes to exactly one of them, and
+    // ownership is handed over without cloning.
+    //
+    // A named function rather than a `let` binding, so the runtime type is
+    // concrete instead of needing inference through the macro.
+    fn raw_body_handler(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
+        let handler: fn(tauri::ipc::Invoke<tauri::Wry>) -> bool =
+            tauri::generate_handler![commands::assistant::assistant_play_local_tts_chunk];
+        handler(invoke)
+    }
+    let specta_handler = specta_builder.invoke_handler();
+    let invoke_handler = move |invoke: tauri::ipc::Invoke<tauri::Wry>| {
+        if invoke.message.command() == "assistant_play_local_tts_chunk" {
+            raw_body_handler(invoke)
+        } else {
+            specta_handler(invoke)
+        }
+    };
 
     #[allow(unused_mut)]
     let mut builder = tauri::Builder::default()

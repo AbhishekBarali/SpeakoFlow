@@ -31,6 +31,11 @@ interface TextSplitter {
 
 const KOKORO_MODEL_ID = "onnx-community/Kokoro-82M-v1.0-ONNX";
 
+/** Carries the reply's cancellation epoch alongside a raw audio body, since the
+ *  body itself is taken up by the audio. Must match `TTS_EPOCH_HEADER` in
+ *  `src-tauri/src/commands/assistant.rs`. */
+const TTS_EPOCH_HEADER = "x-tts-epoch";
+
 interface ProgressEvent {
   status: string;
   file?: string;
@@ -100,6 +105,32 @@ export function useKokoroTts(
   // second pump in parallel.
   const nativePlayingRef = useRef(false);
   const generationRef = useRef(0);
+
+  /** Open splitter for a reply that is still being written, if any. Text is fed
+   *  in as the model produces it and the splitter stays open until the reply
+   *  ends, so Kokoro sees one continuous utterance instead of isolated clips. */
+  const streamRef = useRef<{
+    splitter: TextSplitter;
+    generation: number;
+  } | null>(null);
+  /** Text that arrived before the model finished loading. The first reply of a
+   *  session can begin while weights are still initializing; buffering here
+   *  means those words are spoken late rather than lost. */
+  const pendingTextRef = useRef<string[]>([]);
+  /** A reply is open: text may still arrive. */
+  const streamOpenRef = useRef(false);
+  /** The reply ended while the model was still loading, so the splitter must be
+   *  closed as soon as it exists. */
+  const closeWhenReadyRef = useRef(false);
+  /** No more audio will be produced for the current reply. Together with an
+   *  empty queue this means the native sink can drain and hand the audio device
+   *  back; while it is false, an empty queue only means synthesis is behind. */
+  const synthDoneRef = useRef(true);
+  /** Cancellation epoch of the reply being streamed, handed out by the backend.
+   *  Tagging each chunk with it means a clip still crossing the IPC boundary when
+   *  the user hits Stop is dropped rather than played over the next reply. `null`
+   *  for the one-shot replay path, which has no reply of its own. */
+  const streamEpochRef = useRef<number | null>(null);
 
   const ensureLoaded = useCallback(async (): Promise<KokoroModel> => {
     if (modelRef.current) return modelRef.current;
@@ -193,12 +224,37 @@ export function useKokoroTts(
     }
   }, [enabled, preload, ensureLoaded]);
 
-  const stop = useCallback(() => {
+  /**
+   * Abandon whatever this hook is currently synthesizing or playing.
+   *
+   * `cancelNative` decides whether the native side is cancelled too. Cancelling
+   * bumps the shared playback epoch, which is right for a real Stop but wrong
+   * when starting a new reply: the backend has already issued that reply's epoch,
+   * and bumping it here would invalidate the very chunks about to be sent.
+   */
+  const teardown = useCallback((cancelNative: boolean) => {
     generationRef.current += 1; // invalidate in-flight generation
     queueRef.current = [];
     const el = playingRef.current;
     nativePlayingRef.current = false;
-    if (isTauri()) {
+    // Abandon any reply that is still being streamed in. Closing the splitter
+    // lets kokoro-js finish its generator instead of leaving it suspended; the
+    // bumped generation makes every clip it still produces a no-op.
+    const open = streamRef.current;
+    streamRef.current = null;
+    streamOpenRef.current = false;
+    closeWhenReadyRef.current = false;
+    pendingTextRef.current = [];
+    synthDoneRef.current = true;
+    streamEpochRef.current = null;
+    if (open) {
+      try {
+        open.splitter.close();
+      } catch {
+        // already closed
+      }
+    }
+    if (cancelNative && isTauri()) {
       // Native playback polls the same cancellation epoch and stops within one
       // 50 ms tick. Fire-and-forget here so React cleanup stays synchronous.
       void invoke("assistant_stop_local_tts").catch(() => {});
@@ -221,6 +277,8 @@ export function useKokoroTts(
     setError(null);
     setStatus((s) => (s === "speaking" ? "ready" : s));
   }, []);
+
+  const stop = useCallback(() => teardown(true), [teardown]);
 
   // When the dtype (precision) changes, drop the cached model so the next
   // synthesis reloads at the new precision.
@@ -274,6 +332,15 @@ export function useKokoroTts(
     const next = queueRef.current.shift();
     if (!next) {
       playingRef.current = null;
+      // Everything synthesized has been handed over. Telling the native sink the
+      // reply is complete lets it play out its queue and then release the audio
+      // device; while synthesis is still running an empty queue only means we are
+      // ahead, so the sink is left open to keep the next sentence gapless.
+      if (isTauri() && synthDoneRef.current) {
+        void invoke("assistant_finish_local_tts", {
+          epoch: streamEpochRef.current,
+        }).catch(() => {});
+      }
       setStatus((s) => (s === "speaking" ? "ready" : s));
       return;
     }
@@ -283,22 +350,38 @@ export function useKokoroTts(
       // The HUD is deliberately non-focus-stealing. Route generated speech to
       // the native audio backend so Linux WebKit cannot suppress it as
       // background autoplay and so the configured output device is respected.
+      // The call returns once the clip is queued, not once it has been heard, so
+      // chunks are appended to one continuous sink without a gap between them.
       URL.revokeObjectURL(url);
       nativePlayingRef.current = true;
+      const epoch = streamEpochRef.current;
       void next
         .arrayBuffer()
         .then((buffer) =>
-          invoke("assistant_play_local_tts_chunk", {
-            audio: Array.from(new Uint8Array(buffer)),
-          }),
+          // The buffer is the whole payload, so it crosses as raw bytes rather
+          // than a JSON array of numbers. That encoding inflated four seconds of
+          // speech from ~190 KB of audio to ~660 KB of text, built in the webview
+          // and parsed again in Rust for every sentence. The epoch travels as a
+          // header because the body is taken by the audio.
+          invoke(
+            "assistant_play_local_tts_chunk",
+            buffer,
+            epoch === null
+              ? undefined
+              : { headers: { [TTS_EPOCH_HEADER]: String(epoch) } },
+          ),
         )
         .then(() => {
+          // Only the current reply may clear the flag: a stale chunk resolving
+          // late would otherwise make the queue look drained and let
+          // `finishSynthesis` release the sink while audio is still coming.
+          if (generation !== generationRef.current) return;
           nativePlayingRef.current = false;
-          if (generation === generationRef.current) pump(generation);
+          pump(generation);
         })
         .catch(() => {
-          nativePlayingRef.current = false;
           if (generation !== generationRef.current) return;
+          nativePlayingRef.current = false;
           setError({ reason: "playback" });
           pump(generation);
         });
@@ -361,6 +444,131 @@ export function useKokoroTts(
     }
   }, [pump]);
 
+  /** Drain a kokoro-js audio stream into the playback queue. Shared by the
+   *  one-shot and streaming paths, which differ only in how text gets in. */
+  const consume = useCallback(
+    async (
+      stream: AsyncIterable<{ audio: { toBlob(): Blob } }>,
+      generation: number,
+    ) => {
+      let started = false;
+      for await (const { audio } of stream) {
+        if (generation !== generationRef.current) return; // superseded
+        queueRef.current.push(audio.toBlob());
+        if (!started) {
+          started = true;
+          pump(generation);
+        } else if (!playingRef.current && !nativePlayingRef.current) {
+          pump(generation); // queue drained while synthesizing; resume
+        }
+      }
+    },
+    [pump],
+  );
+
+  /** Mark synthesis complete for `generation`, and release the native sink now
+   *  if playback has already caught up (otherwise `pump` does it on drain). */
+  const finishSynthesis = useCallback((generation: number) => {
+    if (generation !== generationRef.current) return;
+    synthDoneRef.current = true;
+    if (
+      isTauri() &&
+      queueRef.current.length === 0 &&
+      !nativePlayingRef.current
+    ) {
+      void invoke("assistant_finish_local_tts").catch(() => {});
+    }
+  }, []);
+
+  /** Kokoro's own pace, rather than time-stretching the finished clip: the model
+   *  adjusts its phoneme durations, so the result keeps the voice's pitch and
+   *  natural pauses, and the setting is honoured whichever backend plays the
+   *  audio (native playback has no `playbackRate` equivalent). Clamped because a
+   *  hand-edited config could carry anything. */
+  const currentSpeed = () => Math.min(4, Math.max(0.25, speedRef.current || 1));
+
+  /**
+   * Open a reply that is still being generated.
+   *
+   * The backend calls this the moment a turn starts speaking, then feeds
+   * sentences in with [`pushText`] as the language model writes them. Loading the
+   * model now — in parallel with generation, rather than after it — is itself a
+   * large part of the latency win on a cold panel.
+   */
+  const beginStream = useCallback(
+    async (epoch: number | null) => {
+      if (!enabled) return;
+      setError(null);
+      // Local teardown only. The backend has already superseded any previous
+      // reply and issued this reply's epoch; cancelling natively here would bump
+      // that epoch and silence the reply we are about to speak.
+      teardown(false);
+      streamOpenRef.current = true;
+      closeWhenReadyRef.current = false;
+      pendingTextRef.current = [];
+      synthDoneRef.current = false;
+      streamEpochRef.current = epoch;
+      const generation = generationRef.current;
+      try {
+        const model = await ensureLoaded();
+        // Superseded (Stop, or a newer reply) while the model was loading.
+        if (generation !== generationRef.current || !streamOpenRef.current)
+          return;
+        setStatus("speaking");
+
+        const { TextSplitterStream } = await import("kokoro-js");
+        const splitter = new TextSplitterStream();
+        const stream = model.stream(splitter, { voice, speed: currentSpeed() });
+        streamRef.current = { splitter, generation };
+
+        // Anything that arrived during loading, in order.
+        for (const buffered of pendingTextRef.current) splitter.push(buffered);
+        pendingTextRef.current = [];
+        if (closeWhenReadyRef.current) {
+          closeWhenReadyRef.current = false;
+          streamRef.current = null;
+          streamOpenRef.current = false;
+          splitter.close();
+        }
+
+        await consume(stream, generation);
+        finishSynthesis(generation);
+      } catch (e) {
+        console.error("Kokoro TTS stream failed:", e);
+        finishSynthesis(generation);
+        setError((prev) => prev ?? { reason: "synthesis" });
+        setStatus("error");
+      }
+    },
+    [enabled, voice, ensureLoaded, teardown, consume, finishSynthesis],
+  );
+
+  /** Feed the next sentence of the open reply. */
+  const pushText = useCallback((text: string) => {
+    if (!text.trim() || !streamOpenRef.current) return;
+    const open = streamRef.current;
+    if (open && open.generation === generationRef.current) {
+      open.splitter.push(text);
+    } else {
+      // Model still loading — hold the text until the splitter exists.
+      pendingTextRef.current.push(text);
+    }
+  }, []);
+
+  /** Mark the reply complete so the last sentence is flushed and spoken. */
+  const endStream = useCallback(() => {
+    if (!streamOpenRef.current) return;
+    const open = streamRef.current;
+    if (open && open.generation === generationRef.current) {
+      streamRef.current = null;
+      streamOpenRef.current = false;
+      open.splitter.close();
+    } else {
+      // The splitter appears after loading finishes; close it then.
+      closeWhenReadyRef.current = true;
+    }
+  }, []);
+
   const speak = useCallback(
     async (text: string, force = false) => {
       if ((!enabled && !force) || !text.trim()) return;
@@ -369,41 +577,27 @@ export function useKokoroTts(
         const model = await ensureLoaded();
         stop();
         const generation = generationRef.current;
+        synthDoneRef.current = false;
         setStatus("speaking");
 
         const { TextSplitterStream } = await import("kokoro-js");
         const splitter = new TextSplitterStream();
-        // Ask Kokoro itself for the requested pace rather than time-stretching
-        // the finished clip: the model adjusts its own phoneme durations, so the
-        // result keeps the voice's pitch and natural pauses, and the speed
-        // setting is honoured whichever backend plays the audio (native
-        // playback has no `playbackRate` equivalent). Clamped because a
-        // hand-edited config could carry anything.
-        const speed = Math.min(4, Math.max(0.25, speedRef.current || 1));
-        const stream = model.stream(splitter, { voice, speed });
+        const stream = model.stream(splitter, { voice, speed: currentSpeed() });
         splitter.push(text);
         splitter.close();
 
-        let started = false;
-        for await (const { audio } of stream) {
-          if (generation !== generationRef.current) return; // superseded
-          queueRef.current.push(audio.toBlob());
-          if (!started) {
-            started = true;
-            pump(generation);
-          } else if (!playingRef.current && !nativePlayingRef.current) {
-            pump(generation); // queue drained while synthesizing; resume
-          }
-        }
+        await consume(stream, generation);
+        finishSynthesis(generation);
       } catch (e) {
         console.error("Kokoro TTS failed:", e);
+        synthDoneRef.current = true;
         // A load failure already set reason "load"; only mark synthesis when the
         // model was loaded but generating audio threw.
         setError((prev) => prev ?? { reason: "synthesis" });
         setStatus("error");
       }
     },
-    [enabled, voice, ensureLoaded, stop, pump],
+    [enabled, voice, ensureLoaded, stop, consume, finishSynthesis],
   );
 
   return {
@@ -412,6 +606,9 @@ export function useKokoroTts(
     error,
     prepare: ensureLoaded,
     speak,
+    beginStream,
+    pushText,
+    endStream,
     stop,
     retry,
   };
