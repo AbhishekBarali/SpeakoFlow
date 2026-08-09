@@ -46,6 +46,7 @@ import "../../../assistant/AssistantPanel.css";
 import { useModelStore } from "@/stores/modelStore";
 import { getModelCategory } from "@/lib/utils/modelCategory";
 import { useLocalLlmEngineStatus } from "@/hooks/useLocalLlmEngineStatus";
+import { useOsType } from "@/hooks/useOsType";
 import ScreenRecordingPermission from "@/components/ScreenRecordingPermission";
 
 /** The built-in (local) llama.cpp provider id, mirrored from the backend. */
@@ -178,6 +179,8 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
   } = useSettings();
 
   const providers = settings?.post_process_providers || [];
+  const osType = useOsType();
+  const isWindows = osType === "windows";
   const selectedProviderId = settings?.assistant_provider_id || "custom";
   const selectedProvider = providers.find((p) => p.id === selectedProviderId);
 
@@ -1154,6 +1157,14 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
                     value: "azure",
                     label: t("settings.assistant.tts.engines.azure"),
                   },
+                  ...(isWindows
+                    ? [
+                        {
+                          value: "windows",
+                          label: t("settings.assistant.tts.engines.windows"),
+                        },
+                      ]
+                    : []),
                 ]}
                 selectedValue={settings?.assistant_tts_engine ?? "kokoro"}
                 onSelect={(engine) => {
@@ -1497,6 +1508,19 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
                   />
                 </SettingContainer>
               </>
+            )}
+
+            {settings?.assistant_tts_engine === "windows" && (
+              <SettingContainer
+                title={t("settings.assistant.tts.windowsVoiceLabel")}
+                info={t("settings.assistant.tts.windowsVoiceDescription")}
+                layout="horizontal"
+                grouped={true}
+              >
+                <span className="text-[13px] text-muted">
+                  {t("settings.assistant.tts.windowsVoiceInstalled")}
+                </span>
+              </SettingContainer>
             )}
 
             <SettingContainer

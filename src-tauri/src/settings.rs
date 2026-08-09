@@ -1805,6 +1805,15 @@ fn default_assistant_tts_engine() -> String {
     "kokoro".to_string()
 }
 
+pub(crate) fn assistant_tts_engine_supported(engine: &str) -> bool {
+    match engine {
+        "kokoro" | "openai" | "openrouter" | "elevenlabs" | "azure" => true,
+        #[cfg(windows)]
+        "windows" => true,
+        _ => false,
+    }
+}
+
 fn default_assistant_tts_base_url() -> String {
     "https://api.openai.com/v1".to_string()
 }
@@ -2036,10 +2045,7 @@ fn ensure_assistant_defaults(settings: &mut AppSettings) -> bool {
         settings.assistant_tts_voice = default_assistant_tts_voice();
         changed = true;
     }
-    if !matches!(
-        settings.assistant_tts_engine.as_str(),
-        "kokoro" | "openai" | "openrouter" | "elevenlabs" | "azure"
-    ) {
+    if !assistant_tts_engine_supported(&settings.assistant_tts_engine) {
         settings.assistant_tts_engine = default_assistant_tts_engine();
         changed = true;
     }

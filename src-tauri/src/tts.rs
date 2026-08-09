@@ -414,8 +414,31 @@ pub(crate) async fn synthesize_speech(
                 bytes,
                 request_id: None,
             }),
+        "windows" => fetch_windows_speech(settings, request.text)
+            .await
+            .map(|bytes| SynthesizedSpeech {
+                bytes,
+                request_id: None,
+            }),
         other => Err(format!("Unknown TTS engine: {}", other)),
     }
+}
+
+/// Render through the default Windows SAPI 5 voice. The work runs on a
+/// dedicated thread because SAPI is a synchronous COM API and requires an
+/// apartment initialized on the calling thread.
+#[cfg(windows)]
+async fn fetch_windows_speech(settings: &AppSettings, text: &str) -> Result<Vec<u8>, String> {
+    let text = text.to_string();
+    let speed = settings.assistant_tts_speed;
+    tauri::async_runtime::spawn_blocking(move || crate::windows_sapi::synthesize(&text, speed))
+        .await
+        .map_err(|e| format!("Windows SAPI task failed: {}", e))?
+}
+
+#[cfg(not(windows))]
+async fn fetch_windows_speech(_settings: &AppSettings, _text: &str) -> Result<Vec<u8>, String> {
+    Err("Windows SAPI is only available on Windows".to_string())
 }
 
 /// Fetch speech audio for `text` using the configured remote engine and play

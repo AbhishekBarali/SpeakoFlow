@@ -30,6 +30,8 @@ mod tray_i18n;
 mod tts;
 mod utils;
 mod web_search;
+#[cfg(windows)]
+mod windows_sapi;
 
 pub use cli::CliArgs;
 

@@ -1308,7 +1308,8 @@
           "openai": "OpenAI-compatible",
           "openrouter": "OpenRouter",
           "elevenlabs": "ElevenLabs",
-          "azure": "Azure AI Speech"
+          "azure": "Azure AI Speech",
+          "windows": "Windows SAPI (system)"
         },
         "voiceLabel": "Voice",
         "voiceDescription": "Kokoro voice for spoken replies.",
@@ -1340,6 +1341,9 @@
         "remoteVoiceDescription": "Voice for OpenAI-compatible TTS, e.g. alloy, echo, nova, shimmer.",
         "azureVoiceLabel": "Voice name",
         "azureVoiceDescription": "Azure voice name, e.g. en-US-JennyNeural. Click Load voices to browse.",
+        "windowsVoiceLabel": "Windows voice",
+        "windowsVoiceDescription": "Uses the default voice selected in Windows Speech settings, including installed SAPI voices. No API key or internet connection is required.",
+        "windowsVoiceInstalled": "Uses your Windows default voice",
         "loadVoices": "Load voices",
         "voicesLoading": "Loading…",
         "voicesPick": "Pick from {{count}} voices…",
