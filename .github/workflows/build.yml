@@ -499,6 +499,46 @@ jobs:
       # config patch below makes tauri-bundler copy the dylib into
       # Contents/Frameworks, and the audit step after the build verifies all
       # three halves actually met.
+      # Make the Intel build portable across the Intel Mac fleet, not tuned to
+      # whatever CPU this runner happens to have.
+      #
+      # ggml's CMake sets GGML_NATIVE_DEFAULT=ON for any native (non-cross)
+      # build, and GGML_NATIVE adds -march=native. macOS x86_64 builds
+      # transcribe-cpp AND whisper.cpp statically here, so both would be
+      # compiled for the runner's exact instruction set. GitHub's Intel macOS
+      # runners are server-class parts; a 2017-2020 consumer Intel Mac is not.
+      # Comet Lake desktop chips (e.g. the i5-10500 our tester runs) have AVX2
+      # but no AVX-512, so a native build on a runner that has it produces an app
+      # that transcribes fine in CI and dies with SIGILL / "Illegal instruction"
+      # on a user's Mac. That is the same shape of bug as #19 — works on the
+      # build machine, broken everywhere else — and would have been the next
+      # thing our tester hit after the dylib fix.
+      #
+      # Two levers, because the two engines expose different knobs:
+      #   * transcribe-cpp reads TRANSCRIBE_CMAKE_ARGS (same mechanism the
+      #     Windows job already uses), so pass -DGGML_NATIVE=OFF directly.
+      #   * whisper-rs-sys 0.15 has NO hook for arbitrary cmake defines and never
+      #     sets GGML_NATIVE itself. But ggml's own CMakeLists flips
+      #     GGML_NATIVE_DEFAULT to OFF when SOURCE_DATE_EPOCH is present in the
+      #     environment — an upstream affordance for exactly this
+      #     reproducible/distributable case. Setting it covers both engines.
+      # Never do this for a local dev build: -march=native is the right default
+      # when the binary only has to run on the machine that compiled it.
+      - name: Build portable CPU code for Intel macOS
+        if: inputs.target == 'x86_64-apple-darwin'
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "TRANSCRIBE_CMAKE_ARGS=-DGGML_NATIVE=OFF" >> "$GITHUB_ENV"
+          # Value is arbitrary; ggml only checks whether it is DEFINED. Using the
+          # commit timestamp keeps it meaningful for any other reproducible-build
+          # tooling that reads it.
+          echo "SOURCE_DATE_EPOCH=$(git log -1 --pretty=%ct)" >> "$GITHUB_ENV"
+
+          echo "--- runner CPU (for comparison against tester hardware) ---"
+          sysctl -n machdep.cpu.brand_string || true
+          echo "AVX512 features: $(sysctl -n machdep.cpu.leaf7_features 2>/dev/null | tr ' ' '\n' | grep -i avx512 | tr '\n' ' ' || true)"
+
       - name: Stage ONNX Runtime for Intel macOS
         if: inputs.target == 'x86_64-apple-darwin'
         shell: bash
