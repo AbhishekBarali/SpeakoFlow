@@ -2127,7 +2127,7 @@ fn ensure_assistant_defaults(settings: &mut AppSettings) -> bool {
     }
     if !matches!(
         settings.assistant_tts_kokoro_dtype.as_str(),
-        "fp32" | "fp16" | "q8" | "q4" | "q4f16"
+        "fp32" | "fp16" | "q8" | "q4" | "q4f16" | "q8-cpu"
     ) {
         settings.assistant_tts_kokoro_dtype = default_assistant_tts_kokoro_dtype();
         changed = true;

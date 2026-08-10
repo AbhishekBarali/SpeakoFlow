@@ -57,6 +57,7 @@ const KOKORO_DTYPES = [
   { value: "q8", label: "q8 (8-bit, fast on CPU)" },
   { value: "q4", label: "q4 (4-bit, fastest)" },
   { value: "q4f16", label: "q4f16 (4-bit mixed)" },
+  { value: "q8-cpu", label: "q8 on CPU (fixes garbled audio)" },
 ];
 
 const KOKORO_VOICES = [
@@ -425,7 +426,14 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
     progress: kokoroProgress,
     error: kokoroError,
   } = kokoroTest;
-  const kokoroReadyKey = `speakoflow.kokoro.ready.${ttsDtype}`;
+  // "q8-cpu" is the q8 graph with WebGPU disabled, so it downloads and caches
+  // exactly the same weights file. Strip the suffix before anything that keys
+  // off the precision, or switching to it would re-prompt a download that has
+  // already happened.
+  const ttsDtypeBase = ttsDtype.endsWith("-cpu")
+    ? ttsDtype.slice(0, -"-cpu".length)
+    : ttsDtype;
+  const kokoroReadyKey = `speakoflow.kokoro.ready.${ttsDtypeBase}`;
   const [kokoroPrepared, setKokoroPrepared] = useState(false);
 
   // Reflect the ACTUAL browser cache, not just a local flag. kokoro-js
@@ -456,7 +464,7 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
           const urls = (await cache.keys())
             .map((r) => r.url)
             .filter((u) => u.includes("Kokoro-82M"));
-          const file = `model${dtypeSuffix[ttsDtype] ?? ""}.onnx`;
+          const file = `model${dtypeSuffix[ttsDtypeBase] ?? ""}.onnx`;
           cached =
             urls.some((u) => u.includes(file)) ||
             urls.some((u) => u.endsWith(".onnx"));
@@ -471,7 +479,7 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [kokoroReadyKey, ttsDtype]);
+  }, [kokoroReadyKey, ttsDtypeBase]);
 
   const rememberKokoroReady = () => {
     window.localStorage.setItem(kokoroReadyKey, "true");
