@@ -518,10 +518,47 @@ jobs:
           # the plain name the linker resolves for -lonnxruntime.
           cp -L "$BREW_LIB/libonnxruntime.dylib" "$STAGE/libonnxruntime.dylib"
           chmod u+w "$STAGE/libonnxruntime.dylib"
+
+          # Homebrew's libonnxruntime is NOT self-contained. It carries ~84
+          # absolute @@HOMEBREW_PREFIX@@/opt references of its OWN (onnx,
+          # onnx_proto, protobuf-lite, utf8_range, utf8_validity, re2 and dozens
+          # of versioned abseil libs), because Homebrew builds onnxruntime
+          # against shared formulae rather than vendoring them the way
+          # Microsoft's own release binaries do. Copying just this one file is
+          # what shipped issue #19: the .dmg installed, passed CI, and then died
+          # in dyld before main() on the first real Intel Mac, on
+          # /usr/local/opt/onnx/lib/libonnx.dylib.
+          #
+          # dylibbundler walks that whole graph in one command: it copies every
+          # non-system dependency into $STAGE, rewrites each reference (and each
+          # copied library's own id) to the -p prefix, and fixes the
+          # library-to-library references too (-b). @rpath is the right prefix
+          # here because build.rs emits @executable_path/../Frameworks on the
+          # executable, and dyld applies the main executable's rpaths when
+          # resolving @rpath from nested dylibs as well.
+          brew install dylibbundler
+          dylibbundler \
+            -x "$STAGE/libonnxruntime.dylib" \
+            -d "$STAGE" \
+            -p '@rpath/' \
+            -b -of -cd \
+            -i /usr/lib -i /System/Library
+
+          # dylibbundler rewrote the id to @rpath/<real versioned name>; force it
+          # back to the plain name the linker resolves for -lonnxruntime, then
+          # re-sign (any install_name_tool edit invalidates the signature
+          # dylibbundler just applied). The other staged libs keep theirs.
           install_name_tool -id "@rpath/libonnxruntime.dylib" "$STAGE/libonnxruntime.dylib"
-          # install_name_tool invalidates the dylib's existing signature; re-sign
-          # ad-hoc so it stays loadable (and re-signable later by the bundler).
           codesign --force --sign - "$STAGE/libonnxruntime.dylib"
+
+          staged_count="$(find "$STAGE" -name '*.dylib' | wc -l | tr -d ' ')"
+          echo "Staged ${staged_count} dylib(s) for the bundle:"
+          ls -la "$STAGE"
+          if [ "$staged_count" -lt 2 ]; then
+            echo "ERROR: only ${staged_count} dylib staged — dylibbundler did not gather the dependency closure" >&2
+            echo "Homebrew's libonnxruntime has dozens of non-system dependencies; one file is never right." >&2
+            exit 1
+          fi
 
           echo "Staged dylib install name:"
           otool -D "$STAGE/libonnxruntime.dylib"
@@ -529,15 +566,30 @@ jobs:
           echo "ORT_LIB_LOCATION=$STAGE" >> "$GITHUB_ENV"
           echo "ORT_PREFER_DYNAMIC_LINK=1" >> "$GITHUB_ENV"
 
-      # Make tauri-bundler copy the staged dylib into
+      # Make tauri-bundler copy the staged dylibs into
       # SpeakoFlow.app/Contents/Frameworks. `bundle.macOS.frameworks` accepts a
       # path to a .dylib and copies it there verbatim — it deliberately does not
       # touch install names or rpaths, which the two steps above/around it handle.
       # Patched here rather than committed to tauri.conf.json so the path only
       # exists for the Intel job; every other target would fail on a missing file.
+      #
+      # EVERY dylib dylibbundler staged is listed, not just libonnxruntime: the
+      # whole point of the staging step is that the closure travels together.
+      #
+      # minimumSystemVersion is corrected here too. The committed value (10.15)
+      # is the Apple Silicon truth; on Intel the floor is whatever Homebrew's
+      # onnxruntime bottle demands, which is currently macOS 14 (bottles are
+      # published per-OS and the Intel one is Sonoma-only). Leaving 10.15 in
+      # place ships a .dmg that installs on a Ventura Intel Mac and then refuses
+      # to start — the audit step below asserts these agree.
       - name: Bundle ONNX Runtime into the app (Intel macOS)
         if: inputs.target == 'x86_64-apple-darwin'
         shell: bash
+        env:
+          # Homebrew publishes the Intel onnxruntime bottle for Sonoma only, and
+          # that dylib reports minos 14.0. Bump this when that changes — the
+          # audit step fails the build if it disagrees with the binaries.
+          INTEL_MIN_MACOS: "14.0"
         run: |
           node -e '
             const fs = require("fs");
@@ -547,10 +599,16 @@ jobs:
             c.bundle.macOS = c.bundle.macOS || {};
             const fw = new Set(c.bundle.macOS.frameworks || []);
             // Relative to tauri.conf.json (src-tauri/), same as bundle.resources.
-            fw.add("onnx-libs/libonnxruntime.dylib");
+            const staged = fs.readdirSync("src-tauri/onnx-libs").filter((f) => f.endsWith(".dylib"));
+            if (staged.length === 0) {
+              console.error("ERROR: src-tauri/onnx-libs contains no dylibs");
+              process.exit(1);
+            }
+            for (const f of staged) fw.add("onnx-libs/" + f);
             c.bundle.macOS.frameworks = [...fw];
+            c.bundle.macOS.minimumSystemVersion = process.env.INTEL_MIN_MACOS;
             fs.writeFileSync(p, JSON.stringify(c, null, 2));
-            console.log("Patched tauri.conf.json: macOS frameworks =", c.bundle.macOS.frameworks);
+            console.log("Patched tauri.conf.json:", fw.size, "framework entries, minimumSystemVersion =", c.bundle.macOS.minimumSystemVersion);
           '
 
       # Split signed (production) vs unsigned (test). The UNSIGNED path passes NO
@@ -595,20 +653,22 @@ jobs:
 
       # The hard gate for Intel macOS, mirroring the Windows/Linux package audits:
       # a .dmg that installs and then cannot start is the failure mode worth
-      # catching in CI rather than in a user's issue tracker. Four failing checks,
-      # because each covers a different way the ORT bundling can silently
-      # half-work, plus one informational report:
+      # catching in CI rather than in a user's issue tracker — which is exactly
+      # what happened in #19, because the first version of this step only ever
+      # inspected the app executable's own load commands. Five failing checks now,
+      # each covering a different way the ORT bundling can silently half-work,
+      # plus one provenance report:
       #   1. the binary is really x86_64 (not an accidental arm64 build),
       #   2. it references @rpath/libonnxruntime.dylib and NOT a Homebrew path
       #      (a Homebrew path means step 2 of the staging never took effect),
       #   3. the dylib is actually inside Contents/Frameworks (i.e. tauri-bundler
       #      honored the `frameworks` entry) and carries the rpath to find it,
-      #   4. the bundled binary launches: `--list-devices` exits before Tauri and
-      #      any window setup, but dyld still has to resolve every linked dylib
-      #      first — so a missing/unresolvable libonnxruntime fails right here.
+      #   4. the FULL dependency graph stays inside the bundle, at every depth,
+      #      and the declared minimumSystemVersion matches what the binaries
+      #      really demand (scripts/ci/audit-macos-bundle.sh),
+      #   5. the bundled binary launches with Homebrew's prefixes moved aside, so
+      #      the build machine cannot supply a library the .dmg forgot to carry.
       #      This runs on an Intel runner, so it is a genuine native check.
-      #   5. it prints the real minimum macOS version of the artifact, which the
-      #      bundled Homebrew dylib — not tauri.conf.json — ultimately decides.
       #
       # ONNX Runtime is NOT optional here, which is why all of this exists: `ort`
       # is pulled in by vad-rs (Silero VAD, core to every recording) as well as
@@ -673,24 +733,71 @@ jobs:
             exit 1
           fi
 
-          # 4. It actually starts. dyld resolves libonnxruntime before main() runs,
-          #    so this is the real end-to-end proof the bundling worked.
-          echo "--- runtime smoke test ---"
+          # 4. The RECURSIVE audit, and the honest minimum-macOS assert. Checks
+          #    1-3 above all pass on a bundle that cannot start, because they only
+          #    ever look at $BIN's own load commands — that is precisely how #19
+          #    shipped. This walks every dylib in Contents/Frameworks too, at
+          #    every depth, and fails on any path that points outside the bundle.
+          DECLARED_MIN_OS="$(node -e 'console.log(JSON.parse(require("fs").readFileSync("src-tauri/tauri.conf.json","utf8")).bundle.macOS.minimumSystemVersion)')"
+          bash scripts/ci/audit-macos-bundle.sh "$APP" "$DECLARED_MIN_OS"
+
+          # 5. It actually starts, ON A MACHINE THAT LOOKS LIKE A USER'S. dyld
+          #    resolves every linked dylib before main() runs, so `--list-devices`
+          #    (which exits before Tauri and any window setup) is a real
+          #    end-to-end proof — but ONLY if the build machine is not quietly
+          #    supplying the libraries. The previous version of this step ran the
+          #    binary with Homebrew fully installed, so all ~84 of libonnxruntime's
+          #    dependencies resolved from /usr/local/opt and the test passed on an
+          #    artifact that could not start anywhere else.
+          #
+          #    So move the Homebrew opt prefixes aside first. `brew unlink` is the
+          #    obvious tool but its exact effect on /usr/local/opt/<formula> is a
+          #    Homebrew implementation detail; moving the directories is
+          #    unambiguous. Then ASSERT they are gone — a silently-failed move
+          #    would restore the old false green, which is the whole bug we are
+          #    fixing.
+          echo "--- clean-room launch test ---"
+          CLEANROOM_BACKUP="${RUNNER_TEMP}/brew-opt-backup"
+          mkdir -p "$CLEANROOM_BACKUP"
+          MOVED=""
+          for formula in onnxruntime onnx protobuf re2 abseil; do
+            if [ -e "/usr/local/opt/${formula}" ]; then
+              sudo mv "/usr/local/opt/${formula}" "${CLEANROOM_BACKUP}/${formula}"
+              MOVED="${MOVED} ${formula}"
+            fi
+          done
+          echo "Moved aside:${MOVED:- (nothing)}"
+
+          if [ -e /usr/local/opt/onnx ]; then
+            echo "ERROR: /usr/local/opt/onnx is still present; a clean-room test here would prove nothing" >&2
+            exit 1
+          fi
+
+          set +e
           "$BIN" --list-devices
+          SMOKE_RC=$?
+          set -e
+
+          # Restore before acting on the result, so later steps (and the runner's
+          # own cleanup) see the machine they expect either way.
+          for formula in $MOVED; do
+            sudo mv "${CLEANROOM_BACKUP}/${formula}" "/usr/local/opt/${formula}"
+          done
+          echo "Restored:${MOVED:- (nothing)}"
+
+          if [ "$SMOKE_RC" -ne 0 ]; then
+            echo "ERROR: the bundled binary failed to launch without Homebrew (exit ${SMOKE_RC})" >&2
+            echo "This is what a user's Intel Mac would do. A dyld 'Library not loaded'" >&2
+            echo "message above names the dependency that was not bundled." >&2
+            exit 1
+          fi
           echo "Intel macOS bundle audit passed"
 
-          # 5. Informational, but decides who can actually run this: the REAL
-          #    minimum macOS is whichever of the app binary or the bundled dylib
-          #    demands more, not tauri.conf.json's minimumSystemVersion (10.15).
-          #    Homebrew builds bottles per-OS version, so a dylib pulled on a
-          #    macOS 15 runner may well refuse to load on an older Intel Mac —
-          #    and plenty of Intel Macs top out at Monterey or Ventura. Printed
-          #    loudly instead of assumed; it is what tells us which Intel Macs
-          #    this artifact is worth handing to a tester.
-          echo "--- minimum macOS: app binary ---"
-          vtool -show-build "$BIN" 2>/dev/null || otool -l "$BIN" | grep -A4 LC_BUILD_VERSION || true
-          echo "--- minimum macOS: bundled libonnxruntime.dylib ---"
-          vtool -show-build "${APP}/Contents/Frameworks/libonnxruntime.dylib" 2>/dev/null || true
+          # 6. Provenance, for the record. The minimum-macOS numbers are printed
+          #    AND asserted by audit-macos-bundle.sh above, so all that is left
+          #    worth logging is where the dylib came from — Homebrew publishes
+          #    bottles per-OS version, and the Intel tag it offers is what moves
+          #    this artifact's floor between releases.
           echo "--- Homebrew bottle provenance ---"
           brew info --json=v2 onnxruntime 2>/dev/null | node -e '
             let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{
@@ -700,6 +807,9 @@ jobs:
                   Object.keys(f.bottle?.stable?.files || {}).join(", ") || "(none)");
               } catch { console.log("(could not parse brew info)"); }
             });' || true
+
+          echo "--- bundled Frameworks ---"
+          ls -la "${APP}/Contents/Frameworks" 2>/dev/null || true
 
           echo "--- produced artifacts ---"
           ls -la "${BUNDLE_DIR}/macos" "${BUNDLE_DIR}/dmg" 2>/dev/null || true
