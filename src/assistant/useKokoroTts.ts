@@ -140,16 +140,25 @@ export function useKokoroTts(
       setProgress(0);
       loadingRef.current = (async () => {
         const { KokoroTTS } = await import("kokoro-js");
-        const useGpu = hasWebGpu();
         const requestedDtype = dtypeRef.current;
+        // A "-cpu" suffix is an explicit opt-out of WebGPU. Some Chromium and
+        // GPU-driver combinations initialize WebGPU successfully and then emit
+        // garbled audio instead of speech. That throws no error, so the catch
+        // below never fires and auto-detection cannot see it. This is the
+        // manual escape hatch for those machines.
+        const forceCpu = requestedDtype.endsWith("-cpu");
+        const baseDtype = forceCpu
+          ? requestedDtype.slice(0, -"-cpu".length)
+          : requestedDtype;
+        const useGpu = hasWebGpu() && !forceCpu;
         // WebKitGTK commonly has no WebGPU. Loading the 325 MB fp32 graph into
         // WASM can appear to hang after the text answer is already visible;
         // use the cached 92 MB q8 graph directly on CPU instead of waiting for
         // fp32 initialization to fail first.
         const chosenDtype =
-          !useGpu && (requestedDtype === "fp32" || requestedDtype === "fp16")
+          !useGpu && (baseDtype === "fp32" || baseDtype === "fp16")
             ? "q8"
-            : requestedDtype;
+            : baseDtype;
         // Track download progress of the (largest) onnx weights file.
         const progress_callback = (event: ProgressEvent) => {
           if (
