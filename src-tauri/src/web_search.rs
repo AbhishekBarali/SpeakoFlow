@@ -38,12 +38,19 @@ use regex::Regex;
 use serde::Serialize;
 use serde_json::json;
 use specta::Type;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
+use std::sync::{Mutex, OnceLock};
 use std::time::Duration;
 
 /// Timeout for a snippet search HTTP call (Serper, Brave, Tavily, Exa, SerpAPI,
-/// TinyFish). Normally ~1–2 s; this is just the ceiling.
-const REQUEST_TIMEOUT: Duration = Duration::from_secs(8);
+/// TinyFish).
+///
+/// A search happens inside a wait the user is sitting through in silence, so the
+/// ceiling is a UX number, not just a safety net. Sized against measured
+/// provider latency: Serper averages ~0.8s (p99 ~2.1s) and the slowest supported
+/// providers average ~5s, so 6s still lets a slow provider finish while cutting
+/// the worst case a hung request can impose on a turn.
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(6);
 
 /// Per-snippet character cap.
 const SNIPPET_MAX_CHARS: usize = 500;
@@ -267,10 +274,11 @@ pub async fn search_with_plan(settings: &AppSettings, plan: &SearchPlan) -> Vec<
         return Vec::new();
     }
 
-    // Recency-sensitive topics get news + a date-restricted window.
+    // Recency-sensitive topics get news results and a date-restricted window.
+    // Recency itself is applied in the local rerank, not as a Google sort order.
     let recency_sensitive = plan.news || matches!(plan.freshness.as_str(), "day" | "week");
     let include_news = plan.news || matches!(plan.freshness.as_str(), "day" | "week" | "month");
-    let tbs = build_tbs(&plan.freshness, recency_sensitive);
+    let tbs = build_tbs(&plan.freshness);
     let tbs_ref = tbs.as_deref();
 
     // Stage 1 — snippet search, every query in parallel.
@@ -400,23 +408,23 @@ fn candidate_score(c: &Candidate, terms: &[String], recency_sensitive: bool) -> 
     score
 }
 
-/// Map a freshness window (+ recency sensitivity) to a Google-style `tbs` value.
-/// `sbd:1` sorts results newest-first; `qdr:*` restricts the window. Used
-/// directly by Serper/SerpAPI; Brave/Tavily/Exa map it to their own freshness
-/// params via the helpers below.
-fn build_tbs(freshness: &str, recency_sensitive: bool) -> Option<String> {
-    let qdr = match freshness {
-        "day" => Some("qdr:d"),
-        "week" => Some("qdr:w"),
-        "month" => Some("qdr:m"),
-        "year" => Some("qdr:y"),
+/// Build Google's `tbs` time filter, or `None` for an unfiltered search.
+///
+/// Deliberately a time *window* only, never a sort order. Google's `sbd:1`
+/// ("sort by date") was applied here for any recency-sensitive turn, and it is
+/// destructive: re-ranking the whole index by date routinely returns junk or an
+/// empty set for a broad query ("2026 movie release calendar"), which then made
+/// `search_serper` pay a second, sequential round trip to recover — the single
+/// largest source of search latency on exactly the questions people ask an
+/// assistant. Recency still matters, so it is applied where it is free: the
+/// local rerank boosts fresh news results (see `rerank`).
+fn build_tbs(freshness: &str) -> Option<String> {
+    match freshness {
+        "day" => Some("qdr:d".to_string()),
+        "week" => Some("qdr:w".to_string()),
+        "month" => Some("qdr:m".to_string()),
+        "year" => Some("qdr:y".to_string()),
         _ => None,
-    };
-    match (recency_sensitive, qdr) {
-        (true, Some(q)) => Some(format!("sbd:1,{}", q)),
-        (true, None) => Some("sbd:1".to_string()),
-        (false, Some(q)) => Some(q.to_string()),
-        (false, None) => None,
     }
 }
 
@@ -495,12 +503,33 @@ pub fn format_results_for_prompt(results: &[SearchResult], total_budget: usize) 
 // ---------------------------------------------------------------------------
 
 /// Build a reqwest client with the given timeout and a browser User-Agent.
+///
+/// Cached per timeout. A fresh `Client` carries a fresh connection pool, so
+/// building one per search meant a DNS lookup and a full TLS handshake before
+/// every query — a few hundred milliseconds of the user's silence, repeated on
+/// every turn. Reusing the client keeps the connection to the search provider
+/// warm between turns, exactly as `llm_client` does for providers.
 fn http_client(timeout: Duration) -> Result<reqwest::Client, String> {
-    reqwest::Client::builder()
+    static CLIENTS: OnceLock<Mutex<HashMap<u64, reqwest::Client>>> = OnceLock::new();
+    let cache = CLIENTS.get_or_init(|| Mutex::new(HashMap::new()));
+    let key = timeout.as_millis() as u64;
+    if let Ok(clients) = cache.lock() {
+        if let Some(client) = clients.get(&key) {
+            return Ok(client.clone());
+        }
+    }
+    let client = reqwest::Client::builder()
         .timeout(timeout)
         .user_agent(BROWSER_UA)
+        // Keep the socket around between searches so a follow-up question
+        // reuses the handshake instead of repeating it.
+        .pool_idle_timeout(Duration::from_secs(90))
         .build()
-        .map_err(|e| format!("Failed to build HTTP client: {}", e))
+        .map_err(|e| format!("Failed to build HTTP client: {}", e))?;
+    if let Ok(mut clients) = cache.lock() {
+        clients.insert(key, client.clone());
+    }
+    Ok(client)
 }
 
 /// Tavily Search (`POST /search`) — an LLM-optimized search API returning clean
@@ -865,23 +894,51 @@ async fn search_serper(
     let client = http_client(REQUEST_TIMEOUT)?;
     let num = max_results.clamp(1, 20);
 
-    let mut candidates = serper_query(&client, api_key, query, num, tbs, include_news).await?;
-
     // Serper proxies live Google, and a 200 response intermittently comes back
     // with an *empty* result set — most often on the first, uncached hit for a
-    // query, or when a tight `tbs` time window filters everything out. Verified
+    // query, or when a `tbs` time window filters everything out. Verified
     // against the live API: the very next identical request returns the full
-    // result set. Without a retry the turn silently degrades to "no web
-    // context" and the model answers from stale memory — which reads to the
-    // user as "web search doesn't work". Retry once, dropping the time filter
-    // so a too-narrow `tbs` can't keep returning nothing.
-    if candidates.is_empty() {
-        debug!(
-            "Serper returned no results for {:?} (tbs={:?}); retrying once without the time filter",
-            query, tbs
-        );
-        candidates = serper_query(&client, api_key, query, num, None, include_news).await?;
-    }
+    // result set. Without a fallback the turn silently degrades to "no web
+    // context" and the model answers from stale memory — which reads to the user
+    // as "web search doesn't work".
+    //
+    // When a time filter is in play, the fallback runs *concurrently* rather
+    // than after the first request fails. Sequentially it cost two full round
+    // trips — the difference between a ~1s search and a ~3s one — and the
+    // filtered request is the one that can come back empty, so waiting to find
+    // out is the expensive way to learn it. The filtered results still win
+    // whenever they exist; the unfiltered pass is only consulted if they don't.
+    let candidates = match tbs {
+        Some(tbs) => {
+            let (filtered, unfiltered) = futures_util::future::join(
+                serper_query(&client, api_key, query, num, Some(tbs), include_news),
+                serper_query(&client, api_key, query, num, None, include_news),
+            )
+            .await;
+            match filtered {
+                Ok(hits) if !hits.is_empty() => hits,
+                Ok(_) => {
+                    debug!(
+                        "Serper returned no results for {:?} within the {} window; using the unfiltered pass",
+                        query, tbs
+                    );
+                    unfiltered?
+                }
+                // A hard failure on the filtered request (bad key, rate limit)
+                // will have failed the other one too; report the original.
+                Err(e) => return Err(e),
+            }
+        }
+        None => {
+            let hits = serper_query(&client, api_key, query, num, None, include_news).await?;
+            if hits.is_empty() {
+                debug!("Serper returned no results for {:?}; retrying once", query);
+                serper_query(&client, api_key, query, num, None, include_news).await?
+            } else {
+                hits
+            }
+        }
+    };
 
     debug!(
         "Serper returned {} candidate(s) for {:?}",
@@ -1282,12 +1339,22 @@ mod tests {
     use super::*;
 
     #[test]
-    fn build_tbs_combines_sort_and_window() {
-        assert_eq!(build_tbs("day", true), Some("sbd:1,qdr:d".to_string()));
-        assert_eq!(build_tbs("week", false), Some("qdr:w".to_string()));
-        assert_eq!(build_tbs("none", true), Some("sbd:1".to_string()));
-        assert_eq!(build_tbs("none", false), None);
-        assert_eq!(build_tbs("year", false), Some("qdr:y".to_string()));
+    fn build_tbs_is_a_window_never_a_sort_order() {
+        // `sbd:1` (sort by date) must never appear: re-ranking Google by date
+        // empties broad queries, which used to cost a second round trip.
+        for freshness in ["day", "week", "month", "year", "none", ""] {
+            let tbs = build_tbs(freshness).unwrap_or_default();
+            assert!(
+                !tbs.contains("sbd"),
+                "{freshness:?} produced a sort order: {tbs}"
+            );
+        }
+        assert_eq!(build_tbs("day"), Some("qdr:d".to_string()));
+        assert_eq!(build_tbs("week"), Some("qdr:w".to_string()));
+        assert_eq!(build_tbs("month"), Some("qdr:m".to_string()));
+        assert_eq!(build_tbs("year"), Some("qdr:y".to_string()));
+        assert_eq!(build_tbs("none"), None);
+        assert_eq!(build_tbs("nonsense"), None);
     }
 
     #[test]

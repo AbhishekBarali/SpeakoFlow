@@ -601,7 +601,8 @@ impl SpeechPipeline {
     ///
     /// Used between tool-calling rounds: a round that ends in tool calls has its
     /// text replaced by the next round, so its unspoken tail must not be voiced
-    /// as though it belonged to the answer.
+    /// as though it belonged to the answer. Anything already spoken stands — it
+    /// was the model's own words and the panel showed it live.
     pub fn reset(&mut self) {
         self.chunker.reset();
     }

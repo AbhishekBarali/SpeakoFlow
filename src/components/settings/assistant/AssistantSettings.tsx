@@ -1637,10 +1637,14 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
             }
           />
         </SettingContainer>
-        {manualScreenAccess && (
+        {screenAccessMode !== "off" && (
           <SettingContainer
             title={t("settings.assistant.vision.timing.label")}
-            info={t("settings.assistant.vision.timing.description")}
+            info={t(
+              screenAccessMode === "agent_decides"
+                ? "settings.assistant.vision.timing.descriptionAgent"
+                : "settings.assistant.vision.timing.description",
+            )}
             layout="horizontal"
             grouped={true}
           >
