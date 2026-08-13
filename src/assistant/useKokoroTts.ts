@@ -104,6 +104,16 @@ export function useKokoroTts(
   // true while an awaited native chunk is playing so synthesis cannot start a
   // second pump in parallel.
   const nativePlayingRef = useRef(false);
+  /** This hook instance actually handed audio to the native sink, so its
+   *  teardown owns stopping it.
+   *
+   *  Settings mounts this hook too, purely for the Kokoro setup/test buttons,
+   *  and `assistant_stop_local_tts` bumps the *shared* playback epoch — which
+   *  silences remote engines as well. Combined with StrictMode's
+   *  mount→cleanup→mount, that meant simply opening Settings → Assistant cut off
+   *  whatever the assistant was saying. A hook that never spoke must not stop
+   *  speech it doesn't own. */
+  const usedNativeSinkRef = useRef(false);
   const generationRef = useRef(0);
 
   /** Open splitter for a reply that is still being written, if any. Text is fed
@@ -306,7 +316,9 @@ export function useKokoroTts(
       queueRef.current = [];
       const el = playingRef.current;
       nativePlayingRef.current = false;
-      if (isTauri()) {
+      // Only stop speech this hook actually started (see usedNativeSinkRef):
+      // the Settings page mounts one that must never silence a live reply.
+      if (isTauri() && usedNativeSinkRef.current) {
         void invoke("assistant_stop_local_tts").catch(() => {});
       }
       if (el) {
@@ -354,6 +366,7 @@ export function useKokoroTts(
       // chunks are appended to one continuous sink without a gap between them.
       URL.revokeObjectURL(url);
       nativePlayingRef.current = true;
+      usedNativeSinkRef.current = true;
       const epoch = streamEpochRef.current;
       void next
         .arrayBuffer()
