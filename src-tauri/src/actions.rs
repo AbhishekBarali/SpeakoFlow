@@ -1442,6 +1442,10 @@ impl ShortcutAction for AssistantAction {
         // worker from an older/cancelled recording cannot populate this turn.
         {
             let settings = get_settings(app);
+            let profile = settings
+                .active_assistant_provider()
+                .map(|p| crate::screenshot::CaptureProfile::for_base_url(&p.base_url))
+                .unwrap_or(crate::screenshot::CaptureProfile::Generous);
             let capture_requested = settings.assistant_screen_access_mode
                 == crate::settings::AssistantScreenAccessMode::Manual
                 && settings.assistant_vision_capture_timing
@@ -1450,10 +1454,6 @@ impl ShortcutAction for AssistantAction {
             if let Some((manual_token, immediate_epoch)) =
                 crate::assistant::begin_immediate_capture(app, capture_requested)
             {
-                let profile = settings
-                    .active_assistant_provider()
-                    .map(|p| crate::screenshot::CaptureProfile::for_base_url(&p.base_url))
-                    .unwrap_or(crate::screenshot::CaptureProfile::Generous);
                 let app_for_capture = app.clone();
                 std::thread::spawn(move || {
                     match crate::screenshot::capture_screen_data_url_at(None, profile) {
@@ -1466,6 +1466,21 @@ impl ShortcutAction for AssistantAction {
                             );
                         }
                         Err(e) => debug!("Immediate vision capture failed: {}", e),
+                    }
+                });
+            }
+
+            // Agent-decides mode: grab a frame now, while the user is still
+            // talking, so that if the model does call `capture_screen` the tool
+            // returns instantly instead of spending a few hundred milliseconds
+            // of the user's silence on a screenshot. The frame stays on this
+            // machine and is dropped at the end of the turn if the model never
+            // asks for it.
+            if let Some(generation) = crate::assistant::begin_agent_capture(&settings) {
+                std::thread::spawn(move || {
+                    match crate::screenshot::capture_screen_data_url_at(None, profile) {
+                        Ok(url) => crate::assistant::stash_agent_capture(generation, profile, url),
+                        Err(e) => debug!("Agent vision pre-capture failed: {}", e),
                     }
                 });
             }

@@ -13,6 +13,7 @@ use serde::Serialize;
 use serde_json::{json, Value};
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
+use std::time::Instant;
 use tauri::{AppHandle, Emitter, Manager, WebviewWindowBuilder};
 use tauri_plugin_store::StoreExt;
 use tokio::sync::Notify;
@@ -271,6 +272,110 @@ pub fn stash_immediate_capture(
 pub fn clear_immediate_capture() {
     if let Ok(mut pending) = PENDING_IMMEDIATE_CAPTURE.lock() {
         pending.advance();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Agent-decided capture, grabbed early
+// ---------------------------------------------------------------------------
+
+/// A frame grabbed at recording start in case the assistant asks to see the
+/// screen.
+///
+/// Taking a screenshot is local, private and cheap: a few hundred milliseconds
+/// of work on the user's own machine that goes nowhere. Waiting until the model
+/// calls `capture_screen`, though, spends all of it inside the silence the user
+/// is already sitting through — and that silence is the one this whole path is
+/// trying to remove. So the frame is grabbed while the user is still talking and
+/// parked here.
+///
+/// Privacy is unchanged: the model still decides whether it needs the screen. A
+/// frame nobody asked for is dropped at the end of the turn and never leaves the
+/// device. What changes is only that the answer to "yes, look" is already in
+/// hand.
+static PENDING_AGENT_CAPTURE: Mutex<Option<PendingAgentCapture>> = Mutex::new(None);
+
+/// Which recording the parked frame belongs to. Every recording advances it, so
+/// a slow capture worker can never populate a later turn's slot.
+static AGENT_CAPTURE_GENERATION: AtomicU64 = AtomicU64::new(0);
+
+/// How stale a parked frame may be before a fresh capture is preferred. Long
+/// enough to cover a long question, short enough that it still shows what the
+/// user was looking at when they asked.
+const AGENT_CAPTURE_MAX_AGE: std::time::Duration = std::time::Duration::from_secs(45);
+
+struct PendingAgentCapture {
+    generation: u64,
+    taken: Instant,
+    /// The size/quality budget it was compressed for. A frame sized for one
+    /// provider is not necessarily accepted by another, so a provider change
+    /// between the capture and the request falls back to a fresh capture.
+    profile: crate::screenshot::CaptureProfile,
+    data_url: String,
+}
+
+/// Whether this recording should grab a frame up front, and under which
+/// generation. `None` means don't: the mode, the timing setting or the persona
+/// rules it out.
+///
+/// Advancing the generation on every recording — even when no capture is wanted
+/// — is what guarantees a frame from an abandoned recording can't be adopted by
+/// a later turn.
+pub fn begin_agent_capture(settings: &crate::settings::AppSettings) -> Option<u64> {
+    let generation = AGENT_CAPTURE_GENERATION
+        .fetch_add(1, Ordering::SeqCst)
+        .wrapping_add(1);
+    if let Ok(mut pending) = PENDING_AGENT_CAPTURE.lock() {
+        *pending = None;
+    }
+    let wanted = settings.assistant_screen_access_mode == AssistantScreenAccessMode::AgentDecides
+        && settings.assistant_vision_capture_timing
+            == crate::settings::VisionCaptureTiming::Immediate
+        && !settings.active_character_is_cat();
+    wanted.then_some(generation)
+}
+
+/// Park a captured frame, if the recording it belongs to is still the current
+/// one.
+pub fn stash_agent_capture(
+    generation: u64,
+    profile: crate::screenshot::CaptureProfile,
+    data_url: String,
+) {
+    if AGENT_CAPTURE_GENERATION.load(Ordering::SeqCst) != generation {
+        return;
+    }
+    if let Ok(mut pending) = PENDING_AGENT_CAPTURE.lock() {
+        *pending = Some(PendingAgentCapture {
+            generation,
+            taken: Instant::now(),
+            profile,
+            data_url,
+        });
+    }
+}
+
+/// Consume the parked frame if it is current, fresh, and sized for the provider
+/// about to receive it.
+fn take_agent_capture(profile: crate::screenshot::CaptureProfile) -> Option<String> {
+    let mut pending = PENDING_AGENT_CAPTURE.lock().ok()?;
+    let usable = pending.as_ref().is_some_and(|frame| {
+        frame.generation == AGENT_CAPTURE_GENERATION.load(Ordering::SeqCst)
+            && frame.profile == profile
+            && frame.taken.elapsed() < AGENT_CAPTURE_MAX_AGE
+    });
+    if !usable {
+        *pending = None;
+        return None;
+    }
+    pending.take().map(|frame| frame.data_url)
+}
+
+/// Drop any parked frame. Called when a turn ends, so a frame the model never
+/// asked for cannot outlive the question it was taken for.
+pub fn clear_agent_capture() {
+    if let Ok(mut pending) = PENDING_AGENT_CAPTURE.lock() {
+        *pending = None;
     }
 }
 
@@ -1825,11 +1930,22 @@ async fn agent_capture_screen(
         return Err("screen access is no longer set to Agent decides".to_string());
     }
     let profile = crate::screenshot::CaptureProfile::for_base_url(&provider.base_url);
-    let data_url = tauri::async_runtime::spawn_blocking(move || {
-        crate::screenshot::capture_screen_data_url_at(None, profile)
-    })
-    .await
-    .map_err(|e| format!("Screen capture task failed: {}", e))??;
+    // Prefer the frame grabbed at recording start (see PENDING_AGENT_CAPTURE):
+    // it is already in memory, so the model's decision to look costs nothing,
+    // and it shows what the user was looking at when they started asking. A
+    // typed turn, an On-send timing setting, or a stale/mismatched frame all
+    // fall through to capturing now.
+    let data_url = match take_agent_capture(profile) {
+        Some(data_url) => {
+            debug!("Agent screen capture served from the recording-start frame");
+            data_url
+        }
+        None => tauri::async_runtime::spawn_blocking(move || {
+            crate::screenshot::capture_screen_data_url_at(None, profile)
+        })
+        .await
+        .map_err(|e| format!("Screen capture task failed: {}", e))??,
+    };
 
     // Visible audit trail: marker + thumbnail on the turn's user message.
     let thumb_src = data_url.clone();
@@ -1964,6 +2080,105 @@ fn tool_round_policy(round: &llm_client::ToolStreamOutcome, round_index: usize) 
     } else {
         ToolRoundPolicy::RunToolsThenStop
     }
+}
+
+/// Stage timings for one turn.
+///
+/// Perceived speed is decided by two numbers — how long until the first word,
+/// and how long each tool holds the turn — and neither was measurable before.
+/// Logged at debug level only; nothing is sent anywhere.
+struct TurnTimer {
+    started: Instant,
+    /// Milliseconds from turn start to the first streamed token, or 0 if none
+    /// has arrived. Written once, by whichever round streams first.
+    first_token_ms: AtomicU64,
+}
+
+impl TurnTimer {
+    fn new() -> Arc<Self> {
+        Arc::new(Self {
+            started: Instant::now(),
+            first_token_ms: AtomicU64::new(0),
+        })
+    }
+
+    fn mark_first_token(&self) {
+        let elapsed = self.started.elapsed().as_millis().min(u64::MAX as u128) as u64;
+        // Only the first writer wins, so a follow-up round can't overwrite the
+        // number that the user actually waited.
+        let _ = self.first_token_ms.compare_exchange(
+            0,
+            elapsed.max(1),
+            Ordering::Relaxed,
+            Ordering::Relaxed,
+        );
+    }
+
+    fn elapsed_ms(&self) -> u128 {
+        self.started.elapsed().as_millis()
+    }
+
+    fn first_token_ms(&self) -> Option<u64> {
+        match self.first_token_ms.load(Ordering::Relaxed) {
+            0 => None,
+            ms => Some(ms),
+        }
+    }
+}
+
+/// Run one text-returning tool and format its result for the model.
+///
+/// Split out of the dispatch loop so several independent calls in one round can
+/// run concurrently instead of one after another.
+async fn run_text_tool(
+    settings: &crate::settings::AppSettings,
+    name: &str,
+    arguments: &str,
+) -> String {
+    match name {
+        "web_search" => {
+            let (query, freshness, news) = parse_web_search_args(arguments);
+            if query.is_empty() {
+                return "No query was provided to web_search.".to_string();
+            }
+            let results =
+                web_search::run_tool_search(settings, &query, freshness.as_deref(), news).await;
+            if results.is_empty() {
+                return "No results found for that query.".to_string();
+            }
+            let budget = web_search::context_budget_for(settings.assistant_search_depth);
+            web_search::format_results_for_prompt(&results, budget)
+        }
+        "get_current_datetime" => current_datetime_line(),
+        other => format!("Unknown tool '{}'.", other),
+    }
+}
+
+/// Tell the panel which tool is running, and what for.
+///
+/// Deliberately separate from the spoken line: the voice says "let me look that
+/// up", the panel shows *what* is being looked up. Repeating the spoken sentence
+/// on screen would be noise.
+fn emit_tool_activity(app: &AppHandle, calls: &[llm_client::ToolCall]) {
+    let Some(first) = calls.first() else {
+        return;
+    };
+    // Only the search query is worth surfacing; the other tools take no
+    // meaningful argument.
+    let detail = if first.name == "web_search" {
+        let (query, _, _) = parse_web_search_args(&first.arguments);
+        query
+    } else {
+        String::new()
+    };
+    let _ = app.emit(
+        "assistant-tool",
+        json!({
+            "name": first.name,
+            "detail": detail,
+            "count": calls.len(),
+        }),
+    );
 }
 
 /// Run one assistant turn: record the user message, stream the LLM answer to
@@ -2192,6 +2407,18 @@ pub async fn run_assistant_turn(
             sections.push(directive.to_string());
         }
 
+        // 2b. Spoken turns: the voice can only start once the first sentence
+        //     exists, so a reply that opens with one short sentence is heard
+        //     sooner than the identical reply that opens with a long one. Asking
+        //     for a short opener is the cheapest way to cut time-to-first-word —
+        //     no extra request, no machinery, and it reads better aloud anyway.
+        if settings.assistant_tts_enabled {
+            sections.push(
+                "This reply will be read aloud. Open with one short sentence that stands on its own, then continue. Write in speakable prose — no markdown, no bullet lists, no headings."
+                    .to_string(),
+            );
+        }
+
         // 3. Personal memory — advisory "About You" block, only when memory is
         //    on, not incognito, and something relevant was selected.
         if let Some(block) = crate::memory::build_memory_block(&settings, &user_text) {
@@ -2397,6 +2624,8 @@ pub async fn run_assistant_turn(
         None
     };
     let speech_sink = speech.as_ref().map(|(pipeline, _)| pipeline.clone());
+    // Stage timings for this turn, so thresholds can be set from measurement.
+    let timer = TurnTimer::new();
 
     // Generation. On the tool-calling path the model may call our `web_search`
     // tool; we run it, feed the results back, and let it continue (up to a few
@@ -2434,7 +2663,9 @@ pub async fn run_assistant_turn(
         let api_key_c = api_key.clone();
         let model_c = model.clone();
         let settings_c = settings.clone();
+        let timer_c = timer.clone();
         let loop_fut = async move {
+            let timer = timer_c;
             let mut msgs = messages;
             let mut answer = String::new();
             // At most one agent-decided screenshot per user message.
@@ -2454,7 +2685,12 @@ pub async fn run_assistant_turn(
                     tool_choice,
                     None,
                     None,
-                    assistant_token_sink(app_tokens.clone(), partial_cb.clone(), speech_cb.clone()),
+                    assistant_token_sink(
+                        app_tokens.clone(),
+                        partial_cb.clone(),
+                        speech_cb.clone(),
+                        timer.clone(),
+                    ),
                 )
                 .await?;
                 let round_policy = tool_round_policy(&round_out, round_index);
@@ -2463,9 +2699,11 @@ pub async fn run_assistant_turn(
                     break;
                 }
                 // This round's text is about to be replaced by the next round's,
-                // so drop whatever it buffered but has not spoken. Anything
-                // already spoken was a preamble the panel also displayed live
-                // ("Let me look that up"), which is fine to have voiced.
+                // so drop whatever it buffered but has not spoken. Nothing is
+                // said in its place: while a tool runs the turn simply waits,
+                // and the panel's tool chip carries the status instead. A spoken
+                // stand-in was tried and removed — a canned line every search
+                // turn was worse than the silence it covered.
                 if let Some(pipeline) = &speech_cb {
                     if let Ok(mut pipeline) = pipeline.lock() {
                         pipeline.reset();
@@ -2473,7 +2711,7 @@ pub async fn run_assistant_turn(
                 }
                 // Reflect tool use in the panel: "searching" only when the
                 // model actually called web_search (a get_current_datetime call
-                // stays in "thinking").
+                // stays in "thinking"), plus the specific tool and its query.
                 if round_out
                     .tool_calls
                     .iter()
@@ -2481,6 +2719,7 @@ pub async fn run_assistant_turn(
                 {
                     emit_state(&app_state, "searching");
                 }
+                emit_tool_activity(&app_state, &round_out.tool_calls);
                 let tool_calls_json: Vec<Value> = round_out
                     .tool_calls
                     .iter()
@@ -2509,7 +2748,34 @@ pub async fn run_assistant_turn(
                     "content": round_out.text,
                     "tool_calls": tool_calls_json
                 }));
-                for tc in &round_out.tool_calls {
+                let tool_names: Vec<&str> = round_out
+                    .tool_calls
+                    .iter()
+                    .map(|tc| tc.name.as_str())
+                    .collect();
+
+                // Independent tools run concurrently: two searches in one round
+                // should cost one wait, not two. `capture_screen` stays in the
+                // ordered pass below because its result is an image, not text.
+                let dispatched = Instant::now();
+                let text_indexes: Vec<usize> = round_out
+                    .tool_calls
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, tc)| tc.name != "capture_screen")
+                    .map(|(index, _)| index)
+                    .collect();
+                let mut text_results: Vec<Option<String>> = vec![None; round_out.tool_calls.len()];
+                let completed = futures_util::future::join_all(text_indexes.iter().map(|&index| {
+                    let call = &round_out.tool_calls[index];
+                    run_text_tool(&settings_c, &call.name, &call.arguments)
+                }))
+                .await;
+                for (&index, content) in text_indexes.iter().zip(completed) {
+                    text_results[index] = Some(content);
+                }
+
+                for (index, tc) in round_out.tool_calls.iter().enumerate() {
                     // capture_screen returns an image, not text — handled
                     // apart from the text-tool match: the tool message is a
                     // short receipt and the frame rides in a follow-up user
@@ -2551,31 +2817,11 @@ pub async fn run_assistant_turn(
                         }
                         continue;
                     }
-                    let content = match tc.name.as_str() {
-                        "web_search" => {
-                            let (query, freshness, news) = parse_web_search_args(&tc.arguments);
-                            if query.is_empty() {
-                                "No query was provided to web_search.".to_string()
-                            } else {
-                                let results = web_search::run_tool_search(
-                                    &settings_c,
-                                    &query,
-                                    freshness.as_deref(),
-                                    news,
-                                )
-                                .await;
-                                if results.is_empty() {
-                                    "No results found for that query.".to_string()
-                                } else {
-                                    let budget = web_search::context_budget_for(
-                                        settings_c.assistant_search_depth,
-                                    );
-                                    web_search::format_results_for_prompt(&results, budget)
-                                }
-                            }
-                        }
-                        "get_current_datetime" => current_datetime_line(),
-                        other => format!("Unknown tool '{}'.", other),
+                    let content = match text_results[index].take() {
+                        Some(content) => content,
+                        // Unreachable: every non-screen call was dispatched
+                        // above. Answer rather than stall if it ever happens.
+                        None => format!("The {} tool produced no result.", tc.name),
                     };
                     msgs.push(json!({
                         "role": "tool",
@@ -2583,9 +2829,42 @@ pub async fn run_assistant_turn(
                         "content": content
                     }));
                 }
+                debug!(
+                    "Assistant tools [{}] took {}ms ({}ms into the turn)",
+                    tool_names.join(", "),
+                    dispatched.elapsed().as_millis(),
+                    timer.elapsed_ms()
+                );
                 emit_state(&app_state, "thinking");
                 answer = round_out.text;
                 if round_policy == ToolRoundPolicy::RunToolsThenStop {
+                    // Out of tool rounds. `round_out.text` is normally EMPTY
+                    // here — a round that ends in tool calls usually writes no
+                    // prose — so stopping now ends the turn with no reply at
+                    // all, which is what a question that "got searched and then
+                    // never answered" looked like. Ask once more with no tools
+                    // attached, so the model has to answer from what it already
+                    // fetched instead of reaching for another search.
+                    if answer.trim().is_empty() {
+                        debug!(
+                            "Tool rounds exhausted with no answer text; asking once more without tools"
+                        );
+                        answer = llm_client::send_chat_stream(
+                            &provider_c,
+                            api_key_c.clone(),
+                            &model_c,
+                            msgs.clone(),
+                            None,
+                            None,
+                            assistant_token_sink(
+                                app_tokens.clone(),
+                                partial_cb.clone(),
+                                speech_cb.clone(),
+                                timer.clone(),
+                            ),
+                        )
+                        .await?;
+                    }
                     break;
                 }
             }
@@ -2604,7 +2883,12 @@ pub async fn run_assistant_turn(
             messages,
             None,
             None,
-            assistant_token_sink(app.clone(), partial.clone(), speech_sink.clone()),
+            assistant_token_sink(
+                app.clone(),
+                partial.clone(),
+                speech_sink.clone(),
+                timer.clone(),
+            ),
         );
         tokio::pin!(stream_fut);
         // Race the stream against a Stop request. notify_waiters wakes this select.
@@ -2703,6 +2987,24 @@ pub async fn run_assistant_turn(
     // its idle "Assistant" affordance in the gap before audio begins. The panel
     // flips itself back to idle once playback ends (it owns the local engine).
     emit_state(&app, if speaking { "speaking" } else { "idle" });
+    // No tool is running any more, whatever happened above.
+    let _ = app.emit("assistant-tool", Value::Null);
+    // A frame grabbed for this question and never asked for is dropped here, so
+    // it can't be adopted by a later turn.
+    clear_agent_capture();
+    match timer.first_token_ms() {
+        Some(first) => debug!(
+            "Assistant turn timing: first token {}ms, turn {}ms ({})",
+            first,
+            timer.elapsed_ms(),
+            provider.id
+        ),
+        None => debug!(
+            "Assistant turn timing: no tokens, turn {}ms ({})",
+            timer.elapsed_ms(),
+            provider.id
+        ),
+    }
 }
 
 /// Speak the assistant's reply aloud via the configured TTS engine.
@@ -2905,7 +3207,7 @@ pub async fn run_summarize_turn(app: AppHandle) {
         None,
         None,
         // The summarize turn is text-only; it is never spoken aloud.
-        assistant_token_sink(app.clone(), partial.clone(), None),
+        assistant_token_sink(app.clone(), partial.clone(), None, TurnTimer::new()),
     );
     tokio::pin!(stream_fut);
 
@@ -3468,12 +3770,13 @@ fn assistant_token_sink(
     app: tauri::AppHandle,
     partial: Arc<Mutex<String>>,
     speech: Option<Arc<Mutex<crate::speech_stream::SpeechPipeline>>>,
+    timer: Arc<TurnTimer>,
 ) -> impl FnMut(&str) {
-    use std::time::Instant;
     const FLUSH_INTERVAL_MS: u128 = 40;
     let mut pending = String::new();
     let mut last_flush = Instant::now();
     move |token: &str| {
+        timer.mark_first_token();
         if let Ok(mut buf) = partial.lock() {
             buf.push_str(token);
         }

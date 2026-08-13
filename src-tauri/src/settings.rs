@@ -597,12 +597,19 @@ pub enum AssistantScreenAccessMode {
 /// This only changes the timing for **voice** questions (where there's a real
 /// gap between starting and finishing the question); typed messages always
 /// capture at send, since the panel is already on screen either way.
+///
+/// It applies to both ways a capture can happen: a Manual capture the user
+/// armed, and an Agent-decides capture the model asks for mid-turn. In the agent
+/// case `Immediate` is purely a speed setting — the frame is held locally and is
+/// only ever sent if the model actually calls the screen tool.
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default, Type)]
 #[serde(rename_all = "snake_case")]
 pub enum VisionCaptureTiming {
     /// Capture the moment you start asking (voice: at hotkey/mic press), so it
     /// grabs what you were looking at when you began — not what's on screen
-    /// after you finish talking. This is the default.
+    /// after you finish talking. This is the default, and it is also what makes
+    /// an agent-decided screen look instant instead of costing a screenshot
+    /// inside the wait.
     #[default]
     Immediate,
     /// Capture when the message is actually sent (voice: after you stop talking

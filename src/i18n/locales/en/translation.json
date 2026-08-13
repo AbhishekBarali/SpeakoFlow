@@ -1239,6 +1239,7 @@
         "timing": {
           "label": "When to capture",
           "description": "For voice questions: capture the moment you start asking, or wait until the message is sent. Typed messages always capture on send.",
+          "descriptionAgent": "\"When I ask\" grabs the screen while you're still speaking, so if the assistant decides it needs to look, the answer comes much sooner. The image stays on your device and is only sent if the assistant actually asks for it.",
           "options": {
             "immediate": "When I ask",
             "on_send": "When the message sends"
@@ -1533,6 +1534,12 @@
       "searching": "Searching the web...",
       "thinking": "Thinking...",
       "speaking": "Speaking..."
+    },
+    "tool": {
+      "search": "Searching the web",
+      "screen": "Looking at your screen",
+      "working": "Working on it",
+      "elapsed": "{{seconds}}s"
     },
     "errors": {
       "generic": "Something went wrong. Please try again.",

@@ -2,7 +2,13 @@ import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open as openFileDialog } from "@tauri-apps/plugin-dialog";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useTranslation } from "react-i18next";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -51,6 +57,18 @@ type AssistantState =
   | "searching"
   | "thinking"
   | "speaking";
+
+/** A tool the current turn is running, as reported by the backend. */
+interface ToolActivity {
+  /** Backend tool id, e.g. `web_search`. */
+  name: string;
+  /** The one argument worth showing — currently only the search query. */
+  detail: string;
+  /** How many tools this round called; they run concurrently. */
+  count: number;
+  /** When the panel first saw it, for the elapsed counter. */
+  startedAt: number;
+}
 
 interface DisplayMessage {
   role: "user" | "assistant";
@@ -405,6 +423,11 @@ const AssistantPanel: React.FC = () => {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [micLevels, setMicLevels] = useState<number[]>([]);
   const [visionActive, setVisionActive] = useState(false);
+  // Which tool the turn is running, if any. Shown as a chip: the voice says
+  // "let me look that up", this says *what* is being looked up. Deliberately
+  // never the spoken sentence itself — printing that would just be noise.
+  const [tool, setTool] = useState<ToolActivity | null>(null);
+  const [toolElapsed, setToolElapsed] = useState(0);
   const [characterMenuOpen, setCharacterMenuOpen] = useState(false);
   const characterMenuRef = useRef<HTMLDivElement>(null);
   const [mounted, setMounted] = useState(false);
@@ -642,8 +665,30 @@ const AssistantPanel: React.FC = () => {
           // the turn ends (it self-clears via the transient timer).
           if (next === "idle") {
             setVisionActive(false);
+            setTool(null);
           }
         }),
+      );
+
+      // Which tool is running, or null when none is. Emitted at dispatch and
+      // cleared when the turn ends.
+      track(
+        await listen<{ name: string; detail: string; count: number } | null>(
+          "assistant-tool",
+          (e) => {
+            const payload = e.payload;
+            setTool(
+              payload
+                ? {
+                    name: payload.name,
+                    detail: payload.detail,
+                    count: payload.count,
+                    startedAt: Date.now(),
+                  }
+                : null,
+            );
+          },
+        ),
       );
 
       track(
@@ -867,6 +912,33 @@ const AssistantPanel: React.FC = () => {
 
   const busy = state !== "idle";
   const isListening = state === "listening";
+
+  // Tick a seconds counter while a tool runs, so a long wait reads as progress
+  // rather than as a frozen panel. Stops the moment the tool does.
+  useEffect(() => {
+    if (!tool) {
+      setToolElapsed(0);
+      return;
+    }
+    const startedAt = tool.startedAt;
+    const tick = () =>
+      setToolElapsed(Math.max(0, Math.round((Date.now() - startedAt) / 1000)));
+    tick();
+    const id = window.setInterval(tick, 1000);
+    return () => window.clearInterval(id);
+  }, [tool]);
+
+  /** What the tool chip reads: the action, then what it's acting on. */
+  const toolLabel = useMemo(() => {
+    if (!tool) return null;
+    const action =
+      tool.name === "web_search"
+        ? t("assistant.tool.search")
+        : tool.name === "capture_screen"
+          ? t("assistant.tool.screen")
+          : t("assistant.tool.working");
+    return tool.detail ? `${action} · ${tool.detail}` : action;
+  }, [tool, t]);
 
   /** Route a dropped/picked path to the right reader by extension. */
   const addPath = useCallback(async (path: string) => {
@@ -1404,7 +1476,7 @@ const AssistantPanel: React.FC = () => {
                           <Loader2 className="apill-spin" size={12} />
                           {engineSetupActive
                             ? engineSetupLabel
-                            : t(`assistant.status.${state}`)}
+                            : (toolLabel ?? t(`assistant.status.${state}`))}
                         </span>
                       ) : (
                         <span className="alive-placeholder">
@@ -1853,6 +1925,17 @@ const AssistantPanel: React.FC = () => {
                   ? t("assistant.status.locked")
                   : t(`assistant.status.${state}`)}
               </span>
+            </div>
+          )}
+          {toolLabel && (
+            <div className="assistant-tool-chip" aria-live="polite">
+              <Loader2 className="apill-spin" size={12} aria-hidden="true" />
+              <span className="assistant-tool-text">{toolLabel}</span>
+              {toolElapsed >= 3 && (
+                <span className="assistant-tool-elapsed">
+                  {t("assistant.tool.elapsed", { seconds: toolElapsed })}
+                </span>
+              )}
             </div>
           )}
           {showTypingDots && (
