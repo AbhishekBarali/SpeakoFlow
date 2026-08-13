@@ -1979,10 +1979,11 @@ async fn agent_capture_screen(
 
 /// Build the current local tool capability matrix. `web` exposes `web_search`
 /// followed by `get_current_datetime`; `screen` (Agent-decides screen access)
-/// appends `capture_screen`. Turns with no capability expose no tools. The
-/// order is stable because it is part of the model-facing request baseline.
-fn build_assistant_tool_capabilities(web: bool, screen: bool) -> Option<Value> {
-    if !web && !screen {
+/// appends `capture_screen`; `agents` appends the managed coding-agent tools.
+/// Turns with no capability expose no tools. The order is stable because it is
+/// part of the model-facing request baseline.
+fn build_assistant_tool_capabilities(web: bool, screen: bool, agents: bool) -> Option<Value> {
+    if !web && !screen && !agents {
         return None;
     }
 
@@ -2039,7 +2040,176 @@ fn build_assistant_tool_capabilities(web: bool, screen: bool) -> Option<Value> {
             }
         }));
     }
+    if agents {
+        tools.extend(agent_tool_defs());
+    }
     Some(Value::Array(tools))
+}
+
+/// Tool definitions for the managed coding-agent sessions.
+///
+/// Kept in its own function because this group is gated separately (it is
+/// experimental) and because the descriptions carry the behavioral contract:
+/// the model must answer status questions from `list_agent_sessions` rather than
+/// guessing, and must never approve anything the user did not ask it to.
+fn agent_tool_defs() -> Vec<Value> {
+    vec![
+        json!({
+            "type": "function",
+            "function": {
+                "name": "list_agent_sessions",
+                "description": "List the coding-agent sessions running on this machine, with each one's status (working, waiting for your approval, finished, failed), how long it has been going, the last tool it used, files it changed, and cost. Call this for ANY question about what the agents are doing — 'what's happening', 'status', 'are they done', 'is anything waiting on me', 'how many are running'. Always call it instead of answering from memory: the state changes constantly. Takes no arguments.",
+                "parameters": { "type": "object", "properties": {} }
+            }
+        }),
+        json!({
+            "type": "function",
+            "function": {
+                "name": "get_agent_session",
+                "description": "Get the full detail of ONE coding-agent session: its task, folder, every file it has touched, what it is waiting on, and its last message. Use this when the user asks about a specific session ('what is the frontend one doing', 'why did session 2 fail', 'what did it change').",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "session": {
+                            "type": "string",
+                            "description": "Which session: its number, its label, or part of its folder name. Leave empty when only one session exists."
+                        }
+                    }
+                }
+            }
+        }),
+        json!({
+            "type": "function",
+            "function": {
+                "name": "start_agent_session",
+                "description": "Start a NEW coding agent working on a task in a folder. Call this when the user asks to build, fix, refactor, or investigate something in a project. Turn their spoken request into a clear, specific task description — keep every requirement they stated, drop the filler. Only call this when the user actually asked for work to be done; never start an agent to answer a question you could answer yourself.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "task": {
+                            "type": "string",
+                            "description": "The instruction for the agent: what to build or change, stated clearly and completely."
+                        },
+                        "cwd": {
+                            "type": "string",
+                            "description": "Absolute path of the project folder to work in."
+                        },
+                        "label": {
+                            "type": "string",
+                            "description": "Optional short name for this session, so the user can refer to it later."
+                        }
+                    },
+                    "required": ["task", "cwd"]
+                }
+            }
+        }),
+        json!({
+            "type": "function",
+            "function": {
+                "name": "send_agent_message",
+                "description": "Send a follow-up instruction to a coding-agent session that is already running or finished, for example a correction, an extra requirement, or an answer to a question it asked.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "session": {
+                            "type": "string",
+                            "description": "Which session: its number, label, or part of its folder name."
+                        },
+                        "message": {
+                            "type": "string",
+                            "description": "What to tell the agent."
+                        }
+                    },
+                    "required": ["message"]
+                }
+            }
+        }),
+        json!({
+            "type": "function",
+            "function": {
+                "name": "cancel_agent_session",
+                "description": "Stop what a coding-agent session is currently doing. The session stays open, so a new instruction can be sent afterwards. Call this when the user says to stop, halt, or abort a session, or that it is going the wrong way.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "session": {
+                            "type": "string",
+                            "description": "Which session: its number, label, or part of its folder name."
+                        }
+                    }
+                }
+            }
+        }),
+        json!({
+            "type": "function",
+            "function": {
+                "name": "answer_agent_permission",
+                "description": "Approve or refuse the action a coding-agent session is blocked on. Call this ONLY when the user has clearly decided — 'allow it', 'yes, approve that', 'no, deny it'. Before approving, make sure the user knows what the action actually is; if they have not been told, describe it and ask instead of calling this. Actions that look destructive are refused here on purpose and have to be confirmed in the app.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "session": {
+                            "type": "string",
+                            "description": "Which session: its number, label, or part of its folder name."
+                        },
+                        "allow": {
+                            "type": "boolean",
+                            "description": "True to approve the pending action, false to refuse it."
+                        }
+                    },
+                    "required": ["allow"]
+                }
+            }
+        }),
+        json!({
+            "type": "function",
+            "function": {
+                "name": "close_agent_session",
+                "description": "Shut a coding-agent session down completely and free it. Use this when the user is finished with a session — 'close it', 'get rid of that one', 'we're done with the frontend one'. Unlike cancel, the session cannot be reused afterwards.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "session": {
+                            "type": "string",
+                            "description": "Which session: its number, label, or part of its folder name."
+                        }
+                    }
+                }
+            }
+        }),
+        json!({
+            "type": "function",
+            "function": {
+                "name": "resume_agent_in_terminal",
+                "description": "Hand a coding-agent session over to a real terminal window, resumed with its full history, so the user can carry on working in the CLI themselves. Call this when the user wants to see, open, take over, or continue a session in a terminal. SpeakoFlow stops driving that session once it is handed over.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "session": {
+                            "type": "string",
+                            "description": "Which session: its number, label, or part of its folder name."
+                        }
+                    }
+                }
+            }
+        }),
+        json!({
+            "type": "function",
+            "function": {
+                "name": "open_agent_folder",
+                "description": "Open the folder a coding-agent session is working in, in the user's file manager. Call this when the user asks to see, open, or go to the files or the project of a session.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "session": {
+                            "type": "string",
+                            "description": "Which session: its number, label, or part of its folder name."
+                        }
+                    }
+                }
+            }
+        }),
+    ]
 }
 
 /// Parse the JSON arguments of a `web_search` tool call into (query, freshness,
@@ -2131,6 +2301,7 @@ impl TurnTimer {
 /// Split out of the dispatch loop so several independent calls in one round can
 /// run concurrently instead of one after another.
 async fn run_text_tool(
+    app: &AppHandle,
     settings: &crate::settings::AppSettings,
     name: &str,
     arguments: &str,
@@ -2150,7 +2321,99 @@ async fn run_text_tool(
             web_search::format_results_for_prompt(&results, budget)
         }
         "get_current_datetime" => current_datetime_line(),
+        "list_agent_sessions"
+        | "get_agent_session"
+        | "start_agent_session"
+        | "send_agent_message"
+        | "cancel_agent_session"
+        | "answer_agent_permission"
+        | "close_agent_session"
+        | "resume_agent_in_terminal"
+        | "open_agent_folder" => run_agent_tool(app, name, arguments),
         other => format!("Unknown tool '{}'.", other),
+    }
+}
+
+/// Dispatch one managed coding-agent tool call.
+///
+/// Every arm returns prose rather than an error type: the result goes straight
+/// back to the model as a tool message, and a plain sentence is something it can
+/// relay to the user out loud. All of these are synchronous — the session
+/// manager only ever touches in-memory state and a pipe, which is what keeps a
+/// spoken status answer fast.
+fn run_agent_tool(app: &AppHandle, name: &str, arguments: &str) -> String {
+    let Some(manager) = app.try_state::<crate::agents::AgentManager>() else {
+        return "The agent session manager is not available in this build.".to_string();
+    };
+    let which = crate::agents::parse_session_ref(arguments);
+    match name {
+        "list_agent_sessions" => manager.summary_block(),
+        "get_agent_session" => match manager.detail_block(&which) {
+            Ok(detail) => detail,
+            Err(e) => e,
+        },
+        "start_agent_session" => {
+            let Some(task) = crate::agents::arg_str(arguments, &["task", "prompt", "instruction"])
+            else {
+                return "No task was provided for the agent.".to_string();
+            };
+            let Some(cwd) = crate::agents::arg_str(
+                arguments,
+                &["cwd", "folder", "directory", "path", "project"],
+            ) else {
+                return "No project folder was provided. Ask the user which folder to work in."
+                    .to_string();
+            };
+            let label = crate::agents::arg_str(arguments, &["label", "name"]);
+            match manager.start(app, &cwd, &task, label, None) {
+                Ok(id) => format!(
+                    "Started agent session [{}] in {}. It is working now; the user can ask for its status at any time.",
+                    id, cwd
+                ),
+                Err(e) => e,
+            }
+        }
+        "send_agent_message" => {
+            let Some(message) =
+                crate::agents::arg_str(arguments, &["message", "text", "instruction"])
+            else {
+                return "No message was provided to send.".to_string();
+            };
+            match manager.send(app, &which, &message) {
+                Ok(ok) => ok,
+                Err(e) => e,
+            }
+        }
+        "cancel_agent_session" => match manager.cancel(app, &which) {
+            Ok(ok) => ok,
+            Err(e) => e,
+        },
+        "answer_agent_permission" => {
+            let Some(allow) = crate::agents::arg_bool(arguments, &["allow", "approve", "approved"])
+            else {
+                return "It wasn't clear whether to approve or refuse. Ask the user to say allow or deny."
+                    .to_string();
+            };
+            // `force` is deliberately never set from the voice path: a
+            // destructive action has to be confirmed in the app.
+            match manager.answer_permission(app, &which, allow, false) {
+                Ok(ok) => ok,
+                Err(e) => e,
+            }
+        }
+        "open_agent_folder" => match manager.open_folder(app, &which) {
+            Ok(ok) => ok,
+            Err(e) => e,
+        },
+        "close_agent_session" => match manager.close(app, &which) {
+            Ok(ok) => ok,
+            Err(e) => e,
+        },
+        "resume_agent_in_terminal" => match manager.resume_in_terminal(app, &which) {
+            Ok(ok) => ok,
+            Err(e) => e,
+        },
+        other => format!("Unknown agent tool '{}'.", other),
     }
 }
 
@@ -2319,7 +2582,11 @@ pub async fn run_assistant_turn(
     let agent_screen = settings.assistant_screen_access_mode
         == AssistantScreenAccessMode::AgentDecides
         && screenshot.is_none();
-    let tool_capabilities = build_assistant_tool_capabilities(web_via_tools, agent_screen);
+    // Managed coding-agent control rides behind the experimental gate while the
+    // tool surface settles.
+    let agent_sessions = settings.experimental_enabled;
+    let tool_capabilities =
+        build_assistant_tool_capabilities(web_via_tools, agent_screen, agent_sessions);
     // OpenRouter's `:online` model suffix turns on its built-in web search
     // server-side; every other path uses the model name unchanged.
     let request_model = if web_via_online {
@@ -2768,7 +3035,7 @@ pub async fn run_assistant_turn(
                 let mut text_results: Vec<Option<String>> = vec![None; round_out.tool_calls.len()];
                 let completed = futures_util::future::join_all(text_indexes.iter().map(|&index| {
                     let call = &round_out.tool_calls[index];
-                    run_text_tool(&settings_c, &call.name, &call.arguments)
+                    run_text_tool(&app_state, &settings_c, &call.name, &call.arguments)
                 }))
                 .await;
                 for (&index, content) in text_indexes.iter().zip(completed) {
@@ -3535,10 +3802,10 @@ mod tests {
 
     #[test]
     fn assistant_tool_capability_matrix_and_order_are_stable() {
-        assert!(build_assistant_tool_capabilities(false, false).is_none());
+        assert!(build_assistant_tool_capabilities(false, false, false).is_none());
 
         let tools =
-            build_assistant_tool_capabilities(true, false).expect("tools should be enabled");
+            build_assistant_tool_capabilities(true, false, false).expect("tools should be enabled");
         let tools = tools
             .as_array()
             .expect("tool definitions should be an array");
@@ -3559,7 +3826,8 @@ mod tests {
 
         // Agent-decides screen access appends capture_screen after the web
         // tools; screen-only turns expose just capture_screen.
-        let tools = build_assistant_tool_capabilities(true, true).expect("tools should be enabled");
+        let tools =
+            build_assistant_tool_capabilities(true, true, false).expect("tools should be enabled");
         let names: Vec<&str> = tools
             .as_array()
             .unwrap()
@@ -3572,7 +3840,7 @@ mod tests {
         );
 
         let tools =
-            build_assistant_tool_capabilities(false, true).expect("tools should be enabled");
+            build_assistant_tool_capabilities(false, true, false).expect("tools should be enabled");
         let names: Vec<&str> = tools
             .as_array()
             .unwrap()
@@ -3580,6 +3848,70 @@ mod tests {
             .map(|tool| tool["function"]["name"].as_str().unwrap())
             .collect();
         assert_eq!(names, vec!["capture_screen"]);
+    }
+
+    #[test]
+    fn agent_tools_are_gated_and_appended_last() {
+        // The experimental gate is the only thing that exposes them.
+        let tools =
+            build_assistant_tool_capabilities(true, false, false).expect("tools should be enabled");
+        let names: Vec<String> = tools
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|tool| tool["function"]["name"].as_str().unwrap().to_string())
+            .collect();
+        assert!(!names.iter().any(|n| n.contains("agent")));
+
+        // Agent-only turns are valid: the group can carry a turn by itself.
+        let tools =
+            build_assistant_tool_capabilities(false, false, true).expect("tools should be enabled");
+        let names: Vec<&str> = tools
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|tool| tool["function"]["name"].as_str().unwrap())
+            .collect();
+        assert_eq!(
+            names,
+            vec![
+                "list_agent_sessions",
+                "get_agent_session",
+                "start_agent_session",
+                "send_agent_message",
+                "cancel_agent_session",
+                "answer_agent_permission",
+                "close_agent_session",
+                "resume_agent_in_terminal",
+                "open_agent_folder",
+            ]
+        );
+
+        // The existing baseline keeps its order and position when they are on.
+        let tools =
+            build_assistant_tool_capabilities(true, true, true).expect("tools should be enabled");
+        let names: Vec<&str> = tools
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|tool| tool["function"]["name"].as_str().unwrap())
+            .collect();
+        assert_eq!(
+            &names[..3],
+            &["web_search", "get_current_datetime", "capture_screen"]
+        );
+        assert_eq!(names.len(), 12);
+
+        // Every agent tool must declare an object schema, or strict providers
+        // reject the request outright.
+        for tool in build_assistant_tool_capabilities(false, false, true)
+            .unwrap()
+            .as_array()
+            .unwrap()
+        {
+            assert_eq!(tool["type"], json!("function"));
+            assert_eq!(tool["function"]["parameters"]["type"], json!("object"));
+        }
     }
 
     #[test]

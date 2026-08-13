@@ -1,0 +1,10 @@
+[package]
+name = "claude-bridge-spike"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+# Standalone on purpose: this is a throwaway probe, not part of the app build.
+[workspace]
+
+[dependencies]

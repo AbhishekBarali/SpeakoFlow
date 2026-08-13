@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import {
   SlidersHorizontal,
   Mic,
+  Bot,
   FlaskConical,
   History,
   Info,
@@ -18,6 +19,7 @@ import {
   DebugSettings,
   AboutSettings,
   AssistantSection,
+  AgentsSettings,
 } from "./settings";
 
 export type SidebarSection = keyof typeof SECTIONS_CONFIG;
@@ -67,6 +69,14 @@ export const SECTIONS_CONFIG = {
     icon: History,
     component: HistorySettings,
     enabled: () => true,
+  },
+  // Coding-agent control is pre-release, so it rides the experimental gate
+  // rather than showing up for everyone.
+  agents: {
+    labelKey: "sidebar.agents",
+    icon: Bot,
+    component: AgentsSettings,
+    enabled: (settings) => settings?.experimental_enabled ?? false,
   },
   debug: {
     labelKey: "sidebar.debug",

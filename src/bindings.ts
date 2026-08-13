@@ -2101,6 +2101,101 @@ async assistantDistillMemoryNow() : Promise<Result<null, string>> {
 }
 },
 /**
+ * Every session SpeakoFlow has started, in start order.
+ */
+async agentSessions() : Promise<Result<AgentSessionView[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("agent_sessions") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Start a session in `cwd` with `task` as its first instruction.
+ */
+async agentSessionStart(cwd: string, task: string, label: string | null) : Promise<Result<string, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("agent_session_start", { cwd, task, label }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Send a follow-up instruction to a live session.
+ */
+async agentSessionSend(id: string, message: string) : Promise<Result<string, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("agent_session_send", { id, message }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Stop the current turn, leaving the session open for a new instruction.
+ */
+async agentSessionCancel(id: string) : Promise<Result<string, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("agent_session_cancel", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Shut a session down for good.
+ */
+async agentSessionClose(id: string) : Promise<Result<string, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("agent_session_close", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Answer the permission prompt a session is blocked on.
+ * 
+ * `force` is what makes this different from the voice path: approving an action
+ * classified as destructive requires an explicit on-screen confirmation, where
+ * the user can read the exact command instead of trusting a transcript.
+ */
+async agentSessionAnswerPermission(id: string, allow: boolean, force: boolean) : Promise<Result<string, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("agent_session_answer_permission", { id, allow, force }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Open a session's working folder in the OS file manager.
+ */
+async agentSessionOpenFolder(id: string) : Promise<Result<string, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("agent_session_open_folder", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Hand a session to a real terminal, resumed with its full history.
+ * 
+ * SpeakoFlow stops driving it at that point — two processes on one transcript
+ * would race — so this is a deliberate handover, not a second view.
+ */
+async agentSessionResumeInTerminal(id: string) : Promise<Result<string, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("agent_session_resume_in_terminal", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * Stub implementation for non-macOS platforms
  * Always returns false since laptop detection is macOS-specific
  */
@@ -2129,6 +2224,70 @@ historyUpdatePayload: "history-update-payload"
 
 /** user-defined types **/
 
+/**
+ * The rolling per-session digest. Everything the assistant needs to answer a
+ * status question, and nothing else.
+ */
+export type AgentSessionView = { 
+/**
+ * Short stable handle used by voice ("stop session 2").
+ */
+id: string; 
+/**
+ * The agent CLI's own session id, once known, for `--resume`.
+ */
+agentSessionId: string | null; 
+/**
+ * Human name, defaulting to the working directory's folder name.
+ */
+label: string; cwd: string; model: string | null; status: AgentStatus; elapsedSecs: number; lastTool: string | null; lastLine: string | null; filesTouched: string[]; toolCalls: number; costUsd: number; pending: PendingApproval | null; 
+/**
+ * The last tool failure, cleared as soon as a tool succeeds again. Separate
+ * from `error`, which is about the turn as a whole: a model that malforms a
+ * tool call and retries is not a failed session, but a session that looks
+ * frozen for ten seconds with no explanation is a bad experience.
+ */
+toolError: string | null; error: string | null; 
+/**
+ * The prompt that started the session, trimmed.
+ */
+task: string }
+/**
+ * Where a session is, in the only terms a user cares about out loud.
+ */
+export type AgentStatus = 
+/**
+ * Process spawned, handshake not finished.
+ */
+"starting" | 
+/**
+ * Actively thinking or running tools.
+ */
+"working" | 
+/**
+ * Blocked on a human decision. The one status worth interrupting someone for.
+ */
+"waitingApproval" | 
+/**
+ * Turn finished successfully; the session is still alive for follow-ups.
+ */
+"idle" | 
+/**
+ * The turn ended in an error reported by the agent.
+ */
+"failed" | 
+/**
+ * Stopped by the user.
+ */
+"cancelled" | 
+/**
+ * Handed to a terminal, which now owns it.
+ */
+"handedOff" | 
+/**
+ * The process exited.
+ */
+"ended"
 /**
  * The container-level `#[serde(default)]` (backed by the `Default` impl below,
  * which returns `get_default_settings()`) guarantees every field — including
@@ -2801,6 +2960,23 @@ export type OverlayStyle = "auto" | "none" | "minimal" | "live"
 export type PaginatedAssistantHistory = { entries: AssistantHistoryEntry[]; has_more: boolean }
 export type PaginatedHistory = { entries: HistoryEntry[]; has_more: boolean }
 export type PasteMethod = "ctrl_v" | "direct" | "none" | "shift_insert" | "ctrl_shift_v" | "external_script"
+/**
+ * A permission prompt the agent is blocked on.
+ */
+export type PendingApproval = { 
+/**
+ * Correlation id required on the control response.
+ */
+requestId: string; toolName: string; 
+/**
+ * One line describing what it wants to do, safe to read aloud.
+ */
+detail: string; 
+/**
+ * True when the action looks destructive enough that a voice "yes" must not
+ * be enough on its own.
+ */
+highRisk: boolean }
 export type PermissionAccess = "allowed" | "denied" | "unknown"
 /**
  * How aggressively dictation cleanup condenses the transcript. This is

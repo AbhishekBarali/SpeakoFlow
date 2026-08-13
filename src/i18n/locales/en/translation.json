@@ -26,6 +26,7 @@
     "dictation": "Dictation",
     "assistant": "Assistant",
     "history": "History",
+    "agents": "Agents",
     "about": "About",
     "debug": "Debug",
     "characters": "Profiles",
@@ -44,6 +45,7 @@
     "dictation": "The model that turns your voice into text, and how it's cleaned up.",
     "assistant": "Set up the assistant, then tune its voice, screen vision, and web search.",
     "history": "Your recent dictations, Flow generations, and assistant chats, stored on this device.",
+    "agents": "Coding agents you started by voice: what they're doing, and anything waiting on you.",
     "about": "Version, app language, data locations, and credits.",
     "debug": "Diagnostics and developer tools."
   },
@@ -305,6 +307,47 @@
     }
   },
   "settings": {
+    "agents": {
+      "sessions": {
+        "title": "Sessions",
+        "description": "Every coding agent SpeakoFlow has started this run."
+      },
+      "approvals": {
+        "title": "Waiting on you",
+        "description": "An agent has paused until you decide.",
+        "highRisk": "High risk",
+        "approve": "Approve",
+        "deny": "Deny",
+        "confirmApprove": "Yes, run it",
+        "confirmWarning": "This looks destructive and can't be approved by voice. Read the command above before confirming."
+      },
+      "status": {
+        "starting": "Starting",
+        "working": "Working",
+        "waitingApproval": "Waiting on you",
+        "idle": "Done",
+        "failed": "Failed",
+        "cancelled": "Stopped",
+        "handedOff": "In terminal",
+        "ended": "Closed"
+      },
+      "actions": {
+        "stop": "Stop",
+        "openFolder": "Open folder",
+        "terminal": "Continue in terminal",
+        "terminalHint": "Opens a terminal with this session resumed and its full history. SpeakoFlow stops driving it.",
+        "close": "Close",
+        "closeHint": "Ends the session and removes it from this list."
+      },
+      "empty": {
+        "title": "No agent sessions yet.",
+        "hint": "Ask the assistant to start one, for example: start an agent in my project folder and add tests."
+      },
+      "filesChanged_one": "{{count}} file changed",
+      "filesChanged_other": "{{count}} files changed",
+      "toolFailed": "A tool call failed and it's retrying: {{detail}}",
+      "cost": "${{amount}}"
+    },
     "personalMemory": {
       "enable": {
         "label": "Remember me",

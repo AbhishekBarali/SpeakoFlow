@@ -1,4 +1,5 @@
 mod actions;
+mod agents;
 #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
 mod apple_intelligence;
 mod assistant;
@@ -753,6 +754,14 @@ pub fn run(cli_args: CliArgs) {
             commands::memory::export_assistant_memory,
             commands::memory::import_assistant_memory,
             commands::memory::assistant_distill_memory_now,
+            commands::agents::agent_sessions,
+            commands::agents::agent_session_start,
+            commands::agents::agent_session_send,
+            commands::agents::agent_session_cancel,
+            commands::agents::agent_session_close,
+            commands::agents::agent_session_answer_permission,
+            commands::agents::agent_session_open_folder,
+            commands::agents::agent_session_resume_in_terminal,
             helpers::clamshell::is_laptop,
         ])
         .events(collect_events![managers::history::HistoryUpdatePayload,]);
@@ -995,6 +1004,9 @@ pub fn run(cli_args: CliArgs) {
                 app.manage(lock_watch::LockWatch::new(app_handle.clone()));
             }
             app.manage(assistant::AssistantConversation::new());
+            // Managed coding-agent sessions (experimental). Empty until the user
+            // starts one, so this costs nothing at launch.
+            app.manage(agents::AgentManager::new());
 
             initialize_core_logic(&app_handle);
 
@@ -1106,6 +1118,12 @@ pub fn run(cli_args: CliArgs) {
                     app.try_state::<std::sync::Arc<managers::local_llm::LocalLlmManager>>()
                 {
                     mgr.stop();
+                }
+                // Same reasoning for managed coding-agent CLIs: `std::process::exit`
+                // skips `Drop`, so without this every session the user started
+                // outlives the app.
+                if let Some(agents) = app.try_state::<agents::AgentManager>() {
+                    agents.shutdown();
                 }
             }
             let _ = (app, event); // suppress unused warnings on non-macOS
