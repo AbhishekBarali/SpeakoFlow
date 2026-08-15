@@ -20,12 +20,20 @@
 //!   leaves the sanitizer unable to recognise it, so raw punctuation or a URL
 //!   gets read aloud. Cuts are therefore suppressed inside those constructs.
 //!
-//! The other half is pacing. The *first* chunk is cut as early as is defensible
-//! because it decides how long the user waits in silence; later chunks are
-//! allowed to grow so the engine gets whole thoughts and the delivery keeps its
-//! natural rhythm. Since speaking a sentence takes longer than generating the
-//! next one, the pipeline is ahead of playback after the opening and the extra
-//! size costs nothing.
+//! The other half is pacing, and it is the part that is easy to get subtly
+//! wrong. The *first* chunk is cut as early as is defensible because it decides
+//! how long the user waits in silence; later chunks are allowed to grow so the
+//! engine gets whole thoughts and the delivery keeps its natural rhythm. The
+//! growth has to be *gradual*, though. Speaking is roughly 14 characters per
+//! second while even a slow local model writes two to three times that, so the
+//! pipeline does end up ahead of playback — but it is not ahead *yet* when the
+//! opener finishes. Jumping straight from a 24-character opener to a
+//! 140-character follow-up asked for six times more text than the opener buys
+//! playback time for, which drained the audio queue right after the first few
+//! words and produced seconds of dead air. Minimums therefore ramp
+//! (see [`ChunkPolicy::min_chars_for`]): the second chunk is nearly as small as
+//! the opener, and chunks only grow once speech is comfortably behind
+//! generation.
 //!
 //! Chunks come out already cleaned by [`crate::tts::sanitize_for_speech_chunk`],
 //! and pieces that clean away to nothing (a lone code block, a divider) are
@@ -43,13 +51,50 @@ pub struct ChunkPolicy {
     /// back to a clause boundary (comma/semicolon/colon) instead of waiting for
     /// a full stop. Only ever applies to the first chunk of a reply.
     pub first_clause_chars: usize,
-    /// Shortest acceptable follow-up chunk. Larger than the opener so the engine
-    /// receives complete thoughts, usually two or three sentences.
+    /// Shortest acceptable chunk once the ramp has finished. Large enough that
+    /// the engine receives whole thoughts, usually two or three sentences. Only
+    /// reached after speech is running behind generation, so waiting this long
+    /// for text no longer risks a gap.
     pub min_chars: usize,
     /// Hard ceiling. Past this a cut is forced at the last clause boundary, or
     /// failing that the last space, so a wall of unpunctuated prose still
     /// speaks instead of buffering forever.
     pub max_chars: usize,
+    /// How fast the minimum grows per chunk, from [`Self::first_min_chars`] up
+    /// to [`Self::min_chars`].
+    ///
+    /// This is what keeps the queue fed across the opening hand-offs. A value of
+    /// `1.0` disables the ramp, so every chunk after the opener uses
+    /// [`Self::min_chars`] directly.
+    pub ramp_factor: f32,
+}
+
+impl ChunkPolicy {
+    /// Minimum length for the chunk that follows `chunks_spoken` already-spoken
+    /// chunks: the opener's own minimum, doubled per chunk (at the default
+    /// factor) until it reaches the steady-state minimum.
+    ///
+    /// At the defaults that is 24 → 48 → 96 → 140. The point is the *second*
+    /// value: playing a 24-character opener buys under two seconds, so the next
+    /// chunk has to be ready almost immediately. Asking for 140 characters there
+    /// guaranteed silence; asking for 48 keeps speech running while the buffer
+    /// builds the lead that makes the later, larger chunks safe.
+    pub fn min_chars_for(&self, chunks_spoken: usize) -> usize {
+        if chunks_spoken == 0 {
+            return self.first_min_chars;
+        }
+        let factor = self.ramp_factor as f64;
+        if !(factor > 1.0) {
+            return self.min_chars;
+        }
+        // Saturating by construction: `powi` overflows to infinity, which fails
+        // the comparison below and falls through to the steady-state minimum.
+        let grown = self.first_min_chars as f64 * factor.powi(chunks_spoken as i32);
+        if !grown.is_finite() || grown >= self.min_chars as f64 {
+            return self.min_chars;
+        }
+        (grown as usize).clamp(self.first_min_chars, self.min_chars)
+    }
 }
 
 impl Default for ChunkPolicy {
@@ -59,6 +104,7 @@ impl Default for ChunkPolicy {
             first_clause_chars: 90,
             min_chars: 140,
             max_chars: 400,
+            ramp_factor: 2.0,
         }
     }
 }
@@ -96,10 +142,10 @@ pub struct SpeechChunker {
     policy: ChunkPolicy,
     /// Raw model text not yet emitted.
     buf: String,
-    /// Whether anything has been spoken yet this turn, which selects the opening
-    /// pacing rules. Only chunks that survived sanitizing count, so a reply that
-    /// opens with a code block still gets a fast first *spoken* chunk.
-    spoke: bool,
+    /// How many chunks have been spoken this turn, which selects the pacing rule
+    /// for the next one. Only chunks that survived sanitizing count, so a reply
+    /// that opens with a code block still gets a fast first *spoken* chunk.
+    chunks_spoken: usize,
     /// Whether `buf` begins at the start of a line.
     ///
     /// Carried across cuts because a code fence is only a fence at a line start.
@@ -125,7 +171,7 @@ impl SpeechChunker {
         Self {
             policy,
             buf: String::new(),
-            spoke: false,
+            chunks_spoken: 0,
             at_line_start: true,
         }
     }
@@ -136,7 +182,7 @@ impl SpeechChunker {
     /// never reaches the transcript, so it must not reach the speaker either.
     pub fn reset(&mut self) {
         self.buf.clear();
-        self.spoke = false;
+        self.chunks_spoken = 0;
         self.at_line_start = true;
     }
 
@@ -154,7 +200,7 @@ impl SpeechChunker {
             let raw: String = self.buf.drain(..cut).collect();
             self.at_line_start = raw.ends_with('\n');
             if let Some(clean) = clean_chunk(&raw) {
-                self.spoke = true;
+                self.chunks_spoken += 1;
                 out.push(clean);
             }
         }
@@ -167,7 +213,12 @@ impl SpeechChunker {
     /// fence, so the sanitizer cannot recognise it as code and would otherwise
     /// read the block aloud.
     pub fn finish(&mut self) -> Vec<String> {
-        let scan = scan(&self.buf, &self.policy, self.spoke, self.at_line_start);
+        let scan = scan(
+            &self.buf,
+            &self.policy,
+            self.policy.min_chars_for(self.chunks_spoken),
+            self.at_line_start,
+        );
         if let Some(start) = scan.open_fence_start {
             self.buf.truncate(start);
         }
@@ -175,7 +226,7 @@ impl SpeechChunker {
         self.at_line_start = true;
         match clean_chunk(&raw) {
             Some(clean) => {
-                self.spoke = true;
+                self.chunks_spoken += 1;
                 vec![clean]
             }
             None => Vec::new(),
@@ -184,7 +235,8 @@ impl SpeechChunker {
 
     /// Byte offset to cut the buffer at, or `None` while more text is needed.
     fn next_cut(&self) -> Option<usize> {
-        let scan = scan(&self.buf, &self.policy, self.spoke, self.at_line_start);
+        let min_chars = self.policy.min_chars_for(self.chunks_spoken);
+        let scan = scan(&self.buf, &self.policy, min_chars, self.at_line_start);
 
         // Preferred: the earliest real sentence end at or past the minimum.
         if let Some(end) = scan.sentence_at_min {
@@ -192,7 +244,7 @@ impl SpeechChunker {
         }
         // Opening chunk only: a long first sentence is cut at a clause boundary
         // rather than making the user wait for the full stop.
-        if !self.spoke && scan.total_chars >= self.policy.first_clause_chars {
+        if self.chunks_spoken == 0 && scan.total_chars >= self.policy.first_clause_chars {
             if let Some(end) = scan.first_clause_at_min {
                 return Some(end);
             }
@@ -236,12 +288,10 @@ struct Scan {
 
 /// Single pass over `buf`, tracking Markdown structure so cuts are only offered
 /// at positions where the text can be safely sanitized in isolation.
-fn scan(buf: &str, policy: &ChunkPolicy, spoke: bool, starts_at_line_start: bool) -> Scan {
-    let min_chars = if spoke {
-        policy.min_chars
-    } else {
-        policy.first_min_chars
-    };
+///
+/// `min_chars` is the caller's already-resolved minimum for the chunk being cut
+/// (see [`ChunkPolicy::min_chars_for`]).
+fn scan(buf: &str, policy: &ChunkPolicy, min_chars: usize, starts_at_line_start: bool) -> Scan {
     let mut s = Scan::default();
 
     // Which delimiter opened the current fence. A fence must be closed by its
@@ -666,13 +716,55 @@ impl Drop for SpeechPipeline {
     }
 }
 
-/// Spawn the task that synthesizes remote chunks in order.
+/// How many chunks may be in synthesis at the same time for a remote engine.
 ///
-/// Deliberately sequential. Synthesizing a sentence is far faster than speaking
-/// it, so one request at a time still stays comfortably ahead of playback, while
-/// avoiding parallel requests keeps chunks in order, keeps request rate low, and
-/// is required for ElevenLabs Request Stitching, where each chunk is conditioned
-/// on the ids of the ones before it.
+/// Synthesis is a network round trip, and it used to be strictly serial: the
+/// request for sentence two was not sent until sentence one's audio had come
+/// back. Past the opening that is invisible, because the queue is far enough
+/// ahead to absorb it — but the *first* hand-off has no lead to absorb anything,
+/// so the round trip landed as audible silence right after the opening words.
+/// Starting the next request while the current one is still out removes it.
+///
+/// Two is enough. Speech consumes text several times slower than the model
+/// writes it, so a deeper pipeline would only do work that a Stop throws away.
+const SYNTH_LOOKAHEAD: usize = 2;
+
+/// Kick off synthesis for one chunk, handing back a receiver for its audio.
+///
+/// A separate task per chunk is what allows requests to overlap;
+/// [`spawn_remote_synthesis`] still consumes the receivers in order, so
+/// overlapping never reorders speech.
+fn spawn_chunk_synthesis(
+    settings: std::sync::Arc<crate::settings::AppSettings>,
+    text: String,
+    stitch_ids: Vec<String>,
+) -> tokio::sync::oneshot::Receiver<Result<crate::tts::SynthesizedSpeech, String>> {
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    tauri::async_runtime::spawn(async move {
+        let result = crate::tts::synthesize_speech(
+            &settings,
+            crate::tts::SpeechRequest {
+                text: &text,
+                previous_request_ids: &stitch_ids,
+            },
+        )
+        .await;
+        // A closed receiver means the reply was superseded; the audio is simply
+        // dropped.
+        let _ = tx.send(result);
+    });
+    rx
+}
+
+/// Spawn the task that synthesizes remote chunks and queues them for playback.
+///
+/// Chunks are always *played* in the order they arrive. Up to
+/// [`SYNTH_LOOKAHEAD`] of them may be *synthesized* concurrently so a round trip
+/// is spent while audio is playing rather than instead of it.
+///
+/// ElevenLabs is the exception and stays serial: Request Stitching conditions
+/// each chunk on the request ids of the ones before it, so its next request
+/// genuinely cannot be built until the current response has come back.
 fn spawn_remote_synthesis(
     app: tauri::AppHandle,
     settings: crate::settings::AppSettings,
@@ -682,23 +774,73 @@ fn spawn_remote_synthesis(
     tauri::async_runtime::spawn(async move {
         let device = settings.selected_output_device.clone();
         let volume = settings.audio_feedback_volume;
-        let mut stitch_ids: Vec<String> = Vec::new();
+        let stitching = settings.assistant_tts_engine == "elevenlabs";
+        // Shared with every synthesis task rather than cloned per chunk.
+        let settings = std::sync::Arc::new(settings);
+        let lookahead = if stitching { 1 } else { SYNTH_LOOKAHEAD };
 
-        while let Some(text) = rx.recv().await {
+        let mut stitch_ids: Vec<String> = Vec::new();
+        let mut inflight: std::collections::VecDeque<
+            tokio::sync::oneshot::Receiver<Result<crate::tts::SynthesizedSpeech, String>>,
+        > = std::collections::VecDeque::new();
+        // No further chunks will arrive; drain what is still being synthesized.
+        let mut closed = false;
+
+        loop {
             if crate::tts::current_epoch() != epoch {
                 break;
             }
-            let synthesized = crate::tts::synthesize_speech(
-                &settings,
-                crate::tts::SpeechRequest {
-                    text: &text,
-                    previous_request_ids: &stitch_ids,
-                },
-            )
-            .await;
 
-            match synthesized {
-                Ok(speech) => {
+            // Nothing out yet: wait for the next chunk, or finish the reply.
+            let Some(mut front) = inflight.pop_front() else {
+                if closed {
+                    break;
+                }
+                match rx.recv().await {
+                    Some(text) => {
+                        inflight.push_back(spawn_chunk_synthesis(
+                            settings.clone(),
+                            text,
+                            stitch_ids.clone(),
+                        ));
+                        continue;
+                    }
+                    None => break,
+                }
+            };
+
+            // While the oldest request is still out, accept the next chunk and
+            // start it too. `biased` keeps draining finished audio the priority,
+            // so a backlog is never left waiting behind new arrivals.
+            let may_overlap = !closed && inflight.len() + 1 < lookahead;
+            let finished = if may_overlap {
+                tokio::select! {
+                    biased;
+                    audio = &mut front => Some(audio),
+                    next = rx.recv() => {
+                        match next {
+                            Some(text) => inflight.push_back(spawn_chunk_synthesis(
+                                settings.clone(),
+                                text,
+                                stitch_ids.clone(),
+                            )),
+                            None => closed = true,
+                        }
+                        None
+                    }
+                }
+            } else {
+                Some((&mut front).await)
+            };
+
+            let Some(audio) = finished else {
+                // Still out. Back to the head of the queue so reading order holds.
+                inflight.push_front(front);
+                continue;
+            };
+
+            match audio {
+                Ok(Ok(speech)) => {
                     if let Some(id) = speech.request_id {
                         stitch_ids.push(id);
                     }
@@ -721,7 +863,7 @@ fn spawn_remote_synthesis(
                         break;
                     }
                 }
-                Err(e) => {
+                Ok(Err(e)) => {
                     log::error!("Streaming TTS request failed: {}", e);
                     // Report once and stop: a configuration failure (bad key,
                     // wrong voice) would otherwise repeat for every sentence.
@@ -730,6 +872,8 @@ fn spawn_remote_synthesis(
                     }
                     break;
                 }
+                // The synthesis task went away without answering.
+                Err(_) => break,
             }
         }
         crate::tts::finish_speech_stream(epoch);
@@ -762,12 +906,14 @@ mod tests {
     }
 
     /// Small thresholds so tests exercise boundary logic rather than sizing.
+    /// The ramp is disabled here for the same reason.
     fn eager() -> ChunkPolicy {
         ChunkPolicy {
             first_min_chars: 1,
             first_clause_chars: usize::MAX,
             min_chars: 1,
             max_chars: 10_000,
+            ramp_factor: 1.0,
         }
     }
 
@@ -901,6 +1047,8 @@ mod tests {
             first_clause_chars: 90,
             min_chars: 60,
             max_chars: 400,
+            // Ramp off: this test is about the opener/steady-state contrast.
+            ramp_factor: 1.0,
         };
         let text = "Sure thing. Alpha beta gamma. Delta epsilon zeta. Eta theta iota. Kappa.";
         let out = stream_chars(text, policy);
@@ -916,12 +1064,63 @@ mod tests {
     }
 
     #[test]
+    fn chunk_minimums_ramp_instead_of_jumping_to_the_steady_state() {
+        // Regression: the opener was cut at 24 characters while the *second*
+        // chunk had to reach 140 before it could be spoken. A 24-character
+        // opener is under two seconds of audio, so playback drained before six
+        // times that much text existed — heard as a handful of words followed by
+        // seconds of silence. The minimum now doubles per chunk instead.
+        let policy = ChunkPolicy::default();
+        assert_eq!(policy.min_chars_for(0), 24);
+        assert_eq!(policy.min_chars_for(1), 48);
+        assert_eq!(policy.min_chars_for(2), 96);
+        // Capped at the steady-state minimum once speech is safely behind.
+        assert_eq!(policy.min_chars_for(3), 140);
+        assert_eq!(policy.min_chars_for(9), 140);
+    }
+
+    #[test]
+    fn ramp_factor_of_one_keeps_the_flat_two_tier_sizing() {
+        let policy = ChunkPolicy {
+            ramp_factor: 1.0,
+            ..ChunkPolicy::default()
+        };
+        assert_eq!(policy.min_chars_for(0), 24);
+        assert_eq!(policy.min_chars_for(1), 140);
+    }
+
+    #[test]
+    fn the_second_chunk_follows_the_opener_closely() {
+        // The user-visible half of the ramp: a short reply is spoken as a run of
+        // chunks that grow, rather than a tiny opener and then one long wait.
+        // Under the old flat 140-character minimum the tail below arrived as a
+        // single chunk, so nothing was spoken between the opener and the end of
+        // generation.
+        let text = "Got it. The build failed. The linker cannot find the Vulkan SDK. \
+                    Install it and rerun the build. That should fix it.";
+        let out = stream_chars(text, ChunkPolicy::default());
+        assert_eq!(
+            out,
+            vec![
+                "Got it. The build failed.".to_string(),
+                "The linker cannot find the Vulkan SDK. Install it and rerun the build."
+                    .to_string(),
+                "That should fix it.".to_string(),
+            ]
+        );
+        // Each chunk is at least as long as the opener and no shorter than the
+        // one before it until the tail, so the queue keeps building a lead.
+        assert!(out[1].chars().count() > out[0].chars().count());
+    }
+
+    #[test]
     fn long_opening_sentence_falls_back_to_a_clause() {
         let policy = ChunkPolicy {
             first_min_chars: 10,
             first_clause_chars: 40,
             min_chars: 140,
             max_chars: 400,
+            ramp_factor: 2.0,
         };
         let mut chunker = SpeechChunker::with_policy(policy);
         let out = chunker.push(
@@ -941,6 +1140,7 @@ mod tests {
             first_clause_chars: 20,
             min_chars: 140,
             max_chars: 400,
+            ramp_factor: 2.0,
         };
         let mut chunker = SpeechChunker::with_policy(policy);
         let first = chunker.push("Right. Now");
@@ -960,6 +1160,7 @@ mod tests {
             first_clause_chars: usize::MAX,
             min_chars: 10,
             max_chars: 40,
+            ramp_factor: 2.0,
         };
         let mut chunker = SpeechChunker::with_policy(policy);
         let out = chunker.push(&"word ".repeat(20));
@@ -1022,6 +1223,7 @@ mod tests {
             first_clause_chars: usize::MAX,
             min_chars: 10,
             max_chars: 40,
+            ramp_factor: 2.0,
         };
         let mut chunker = SpeechChunker::with_policy(policy);
         let out = chunker.push(&format!("`{}", "word ".repeat(30)));
