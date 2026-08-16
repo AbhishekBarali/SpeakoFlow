@@ -2113,10 +2113,13 @@ async agentSessions() : Promise<Result<AgentSessionView[], string>> {
 },
 /**
  * Start a session in `cwd` with `task` as its first instruction.
+ * 
+ * `agent` names which CLI to drive ("kiro", "claude", "codex", …) and defaults
+ * to the configured or first installed one.
  */
-async agentSessionStart(cwd: string, task: string, label: string | null) : Promise<Result<string, string>> {
+async agentSessionStart(cwd: string, task: string, label: string | null, agent: string | null, createIfMissing: boolean | null, autoApprove: boolean | null, model: string | null, effort: string | null) : Promise<Result<string, string>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("agent_session_start", { cwd, task, label }) };
+    return { status: "ok", data: await TAURI_INVOKE("agent_session_start", { cwd, task, label, agent, createIfMissing, autoApprove, model, effort }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -2196,6 +2199,70 @@ async agentSessionResumeInTerminal(id: string) : Promise<Result<string, string>>
 }
 },
 /**
+ * Which agents are installed on this machine, for the picker.
+ */
+async agentAvailableAgents() : Promise<string[]> {
+    return await TAURI_INVOKE("agent_available_agents");
+},
+/**
+ * Send an instruction that interrupts whatever the session is doing.
+ * 
+ * The UI equivalent of saying "no, stop, do this instead". Queued delivery is
+ * [`agent_session_send`]; this one cancels the running turn first.
+ */
+async agentSessionInterruptWith(id: string, message: string) : Promise<Result<string, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("agent_session_interrupt_with", { id, message }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Switch a session's mode (Kiro exposes its agents this way).
+ */
+async agentSessionSetMode(id: string, mode: string) : Promise<Result<string, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("agent_session_set_mode", { id, mode }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * The modes a session offers.
+ */
+async agentSessionModes(id: string) : Promise<Result<string, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("agent_session_modes", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Turn automatic approval of safe actions on or off for one session.
+ */
+async agentSessionSetAutoApprove(id: string, enabled: boolean) : Promise<Result<string, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("agent_session_set_auto_approve", { id, enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Create a project folder under one of the allowed roots.
+ */
+async agentCreateProjectFolder(path: string) : Promise<Result<string, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("agent_create_project_folder", { path }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * Stub implementation for non-macOS platforms
  * Always returns false since laptop detection is macOS-specific
  */
@@ -2251,7 +2318,23 @@ toolError: string | null; error: string | null;
 /**
  * The prompt that started the session, trimmed.
  */
-task: string }
+task: string; 
+/**
+ * Which agent is behind this session, for the spoken summary.
+ */
+agent: string; 
+/**
+ * Cost and context usage as a ready-made phrase, when the agent volunteers
+ * them. A phrase rather than a number because agents do not agree on units:
+ * Kiro meters in credits, Claude in dollars, and a single `cost_usd` field
+ * holding either is a status report that lies.
+ */
+usage: string | null; 
+/**
+ * How many permission requests were answered automatically by policy.
+ * Surfaced so auto-approval is never silent.
+ */
+autoApprovals: number }
 /**
  * Where a session is, in the only terms a user cares about out loud.
  */
@@ -2371,7 +2454,17 @@ text_replacements?: Replacement[]; model_unload_timeout?: ModelUnloadTimeout;
  * sidecar) is unloaded to free RAM/VRAM. Mirrors `model_unload_timeout`
  * but applies to the LLM used for post-processing and the assistant.
  */
-local_llm_unload_timeout?: ModelUnloadTimeout; word_correction_threshold?: number; history_limit?: number; recording_retention_period?: RecordingRetentionPeriod; paste_method?: PasteMethod; clipboard_handling?: ClipboardHandling; auto_submit?: boolean; auto_submit_key?: AutoSubmitKey; post_process_enabled?: boolean; post_process_provider_id?: string; post_process_providers?: PostProcessProvider[]; post_process_api_keys?: SecretMap; post_process_models?: Partial<{ [key in string]: string }>; post_process_prompts?: LLMPrompt[]; post_process_selected_prompt_id?: string | null; post_process_tone?: PostProcessTone; 
+local_llm_unload_timeout?: ModelUnloadTimeout; 
+/**
+ * How long the **AI-cleanup** engine stays loaded after its last use.
+ * 
+ * Separate from `local_llm_unload_timeout` on purpose: cleanup runs on
+ * every dictation with a small model, while the assistant's model is larger
+ * and used in bursts. Keeping cleanup resident for longer costs a few
+ * hundred MB of RAM and no CPU at all (an idle engine does no work), and it
+ * removes the reload from the dictation path entirely.
+ */
+post_process_unload_timeout?: ModelUnloadTimeout; word_correction_threshold?: number; history_limit?: number; recording_retention_period?: RecordingRetentionPeriod; paste_method?: PasteMethod; clipboard_handling?: ClipboardHandling; auto_submit?: boolean; auto_submit_key?: AutoSubmitKey; post_process_enabled?: boolean; post_process_provider_id?: string; post_process_providers?: PostProcessProvider[]; post_process_api_keys?: SecretMap; post_process_models?: Partial<{ [key in string]: string }>; post_process_prompts?: LLMPrompt[]; post_process_selected_prompt_id?: string | null; post_process_tone?: PostProcessTone; 
 /**
  * User-created writing styles. Built-ins remain code-defined/localized and
  * are selected by their stable IDs.

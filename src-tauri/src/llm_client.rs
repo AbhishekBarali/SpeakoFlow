@@ -229,8 +229,31 @@ fn create_client(provider: &PostProcessProvider, api_key: &str) -> Result<reqwes
         }
     }
 
+    let client = build_client(provider, api_key)?;
+    if let Ok(mut cache) = CLIENT_CACHE.lock() {
+        // Guard against unbounded growth if a caller ever varies the key wildly.
+        if cache.len() >= 8 {
+            cache.clear();
+        }
+        cache.insert(key, client.clone());
+    }
+    Ok(client)
+}
+
+/// A client that shares no connection pool with the cached one.
+///
+/// Used for the single retry after a gateway-shaped rejection: the point of the
+/// retry is to not reuse whatever socket produced it.
+fn uncached_client(
+    provider: &PostProcessProvider,
+    api_key: &str,
+) -> Result<reqwest::Client, String> {
+    build_client(provider, api_key)
+}
+
+fn build_client(provider: &PostProcessProvider, api_key: &str) -> Result<reqwest::Client, String> {
     let headers = build_headers(provider, api_key)?;
-    let client = reqwest::Client::builder()
+    reqwest::Client::builder()
         .default_headers(headers)
         // HTTP/1.1 avoids h2 flow-control issues seen with some gateways
         // (Azure) on large bodies, e.g. multi-hundred-KB image payloads
@@ -246,16 +269,148 @@ fn create_client(provider: &PostProcessProvider, api_key: &str) -> Result<reqwes
         // the handshake instead of repeating it.
         .pool_idle_timeout(std::time::Duration::from_secs(90))
         .build()
-        .map_err(|e| format!("Failed to build HTTP client: {}", e))?;
+        .map_err(|e| format!("Failed to build HTTP client: {}", e))
+}
 
-    if let Ok(mut cache) = CLIENT_CACHE.lock() {
-        // Guard against unbounded growth if a caller ever varies the key wildly.
-        if cache.len() >= 8 {
-            cache.clear();
+/// Why a chat request did not come back with a usable response.
+pub(crate) enum ChatRequestFailure {
+    /// The client or request could not be constructed — a bad header value, say.
+    Build(String),
+    Transport(String),
+    Status {
+        status: u16,
+        detail: String,
+    },
+}
+
+impl ChatRequestFailure {
+    /// The wording the rest of the app shows or speaks.
+    fn message(&self) -> String {
+        match self {
+            Self::Build(detail) => format!("Request setup failed: {detail}"),
+            Self::Transport(detail) => format!("HTTP request failed: {detail}"),
+            Self::Status { status, detail } => {
+                format!("API request failed with status {status}: {detail}")
+            }
         }
-        cache.insert(key, client.clone());
     }
-    Ok(client)
+}
+
+/// Whether an error body came from an HTTP front end rather than the model API.
+///
+/// Every provider reports its own errors as JSON. An HTML error page means the
+/// request was rejected before anything looked at it — observed live on an Azure
+/// AI Foundry endpoint, which answered a vision turn with IIS/http.sys's
+/// "Bad Request - Invalid Verb" page while the identical URL accepted 400 KB
+/// bodies from curl moments later.
+///
+/// Two consequences. The HTML must never reach the panel or the text-to-speech
+/// engine, which would otherwise read out a DOCTYPE. And it earns exactly one
+/// retry on a connection that has nothing to do with the one that failed, since
+/// a socket a gateway has already half-closed produces this shape.
+fn is_gateway_html(body: &str) -> bool {
+    let head = body.trim_start().to_lowercase();
+    head.starts_with("<!doctype html")
+        || head.starts_with("<html")
+        || head.contains("microsoft-httpapi")
+        || head.contains("the request verb is invalid")
+}
+
+/// A sentence for a gateway rejection, in place of a page of markup.
+fn gateway_message(status: u16) -> String {
+    format!(
+        "The model provider's gateway rejected the request before the model saw it (HTTP {status}). \
+This is not an answer the model refused — it never got there. If it keeps happening on turns with \
+a screenshot, lower the screen-capture quality or try another provider."
+    )
+}
+
+/// Send one chat request, retrying once on a fresh connection when the response
+/// looks like it came from a front end rather than the API.
+///
+/// The body is serialised once and reused, both so the retry is byte-identical
+/// and so the size can be logged: when a request fails for reasons the provider
+/// will not explain, its shape is the only evidence there is, and reconstructing
+/// it after the fact is impossible.
+async fn send_chat_request(
+    provider: &PostProcessProvider,
+    api_key: &str,
+    url: &str,
+    request_body: &ChatCompletionRequest,
+) -> Result<reqwest::Response, ChatRequestFailure> {
+    let bytes = serde_json::to_vec(request_body)
+        .map_err(|e| ChatRequestFailure::Build(format!("could not encode the request: {e}")))?;
+    let images = count_image_parts(&request_body.messages);
+    debug!(
+        "Chat request to {}: {} message(s), {} image part(s), {} KB",
+        url,
+        request_body.messages.len(),
+        images,
+        bytes.len() / 1024
+    );
+
+    let client = create_client(provider, api_key).map_err(ChatRequestFailure::Build)?;
+    let failure = match client.post(url).body(bytes.clone()).send().await {
+        Ok(response) if response.status().is_success() => return Ok(response),
+        Ok(response) => {
+            let status = response.status().as_u16();
+            let detail = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Failed to read error response".to_string());
+            ChatRequestFailure::Status { status, detail }
+        }
+        Err(error) => ChatRequestFailure::Transport(error.to_string()),
+    };
+
+    // Only a gateway-shaped rejection is retried. A real API error (a bad model
+    // name, a rate limit, an oversized image the provider explains) would fail
+    // identically and the second attempt would only cost the user time.
+    let ChatRequestFailure::Status { status, detail } = &failure else {
+        return Err(failure);
+    };
+    if !is_gateway_html(detail) {
+        return Err(failure);
+    }
+    log::warn!(
+        "Provider gateway rejected the request with HTTP {} and an HTML page ({} message(s), {} image part(s), {} KB). Retrying once on a new connection.",
+        status,
+        request_body.messages.len(),
+        images,
+        bytes.len() / 1024
+    );
+
+    let fresh = uncached_client(provider, api_key).map_err(ChatRequestFailure::Build)?;
+    match fresh.post(url).body(bytes).send().await {
+        Ok(response) if response.status().is_success() => {
+            debug!("The retry on a fresh connection succeeded.");
+            Ok(response)
+        }
+        Ok(response) => {
+            let status = response.status().as_u16();
+            let detail = response.text().await.unwrap_or_default();
+            if is_gateway_html(&detail) {
+                // Twice, on two connections: the request itself is what the
+                // gateway objects to. Say that, rather than quoting its markup.
+                return Err(ChatRequestFailure::Status {
+                    status,
+                    detail: gateway_message(status),
+                });
+            }
+            Err(ChatRequestFailure::Status { status, detail })
+        }
+        Err(error) => Err(ChatRequestFailure::Transport(error.to_string())),
+    }
+}
+
+/// How many image parts a message list carries, for diagnostics.
+fn count_image_parts(messages: &[Value]) -> usize {
+    messages
+        .iter()
+        .filter_map(|message| message.get("content").and_then(Value::as_array))
+        .flatten()
+        .filter(|part| part.get("type").and_then(Value::as_str) == Some("image_url"))
+        .count()
 }
 
 /// If `raw` points at an Azure OpenAI–style host, return just the host. Covers
@@ -464,8 +619,6 @@ pub(crate) async fn send_chat_completion_with_schema_typed(
 
     debug!("Sending chat completion request to: {}", url);
 
-    let client = create_client(provider, &api_key).map_err(ChatCompletionError::RequestBuild)?;
-
     let mut messages = Vec::new();
     if let Some(system) = system_prompt {
         messages.push(serde_json::json!({"role": "system", "content": system}));
@@ -484,24 +637,15 @@ pub(crate) async fn send_chat_completion_with_schema_typed(
         },
     );
 
-    let response = client
-        .post(&url)
-        .json(&request_body)
-        .send()
+    let response = send_chat_request(provider, &api_key, &url, &request_body)
         .await
-        .map_err(|error| ChatCompletionError::Transport(error.to_string()))?;
-
-    let status = response.status();
-    if !status.is_success() {
-        let error_text = response
-            .text()
-            .await
-            .unwrap_or_else(|_| "Failed to read error response".to_string());
-        return Err(ChatCompletionError::HttpStatus {
-            status: status.as_u16(),
-            detail: error_text,
-        });
-    }
+        .map_err(|failure| match failure {
+            ChatRequestFailure::Build(detail) => ChatCompletionError::RequestBuild(detail),
+            ChatRequestFailure::Transport(detail) => ChatCompletionError::Transport(detail),
+            ChatRequestFailure::Status { status, detail } => {
+                ChatCompletionError::HttpStatus { status, detail }
+            }
+        })?;
 
     let completion: ChatCompletionResponse = response
         .json()
@@ -847,7 +991,6 @@ pub async fn send_chat_stream(
 
     debug!("Sending streaming chat completion request to: {}", url);
 
-    let client = create_client(provider, &api_key)?;
     let request_body = build_chat_completion_request(
         provider,
         model,
@@ -860,24 +1003,9 @@ pub async fn send_chat_stream(
         },
     );
 
-    let response = client
-        .post(&url)
-        .json(&request_body)
-        .send()
+    let response = send_chat_request(provider, &api_key, &url, &request_body)
         .await
-        .map_err(|e| format!("HTTP request failed: {}", e))?;
-
-    let status = response.status();
-    if !status.is_success() {
-        let error_text = response
-            .text()
-            .await
-            .unwrap_or_else(|_| "Failed to read error response".to_string());
-        return Err(format!(
-            "API request failed with status {}: {}",
-            status, error_text
-        ));
-    }
+        .map_err(|failure| failure.message())?;
 
     Ok(read_sse_round(response, on_token).await?.text)
 }
@@ -902,7 +1030,6 @@ pub async fn send_chat_stream_with_tools(
 ) -> Result<ToolStreamOutcome, String> {
     let base_url = effective_base_url(provider);
     let url = format!("{}/chat/completions", base_url);
-    let client = create_client(provider, &api_key)?;
     let request_body = build_chat_completion_request(
         provider,
         model,
@@ -917,24 +1044,9 @@ pub async fn send_chat_stream_with_tools(
         },
     );
 
-    let response = client
-        .post(&url)
-        .json(&request_body)
-        .send()
+    let response = send_chat_request(provider, &api_key, &url, &request_body)
         .await
-        .map_err(|e| format!("HTTP request failed: {}", e))?;
-
-    let status = response.status();
-    if !status.is_success() {
-        let error_text = response
-            .text()
-            .await
-            .unwrap_or_else(|_| "Failed to read error response".to_string());
-        return Err(format!(
-            "API request failed with status {}: {}",
-            status, error_text
-        ));
-    }
+        .map_err(|failure| failure.message())?;
 
     Ok(read_sse_round(response, on_token).await?.into())
 }

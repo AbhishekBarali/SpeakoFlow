@@ -5,7 +5,7 @@
 //! command is deliberately refused on the voice path, so the app has to provide
 //! a way to confirm it deliberately, with the command visible on screen.
 
-use crate::agents::{AgentManager, AgentSessionView};
+use crate::agents::{AgentManager, AgentSessionView, Delivery, StartRequest};
 use tauri::{AppHandle, Manager};
 
 /// Fetch the manager, or explain why it is missing rather than panicking.
@@ -22,15 +22,43 @@ pub fn agent_sessions(app: AppHandle) -> Result<Vec<AgentSessionView>, String> {
 }
 
 /// Start a session in `cwd` with `task` as its first instruction.
+///
+/// `agent` names which CLI to drive ("kiro", "claude", "codex", …) and defaults
+/// to the configured or first installed one.
 #[tauri::command]
 #[specta::specta]
+#[allow(clippy::too_many_arguments)]
 pub fn agent_session_start(
     app: AppHandle,
     cwd: String,
     task: String,
     label: Option<String>,
+    agent: Option<String>,
+    create_if_missing: Option<bool>,
+    auto_approve: Option<bool>,
+    model: Option<String>,
+    effort: Option<String>,
 ) -> Result<String, String> {
-    manager(&app)?.start(&app, &cwd, &task, label, None)
+    manager(&app)?.start(
+        &app,
+        StartRequest {
+            cwd: &cwd,
+            prompt: &task,
+            label,
+            model,
+            effort,
+            agent: agent.as_deref(),
+            create_if_missing: create_if_missing.unwrap_or(false),
+            auto_approve: auto_approve.unwrap_or(false),
+        },
+    )
+}
+
+/// Which agents are installed on this machine, for the picker.
+#[tauri::command]
+#[specta::specta]
+pub fn agent_available_agents() -> Vec<String> {
+    crate::agents::installed_agent_labels()
 }
 
 /// Send a follow-up instruction to a live session.
@@ -38,6 +66,52 @@ pub fn agent_session_start(
 #[specta::specta]
 pub fn agent_session_send(app: AppHandle, id: String, message: String) -> Result<String, String> {
     manager(&app)?.send(&app, &id, &message)
+}
+
+/// Send an instruction that interrupts whatever the session is doing.
+///
+/// The UI equivalent of saying "no, stop, do this instead". Queued delivery is
+/// [`agent_session_send`]; this one cancels the running turn first.
+#[tauri::command]
+#[specta::specta]
+pub fn agent_session_interrupt_with(
+    app: AppHandle,
+    id: String,
+    message: String,
+) -> Result<String, String> {
+    manager(&app)?.steer(&app, &id, &message, Delivery::Interrupt)
+}
+
+/// Switch a session's mode (Kiro exposes its agents this way).
+#[tauri::command]
+#[specta::specta]
+pub fn agent_session_set_mode(app: AppHandle, id: String, mode: String) -> Result<String, String> {
+    manager(&app)?.set_mode(&app, &id, &mode)
+}
+
+/// The modes a session offers.
+#[tauri::command]
+#[specta::specta]
+pub fn agent_session_modes(app: AppHandle, id: String) -> Result<String, String> {
+    manager(&app)?.modes_block(&id)
+}
+
+/// Turn automatic approval of safe actions on or off for one session.
+#[tauri::command]
+#[specta::specta]
+pub fn agent_session_set_auto_approve(
+    app: AppHandle,
+    id: String,
+    enabled: bool,
+) -> Result<String, String> {
+    manager(&app)?.set_auto_approve(&app, &id, enabled)
+}
+
+/// Create a project folder under one of the allowed roots.
+#[tauri::command]
+#[specta::specta]
+pub fn agent_create_project_folder(path: String) -> Result<String, String> {
+    crate::agents::create_folder(&path).map(|p| p.to_string_lossy().to_string())
 }
 
 /// Stop the current turn, leaving the session open for a new instruction.

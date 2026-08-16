@@ -17,6 +17,9 @@
 
 use std::path::PathBuf;
 
+/// The platform's `PATH` entry separator.
+const SEPARATOR: char = if cfg!(windows) { ';' } else { ':' };
+
 /// Environment variables the agent CLI needs that a stale app process is likely
 /// to be missing. Deliberately a fixed list rather than "everything": copying
 /// the whole user environment into a child is a good way to smuggle in surprises.
@@ -107,12 +110,16 @@ fn expand(raw: &str) -> String {
 
 /// A `PATH` a child process can actually rely on: the live one, plus both
 /// registry hives, in that order, deduplicated.
+///
+/// Joined with the platform's own separator. This matters: the result is handed
+/// to a child as its `PATH`, so a semicolon-joined value on Unix would give the
+/// child one nonsensical directory instead of many working ones.
 pub fn effective_path() -> String {
     let mut parts: Vec<String> = Vec::new();
     let mut seen: Vec<String> = Vec::new();
     let mut push_all = |value: Option<String>| {
         if let Some(value) = value {
-            for part in value.split(';') {
+            for part in value.split(SEPARATOR) {
                 let part = part.trim();
                 if part.is_empty() {
                     continue;
@@ -137,7 +144,90 @@ pub fn effective_path() -> String {
             "{root}\\System32;{root};{root}\\System32\\Wbem"
         )));
     }
-    parts.join(";")
+    parts.join(&SEPARATOR.to_string())
+}
+
+/// Every directory on the effective `PATH`, as paths.
+pub fn path_dirs() -> Vec<PathBuf> {
+    effective_path()
+        .split(SEPARATOR)
+        .map(str::trim)
+        .filter(|p| !p.is_empty())
+        .map(PathBuf::from)
+        .collect()
+}
+
+/// Find an executable by name, the way a shell would, but against the
+/// [`effective_path`] rather than whatever the app inherited.
+///
+/// On Windows the bare stem is tried with each of the extensions that make a
+/// file executable, because npm-installed CLIs are usually `.cmd` shims rather
+/// than `.exe` binaries.
+pub fn resolve_program(stem: &str) -> Option<PathBuf> {
+    let stem = stem.trim();
+    if stem.is_empty() {
+        return None;
+    }
+    // An absolute path needs no searching.
+    let direct = PathBuf::from(stem);
+    if direct.is_absolute() {
+        return direct.is_file().then_some(direct);
+    }
+
+    let mut names: Vec<String> = Vec::new();
+    #[cfg(windows)]
+    {
+        // `.exe` first: when both exist the native binary is the better target,
+        // and a `.cmd` shim needs a shell to run.
+        for extension in ["exe", "cmd", "bat", "com", ""] {
+            names.push(if extension.is_empty() {
+                stem.to_string()
+            } else {
+                format!("{stem}.{extension}")
+            });
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        names.push(stem.to_string());
+    }
+
+    let mut roots = well_known_bin_dirs();
+    roots.extend(path_dirs());
+    for root in roots {
+        for name in &names {
+            let candidate = root.join(name);
+            if candidate.is_file() {
+                return Some(candidate);
+            }
+        }
+    }
+    None
+}
+
+/// Directories that hold user-installed CLIs, checked before `PATH` so a broken
+/// `PATH` cannot break the feature.
+fn well_known_bin_dirs() -> Vec<PathBuf> {
+    let mut roots: Vec<PathBuf> = Vec::new();
+    if let Some(home) = resolve_var("USERPROFILE").or_else(|| resolve_var("HOME")) {
+        let home = PathBuf::from(home);
+        roots.push(home.join(".local").join("bin"));
+        roots.push(home.join(".claude").join("local"));
+        roots.push(home.join(".kiro").join("bin"));
+        roots.push(home.join("AppData").join("Roaming").join("npm"));
+        roots.push(home.join(".npm-global").join("bin"));
+        roots.push(home.join(".bun").join("bin"));
+        roots.push(home.join(".cargo").join("bin"));
+    }
+    if let Some(local) = resolve_var("LOCALAPPDATA") {
+        let local = PathBuf::from(local);
+        roots.push(local.join("Programs").join("claude"));
+        roots.push(local.join("Programs").join("kiro").join("bin"));
+        roots.push(local.join("Microsoft").join("WindowsApps"));
+    }
+    roots.push(PathBuf::from("/usr/local/bin"));
+    roots.push(PathBuf::from("/opt/homebrew/bin"));
+    roots
 }
 
 /// Provider credentials and settings to hand the child, taken from the registry
@@ -198,12 +288,7 @@ pub fn resolve_claude() -> Result<PathBuf, String> {
     roots.push(PathBuf::from("/usr/local/bin"));
     roots.push(PathBuf::from("/opt/homebrew/bin"));
 
-    for dir in effective_path().split(';') {
-        let dir = dir.trim();
-        if !dir.is_empty() {
-            roots.push(PathBuf::from(dir));
-        }
-    }
+    roots.extend(path_dirs());
 
     for root in roots {
         for name in names {

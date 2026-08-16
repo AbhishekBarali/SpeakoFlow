@@ -294,11 +294,10 @@ export const AgentsSettings: React.FC = () => {
                   <Button
                     size="sm"
                     variant="primary-soft"
-                    disabled={
-                      busy === `${session.id}:terminal` ||
-                      session.agentSessionId === null ||
-                      session.status === "handedOff"
-                    }
+                    // Deliberately still enabled once handed off: opening another
+                    // terminal is harmless, and disabling it turned a failed
+                    // handoff into a dead end with no way back.
+                    disabled={busy === `${session.id}:terminal`}
                     title={t("settings.agents.actions.terminalHint")}
                     onClick={() =>
                       void run(`${session.id}:terminal`, () =>

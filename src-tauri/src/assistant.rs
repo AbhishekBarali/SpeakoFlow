@@ -1782,7 +1782,7 @@ fn vision_unsupported_message(provider_id: &str, model: &str) -> String {
 /// `capture_screen` when the screen-access mode is Agent decides — explains
 /// when to reach for each, and (reusing the shared, TTS-aware directive) how
 /// to present web findings. Fixed text per flag combination → cache-safe.
-fn tools_system_section(web: bool, screen: bool, tts_enabled: bool) -> String {
+fn tools_system_section(web: bool, screen: bool, tts_enabled: bool, agents: bool) -> String {
     let mut s = String::from(
         "## Tools\n\
          You can call tools before answering; use one only when it genuinely helps, then reply normally.\n",
@@ -1790,7 +1790,8 @@ fn tools_system_section(web: bool, screen: bool, tts_enabled: bool) -> String {
     if web {
         s.push_str(
             "• web_search(query, freshness, news): live web results (titles + short snippets). Call it BEFORE answering any question about current, recent, or changeable facts — news, prices, sports scores, schedules, software versions, who currently holds a role or title, or recent events — because your training data has a fixed cutoff and may be out of date. For timeless things (definitions, concepts, math, coding, writing, translation, general how-to), answer directly without searching. Never claim you cannot access the internet.\n\
-             • get_current_datetime(): the user's current local date and time. Call it whenever you need the present moment — to say what day or time it is, or to turn a relative reference (today, yesterday, this week, how long until X) into a concrete date, including before building a web_search query.\n",
+             • get_current_datetime(): the user's current local date and time. Call it whenever you need the present moment — to say what day or time it is, or to turn a relative reference (today, yesterday, this week, how long until X) into a concrete date, including before building a web_search query.\n\
+             • Search budget: at most three search rounds for one question, and one query per round is usually enough. Do not keep refining the query hoping for a better hit — take what the snippets give you and answer. ALWAYS finish with a written reply, even when the results are thin: say what you found, and what stayed uncertain.\n",
         );
     }
     if screen {
@@ -1801,6 +1802,26 @@ fn tools_system_section(web: bool, screen: bool, tts_enabled: bool) -> String {
     if web {
         s.push('\n');
         s.push_str(&web_search::web_search_system_directive(tts_enabled));
+    }
+    if agents {
+        // Machine facts come first, because the failure this fixes was the
+        // assistant asking the user for their own username. Concrete paths in
+        // the prompt remove a whole class of question.
+        s.push('\n');
+        s.push('\n');
+        s.push_str(&crate::agents::machine_context());
+        s.push_str(
+            "\n\n## Driving coding agents\n\
+             You can run real coding agents on this machine and report on them out loud.\n\
+             • Build folder paths yourself from the machine facts above. Never ask for a username or home folder.\n\
+             • Answer every status question from list_agent_sessions, never from memory — the state changes constantly.\n\
+             • Refer to sessions the way the user does, by project or label, not by number, unless they used a number.\n\
+             • Keep spoken summaries short: what it is doing, what changed, whether it needs them. Never read out file paths character by character, tool ids, or code.\n\
+             • When the user redirects mid-task ('no, stop', 'wait', 'use X instead'), send the message with delivery 'interrupt'. When they add to the task ('also…', 'after that…'), use 'queue'. If it is genuinely unclear, queue it — interrupting destroys work in progress.\n\
+             • Never approve an agent's pending action unless the user decided to, and never before they know what the action is. Destructive actions are refused on this path by design; say so and point them to the app.\n\
+             • A running session is configurable, so never tell the user they must start a new session or a different agent to change something. Its model (set_agent_model), its thinking effort (set_agent_effort), and its mode or persona (set_agent_mode) all change in place, mid-task, without losing work. Its own commands are available through run_agent_command — 'compact' to reclaim a filling context window, 'context add <path>' to put a file in front of it, 'usage' for what it has spent. Use get_agent_controls when you need to know what a session currently has.\n\
+             • Only say something is impossible after a tool has told you so. If a session genuinely cannot do it, the tool says which one can.\n",
+        );
     }
     s
 }
@@ -2082,7 +2103,7 @@ fn agent_tool_defs() -> Vec<Value> {
             "type": "function",
             "function": {
                 "name": "start_agent_session",
-                "description": "Start a NEW coding agent working on a task in a folder. Call this when the user asks to build, fix, refactor, or investigate something in a project. Turn their spoken request into a clear, specific task description — keep every requirement they stated, drop the filler. Only call this when the user actually asked for work to be done; never start an agent to answer a question you could answer yourself.",
+                "description": "Start a NEW coding agent working on a task in a folder. Call this when the user asks to build, fix, refactor, or investigate something in a project. Turn their spoken request into a clear, specific task description — keep every requirement they stated, drop the filler. Only call this when the user actually asked for work to be done; never start an agent to answer a question you could answer yourself. You already know this machine's folder paths from the context above: build the path yourself instead of asking for it.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -2092,11 +2113,23 @@ fn agent_tool_defs() -> Vec<Value> {
                         },
                         "cwd": {
                             "type": "string",
-                            "description": "Absolute path of the project folder to work in."
+                            "description": "Absolute path of the project folder to work in. A bare folder name is treated as a new project in the default projects folder."
                         },
                         "label": {
                             "type": "string",
                             "description": "Optional short name for this session, so the user can refer to it later."
+                        },
+                        "agent": {
+                            "type": "string",
+                            "description": "Which coding agent to use, when the user named one: 'kiro', 'claude', 'codex', 'gemini', or 'copilot'. Leave empty to use the default."
+                        },
+                        "create_if_missing": {
+                            "type": "boolean",
+                            "description": "True if the folder may need creating — set this when the user asked for a NEW project or folder. False when they named a project that already exists."
+                        },
+                        "auto_approve": {
+                            "type": "boolean",
+                            "description": "True only if the user asked for it to run without interrupting them ('approve it for me', 'don't ask me', 'just do it', 'work unattended'). Safe reads and edits inside the project are then approved automatically; commands and deletes still stop for them."
                         }
                     },
                     "required": ["task", "cwd"]
@@ -2107,7 +2140,7 @@ fn agent_tool_defs() -> Vec<Value> {
             "type": "function",
             "function": {
                 "name": "send_agent_message",
-                "description": "Send a follow-up instruction to a coding-agent session that is already running or finished, for example a correction, an extra requirement, or an answer to a question it asked.",
+                "description": "Send a follow-up instruction to a coding-agent session: a correction, an extra requirement, or an answer to a question it asked. Choose 'delivery' carefully — it decides whether the agent's current work survives.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -2118,6 +2151,11 @@ fn agent_tool_defs() -> Vec<Value> {
                         "message": {
                             "type": "string",
                             "description": "What to tell the agent."
+                        },
+                        "delivery": {
+                            "type": "string",
+                            "enum": ["queue", "interrupt"],
+                            "description": "'interrupt' stops what the agent is doing right now and switches to this — use it when the user is correcting or redirecting ('no, stop', 'wait', 'use JWT instead'). 'queue' waits until the current work finishes — use it for additions ('also add tests', 'after that, update the docs'). When unsure, choose queue: interrupting throws away work in progress."
                         }
                     },
                     "required": ["message"]
@@ -2209,6 +2247,172 @@ fn agent_tool_defs() -> Vec<Value> {
                 }
             }
         }),
+        json!({
+            "type": "function",
+            "function": {
+                "name": "create_project_folder",
+                "description": "Create a folder for a new project. Use this when the user asks for a new folder or a new project and there is nothing there yet. A bare name goes into the default projects folder; 'desktop/name' and 'documents/name' go where they say. You do NOT need the user's username or home path — you already have them from the machine facts. Folders can only be created under the allowed roots listed there.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "path": {
+                            "type": "string",
+                            "description": "Folder to create: a bare name, a relative path like 'desktop/my-site', or an absolute path."
+                        }
+                    },
+                    "required": ["path"]
+                }
+            }
+        }),
+        json!({
+            "type": "function",
+            "function": {
+                "name": "create_file",
+                "description": "Create a NEW text file with the given contents, so an agent has something to start from. Refuses to touch a file that already exists — for changing an existing file, give the work to a coding agent instead.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "path": {
+                            "type": "string",
+                            "description": "Where the file goes: a bare name, 'desktop/notes.txt', or an absolute path."
+                        },
+                        "contents": {
+                            "type": "string",
+                            "description": "What to write into the file. May be empty."
+                        }
+                    },
+                    "required": ["path"]
+                }
+            }
+        }),
+        json!({
+            "type": "function",
+            "function": {
+                "name": "set_agent_mode",
+                "description": "Switch a coding-agent session into a different mode or persona — for example a planning mode, a research mode, or a read-only mode. Call it with no mode to list what that session offers instead. Only agents driven over ACP have modes.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "session": {
+                            "type": "string",
+                            "description": "Which session: its number, label, or part of its folder name."
+                        },
+                        "mode": {
+                            "type": "string",
+                            "description": "The mode to switch to. Leave empty to list the available modes."
+                        }
+                    }
+                }
+            }
+        }),
+        json!({
+            "type": "function",
+            "function": {
+                "name": "set_agent_auto_approve",
+                "description": "Turn automatic approval of safe actions on or off for one session. Call this whenever the user says they don't want to be asked about every step — 'approve it for me', 'approve things for me', 'stop asking me', 'just do it', 'you approve them', 'don't interrupt me' — or when they want to go back to approving things themselves. If the session is already waiting on a safe action, turning this on also approves that one. With it on, file reads and edits inside the project folder proceed silently; running commands, deleting, moving, and anything outside the project folder still stop and wait for them.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "session": {
+                            "type": "string",
+                            "description": "Which session: its number, label, or part of its folder name."
+                        },
+                        "enabled": {
+                            "type": "boolean",
+                            "description": "True to approve safe actions automatically, false to ask about everything."
+                        }
+                    },
+                    "required": ["enabled"]
+                }
+            }
+        }),
+        json!({
+            "type": "function",
+            "function": {
+                "name": "set_agent_model",
+                "description": "Change which AI model a coding-agent session uses, WITHOUT restarting it or losing its work. This works while the agent is mid-task: it finishes the switch and carries on. Call this whenever the user asks to change, switch, upgrade, or downgrade the model on a running session ('use Sonnet instead', 'switch it to a cheaper model', 'put it on Opus'). Never tell the user a new session is needed for this. Call it with no model to hear what the session currently uses and what it can switch to.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "session": {
+                            "type": "string",
+                            "description": "Which session: its number, label, or part of its folder name."
+                        },
+                        "model": {
+                            "type": "string",
+                            "description": "The model to switch to, as the user said it — 'sonnet', 'opus 5', 'gpt 5.6 luna'. Close is good enough; it is matched against the session's own list. Leave empty to list what is available."
+                        }
+                    }
+                }
+            }
+        }),
+        json!({
+            "type": "function",
+            "function": {
+                "name": "set_agent_effort",
+                "description": "Change how hard a coding-agent session's model thinks before acting — its reasoning or thinking effort. Use it when the user wants more care on a hard problem or more speed on an easy one ('think harder about this', 'put it on maximum effort', 'lower the effort, this is simple'). Typical levels are low, medium, high, xhigh and max, but the session's own list wins.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "session": {
+                            "type": "string",
+                            "description": "Which session: its number, label, or part of its folder name."
+                        },
+                        "effort": {
+                            "type": "string",
+                            "description": "The level to set: low, medium, high, xhigh, or max."
+                        }
+                    },
+                    "required": ["effort"]
+                }
+            }
+        }),
+        json!({
+            "type": "function",
+            "function": {
+                "name": "get_agent_controls",
+                "description": "Report what a coding-agent session can be told to change right now: its current model, thinking effort, mode, how full its context window is, and which of its own slash commands are available. Call this when the user asks what model it is on, how much context is left, what it can do, or what you can change about it.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "session": {
+                            "type": "string",
+                            "description": "Which session: its number, label, or part of its folder name."
+                        }
+                    }
+                }
+            }
+        }),
+        json!({
+            "type": "function",
+            "function": {
+                "name": "run_agent_command",
+                "description": "Run one of the coding agent's own slash commands on a session — the controls a person at the terminal would use. The most useful ones: 'compact' summarises the conversation to free up context when it is filling up; 'context' with args 'add <path>' puts a file permanently in front of the agent; 'usage' reports what it has spent; 'tools' lists what it can do; 'mcp' lists its connected servers. Call get_agent_controls first if you are unsure which commands this session has. Commands that throw work away or switch off approvals (clear, rewind, quit, trust-all) are refused on purpose.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "session": {
+                            "type": "string",
+                            "description": "Which session: its number, label, or part of its folder name."
+                        },
+                        "command": {
+                            "type": "string",
+                            "description": "The command name, with or without the leading slash: 'compact', 'context', 'usage', 'tools'."
+                        },
+                        "args": {
+                            "type": "string",
+                            "description": "Anything the command needs after its name, for example 'add src/main.rs' for the context command. Leave empty when it takes nothing."
+                        },
+                        "delivery": {
+                            "type": "string",
+                            "enum": ["queue", "interrupt"],
+                            "description": "'queue' runs the command after the agent's current work finishes, which is almost always right. 'interrupt' stops the current work to run it now — only when the user is explicit about doing it immediately."
+                        }
+                    },
+                    "required": ["command"]
+                }
+            }
+        }),
     ]
 }
 
@@ -2250,6 +2454,18 @@ fn tool_round_policy(round: &llm_client::ToolStreamOutcome, round_index: usize) 
     } else {
         ToolRoundPolicy::RunToolsThenStop
     }
+}
+
+/// Whether a finished tool loop needs one more request with no tools attached.
+///
+/// A round that ends in tool calls writes no prose of its own, and some
+/// providers end a "final" round with neither tool calls nor text (a reasoning
+/// model that spent its whole response budget thinking), so the loop can fall
+/// out of any of its exits with nothing to show. Both cases looked the same from
+/// the panel: it searched, it loaded, it answered nothing. One tool-free
+/// follow-up makes the model answer from what it already fetched.
+fn needs_toolless_followup(used_tools: bool, answer: &str) -> bool {
+    used_tools && answer.trim().is_empty()
 }
 
 /// Stage timings for one turn.
@@ -2321,18 +2537,39 @@ async fn run_text_tool(
             web_search::format_results_for_prompt(&results, budget)
         }
         "get_current_datetime" => current_datetime_line(),
-        "list_agent_sessions"
-        | "get_agent_session"
-        | "start_agent_session"
-        | "send_agent_message"
-        | "cancel_agent_session"
-        | "answer_agent_permission"
-        | "close_agent_session"
-        | "resume_agent_in_terminal"
-        | "open_agent_folder" => run_agent_tool(app, name, arguments),
+        name if AGENT_TOOLS.contains(&name) => run_agent_tool(app, name, arguments),
         other => format!("Unknown tool '{}'.", other),
     }
 }
+
+/// Every tool name [`run_agent_tool`] handles.
+///
+/// One list, used both to route calls and to assert in tests that everything
+/// `agent_tool_defs` advertises can actually run. That drift was not
+/// theoretical: `create_project_folder`, `create_file`, `set_agent_mode` and
+/// `set_agent_auto_approve` were all offered to the model while the router
+/// answered "Unknown tool", so "make me a folder on the desktop" and "approve
+/// things for me" — the two requests the feature was built for — reached a dead
+/// end that looked, to the model, like a tool it had imagined.
+const AGENT_TOOLS: &[&str] = &[
+    "list_agent_sessions",
+    "get_agent_session",
+    "start_agent_session",
+    "send_agent_message",
+    "cancel_agent_session",
+    "answer_agent_permission",
+    "close_agent_session",
+    "resume_agent_in_terminal",
+    "open_agent_folder",
+    "create_project_folder",
+    "create_file",
+    "set_agent_mode",
+    "set_agent_model",
+    "set_agent_effort",
+    "get_agent_controls",
+    "run_agent_command",
+    "set_agent_auto_approve",
+];
 
 /// Dispatch one managed coding-agent tool call.
 ///
@@ -2365,7 +2602,28 @@ fn run_agent_tool(app: &AppHandle, name: &str, arguments: &str) -> String {
                     .to_string();
             };
             let label = crate::agents::arg_str(arguments, &["label", "name"]);
-            match manager.start(app, &cwd, &task, label, None) {
+            let agent = crate::agents::arg_str(arguments, &["agent", "cli", "tool"]);
+            let create_if_missing =
+                crate::agents::arg_bool(arguments, &["create_if_missing", "create", "make_folder"])
+                    .unwrap_or(false);
+            let auto_approve =
+                crate::agents::arg_bool(arguments, &["auto_approve", "unattended", "hands_off"])
+                    .unwrap_or(false);
+            let model = crate::agents::arg_str(arguments, &["model", "llm"]);
+            let effort = crate::agents::arg_str(arguments, &["effort", "thinking", "reasoning"]);
+            match manager.start(
+                app,
+                crate::agents::StartRequest {
+                    cwd: &cwd,
+                    prompt: &task,
+                    label,
+                    model,
+                    effort,
+                    agent: agent.as_deref(),
+                    create_if_missing,
+                    auto_approve,
+                },
+            ) {
                 Ok(id) => format!(
                     "Started agent session [{}] in {}. It is working now; the user can ask for its status at any time.",
                     id, cwd
@@ -2379,7 +2637,127 @@ fn run_agent_tool(app: &AppHandle, name: &str, arguments: &str) -> String {
             else {
                 return "No message was provided to send.".to_string();
             };
-            match manager.send(app, &which, &message) {
+            // How the message is delivered is the interesting decision. The model
+            // may state it outright; otherwise the wording decides, and anything
+            // ambiguous queues rather than destroying work in progress.
+            let delivery = match crate::agents::arg_str(arguments, &["delivery", "mode", "when"]) {
+                Some(explicit) => {
+                    let explicit = explicit.to_lowercase();
+                    if explicit.contains("interrupt")
+                        || explicit.contains("now")
+                        || explicit.contains("immediate")
+                    {
+                        crate::agents::Delivery::Interrupt
+                    } else {
+                        crate::agents::Delivery::Queue
+                    }
+                }
+                None => crate::agents::Delivery::from_spoken(&message),
+            };
+            match manager.steer(app, &which, &message, delivery) {
+                Ok(ok) => ok,
+                Err(e) => e,
+            }
+        }
+        "create_project_folder" => {
+            let Some(path) = crate::agents::arg_str(
+                arguments,
+                &["path", "folder", "name", "directory", "project"],
+            ) else {
+                return "No folder name was provided.".to_string();
+            };
+            match crate::agents::create_folder(&path) {
+                Ok(created) => format!(
+                    "Created the folder {}. It is ready for an agent session.",
+                    created.display()
+                ),
+                Err(e) => e,
+            }
+        }
+        "create_file" => {
+            let Some(path) =
+                crate::agents::arg_str(arguments, &["path", "file", "name", "file_path"])
+            else {
+                return "No file name was provided.".to_string();
+            };
+            let contents =
+                crate::agents::arg_str(arguments, &["contents", "content", "text", "body"])
+                    .unwrap_or_default();
+            match crate::agents::create_file(&path, &contents) {
+                Ok(created) => format!("Created {}.", created.display()),
+                Err(e) => e,
+            }
+        }
+        "set_agent_mode" => {
+            let Some(mode) = crate::agents::arg_str(arguments, &["mode", "persona", "agent_mode"])
+            else {
+                return match manager.modes_block(&which) {
+                    Ok(list) => list,
+                    Err(e) => e,
+                };
+            };
+            match manager.set_mode(app, &which, &mode) {
+                Ok(ok) => ok,
+                Err(e) => e,
+            }
+        }
+        "set_agent_model" => {
+            let Some(model) = crate::agents::arg_str(arguments, &["model", "llm", "name"]) else {
+                // No model named is a question, not a failure: "what model is it
+                // on?" reaches this tool too.
+                return match manager.controls_block(&which) {
+                    Ok(block) => block,
+                    Err(e) => e,
+                };
+            };
+            match manager.set_model(app, &which, &model) {
+                Ok(ok) => ok,
+                Err(e) => e,
+            }
+        }
+        "set_agent_effort" => {
+            let Some(effort) =
+                crate::agents::arg_str(arguments, &["effort", "level", "thinking", "reasoning"])
+            else {
+                return "It wasn't clear which effort level to set.".to_string();
+            };
+            match manager.set_effort(app, &which, &effort) {
+                Ok(ok) => ok,
+                Err(e) => e,
+            }
+        }
+        "get_agent_controls" => match manager.controls_block(&which) {
+            Ok(block) => block,
+            Err(e) => e,
+        },
+        "run_agent_command" => {
+            let Some(command) =
+                crate::agents::arg_str(arguments, &["command", "name", "slash_command"])
+            else {
+                return "Which command should it run?".to_string();
+            };
+            let args =
+                crate::agents::arg_str(arguments, &["args", "arguments", "argument", "rest"]);
+            // Same conservative default as steering: a command that waits is
+            // recoverable, a command that cancelled the turn is not.
+            let delivery = match crate::agents::arg_str(arguments, &["delivery", "priority"]) {
+                Some(explicit) if explicit.to_lowercase().contains("interrupt") => {
+                    crate::agents::Delivery::Interrupt
+                }
+                _ => crate::agents::Delivery::Queue,
+            };
+            match manager.run_command(app, &which, &command, args.as_deref(), delivery) {
+                Ok(ok) => ok,
+                Err(e) => e,
+            }
+        }
+        "set_agent_auto_approve" => {
+            let Some(enabled) =
+                crate::agents::arg_bool(arguments, &["enabled", "on", "auto_approve", "allow"])
+            else {
+                return "It wasn't clear whether to turn auto-approval on or off.".to_string();
+            };
+            match manager.set_auto_approve(app, &which, enabled) {
                 Ok(ok) => ok,
                 Err(e) => e,
             }
@@ -2703,6 +3081,7 @@ pub async fn run_assistant_turn(
                 web_via_tools,
                 agent_screen,
                 settings.assistant_tts_enabled,
+                agent_sessions,
             ));
         } else if web_via_online {
             sections.push(web_search::WEB_SEARCH_CAPABILITY_NOTE.to_string());
@@ -2937,6 +3316,9 @@ pub async fn run_assistant_turn(
             let mut answer = String::new();
             // At most one agent-decided screenshot per user message.
             let mut screen_captured = false;
+            // Whether any round actually ran tools. Decides whether an empty
+            // final answer is worth one no-tools retry (see after the loop).
+            let mut used_tools = false;
             // A small round cap: one search round covers almost every question;
             // the cap just prevents a pathological tool-call loop.
             for round_index in 0..MAX_ASSISTANT_TOOL_ROUNDS {
@@ -2965,6 +3347,7 @@ pub async fn run_assistant_turn(
                     answer = round_out.text;
                     break;
                 }
+                used_tools = true;
                 // This round's text is about to be replaced by the next round's,
                 // so drop whatever it buffered but has not spoken. Nothing is
                 // said in its place: while a tool runs the turn simply waits,
@@ -3105,35 +3488,31 @@ pub async fn run_assistant_turn(
                 emit_state(&app_state, "thinking");
                 answer = round_out.text;
                 if round_policy == ToolRoundPolicy::RunToolsThenStop {
-                    // Out of tool rounds. `round_out.text` is normally EMPTY
-                    // here — a round that ends in tool calls usually writes no
-                    // prose — so stopping now ends the turn with no reply at
-                    // all, which is what a question that "got searched and then
-                    // never answered" looked like. Ask once more with no tools
-                    // attached, so the model has to answer from what it already
-                    // fetched instead of reaching for another search.
-                    if answer.trim().is_empty() {
-                        debug!(
-                            "Tool rounds exhausted with no answer text; asking once more without tools"
-                        );
-                        answer = llm_client::send_chat_stream(
-                            &provider_c,
-                            api_key_c.clone(),
-                            &model_c,
-                            msgs.clone(),
-                            None,
-                            None,
-                            assistant_token_sink(
-                                app_tokens.clone(),
-                                partial_cb.clone(),
-                                speech_cb.clone(),
-                                timer.clone(),
-                            ),
-                        )
-                        .await?;
-                    }
                     break;
                 }
+            }
+            // A round that ends in tool calls normally writes no prose of its
+            // own, and a "final" round can come back empty as well, so the loop
+            // can leave every one of its exits with nothing to show. Ask once
+            // more with no tools attached so the model has to answer from what
+            // it already fetched instead of reaching for another search.
+            if needs_toolless_followup(used_tools, &answer) {
+                debug!("Tool loop produced no answer text; asking once more without tools");
+                answer = llm_client::send_chat_stream(
+                    &provider_c,
+                    api_key_c.clone(),
+                    &model_c,
+                    msgs.clone(),
+                    None,
+                    None,
+                    assistant_token_sink(
+                        app_tokens.clone(),
+                        partial_cb.clone(),
+                        speech_cb.clone(),
+                        timer.clone(),
+                    ),
+                )
+                .await?;
             }
             Ok::<String, String>(answer)
         };
@@ -3203,6 +3582,22 @@ pub async fn run_assistant_turn(
             emit_conversation(&app);
             persist_assistant_session(&app);
             debug!("Assistant turn cancelled by user");
+        }
+        // The turn "succeeded" with nothing written. Storing that leaves a blank
+        // bubble in the panel — the failure that looks like a crash — and carries
+        // an empty assistant turn into the next request's context. Say so
+        // instead, and leave the conversation as it was.
+        Some(Ok(full_text)) if full_text.trim().is_empty() => {
+            close_speech();
+            warn!(
+                "Assistant produced an empty reply (provider '{}', model '{}')",
+                provider.id, model
+            );
+            emit_error(
+                &app,
+                "empty_reply",
+                "The model ended the turn without writing a reply.".to_string(),
+            );
         }
         Some(Ok(full_text)) => {
             {
@@ -3679,6 +4074,45 @@ mod tests {
     use super::*;
     use crate::llm_client::{ChatRound, ToolCall, ToolStreamOutcome};
 
+    #[test]
+    fn every_advertised_agent_tool_is_routed() {
+        // Four tools were offered to the model while the router answered "Unknown
+        // tool": creating a folder, creating a file, switching mode, and turning
+        // on auto-approval. From the model's side that is indistinguishable from
+        // having imagined the tool, so it apologises or invents a result — which
+        // is exactly what "it said it made the folder but nothing was there"
+        // looks like from the outside. One list, asserted here, prevents the
+        // same drift the next time a tool is added.
+        for def in agent_tool_defs() {
+            let name = def
+                .pointer("/function/name")
+                .and_then(Value::as_str)
+                .expect("every tool definition has a name");
+            assert!(
+                AGENT_TOOLS.contains(&name),
+                "{name} is advertised to the model but run_text_tool does not route it"
+            );
+        }
+    }
+
+    #[test]
+    fn the_router_lists_nothing_that_does_not_exist() {
+        let advertised: Vec<String> = agent_tool_defs()
+            .iter()
+            .filter_map(|def| {
+                def.pointer("/function/name")
+                    .and_then(Value::as_str)
+                    .map(str::to_string)
+            })
+            .collect();
+        for name in AGENT_TOOLS {
+            assert!(
+                advertised.iter().any(|a| a == name),
+                "{name} is routed but never advertised, so nothing can call it"
+            );
+        }
+    }
+
     fn screen_inputs() -> VoiceScreenPlanInputs {
         VoiceScreenPlanInputs {
             screen_access_mode: AssistantScreenAccessMode::Manual,
@@ -3884,6 +4318,14 @@ mod tests {
                 "close_agent_session",
                 "resume_agent_in_terminal",
                 "open_agent_folder",
+                "create_project_folder",
+                "create_file",
+                "set_agent_mode",
+                "set_agent_auto_approve",
+                "set_agent_model",
+                "set_agent_effort",
+                "get_agent_controls",
+                "run_agent_command",
             ]
         );
 
@@ -3900,7 +4342,9 @@ mod tests {
             &names[..3],
             &["web_search", "get_current_datetime", "capture_screen"]
         );
-        assert_eq!(names.len(), 12);
+        // Derived rather than hardcoded: the exact number is not the contract,
+        // "the three baseline tools plus every agent tool" is.
+        assert_eq!(names.len(), 3 + agent_tool_defs().len());
 
         // Every agent tool must declare an object schema, or strict providers
         // reject the request outright.
@@ -3963,6 +4407,28 @@ mod tests {
             tool_round_policy(&tool_round, MAX_ASSISTANT_TOOL_ROUNDS - 1),
             ToolRoundPolicy::RunToolsThenStop
         );
+    }
+
+    /// The "it searched and then said nothing" regression. Every way the loop
+    /// can end without prose has to ask once more with no tools attached; a turn
+    /// that already wrote an answer must not pay for a second request.
+    #[test]
+    fn a_tool_loop_that_ends_without_prose_asks_again_without_tools() {
+        // Rounds exhausted on a tool call: the round carries no text.
+        assert!(needs_toolless_followup(true, ""));
+        // Whitespace-only is just as blank to the reader.
+        assert!(needs_toolless_followup(true, "  \n "));
+        // A "final" round with neither tool calls nor text lands here too.
+        let empty_final: ToolStreamOutcome = ChatRound::default().into();
+        assert_eq!(
+            tool_round_policy(&empty_final, 0),
+            ToolRoundPolicy::FinalResponse
+        );
+        assert!(needs_toolless_followup(true, &empty_final.text));
+
+        // Already answered, or never used a tool: no extra request.
+        assert!(!needs_toolless_followup(true, "Here's what I found."));
+        assert!(!needs_toolless_followup(false, ""));
     }
 
     #[test]

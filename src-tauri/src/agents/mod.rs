@@ -39,7 +39,143 @@ use std::sync::{Arc, Mutex};
 use std::time::Instant;
 use tauri::{AppHandle, Emitter};
 
+mod acp;
 mod env;
+mod policy;
+mod registry;
+mod workspace;
+
+pub use policy::ApprovalPolicy;
+pub use registry::{AgentKind, Transport};
+pub use workspace::{create_file, create_folder, machine_context};
+
+/// Spoken names of every coding agent installed on this machine.
+pub fn installed_agent_labels() -> Vec<String> {
+    registry::installed()
+        .iter()
+        .map(|a| a.label().to_string())
+        .collect()
+}
+
+/// How a new instruction should reach a session that is already working.
+///
+/// ACP has no way to slip a message into a running turn — `session/cancel` is
+/// the only interrupt — so the choice is real and it matters: interrupting
+/// throws away whatever the agent was part-way through, and queueing makes the
+/// user wait. Every other tool in this space makes the human pick with a
+/// modifier key. We are listening to a sentence, so we can read the intent out
+/// of how it was said, which is the one thing voice is genuinely better at.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Delivery {
+    /// Deliver after the current turn finishes. The safe default.
+    Queue,
+    /// Cancel the running turn and deliver immediately.
+    Interrupt,
+}
+
+impl Delivery {
+    /// Read the intent out of what the user said.
+    ///
+    /// Deliberately conservative and deliberately deterministic. Conservative
+    /// because the costs are lopsided: a wrongly queued message wastes a little
+    /// time, while a wrongly interrupted turn destroys work in progress — so
+    /// anything ambiguous queues. Deterministic because "stop" must not wait on
+    /// a model round trip to be understood, and because a hard-coded list of
+    /// stop words is auditable in a way an LLM's judgement is not.
+    ///
+    /// The assistant may still override this when a sentence needs real
+    /// understanding; this is the floor, not the ceiling.
+    pub fn from_spoken(text: &str) -> Self {
+        let lowered = text.trim().to_lowercase();
+        if lowered.is_empty() {
+            return Delivery::Queue;
+        }
+
+        // "also", "after that", "and then" — explicitly about what comes next,
+        // even when the sentence also contains a stop word ("after that, stop
+        // the dev server"). Checked first for exactly that reason.
+        const DEFERRING: [&str; 9] = [
+            "after that",
+            "after this",
+            "afterwards",
+            "when you're done",
+            "when you are done",
+            "when that's done",
+            "and then",
+            "next, ",
+            "also ",
+        ];
+        if DEFERRING.iter().any(|marker| lowered.contains(marker)) {
+            return Delivery::Queue;
+        }
+
+        // Spoken corrections front-load the stop word: people say "stop, do X",
+        // not "do X, stop". So position carries the meaning, and matching these
+        // anywhere in the sentence is what made "make it wait for the response"
+        // read as an interrupt. Leading position only.
+        let mut head = lowered.as_str();
+        for filler in [
+            "um,", "um ", "uh,", "uh ", "okay,", "okay ", "ok,", "ok ", "so,", "so ", "hey ",
+            "yeah,", "yeah ", "hmm,", "hmm ",
+        ] {
+            if let Some(rest) = head.strip_prefix(filler) {
+                head = rest.trim_start();
+            }
+        }
+        const HALTING_LEAD: [&str; 20] = [
+            "stop",
+            "wait",
+            "hold on",
+            "hang on",
+            "hold up",
+            "no",
+            "nope",
+            "nah",
+            "actually",
+            "cancel",
+            "forget",
+            "scrap",
+            "never mind",
+            "nevermind",
+            "abort",
+            "halt",
+            "don't",
+            "dont",
+            "do not",
+            "instead",
+        ];
+        for marker in HALTING_LEAD {
+            if head == marker {
+                return Delivery::Interrupt;
+            }
+            if let Some(rest) = head.strip_prefix(marker) {
+                // A real word boundary, so "not sure" and "now do X" are not
+                // read as "no", and "nonstop" is not read as "stop".
+                if rest.starts_with(|c: char| !c.is_alphanumeric() && c != '\'') {
+                    return Delivery::Interrupt;
+                }
+            }
+        }
+
+        // A few phrases mean "abandon that" wherever they appear.
+        const HALTING_ANYWHERE: [&str; 6] = [
+            "cancel that",
+            "forget that",
+            "scrap that",
+            "never mind that",
+            "instead of",
+            "stop doing",
+        ];
+        if HALTING_ANYWHERE
+            .iter()
+            .any(|marker| lowered.contains(marker))
+        {
+            return Delivery::Interrupt;
+        }
+
+        Delivery::Queue
+    }
+}
 
 /// Environment override for the model handed to the agent CLI.
 ///
@@ -48,6 +184,14 @@ mod env;
 /// generated frontend bindings before the shape has settled. When unset the
 /// agent uses whatever its own config selects.
 const MODEL_ENV: &str = "SPEAKOFLOW_AGENT_MODEL";
+
+/// Default reasoning effort for new sessions, when the agent supports one.
+///
+/// Same reasoning as [`MODEL_ENV`]: an override for now, not a settings field.
+/// Kiro's ladder is `low`, `medium`, `high`, `xhigh`, `max`; the spec's
+/// equivalent is a `thought_level` config option, whose values are the agent's
+/// to name.
+const EFFORT_ENV: &str = "SPEAKOFLOW_AGENT_EFFORT";
 
 /// Cap on how much of an assistant line we keep for the spoken summary.
 const LINE_BUDGET: usize = 220;
@@ -141,6 +285,16 @@ pub struct AgentSessionView {
     pub error: Option<String>,
     /// The prompt that started the session, trimmed.
     pub task: String,
+    /// Which agent is behind this session, for the spoken summary.
+    pub agent: String,
+    /// Cost and context usage as a ready-made phrase, when the agent volunteers
+    /// them. A phrase rather than a number because agents do not agree on units:
+    /// Kiro meters in credits, Claude in dollars, and a single `cost_usd` field
+    /// holding either is a status report that lies.
+    pub usage: Option<String>,
+    /// How many permission requests were answered automatically by policy.
+    /// Surfaced so auto-approval is never silent.
+    pub auto_approvals: u32,
 }
 
 /// Internal mutable state, kept behind a mutex and updated by the reader thread.
@@ -162,6 +316,9 @@ struct SessionState {
     tool_error: Option<String>,
     error: Option<String>,
     task: String,
+    agent: AgentKind,
+    usage: Option<String>,
+    auto_approvals: u32,
 }
 
 impl SessionState {
@@ -183,6 +340,9 @@ impl SessionState {
             tool_error: self.tool_error.clone(),
             error: self.error.clone(),
             task: self.task.clone(),
+            agent: self.agent.label().to_string(),
+            usage: self.usage.clone(),
+            auto_approvals: self.auto_approvals,
         }
     }
 }
@@ -191,8 +351,34 @@ impl SessionState {
 struct Session {
     state: Arc<Mutex<SessionState>>,
     /// Held separately so the reader thread never blocks a writer.
+    ///
+    /// Empty for ACP sessions, whose writes all go through [`acp::AcpHandle`].
     stdin: Arc<Mutex<Option<ChildStdin>>>,
     child: Arc<Mutex<Child>>,
+    /// The protocol client, for every agent except native Claude Code.
+    acp: Option<Arc<acp::AcpHandle>>,
+}
+
+/// What to start, and how.
+///
+/// A struct rather than eight positional arguments, because the list grew a
+/// "which agent" and a "create the folder" and will grow more.
+pub struct StartRequest<'a> {
+    /// Working directory for the agent.
+    pub cwd: &'a str,
+    /// The first turn.
+    pub prompt: &'a str,
+    /// Spoken name for the session. Defaults to the folder name.
+    pub label: Option<String>,
+    pub model: Option<String>,
+    /// Reasoning effort for this session, where the agent has one.
+    pub effort: Option<String>,
+    /// Which agent to use. `None` picks the configured or first installed one.
+    pub agent: Option<&'a str>,
+    /// Create `cwd` if it does not exist. Only ever set from an explicit request.
+    pub create_if_missing: bool,
+    /// Answer safe permission requests automatically for this session.
+    pub auto_approve: bool,
 }
 
 /// The write end and process handle of one session.
@@ -218,26 +404,64 @@ impl AgentManager {
         Self::default()
     }
 
-    /// Start a new agent session in `cwd` and send `prompt` as its first turn.
+    /// Start a new agent session and send its first turn.
     ///
     /// Returns the short session id. The call does not wait for the agent to
     /// finish — that is the entire point.
-    pub fn start(
-        &self,
-        app: &AppHandle,
-        cwd: &str,
-        prompt: &str,
-        label: Option<String>,
-        model: Option<String>,
-    ) -> Result<String, String> {
-        let dir = std::path::Path::new(cwd);
-        if !dir.is_dir() {
-            return Err(format!("`{}` is not a folder that exists.", cwd));
-        }
-        let prompt = prompt.trim();
+    pub fn start(&self, app: &AppHandle, req: StartRequest<'_>) -> Result<String, String> {
+        let prompt = req.prompt.trim();
         if prompt.is_empty() {
             return Err("The agent needs a task to work on.".to_string());
         }
+
+        // A folder that does not exist yet is the normal case for "start a new
+        // project", so it can be created — but only when asked, and only
+        // somewhere allowed. Creating directories from a possibly-misheard path
+        // without being asked is how you end up with a folder called "the
+        // desktop".
+        let cwd = req.cwd.trim();
+        if cwd.is_empty() {
+            return Err("Which folder should it work in?".to_string());
+        }
+        let resolved = if std::path::Path::new(cwd).is_dir() {
+            std::path::PathBuf::from(cwd)
+        } else if req.create_if_missing {
+            workspace::create_folder(cwd)?
+        } else {
+            return Err(format!(
+                "`{}` is not a folder that exists. Ask me to create it and I will.",
+                cwd
+            ));
+        };
+        let dir = resolved.as_path();
+
+        let kind = match req.agent {
+            Some(name) if !name.trim().is_empty() => {
+                AgentKind::from_spoken(name).ok_or_else(|| {
+                    format!(
+                        "I don't know an agent called \"{}\". I can use: {}.",
+                        name.trim(),
+                        registry::installed()
+                            .iter()
+                            .map(|a| a.label())
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    )
+                })?
+            }
+            _ => registry::default_agent().ok_or_else(|| {
+                "No coding agent is installed. Install the Kiro CLI or Claude Code first."
+                    .to_string()
+            })?,
+        };
+
+        // Everything except Claude's own protocol goes over ACP.
+        if kind.transport() == Transport::Acp {
+            return self.start_acp(app, kind, dir, prompt, req);
+        }
+
+        let model = req.model;
+        let label = req.label;
 
         let model = model.or_else(|| env::resolve_var(MODEL_ENV)).and_then(|m| {
             let m = m.trim().to_string();
@@ -313,34 +537,7 @@ impl AgentManager {
         let stdout = child.stdout.take();
         let stderr = child.stderr.take();
 
-        let short_id = format!("{}", self.counter.fetch_add(1, Ordering::Relaxed) + 1);
-        let label = label
-            .map(|l| l.trim().to_string())
-            .filter(|l| !l.is_empty())
-            .unwrap_or_else(|| {
-                dir.file_name()
-                    .map(|n| n.to_string_lossy().to_string())
-                    .unwrap_or_else(|| "agent".to_string())
-            });
-
-        let state = Arc::new(Mutex::new(SessionState {
-            id: short_id.clone(),
-            agent_session_id: None,
-            label,
-            cwd: dir.to_string_lossy().to_string(),
-            model,
-            status: AgentStatus::Starting,
-            started: Instant::now(),
-            last_tool: None,
-            last_line: None,
-            files_touched: Vec::new(),
-            tool_calls: 0,
-            cost_usd: 0.0,
-            pending: None,
-            tool_error: None,
-            error: None,
-            task: truncate(prompt, LINE_BUDGET),
-        }));
+        let (short_id, state) = self.new_state(dir, prompt, label, model, AgentKind::ClaudeCode);
         let stdin = Arc::new(Mutex::new(stdin));
 
         // Handshake, then the first turn. Both go out before the reader starts
@@ -414,9 +611,405 @@ impl AgentManager {
             state,
             stdin,
             child: Arc::new(Mutex::new(child)),
+            acp: None,
         });
         let _ = app.emit("agent-sessions-changed", self.views());
         Ok(short_id)
+    }
+
+    /// Start a session over the Agent Client Protocol.
+    ///
+    /// Short, because the protocol client does the work. That is the point of
+    /// the exercise: adding an agent should not add a code path.
+    fn start_acp(
+        &self,
+        app: &AppHandle,
+        kind: AgentKind,
+        dir: &std::path::Path,
+        prompt: &str,
+        req: StartRequest<'_>,
+    ) -> Result<String, String> {
+        let model = req
+            .model
+            .or_else(|| env::resolve_var(MODEL_ENV))
+            .filter(|m| !m.trim().is_empty());
+        let wanted = acp::Wanted {
+            model: model.clone(),
+            effort: req
+                .effort
+                .or_else(|| env::resolve_var(EFFORT_ENV))
+                .filter(|e| !e.trim().is_empty()),
+        };
+        let (short_id, state) = self.new_state(dir, prompt, req.label, model, kind);
+
+        let policy = ApprovalPolicy {
+            enabled: req.auto_approve,
+            project_root: Some(dir.to_path_buf()),
+            ..ApprovalPolicy::default()
+        };
+        let (handle, child) =
+            match acp::AcpHandle::start(app, kind, Arc::clone(&state), prompt, policy, wanted) {
+                Ok(started) => started,
+                Err(e) => {
+                    // Nothing was registered yet, so there is no row to leave behind.
+                    return Err(e);
+                }
+            };
+
+        self.sessions.lock().unwrap().push(Session {
+            state,
+            // The real pipe lives inside the ACP handle; every write for this
+            // session goes through the protocol client, never through here.
+            stdin: Arc::new(Mutex::new(None)),
+            child: Arc::new(Mutex::new(child)),
+            acp: Some(Arc::new(handle)),
+        });
+        let _ = app.emit("agent-sessions-changed", self.views());
+        Ok(short_id)
+    }
+
+    /// Build the shared digest for a new session and allocate its short id.
+    fn new_state(
+        &self,
+        dir: &std::path::Path,
+        prompt: &str,
+        label: Option<String>,
+        model: Option<String>,
+        agent: AgentKind,
+    ) -> (String, Arc<Mutex<SessionState>>) {
+        let short_id = format!("{}", self.counter.fetch_add(1, Ordering::Relaxed) + 1);
+        let label = label
+            .map(|l| l.trim().to_string())
+            .filter(|l| !l.is_empty())
+            .unwrap_or_else(|| {
+                dir.file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_else(|| "agent".to_string())
+            });
+        let state = Arc::new(Mutex::new(SessionState {
+            id: short_id.clone(),
+            agent_session_id: None,
+            label,
+            cwd: dir.to_string_lossy().to_string(),
+            model,
+            status: AgentStatus::Starting,
+            started: Instant::now(),
+            last_tool: None,
+            last_line: None,
+            files_touched: Vec::new(),
+            tool_calls: 0,
+            cost_usd: 0.0,
+            pending: None,
+            tool_error: None,
+            error: None,
+            task: truncate(prompt, LINE_BUDGET),
+            agent,
+            usage: None,
+            auto_approvals: 0,
+        }));
+        (short_id, state)
+    }
+
+    /// The ACP driver for a session, if it has one.
+    fn acp_for(&self, id: &str) -> Option<Arc<acp::AcpHandle>> {
+        self.sessions
+            .lock()
+            .unwrap()
+            .iter()
+            .find(|s| s.state.lock().unwrap().id == id)
+            .and_then(|s| s.acp.clone())
+    }
+
+    /// Switch a session's mode, which is how ACP exposes personas.
+    ///
+    /// Kiro returns its whole agent list as modes — `kiro_planner`, `research`,
+    /// and any the user has defined — so this is "switch to the planner" without
+    /// a feature behind it.
+    pub fn set_mode(&self, app: &AppHandle, needle: &str, mode: &str) -> Result<String, String> {
+        let state = self.resolve(needle)?;
+        let (id, label) = {
+            let s = state.lock().unwrap();
+            (s.id.clone(), s.label.clone())
+        };
+        let acp = self.acp_for(&id).ok_or_else(|| {
+            format!(
+                "[{}] {} doesn't support modes — only agents driven over ACP do.",
+                id, label
+            )
+        })?;
+        let chosen = acp.set_mode(mode)?;
+        emit_changed(app, &state);
+        Ok(format!("[{}] {} is now in {} mode.", id, label, chosen))
+    }
+
+    /// The modes a session offers, worded for reading aloud.
+    pub fn modes_block(&self, needle: &str) -> Result<String, String> {
+        let state = self.resolve(needle)?;
+        let (id, label) = {
+            let s = state.lock().unwrap();
+            (s.id.clone(), s.label.clone())
+        };
+        let Some(acp) = self.acp_for(&id) else {
+            return Ok(format!(
+                "[{}] {} has no modes to switch between.",
+                id, label
+            ));
+        };
+        let modes = acp.modes();
+        if modes.available.is_empty() {
+            return Ok(format!("[{}] {} didn't report any modes.", id, label));
+        }
+        let mut out = format!(
+            "[{}] {} is in {} mode. Available:\n",
+            id,
+            label,
+            modes.current.as_deref().unwrap_or("its default")
+        );
+        for (mode_id, description) in modes.available.iter().take(12) {
+            if description.is_empty() {
+                out.push_str(&format!("- {}\n", mode_id));
+            } else {
+                out.push_str(&format!("- {}: {}\n", mode_id, truncate(description, 140)));
+            }
+        }
+        Ok(out)
+    }
+
+    /// Switch the model a running session is using.
+    ///
+    /// This is the thing the feature was accused of not being able to do. It can:
+    /// ACP's config-option surface is explicitly changeable "at any point during
+    /// a session, whether the Agent is idle or generating a response", and
+    /// `session/set_model` was verified to take effect on a live Kiro session.
+    /// Nothing is cancelled and no work is lost — the next request the agent
+    /// makes uses the new model.
+    pub fn set_model(&self, app: &AppHandle, needle: &str, model: &str) -> Result<String, String> {
+        let state = self.resolve(needle)?;
+        let (id, label, working) = {
+            let s = state.lock().unwrap();
+            (
+                s.id.clone(),
+                s.label.clone(),
+                matches!(s.status, AgentStatus::Working),
+            )
+        };
+        let acp = self.acp_for(&id).ok_or_else(|| {
+            format!(
+                "[{}] {} can't change model mid-session — only agents driven over ACP can.",
+                id, label
+            )
+        })?;
+        let chosen = acp.set_model(model)?;
+        emit_changed(app, &state);
+        Ok(if working {
+            format!(
+                "[{}] {} is switching to {} and carrying on with what it was doing.",
+                id, label, chosen
+            )
+        } else {
+            format!("[{}] {} is now using {}.", id, label, chosen)
+        })
+    }
+
+    /// Set how hard a session's model should think.
+    pub fn set_effort(&self, app: &AppHandle, needle: &str, level: &str) -> Result<String, String> {
+        let state = self.resolve(needle)?;
+        let (id, label) = {
+            let s = state.lock().unwrap();
+            (s.id.clone(), s.label.clone())
+        };
+        let acp = self.acp_for(&id).ok_or_else(|| {
+            format!(
+                "[{}] {} has no thinking-effort setting to change.",
+                id, label
+            )
+        })?;
+        let (chosen, via_command) = acp.set_effort(level)?;
+        emit_changed(app, &state);
+        Ok(if via_command {
+            // Hedged deliberately: this route goes through the agent's own
+            // command, which accepts the request without reporting the result
+            // back, so a flat "done" would be unverifiable.
+            format!(
+                "Asked [{}] {} to switch to {} effort. It applies from its next step, and it doesn't report the level back, so I can't confirm more than that.",
+                id, label, chosen
+            )
+        } else {
+            format!("[{}] {} is set to {} effort.", id, label, chosen)
+        })
+    }
+
+    /// Run one of the agent's own slash commands on a session.
+    ///
+    /// The point is that a coding CLI is more than a chat box: `/compact` when
+    /// the context fills, `/context add` to put a file in front of it, `/usage`
+    /// to see what it has spent. Those are the controls a person at a terminal
+    /// reaches for, and none of them were reachable by voice.
+    pub fn run_command(
+        &self,
+        app: &AppHandle,
+        needle: &str,
+        command: &str,
+        args: Option<&str>,
+        delivery: Delivery,
+    ) -> Result<String, String> {
+        let state = self.resolve(needle)?;
+        let (id, label, live) = {
+            let s = state.lock().unwrap();
+            (s.id.clone(), s.label.clone(), s.status.is_live())
+        };
+        if !live {
+            return Err(format!("Session [{}] {} has closed.", id, label));
+        }
+        let acp = self.acp_for(&id).ok_or_else(|| {
+            format!(
+                "[{}] {} doesn't expose commands — only agents driven over ACP do.",
+                id, label
+            )
+        })?;
+        let name = command.trim().trim_start_matches('/');
+        acp.run_command(name, args, delivery)?;
+        emit_changed(app, &state);
+        Ok(format!("Ran /{} on [{}] {}.", name, id, label))
+    }
+
+    /// What a session can be told to change, worded for reading aloud.
+    ///
+    /// Deliberately not a dump of everything: a spoken list of nineteen model ids
+    /// is unusable, so the current values lead and the choices are trimmed.
+    pub fn controls_block(&self, needle: &str) -> Result<String, String> {
+        let state = self.resolve(needle)?;
+        let (id, label) = {
+            let s = state.lock().unwrap();
+            (s.id.clone(), s.label.clone())
+        };
+        let Some(acp) = self.acp_for(&id) else {
+            return Ok(format!(
+                "[{}] {} runs on its own protocol, so its model and effort can't be changed from here.",
+                id, label
+            ));
+        };
+        let controls = acp.controls();
+        let modes = acp.modes();
+        let mut out = format!("[{}] {}\n", id, label);
+        out.push_str(&format!(
+            "model: {}\n",
+            controls.model.as_deref().unwrap_or("not reported")
+        ));
+        if let Some(effort) = &controls.effort {
+            out.push_str(&format!("effort: {}\n", effort));
+        }
+        if let Some(mode) = &modes.current {
+            out.push_str(&format!("mode: {}\n", mode));
+        }
+        if let Some(percent) = controls.context_percent {
+            out.push_str(&format!("context used: {:.0}%\n", percent));
+        }
+        let choices = controls.models;
+        if !choices.is_empty() {
+            out.push_str(&format!(
+                "models available ({}): {}\n",
+                choices.len(),
+                choices
+                    .iter()
+                    .take(12)
+                    .map(|(model_id, _)| model_id.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ));
+        }
+        for option in &controls.config {
+            out.push_str(&format!(
+                "{} ({}): {}\n",
+                option.name,
+                option.category.as_deref().unwrap_or("setting"),
+                option.current
+            ));
+        }
+        if !controls.commands.is_empty() {
+            // Descriptions matter here even though this reads back as speech: the
+            // block goes to the model first, and "/compact — Compact conversation
+            // history" is what lets it pick the right command instead of guessing
+            // at a name it half-remembers.
+            out.push_str("commands it accepts:\n");
+            for command in controls.commands.iter().take(20) {
+                out.push_str(&format!("- /{}", command.name));
+                if let Some(hint) = &command.hint {
+                    out.push_str(&format!(" {}", hint));
+                }
+                if !command.description.is_empty() {
+                    out.push_str(&format!(": {}", truncate(&command.description, 90)));
+                }
+                out.push('\n');
+            }
+        }
+        Ok(out)
+    }
+
+    /// Turn auto-approval of safe actions on or off for one session.
+    ///
+    /// Deliberately per-session rather than global: trusting an agent to write
+    /// files unattended in a scratch project is not the same decision as
+    /// trusting it in the repository that pays the bills.
+    pub fn set_auto_approve(
+        &self,
+        app: &AppHandle,
+        needle: &str,
+        enabled: bool,
+    ) -> Result<String, String> {
+        let state = self.resolve(needle)?;
+        let (id, label, cwd) = {
+            let s = state.lock().unwrap();
+            (s.id.clone(), s.label.clone(), s.cwd.clone())
+        };
+        let acp = self.acp_for(&id).ok_or_else(|| {
+            format!(
+                "Auto-approval isn't available for [{}] {} yet — it only works over ACP.",
+                id, label
+            )
+        })?;
+        acp.set_policy(ApprovalPolicy {
+            enabled,
+            project_root: Some(std::path::PathBuf::from(&cwd)),
+            ..ApprovalPolicy::default()
+        });
+
+        // "Approve it for me" almost always means the thing on screen right now
+        // as well as everything after it. Turning the policy on and then leaving
+        // the session still parked would be technically correct and useless.
+        // Destructive actions are excluded, as everywhere else.
+        let mut released = None;
+        if enabled {
+            let pending = state.lock().unwrap().pending.clone();
+            if let Some(pending) = pending {
+                if pending.high_risk {
+                    released = Some(format!(
+                        " It's still waiting on {}, which is destructive — that one needs you to confirm it in the app.",
+                        pending.detail
+                    ));
+                } else if acp.answer(true).is_ok() {
+                    let mut s = state.lock().unwrap();
+                    s.pending = None;
+                    s.status = AgentStatus::Working;
+                    s.auto_approvals += 1;
+                    released = Some(format!(" Approved {} for you.", pending.detail));
+                }
+            }
+        }
+
+        emit_changed(app, &state);
+        Ok(if enabled {
+            format!(
+                "Auto-approval on for [{}] {}: reads and edits inside {} go ahead without asking. \
+Commands, deletes, and anything outside the folder still stop for you.{}",
+                id,
+                label,
+                cwd,
+                released.unwrap_or_default()
+            )
+        } else {
+            format!("Auto-approval off for [{}] {}.", id, label)
+        })
     }
 
     /// Every session, newest last.
@@ -601,8 +1194,24 @@ impl AgentManager {
         Ok(out)
     }
 
-    /// Send another instruction to a live session.
+    /// Send another instruction to a live session, queued behind whatever it is
+    /// already doing.
     pub fn send(&self, app: &AppHandle, needle: &str, text: &str) -> Result<String, String> {
+        self.steer(app, needle, text, Delivery::Queue)
+    }
+
+    /// Send an instruction, choosing whether it waits or interrupts.
+    ///
+    /// Interrupting is the reason this exists: "no, stop, use JWT instead" has to
+    /// land now, and a queued message would arrive after the agent had finished
+    /// doing the wrong thing.
+    pub fn steer(
+        &self,
+        app: &AppHandle,
+        needle: &str,
+        text: &str,
+        delivery: Delivery,
+    ) -> Result<String, String> {
         let state = self.resolve(needle)?;
         let (id, label, live) = {
             let s = state.lock().unwrap();
@@ -611,9 +1220,35 @@ impl AgentManager {
         if !live {
             return Err(format!("Session [{}] {} has closed.", id, label));
         }
+
+        if let Some(acp) = self.acp_for(&id) {
+            acp.submit(text, delivery)?;
+            emit_changed(app, &state);
+            return Ok(match delivery {
+                Delivery::Interrupt => {
+                    format!("Stopping [{}] {} and switching to that.", id, label)
+                }
+                Delivery::Queue if acp.is_ready() => format!("Sent to [{}] {}.", id, label),
+                // Worth saying: the message is safe, it just has not gone yet.
+                Delivery::Queue => format!("[{}] {} is still starting — queued it.", id, label),
+            });
+        }
+
+        // Native Claude transport: stdin is a queue, so an interrupt has to be
+        // an interrupt control request followed by the new instruction.
         let (stdin, _) = self
             .pipes(&id)
             .ok_or_else(|| "That session is no longer available.".to_string())?;
+        if delivery == Delivery::Interrupt {
+            let _ = write_line(
+                &stdin,
+                &json!({
+                    "type": "control_request",
+                    "request_id": format!("int_{}", now_millis()),
+                    "request": { "subtype": "interrupt" }
+                }),
+            );
+        }
         write_line(&stdin, &user_message(text))?;
         {
             let mut s = state.lock().unwrap();
@@ -647,6 +1282,20 @@ impl AgentManager {
             return Err(format!(
                 "That action looks destructive ({}). It can't be approved by voice — confirm it in the app instead.",
                 pending.detail
+            ));
+        }
+
+        if let Some(acp) = self.acp_for(&id) {
+            let outcome = acp.answer(allow)?;
+            {
+                let mut s = state.lock().unwrap();
+                s.pending = None;
+                s.status = AgentStatus::Working;
+            }
+            emit_changed(app, &state);
+            return Ok(format!(
+                "{} {} in [{}] {}.",
+                outcome, pending.tool_name, id, label
             ));
         }
 
@@ -712,6 +1361,20 @@ impl AgentManager {
                 status.label()
             ));
         }
+        if let Some(acp) = self.acp_for(&id) {
+            // A session parked on a permission prompt is waiting, not running, so
+            // the prompt has to be answered before a cancel means anything.
+            if pending.is_some() {
+                let _ = acp.answer(false);
+            }
+            acp.cancel()?;
+            // The status flips to Cancelled when the turn actually settles with a
+            // `cancelled` stop reason, not here: the agent decides when it has
+            // stopped, and claiming otherwise would make the digest lie.
+            emit_changed(app, &state);
+            return Ok(format!("Stopping [{}] {}.", id, label));
+        }
+
         let (stdin, _) = self
             .pipes(&id)
             .ok_or_else(|| "That session is no longer available.".to_string())?;
@@ -807,7 +1470,7 @@ impl AgentManager {
     /// worse than a clean handover.
     pub fn resume_in_terminal(&self, app: &AppHandle, needle: &str) -> Result<String, String> {
         let state = self.resolve(needle)?;
-        let (id, label, cwd, agent_session_id, pending) = {
+        let (id, label, cwd, agent_session_id, pending, kind, status) = {
             let s = state.lock().unwrap();
             (
                 s.id.clone(),
@@ -815,67 +1478,202 @@ impl AgentManager {
                 s.cwd.clone(),
                 s.agent_session_id.clone(),
                 s.pending.clone(),
+                s.agent,
+                s.status,
             )
         };
-        let agent_session_id = agent_session_id.ok_or_else(|| {
-            format!(
+
+        // Work out what to run before touching the session, so a missing CLI
+        // fails without having killed anything.
+        let mut handoff = kind.handoff(agent_session_id.as_deref().unwrap_or_default())?;
+        if handoff.resumes_history && agent_session_id.is_none() {
+            return Err(format!(
                 "Session [{}] {} never got far enough to have a resumable id.",
                 id, label
-            )
-        })?;
+            ));
+        }
 
-        // Release a pending prompt before handing over, so the resumed session
-        // does not inherit a decision nobody answered.
+        // The transcript cannot follow a Kiro session into a terminal, so the
+        // situation does instead: a brief on disk, and a first question that makes
+        // the new session read it before doing anything.
+        let brief = if handoff.resumes_history {
+            None
+        } else {
+            let view = state.lock().unwrap().view();
+            match workspace::write_handoff_brief(
+                &cwd,
+                &format!("handoff-{}", id),
+                &Self::handoff_brief(&view),
+            ) {
+                Ok(path) => Some(path),
+                Err(e) => {
+                    // A read-only or unusual folder must not block the handover;
+                    // the terminal is still better than nothing.
+                    log::warn!("agents: couldn't write a handoff brief: {}", e);
+                    None
+                }
+            }
+        };
+        if let (Some(brief), true) = (brief.as_ref(), handoff.accepts_first_prompt) {
+            let relative = brief
+                .strip_prefix(std::path::Path::new(&cwd))
+                .unwrap_or(brief.as_path());
+            handoff.command.push_str(&format!(
+                " \"Read {} — it is the brief from the session you are taking over. Summarise where things stand in two or three sentences, then wait for instructions.\"",
+                relative.display().to_string().replace('\\', "/")
+            ));
+        }
+
+        // Already handed over: just open another terminal. The previous version
+        // left the button dead, which made a failed handoff unrecoverable.
+        let already_handed_off = matches!(status, AgentStatus::HandedOff);
+
         let dropped_pending = pending.is_some();
-        if let Some((stdin, _)) = self.pipes(&id) {
+        if !already_handed_off {
+            // Release a pending prompt before handing over, so nothing is left
+            // waiting on a decision no one will answer.
             if let Some(pending) = pending {
-                let _ = write_line(
-                    &stdin,
-                    &json!({
-                        "type": "control_response",
-                        "response": {
-                            "subtype": "success",
-                            "request_id": pending.request_id,
+                if let Some(acp) = self.acp_for(&id) {
+                    let _ = acp.answer(false);
+                } else if let Some((stdin, _)) = self.pipes(&id) {
+                    let _ = write_line(
+                        &stdin,
+                        &json!({
+                            "type": "control_response",
                             "response": {
-                                "behavior": "deny",
-                                "message": "Handed over to a terminal; ask again there."
+                                "subtype": "success",
+                                "request_id": pending.request_id,
+                                "response": {
+                                    "behavior": "deny",
+                                    "message": "Handed over to a terminal; ask again there."
+                                }
                             }
-                        }
-                    }),
-                );
+                        }),
+                    );
+                }
+            }
+            // Kill our child but keep the row: removing it looked like the
+            // session had vanished rather than moved.
+            {
+                let sessions = self.sessions.lock().unwrap();
+                if let Some(session) = sessions.iter().find(|s| s.state.lock().unwrap().id == id) {
+                    session.stdin.lock().unwrap().take();
+                    let _ = session.child.lock().unwrap().kill();
+                }
+            }
+            {
+                let mut s = state.lock().unwrap();
+                s.pending = None;
+                s.last_tool = None;
+                s.error = None;
+                s.status = AgentStatus::HandedOff;
             }
         }
-        // Kill our child but keep the row: the previous version removed it, which
-        // looked like the session had vanished rather than moved.
-        {
-            let sessions = self.sessions.lock().unwrap();
-            if let Some(session) = sessions.iter().find(|s| s.state.lock().unwrap().id == id) {
-                session.stdin.lock().unwrap().take();
-                let _ = session.child.lock().unwrap().kill();
-            }
-        }
-        {
-            let mut s = state.lock().unwrap();
-            s.pending = None;
-            s.status = AgentStatus::HandedOff;
-        }
-        if let Err(e) = spawn_resume_terminal(&cwd, &agent_session_id) {
+
+        if let Err(e) = spawn_agent_terminal(&cwd, &handoff.command) {
             // The terminal is the whole point, so a failure here is worth
             // reporting even though the session is already released.
             emit_changed(app, &state);
             return Err(e);
         }
         emit_changed(app, &state);
-        let mut message = format!(
-            "Handed [{}] {} to a terminal — it resumed with its full history, and SpeakoFlow is no longer driving it.",
-            id, label
-        );
+
+        let mut message = if handoff.resumes_history {
+            format!(
+                "Handed [{}] {} to a terminal — it resumed with its full history, and SpeakoFlow is no longer driving it.",
+                id, label
+            )
+        } else {
+            // Said plainly, because the alternative is the user discovering it
+            // from a confusing error in the terminal.
+            let mut text = format!(
+                "Opened {} in a terminal at {}. {} keeps coding sessions separate from terminal ones, so the conversation itself doesn't carry over",
+                kind.label(),
+                cwd,
+                kind.label(),
+            );
+            match (&brief, handoff.accepts_first_prompt) {
+                (Some(_), true) => text.push_str(
+                    " — I left it a brief of the task, the files it changed and where it got to, and it opens reading that.",
+                ),
+                (Some(path), false) => {
+                    text.push_str(&format!(" — the brief is at {}.", path.display()))
+                }
+                (None, _) => text.push('.'),
+            }
+            text.push_str(&format!(
+                " SpeakoFlow is no longer driving [{}] {}.",
+                id, label
+            ));
+            text
+        };
         if dropped_pending {
             message.push_str(
                 " The action it was waiting on was not applied; it will ask again there.",
             );
         }
         Ok(message)
+    }
+
+    /// The takeover brief written into a project when a session is handed to a
+    /// terminal that cannot inherit the conversation.
+    ///
+    /// Written for the *next agent* to read, not for a human to admire: what was
+    /// asked, what happened, what is unfinished. Deliberately excludes the rolling
+    /// spoken digest's chatter and any tool ids — the incoming agent should re-derive
+    /// state from the repository, and a brief that reads like a transcript invites it
+    /// to trust stale detail instead.
+    fn handoff_brief(view: &AgentSessionView) -> String {
+        let mut out = String::from("# Session handoff\n\n");
+        out.push_str(&format!(
+            "Written by SpeakoFlow when this session moved to a terminal.\n\n\
+         - Project: {}\n\
+         - Agent: {}\n",
+            view.cwd, view.agent
+        ));
+        if let Some(model) = &view.model {
+            out.push_str(&format!("- Model: {}\n", model));
+        }
+        out.push_str(&format!(
+            "- Status when handed over: {}\n- Ran for: {}\n- Tool calls: {}\n",
+            view.status.label(),
+            format_duration(view.elapsed_secs),
+            view.tool_calls
+        ));
+        if let Some(usage) = &view.usage {
+            out.push_str(&format!("- Usage: {}\n", usage));
+        }
+        out.push_str(&format!("\n## The task as given\n\n{}\n", view.task));
+        if !view.files_touched.is_empty() {
+            out.push_str("\n## Files it finished changing\n\n");
+            for file in &view.files_touched {
+                out.push_str(&format!("- {}\n", file));
+            }
+            out.push_str(
+            "\nOnly completed changes are listed. Anything it was part-way through is not here — check the working tree.\n",
+        );
+        }
+        if let Some(pending) = &view.pending {
+            out.push_str(&format!(
+            "\n## Left waiting for approval\n\n{} ({}). It was refused on the way out, so it will ask again.\n",
+            pending.detail, pending.tool_name
+        ));
+        }
+        if let Some(error) = &view.tool_error {
+            out.push_str(&format!("\n## Last tool failure\n\n{}\n", error));
+        }
+        if let Some(error) = &view.error {
+            out.push_str(&format!("\n## Last error\n\n{}\n", error));
+        }
+        if let Some(line) = &view.last_line {
+            out.push_str(&format!("\n## Its last message\n\n{}\n", line));
+        }
+        out.push_str(
+            "\n## Taking over\n\nThe previous conversation is gone; this file is all of it. \
+         Verify the current state from the files before continuing, and do not assume the \
+         work above is complete.\n",
+        );
+        out
     }
 
     /// Kill every session. Called on app shutdown so we never orphan a CLI.
@@ -896,13 +1694,10 @@ impl AgentManager {
 /// recognized` — the second of which lives in System32, so the child had no
 /// usable `PATH` at all. A handed-off terminal has to work on the first try, so
 /// the CLI path, the shell path, and `PATH` itself are all supplied here.
-fn spawn_resume_terminal(cwd: &str, session_id: &str) -> Result<(), String> {
-    let binary = env::resolve_claude()?;
-    let claude = binary.display().to_string();
+fn spawn_agent_terminal(cwd: &str, command_line: &str) -> Result<(), String> {
     let path = env::effective_path();
     let forwarded = env::forwarded_vars();
-    // Quoted, because an install path can contain spaces.
-    let manual = format!("\"{}\" --resume {}", claude, session_id);
+    let manual = command_line.to_string();
 
     #[cfg(windows)]
     {
@@ -1507,7 +2302,68 @@ mod tests {
             tool_error: None,
             error: None,
             task: "do a thing".into(),
+            agent: AgentKind::ClaudeCode,
+            usage: None,
+            auto_approvals: 0,
         }))
+    }
+
+    #[test]
+    fn corrections_interrupt_and_additions_queue() {
+        // The distinction the whole steering feature rests on.
+        for spoken in [
+            "no, stop",
+            "stop, that's wrong",
+            "wait, use JWT instead",
+            "hold on",
+            "actually, do it the other way",
+            "don't use sockets",
+            "never mind that approach",
+            "cancel that and start over",
+            "instead of Redis use Postgres",
+        ] {
+            assert_eq!(
+                Delivery::from_spoken(spoken),
+                Delivery::Interrupt,
+                "{spoken} should interrupt"
+            );
+        }
+        for spoken in [
+            "also add tests",
+            "after that, update the docs",
+            "and then deploy it",
+            "when you're done, run the linter",
+            "add a dark mode toggle too",
+            "make the button blue",
+        ] {
+            assert_eq!(
+                Delivery::from_spoken(spoken),
+                Delivery::Queue,
+                "{spoken} should queue"
+            );
+        }
+    }
+
+    #[test]
+    fn ambiguity_queues_rather_than_destroying_work() {
+        // The lopsided-cost rule: unclear input must never interrupt.
+        assert_eq!(Delivery::from_spoken(""), Delivery::Queue);
+        assert_eq!(Delivery::from_spoken("update the readme"), Delivery::Queue);
+        // "stop" inside a word is not a command to stop.
+        assert_eq!(
+            Delivery::from_spoken("add a nonstop scrolling banner"),
+            Delivery::Queue
+        );
+        assert_eq!(
+            Delivery::from_spoken("make it wait for the response"),
+            Delivery::Queue
+        );
+        // A deferring phrase wins even when a stop word is present, because the
+        // sentence is explicitly about what happens next.
+        assert_eq!(
+            Delivery::from_spoken("after that, stop the dev server"),
+            Delivery::Queue
+        );
     }
 
     #[test]
