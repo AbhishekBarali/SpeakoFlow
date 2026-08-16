@@ -1017,6 +1017,16 @@ pub struct AppSettings {
     /// but applies to the LLM used for post-processing and the assistant.
     #[serde(default = "default_local_llm_unload_timeout")]
     pub local_llm_unload_timeout: ModelUnloadTimeout,
+
+    /// How long the **AI-cleanup** engine stays loaded after its last use.
+    ///
+    /// Separate from `local_llm_unload_timeout` on purpose: cleanup runs on
+    /// every dictation with a small model, while the assistant's model is larger
+    /// and used in bursts. Keeping cleanup resident for longer costs a few
+    /// hundred MB of RAM and no CPU at all (an idle engine does no work), and it
+    /// removes the reload from the dictation path entirely.
+    #[serde(default = "default_post_process_unload_timeout")]
+    pub post_process_unload_timeout: ModelUnloadTimeout,
     #[serde(default = "default_word_correction_threshold")]
     pub word_correction_threshold: f64,
     #[serde(default = "default_history_limit")]
@@ -1580,13 +1590,24 @@ fn default_post_process_providers() -> Vec<PostProcessProvider> {
     // Built-in local LLM (no setup, no API key). Served by the bundled
     // llama.cpp sidecar on a loopback port; the LocalLlmManager starts it on
     // demand against the GGUF model the user downloads from the Models tab.
+    //
+    // Structured output is ON: llama.cpp turns a JSON schema into a decoding
+    // grammar, which is the single most effective guard against small chat
+    // models ignoring "return only the cleaned transcript". Measured on
+    // Gemma 4 E2B with this app's real cleanup prompt: without a schema it spent
+    // 400 tokens (~2.0s) writing "The user wants me to clean up a raw
+    // speech-to-text transcript... **Cleaning goals:** 1. ..." and never emitted
+    // the transcript at all; with the schema the same model answered correctly in
+    // 53-98 tokens (~0.5s). Models that reject the schema still fall back to a
+    // plain request (see `run_provider_post_process`), so this cannot make a
+    // working setup worse.
     providers.push(PostProcessProvider {
         id: "builtin".to_string(),
         label: "Built-in (Local)".to_string(),
         base_url: "http://127.0.0.1:11435/v1".to_string(),
         allow_base_url_edit: false,
         models_endpoint: Some("/models".to_string()),
-        supports_structured_output: false,
+        supports_structured_output: true,
     });
 
     // Local OpenAI-compatible servers (Ollama, LM Studio, llama.cpp, vLLM)
@@ -1901,6 +1922,15 @@ fn default_local_llm_unload_timeout() -> ModelUnloadTimeout {
     // the built-in LLM frees RAM/VRAM when unused, while staying warm during
     // active use. Paired with prewarm-on-record, reloads stay mostly hidden.
     ModelUnloadTimeout::Min5
+}
+
+fn default_post_process_unload_timeout() -> ModelUnloadTimeout {
+    // Longer than the assistant's: the cleanup engine is small (a few hundred MB
+    // for the models this feature targets), does no work while idle, and is used
+    // on every dictation — so holding it through a normal writing session is a
+    // better trade than reloading it repeatedly. Users on tight memory can dial
+    // this down (or to `Immediately`) without touching the assistant.
+    ModelUnloadTimeout::Min15
 }
 
 fn default_assistant_panel_opacity() -> f64 {
@@ -2455,6 +2485,7 @@ pub fn get_default_settings() -> AppSettings {
         text_replacements: default_text_replacements(),
         model_unload_timeout: ModelUnloadTimeout::default(),
         local_llm_unload_timeout: default_local_llm_unload_timeout(),
+        post_process_unload_timeout: default_post_process_unload_timeout(),
         word_correction_threshold: default_word_correction_threshold(),
         history_limit: default_history_limit(),
         recording_retention_period: default_recording_retention_period(),

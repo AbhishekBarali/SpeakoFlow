@@ -1,0 +1,43 @@
+<!--
+  Flow v2 — cute-proportion pass.
+  Rules baked in: eyes = 20% of body width, eye line at 60% of body height,
+  tiny mouth just below, soft charcoal (not black), warm blush against cool body,
+  fully convex silhouette, speech-bubble tail kept for brand recognition.
+  The waveform stays in the LOGO, not on his face (bars in a mouth read as teeth).
+
+  Swap palettes by editing the four variables in the style block below.
+  A. Soft mint (default): body #5FD4C4, ink #2B2A28, shine #FFFDF8, blush #FF9E7D
+  B. Deep teal:           body #0F766E, ink #FFFDF8, shine #0B4F4A, blush #FFB59B
+  C. Cream:               body #F5EDE0, ink #2B2A28, shine #FFFFFF, blush #FFB59B
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" width="480" height="480" role="img" aria-label="Flow, the SpeakoFlow mascot">
+  <style>
+    svg { --flow-body: #5FD4C4; --flow-ink: #2B2A28; --flow-shine: #FFFDF8; --flow-blush: #FF9E7D; }
+    .flow-body { fill: var(--flow-body); }
+    .flow-ink  { fill: var(--flow-ink); }
+    .flow-shine{ fill: var(--flow-shine); }
+    .flow-blush{ fill: var(--flow-blush); opacity: .34; }
+    .flow-mouth{ fill: none; stroke: var(--flow-ink); stroke-width: 7; stroke-linecap: round; }
+  </style>
+
+  <!-- tail (drawn first so it merges into the body) -->
+  <path class="flow-body" d="M72,176 C75,197 66,212 44,219 C68,215 93,201 98,183 Z"/>
+
+  <!-- body: soft convex blob, no spikes, no concave dents -->
+  <path class="flow-body" d="M120,38 C170,38 206,70 206,112 C206,158 172,198 120,198 C68,198 34,158 34,112 C34,70 70,38 120,38 Z"/>
+
+  <!-- blush -->
+  <ellipse class="flow-blush" cx="64"  cy="156" rx="11" ry="8"/>
+  <ellipse class="flow-blush" cx="176" cy="156" rx="11" ry="8"/>
+
+  <!-- eyes: r17 = 20% of the 172-wide body, centred on the 60%-height line -->
+  <g class="flow-eyes">
+    <circle class="flow-ink" cx="83"  cy="134" r="17"/>
+    <circle class="flow-ink" cx="157" cy="134" r="17"/>
+    <circle class="flow-shine" cx="77"  cy="127" r="6"/>
+    <circle class="flow-shine" cx="151" cy="127" r="6"/>
+  </g>
+
+  <!-- mouth: one small curve, sitting half an eye-radius below the eye line -->
+  <path class="flow-mouth" d="M109,159 Q120,172 131,159"/>
+</svg>

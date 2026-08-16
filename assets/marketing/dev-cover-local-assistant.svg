@@ -1,0 +1,129 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="420" viewBox="0 0 1000 420" role="img" aria-labelledby="title desc">
+  <title id="title">The models were the easy part</title>
+  <desc id="desc">Cover for an article about building a local voice assistant, with a stylized recording window and speech pipeline.</desc>
+  <defs>
+    <radialGradient id="glow" cx="78%" cy="42%" r="58%">
+      <stop offset="0" stop-color="#1a6a5d" stop-opacity="0.58"/>
+      <stop offset="0.52" stop-color="#0c2c27" stop-opacity="0.42"/>
+      <stop offset="1" stop-color="#071512" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="panel" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#152823"/>
+      <stop offset="1" stop-color="#0a1412"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#6ee7d4"/>
+      <stop offset="1" stop-color="#14b8a6"/>
+    </linearGradient>
+    <filter id="softShadow" x="-30%" y="-30%" width="160%" height="180%">
+      <feDropShadow dx="0" dy="20" stdDeviation="22" flood-color="#000000" flood-opacity="0.34"/>
+    </filter>
+    <filter id="tinyGlow" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="8"/>
+    </filter>
+  </defs>
+
+  <rect width="1000" height="420" rx="28" fill="#071512"/>
+  <rect width="1000" height="420" rx="28" fill="url(#glow)"/>
+
+  <g opacity="0.13">
+    <path d="M0 84H1000M0 168H1000M0 252H1000M0 336H1000" stroke="#b9fff3" stroke-width="1"/>
+    <path d="M125 0V420M250 0V420M375 0V420M500 0V420M625 0V420M750 0V420M875 0V420" stroke="#b9fff3" stroke-width="1"/>
+  </g>
+
+  <g transform="translate(62 48)">
+    <rect width="188" height="30" rx="15" fill="#dffcf6" fill-opacity="0.08" stroke="#8aeadb" stroke-opacity="0.24"/>
+    <circle cx="16" cy="15" r="4" fill="#55dbc6"/>
+    <text x="30" y="19" fill="#bcefe6" font-size="11" font-weight="700" letter-spacing="1.8" font-family="Segoe UI, sans-serif">SPEAKOFLOW / BUILD LOG</text>
+  </g>
+
+  <g transform="translate(62 111)" font-family="Segoe UI, sans-serif">
+    <text x="0" y="0" fill="#f3fbf8" font-size="52" font-weight="760" letter-spacing="-2.1">
+      <tspan x="0" dy="0">THE MODELS WERE</tspan>
+      <tspan x="0" dy="60" fill="#70e1cf">THE EASY PART.</tspan>
+    </text>
+    <text x="2" y="145" fill="#a7c6c0" font-size="17" font-weight="450" letter-spacing="0.1">
+      Building a local voice assistant that sees, listens, and talks.
+    </text>
+  </g>
+
+  <g transform="translate(62 316)" font-family="Segoe UI, sans-serif">
+    <g>
+      <rect width="68" height="30" rx="15" fill="#dffcf6" fill-opacity="0.08" stroke="#dffcf6" stroke-opacity="0.12"/>
+      <text x="34" y="19" text-anchor="middle" fill="#c9e7e1" font-size="11" font-weight="700" letter-spacing="1">STT</text>
+    </g>
+    <path d="M76 15H99" stroke="#47877c" stroke-width="2" stroke-linecap="round"/>
+    <circle cx="106" cy="15" r="3" fill="#55dbc6"/>
+    <g transform="translate(116 0)">
+      <rect width="86" height="30" rx="15" fill="#dffcf6" fill-opacity="0.08" stroke="#dffcf6" stroke-opacity="0.12"/>
+      <text x="43" y="19" text-anchor="middle" fill="#c9e7e1" font-size="11" font-weight="700" letter-spacing="1">VISION</text>
+    </g>
+    <path d="M210 15H233" stroke="#47877c" stroke-width="2" stroke-linecap="round"/>
+    <circle cx="240" cy="15" r="3" fill="#55dbc6"/>
+    <g transform="translate(250 0)">
+      <rect width="68" height="30" rx="15" fill="#dffcf6" fill-opacity="0.08" stroke="#dffcf6" stroke-opacity="0.12"/>
+      <text x="34" y="19" text-anchor="middle" fill="#c9e7e1" font-size="11" font-weight="700" letter-spacing="1">LLM</text>
+    </g>
+    <path d="M326 15H349" stroke="#47877c" stroke-width="2" stroke-linecap="round"/>
+    <circle cx="356" cy="15" r="3" fill="#55dbc6"/>
+    <g transform="translate(366 0)">
+      <rect width="68" height="30" rx="15" fill="#dffcf6" fill-opacity="0.08" stroke="#dffcf6" stroke-opacity="0.12"/>
+      <text x="34" y="19" text-anchor="middle" fill="#c9e7e1" font-size="11" font-weight="700" letter-spacing="1">TTS</text>
+    </g>
+  </g>
+
+  <g transform="translate(635 45)" filter="url(#softShadow)">
+    <rect x="0" y="0" width="310" height="330" rx="34" fill="#ffffff" fill-opacity="0.04" stroke="#c9fff5" stroke-opacity="0.16" stroke-width="1.5"/>
+    <rect x="9" y="9" width="292" height="312" rx="27" fill="url(#panel)" stroke="#ffffff" stroke-opacity="0.06"/>
+
+    <g transform="translate(30 30)" font-family="Segoe UI, sans-serif">
+      <circle cx="7" cy="7" r="7" fill="#14b8a6" opacity="0.18"/>
+      <circle cx="7" cy="7" r="3.5" fill="#56dec9"/>
+      <text x="22" y="11" fill="#d8ebe7" font-size="12" font-weight="650">Recording</text>
+      <text x="218" y="11" text-anchor="end" fill="#77938d" font-size="11">00:04</text>
+    </g>
+
+    <g transform="translate(30 72)">
+      <rect x="0" y="0" width="250" height="64" rx="18" fill="#050a09" fill-opacity="0.58" stroke="#75e8d5" stroke-opacity="0.12"/>
+      <g transform="translate(20 19)" fill="url(#accent)">
+        <rect x="0" y="9" width="4" height="8" rx="2"/>
+        <rect x="8" y="5" width="4" height="16" rx="2"/>
+        <rect x="16" y="1" width="4" height="24" rx="2"/>
+        <rect x="24" y="7" width="4" height="12" rx="2"/>
+        <rect x="32" y="3" width="4" height="20" rx="2"/>
+        <rect x="40" y="8" width="4" height="10" rx="2"/>
+        <rect x="48" y="5" width="4" height="16" rx="2"/>
+        <rect x="56" y="2" width="4" height="22" rx="2"/>
+        <rect x="64" y="7" width="4" height="12" rx="2"/>
+      </g>
+      <text x="104" y="28" fill="#eef8f5" font-family="Segoe UI, sans-serif" font-size="12.5" font-weight="560">Can you explain this error?</text>
+      <text x="104" y="46" fill="#6f8e87" font-family="Segoe UI, sans-serif" font-size="10.5">screen context armed</text>
+    </g>
+
+    <g transform="translate(30 154)" font-family="Segoe UI, sans-serif">
+      <text x="0" y="11" fill="#66837d" font-size="10" font-weight="700" letter-spacing="1.6">LOCAL PIPELINE</text>
+      <path d="M0 30H250" stroke="#c7fff5" stroke-opacity="0.09"/>
+      <g transform="translate(0 48)">
+        <circle cx="12" cy="12" r="12" fill="#14b8a6" fill-opacity="0.15" stroke="#61dfcb" stroke-opacity="0.35"/>
+        <path d="M8 12l3 3 6-7" fill="none" stroke="#70e1cf" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        <text x="34" y="9" fill="#d6e9e5" font-size="11.5" font-weight="620">Speech transcribed locally</text>
+        <text x="34" y="26" fill="#698780" font-size="10">Whisper or Parakeet</text>
+      </g>
+      <g transform="translate(0 91)">
+        <circle cx="12" cy="12" r="12" fill="#14b8a6" fill-opacity="0.15" stroke="#61dfcb" stroke-opacity="0.35"/>
+        <path d="M8 12l3 3 6-7" fill="none" stroke="#70e1cf" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        <text x="34" y="9" fill="#d6e9e5" font-size="11.5" font-weight="620">Screen compressed to budget</text>
+        <text x="34" y="26" fill="#698780" font-size="10">one frame, one model turn</text>
+      </g>
+      <g transform="translate(0 134)">
+        <circle cx="12" cy="12" r="12" fill="#14b8a6" fill-opacity="0.15" stroke="#61dfcb" stroke-opacity="0.35"/>
+        <circle cx="12" cy="12" r="3" fill="#70e1cf"/>
+        <text x="34" y="9" fill="#d6e9e5" font-size="11.5" font-weight="620">Assistant warming up</text>
+        <text x="34" y="26" fill="#698780" font-size="10">while the user is still speaking</text>
+      </g>
+    </g>
+  </g>
+
+  <circle cx="913" cy="72" r="46" fill="#26d7bd" opacity="0.09" filter="url(#tinyGlow)"/>
+  <text x="938" y="395" text-anchor="end" fill="#5e7e77" font-size="10" font-weight="700" letter-spacing="1.4" font-family="Segoe UI, sans-serif">RUST · TAURI · LLAMA.CPP · KOKORO</text>
+</svg>

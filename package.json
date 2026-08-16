@@ -16,6 +16,7 @@
     "format:backend": "cd src-tauri && cargo fmt",
     "install:arch": "bash scripts/install-arch.sh",
     "check:translations": "bun scripts/check-translations.ts",
+    "metrics:github": "bun scripts/github-metrics.ts",
     "postinstall": "bun scripts/check-nix-deps.ts"
   },
   "dependencies": {

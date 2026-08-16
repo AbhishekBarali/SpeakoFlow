@@ -34,6 +34,26 @@ use tauri::{AppHandle, Emitter, Manager};
 /// Ollama's default (11434) so a user's existing Ollama install is untouched.
 const ENGINE_PORT: u16 = 11435;
 
+/// Loopback port for the dedicated AI-cleanup engine (see [`LlmRole`]).
+const CLEANUP_ENGINE_PORT: u16 = 11436;
+
+/// Context window for the cleanup engine. Cleanup sees one system prompt plus
+/// one transcript — measured at ~1050 tokens with every feature on (misheard
+/// vocabulary, cleanup strength, style preset) — so a large window only wastes
+/// KV-cache memory. Prefill at that size costs ~0.15s on GPU and ~0.6s on CPU,
+/// which is why the prompt does NOT need trimming for speed.
+pub const CLEANUP_CONTEXT_SIZE: u32 = 4096;
+
+/// Cleanup models at or below this size run on the CPU (`-ngl 0`).
+///
+/// Measured on a 380MB Q4 model: CPU load 0.9s vs GPU 2.0s (no VRAM upload, no
+/// Vulkan init), and inference 0.33s vs 0.05s — so CPU is a net win for the
+/// cold path that dictation actually hits, costs no VRAM next to the ASR model,
+/// keeps the GPU out of a raised power state, and avoids the 13–20s one-time
+/// GPU shader compilation a new model/quant pays on its first ever run.
+/// Anything larger stays on the GPU, where the compute saving is worth it.
+const CLEANUP_CPU_MAX_BYTES: u64 = 2 * 1024 * 1024 * 1024;
+
 /// Pinned llama.cpp release used as a fallback when the GitHub "latest" API is
 /// unreachable or rate-limited. Its assets are fetched directly from the
 /// release-download host, which — unlike `api.github.com` — is NOT subject to
@@ -82,10 +102,73 @@ struct ServerState {
     last_error: Option<String>,
 }
 
+/// Which workload an engine instance serves.
+///
+/// The assistant and AI cleanup run as **separate engine processes on separate
+/// ports**. They used to share one: whenever the two were configured with
+/// different models, every cleanup pass killed the assistant's engine (and vice
+/// versa), so each dictation paid a full model load — measured at 4–6s for a
+/// 3.2GB model, on top of ~1.4s of vision-projector load that cleanup never
+/// uses. Splitting them also lets cleanup run leaner than a chat engine:
+/// projector skipped, thinking forced off, small context, and CPU-first for
+/// small models (which loads ~2x faster than GPU and skips the one-time
+/// first-run GPU shader compilation entirely).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LlmRole {
+    /// The floating assistant panel: chat, vision, tools, long context.
+    Assistant,
+    /// Dictation AI cleanup: one short, deterministic rewrite per recording.
+    Cleanup,
+}
+
+impl LlmRole {
+    fn port(self) -> u16 {
+        match self {
+            LlmRole::Assistant => ENGINE_PORT,
+            LlmRole::Cleanup => CLEANUP_ENGINE_PORT,
+        }
+    }
+
+    fn log_filename(self) -> &'static str {
+        match self {
+            LlmRole::Assistant => "llama-server.log",
+            LlmRole::Cleanup => "llama-server-cleanup.log",
+        }
+    }
+}
+
+/// Wrapper so the cleanup engine can live in Tauri state alongside the
+/// assistant one (managed state is keyed by type, so two `Arc<LocalLlmManager>`
+/// entries would collide).
+pub struct CleanupLlm(pub Arc<LocalLlmManager>);
+
+/// Context window to launch with, per role. Pure so it is testable without an
+/// `AppHandle`.
+fn context_size_for(role: LlmRole, configured: u32) -> u32 {
+    match role {
+        LlmRole::Assistant => configured,
+        LlmRole::Cleanup => configured.min(CLEANUP_CONTEXT_SIZE),
+    }
+}
+
+/// GPU layers to offload, per role and model size. `model_bytes` is `None` when
+/// the file can't be stat'd, in which case the GPU keeps its usual "take
+/// everything" behaviour rather than silently dropping to CPU.
+fn gpu_layers_for(role: LlmRole, model_bytes: Option<u64>) -> u32 {
+    match role {
+        LlmRole::Assistant => 999,
+        LlmRole::Cleanup => match model_bytes {
+            Some(bytes) if bytes <= CLEANUP_CPU_MAX_BYTES => 0,
+            _ => 999,
+        },
+    }
+}
+
 pub struct LocalLlmManager {
     app_handle: AppHandle,
     models_dir: PathBuf,
     port: u16,
+    role: LlmRole,
     state: Arc<Mutex<ServerState>>,
     /// Serializes concurrent `ensure_running` calls (e.g. two assistant turns
     /// fired in quick succession) so only one start happens at a time.
@@ -99,7 +182,12 @@ pub struct LocalLlmManager {
 }
 
 impl LocalLlmManager {
+    /// The assistant engine (the historical behaviour of this manager).
     pub fn new(app_handle: &AppHandle) -> Result<Self> {
+        Self::new_for_role(app_handle, LlmRole::Assistant)
+    }
+
+    pub fn new_for_role(app_handle: &AppHandle, role: LlmRole) -> Result<Self> {
         let models_dir = crate::portable::app_data_dir(app_handle)
             .map_err(|e| anyhow::anyhow!("Failed to get app data dir: {}", e))?
             .join("models");
@@ -107,7 +195,8 @@ impl LocalLlmManager {
         Ok(Self {
             app_handle: app_handle.clone(),
             models_dir,
-            port: ENGINE_PORT,
+            port: role.port(),
+            role,
             state: Arc::new(Mutex::new(ServerState {
                 child: None,
                 model_id: None,
@@ -117,6 +206,13 @@ impl LocalLlmManager {
             last_activity: Arc::new(AtomicU64::new(Self::now_ms())),
             in_flight: Arc::new(AtomicUsize::new(0)),
         })
+    }
+
+    /// OpenAI-compatible base URL for this engine instance. Callers must use
+    /// this rather than a hardcoded port, so the cleanup engine's requests
+    /// reach the cleanup process and not the assistant's.
+    pub fn base_url(&self) -> String {
+        format!("http://127.0.0.1:{}/v1", self.port)
     }
 
     /// Platform-specific engine binary filename.
@@ -130,7 +226,9 @@ impl LocalLlmManager {
 
     /// Path to the engine's captured stdout/stderr log.
     fn engine_log_path(&self) -> PathBuf {
-        self.models_dir.join("engine").join("llama-server.log")
+        self.models_dir
+            .join("engine")
+            .join(self.role.log_filename())
     }
 
     /// Read the last `max_lines` lines of the engine log, for surfacing the
@@ -778,10 +876,19 @@ impl LocalLlmManager {
 
     /// The context window to launch the engine with: the user's configured
     /// value clamped to a safe range, or the default if settings can't be read.
+    /// The cleanup engine is additionally capped at [`CLEANUP_CONTEXT_SIZE`] —
+    /// it only ever sees one prompt plus one transcript, so a chat-sized window
+    /// would just reserve KV cache it never uses.
     fn configured_context_size(&self) -> u32 {
-        crate::settings::get_settings(&self.app_handle)
+        let configured = crate::settings::get_settings(&self.app_handle)
             .local_llm_context_size
-            .clamp(MIN_CONTEXT_SIZE, MAX_CONTEXT_SIZE)
+            .clamp(MIN_CONTEXT_SIZE, MAX_CONTEXT_SIZE);
+        context_size_for(self.role, configured)
+    }
+
+    /// Number of layers to offload to the GPU for this role/model.
+    fn gpu_layers(&self, gguf: &Path) -> u32 {
+        gpu_layers_for(self.role, std::fs::metadata(gguf).ok().map(|m| m.len()))
     }
 
     fn spawn_server(
@@ -791,6 +898,7 @@ impl LocalLlmManager {
         mmproj: Option<&Path>,
     ) -> std::io::Result<Child> {
         let context_size = self.configured_context_size();
+        let gpu_layers = self.gpu_layers(gguf);
 
         let mut cmd = Command::new(engine);
         cmd.arg("-m")
@@ -816,9 +924,11 @@ impl LocalLlmManager {
             // fighting over a fragmented KV cache.
             .arg("--parallel")
             .arg("1")
-            // Offload as many layers to the GPU as fit; CPU-only builds ignore this.
+            // Offload as many layers to the GPU as fit; CPU-only builds ignore
+            // this. Cleanup with a small model deliberately passes 0 — see
+            // `gpu_layers` / `CLEANUP_CPU_MAX_BYTES`.
             .arg("-ngl")
-            .arg("999")
+            .arg(gpu_layers.to_string())
             // Use the model's embedded Jinja chat template — needed for correct
             // prompting, tool calls, and reasoning separation on modern models.
             .arg("--jinja")
@@ -827,16 +937,37 @@ impl LocalLlmManager {
             .arg("--repeat-penalty")
             .arg("1.1");
 
+        // Cleanup is a rewrite, not a conversation: thinking is pure cost here.
+        // Left to their defaults, current small chat models spend the whole
+        // budget on a "Thinking Process: 1. Analyze the request..." monologue
+        // and return EMPTY content (verified on Gemma 4 E2B and Qwen3.5-0.8B:
+        // finish_reason=length, content empty, ~1100 chars of reasoning), which
+        // the cleanup path can only treat as a failure and fall back to the raw
+        // transcript. The request already asks templates for
+        // `enable_thinking: false`, but models whose template lacks that flag
+        // ignore it — this budget closes the thinking block immediately
+        // regardless of template.
+        //
+        // Passed via the env var rather than `--reasoning-budget` so that an
+        // older cached engine build (which predates the flag) ignores it instead
+        // of refusing to start, exactly like `LLAMA_ARG_FLASH_ATTN` below.
+        if self.role == LlmRole::Cleanup {
+            cmd.env("LLAMA_ARG_THINK_BUDGET", "0");
+        }
+
         // Keep local chat on the same dedicated-first GPU policy used by the
         // rest of the app. This matters on hybrid Windows/Linux systems where
         // an integrated adapter can report more shared memory than a discrete
         // card. Metal exposes a single device, so index 0 remains a no-op there.
-        if let Some(device) = crate::managers::transcription::preferred_gpu_device() {
-            info!(
-                "Selecting llama.cpp main GPU {}: {} ({}, {} MiB)",
-                device.id, device.name, device.kind, device.total_vram_mb
-            );
-            cmd.arg("--main-gpu").arg(device.id.to_string());
+        // Skipped when everything runs on the CPU (`-ngl 0`).
+        if gpu_layers > 0 {
+            if let Some(device) = crate::managers::transcription::preferred_gpu_device() {
+                info!(
+                    "Selecting llama.cpp main GPU {}: {} ({}, {} MiB)",
+                    device.id, device.name, device.kind, device.total_vram_mb
+                );
+                cmd.arg("--main-gpu").arg(device.id.to_string());
+            }
         }
 
         // Flash Attention in "auto" mode: the engine enables it only on backends
@@ -850,8 +981,10 @@ impl LocalLlmManager {
         cmd.env("LLAMA_ARG_FLASH_ATTN", "auto");
 
         // Multimodal models need their vision projector to "see" images
-        // (the assistant's screenshot feature).
-        if let Some(mmproj) = mmproj {
+        // (the assistant's screenshot feature). Cleanup never sends an image, so
+        // it skips the projector: loading `gemma-4-E2B-it-mmproj.gguf` cost a
+        // measured ~1.4s of engine start and ~940MB of memory for nothing.
+        if let Some(mmproj) = mmproj.filter(|_| self.role == LlmRole::Assistant) {
             cmd.arg("--mmproj").arg(mmproj);
         }
 
@@ -1075,6 +1208,62 @@ impl LocalLlmManager {
             .as_millis() as u64
     }
 
+    /// Force the expensive one-time work to happen NOW, off the user's hot path.
+    ///
+    /// `ensure_running` returning only means the engine bound its port. Two
+    /// costs are still outstanding at that moment:
+    ///
+    /// 1. Weights are memory-mapped, so their pages are faulted in lazily by the
+    ///    FIRST real inference (llama.cpp's built-in warmup is an empty run and
+    ///    does not cover a batched prefill).
+    /// 2. On a GPU, the driver compiles compute pipelines for this
+    ///    model + quantization on its first large prefill. Measured on an
+    ///    RTX 4070 Ti Super via Vulkan: 13–20s the first time a given
+    ///    model/quant/driver combination runs, then ~0.14s on every later run
+    ///    once the driver has cached it.
+    ///
+    /// Sending a synthetic prefill here pays both while the user is still
+    /// speaking, which is the difference between a 20s first cleanup and an
+    /// invisible one. Failures are ignored: this is best-effort warming, and the
+    /// real request path reports errors.
+    pub async fn warm_up(&self) {
+        let _guard = self.begin_request();
+        let started = Instant::now();
+        // ~600 tokens of filler: enough to take the same batched-prefill path a
+        // real cleanup prompt takes, small enough to finish quickly.
+        let body = serde_json::json!({
+            "prompt": "warm ".repeat(600),
+            "n_predict": 1,
+            "temperature": 0.0,
+            "cache_prompt": false,
+        });
+
+        let client = match reqwest::Client::builder()
+            .timeout(Duration::from_secs(READY_TIMEOUT.as_secs()))
+            .build()
+        {
+            Ok(client) => client,
+            Err(e) => {
+                debug!("LLM warm-up client build failed: {}", e);
+                return;
+            }
+        };
+
+        match client
+            .post(format!("http://127.0.0.1:{}/completion", self.port))
+            .json(&body)
+            .send()
+            .await
+        {
+            Ok(response) => debug!(
+                "Built-in LLM warm-up finished in {:?} (status {})",
+                started.elapsed(),
+                response.status()
+            ),
+            Err(e) => debug!("Built-in LLM warm-up skipped: {}", e),
+        }
+    }
+
     /// Reset the idle timer to "now". Called on every engine use (prewarm,
     /// `ensure_running`, and at the start/end of each request) so the watcher
     /// only unloads after a genuine idle period.
@@ -1114,7 +1303,13 @@ impl LocalLlmManager {
     /// Never unloads while a request is in flight, or when the timeout is set to
     /// `Never`.
     fn idle_check_and_maybe_stop(&self) {
-        let timeout = crate::settings::get_settings(&self.app_handle).local_llm_unload_timeout;
+        let settings = crate::settings::get_settings(&self.app_handle);
+        // Each role has its own residency policy: the assistant's model is large
+        // and rarely used, cleanup's is small and used on every dictation.
+        let timeout = match self.role {
+            LlmRole::Assistant => settings.local_llm_unload_timeout,
+            LlmRole::Cleanup => settings.post_process_unload_timeout,
+        };
         let Some(limit_seconds) = timeout.to_seconds() else {
             return; // `Never` — keep the engine resident.
         };
@@ -1242,6 +1437,67 @@ fn assign_child_to_kill_on_close_job(child: &Child) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // The assistant and cleanup engines must never share a port, or the second
+    // one to start fails to bind and the feature silently falls back to raw
+    // transcripts.
+    #[test]
+    fn roles_use_distinct_ports_and_logs() {
+        assert_ne!(LlmRole::Assistant.port(), LlmRole::Cleanup.port());
+        assert_ne!(
+            LlmRole::Assistant.log_filename(),
+            LlmRole::Cleanup.log_filename()
+        );
+    }
+
+    // Cleanup sees one prompt plus one transcript, so its window is capped
+    // regardless of the (assistant-oriented) configured size — while never
+    // exceeding what the user asked for.
+    #[test]
+    fn cleanup_context_is_capped_but_never_raised() {
+        assert_eq!(
+            context_size_for(LlmRole::Assistant, 32_768),
+            32_768,
+            "the assistant keeps the configured window"
+        );
+        assert_eq!(
+            context_size_for(LlmRole::Cleanup, 32_768),
+            CLEANUP_CONTEXT_SIZE
+        );
+        assert_eq!(
+            context_size_for(LlmRole::Cleanup, 1024),
+            1024,
+            "a smaller configured window is respected, not padded up"
+        );
+    }
+
+    // Small cleanup models run on the CPU: measured 2x faster to load, no VRAM
+    // next to the ASR model, and it skips the one-time GPU shader compile that
+    // costs 13-20s on a model's first ever run.
+    #[test]
+    fn small_cleanup_models_run_on_cpu_only() {
+        assert_eq!(gpu_layers_for(LlmRole::Cleanup, Some(400 * 1024 * 1024)), 0);
+        assert_eq!(
+            gpu_layers_for(LlmRole::Cleanup, Some(CLEANUP_CPU_MAX_BYTES)),
+            0,
+            "the threshold itself is inclusive"
+        );
+        assert_eq!(
+            gpu_layers_for(LlmRole::Cleanup, Some(CLEANUP_CPU_MAX_BYTES + 1)),
+            999,
+            "big cleanup models still want the GPU"
+        );
+        assert_eq!(
+            gpu_layers_for(LlmRole::Cleanup, None),
+            999,
+            "an unreadable file must not silently demote to CPU"
+        );
+        assert_eq!(
+            gpu_layers_for(LlmRole::Assistant, Some(1024)),
+            999,
+            "the assistant is unaffected by the cleanup policy"
+        );
+    }
 
     // Asset naming was verified live against the llama.cpp b10075 release:
     // Windows ships `llama-<tag>-bin-win-*-x64.zip`, macOS/Linux ship

@@ -1,11 +1,11 @@
 //! Tauri commands for the built-in local LLM engine.
 
 use crate::managers::local_llm::{
-    LocalLlmManager, LocalLlmStatus, MAX_CONTEXT_SIZE, MIN_CONTEXT_SIZE,
+    CleanupLlm, LocalLlmManager, LocalLlmStatus, MAX_CONTEXT_SIZE, MIN_CONTEXT_SIZE,
 };
 use crate::settings::{get_settings, write_settings, ModelUnloadTimeout};
 use std::sync::Arc;
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 /// Current status of the built-in LLM engine (running, which model, whether an
 /// engine binary is present, etc.).
@@ -53,8 +53,13 @@ pub fn set_local_llm_context_size(
     settings.local_llm_context_size = size.clamp(MIN_CONTEXT_SIZE, MAX_CONTEXT_SIZE);
     write_settings(&app, settings);
     // The size is applied at engine launch, so stop any running engine; the
-    // next turn restarts it with the new context window.
+    // next turn restarts it with the new context window. Both engines read this
+    // setting (cleanup clamps it down), so both have to be restarted or the
+    // cleanup process would keep serving the old window until it idles out.
     local_llm.stop();
+    if let Some(cleanup) = app.try_state::<CleanupLlm>() {
+        cleanup.0.stop();
+    }
     // Mirror the assistant settings commands so the panel webview refreshes.
     let _ = app.emit("assistant-settings-changed", ());
     Ok(())

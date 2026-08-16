@@ -23,6 +23,7 @@ export const ERROR_KINDS: Record<string, AssistantErrorKind> = {
   vision_unsupported: "blocking",
   engine_start: "transient",
   provider: "transient",
+  empty_reply: "transient",
   screenshot_too_large: "transient",
   screen_capture: "transient",
   transcription: "transient",

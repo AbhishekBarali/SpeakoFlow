@@ -46,10 +46,6 @@ recording_*
 # Nix build output
 result
 
-# Knowledge-graph analysis output: internal AI-tooling artifact, kept out of
-# the public repo entirely (regenerable from source).
-graphify-out/
-
 # Editor / agent tooling
 .kiro/
 .agents/
@@ -106,6 +102,12 @@ build/*.AppImage
 
 # Reddit promotion working notes (fact sheet, account notes, drafts)
 .promote/
+
+# GitHub traffic/download snapshots from `bun run metrics:github`. Owner-only
+# analytics and competitive signal, so the archive stays local. GitHub deletes
+# traffic data older than 14 days, so do not delete this folder — it is the only
+# record of how the repo performed before each README/metadata change.
+.metrics/
 
 # Scratch space for bulk translation passes (see CONTRIBUTING_TRANSLATIONS.md)
 .i18n-work/

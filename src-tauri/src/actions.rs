@@ -176,7 +176,12 @@ If the input is non-empty, the output must be non-empty.",
 /// characters some models insert. Only the exact `<transcript>` wrapper tags are
 /// stripped — never arbitrary angle-bracket text the speaker may have dictated.
 fn sanitize_post_process_output(s: &str) -> String {
-    let mut text = strip_invisible_chars(s).trim().to_string();
+    // Thinking models leak `<think>…</think>` into content when a template or
+    // server flag fails to suppress it. Pasting a monologue into the user's
+    // document is worse than pasting the raw transcript, so drop it here even
+    // though the cleanup engine already launches with a zero thinking budget.
+    let stripped = crate::flow::strip_reasoning_blocks(s);
+    let mut text = strip_invisible_chars(&stripped).trim().to_string();
 
     // Strip a single surrounding Markdown code fence: ```lang\n … \n``` (or a
     // one-line ```…```). Only when the whole output is fenced, which is a model
@@ -205,21 +210,54 @@ fn sanitize_post_process_output(s: &str) -> String {
     text.trim().to_string()
 }
 
-/// Kick off loading the built-in LLM engine in the background so its (slow)
-/// first-time load overlaps with recording + transcription instead of blocking
-/// the first response. Errors are ignored here; the real request path surfaces
-/// them and retries. No-op unless the built-in provider is the active one.
+/// Kick off loading the AI-cleanup engine in the background so its (slow) first
+/// load overlaps with recording + transcription instead of blocking the paste.
+///
+/// This is the single biggest lever on perceived cleanup latency: a cold engine
+/// costs seconds (engine spawn + model load + first-inference page-in + a
+/// one-time GPU shader compile), and a dictation is several seconds of speaking
+/// — so started early enough, the whole cost disappears behind the user's own
+/// voice. Errors are ignored here; the real request path surfaces them and
+/// retries.
 fn prewarm_builtin_llm(app: &AppHandle, model: String) {
+    let manager = cleanup_llm(app);
+    tauri::async_runtime::spawn(async move {
+        match manager.ensure_running(&model).await {
+            // Loading the weights is only half of it — force the first prefill
+            // now too, or the user's first cleanup pays for faulting the model
+            // in and compiling GPU pipelines.
+            Ok(()) => manager.warm_up().await,
+            Err(e) => debug!(
+                "Built-in LLM prewarm failed (will retry on first use): {}",
+                e
+            ),
+        }
+    });
+}
+
+/// The dedicated AI-cleanup engine (separate process/port from the assistant's,
+/// so the two can never evict each other).
+fn cleanup_llm(app: &AppHandle) -> Arc<crate::managers::local_llm::LocalLlmManager> {
+    app.state::<crate::managers::local_llm::CleanupLlm>()
+        .inner()
+        .0
+        .clone()
+}
+
+/// Same overlap trick for the assistant's own engine, which is a different
+/// process on a different port (and keeps its own model, projector and context).
+fn prewarm_assistant_llm(app: &AppHandle, model: String) {
     let manager = app
         .state::<Arc<crate::managers::local_llm::LocalLlmManager>>()
         .inner()
         .clone();
     tauri::async_runtime::spawn(async move {
-        if let Err(e) = manager.ensure_running(&model).await {
-            debug!(
-                "Built-in LLM prewarm failed (will retry on first use): {}",
+        match manager.ensure_running(&model).await {
+            Ok(()) => manager.warm_up().await,
+            Err(e) => debug!(
+                "Assistant LLM prewarm failed (will retry on first use): {}",
                 e
-            );
+            ),
         }
     });
 }
@@ -357,10 +395,32 @@ fn validate_cleaned_output(
 ) -> Result<String, PostProcessFailureKind> {
     let cleaned = sanitize_post_process_output(output);
     if cleaned.is_empty() && !transcription_allows_empty_output(transcription) {
-        Err(PostProcessFailureKind::EmptyResponse)
-    } else {
-        Ok(cleaned)
+        return Err(PostProcessFailureKind::EmptyResponse);
     }
+    if is_implausibly_long(transcription, &cleaned) {
+        return Err(PostProcessFailureKind::MalformedResponse);
+    }
+    Ok(cleaned)
+}
+
+/// Reject output that is far longer than what was dictated.
+///
+/// Cleanup only ever tidies: it removes fillers, fixes punctuation and collapses
+/// repetition, so the result is normally shorter than the input and never much
+/// longer. Output that balloons is the classic small-model failure — narrating
+/// its plan ("The user wants me to clean up a raw transcript... **Cleaning
+/// goals:** 1. ...") instead of doing the work, which is far worse to paste than
+/// the raw transcript. Structured output prevents this on models that support it;
+/// this is the deterministic net for the plain-request fallback.
+///
+/// The allowance is generous on purpose: short utterances legitimately grow
+/// (spoken formatting commands, number expansion), so a floor of 80 characters
+/// applies before the ratio does any work.
+fn is_implausibly_long(transcription: &str, cleaned: &str) -> bool {
+    const RATIO: usize = 3;
+    const FLOOR: usize = 80;
+    let budget = FLOOR.max(transcription.chars().count().saturating_mul(RATIO));
+    cleaned.chars().count() > budget
 }
 
 fn parse_structured_output(
@@ -420,9 +480,22 @@ async fn send_post_process_request(
     config: &ResolvedPostProcessConfig,
     request: &PostProcessRequest,
     schema: Option<serde_json::Value>,
+    endpoint: Option<&str>,
 ) -> Result<Option<String>, crate::llm_client::ChatCompletionError> {
+    // The built-in provider's stored base URL points at the assistant engine.
+    // Cleanup runs on its own engine process/port, so the caller passes that
+    // endpoint in and it wins for this request only (settings stay untouched).
+    let provider = match endpoint {
+        Some(base_url) if base_url != config.provider.base_url => {
+            let mut provider = config.provider.clone();
+            provider.base_url = base_url.to_string();
+            std::borrow::Cow::Owned(provider)
+        }
+        _ => std::borrow::Cow::Borrowed(&config.provider),
+    };
+
     crate::llm_client::send_chat_completion_with_schema_typed(
-        &config.provider,
+        provider.as_ref(),
         config.api_key.clone(),
         &config.model,
         request.user_content.clone(),
@@ -438,6 +511,7 @@ async fn run_provider_post_process(
     config: &ResolvedPostProcessConfig,
     transcription: &str,
     deadline: TokioInstant,
+    endpoint: Option<&str>,
 ) -> PostProcessAttemptOutcome {
     let request = build_post_process_request(config, transcription);
 
@@ -460,7 +534,7 @@ async fn run_provider_post_process(
         let attempt_started = Instant::now();
         let structured = tokio::time::timeout_at(
             structured_deadline,
-            send_post_process_request(config, &request, Some(transcription_schema())),
+            send_post_process_request(config, &request, Some(transcription_schema()), endpoint),
         )
         .await;
         debug!(
@@ -503,9 +577,11 @@ async fn run_provider_post_process(
             config.provider.id, remaining
         );
         let fallback_started = Instant::now();
-        let plain =
-            tokio::time::timeout_at(deadline, send_post_process_request(config, &request, None))
-                .await;
+        let plain = tokio::time::timeout_at(
+            deadline,
+            send_post_process_request(config, &request, None, endpoint),
+        )
+        .await;
         debug!(
             "Cleanup plain compatibility attempt for provider '{}' finished in {:?}",
             config.provider.id,
@@ -525,8 +601,11 @@ async fn run_provider_post_process(
     }
 
     let attempt_started = Instant::now();
-    let plain =
-        tokio::time::timeout_at(deadline, send_post_process_request(config, &request, None)).await;
+    let plain = tokio::time::timeout_at(
+        deadline,
+        send_post_process_request(config, &request, None, endpoint),
+    )
+    .await;
     debug!(
         "Cleanup plain attempt for provider '{}' finished in {:?}",
         config.provider.id,
@@ -555,7 +634,7 @@ async fn post_process_transcription(
     );
 
     let _llm_activity_guard = if config.provider.id == "builtin" {
-        let manager = app.state::<Arc<crate::managers::local_llm::LocalLlmManager>>();
+        let manager = cleanup_llm(app);
         let startup_started = Instant::now();
         match tokio::time::timeout_at(deadline, manager.ensure_running(&config.model)).await {
             Ok(Ok(())) => {
@@ -610,7 +689,10 @@ async fn post_process_transcription(
         }
     }
 
-    run_provider_post_process(config, transcription, deadline).await
+    // Cleanup talks to its own engine when the built-in provider is active; every
+    // other provider keeps the endpoint it was configured with.
+    let endpoint = (config.provider.id == "builtin").then(|| cleanup_llm(app).base_url());
+    run_provider_post_process(config, transcription, deadline, endpoint.as_deref()).await
 }
 
 fn fallback_reason_for_unavailable(
@@ -918,7 +1000,8 @@ impl ShortcutAction for TranscribeAction {
         // dedicated selection and an Assistant fallback receive identical cold-
         // start treatment. Runtime still calls ensure_running inside the user
         // timeout; this is only a best-effort overlap with recording.
-        if self.post_process && settings.local_llm_unload_timeout != ModelUnloadTimeout::Immediately
+        if self.post_process
+            && settings.post_process_unload_timeout != ModelUnloadTimeout::Immediately
         {
             if let Ok(config) = resolve_post_process_config(&settings) {
                 if config.provider.id == "builtin" {
@@ -1510,7 +1593,7 @@ impl ShortcutAction for AssistantAction {
                     if provider.id == "builtin" {
                         if let Some(model) = settings.assistant_models.get("builtin") {
                             if !model.trim().is_empty() {
-                                prewarm_builtin_llm(app, model.clone());
+                                prewarm_assistant_llm(app, model.clone());
                             }
                         }
                     }
@@ -1731,6 +1814,46 @@ mod tests {
         let mut prompt = base.clone();
         append_tone_directive(&mut prompt, None);
         assert_eq!(prompt, base, "cleanup-only must not add a style block");
+    }
+
+    // The failure this guards against, verbatim from Gemma 4 E2B running this
+    // app's real cleanup prompt: instead of the cleaned transcript it narrated
+    // its plan. Pasting that into the user's document is worse than pasting the
+    // raw transcript, so it must be rejected and fall back.
+    #[test]
+    fn a_narrated_plan_is_rejected_instead_of_pasted() {
+        let transcription = "um so the meeting is at 5 no wait make it 6";
+        let monologue = "The user wants me to clean up a raw speech-to-text transcript. \
+             **Input:** \"um so the meeting is at 5 no wait make it 6\" \
+             **Cleaning goals:** 1. Fix spelling, capitalization, punctuation. \
+             2. Remove fillers. 3. Collapse repetition. \
+             **Drafting the cleaned text:** The meeting is at six. \
+             **Review against constraints:** output only the cleaned text.";
+        assert_eq!(
+            validate_cleaned_output(transcription, monologue),
+            Err(PostProcessFailureKind::MalformedResponse)
+        );
+    }
+
+    #[test]
+    fn normal_cleanup_output_is_never_rejected_for_length() {
+        // Real output from the same model once structured output was enabled.
+        let transcription = "um so the meeting is at 5 no wait make it 6 and uh we need to \
+             discuss the q3 budget with speako flow team period new line also ping tori \
+             about the gguf thing";
+        let cleaned = "So, the meeting is at six. We need to discuss the Q3 budget with the \
+             SpeakoFlow team.\nAlso, ping Tori about the GGUF thing.";
+        assert_eq!(
+            validate_cleaned_output(transcription, cleaned),
+            Ok(cleaned.to_string())
+        );
+
+        // Short utterances legitimately grow (spoken punctuation, capitalization).
+        assert_eq!(
+            validate_cleaned_output("ok", "Okay."),
+            Ok("Okay.".to_string()),
+            "the character floor must protect very short dictations"
+        );
     }
 
     #[test]
@@ -2090,6 +2213,7 @@ mod tests {
             &config,
             "raw transcript exactly",
             TokioInstant::now() + Duration::from_secs(2),
+            None,
         ));
         assert_eq!(
             outcome,
@@ -2134,6 +2258,7 @@ mod tests {
             &config,
             "raw",
             TokioInstant::now() + Duration::from_secs(3),
+            None,
         ));
         assert_eq!(
             outcome,
@@ -2174,6 +2299,7 @@ mod tests {
             &config,
             "raw",
             TokioInstant::now() + Duration::from_secs(3),
+            None,
         ));
         assert_eq!(
             outcome,
@@ -2200,6 +2326,7 @@ mod tests {
             &config,
             "raw",
             TokioInstant::now() + Duration::from_secs(2),
+            None,
         ));
         assert_eq!(
             outcome,
@@ -2227,6 +2354,7 @@ mod tests {
             &config,
             "raw",
             TokioInstant::now() + Duration::from_millis(100),
+            None,
         ));
         assert_eq!(outcome, PostProcessAttemptOutcome::TimedOut);
         assert!(started.elapsed() < Duration::from_millis(500));
@@ -2255,6 +2383,7 @@ mod tests {
             &config,
             "raw",
             TokioInstant::now() + Duration::from_secs(2),
+            None,
         ));
         assert_eq!(
             outcome,
@@ -2286,6 +2415,7 @@ mod tests {
                 &config,
                 "raw",
                 TokioInstant::now() + Duration::from_secs(2),
+                None,
             ));
             assert_eq!(outcome, PostProcessAttemptOutcome::Failed(expected));
             server.join().unwrap();
@@ -2317,6 +2447,7 @@ mod tests {
             &config,
             "raw",
             TokioInstant::now() + Duration::from_secs(2),
+            None,
         ));
         assert_eq!(
             outcome,
@@ -2346,6 +2477,7 @@ mod tests {
                 &config,
                 "raw",
                 TokioInstant::now() + Duration::from_secs(2),
+                None,
             ));
             assert_eq!(
                 outcome,

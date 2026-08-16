@@ -1,3 +1,4 @@
+- [SpeakoFlow](https://github.com/AbhishekBarali/SpeakoFlow) - Offline dictation and a screen-aware AI assistant for Windows, macOS, and Linux. (FOSS)
 <div align="center">
 
 <picture>
@@ -58,12 +59,13 @@ I built it while studying alone for exams. I was paying for dictation software t
 
 ## Why SpeakoFlow
 
-Most dictation tools stop at typing. Wispr Flow, Superwhisper, and Handy all turn
-speech into text well. None of them can look at what you are working on and write
-the reply for you.
+Most dictation tools stop at typing. They hear you accurately, put the words on
+screen, and that is where they end. SpeakoFlow keeps going. Ask it about the error
+or the email in front of you and it takes one look at your screen, then answers
+with that context, out loud if you want it to.
 
-SpeakoFlow does both. It's also the only one of the four that's free, open source,
-and runs on all three desktop platforms.
+Transcription runs on your own machine. The whole app is MIT licensed and free on
+Windows, macOS, and Linux.
 
 - **Compared with Wispr Flow.** Wispr Flow is closed source, transcribes in the
   cloud, has no Linux build, and caps its free tier at 2,000 words per week
@@ -73,14 +75,9 @@ and runs on all three desktop platforms.
 - **Compared with Superwhisper.** Superwhisper is a capable closed-source app on
   macOS, Windows, and iOS, with Pro at $8.49/month or $249.99 for a lifetime
   licence. SpeakoFlow is free, MIT licensed, and also runs on Linux.
-- **Built on Handy.** SpeakoFlow's dictation core comes from
-  [Handy](https://github.com/cjpais/Handy), the more established project and a
-  genuinely good pure-dictation tool. SpeakoFlow takes that core further:
-  spoken-instruction writing, on-device translation, text-to-speech, personal
-  memory, and a screen-aware assistant.
 
-If all you need is dictation, Handy is a solid choice. If you want your computer
-to answer you, keep reading. See also:
+On top of dictation you get spoken-instruction writing, on-device translation,
+spoken answers, personal memory, and switchable assistant profiles. See also:
 [the best free and open-source Wispr Flow alternatives](https://www.speakoflow.com/blog/best-free-open-source-wispr-flow-alternatives).
 
 ## Features

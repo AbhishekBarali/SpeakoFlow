@@ -501,7 +501,10 @@ fn sanitize_flow_output(raw: &str) -> Option<String> {
 /// Remove leaked reasoning blocks (`<think>`, `<thinking>`, `<reasoning>`,
 /// case-insensitive). A block that never closes swallows the rest of the text
 /// — an unfinished thought is reasoning, not content.
-fn strip_reasoning_blocks(text: &str) -> String {
+///
+/// Shared with AI cleanup (`actions.rs`), which pastes model output straight
+/// into the user's document and must never leak a thinking monologue.
+pub(crate) fn strip_reasoning_blocks(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
     // ASCII lowercase preserves byte offsets exactly (the tags are ASCII), so
     // indices found in `lower` are valid for `text`.

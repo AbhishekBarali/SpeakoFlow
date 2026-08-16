@@ -449,6 +449,8 @@ const AssistantPanel: React.FC = () => {
     : "";
   const listRef = useRef<HTMLDivElement>(null);
   const sendingRef = useRef(false);
+  /// Text typed while a reply was still streaming, sent when the turn ends.
+  const queuedTextRef = useRef<string | null>(null);
   // Streaming is smoothed: raw tokens accumulate in a buffer and are flushed to
   // React state at most once per animation frame. A fast provider can burst
   // many tokens between paints, and each flush re-parses the whole growing
@@ -1134,48 +1136,69 @@ const AssistantPanel: React.FC = () => {
     return () => window.clearTimeout(timer);
   }, [collapsed, liveOverlay, state, ttsActive, error, history.length]);
 
-  const sendText = useCallback(async () => {
-    const text = input.trim();
-    if (!text || sendingRef.current || busy) return;
-    sendingRef.current = true;
-    setInput("");
-    // The one slash command: /summarize compacts the conversation.
-    if (text.toLowerCase() === "/summarize") {
+  const dispatchText = useCallback(
+    async (text: string) => {
+      sendingRef.current = true;
+      // The one slash command: /summarize compacts the conversation.
+      if (text.toLowerCase() === "/summarize") {
+        try {
+          await commands.assistantSummarize();
+        } catch (err) {
+          setError({ code: null, detail: String(err) });
+        } finally {
+          sendingRef.current = false;
+        }
+        return;
+      }
+      const withScreen = attachScreen && manualScreenAccess;
+      const images = pendingImages.map((image) => image.dataUrl);
+      const files = pendingFiles.map(({ name, content }) => ({
+        name,
+        content,
+      }));
       try {
-        await commands.assistantSummarize();
+        if (images.length > 0 || files.length > 0 || withScreen) {
+          // Screen vision is sticky: it stays armed for the following turns
+          // until the user switches it off (camera toggle or pill badge).
+          await commands.assistantSendComposed(text, images, files, withScreen);
+          setPendingImages([]);
+          setPendingFiles([]);
+        } else {
+          await commands.assistantSendText(text);
+        }
       } catch (err) {
         setError({ code: null, detail: String(err) });
       } finally {
         sendingRef.current = false;
       }
+    },
+    [attachScreen, manualScreenAccess, pendingImages, pendingFiles],
+  );
+
+  const sendText = useCallback(async () => {
+    const text = input.trim();
+    if (!text || sendingRef.current) return;
+    setInput("");
+    // Typing while a reply is still streaming used to discard the message
+    // silently, which is fatal for steering a coding agent: "no, stop, use JWT
+    // instead" is exactly the thing a person types before the previous answer
+    // has finished. Hold it and send it as soon as the turn ends.
+    if (busy) {
+      queuedTextRef.current = text;
+      setNotice(t("assistant.queuedUntilReady"));
       return;
     }
-    const withScreen = attachScreen && manualScreenAccess;
-    const images = pendingImages.map((image) => image.dataUrl);
-    const files = pendingFiles.map(({ name, content }) => ({ name, content }));
-    try {
-      if (images.length > 0 || files.length > 0 || withScreen) {
-        // Screen vision is sticky: it stays armed for the following turns
-        // until the user switches it off (camera toggle or pill badge).
-        await commands.assistantSendComposed(text, images, files, withScreen);
-        setPendingImages([]);
-        setPendingFiles([]);
-      } else {
-        await commands.assistantSendText(text);
-      }
-    } catch (err) {
-      setError({ code: null, detail: String(err) });
-    } finally {
-      sendingRef.current = false;
-    }
-  }, [
-    input,
-    busy,
-    attachScreen,
-    manualScreenAccess,
-    pendingImages,
-    pendingFiles,
-  ]);
+    await dispatchText(text);
+  }, [input, busy, dispatchText, t]);
+
+  // Flush whatever was typed mid-reply, once the turn is over.
+  useEffect(() => {
+    if (busy) return;
+    const queued = queuedTextRef.current;
+    if (!queued) return;
+    queuedTextRef.current = null;
+    void dispatchText(queued);
+  }, [busy, dispatchText]);
 
   const clearConversation = useCallback(async () => {
     tts.stop();
