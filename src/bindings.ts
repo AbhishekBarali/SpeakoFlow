@@ -2212,7 +2212,17 @@ text_replacements?: Replacement[]; model_unload_timeout?: ModelUnloadTimeout;
  * sidecar) is unloaded to free RAM/VRAM. Mirrors `model_unload_timeout`
  * but applies to the LLM used for post-processing and the assistant.
  */
-local_llm_unload_timeout?: ModelUnloadTimeout; word_correction_threshold?: number; history_limit?: number; recording_retention_period?: RecordingRetentionPeriod; paste_method?: PasteMethod; clipboard_handling?: ClipboardHandling; auto_submit?: boolean; auto_submit_key?: AutoSubmitKey; post_process_enabled?: boolean; post_process_provider_id?: string; post_process_providers?: PostProcessProvider[]; post_process_api_keys?: SecretMap; post_process_models?: Partial<{ [key in string]: string }>; post_process_prompts?: LLMPrompt[]; post_process_selected_prompt_id?: string | null; post_process_tone?: PostProcessTone; 
+local_llm_unload_timeout?: ModelUnloadTimeout; 
+/**
+ * How long the **AI-cleanup** engine stays loaded after its last use.
+ * 
+ * Separate from `local_llm_unload_timeout` on purpose: cleanup runs on
+ * every dictation with a small model, while the assistant's model is larger
+ * and used in bursts. Keeping cleanup resident for longer costs a few
+ * hundred MB of RAM and no CPU at all (an idle engine does no work), and it
+ * removes the reload from the dictation path entirely.
+ */
+post_process_unload_timeout?: ModelUnloadTimeout; word_correction_threshold?: number; history_limit?: number; recording_retention_period?: RecordingRetentionPeriod; paste_method?: PasteMethod; clipboard_handling?: ClipboardHandling; auto_submit?: boolean; auto_submit_key?: AutoSubmitKey; post_process_enabled?: boolean; post_process_provider_id?: string; post_process_providers?: PostProcessProvider[]; post_process_api_keys?: SecretMap; post_process_models?: Partial<{ [key in string]: string }>; post_process_prompts?: LLMPrompt[]; post_process_selected_prompt_id?: string | null; post_process_tone?: PostProcessTone; 
 /**
  * User-created writing styles. Built-ins remain code-defined/localized and
  * are selected by their stable IDs.

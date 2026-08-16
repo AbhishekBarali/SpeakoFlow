@@ -872,6 +872,10 @@
         "styleGroupTitle": "Writing style",
         "styleGroupDescription": "Choose a built-in style or save your own rules for how cleaned dictation should sound.",
         "modelGroupTitle": "Cleanup model",
+        "unloadTimeout": {
+          "title": "Keep cleanup model loaded",
+          "description": "How long the on-device cleanup model stays in memory after you stop using it. Longer means no reload before your next dictation; an idle model uses memory but no CPU. Separate from the assistant's setting."
+        },
         "promptGroupTitle": "Cleanup prompt",
         "title": "Fix up my dictation with AI",
         "caption": "Experimental — tidies punctuation and filler after you dictate.",
@@ -1479,6 +1483,7 @@
     "empty": "Ask by voice with your assistant shortcut,\nor type below.",
     "inputPlaceholder": "Message…",
     "inputPlaceholderScreen": "Ask about your screen…",
+    "queuedUntilReady": "Queued — sending as soon as this reply finishes.",
     "send": "Send",
     "stop": "Stop",
     "cancel": "Cancel",
@@ -1552,6 +1557,8 @@
       "engine_startShort": "Model couldn't start",
       "provider": "The model couldn't answer. Check your API key and connection, then try again.",
       "providerShort": "Couldn't get an answer",
+      "empty_reply": "The model finished without writing a reply. Try asking again, or pick a different model in Settings → Assistant.",
+      "empty_replyShort": "Empty reply",
       "vision_unsupported": "This model can't read your screen. Pick a vision-capable model in Settings → Assistant, or ask again without screen vision.",
       "vision_unsupportedShort": "Model can't see images",
       "screenshot_too_large": "The screen capture was too large for this provider. Please try again — it will be compressed harder.",

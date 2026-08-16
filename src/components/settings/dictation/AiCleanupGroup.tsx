@@ -13,6 +13,7 @@ import {
   PostProcessingTone,
 } from "../post-processing/PostProcessingSettings";
 import { PostProcessTimeout } from "../PostProcessTimeout";
+import { PostProcessUnloadTimeout } from "../PostProcessUnloadTimeout";
 import { ShortcutInput } from "../ShortcutInput";
 
 /**
@@ -26,7 +27,8 @@ export const AiCleanupGroup: React.FC = () => {
 
   const enabled = getSetting("post_process_enabled") ?? false;
   const fixMisheard = getSetting("post_process_fix_misheard") ?? false;
-  const cleanupStrength = getSetting("post_process_cleanup_strength") ?? "balanced";
+  const cleanupStrength =
+    getSetting("post_process_cleanup_strength") ?? "balanced";
 
   return (
     <>
@@ -58,7 +60,9 @@ export const AiCleanupGroup: React.FC = () => {
                 options={[
                   {
                     value: "light",
-                    label: t("settings.dictation.aiCleanup.strengthOptions.light"),
+                    label: t(
+                      "settings.dictation.aiCleanup.strengthOptions.light",
+                    ),
                   },
                   {
                     value: "balanced",
@@ -117,6 +121,7 @@ export const AiCleanupGroup: React.FC = () => {
           >
             <PostProcessingSettingsApi />
             <PostProcessTimeout grouped={true} />
+            <PostProcessUnloadTimeout grouped={true} />
           </SettingsGroup>
 
           <SettingsGroup

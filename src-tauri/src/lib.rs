@@ -230,6 +230,19 @@ fn initialize_core_logic(app_handle: &AppHandle) {
             .expect("Failed to initialize local LLM manager"),
     );
 
+    // A SECOND engine instance, dedicated to dictation AI cleanup. Sharing one
+    // engine with the assistant meant a different model on either side evicted
+    // the other on every use, so each dictation paid a full model load. Separate
+    // processes also let cleanup run leaner (no vision projector, thinking off,
+    // small context, CPU for small models) and keep their own residency policy.
+    let cleanup_llm_manager = Arc::new(
+        managers::local_llm::LocalLlmManager::new_for_role(
+            app_handle,
+            managers::local_llm::LlmRole::Cleanup,
+        )
+        .expect("Failed to initialize cleanup LLM manager"),
+    );
+
     // Initialize transcribe.cpp (logging + backend modules) once, before any
     // transcribe.cpp model load or device enumeration. Failures are logged and
     // swallowed so transcribe-rs engines keep working (N1). See PLAN.md S2.
@@ -244,6 +257,7 @@ fn initialize_core_logic(app_handle: &AppHandle) {
     app_handle.manage(transcription_manager.clone());
     app_handle.manage(history_manager.clone());
     app_handle.manage(local_llm_manager.clone());
+    app_handle.manage(managers::local_llm::CleanupLlm(cleanup_llm_manager.clone()));
 
     // Apply history retention once, at startup. This is the ONLY place old
     // recordings are pruned: changing the history limit / retention period
@@ -262,6 +276,7 @@ fn initialize_core_logic(app_handle: &AppHandle) {
     // Start the idle watcher that unloads the built-in LLM after it has been
     // idle for the configured timeout, freeing RAM/VRAM when it's not in use.
     managers::local_llm::LocalLlmManager::spawn_idle_watcher(&local_llm_manager);
+    managers::local_llm::LocalLlmManager::spawn_idle_watcher(&cleanup_llm_manager);
 
     // Note: Shortcuts are NOT initialized here.
     // The frontend is responsible for calling the `initialize_shortcuts` command
@@ -1106,6 +1121,11 @@ pub fn run(cli_args: CliArgs) {
                     app.try_state::<std::sync::Arc<managers::local_llm::LocalLlmManager>>()
                 {
                     mgr.stop();
+                }
+                // The cleanup engine is a second process and needs the same
+                // teardown, or it outlives the app holding its model in memory.
+                if let Some(cleanup) = app.try_state::<managers::local_llm::CleanupLlm>() {
+                    cleanup.0.stop();
                 }
             }
             let _ = (app, event); // suppress unused warnings on non-macOS

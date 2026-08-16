@@ -107,5 +107,10 @@ build/*.AppImage
 # Reddit promotion working notes (fact sheet, account notes, drafts)
 .promote/
 
+# Local GitHub traffic/download snapshots. Owner-only analytics, kept off the
+# public repo. GitHub deletes traffic data after 14 days, so this folder is the
+# only record of how the repo performed before each README/metadata change.
+.metrics/
+
 # Scratch space for bulk translation passes (see CONTRIBUTING_TRANSLATIONS.md)
 .i18n-work/
