@@ -19,9 +19,9 @@ use crate::TranscriptionCoordinator;
 use ferrous_opencc::{config::BuiltinConfig, OpenCC};
 use log::{debug, error, warn};
 use once_cell::sync::Lazy;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tauri::Manager;
 use tauri::{AppHandle, Emitter};
@@ -348,8 +348,36 @@ fn build_post_process_request(
     append_tone_directive(&mut system_prompt, config.tone_instruction.as_deref());
     append_misheard_directive(&mut system_prompt, config.fix_misheard);
     append_final_output_contract(&mut system_prompt);
-    let (reasoning_effort, reasoning) = match config.provider.id.as_str() {
-        "custom" => (Some("none".to_string()), None),
+    let (reasoning_effort, reasoning) = cleanup_reasoning_options(&config.provider.id);
+
+    PostProcessRequest {
+        system_prompt,
+        user_content: transcription.to_string(),
+        reasoning_effort,
+        reasoning,
+    }
+}
+
+/// Ask the provider NOT to think before cleaning a transcript.
+///
+/// Cleaning one sentence is the least reasoning-shaped task in the app, but a
+/// modern model left on its defaults will still spend a thinking budget on it:
+/// Gemini's OpenAI-compatible layer documents that it uses "the model's default
+/// level or budget" when `reasoning_effort` is absent, and OpenAI's reasoning
+/// models default to medium. That thinking is invisible here — cleanup is a
+/// single non-streamed request — so it shows up purely as a dictation that takes
+/// seconds to paste.
+///
+/// Suppression is therefore sent to every remote provider, with two documented
+/// exceptions, and a rejection downgrades once per model (see
+/// [`send_post_process_request`]) so a provider that refuses the parameter
+/// cannot break cleanup.
+fn cleanup_reasoning_options(
+    provider_id: &str,
+) -> (Option<String>, Option<crate::llm_client::ReasoningConfig>) {
+    match provider_id {
+        // OpenRouter has its own reasoning object, and `exclude` also keeps the
+        // reasoning text out of the response body.
         "openrouter" => (
             None,
             Some(crate::llm_client::ReasoningConfig {
@@ -357,14 +385,37 @@ fn build_post_process_request(
                 exclude: Some(true),
             }),
         ),
-        _ => (None, None),
-    };
+        // Anthropic's OpenAI-compatible layer documents `reasoning_effort` as
+        // ignored; Claude does not think unless asked via the native `thinking`
+        // field, so there is nothing to suppress.
+        "anthropic" => (None, None),
+        // The built-in engine is handled at a lower level: `enable_thinking:
+        // false` in the chat template plus `LLAMA_ARG_THINK_BUDGET=0` on the
+        // cleanup process. Apple Intelligence never reaches this path.
+        "builtin" | APPLE_INTELLIGENCE_PROVIDER_ID => (None, None),
+        _ => (Some("none".to_string()), None),
+    }
+}
 
-    PostProcessRequest {
-        system_prompt,
-        user_content: transcription.to_string(),
-        reasoning_effort,
-        reasoning,
+/// Provider+model pairs that rejected reasoning suppression. Remembered so the
+/// extra round trip happens at most once per model per app run.
+static REASONING_SUPPRESSION_REJECTED: Lazy<Mutex<HashSet<String>>> =
+    Lazy::new(|| Mutex::new(HashSet::new()));
+
+fn suppression_key(provider_id: &str, model: &str) -> String {
+    format!("{provider_id}|{model}")
+}
+
+fn suppression_rejected(provider_id: &str, model: &str) -> bool {
+    REASONING_SUPPRESSION_REJECTED
+        .lock()
+        .map(|set| set.contains(&suppression_key(provider_id, model)))
+        .unwrap_or(false)
+}
+
+fn remember_suppression_rejected(provider_id: &str, model: &str) {
+    if let Ok(mut set) = REASONING_SUPPRESSION_REJECTED.lock() {
+        set.insert(suppression_key(provider_id, model));
     }
 }
 
@@ -482,6 +533,46 @@ async fn send_post_process_request(
     schema: Option<serde_json::Value>,
     endpoint: Option<&str>,
 ) -> Result<Option<String>, crate::llm_client::ChatCompletionError> {
+    let suppress = !suppression_rejected(&config.provider.id, &config.model);
+    let (effort, reasoning) = if suppress {
+        (request.reasoning_effort.clone(), request.reasoning.clone())
+    } else {
+        (None, None)
+    };
+    let sent_suppression = effort.is_some() || reasoning.is_some();
+
+    let result =
+        send_one_post_process_request(config, request, schema.clone(), endpoint, effort, reasoning)
+            .await;
+
+    // A provider that refuses `reasoning_effort` must not cost the user the
+    // whole feature. Retry once without it and remember, so this happens at most
+    // once per model. Only on the plain path: with a schema attached, a 400 is
+    // ambiguous (schema or parameter?) and the structured path already has its
+    // own plain fallback, which lands here.
+    match result {
+        Err(error)
+            if sent_suppression && schema.is_none() && is_schema_compatibility_error(&error) =>
+        {
+            debug!(
+                "Provider '{}' rejected reasoning suppression for model '{}'; retrying without it",
+                config.provider.id, config.model
+            );
+            remember_suppression_rejected(&config.provider.id, &config.model);
+            send_one_post_process_request(config, request, schema, endpoint, None, None).await
+        }
+        other => other,
+    }
+}
+
+async fn send_one_post_process_request(
+    config: &ResolvedPostProcessConfig,
+    request: &PostProcessRequest,
+    schema: Option<serde_json::Value>,
+    endpoint: Option<&str>,
+    effort: Option<String>,
+    reasoning: Option<crate::llm_client::ReasoningConfig>,
+) -> Result<Option<String>, crate::llm_client::ChatCompletionError> {
     // The built-in provider's stored base URL points at the assistant engine.
     // Cleanup runs on its own engine process/port, so the caller passes that
     // endpoint in and it wins for this request only (settings stay untouched).
@@ -501,8 +592,8 @@ async fn send_post_process_request(
         request.user_content.clone(),
         Some(request.system_prompt.clone()),
         schema,
-        request.reasoning_effort.clone(),
-        request.reasoning.clone(),
+        effort,
+        reasoning,
     )
     .await
 }
@@ -1791,10 +1882,11 @@ pub static ACTION_MAP: Lazy<HashMap<String, Arc<dyn ShortcutAction>>> = Lazy::ne
 mod tests {
     use super::{
         append_tone_directive, build_post_process_request, build_system_prompt,
-        finalize_post_process_attempt, parse_structured_output, run_provider_post_process,
-        sanitize_post_process_output, transcription_allows_empty_output, uses_ai_cleanup,
-        validate_cleaned_output, PostProcessAttemptOutcome, PostProcessFailureKind,
-        PostProcessFallbackReason, PostProcessResultEvent,
+        cleanup_reasoning_options, finalize_post_process_attempt, parse_structured_output,
+        run_provider_post_process, sanitize_post_process_output, suppression_rejected,
+        transcription_allows_empty_output, uses_ai_cleanup, validate_cleaned_output,
+        PostProcessAttemptOutcome, PostProcessFailureKind, PostProcessFallbackReason,
+        PostProcessResultEvent, APPLE_INTELLIGENCE_PROVIDER_ID,
     };
     use crate::settings::{
         PostProcessConfigSource, PostProcessProvider, PostProcessTone,
@@ -2272,6 +2364,89 @@ mod tests {
         for body in captured {
             assert!(body.get("tools").is_none());
             assert!(body.get("tool_choice").is_none());
+        }
+    }
+
+    #[test]
+    fn reasoning_suppression_is_dropped_once_when_the_provider_rejects_it() {
+        let (base_url, requests, server) = spawn_mock_provider(vec![
+            MockResponse {
+                status: 400,
+                body: "{}".to_string(),
+                delay: Duration::ZERO,
+            },
+            MockResponse {
+                status: 200,
+                body: completion_response("Cleaned."),
+                delay: Duration::ZERO,
+            },
+        ]);
+        let mut config = test_config(
+            base_url,
+            false,
+            PostProcessTone::None,
+            "Clean the transcript.",
+        );
+        // Distinct from other tests: the "already rejected" memo is process-wide.
+        config.model = "reasoning-picky-model".to_string();
+
+        let outcome = tauri::async_runtime::block_on(run_provider_post_process(
+            &config,
+            "raw",
+            TokioInstant::now() + Duration::from_secs(3),
+            None,
+        ));
+
+        assert_eq!(
+            outcome,
+            PostProcessAttemptOutcome::Applied("Cleaned.".to_string()),
+            "a provider that refuses reasoning_effort must not lose the feature"
+        );
+        server.join().unwrap();
+        let captured: Vec<_> = requests.try_iter().collect();
+        assert_eq!(captured.len(), 2);
+        assert_eq!(
+            captured[0]["reasoning_effort"], "none",
+            "cleanup asks the model not to think"
+        );
+        assert!(
+            captured[1].get("reasoning_effort").is_none(),
+            "the retry drops the parameter the provider rejected"
+        );
+        assert!(
+            suppression_rejected("custom", "reasoning-picky-model"),
+            "the rejection is remembered so it costs one round trip, once"
+        );
+    }
+
+    #[test]
+    fn thinking_is_suppressed_everywhere_it_can_be() {
+        // Remote providers get the OpenAI-style knob: cleaning one sentence must
+        // never spend a thinking budget.
+        assert_eq!(
+            cleanup_reasoning_options("openai").0.as_deref(),
+            Some("none")
+        );
+        assert_eq!(
+            cleanup_reasoning_options("gemini").0.as_deref(),
+            Some("none")
+        );
+        assert_eq!(
+            cleanup_reasoning_options("custom").0.as_deref(),
+            Some("none")
+        );
+        // OpenRouter uses its own object, and excludes the reasoning text too.
+        let (effort, reasoning) = cleanup_reasoning_options("openrouter");
+        assert!(effort.is_none());
+        let reasoning = reasoning.expect("OpenRouter gets a reasoning config");
+        assert_eq!(reasoning.effort.as_deref(), Some("none"));
+        assert_eq!(reasoning.exclude, Some(true));
+        // Documented exceptions: Anthropic ignores the field, and the built-in
+        // engine is handled by the chat template + think budget instead.
+        for id in ["anthropic", "builtin", APPLE_INTELLIGENCE_PROVIDER_ID] {
+            let (effort, reasoning) = cleanup_reasoning_options(id);
+            assert!(effort.is_none(), "{id} must not send reasoning_effort");
+            assert!(reasoning.is_none(), "{id} must not send a reasoning config");
         }
     }
 
