@@ -1318,7 +1318,7 @@
         "voiceLabel": "Voice",
         "voiceDescription": "Kokoro voice for spoken replies.",
         "dtypeLabel": "Kokoro precision",
-        "dtypeDescription": "fp32 is highest quality; q8 is faster on CPU. Changing this reloads the model.",
+        "dtypeDescription": "fp32 is highest quality; q8 is faster on CPU. Changing this reloads the model. If the voice comes out garbled or like noise instead of speech, choose \"q8 on CPU\" — some graphics drivers corrupt audio generated on the GPU.",
         "speedLabel": "Playback speed",
         "speedDescription": "1× is normal. ElevenLabs supports 0.7×–1.2× only.",
         "speedValue": "{{value}}×",

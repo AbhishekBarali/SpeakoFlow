@@ -160,7 +160,22 @@ export function useKokoroTts(
         const baseDtype = forceCpu
           ? requestedDtype.slice(0, -"-cpu".length)
           : requestedDtype;
-        const useGpu = hasWebGpu() && !forceCpu;
+        // A quantized graph on the WebGPU execution provider is a KNOWN broken
+        // combination, not a hardware lottery: onnxruntime#29807 reports q8 and
+        // q4f16 producing unintelligible noise for Kokoro-82M on WebGPU while
+        // the same files are clean on the WASM provider. That is the bug behind
+        // the reports of "garbled sound instead of speech" in Chrome/Edge/Brave
+        // (and it matches Firefox being fine — no WebGPU there, so it silently
+        // ran the correct path). Corruption produces valid audio buffers and no
+        // exception, so nothing downstream can detect it.
+        //
+        // So a quantized precision always runs on the CPU. It costs speed, not
+        // correctness, and q8 on wasm is the configuration upstream treats as
+        // known-good. fp32 (the default) still uses WebGPU; fp16 is left alone
+        // because it is only reported broken on specific GPUs, and the "-cpu"
+        // suffix stays as the manual escape hatch for those.
+        const quantizedOnGpu = ["q8", "q4", "q4f16"].includes(baseDtype);
+        const useGpu = hasWebGpu() && !forceCpu && !quantizedOnGpu;
         // WebKitGTK commonly has no WebGPU. Loading the 325 MB fp32 graph into
         // WASM can appear to hang after the text answer is already visible;
         // use the cached 92 MB q8 graph directly on CPU instead of waiting for
