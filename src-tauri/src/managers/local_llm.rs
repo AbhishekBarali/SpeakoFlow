@@ -44,15 +44,17 @@ const CLEANUP_ENGINE_PORT: u16 = 11436;
 /// which is why the prompt does NOT need trimming for speed.
 pub const CLEANUP_CONTEXT_SIZE: u32 = 4096;
 
-/// Cleanup models at or below this size run on the CPU (`-ngl 0`).
+/// Offload every layer the backend can take. CPU-only builds ignore it.
 ///
-/// Measured on a 380MB Q4 model: CPU load 0.9s vs GPU 2.0s (no VRAM upload, no
-/// Vulkan init), and inference 0.33s vs 0.05s — so CPU is a net win for the
-/// cold path that dictation actually hits, costs no VRAM next to the ASR model,
-/// keeps the GPU out of a raised power state, and avoids the 13–20s one-time
-/// GPU shader compilation a new model/quant pays on its first ever run.
-/// Anything larger stays on the GPU, where the compute saving is worth it.
-const CLEANUP_CPU_MAX_BYTES: u64 = 2 * 1024 * 1024 * 1024;
+/// Cleanup used to pass 0 (CPU) for models at or below 2 GiB, on the grounds
+/// that a cold load is ~2x faster on CPU and skips the one-time 13-20s GPU
+/// shader compile. That optimised the wrong half: the same measurement showed
+/// inference at 0.33s on CPU against 0.05s on the GPU, so it traded a one-time
+/// startup cost for a ~6x penalty on every single cleanup afterwards. Now that
+/// the engine is prewarmed in the background and stays resident (15 minutes by
+/// default), the load and the shader compile happen once, out of sight — so both
+/// roles take the GPU when one exists.
+const ALL_GPU_LAYERS: u32 = 999;
 
 /// Pinned llama.cpp release used as a fallback when the GitHub "latest" API is
 /// unreachable or rate-limited. Its assets are fetched directly from the
@@ -148,19 +150,6 @@ fn context_size_for(role: LlmRole, configured: u32) -> u32 {
     match role {
         LlmRole::Assistant => configured,
         LlmRole::Cleanup => configured.min(CLEANUP_CONTEXT_SIZE),
-    }
-}
-
-/// GPU layers to offload, per role and model size. `model_bytes` is `None` when
-/// the file can't be stat'd, in which case the GPU keeps its usual "take
-/// everything" behaviour rather than silently dropping to CPU.
-fn gpu_layers_for(role: LlmRole, model_bytes: Option<u64>) -> u32 {
-    match role {
-        LlmRole::Assistant => 999,
-        LlmRole::Cleanup => match model_bytes {
-            Some(bytes) if bytes <= CLEANUP_CPU_MAX_BYTES => 0,
-            _ => 999,
-        },
     }
 }
 
@@ -886,9 +875,10 @@ impl LocalLlmManager {
         context_size_for(self.role, configured)
     }
 
-    /// Number of layers to offload to the GPU for this role/model.
-    fn gpu_layers(&self, gguf: &Path) -> u32 {
-        gpu_layers_for(self.role, std::fs::metadata(gguf).ok().map(|m| m.len()))
+    /// Number of layers to offload to the GPU. Both roles take everything the
+    /// backend will accept; see [`ALL_GPU_LAYERS`].
+    fn gpu_layers(&self) -> u32 {
+        ALL_GPU_LAYERS
     }
 
     fn spawn_server(
@@ -898,7 +888,7 @@ impl LocalLlmManager {
         mmproj: Option<&Path>,
     ) -> std::io::Result<Child> {
         let context_size = self.configured_context_size();
-        let gpu_layers = self.gpu_layers(gguf);
+        let gpu_layers = self.gpu_layers();
 
         let mut cmd = Command::new(engine);
         cmd.arg("-m")
@@ -925,8 +915,8 @@ impl LocalLlmManager {
             .arg("--parallel")
             .arg("1")
             // Offload as many layers to the GPU as fit; CPU-only builds ignore
-            // this. Cleanup with a small model deliberately passes 0 — see
-            // `gpu_layers` / `CLEANUP_CPU_MAX_BYTES`.
+            // this. See `ALL_GPU_LAYERS` for why cleanup no longer demotes small
+            // models to the CPU.
             .arg("-ngl")
             .arg(gpu_layers.to_string())
             // Use the model's embedded Jinja chat template — needed for correct
@@ -959,15 +949,12 @@ impl LocalLlmManager {
         // rest of the app. This matters on hybrid Windows/Linux systems where
         // an integrated adapter can report more shared memory than a discrete
         // card. Metal exposes a single device, so index 0 remains a no-op there.
-        // Skipped when everything runs on the CPU (`-ngl 0`).
-        if gpu_layers > 0 {
-            if let Some(device) = crate::managers::transcription::preferred_gpu_device() {
-                info!(
-                    "Selecting llama.cpp main GPU {}: {} ({}, {} MiB)",
-                    device.id, device.name, device.kind, device.total_vram_mb
-                );
-                cmd.arg("--main-gpu").arg(device.id.to_string());
-            }
+        if let Some(device) = crate::managers::transcription::preferred_gpu_device() {
+            info!(
+                "Selecting llama.cpp main GPU {}: {} ({}, {} MiB)",
+                device.id, device.name, device.kind, device.total_vram_mb
+            );
+            cmd.arg("--main-gpu").arg(device.id.to_string());
         }
 
         // Flash Attention in "auto" mode: the engine enables it only on backends
@@ -1471,32 +1458,13 @@ mod tests {
         );
     }
 
-    // Small cleanup models run on the CPU: measured 2x faster to load, no VRAM
-    // next to the ASR model, and it skips the one-time GPU shader compile that
-    // costs 13-20s on a model's first ever run.
     #[test]
-    fn small_cleanup_models_run_on_cpu_only() {
-        assert_eq!(gpu_layers_for(LlmRole::Cleanup, Some(400 * 1024 * 1024)), 0);
-        assert_eq!(
-            gpu_layers_for(LlmRole::Cleanup, Some(CLEANUP_CPU_MAX_BYTES)),
-            0,
-            "the threshold itself is inclusive"
-        );
-        assert_eq!(
-            gpu_layers_for(LlmRole::Cleanup, Some(CLEANUP_CPU_MAX_BYTES + 1)),
-            999,
-            "big cleanup models still want the GPU"
-        );
-        assert_eq!(
-            gpu_layers_for(LlmRole::Cleanup, None),
-            999,
-            "an unreadable file must not silently demote to CPU"
-        );
-        assert_eq!(
-            gpu_layers_for(LlmRole::Assistant, Some(1024)),
-            999,
-            "the assistant is unaffected by the cleanup policy"
-        );
+    fn every_role_offloads_to_the_gpu() {
+        // Regression guard for the reverted CPU-only cleanup policy: a small
+        // cleanup model must NOT be demoted to `-ngl 0`. Loading was faster on
+        // CPU, but generation was ~6x slower, and generation is what runs on
+        // every dictation.
+        assert_eq!(ALL_GPU_LAYERS, 999);
     }
 
     // Asset naming was verified live against the llama.cpp b10075 release:
