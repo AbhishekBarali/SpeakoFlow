@@ -1243,9 +1243,9 @@
         "timing": {
           "label": "When to capture",
           "description": "For voice questions: capture the moment you start asking, or wait until the message is sent. Typed messages always capture on send.",
-          "descriptionAgent": "\"When I ask\" grabs the screen while you're still speaking, so if the assistant decides it needs to look, the answer comes much sooner. The image stays on your device and is only sent if the assistant actually asks for it.",
+          "descriptionAgent": "Both options prepare the screenshot in advance, so the assistant never makes you wait for one. The difference is what the image shows: \"When I ask\" grabs the screen as it looked when you started speaking, \"When the message sends\" grabs it as it looks now. Either way the image stays on your device and is only sent if the assistant actually asks to see it.",
           "options": {
-            "immediate": "When I ask (faster)",
+            "immediate": "When I ask",
             "on_send": "When the message sends"
           }
         },

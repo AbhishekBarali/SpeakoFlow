@@ -16,6 +16,13 @@ custom-protocol = ["tauri/custom-protocol"]
 [profile.dev]
 incremental = true # Compile your binary in smaller steps.
 
+# Screenshot resize/encode is pure pixel math, and unoptimized it costs SECONDS
+# per capture on a 1440p+ display — enough to make a dev build feel broken in a
+# way the shipped release build never is. Optimizing just this one dependency
+# keeps `tauri dev` representative of what users actually experience.
+[profile.dev.package.image]
+opt-level = 3
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [lib]

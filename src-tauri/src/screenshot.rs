@@ -108,8 +108,20 @@ fn encode_provider_data_url(
 ) -> Result<String, String> {
     let (ladder, target) = profile_encoding(profile);
     let mut chosen: Option<(Vec<u8>, u32, u8)> = None;
+    // Each rung downscales from the PREVIOUS rung's image, not from the
+    // full-resolution frame. A conservative (Azure) capture that ends up on the
+    // 4th rung otherwise pays four full 4K resizes for one screenshot — the
+    // measured cost was seconds, spent inside the user's wait. Stepping down
+    // instead costs one large resize plus a few tiny ones, and the output
+    // dimensions are identical (successive Triangle steps also alias slightly
+    // less than one big jump).
+    let mut stepped: Option<DynamicImage> = None;
     for &(max_dim, quality) in ladder {
-        let buf = encode_jpeg(&scaled(img, max_dim), quality)?;
+        let step = match &stepped {
+            Some(previous) => scaled(previous, max_dim),
+            None => scaled(img, max_dim),
+        };
+        let buf = encode_jpeg(&step, quality)?;
         // Budget the encoded base64 payload (the fixed data-URL prefix is tiny
         // and is intentionally excluded from the provider image budget).
         let encoded_size = buf.len().div_ceil(3) * 4;
@@ -117,6 +129,7 @@ fn encode_provider_data_url(
         if encoded_size <= target {
             break;
         }
+        stepped = Some(step);
     }
     let (buf, max_dim, quality) =
         chosen.ok_or_else(|| format!("{} encoding produced no output", label))?;
@@ -143,7 +156,12 @@ where
     F: FnOnce(Option<(i32, i32)>) -> Result<DynamicImage, String>,
 {
     let image = capture(point)?;
-    encode_provider_data_url(&image, profile, "screen")
+    // Split the two costs: a slow desktop grab and a slow encode need different
+    // fixes, and the old single total couldn't tell them apart.
+    let grabbed = std::time::Instant::now();
+    let result = encode_provider_data_url(&image, profile, "screen");
+    debug!("Screen encode pass took {:?}", grabbed.elapsed());
+    result
 }
 
 /// Capture a full monitor and return a `data:image/jpeg;base64,...` URL,

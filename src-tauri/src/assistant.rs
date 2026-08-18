@@ -279,20 +279,27 @@ pub fn clear_immediate_capture() {
 // Agent-decided capture, grabbed early
 // ---------------------------------------------------------------------------
 
-/// A frame grabbed at recording start in case the assistant asks to see the
-/// screen.
+/// A frame grabbed ahead of the model's decision, in case the assistant asks to
+/// see the screen.
 ///
-/// Taking a screenshot is local, private and cheap: a few hundred milliseconds
-/// of work on the user's own machine that goes nowhere. Waiting until the model
-/// calls `capture_screen`, though, spends all of it inside the silence the user
-/// is already sitting through — and that silence is the one this whole path is
-/// trying to remove. So the frame is grabbed while the user is still talking and
-/// parked here.
+/// Taking a screenshot is local and private, but it is not free: on a 4K display
+/// it is a real chunk of wall clock. Waiting until the model calls
+/// `capture_screen` spends all of it inside the silence the user is already
+/// sitting through — the silence this whole path exists to remove. So the frame
+/// is grabbed early and parked here, and the tool call waits on it rather than
+/// starting from scratch.
 ///
-/// Privacy is unchanged: the model still decides whether it needs the screen. A
-/// frame nobody asked for is dropped at the end of the turn and never leaves the
-/// device. What changes is only that the answer to "yes, look" is already in
-/// hand.
+/// Two moments start a capture, which is exactly what the "when to capture"
+/// setting selects:
+/// - `Immediate` — at recording start, while the user is still talking, so the
+///   frame shows what they were looking at when they began asking.
+/// - `OnSend` — at the start of the turn (see [`ensure_agent_capture_started`]),
+///   so the frame shows the screen as it is now, prepared in parallel with the
+///   model's first round instead of after it.
+///
+/// Privacy is unchanged either way: the model still decides whether it needs the
+/// screen, and a frame nobody asked for is dropped at the end of the turn
+/// without ever leaving the device.
 static PENDING_AGENT_CAPTURE: Mutex<Option<PendingAgentCapture>> = Mutex::new(None);
 
 /// Which recording the parked frame belongs to. Every recording advances it, so
@@ -304,14 +311,82 @@ static AGENT_CAPTURE_GENERATION: AtomicU64 = AtomicU64::new(0);
 /// user was looking at when they asked.
 const AGENT_CAPTURE_MAX_AGE: std::time::Duration = std::time::Duration::from_secs(45);
 
+/// How long the tool call will wait on a capture that is still running before
+/// abandoning it and grabbing a fresh frame itself. Generous enough to cover a
+/// slow desktop grab, bounded so a wedged capture can't hang the answer.
+const AGENT_CAPTURE_WAIT: std::time::Duration = std::time::Duration::from_secs(10);
+
 struct PendingAgentCapture {
     generation: u64,
-    taken: Instant,
+    /// When the capture was STARTED (not finished): the age that matters is how
+    /// long ago the screen looked like this.
+    started: Instant,
     /// The size/quality budget it was compressed for. A frame sized for one
     /// provider is not necessarily accepted by another, so a provider change
     /// between the capture and the request falls back to a fresh capture.
     profile: crate::screenshot::CaptureProfile,
-    data_url: String,
+    /// Resolves to the encoded frame, or to `None` when the capture failed.
+    /// Already-finished captures resolve immediately, so waiting costs nothing
+    /// in the common case.
+    frame: tokio::sync::oneshot::Receiver<Option<String>>,
+}
+
+/// The capture worker's half of a parked frame. Holding it is what lets the
+/// tool call wait for an in-flight capture instead of starting a second one.
+pub struct AgentCaptureTicket {
+    generation: u64,
+    frame: tokio::sync::oneshot::Sender<Option<String>>,
+}
+
+impl AgentCaptureTicket {
+    /// Hand the captured frame (or the failure) to whoever is waiting. A send
+    /// that finds no receiver means the turn moved on — nothing to do.
+    pub fn fulfill(self, captured: Result<String, String>) {
+        if AGENT_CAPTURE_GENERATION.load(Ordering::SeqCst) != self.generation {
+            return;
+        }
+        let _ = self.frame.send(match captured {
+            Ok(data_url) => Some(data_url),
+            Err(e) => {
+                debug!("Agent vision pre-capture failed: {}", e);
+                None
+            }
+        });
+    }
+}
+
+/// Park a slot for a capture about to start under `generation`, returning the
+/// worker's ticket.
+fn park_agent_capture(
+    generation: u64,
+    profile: crate::screenshot::CaptureProfile,
+) -> Option<AgentCaptureTicket> {
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    let mut pending = PENDING_AGENT_CAPTURE.lock().ok()?;
+    *pending = Some(PendingAgentCapture {
+        generation,
+        started: Instant::now(),
+        profile,
+        frame: rx,
+    });
+    Some(AgentCaptureTicket {
+        generation,
+        frame: tx,
+    })
+}
+
+/// Whether a parked frame belongs to `generation`, matches `profile`, and is
+/// still fresh enough to use.
+fn parked_frame_is_usable(
+    pending: &Option<PendingAgentCapture>,
+    generation: u64,
+    profile: crate::screenshot::CaptureProfile,
+) -> bool {
+    pending.as_ref().is_some_and(|frame| {
+        frame.generation == generation
+            && frame.profile == profile
+            && frame.started.elapsed() < AGENT_CAPTURE_MAX_AGE
+    })
 }
 
 /// Whether this recording should grab a frame up front, and under which
@@ -321,7 +396,10 @@ struct PendingAgentCapture {
 /// Advancing the generation on every recording — even when no capture is wanted
 /// — is what guarantees a frame from an abandoned recording can't be adopted by
 /// a later turn.
-pub fn begin_agent_capture(settings: &crate::settings::AppSettings) -> Option<u64> {
+pub fn begin_agent_capture(
+    settings: &crate::settings::AppSettings,
+    profile: crate::screenshot::CaptureProfile,
+) -> Option<AgentCaptureTicket> {
     let generation = AGENT_CAPTURE_GENERATION
         .fetch_add(1, Ordering::SeqCst)
         .wrapping_add(1);
@@ -332,43 +410,73 @@ pub fn begin_agent_capture(settings: &crate::settings::AppSettings) -> Option<u6
         && settings.assistant_vision_capture_timing
             == crate::settings::VisionCaptureTiming::Immediate
         && !settings.active_character_is_cat();
-    wanted.then_some(generation)
+    if !wanted {
+        return None;
+    }
+    park_agent_capture(generation, profile)
 }
 
-/// Park a captured frame, if the recording it belongs to is still the current
-/// one.
-pub fn stash_agent_capture(
-    generation: u64,
-    profile: crate::screenshot::CaptureProfile,
-    data_url: String,
-) {
-    if AGENT_CAPTURE_GENERATION.load(Ordering::SeqCst) != generation {
-        return;
-    }
-    if let Ok(mut pending) = PENDING_AGENT_CAPTURE.lock() {
-        *pending = Some(PendingAgentCapture {
-            generation,
-            taken: Instant::now(),
-            profile,
-            data_url,
-        });
-    }
+/// Start a capture for the turn that is about to run, unless a usable one is
+/// already parked (the `Immediate` frame from recording start).
+///
+/// This is the `OnSend` half of the timing setting: the frame still shows the
+/// screen as it is when the message goes out, but the work happens in parallel
+/// with the model's first round instead of stalling inside the tool call. Typed
+/// turns get it too — they have no recording to piggyback on.
+fn ensure_agent_capture_started(profile: crate::screenshot::CaptureProfile) {
+    let generation = AGENT_CAPTURE_GENERATION.load(Ordering::SeqCst);
+    let ticket = {
+        let Ok(pending) = PENDING_AGENT_CAPTURE.lock() else {
+            return;
+        };
+        if parked_frame_is_usable(&pending, generation, profile) {
+            return;
+        }
+        drop(pending);
+        match park_agent_capture(generation, profile) {
+            Some(ticket) => ticket,
+            None => return,
+        }
+    };
+    std::thread::spawn(move || {
+        ticket.fulfill(crate::screenshot::capture_screen_data_url_at(None, profile));
+    });
 }
 
 /// Consume the parked frame if it is current, fresh, and sized for the provider
-/// about to receive it.
-fn take_agent_capture(profile: crate::screenshot::CaptureProfile) -> Option<String> {
-    let mut pending = PENDING_AGENT_CAPTURE.lock().ok()?;
-    let usable = pending.as_ref().is_some_and(|frame| {
-        frame.generation == AGENT_CAPTURE_GENERATION.load(Ordering::SeqCst)
-            && frame.profile == profile
-            && frame.taken.elapsed() < AGENT_CAPTURE_MAX_AGE
-    });
-    if !usable {
-        *pending = None;
-        return None;
+/// about to receive it, waiting on it when the capture is still running.
+///
+/// Waiting is the point: a capture that started a moment ago is most of the way
+/// done, so joining it beats throwing it away and paying the full cost again.
+async fn take_agent_capture(profile: crate::screenshot::CaptureProfile) -> Option<String> {
+    let generation = AGENT_CAPTURE_GENERATION.load(Ordering::SeqCst);
+    let pending = {
+        let mut slot = PENDING_AGENT_CAPTURE.lock().ok()?;
+        if !parked_frame_is_usable(&slot, generation, profile) {
+            *slot = None;
+            return None;
+        }
+        slot.take()?
+    };
+    let waited = Instant::now();
+    match tokio::time::timeout(AGENT_CAPTURE_WAIT, pending.frame).await {
+        Ok(Ok(Some(data_url))) => {
+            debug!(
+                "Agent screen capture served from the parked frame (waited {}ms)",
+                waited.elapsed().as_millis()
+            );
+            Some(data_url)
+        }
+        // The capture failed, or its worker vanished: fall through to a fresh one.
+        Ok(_) => None,
+        Err(_) => {
+            debug!(
+                "Parked screen frame did not arrive within {:?}; capturing fresh",
+                AGENT_CAPTURE_WAIT
+            );
+            None
+        }
     }
-    pending.take().map(|frame| frame.data_url)
 }
 
 /// Drop any parked frame. Called when a turn ends, so a frame the model never
@@ -1938,16 +2046,12 @@ async fn agent_capture_screen(
         return Err("screen access is no longer set to Agent decides".to_string());
     }
     let profile = crate::screenshot::CaptureProfile::for_base_url(&provider.base_url);
-    // Prefer the frame grabbed at recording start (see PENDING_AGENT_CAPTURE):
-    // it is already in memory, so the model's decision to look costs nothing,
-    // and it shows what the user was looking at when they started asking. A
-    // typed turn, an On-send timing setting, or a stale/mismatched frame all
-    // fall through to capturing now.
-    let data_url = match take_agent_capture(profile) {
-        Some(data_url) => {
-            debug!("Agent screen capture served from the recording-start frame");
-            data_url
-        }
+    // Prefer the frame parked for this turn (see PENDING_AGENT_CAPTURE): it is
+    // already captured, or already on its way, so the model's decision to look
+    // costs little or nothing. A stale or mismatched frame, or a capture that
+    // takes too long to arrive, falls through to capturing now.
+    let data_url = match take_agent_capture(profile).await {
+        Some(data_url) => data_url,
         None => tauri::async_runtime::spawn_blocking(move || {
             crate::screenshot::capture_screen_data_url_at(None, profile)
         })
@@ -2327,6 +2431,16 @@ pub async fn run_assistant_turn(
     let agent_screen = settings.assistant_screen_access_mode
         == AssistantScreenAccessMode::AgentDecides
         && screenshot.is_none();
+    // Get the frame moving now rather than inside the tool call. If the model
+    // decides it needs to look, the screenshot is already done or nearly done;
+    // if it doesn't, the frame is dropped at the end of the turn and never
+    // leaves the device. A recording-start frame (Immediate timing) is already
+    // parked and is left alone.
+    if agent_screen && !settings.active_character_is_cat() {
+        ensure_agent_capture_started(crate::screenshot::CaptureProfile::for_base_url(
+            &provider.base_url,
+        ));
+    }
     let tool_capabilities = build_assistant_tool_capabilities(web_via_tools, agent_screen);
     // OpenRouter's `:online` model suffix turns on its built-in web search
     // server-side; every other path uses the model name unchanged.
@@ -3486,6 +3600,66 @@ mod tests {
         inputs.immediate_capture_available = true;
         inputs.screen_armed_for_immediate_reuse = false;
         assert_eq!(voice_screen_plan(inputs), VoiceScreenPlan::CaptureOnSend);
+    }
+
+    /// The parked agent frame, end to end. One test on purpose: these are
+    /// process-wide statics, so splitting them would let parallel tests race.
+    #[test]
+    fn parked_agent_frame_is_waited_on_rather_than_recaptured() {
+        use crate::screenshot::CaptureProfile;
+        let take = |profile| tauri::async_runtime::block_on(take_agent_capture(profile));
+
+        let mut settings = crate::settings::get_default_settings();
+        settings.assistant_screen_access_mode = AssistantScreenAccessMode::AgentDecides;
+        settings.assistant_vision_capture_timing = crate::settings::VisionCaptureTiming::Immediate;
+
+        // A finished capture is served straight from the slot.
+        let ticket = begin_agent_capture(&settings, CaptureProfile::Generous)
+            .expect("agent-decides + immediate must park a capture slot");
+        ticket.fulfill(Ok("ready".to_string()));
+        assert_eq!(take(CaptureProfile::Generous), Some("ready".to_string()));
+        // And it is consumed, so a second ask can't resend the same frame.
+        assert!(take(CaptureProfile::Generous).is_none());
+
+        // The regression this guards: a capture that is still running when the
+        // model asks must be JOINED, not thrown away for a second full capture.
+        // This is the case a short question hits.
+        let ticket = begin_agent_capture(&settings, CaptureProfile::Generous).unwrap();
+        std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_millis(150));
+            ticket.fulfill(Ok("late".to_string()));
+        });
+        assert_eq!(
+            take(CaptureProfile::Generous),
+            Some("late".to_string()),
+            "an in-flight capture must be waited on, not recaptured"
+        );
+
+        // A failed capture falls through to capturing fresh.
+        let ticket = begin_agent_capture(&settings, CaptureProfile::Generous).unwrap();
+        ticket.fulfill(Err("no display".to_string()));
+        assert!(take(CaptureProfile::Generous).is_none());
+
+        // A frame sized for one provider is never handed to another.
+        let ticket = begin_agent_capture(&settings, CaptureProfile::Generous).unwrap();
+        ticket.fulfill(Ok("generous".to_string()));
+        assert!(take(CaptureProfile::Conservative).is_none());
+
+        // A later recording invalidates the earlier frame, and a worker that
+        // vanished without capturing resolves to nothing rather than stalling.
+        let stale = begin_agent_capture(&settings, CaptureProfile::Generous).unwrap();
+        let current = begin_agent_capture(&settings, CaptureProfile::Generous).unwrap();
+        stale.fulfill(Ok("stale".to_string()));
+        drop(current);
+        assert!(
+            take(CaptureProfile::Generous).is_none(),
+            "a frame from an abandoned recording must not be adopted"
+        );
+
+        // On-send timing parks nothing at recording start — the turn starts it.
+        settings.assistant_vision_capture_timing = crate::settings::VisionCaptureTiming::OnSend;
+        assert!(begin_agent_capture(&settings, CaptureProfile::Generous).is_none());
+        clear_agent_capture();
     }
 
     #[test]

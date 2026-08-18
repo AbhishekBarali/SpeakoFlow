@@ -1644,18 +1644,16 @@ impl ShortcutAction for AssistantAction {
                 });
             }
 
-            // Agent-decides mode: grab a frame now, while the user is still
-            // talking, so that if the model does call `capture_screen` the tool
-            // returns instantly instead of spending a few hundred milliseconds
-            // of the user's silence on a screenshot. The frame stays on this
-            // machine and is dropped at the end of the turn if the model never
-            // asks for it.
-            if let Some(generation) = crate::assistant::begin_agent_capture(&settings) {
+            // Agent-decides mode with Immediate timing: grab a frame now, while
+            // the user is still talking, so that if the model does call
+            // `capture_screen` the tool has it in hand instead of spending a few
+            // seconds of the user's silence on a screenshot. With On-send timing
+            // the capture starts at the beginning of the turn instead (see
+            // `ensure_agent_capture_started`). The frame stays on this machine
+            // and is dropped at the end of the turn if the model never asks.
+            if let Some(ticket) = crate::assistant::begin_agent_capture(&settings, profile) {
                 std::thread::spawn(move || {
-                    match crate::screenshot::capture_screen_data_url_at(None, profile) {
-                        Ok(url) => crate::assistant::stash_agent_capture(generation, profile, url),
-                        Err(e) => debug!("Agent vision pre-capture failed: {}", e),
-                    }
+                    ticket.fulfill(crate::screenshot::capture_screen_data_url_at(None, profile));
                 });
             }
         }
