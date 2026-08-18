@@ -1,0 +1,9 @@
+# Shell scripts must keep LF endings even when checked out on Windows.
+#
+# Git's autocrlf would otherwise hand `bash` a file whose `set -o pipefail`
+# line ends in CR, and bash fails with "set: pipefail: invalid option name".
+# That is why scripts/ci/test-audit-macos-bundle.py could not run on a Windows
+# checkout even though it needs neither macOS nor a build: 4 of its 7 cases
+# failed on line endings, not on logic.
+*.sh text eol=lf
+*.bash text eol=lf
