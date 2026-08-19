@@ -237,20 +237,23 @@ one case where no **Open Anyway** button appears in _System Settings → Privacy
 Security_. Terminal is the only route left. Proper Apple signing and
 notarization is on the [roadmap](#roadmap) and removes this step entirely.
 
-**Apple Silicon only for now.** Builds cover M1 and newer. There's no published
-Intel Mac build yet. Not because it can't be built, but because it hasn't been
-tested on real Intel hardware, and shipping a download that might not start
-would be worse than shipping none. An Intel build is being proven in CI now. If
-it works it will be CPU-only, since the GPU backend targets Apple Silicon. In
-the meantime you can [build from source](#build-from-source), and see
-[BUILD.md](BUILD.md) for the extra Intel step.
+**Intel Macs, from 1.3.0 onward.** Download
+`SpeakoFlow_<version>_x64.dmg` for Intel and
+`SpeakoFlow_<version>_aarch64.dmg` for M1 and newer. The Intel build is CPU
+only, since the GPU backend targets Apple Silicon, so transcription is slower
+than on Apple Silicon but fully functional. Every Intel build is checked in CI
+on a real Intel machine: the app's own libraries are the only ones left in
+place, then the binary is launched, so a bundle that could not start on your Mac
+fails the build instead of reaching the release page. You can also
+[build from source](#build-from-source); see [BUILD.md](BUILD.md) for the extra
+Intel step.
 
 > An earlier version of this section said GitHub had retired its Intel build
 > machines, leaving no way to produce or test an Intel build. That was wrong.
 > GitHub retired the old `macos-13` runner in December 2025 but replaced it with
 > `macos-15-intel`, which is available until August 2027. Thanks to
 > [@hellosimplerick](https://github.com/AbhishekBarali/SpeakoFlow/issues/19) for
-> catching it.
+> catching it, which is why the Intel build now exists.
 
 </details>
 
