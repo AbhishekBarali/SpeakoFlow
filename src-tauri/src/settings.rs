@@ -1122,6 +1122,16 @@ pub struct AppSettings {
     pub whisper_gpu_device: i32,
     #[serde(default)]
     pub extra_recording_buffer_ms: u64,
+    /// Master switch for the assistant experience: the floating panel window,
+    /// its two hotkeys, spoken replies, profiles and personal memory.
+    ///
+    /// Off makes SpeakoFlow dictation-only and, crucially, never creates the
+    /// always-on-top panel WebView — a whole renderer process plus whatever it
+    /// loads (the local TTS model above all) that otherwise lives for as long as
+    /// the app does. Kept separate from the provider/model settings on purpose:
+    /// "Generate with Flow" and AI Correction share those and keep working.
+    #[serde(default = "default_true")]
+    pub assistant_enabled: bool,
     #[serde(default = "default_assistant_provider_id")]
     pub assistant_provider_id: String,
     #[serde(default)]
@@ -2525,6 +2535,7 @@ pub fn get_default_settings() -> AppSettings {
         ort_accelerator: OrtAcceleratorSetting::default(),
         whisper_gpu_device: default_whisper_gpu_device(),
         extra_recording_buffer_ms: 0,
+        assistant_enabled: true,
         assistant_provider_id: default_assistant_provider_id(),
         assistant_models: {
             let mut map = HashMap::new();

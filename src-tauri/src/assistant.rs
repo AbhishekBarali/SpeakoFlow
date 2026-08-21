@@ -19,6 +19,16 @@ use tauri_plugin_store::StoreExt;
 use tokio::sync::Notify;
 
 pub const PANEL_LABEL: &str = "assistant_panel";
+
+/// The shortcut bindings that belong to the assistant, and so are switched off
+/// with it: the voice turn and the panel toggle. (Their auto-derived Shift
+/// `.lock` variants resolve to these ids, so checking the base id covers both.)
+pub const ASSISTANT_BINDINGS: [&str; 2] = ["assistant", "assistant_panel_toggle"];
+
+/// Does this shortcut belong to the assistant?
+pub fn is_assistant_binding(binding_id: &str) -> bool {
+    ASSISTANT_BINDINGS.contains(&binding_id)
+}
 const PANEL_MARGIN: f64 = 24.0;
 /// Where the PILL last sat (legacy key — keeps existing stored positions).
 const PANEL_POSITION_KEY: &str = "assistant_panel_position";
@@ -1184,8 +1194,13 @@ fn default_position(app: &AppHandle) -> (f64, f64) {
     }
 }
 
-/// Create the assistant panel window, hidden by default. Called once at setup.
+/// Create the assistant panel window, hidden by default. Called once at setup
+/// when the assistant is enabled, and again if the user enables it later — so it
+/// is idempotent: an existing window is left exactly as it is.
 pub fn create_assistant_panel(app: &AppHandle) {
+    if app.get_webview_window(PANEL_LABEL).is_some() {
+        return;
+    }
     let (x, y) = saved_position(app).unwrap_or_else(|| default_position(app));
     // Build at whichever size matches the current mode (pill by default) so the
     // first show doesn't briefly flash the large panel before collapsing.
@@ -1254,6 +1269,14 @@ pub fn create_assistant_panel(app: &AppHandle) {
 }
 
 pub fn show_assistant_panel(app: &AppHandle) {
+    // Nothing may summon the panel while the assistant is switched off.
+    if !get_settings(app).assistant_enabled {
+        return;
+    }
+    // The window normally exists from launch, but it is absent right after the
+    // user turns the assistant back on. Recreate it rather than silently doing
+    // nothing.
+    create_assistant_panel(app);
     if let Some(window) = app.get_webview_window(PANEL_LABEL) {
         // Keep the webview's layout in sync with the actual window before
         // showing. A reloaded webview resets its React state to "expanded", so
@@ -1328,6 +1351,10 @@ pub fn hide_assistant_panel(app: &AppHandle) {
     if let Some(window) = app.get_webview_window(PANEL_LABEL) {
         let _ = window.hide();
     }
+    // Tell the webview it is off screen. The window stays alive for the app's
+    // lifetime, so this is its cue to give back anything it only needs while
+    // visible — notably the local TTS model's ONNX session and GPU buffers.
+    let _ = app.emit("assistant-panel-hidden", ());
     // Learn from the conversation when the panel is closed — the common way to
     // "end" a chat besides Clear (users often just close it when it gets long).
     // Guarded so it only runs when memory is on, the chat isn't incognito, and
@@ -1352,6 +1379,22 @@ pub fn toggle_assistant_panel(app: &AppHandle) {
             Ok(true) => hide_assistant_panel(app),
             _ => show_assistant_panel(app),
         }
+    } else {
+        // No window yet (the assistant was just enabled): showing creates it.
+        show_assistant_panel(app);
+    }
+}
+
+/// Tear the panel window down so its WebView process — and everything that
+/// process had loaded — is actually released. `close()` is deliberately not used:
+/// the window's own `CloseRequested` handler turns a close into "hide", which is
+/// right for the user dismissing the HUD and wrong here.
+pub fn destroy_assistant_panel(app: &AppHandle) {
+    if let Some(window) = app.get_webview_window(PANEL_LABEL) {
+        // Remember where it sat, so re-enabling puts it back in the same place.
+        save_position(app);
+        let _ = window.destroy();
+        debug!("Assistant panel window destroyed (assistant disabled)");
     }
 }
 
@@ -3533,6 +3576,25 @@ async fn run_auto_summarize(app: AppHandle, from: usize, to: usize) {
 mod tests {
     use super::*;
     use crate::llm_client::{ChatRound, ToolCall, ToolStreamOutcome};
+
+    #[test]
+    fn assistant_bindings_cover_both_assistant_shortcuts() {
+        assert!(is_assistant_binding("assistant"));
+        assert!(is_assistant_binding("assistant_panel_toggle"));
+        // Dictation must keep working with the assistant switched off.
+        assert!(!is_assistant_binding("transcribe"));
+        assert!(!is_assistant_binding("transcribe_with_post_process"));
+        assert!(!is_assistant_binding("cancel"));
+        // The Shift "lock" variants are matched by their base id: callers strip
+        // `LOCK_SUFFIX` before asking (see `shortcut::handler`), so the raw
+        // suffixed id is deliberately not a match on its own.
+        assert!(!is_assistant_binding("assistant.lock"));
+        assert!(is_assistant_binding(
+            "assistant.lock"
+                .strip_suffix(crate::transcription_coordinator::LOCK_SUFFIX)
+                .unwrap()
+        ));
+    }
 
     fn screen_inputs() -> VoiceScreenPlanInputs {
         VoiceScreenPlanInputs {

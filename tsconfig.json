@@ -29,5 +29,9 @@
     "noFallthroughCasesInSwitch": true
   },
   "include": ["src"],
+  /* Tests run on Bun (`bun test`), which type-strips rather than type-checks, and
+     they import `bun:test`. Excluding them keeps the app's typecheck free of a
+     Bun type dependency — nothing here ships in the bundle. */
+  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

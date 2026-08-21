@@ -41,6 +41,14 @@ pub fn handle_shortcut_event(
         None => (binding_id, false),
     };
 
+    // The assistant is switched off: its hotkeys do nothing. They are also
+    // unregistered at the OS level when the setting changes, so this is the
+    // belt-and-braces path (a shortcut that was already in flight, or an engine
+    // that keeps its own derived variants registered).
+    if crate::assistant::is_assistant_binding(base_id) && !get_settings(app).assistant_enabled {
+        return;
+    }
+
     // Transcribe/assistant bindings are handled by the coordinator. The base
     // shortcut uses the default mode (push-to-talk hold by default); tapping the
     // lock key on top converts a hold to hands-free mid-recording.
