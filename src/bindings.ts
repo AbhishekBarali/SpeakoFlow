@@ -1515,6 +1515,12 @@ async assistantRestoreMissingBuiltins() : Promise<Result<number, string>> {
  * and anything in flight is cancelled. Turning it back on recreates the window
  * on demand — no restart. "Generate with Flow" and AI Correction are untouched;
  * they share the provider/model settings but not the panel.
+ * 
+ * Deliberately `async`: a synchronous Tauri command runs on the main thread,
+ * and the teardown below talks to the keyboard engine's thread over a blocking
+ * channel and kills a child process. Any of that stalling on the main thread
+ * freezes the entire app — no overlay, no dictation, windows you cannot even
+ * drag. So the settings write happens here and the slow work runs elsewhere.
  */
 async setAssistantEnabled(enabled: boolean) : Promise<Result<null, string>> {
     try {

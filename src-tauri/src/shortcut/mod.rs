@@ -13,7 +13,7 @@ mod handler;
 pub mod handy_keys;
 mod tauri_impl;
 
-use log::{error, info, warn};
+use log::{debug, error, info, warn};
 use serde::Serialize;
 use specta::Type;
 use tauri::{AppHandle, Emitter, Manager};
@@ -85,6 +85,18 @@ pub fn unregister_cancel_shortcut(app: &AppHandle) {
 /// Register a shortcut using the appropriate implementation
 pub fn register_shortcut(app: &AppHandle, binding: ShortcutBinding) -> Result<(), String> {
     let settings = get_settings(app);
+    // The assistant's master switch owns its two hotkeys: while it is off they
+    // stay unregistered no matter who asks. The Settings shortcut editor calls
+    // `resume_binding` when it loses focus, which re-armed them behind the
+    // switch's back — and a re-armed hotkey then drove a feature whose window
+    // had been torn down.
+    if !settings.assistant_enabled && crate::assistant::is_assistant_binding(&binding.id) {
+        debug!(
+            "Not registering '{}': the assistant is switched off",
+            binding.id
+        );
+        return Ok(());
+    }
     match settings.keyboard_implementation {
         KeyboardImplementation::Tauri => tauri_impl::register_shortcut(app, binding),
         KeyboardImplementation::HandyKeys => handy_keys::register_shortcut(app, binding),
