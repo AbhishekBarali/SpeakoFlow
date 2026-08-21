@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   IDLE_UNLOAD_HIDDEN_MS,
   IDLE_UNLOAD_VISIBLE_MS,
+  idleUnloadDecision,
   idleUnloadDelayMs,
   isSpeechInFlight,
   localTtsActive,
@@ -76,5 +77,48 @@ describe("idleUnloadDelayMs", () => {
     expect(Number.isFinite(IDLE_UNLOAD_HIDDEN_MS)).toBe(true);
     expect(Number.isFinite(IDLE_UNLOAD_VISIBLE_MS)).toBe(true);
     expect(IDLE_UNLOAD_HIDDEN_MS).toBeGreaterThan(0);
+  });
+});
+
+describe("idleUnloadDecision", () => {
+  test("a loaded, idle model is released", () => {
+    // The regression this guards: the timer asked the memoized load *promise*
+    // whether a load was in flight. That promise is kept after it resolves, so
+    // a finished load looked like a running one, the timer rescheduled itself
+    // forever, and the weights were never actually given back.
+    expect(
+      idleUnloadDecision({
+        speechInFlight: false,
+        loadInFlight: false,
+        modelLoaded: true,
+      }),
+    ).toBe("release");
+  });
+
+  test("speech or a running load defers the release", () => {
+    expect(
+      idleUnloadDecision({
+        speechInFlight: true,
+        loadInFlight: false,
+        modelLoaded: true,
+      }),
+    ).toBe("wait");
+    expect(
+      idleUnloadDecision({
+        speechInFlight: false,
+        loadInFlight: true,
+        modelLoaded: false,
+      }),
+    ).toBe("wait");
+  });
+
+  test("no model means there is nothing to release, so stop retrying", () => {
+    expect(
+      idleUnloadDecision({
+        speechInFlight: false,
+        loadInFlight: false,
+        modelLoaded: false,
+      }),
+    ).toBe("nothing");
   });
 });

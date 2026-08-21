@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke, isTauri } from "@tauri-apps/api/core";
-import { idleUnloadDelayMs, isSpeechInFlight } from "./localTts";
+import {
+  idleUnloadDecision,
+  idleUnloadDelayMs,
+  isSpeechInFlight,
+} from "./localTts";
 
 export type TtsStatus = "off" | "loading" | "ready" | "speaking" | "error";
 
@@ -145,6 +149,14 @@ export function useKokoroTts(
 
   /** Pending idle-unload timer, if any. */
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** A load is genuinely running right now.
+   *
+   *  Deliberately not `loadingRef`: that holds the memoized load *promise* and
+   *  keeps holding it after the promise resolves (it is only cleared on
+   *  failure), so it says "loaded", not "loading". Using it as the idle-unload
+   *  guard meant the timer rescheduled itself forever and the weights were
+   *  never released. */
+  const loadInFlightRef = useRef(false);
   const cancelIdleUnload = useCallback(() => {
     if (idleTimerRef.current !== null) {
       clearTimeout(idleTimerRef.current);
@@ -172,13 +184,18 @@ export function useKokoroTts(
       cancelIdleUnload();
       idleTimerRef.current = setTimeout(() => {
         idleTimerRef.current = null;
+        const decision = idleUnloadDecision({
+          speechInFlight: isBusy(),
+          loadInFlight: loadInFlightRef.current,
+          modelLoaded: modelRef.current !== null,
+        });
         // Still working, or a load is in flight: try again later rather than
         // pulling the session out from under it.
-        if (isBusy() || loadingRef.current) {
+        if (decision === "wait") {
           scheduleRef.current(delayMs);
           return;
         }
-        if (!modelRef.current) return;
+        if (decision === "nothing") return;
         void disposeModel(modelRef.current);
         modelRef.current = null;
         loadingRef.current = null;
@@ -198,6 +215,7 @@ export function useKokoroTts(
       setError(null);
       setStatus("loading");
       setProgress(0);
+      loadInFlightRef.current = true;
       loadingRef.current = (async () => {
         const { KokoroTTS } = await import("kokoro-js");
         const requestedDtype = dtypeRef.current;
@@ -279,10 +297,12 @@ export function useKokoroTts(
           );
         }
         modelRef.current = model as KokoroModel;
+        loadInFlightRef.current = false;
         setStatus("ready");
         return modelRef.current;
       })().catch((e: unknown) => {
         loadingRef.current = null;
+        loadInFlightRef.current = false;
         setStatus("error");
         setError({ reason: "load" });
         throw e;

@@ -76,3 +76,24 @@ export function isSpeechInFlight(progress: SpeechProgress): boolean {
 export function idleUnloadDelayMs(panelVisible: boolean): number {
   return panelVisible ? IDLE_UNLOAD_VISIBLE_MS : IDLE_UNLOAD_HIDDEN_MS;
 }
+
+/** What an expired idle-unload timer should do:
+ *  - `release`  — drop the ONNX session and its GPU buffers now.
+ *  - `wait`     — something is in flight; check again after another window.
+ *  - `nothing`  — no model is loaded, so there is nothing to give back. */
+export type IdleUnloadDecision = "release" | "wait" | "nothing";
+
+/** State an idle-unload timer must weigh before dropping the weights.
+ *  `loadInFlight` means a load is *running* — not that one has ever run. Reading
+ *  it off the memoized load promise (which is kept after it resolves) is what
+ *  made the timer defer forever, so the model was never actually released. */
+export interface IdleUnloadState {
+  speechInFlight: boolean;
+  loadInFlight: boolean;
+  modelLoaded: boolean;
+}
+
+export function idleUnloadDecision(state: IdleUnloadState): IdleUnloadDecision {
+  if (state.speechInFlight || state.loadInFlight) return "wait";
+  return state.modelLoaded ? "release" : "nothing";
+}
