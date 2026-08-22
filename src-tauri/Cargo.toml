@@ -117,6 +117,7 @@ transcribe-rs = { version = "0.3.11", features = ["whisper-vulkan", "ort-directm
 keyring = { version = "3", features = ["windows-native"] }
 windows = { version = "0.61.3", features = [
   "Win32_Media_Audio_Endpoints",
+  "Win32_Media_Speech",
   "Win32_System_Com_StructuredStorage",
   "Win32_System_SystemInformation",
   "Win32_System_Variant",

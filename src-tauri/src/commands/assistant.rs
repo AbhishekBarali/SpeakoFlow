@@ -503,10 +503,7 @@ pub fn set_assistant_font_size(app: AppHandle, size: String) -> Result<(), Strin
 #[tauri::command]
 #[specta::specta]
 pub fn set_assistant_tts_engine(app: AppHandle, engine: String) -> Result<(), String> {
-    if !matches!(
-        engine.as_str(),
-        "kokoro" | "openai" | "openrouter" | "elevenlabs" | "azure"
-    ) {
+    if !crate::settings::assistant_tts_engine_supported(&engine) {
         return Err(format!("Unknown TTS engine: {}", engine));
     }
     // Switching engine mid-playback should stop the current clip.
