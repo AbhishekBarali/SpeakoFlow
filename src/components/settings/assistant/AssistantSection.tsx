@@ -7,6 +7,7 @@ import { MemorySettings } from "./MemorySettings";
 import { LlmCatalog } from "./LlmCatalog";
 import { SubPage } from "../../ui/SubPage";
 import { SectionHeader } from "../../ui/SectionHeader";
+import { useSettings } from "../../../hooks/useSettings";
 import {
   TONE_TILE_VIVID,
   type SettingIcon,
@@ -69,7 +70,12 @@ const NavCard: React.FC<SubPageRowProps> = ({
  */
 export const AssistantSection: React.FC = () => {
   const { t } = useTranslation();
+  const { settings } = useSettings();
   const [subPage, setSubPage] = useState<AssistantSubPage>(null);
+  // Profiles and Memory only exist for the assistant, so they follow its master
+  // switch. The model catalog does not: Flow and AI Correction use those models
+  // too, and it is reached from the brain picker, which stays visible.
+  const assistantEnabled = settings?.assistant_enabled ?? true;
 
   if (subPage === "llm-catalog") {
     return (
@@ -114,23 +120,26 @@ export const AssistantSection: React.FC = () => {
         description={t("sectionSubtitles.assistant")}
       />
       {/* Profiles + Memory — prominent entry cards at the top so they're
-          impossible to miss. */}
-      <div className="max-w-3xl w-full mx-auto grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <NavCard
-          icon={Users}
-          tone="violet"
-          title={t("sidebar.characters")}
-          description={t("settings.assistant.subpages.profilesCaption")}
-          onClick={() => setSubPage("characters")}
-        />
-        <NavCard
-          icon={Notebook}
-          tone="emerald"
-          title={t("sidebar.memory")}
-          description={t("settings.assistant.subpages.memoryCaption")}
-          onClick={() => setSubPage("memory")}
-        />
-      </div>
+          impossible to miss. Hidden while the assistant is switched off, since
+          neither does anything without it. */}
+      {assistantEnabled && (
+        <div className="max-w-3xl w-full mx-auto grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <NavCard
+            icon={Users}
+            tone="violet"
+            title={t("sidebar.characters")}
+            description={t("settings.assistant.subpages.profilesCaption")}
+            onClick={() => setSubPage("characters")}
+          />
+          <NavCard
+            icon={Notebook}
+            tone="emerald"
+            title={t("sidebar.memory")}
+            description={t("settings.assistant.subpages.memoryCaption")}
+            onClick={() => setSubPage("memory")}
+          />
+        </div>
+      )}
       <AssistantSettings onOpenLlmCatalog={() => setSubPage("llm-catalog")} />
     </div>
   );

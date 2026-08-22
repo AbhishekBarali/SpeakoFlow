@@ -713,6 +713,7 @@ pub fn run(cli_args: CliArgs) {
             commands::assistant::assistant_generate_character,
             commands::assistant::assistant_restore_builtin_character,
             commands::assistant::assistant_restore_missing_builtins,
+            commands::assistant::set_assistant_enabled,
             commands::assistant::set_assistant_screen_access_mode,
             commands::assistant::set_assistant_screenshot_enabled,
             commands::assistant::set_assistant_vision_capture_timing,
@@ -1013,8 +1014,14 @@ pub fn run(cli_args: CliArgs) {
 
             initialize_core_logic(&app_handle);
 
-            // Create the assistant panel window (hidden until first use)
-            assistant::create_assistant_panel(&app_handle);
+            // Create the assistant panel window (hidden until first use). Skipped
+            // entirely when the assistant is switched off: that saves a whole
+            // WebView renderer process, and everything it would have loaded, for
+            // people who only want dictation. Enabling it later creates it on
+            // demand (see `commands::assistant::set_assistant_enabled`).
+            if settings::get_settings(&app_handle).assistant_enabled {
+                assistant::create_assistant_panel(&app_handle);
+            }
 
             // Pre-warm GPU/accelerator enumeration on a background thread.
             // The first call into transcribe_rs::whisper_cpp::gpu::list_gpu_devices

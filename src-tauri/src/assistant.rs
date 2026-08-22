@@ -19,6 +19,16 @@ use tauri_plugin_store::StoreExt;
 use tokio::sync::Notify;
 
 pub const PANEL_LABEL: &str = "assistant_panel";
+
+/// The shortcut bindings that belong to the assistant, and so are switched off
+/// with it: the voice turn and the panel toggle. (Their auto-derived Shift
+/// `.lock` variants resolve to these ids, so checking the base id covers both.)
+pub const ASSISTANT_BINDINGS: [&str; 2] = ["assistant", "assistant_panel_toggle"];
+
+/// Does this shortcut belong to the assistant?
+pub fn is_assistant_binding(binding_id: &str) -> bool {
+    ASSISTANT_BINDINGS.contains(&binding_id)
+}
 const PANEL_MARGIN: f64 = 24.0;
 /// Where the PILL last sat (legacy key — keeps existing stored positions).
 const PANEL_POSITION_KEY: &str = "assistant_panel_position";
@@ -1184,8 +1194,23 @@ fn default_position(app: &AppHandle) -> (f64, f64) {
     }
 }
 
-/// Create the assistant panel window, hidden by default. Called once at setup.
-pub fn create_assistant_panel(app: &AppHandle) {
+/// Create the assistant panel window, hidden by default. Idempotent: an
+/// existing window is left exactly as it is.
+///
+/// **Must run on the main (event-loop) thread.** Building a WebView window
+/// blocks the calling thread until the event loop has finished creating it, and
+/// the callers that matter here are shortcut actions, which run on the keyboard
+/// engine's thread. On Windows that thread owns handy-keys' `WH_KEYBOARD_LL`
+/// hook and pumps its own message loop, and WebView2 creation needs every
+/// window-owning thread in the process to keep pumping — so the two wait on each
+/// other and the whole app wedges: no overlay, no dictation, windows Windows
+/// paints as unresponsive ghosts. GTK and AppKit are stricter still: neither
+/// tolerates window creation off the main thread at all. Hence every public
+/// entry point below hands this to `run_on_main_thread` and returns immediately.
+fn build_assistant_panel(app: &AppHandle) {
+    if app.get_webview_window(PANEL_LABEL).is_some() {
+        return;
+    }
     let (x, y) = saved_position(app).unwrap_or_else(|| default_position(app));
     // Build at whichever size matches the current mode (pill by default) so the
     // first show doesn't briefly flash the large panel before collapsing.
@@ -1253,7 +1278,39 @@ pub fn create_assistant_panel(app: &AppHandle) {
     }
 }
 
+/// Create the panel window from anywhere. Safe on any thread: the actual build
+/// is queued onto the main thread (see `build_assistant_panel`), so this returns
+/// before the window necessarily exists.
+pub fn create_assistant_panel(app: &AppHandle) {
+    let app_main = app.clone();
+    if let Err(e) = app.run_on_main_thread(move || build_assistant_panel(&app_main)) {
+        error!("Could not queue assistant panel creation: {}", e);
+    }
+}
+
 pub fn show_assistant_panel(app: &AppHandle) {
+    // Nothing may summon the panel while the assistant is switched off.
+    if !get_settings(app).assistant_enabled {
+        return;
+    }
+    // Shortcut actions run on the keyboard engine's thread, so creating and
+    // showing the window from here would touch the WebView from the wrong
+    // thread. Queue the whole create-then-show sequence on the main thread; it
+    // stays ordered with the destroy queued by the master switch, which is what
+    // keeps "off then straight back on" from leaving a half-built panel behind.
+    let app_main = app.clone();
+    if let Err(e) = app.run_on_main_thread(move || {
+        // The window normally exists from launch, but it is absent right after
+        // the user turns the assistant back on. No-op when it is already there.
+        build_assistant_panel(&app_main);
+        present_assistant_panel(&app_main);
+    }) {
+        error!("Could not queue assistant panel show: {}", e);
+    }
+}
+
+/// Size, place and reveal the existing panel window. Main thread only.
+fn present_assistant_panel(app: &AppHandle) {
     if let Some(window) = app.get_webview_window(PANEL_LABEL) {
         // Keep the webview's layout in sync with the actual window before
         // showing. A reloaded webview resets its React state to "expanded", so
@@ -1279,22 +1336,34 @@ pub fn show_assistant_panel(app: &AppHandle) {
 /// manual panel toggle, a hotkey turn always starts in the configured overlay
 /// form: hidden for None, the compact pill for Minimal/Auto, or the readable
 /// question-and-answer HUD for Live.
+///
+/// Runs entirely on the main thread for the reason spelled out on
+/// `build_assistant_panel`: this is called from the keyboard engine's thread, and
+/// `set_panel_collapsed` alone makes half a dozen blocking window calls. Leaving
+/// those on the hotkey thread means it sits waiting for the event loop at exactly
+/// the moment the loop may be building the panel's WebView — the deadlock this
+/// window's lifecycle is now arranged to avoid.
 pub fn show_assistant_voice_overlay(app: &AppHandle) {
-    if matches!(
-        get_settings(app).assistant_overlay_style,
-        OverlayStyle::None
-    ) {
+    let settings = get_settings(app);
+    if !settings.assistant_enabled || matches!(settings.assistant_overlay_style, OverlayStyle::None)
+    {
         return;
     }
 
-    // Don't fight a panel the user opened deliberately: when the full chat is
-    // already on screen, leave it expanded and let the turn stream into it.
-    // Only an absent or already-collapsed panel is forced into the compact
-    // overlay form.
-    if is_panel_collapsed() || !panel_is_visible(app) {
-        set_panel_collapsed(app, true);
+    let app_main = app.clone();
+    if let Err(e) = app.run_on_main_thread(move || {
+        // Don't fight a panel the user opened deliberately: when the full chat is
+        // already on screen, leave it expanded and let the turn stream into it.
+        // Only an absent or already-collapsed panel is forced into the compact
+        // overlay form.
+        if is_panel_collapsed() || !panel_is_visible(&app_main) {
+            set_panel_collapsed(&app_main, true);
+        }
+        build_assistant_panel(&app_main);
+        present_assistant_panel(&app_main);
+    }) {
+        error!("Could not queue assistant voice overlay: {}", e);
     }
-    show_assistant_panel(app);
 }
 
 /// Dismiss the transient collapsed voice overlay, if it is actually on screen.
@@ -1305,8 +1374,16 @@ pub fn dismiss_voice_overlay(app: &AppHandle) {
     if !is_panel_collapsed() {
         return;
     }
-    if panel_is_visible(app) {
-        hide_assistant_panel(app);
+    // `panel_is_visible` is a blocking round-trip to the event loop, so keep it
+    // (and the hide behind it) off the caller's thread — cancel arrives from the
+    // keyboard engine's thread too.
+    let app_main = app.clone();
+    if let Err(e) = app.run_on_main_thread(move || {
+        if panel_is_visible(&app_main) {
+            hide_assistant_panel(&app_main);
+        }
+    }) {
+        error!("Could not queue voice overlay dismissal: {}", e);
     }
 }
 
@@ -1324,9 +1401,21 @@ pub fn is_panel_collapsed() -> bool {
 }
 
 pub fn hide_assistant_panel(app: &AppHandle) {
-    save_position(app);
-    if let Some(window) = app.get_webview_window(PANEL_LABEL) {
-        let _ = window.hide();
+    // Window work on the event loop's own thread: this is reached from the
+    // keyboard engine's thread as well as from commands (see
+    // `build_assistant_panel` for why that distinction matters).
+    let app_main = app.clone();
+    if let Err(e) = app.run_on_main_thread(move || {
+        save_position(&app_main);
+        if let Some(window) = app_main.get_webview_window(PANEL_LABEL) {
+            let _ = window.hide();
+        }
+        // Tell the webview it is off screen. The window stays alive for the app's
+        // lifetime, so this is its cue to give back anything it only needs while
+        // visible — notably the local TTS model's ONNX session and GPU buffers.
+        let _ = app_main.emit("assistant-panel-hidden", ());
+    }) {
+        error!("Could not queue assistant panel hide: {}", e);
     }
     // Learn from the conversation when the panel is closed — the common way to
     // "end" a chat besides Clear (users often just close it when it gets long).
@@ -1347,11 +1436,46 @@ pub fn hide_assistant_panel(app: &AppHandle) {
 }
 
 pub fn toggle_assistant_panel(app: &AppHandle) {
-    if let Some(window) = app.get_webview_window(PANEL_LABEL) {
-        match window.is_visible() {
-            Ok(true) => hide_assistant_panel(app),
-            _ => show_assistant_panel(app),
+    // `is_visible` is a blocking round-trip to the event loop; the panel-toggle
+    // shortcut calls this from the keyboard engine's thread, so decide on the
+    // main thread instead of making that thread wait.
+    let app_main = app.clone();
+    if let Err(e) = app.run_on_main_thread(move || {
+        let visible = app_main
+            .get_webview_window(PANEL_LABEL)
+            .and_then(|window| window.is_visible().ok())
+            .unwrap_or(false);
+        if visible {
+            hide_assistant_panel(&app_main);
+        } else {
+            // Also the "no window yet" case, right after the assistant was
+            // switched back on: showing creates it.
+            show_assistant_panel(&app_main);
         }
+    }) {
+        error!("Could not queue assistant panel toggle: {}", e);
+    }
+}
+
+/// Tear the panel window down so its WebView process — and everything that
+/// process had loaded — is actually released. `close()` is deliberately not used:
+/// the window's own `CloseRequested` handler turns a close into "hide", which is
+/// right for the user dismissing the HUD and wrong here.
+///
+/// Queued on the main thread, like creation: destroying a WebView window is the
+/// event loop's job, and doing it in order with a later re-create is what stops
+/// a rapid off/on from leaving the app believing in a window that is gone.
+pub fn destroy_assistant_panel(app: &AppHandle) {
+    let app_main = app.clone();
+    if let Err(e) = app.run_on_main_thread(move || {
+        if let Some(window) = app_main.get_webview_window(PANEL_LABEL) {
+            // Remember where it sat, so re-enabling puts it back in the same place.
+            save_position(&app_main);
+            let _ = window.destroy();
+            debug!("Assistant panel window destroyed (assistant disabled)");
+        }
+    }) {
+        error!("Could not queue assistant panel teardown: {}", e);
     }
 }
 
@@ -3533,6 +3657,25 @@ async fn run_auto_summarize(app: AppHandle, from: usize, to: usize) {
 mod tests {
     use super::*;
     use crate::llm_client::{ChatRound, ToolCall, ToolStreamOutcome};
+
+    #[test]
+    fn assistant_bindings_cover_both_assistant_shortcuts() {
+        assert!(is_assistant_binding("assistant"));
+        assert!(is_assistant_binding("assistant_panel_toggle"));
+        // Dictation must keep working with the assistant switched off.
+        assert!(!is_assistant_binding("transcribe"));
+        assert!(!is_assistant_binding("transcribe_with_post_process"));
+        assert!(!is_assistant_binding("cancel"));
+        // The Shift "lock" variants are matched by their base id: callers strip
+        // `LOCK_SUFFIX` before asking (see `shortcut::handler`), so the raw
+        // suffixed id is deliberately not a match on its own.
+        assert!(!is_assistant_binding("assistant.lock"));
+        assert!(is_assistant_binding(
+            "assistant.lock"
+                .strip_suffix(crate::transcription_coordinator::LOCK_SUFFIX)
+                .unwrap()
+        ));
+    }
 
     fn screen_inputs() -> VoiceScreenPlanInputs {
         VoiceScreenPlanInputs {

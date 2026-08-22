@@ -42,6 +42,13 @@ use crate::settings::{self, get_settings, ShortcutBinding};
 
 use super::handler::handle_shortcut_event;
 
+/// How long a caller waits for the manager thread to answer a register /
+/// unregister request. The thread answers within its 10 ms poll unless it is
+/// busy running a shortcut action, so this is generous — its job is to make sure
+/// a wedged engine can never freeze the caller (which may be the UI thread)
+/// forever, as an unbounded `recv()` did.
+const MANAGER_REPLY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
+
 /// Commands that can be sent to the hotkey manager thread
 enum ManagerCommand {
     Register {
@@ -239,8 +246,8 @@ impl HandyKeysState {
             })
             .map_err(|_| "Failed to send register command")?;
 
-        rx.recv()
-            .map_err(|_| "Failed to receive register response")?
+        rx.recv_timeout(MANAGER_REPLY_TIMEOUT)
+            .map_err(|_| "Timed out waiting for the hotkey engine to register".to_string())?
     }
 
     /// Unregister a shortcut binding
@@ -255,8 +262,8 @@ impl HandyKeysState {
             })
             .map_err(|_| "Failed to send unregister command")?;
 
-        rx.recv()
-            .map_err(|_| "Failed to receive unregister response")?
+        rx.recv_timeout(MANAGER_REPLY_TIMEOUT)
+            .map_err(|_| "Timed out waiting for the hotkey engine to unregister".to_string())?
     }
 
     /// Start recording mode for a specific binding
@@ -436,6 +443,13 @@ pub fn init_shortcuts(app: &AppHandle) -> Result<(), String> {
         // Skip the post-processing (AI Correction) shortcut when the feature is
         // turned off. Gated only by its own toggle now — not by Experimental.
         if id == "transcribe_with_post_process" && !user_settings.post_process_enabled {
+            continue;
+        }
+        // Same for the assistant's own shortcuts when the master switch is off:
+        // `set_assistant_enabled` unregisters them at runtime, and without this
+        // the next launch would silently grab those combos again — swallowing
+        // them from other apps for a feature that does nothing.
+        if crate::assistant::is_assistant_binding(&id) && !user_settings.assistant_enabled {
             continue;
         }
 

@@ -47,6 +47,7 @@ import { syncLanguageFromSettings } from "@/i18n";
 import { AudioWaveform } from "@/components/shared";
 import { FONT_SIZES, errorKind, type AssistantError } from "./appearance";
 import { useKokoroTts } from "./useKokoroTts";
+import { localTtsActive } from "./localTts";
 import { useLocalLlmEngineStatus } from "@/hooks/useLocalLlmEngineStatus";
 import "./AssistantPanel.css";
 
@@ -414,6 +415,10 @@ const AssistantPanel: React.FC = () => {
   const [input, setInput] = useState("");
   const [attachScreen, setAttachScreen] = useState(false);
   const [collapsed, setCollapsed] = useState(true);
+  // Is the panel window actually on screen? It is built hidden at launch and
+  // only shown on a hotkey/turn, so anything expensive (the local TTS weights)
+  // waits for this rather than loading into a window nobody has opened.
+  const [panelVisible, setPanelVisible] = useState(false);
   const [locked, setLocked] = useState(false);
   // The collapsed pill dims to a thin, translucent sliver after a spell of
   // inactivity so it doesn't sit in the user's way; hovering it (CSS) or any
@@ -479,9 +484,18 @@ const AssistantPanel: React.FC = () => {
   const kokoroErrorRef = useRef(false);
 
   const ttsEnabled = settings?.assistant_tts_enabled ?? false;
+  const ttsEngine = settings?.assistant_tts_engine ?? "kokoro";
   const ttsVoice = settings?.assistant_tts_voice ?? "af_heart";
   const ttsDtype = settings?.assistant_tts_kokoro_dtype ?? "fp32";
   const ttsSpeed = settings?.assistant_tts_speed ?? 1;
+  // Only the built-in Kokoro engine synthesizes inside this WebView; every
+  // remote engine (OpenAI / ElevenLabs / Azure / OpenRouter) is spoken by Rust,
+  // and the backend only emits `assistant-tts-*` for "kokoro". Mounting the
+  // local model for a remote engine therefore pinned a ~310 MB fp32 ONNX graph
+  // (plus an equal-sized set of WebGPU buffers in the shared GPU process) in a
+  // window that is created at launch and never closed — for a model that is
+  // never asked to speak. See `localTts.ts`.
+  const kokoroEnabled = localTtsActive(ttsEnabled, ttsEngine);
   const liveOverlay = settings?.assistant_overlay_style === "live";
   const screenAccessMode = settings?.assistant_screen_access_mode ?? "manual";
   const manualScreenAccess = screenAccessMode === "manual";
@@ -491,7 +505,17 @@ const AssistantPanel: React.FC = () => {
     settings?.assistant_active_character_id ?? "default";
   const activeCharacter =
     characters.find((c) => c.id === activeCharacterId) ?? characters[0] ?? null;
-  const tts = useKokoroTts(ttsEnabled, ttsVoice, ttsDtype, ttsSpeed);
+  const tts = useKokoroTts(
+    kokoroEnabled,
+    ttsVoice,
+    ttsDtype,
+    ttsSpeed,
+    // Prepare the weights only once the panel is actually on screen. The window
+    // exists from launch (hidden) so the old unconditional preload paid the full
+    // model cost in the background before the user had asked for anything. A
+    // hidden panel still speaks on demand: `beginStream` loads lazily.
+    panelVisible,
+  );
   const speakRef = useRef(tts.speak);
   speakRef.current = tts.speak;
   // The event listeners are registered once on mount, so the streaming calls are
@@ -504,6 +528,23 @@ const AssistantPanel: React.FC = () => {
   endStreamRef.current = tts.endStream;
 
   useEffect(() => setMounted(true), []);
+
+  // Seed the visibility flag from the real window state. The events below are
+  // the live source of truth, but a webview created (or reloaded) while the
+  // panel is already on screen would otherwise sit at "hidden" until the next
+  // show, and skip preparing the local voice.
+  useEffect(() => {
+    let active = true;
+    void getCurrentWindow()
+      .isVisible()
+      .then((visible) => {
+        if (active && visible) setPanelVisible(true);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!manualScreenAccess) {
@@ -821,6 +862,20 @@ const AssistantPanel: React.FC = () => {
       track(
         await listen<boolean>("assistant-collapsed", (e) => {
           setCollapsed(e.payload);
+        }),
+      );
+
+      // Window visibility, from the two places Rust shows/hides the panel. Used
+      // to decide when it is worth holding the local TTS model in memory.
+      track(
+        await listen("assistant-panel-shown", () => {
+          setPanelVisible(true);
+        }),
+      );
+
+      track(
+        await listen("assistant-panel-hidden", () => {
+          setPanelVisible(false);
         }),
       );
 

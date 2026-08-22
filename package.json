@@ -1,12 +1,13 @@
 {
   "name": "speakoflow",
   "private": true,
-  "version": "1.3.0",
+  "version": "1.3.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
+    "test": "bun test src",
     "tauri": "tauri",
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",

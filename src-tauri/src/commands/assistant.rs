@@ -2,10 +2,12 @@
 
 use crate::assistant::{self, AssistantConversation, FileAttachment};
 use crate::llm_client::ChatMessage;
+use crate::managers::local_llm::LocalLlmManager;
 use crate::settings::{
     assistant_provider_is_supported, get_settings, write_settings, AssistantCharacter,
     AssistantScreenAccessMode,
 };
+use std::sync::Arc;
 use tauri::{AppHandle, Manager};
 
 fn require_manual_screen_access(mode: AssistantScreenAccessMode) -> Result<(), String> {
@@ -328,6 +330,77 @@ pub fn change_assistant_system_prompt_setting(
     Ok(())
 }
 
+/// Master switch for the whole assistant experience.
+///
+/// Turning it off is what actually reclaims memory: the panel's WebView process
+/// is destroyed (not merely hidden, which is all closing it normally does), its
+/// two hotkeys are unregistered so the key combos fall through to other apps,
+/// and anything in flight is cancelled. Turning it back on recreates the window
+/// on demand — no restart. "Generate with Flow" and AI Correction are untouched;
+/// they share the provider/model settings but not the panel.
+///
+/// Deliberately `async`: a synchronous Tauri command runs on the main thread,
+/// and the teardown below talks to the keyboard engine's thread over a blocking
+/// channel and kills a child process. Any of that stalling on the main thread
+/// freezes the entire app — no overlay, no dictation, windows you cannot even
+/// drag. So the settings write happens here and the slow work runs elsewhere.
+#[tauri::command]
+#[specta::specta]
+pub async fn set_assistant_enabled(app: AppHandle, enabled: bool) -> Result<(), String> {
+    let mut settings = get_settings(&app);
+    if settings.assistant_enabled == enabled {
+        return Ok(());
+    }
+    settings.assistant_enabled = enabled;
+    // Written first: `register_shortcut` refuses assistant bindings while the
+    // switch is off, so the new value has to be visible before we (re)arm them.
+    write_settings(&app, settings);
+
+    // Window work belongs to the event loop. Queued before the teardown so a
+    // rapid off → on lands in order and cannot leave a half-built panel.
+    if enabled {
+        assistant::create_assistant_panel(&app);
+    } else {
+        assistant::destroy_assistant_panel(&app);
+    }
+
+    let app_bg = app.clone();
+    let teardown = tauri::async_runtime::spawn_blocking(move || {
+        for binding_id in assistant::ASSISTANT_BINDINGS {
+            let result = if enabled {
+                crate::shortcut::resume_binding(app_bg.clone(), binding_id.to_string())
+            } else {
+                crate::shortcut::suspend_binding(app_bg.clone(), binding_id.to_string())
+            };
+            if let Err(e) = result {
+                log::warn!("assistant binding '{binding_id}' could not be updated: {e}");
+            }
+        }
+
+        if !enabled {
+            // Stop a turn or a spoken reply that is running right now, rather
+            // than leaving it playing into a window that is about to disappear.
+            crate::utils::cancel_current_operation(&app_bg);
+            crate::tts::stop_remote();
+            // The panel's WebView is not the biggest thing the assistant keeps
+            // resident — a loaded local model is. Kill the assistant's llama.cpp
+            // process instead of waiting for `local_llm_unload_timeout` to
+            // notice nobody is asking. Nothing is lost: "Generate with Flow"
+            // restarts it on demand, and AI Correction has its own engine on
+            // another port.
+            if let Some(llm) = app_bg.try_state::<Arc<LocalLlmManager>>() {
+                llm.stop();
+            }
+        }
+    });
+    if let Err(e) = teardown.await {
+        log::warn!("assistant teardown task failed: {e}");
+    }
+
+    emit_settings_changed(&app);
+    Ok(())
+}
+
 /// Notify the panel (a separate webview) that assistant settings changed.
 fn emit_settings_changed(app: &AppHandle) {
     use tauri::Emitter;
@@ -581,10 +654,15 @@ pub fn assistant_set_pending_attachments(
 }
 
 /// Route the dictation currently being recorded to the assistant (the STT
-/// overlay's Ask-Assistant button), then commit it like a normal finish.
+/// overlay's Ask-Assistant button), then commit it like a normal finish. A no-op
+/// while the assistant is switched off, so the transcript is pasted as usual
+/// instead of vanishing into a feature that isn't running.
 #[tauri::command]
 #[specta::specta]
-pub fn redirect_transcription_to_assistant() -> Result<(), String> {
+pub fn redirect_transcription_to_assistant(app: AppHandle) -> Result<(), String> {
+    if !get_settings(&app).assistant_enabled {
+        return Ok(());
+    }
     assistant::set_transcribe_redirect();
     Ok(())
 }

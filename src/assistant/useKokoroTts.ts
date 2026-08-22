@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke, isTauri } from "@tauri-apps/api/core";
+import {
+  idleUnloadDecision,
+  idleUnloadDelayMs,
+  isSpeechInFlight,
+} from "./localTts";
 
 export type TtsStatus = "off" | "loading" | "ready" | "speaking" | "error";
 
@@ -142,12 +147,75 @@ export function useKokoroTts(
    *  for the one-shot replay path, which has no reply of its own. */
   const streamEpochRef = useRef<number | null>(null);
 
+  /** Pending idle-unload timer, if any. */
+  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** A load is genuinely running right now.
+   *
+   *  Deliberately not `loadingRef`: that holds the memoized load *promise* and
+   *  keeps holding it after the promise resolves (it is only cleared on
+   *  failure), so it says "loaded", not "loading". Using it as the idle-unload
+   *  guard meant the timer rescheduled itself forever and the weights were
+   *  never released. */
+  const loadInFlightRef = useRef(false);
+  const cancelIdleUnload = useCallback(() => {
+    if (idleTimerRef.current !== null) {
+      clearTimeout(idleTimerRef.current);
+      idleTimerRef.current = null;
+    }
+  }, []);
+
+  /** True while anything would be cut off by unloading: a reply still being fed
+   *  in, synthesis in flight, or audio queued/playing. */
+  const isBusy = useCallback(
+    () =>
+      isSpeechInFlight({
+        streamOpen: streamOpenRef.current,
+        synthDone: synthDoneRef.current,
+        queued: queueRef.current.length,
+        elementPlaying: playingRef.current !== null,
+        nativePlaying: nativePlayingRef.current,
+      }),
+    [],
+  );
+
+  const scheduleRef = useRef<(delayMs: number) => void>(() => {});
+  const scheduleIdleUnload = useCallback(
+    (delayMs: number) => {
+      cancelIdleUnload();
+      idleTimerRef.current = setTimeout(() => {
+        idleTimerRef.current = null;
+        const decision = idleUnloadDecision({
+          speechInFlight: isBusy(),
+          loadInFlight: loadInFlightRef.current,
+          modelLoaded: modelRef.current !== null,
+        });
+        // Still working, or a load is in flight: try again later rather than
+        // pulling the session out from under it.
+        if (decision === "wait") {
+          scheduleRef.current(delayMs);
+          return;
+        }
+        if (decision === "nothing") return;
+        void disposeModel(modelRef.current);
+        modelRef.current = null;
+        loadingRef.current = null;
+        // Back to "not loaded". The next reply calls `ensureLoaded` itself, so
+        // this only costs load time, never speech.
+        setStatus((s) => (s === "loading" || s === "speaking" ? s : "off"));
+      }, delayMs);
+    },
+    [cancelIdleUnload, isBusy],
+  );
+  scheduleRef.current = scheduleIdleUnload;
+
   const ensureLoaded = useCallback(async (): Promise<KokoroModel> => {
+    cancelIdleUnload();
     if (modelRef.current) return modelRef.current;
     if (!loadingRef.current) {
       setError(null);
       setStatus("loading");
       setProgress(0);
+      loadInFlightRef.current = true;
       loadingRef.current = (async () => {
         const { KokoroTTS } = await import("kokoro-js");
         const requestedDtype = dtypeRef.current;
@@ -229,21 +297,24 @@ export function useKokoroTts(
           );
         }
         modelRef.current = model as KokoroModel;
+        loadInFlightRef.current = false;
         setStatus("ready");
         return modelRef.current;
       })().catch((e: unknown) => {
         loadingRef.current = null;
+        loadInFlightRef.current = false;
         setStatus("error");
         setError({ reason: "load" });
         throw e;
       });
     }
     return loadingRef.current;
-  }, []);
+  }, [cancelIdleUnload]);
 
   // Callers choose whether passive mounting should prepare the model. Settings
-  // disables this and exposes an explicit setup action; the live assistant keeps
-  // it enabled so an actual spoken reply can start promptly.
+  // disables this and exposes an explicit setup action; the assistant panel
+  // passes its own window visibility, so a panel nobody has opened doesn't pay
+  // for weights it may never use.
   useEffect(() => {
     if (enabled && preload) {
       ensureLoaded().catch(() => {});
@@ -252,11 +323,24 @@ export function useKokoroTts(
       setStatus((s) => (s === "speaking" || s === "ready" ? "off" : s));
       // Turned off: free the model so its ONNX/WebGPU memory isn't pinned for
       // the WebView's lifetime. It reloads on demand if re-enabled.
+      cancelIdleUnload();
       void disposeModel(modelRef.current);
       modelRef.current = null;
       loadingRef.current = null;
     }
-  }, [enabled, preload, ensureLoaded]);
+  }, [enabled, preload, ensureLoaded, cancelIdleUnload]);
+
+  // Give the weights back when they stop being used. Without this, one spoken
+  // reply (or one preload) kept the ONNX session and its GPU buffers resident
+  // for as long as the app ran, since this window is only ever hidden.
+  useEffect(() => {
+    if (!enabled || status !== "ready") {
+      cancelIdleUnload();
+      return;
+    }
+    scheduleIdleUnload(idleUnloadDelayMs(preload));
+    return cancelIdleUnload;
+  }, [enabled, preload, status, scheduleIdleUnload, cancelIdleUnload]);
 
   /**
    * Abandon whatever this hook is currently synthesizing or playing.
@@ -338,6 +422,10 @@ export function useKokoroTts(
     return () => {
       generationRef.current += 1;
       queueRef.current = [];
+      if (idleTimerRef.current !== null) {
+        clearTimeout(idleTimerRef.current);
+        idleTimerRef.current = null;
+      }
       const el = playingRef.current;
       nativePlayingRef.current = false;
       // Only stop speech this hook actually started (see usedNativeSinkRef):

@@ -13,6 +13,7 @@ import {
   PanelTop,
   Download,
   ChevronRight,
+  Power,
 } from "lucide-react";
 import {
   commands,
@@ -41,6 +42,7 @@ import { ShortcutInput } from "../ShortcutInput";
 import { PushToTalk } from "../PushToTalk";
 import { useSettings } from "../../../hooks/useSettings";
 import { useKokoroTts } from "../../../assistant/useKokoroTts";
+import { localTtsActive } from "../../../assistant/localTts";
 import { FONT_SIZES } from "../../../assistant/appearance";
 import "../../../assistant/AssistantPanel.css";
 import { useModelStore } from "@/stores/modelStore";
@@ -410,7 +412,12 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
       setTtsModelsLoading(false);
     }
   };
-  const kokoroEnabled = ttsEnabled && ttsEngine === "kokoro";
+  /** Master switch. Default on, matching the backend's `default_true`. */
+  const assistantEnabled = settings?.assistant_enabled ?? true;
+  // Local speech only makes sense when the assistant is on AND the local engine
+  // is the selected one — otherwise this page must not hold the weights at all.
+  const kokoroEnabled =
+    assistantEnabled && localTtsActive(ttsEnabled, ttsEngine);
   // Settings must never download Kokoro just because this page mounted. The
   // live assistant still loads on an actual spoken reply; here, only Setup or
   // Test voice may call prepare/speak.
@@ -1079,8 +1086,59 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
     </>
   );
 
+  /** The master switch, and the one group that outlives it: "Generate with
+   *  Flow" and AI Correction run on the same provider and model, so the brain
+   *  picker stays reachable even with the assistant switched off. */
+  const masterSwitchGroup = (
+    <SettingsGroup title={t("settings.assistant.enable.title")} icon={Power}>
+      <ToggleSwitch
+        checked={assistantEnabled}
+        onChange={(checked) =>
+          setAndRefresh(commands.setAssistantEnabled(checked))
+        }
+        label={t("settings.assistant.enable.label")}
+        description={t("settings.assistant.enable.description")}
+        grouped={true}
+      />
+    </SettingsGroup>
+  );
+
+  const brainGroup = (
+    <SettingsGroup
+      title={t("settings.assistant.brain.title")}
+      description={t("settings.assistant.brain.description")}
+      icon={Sparkles}
+    >
+      <SettingContainer
+        title={t("settings.assistant.brain.whereLabel")}
+        layout="stacked"
+        grouped={true}
+      >
+        <ProviderModeToggle
+          mode={brainMode}
+          onChange={handleBrainModeChange}
+          disabled={isProviderSwitching}
+        />
+      </SettingContainer>
+      {brainMode === "device" ? deviceProviderForm : cloudProviderForm}
+    </SettingsGroup>
+  );
+
+  // Assistant off: the page shrinks to the switch that turns it back on, plus
+  // the shared brain picker. Everything below belongs to the assistant itself.
+  if (!assistantEnabled) {
+    return (
+      <div className="max-w-3xl w-full mx-auto space-y-8">
+        {masterSwitchGroup}
+        {brainGroup}
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-3xl w-full mx-auto space-y-8">
+      {masterSwitchGroup}
+
       {/* Hotkeys ---------------------------------------------------------- */}
       <SettingsGroup
         title={t("settings.assistant.shortcuts.title")}
@@ -1102,24 +1160,7 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
       </SettingsGroup>
 
       {/* Brain picker ----------------------------------------------------- */}
-      <SettingsGroup
-        title={t("settings.assistant.brain.title")}
-        description={t("settings.assistant.brain.description")}
-        icon={Sparkles}
-      >
-        <SettingContainer
-          title={t("settings.assistant.brain.whereLabel")}
-          layout="stacked"
-          grouped={true}
-        >
-          <ProviderModeToggle
-            mode={brainMode}
-            onChange={handleBrainModeChange}
-            disabled={isProviderSwitching}
-          />
-        </SettingContainer>
-        {brainMode === "device" ? deviceProviderForm : cloudProviderForm}
-      </SettingsGroup>
+      {brainGroup}
 
       {/* Voice output ----------------------------------------------------- */}
       <SettingsGroup title={t("settings.assistant.tts.title")} icon={Volume2}>

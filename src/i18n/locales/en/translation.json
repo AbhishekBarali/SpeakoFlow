@@ -1070,6 +1070,11 @@
       }
     },
     "assistant": {
+      "enable": {
+        "title": "Assistant",
+        "label": "Enable the assistant",
+        "description": "Turn this off to make SpeakoFlow dictation-only. The floating panel is closed and never loaded, its hotkeys are freed, and the memory it uses is returned. Generate with Flow and AI cleanup keep working."
+      },
       "shortcuts": {
         "title": "Shortcuts"
       },

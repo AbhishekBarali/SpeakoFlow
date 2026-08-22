@@ -14,6 +14,16 @@ use std::thread;
 /// Send a transcription input to the coordinator.
 /// Used by signal handlers, CLI flags, and any other external trigger.
 pub fn send_transcription_input(app: &AppHandle, binding_id: &str, source: &str) {
+    // External triggers reach the coordinator directly, so they skip the gate in
+    // `shortcut::handler`. Without this, `--toggle-assistant` would still record
+    // and run a whole assistant turn — model, screen capture, spoken reply —
+    // with the assistant switched off and no window to show any of it in.
+    if crate::assistant::is_assistant_binding(binding_id)
+        && !crate::settings::get_settings(app).assistant_enabled
+    {
+        warn!("Ignoring '{binding_id}' from {source}: the assistant is switched off");
+        return;
+    }
     if let Some(c) = app.try_state::<TranscriptionCoordinator>() {
         // External triggers can't "hold", so they always run hands-free (lock).
         c.send_input(

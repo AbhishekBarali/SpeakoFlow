@@ -28,6 +28,13 @@ pub fn init_shortcuts(app: &AppHandle) {
         if id == "transcribe_with_post_process" && !user_settings.post_process_enabled {
             continue;
         }
+        // Same for the assistant's own shortcuts when the master switch is off:
+        // `set_assistant_enabled` unregisters them at runtime, and without this
+        // the next launch would silently grab those combos again — swallowing
+        // them from other apps for a feature that does nothing.
+        if crate::assistant::is_assistant_binding(&id) && !user_settings.assistant_enabled {
+            continue;
+        }
         let binding = user_settings
             .bindings
             .get(&id)
