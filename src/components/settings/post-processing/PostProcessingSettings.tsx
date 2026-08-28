@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Pencil } from "lucide-react";
+import { Pencil, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { commands, type CustomPostProcessTone } from "@/bindings";
 
@@ -16,11 +16,22 @@ import { ProviderSelect } from "../PostProcessingSettingsApi/ProviderSelect";
 import { BaseUrlField } from "../PostProcessingSettingsApi/BaseUrlField";
 import { ApiKeyField } from "../PostProcessingSettingsApi/ApiKeyField";
 import { ModelCombo } from "../../ui/ModelCombo";
+import { CleanupModelRow } from "../dictation/CleanupModelRow";
 import { usePostProcessProviderState } from "../PostProcessingSettingsApi/usePostProcessProviderState";
 import { useSettings } from "../../../hooks/useSettings";
 
-const PostProcessingSettingsApiComponent: React.FC = () => {
+/**
+ * Where cleanup runs, and which model it uses.
+ *
+ * `onBrowseModels` is required for the device side: picking an on-device model is
+ * a browse-and-download flow, not a dropdown, and the page that owns this
+ * component owns the sub-page it opens.
+ */
+const PostProcessingSettingsApiComponent: React.FC<{
+  onBrowseModels: () => void;
+}> = ({ onBrowseModels }) => {
   const { t } = useTranslation();
+  const { settings } = useSettings();
   const state = usePostProcessProviderState();
   const isBuiltin = state.selectedProvider?.id === "builtin";
   const providerMode = isBuiltin ? "device" : "cloud";
@@ -28,20 +39,14 @@ const PostProcessingSettingsApiComponent: React.FC = () => {
     () => state.providerOptions.filter((option) => option.value !== "builtin"),
     [state.providerOptions],
   );
-  const [lastCloudProviderId, setLastCloudProviderId] = useState(() =>
-    state.selectedProviderId !== "builtin" &&
-    state.providerOptions.some(
-      (option) => option.value === state.selectedProviderId,
-    )
-      ? state.selectedProviderId
-      : "custom",
-  );
 
-  useEffect(() => {
-    if (state.selectedProviderId !== "builtin") {
-      setLastCloudProviderId(state.selectedProviderId);
-    }
-  }, [state.selectedProviderId]);
+  // Which cloud provider to return to, read from settings rather than local
+  // state. It used to be `useState`, which meant the choice survived a toggle
+  // but not a navigation away and back: the user returned, switched to cloud,
+  // and landed on a different provider — so their model, base URL, and key all
+  // looked lost even though they were still stored per provider.
+  const lastCloudProviderId =
+    settings?.post_process_last_cloud_provider_id ?? null;
 
   const handleProviderModeChange = (mode: "device" | "cloud") => {
     if (mode === "device") {
@@ -50,22 +55,31 @@ const PostProcessingSettingsApiComponent: React.FC = () => {
     }
     if (!isBuiltin) return;
 
-    const target = cloudProviderOptions.some(
-      (option) => option.value === lastCloudProviderId,
-    )
-      ? lastCloudProviderId
-      : cloudProviderOptions[0]?.value;
+    const target =
+      lastCloudProviderId &&
+      cloudProviderOptions.some(
+        (option) => option.value === lastCloudProviderId,
+      )
+        ? lastCloudProviderId
+        : cloudProviderOptions[0]?.value;
     if (target) state.handleProviderSelect(target);
   };
 
   const { models } = useModelStore();
-  const llmModels = useMemo(
-    () =>
-      models.filter((model) => {
-        return getModelCategory(model) === "llm" && model.is_downloaded;
-      }),
-    [models],
-  );
+  // The on-device cleanup model, resolved to a real catalog entry. Only a model
+  // that is actually on disk counts as active — a selection whose file is gone
+  // has to read as "nothing selected" or the card would claim cleanup is ready
+  // when it cannot run.
+  const activeLocalModel = useMemo(() => {
+    const id = settings?.post_process_models?.builtin ?? "";
+    if (!id) return undefined;
+    return models.find(
+      (model) =>
+        model.id === id &&
+        getModelCategory(model) === "llm" &&
+        model.is_downloaded,
+    );
+  }, [models, settings?.post_process_models]);
 
   return (
     <>
@@ -73,7 +87,10 @@ const PostProcessingSettingsApiComponent: React.FC = () => {
         title={t("settings.postProcessing.api.location.title")}
         description={t("settings.postProcessing.api.location.description")}
         descriptionMode="tooltip"
-        layout="stacked"
+        // Horizontal: a two-option segmented control is narrow enough to sit
+        // beside its label, and stacking it cost a whole row of height for
+        // nothing.
+        layout="horizontal"
         grouped={true}
       >
         <ProviderModeToggle
@@ -148,35 +165,10 @@ const PostProcessingSettingsApiComponent: React.FC = () => {
 
       {!state.isAppleProvider &&
         (providerMode === "device" ? (
-          <SettingContainer
-            title={t("settings.postProcessing.api.model.title")}
-            description={t(
-              "settings.postProcessing.api.builtin.modelDescription",
-            )}
-            descriptionMode="tooltip"
-            layout="horizontal"
-            grouped={true}
-          >
-            {llmModels.length > 0 ? (
-              <Dropdown
-                options={llmModels.map((model) => ({
-                  value: model.id,
-                  label: model.name,
-                }))}
-                selectedValue={state.model}
-                onSelect={state.handleModelSelect}
-                placeholder={t(
-                  "settings.postProcessing.api.builtin.modelPlaceholder",
-                )}
-                disabled={state.isModelUpdating}
-                className="min-w-[320px]"
-              />
-            ) : (
-              <span className="max-w-[360px] text-right text-xs text-muted">
-                {t("settings.postProcessing.api.builtin.noModels")}
-              </span>
-            )}
-          </SettingContainer>
+          <CleanupModelRow
+            model={activeLocalModel}
+            onChangeModel={onBrowseModels}
+          />
         ) : (
           <SettingContainer
             title={t("settings.postProcessing.api.model.title")}
@@ -201,9 +193,7 @@ const PostProcessingSettingsApiComponent: React.FC = () => {
                   ? t(
                       "settings.postProcessing.api.model.placeholderWithOptions",
                     )
-                  : t(
-                      "settings.postProcessing.api.model.placeholderNoOptions",
-                    )
+                  : t("settings.postProcessing.api.model.placeholderNoOptions")
               }
               loadLabel={t("settings.postProcessing.api.model.refreshModels")}
               className="flex flex-col gap-1"
@@ -214,6 +204,22 @@ const PostProcessingSettingsApiComponent: React.FC = () => {
     </>
   );
 };
+
+/**
+ * Sentinel selection meaning "no cleanup prompt", mirrored from
+ * `settings::NONE_POST_PROCESS_PROMPT_ID`. Cleanup still runs; the model just
+ * receives the transcript and the final-output contract, nothing else.
+ */
+const NONE_PROMPT_ID = "none";
+
+/**
+ * The prompts the app ships, mirrored from `settings.rs`. Only these can be
+ * restored to their original text — a user's own prompt has no "original".
+ */
+const SHIPPED_PROMPT_IDS = new Set([
+  "default_improve_transcriptions",
+  "speakoflow_mini_cleanup",
+]);
 
 const PostProcessingSettingsPromptsComponent: React.FC = () => {
   const { t } = useTranslation();
@@ -231,7 +237,6 @@ const PostProcessingSettingsPromptsComponent: React.FC = () => {
   const selectedPromptId = getSetting("post_process_selected_prompt_id") || "";
   const selectedPrompt =
     prompts.find((prompt) => prompt.id === selectedPromptId) || null;
-
   useEffect(() => {
     if (isCreating) return;
 
@@ -369,6 +374,41 @@ const PostProcessingSettingsPromptsComponent: React.FC = () => {
     }
   };
 
+  /**
+   * Put a shipped prompt back to the text the app ships.
+   *
+   * Matters most for the SpeakoFlow Mini prompt: it is editable like any other,
+   * but it is also the exact string the model was trained against, so a user who
+   * experimented with it needs a way back that doesn't involve retyping it from
+   * the release notes.
+   */
+  const handleRestorePrompt = async () => {
+    if (!selectedPromptId || isPromptBusy) return;
+    setIsPromptBusy(true);
+    try {
+      const result = await commands.restorePostProcessPrompt(selectedPromptId);
+      if (result.status !== "ok") {
+        toast.error(
+          t("settings.postProcessing.errors.promptRestoreFailed", {
+            defaultValue: "Couldn’t restore the prompt.",
+          }),
+        );
+        return;
+      }
+      await refreshSettings();
+      setEditing(false);
+    } catch (error) {
+      console.error("Failed to restore prompt:", error);
+      toast.error(
+        t("settings.postProcessing.errors.promptRestoreFailed", {
+          defaultValue: "Couldn’t restore the prompt.",
+        }),
+      );
+    } finally {
+      setIsPromptBusy(false);
+    }
+  };
+
   const handleCancelCreate = () => {
     setIsCreating(false);
     if (selectedPrompt) {
@@ -411,10 +451,19 @@ const PostProcessingSettingsPromptsComponent: React.FC = () => {
         <div className="flex gap-2">
           <Dropdown
             selectedValue={selectedPromptId || null}
-            options={prompts.map((p) => ({
-              value: p.id,
-              label: p.name,
-            }))}
+            options={[
+              // "No prompt" — cleanup still runs, but the model receives only
+              // the transcript. Useful for judging a model (a fine-tune in
+              // particular) on its own behaviour rather than on ours.
+              {
+                value: NONE_PROMPT_ID,
+                label: t("settings.postProcessing.prompts.nonePrompt"),
+              },
+              ...prompts.map((p) => ({
+                value: p.id,
+                label: p.name,
+              })),
+            ]}
             onSelect={(value) => handlePromptSelect(value)}
             placeholder={
               prompts.length === 0
@@ -526,12 +575,29 @@ const PostProcessingSettingsPromptsComponent: React.FC = () => {
                   >
                     {t("settings.postProcessing.prompts.updatePrompt")}
                   </Button>
+                  {SHIPPED_PROMPT_IDS.has(selectedPromptId) && (
+                    <Button
+                      onClick={handleRestorePrompt}
+                      variant="secondary"
+                      size="md"
+                      disabled={isPromptBusy}
+                    >
+                      <RotateCcw size={14} />
+                      {t("settings.postProcessing.prompts.restorePrompt")}
+                    </Button>
+                  )}
                   <Button
                     onClick={() => handleDeletePrompt(selectedPromptId)}
                     variant="secondary"
                     size="md"
                     disabled={
-                      !selectedPromptId || prompts.length <= 1 || isPromptBusy
+                      // A shipped prompt is a reference point, not user content:
+                      // deleting it just makes the recommended pairing
+                      // unreachable, and the backend would re-seed it anyway.
+                      !selectedPromptId ||
+                      prompts.length <= 1 ||
+                      isPromptBusy ||
+                      SHIPPED_PROMPT_IDS.has(selectedPromptId)
                     }
                   >
                     {t("settings.postProcessing.prompts.deletePrompt")}
@@ -778,7 +844,10 @@ const PostProcessingToneComponent: React.FC = () => {
     <SettingContainer
       title={t("settings.postProcessing.tone.title")}
       description={t("settings.postProcessing.tone.description")}
-      descriptionMode="inline"
+      // Tooltip, not inline: the group header already states that the style is
+      // layer 2 and shapes wording rather than corrections, so printing it again
+      // here was the single biggest source of wall-of-text in this section.
+      descriptionMode="tooltip"
       layout="stacked"
       grouped={true}
     >

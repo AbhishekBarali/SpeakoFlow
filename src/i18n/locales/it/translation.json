@@ -509,6 +509,32 @@
         "add": "Scarica",
         "adding": "Avvio…",
         "addError": "Impossibile aggiungere questo modello. Riprova."
+      },
+      "localModel": {
+        "addButton": "Usa un modello locale",
+        "title": "Usa un modello che hai già",
+        "subtitle": "Aggiungi un file .gguf o un .bin di Whisper da qualsiasi punto di questo dispositivo, oppure collega una cartella in cui tieni i tuoi modelli. Non viene copiato né scaricato nulla.",
+        "pickFiles": "Scegli i file del modello",
+        "pickFilesHint": "Seleziona uno o più file .gguf o .bin. Comodo per un singolo modello che hai appena creato.",
+        "linkFolder": "Collega una cartella",
+        "linkFolderHint": "Viene analizzata automaticamente, sottocartelle incluse. Collega tutte le cartelle che vuoi.",
+        "fileFilter": "File di modello",
+        "filesAdded_one": "Aggiunto {{count}} modello.",
+        "filesAdded_other": "Aggiunti {{count}} modelli.",
+        "folderAdded_one": "Cartella collegata. Trovato {{count}} modello.",
+        "folderAdded_other": "Cartella collegata. Trovati {{count}} modelli.",
+        "folderRemoved": "Cartella scollegata. I tuoi file non sono stati toccati.",
+        "foldersTitle": "Cartelle collegate",
+        "foldersEmpty": "Nessuna cartella collegata per ora. Collegane una e ogni modello al suo interno comparirà nel tuo elenco.",
+        "removeFolder": "Scollega {{folder}}",
+        "rescan": "Analizza di nuovo",
+        "rescanning": "Nuova analisi…",
+        "rescanDone_one": "Trovato {{count}} modello locale.",
+        "rescanDone_other": "Trovati {{count}} modelli locali.",
+        "footnote": "Le cartelle collegate vengono analizzate di nuovo all'avvio di SpeakoFlow, così i modelli che ci aggiungi più tardi compaiono da soli. Scollegare una cartella o rimuovere un modello lo toglie solo da questo elenco: i tuoi file restano dove sono.",
+        "removeTitle": "Rimuovere dall'elenco?",
+        "removeConfirm": "Vuoi rimuovere «{{modelName}}» dal tuo elenco di modelli?\n\nIl file resta dov'è:\n{{path}}",
+        "fileMissing": "Il file di questo modello non c'è più:\n{{path}}\n\nPotrebbe essere stato spostato o rinominato, oppure trovarsi su un'unità non collegata."
       }
     },
     "sound": {
@@ -869,21 +895,10 @@
       },
       "aiCleanup": {
         "groupTitle": "Pulizia IA",
-        "styleGroupTitle": "Stile di scrittura",
-        "styleGroupDescription": "Scegli uno stile integrato o salva le tue regole su come deve suonare la dettatura ripulita.",
         "modelGroupTitle": "Modello di pulizia",
         "promptGroupTitle": "Prompt di pulizia",
         "title": "Sistema la mia dettatura con l'IA",
         "caption": "Sperimentale — sistema punteggiatura e parole di riempimento dopo la dettatura.",
-        "strengthLabel": "Intensità della pulizia",
-        "strengthDescription": "Quanto l'IA riscrive le tue parole. Leggera corregge solo errori e parole di riempimento. Bilanciata elimina anche ripetizioni e false partenze. Aggressiva condensa i discorsi dispersivi in un testo conciso e ben strutturato — mantenendo sempre i tuoi fatti e il tuo significato.",
-        "strengthOptions": {
-          "light": "Leggera",
-          "balanced": "Bilanciata",
-          "aggressive": "Aggressiva"
-        },
-        "fixMisheardLabel": "Correggi le parole fraintese",
-        "fixMisheardDescription": "Quando una parola è chiaramente sbagliata per la frase — un omofono o una pronuncia quasi giusta — la sostituisce con quella che intendevi. Utile con gli accenti; l'IA corregge solo quando la parola voluta è evidente.",
         "info": "Esegue un modello linguistico sulla tua dettatura per correggere la punteggiatura, rimuovere le parole di riempimento e, facoltativamente, regolare il tono. Vale solo per la dettatura, con una scorciatoia dedicata. Aggiunge un breve ritardo dopo che hai parlato; se il modello fallisce o va in timeout, viene usato il testo grezzo. Ancora in sviluppo."
       },
       "spokenEmoji": {

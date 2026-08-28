@@ -509,6 +509,32 @@
         "add": "Descargar",
         "adding": "Iniciando…",
         "addError": "No se pudo añadir este modelo. Inténtalo de nuevo."
+      },
+      "localModel": {
+        "addButton": "Usar un modelo local",
+        "title": "Usa un modelo que ya tengas",
+        "subtitle": "Añade un archivo .gguf o un .bin de Whisper desde cualquier lugar de este dispositivo, o vincula una carpeta donde guardes tus modelos. No se copia nada ni se descarga nada.",
+        "pickFiles": "Elegir archivos de modelo",
+        "pickFilesHint": "Elige uno o varios archivos .gguf o .bin. Ideal para un modelo que acabas de crear.",
+        "linkFolder": "Vincular una carpeta",
+        "linkFolderHint": "Se analiza automáticamente, incluidas las subcarpetas. Vincula todas las carpetas que quieras.",
+        "fileFilter": "Archivos de modelo",
+        "filesAdded_one": "Se añadió {{count}} modelo.",
+        "filesAdded_other": "Se añadieron {{count}} modelos.",
+        "folderAdded_one": "Carpeta vinculada. Se encontró {{count}} modelo.",
+        "folderAdded_other": "Carpeta vinculada. Se encontraron {{count}} modelos.",
+        "folderRemoved": "Carpeta desvinculada. Tus archivos no se han tocado.",
+        "foldersTitle": "Carpetas vinculadas",
+        "foldersEmpty": "Todavía no hay carpetas vinculadas. Vincula una y todos los modelos que haya dentro aparecerán en tu lista.",
+        "removeFolder": "Desvincular {{folder}}",
+        "rescan": "Volver a analizar",
+        "rescanning": "Analizando de nuevo…",
+        "rescanDone_one": "Se encontró {{count}} modelo local.",
+        "rescanDone_other": "Se encontraron {{count}} modelos locales.",
+        "footnote": "Las carpetas vinculadas se vuelven a analizar cuando se inicia SpeakoFlow, así que los modelos que añadas después aparecen por su cuenta. Desvincular una carpeta o quitar un modelo solo lo saca de esta lista: tus archivos se quedan donde están.",
+        "removeTitle": "¿Quitar de la lista?",
+        "removeConfirm": "¿Quitar «{{modelName}}» de tu lista de modelos?\n\nEl archivo se queda donde está:\n{{path}}",
+        "fileMissing": "El archivo de este modelo ya no está ahí:\n{{path}}\n\nPuede que se haya movido o cambiado de nombre, o que esté en una unidad que no está conectada."
       }
     },
     "sound": {
@@ -869,21 +895,10 @@
       },
       "aiCleanup": {
         "groupTitle": "Limpieza con IA",
-        "styleGroupTitle": "Estilo de redacción",
-        "styleGroupDescription": "Elige un estilo integrado o guarda tus propias reglas sobre cómo debe sonar el dictado ya limpio.",
         "modelGroupTitle": "Modelo de limpieza",
         "promptGroupTitle": "Prompt de limpieza",
         "title": "Pulir mi dictado con IA",
         "caption": "Experimental: arregla la puntuación y quita las muletillas después de dictar.",
-        "strengthLabel": "Intensidad de la limpieza",
-        "strengthDescription": "Cuánto reescribe la IA tus palabras. Ligera solo corrige errores y muletillas. Equilibrada también recorta ideas repetidas y arranques en falso. Intensa condensa los divagues en un texto conciso y bien estructurado, conservando siempre tus datos y tu sentido.",
-        "strengthOptions": {
-          "light": "Ligera",
-          "balanced": "Equilibrada",
-          "aggressive": "Intensa"
-        },
-        "fixMisheardLabel": "Corregir palabras mal entendidas",
-        "fixMisheardDescription": "Cuando una palabra es claramente errónea en la frase —un homófono o una pronunciación parecida—, se sustituye por la que querías decir. Útil con distintos acentos; la IA solo corrige cuando la palabra pretendida es evidente.",
         "info": "Pasa un modelo de lenguaje por tu dictado para corregir la puntuación, quitar muletillas y, si quieres, ajustar el tono. Solo se aplica al dictado, con su propio atajo. Añade una breve demora después de hablar; si el modelo falla o se agota el tiempo, se usa tu texto sin procesar. Todavía en desarrollo."
       },
       "spokenEmoji": {

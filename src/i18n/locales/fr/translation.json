@@ -509,6 +509,32 @@
         "add": "Télécharger",
         "adding": "Démarrage…",
         "addError": "Impossible d'ajouter ce modèle. Veuillez réessayer."
+      },
+      "localModel": {
+        "addButton": "Utiliser un modèle local",
+        "title": "Utiliser un modèle que vous avez déjà",
+        "subtitle": "Ajoutez un fichier .gguf ou un .bin Whisper depuis n'importe où sur cet appareil, ou liez un dossier dans lequel vous rangez vos modèles. Rien n'est copié et rien n'est téléchargé.",
+        "pickFiles": "Choisir des fichiers de modèle",
+        "pickFilesHint": "Sélectionnez un ou plusieurs fichiers .gguf ou .bin. Pratique pour un modèle que vous venez de créer.",
+        "linkFolder": "Lier un dossier",
+        "linkFolderHint": "Analysé automatiquement, sous-dossiers inclus. Liez autant de dossiers que vous voulez.",
+        "fileFilter": "Fichiers de modèle",
+        "filesAdded_one": "{{count}} modèle ajouté.",
+        "filesAdded_other": "{{count}} modèles ajoutés.",
+        "folderAdded_one": "Dossier lié. {{count}} modèle trouvé.",
+        "folderAdded_other": "Dossier lié. {{count}} modèles trouvés.",
+        "folderRemoved": "Dossier délié. Vos fichiers n'ont pas été touchés.",
+        "foldersTitle": "Dossiers liés",
+        "foldersEmpty": "Aucun dossier lié pour l'instant. Liez-en un et tous les modèles qu'il contient apparaîtront dans votre liste.",
+        "removeFolder": "Délier {{folder}}",
+        "rescan": "Réanalyser",
+        "rescanning": "Réanalyse…",
+        "rescanDone_one": "{{count}} modèle local trouvé.",
+        "rescanDone_other": "{{count}} modèles locaux trouvés.",
+        "footnote": "Les dossiers liés sont réanalysés au démarrage de SpeakoFlow, donc les modèles que vous y ajoutez ensuite apparaissent tout seuls. Délier un dossier ou retirer un modèle le retire seulement de cette liste — vos fichiers restent là où ils sont.",
+        "removeTitle": "Retirer de la liste ?",
+        "removeConfirm": "Retirer « {{modelName}} » de votre liste de modèles ?\n\nLe fichier lui-même reste là où il est :\n{{path}}",
+        "fileMissing": "Le fichier de ce modèle n'est plus là :\n{{path}}\n\nIl a peut-être été déplacé ou renommé, ou il se trouve sur un disque qui n'est pas connecté."
       }
     },
     "sound": {
@@ -869,21 +895,10 @@
       },
       "aiCleanup": {
         "groupTitle": "Nettoyage IA",
-        "styleGroupTitle": "Style d'écriture",
-        "styleGroupDescription": "Choisissez un style intégré ou enregistrez vos propres règles pour le rendu de la dictée nettoyée.",
         "modelGroupTitle": "Modèle de nettoyage",
         "promptGroupTitle": "Prompt de nettoyage",
         "title": "Corriger ma dictée avec l'IA",
         "caption": "Expérimental — remet en ordre la ponctuation et les mots parasites après votre dictée.",
-        "strengthLabel": "Intensité du nettoyage",
-        "strengthDescription": "Dans quelle mesure l'IA réécrit vos mots. Léger ne corrige que les erreurs et les mots parasites. Équilibré supprime aussi les répétitions et les faux départs. Intensif condense les digressions en un texte concis et bien structuré — en conservant toujours vos faits et votre sens.",
-        "strengthOptions": {
-          "light": "Léger",
-          "balanced": "Équilibré",
-          "aggressive": "Intensif"
-        },
-        "fixMisheardLabel": "Corriger les mots mal entendus",
-        "fixMisheardDescription": "Lorsqu'un mot est manifestement incorrect dans la phrase — un homophone ou une prononciation approchante — le remplacer par le mot que vous vouliez dire. Utile pour les accents ; l'IA ne corrige que lorsque le mot visé est évident.",
         "info": "Applique un modèle de langage à votre dictée pour corriger la ponctuation, supprimer les mots parasites et, si vous le souhaitez, ajuster le ton. Ne s'applique qu'à la dictée, avec son propre raccourci. Cela ajoute un léger délai après que vous avez parlé ; si le modèle échoue ou dépasse le délai, votre texte brut est utilisé à la place. Encore en développement."
       },
       "spokenEmoji": {

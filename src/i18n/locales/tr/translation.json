@@ -509,6 +509,32 @@
         "add": "İndir",
         "adding": "Başlatılıyor…",
         "addError": "Bu model eklenemedi. Lütfen tekrar deneyin."
+      },
+      "localModel": {
+        "addButton": "Yerel bir model kullan",
+        "title": "Zaten sahip olduğunuz bir modeli kullanın",
+        "subtitle": "Bu cihazdaki herhangi bir yerden bir .gguf ya da Whisper .bin dosyası ekleyin veya modellerinizi tuttuğunuz bir klasörü bağlayın. Hiçbir şey kopyalanmaz, hiçbir şey indirilmez.",
+        "pickFiles": "Model dosyalarını seç",
+        "pickFilesHint": "Bir veya daha fazla .gguf ya da .bin dosyası seçin. Yeni oluşturduğunuz tek bir model için idealdir.",
+        "linkFolder": "Bir klasör bağla",
+        "linkFolderHint": "Alt klasörler dahil otomatik olarak taranır. İstediğiniz kadar klasör bağlayabilirsiniz.",
+        "fileFilter": "Model dosyaları",
+        "filesAdded_one": "{{count}} model eklendi.",
+        "filesAdded_other": "{{count}} model eklendi.",
+        "folderAdded_one": "Klasör bağlandı. {{count}} model bulundu.",
+        "folderAdded_other": "Klasör bağlandı. {{count}} model bulundu.",
+        "folderRemoved": "Klasör bağlantısı kaldırıldı. Dosyalarınıza dokunulmadı.",
+        "foldersTitle": "Bağlı klasörler",
+        "foldersEmpty": "Henüz bağlı klasör yok. Bir klasör bağlayın; içindeki her model listenizde görünür.",
+        "removeFolder": "{{folder}} bağlantısını kaldır",
+        "rescan": "Yeniden tara",
+        "rescanning": "Yeniden taranıyor…",
+        "rescanDone_one": "{{count}} yerel model bulundu.",
+        "rescanDone_other": "{{count}} yerel model bulundu.",
+        "footnote": "Bağlı klasörler SpeakoFlow her açıldığında yeniden taranır; bu yüzden sonradan eklediğiniz modeller kendiliğinden görünür. Bir klasörün bağlantısını kaldırmak veya bir modeli kaldırmak onu yalnızca bu listeden siler — dosyalarınız olduğu yerde kalır.",
+        "removeTitle": "Listeden kaldırılsın mı?",
+        "removeConfirm": "“{{modelName}}” model listenizden kaldırılsın mı?\n\nDosyanın kendisi olduğu yerde kalır:\n{{path}}",
+        "fileMissing": "Bu modelin dosyası artık orada değil:\n{{path}}\n\nTaşınmış ya da adı değiştirilmiş olabilir veya bağlı olmayan bir sürücüde olabilir."
       }
     },
     "sound": {
@@ -869,21 +895,10 @@
       },
       "aiCleanup": {
         "groupTitle": "Yapay zekâ temizleme",
-        "styleGroupTitle": "Yazım stili",
-        "styleGroupDescription": "Yerleşik bir stil seçin ya da temizlenmiş diktenin nasıl bir tonda olacağına dair kendi kurallarınızı kaydedin.",
         "modelGroupTitle": "Temizleme modeli",
         "promptGroupTitle": "Temizleme prompt'u",
         "title": "Diktemi yapay zekâ ile düzelt",
         "caption": "Deneysel — dikte ettikten sonra noktalamayı ve dolgu sözcüklerini toparlar.",
-        "strengthLabel": "Temizleme gücü",
-        "strengthDescription": "Yapay zekânın sözlerinizi ne kadar yeniden yazacağı. Hafif yalnızca hataları ve dolgu sözcüklerini düzeltir. Dengeli, ayrıca yinelenen noktaları ve yarım kalmış başlangıçları kırpar. Agresif, dağınık anlatımı öz ve düzenli bir metne dönüştürür — bilgilerinizi ve anlamı her zaman koruyarak.",
-        "strengthOptions": {
-          "light": "Hafif",
-          "balanced": "Dengeli",
-          "aggressive": "Agresif"
-        },
-        "fixMisheardLabel": "Yanlış duyulan kelimeleri düzelt",
-        "fixMisheardDescription": "Bir kelime cümle için açıkça yanlışsa — sesteş bir kelime ya da az farkla kaçırılmış bir telaffuz — onu kastettiğiniz kelimeyle değiştirir. Aksanlarda işe yarar; yapay zekâ yalnızca kastedilen kelime apaçıkken düzeltir.",
         "info": "Noktalama işaretlerini düzeltmek, dolgu sözcüklerini kaldırmak ve isteğe bağlı olarak tonu ayarlamak için diktenizin üzerinde bir dil modeli çalıştırır. Yalnızca dikteye uygulanır ve kendi kısayoluyla çalışır. Konuşmanızın ardından kısa bir gecikme ekler; model başarısız olursa veya zaman aşımına uğrarsa ham metniniz kullanılır. Hâlâ geliştirme aşamasında."
       },
       "spokenEmoji": {

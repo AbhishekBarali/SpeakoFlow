@@ -73,6 +73,38 @@ export const OpenAILogo: React.FC<LogoProps> = ({ size = 20, className }) => (
   </svg>
 );
 
+/**
+ * SpeakoFlow's own mark, used by the SpeakoFlow Mini cleanup model.
+ *
+ * PLACEHOLDER — this is a stand-in glyph (a speech mark with a flow stroke), not
+ * the real product mark. Swap the `<path>` data below for the model's logo when
+ * it lands; nothing else needs to change, because it renders at `currentColor`
+ * inside the tinted tile like every other brand here.
+ */
+export const SpeakoFlowLogo: React.FC<LogoProps> = ({
+  size = 20,
+  className,
+}) => (
+  <svg
+    role="img"
+    aria-hidden
+    viewBox="0 0 24 24"
+    width={size}
+    height={size}
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={2}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+  >
+    <path d="M4 18.5V16a8 8 0 0 1 8-8h8" />
+    <path d="M16.5 4.5 20 8l-3.5 3.5" />
+    <path d="M4 10.5V9" />
+    <path d="M8 20v-1.5" />
+  </svg>
+);
+
 /** Brand identity a model card renders: the mark plus a softly tinted tile in
  *  the brand's own hue. Tints stay quiet in light mode and lift in dark so the
  *  catalog reads as a scannable list of products, not anonymous rows. */
@@ -91,6 +123,9 @@ const BRAND_TILES = {
   openai: "bg-ink/8 text-ink/80 dark:bg-ink/15 dark:text-ink",
   moonshine:
     "bg-amber-500/12 text-amber-600 dark:bg-amber-400/20 dark:text-amber-300",
+  // Our own models wear the app's accent, so a SpeakoFlow model reads as ours
+  // rather than as one more third-party download.
+  speakoflow: "bg-accent/12 text-accent dark:bg-accent/20",
   neutral: "bg-surface-strong text-muted",
 } as const;
 
@@ -102,6 +137,14 @@ const BRAND_TILES = {
  */
 export const getModelBrand = (model: ModelInfo): ModelBrand => {
   const key = `${model.id} ${model.name}`.toLowerCase();
+  // Checked first: a SpeakoFlow fine-tune of another family should still read as
+  // ours, not as the base model's brand.
+  if (/speakoflow/.test(key)) {
+    return {
+      icon: <SpeakoFlowLogo size={18} />,
+      tileClass: BRAND_TILES.speakoflow,
+    };
+  }
   if (/nemotron|parakeet|canary/.test(key)) {
     return { icon: <NvidiaLogo size={18} />, tileClass: BRAND_TILES.nvidia };
   }

@@ -509,6 +509,32 @@
         "add": "Ladda ner",
         "adding": "Startar…",
         "addError": "Kunde inte lägga till den här modellen. Försök igen."
+      },
+      "localModel": {
+        "addButton": "Använd en lokal modell",
+        "title": "Använd en modell du redan har",
+        "subtitle": "Lägg till en .gguf eller en Whisper .bin var som helst på den här enheten, eller länka en mapp där du sparar dina modeller. Inget kopieras och inget laddas ner.",
+        "pickFiles": "Välj modellfiler",
+        "pickFilesHint": "Välj en eller flera .gguf- eller .bin-filer. Bra för en enstaka modell du just byggt.",
+        "linkFolder": "Länka en mapp",
+        "linkFolderHint": "Genomsöks automatiskt, inklusive undermappar. Länka så många mappar du vill.",
+        "fileFilter": "Modellfiler",
+        "filesAdded_one": "Lade till {{count}} modell.",
+        "filesAdded_other": "Lade till {{count}} modeller.",
+        "folderAdded_one": "Mappen länkad. Hittade {{count}} modell.",
+        "folderAdded_other": "Mappen länkad. Hittade {{count}} modeller.",
+        "folderRemoved": "Mappen är inte längre länkad. Dina filer rördes inte.",
+        "foldersTitle": "Länkade mappar",
+        "foldersEmpty": "Inga mappar är länkade än. Länka en och varje modell i den visas i din lista.",
+        "removeFolder": "Ta bort länken till {{folder}}",
+        "rescan": "Sök igen",
+        "rescanning": "Söker igen…",
+        "rescanDone_one": "{{count}} lokal modell hittad.",
+        "rescanDone_other": "{{count}} lokala modeller hittade.",
+        "footnote": "Länkade mappar genomsöks igen när SpeakoFlow startar, så modeller du lägger till i dem senare dyker upp av sig själva. Att ta bort länken till en mapp eller ta bort en modell tar bara bort den från den här listan — dina filer ligger kvar där de är.",
+        "removeTitle": "Ta bort från listan?",
+        "removeConfirm": "Ta bort ”{{modelName}}” från din modellista?\n\nSjälva filen ligger kvar där den är:\n{{path}}",
+        "fileMissing": "Filen för den här modellen finns inte längre:\n{{path}}\n\nDen kan ha flyttats eller bytt namn, eller ligga på en enhet som inte är ansluten."
       }
     },
     "sound": {
@@ -869,21 +895,10 @@
       },
       "aiCleanup": {
         "groupTitle": "AI-rensning",
-        "styleGroupTitle": "Skrivstil",
-        "styleGroupDescription": "Välj en inbyggd stil eller spara egna regler för hur den rensade dikteringen ska låta.",
         "modelGroupTitle": "Modell för rensning",
         "promptGroupTitle": "Prompt för rensning",
         "title": "Snygga till min diktering med AI",
         "caption": "Experimentellt — snyggar till skiljetecken och utfyllnadsord efter att du dikterat.",
-        "strengthLabel": "Rensningsgrad",
-        "strengthDescription": "Hur mycket AI:n skriver om dina ord. Lätt rättar bara fel och utfyllnadsord. Balanserad tar även bort upprepningar och tvekstarter. Aggressiv stramar upp svamlande tal till koncis, välstrukturerad text — dina fakta och din innebörd behålls alltid.",
-        "strengthOptions": {
-          "light": "Lätt",
-          "balanced": "Balanserad",
-          "aggressive": "Aggressiv"
-        },
-        "fixMisheardLabel": "Rätta felhörda ord",
-        "fixMisheardDescription": "När ett ord tydligt är fel i sammanhanget — en homofon eller ett nästan rätt uttal — byts det mot ordet du menade. Hjälper vid brytning och dialekt; AI:n rättar bara när det avsedda ordet är uppenbart.",
         "info": "Kör en språkmodell över din diktering för att rätta skiljetecken, ta bort utfyllnadsord och eventuellt justera tonen. Gäller endast diktering, på sitt eget kortkommando. Det ger en kort fördröjning efter att du talat; om modellen misslyckas eller tar för lång tid används din råa text i stället. Fortfarande under utveckling."
       },
       "spokenEmoji": {

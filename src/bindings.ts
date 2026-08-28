@@ -247,23 +247,41 @@ async changePostProcessEnabledSetting(enabled: boolean) : Promise<Result<null, s
 }
 },
 /**
- * Toggle the opt-in cleanup behavior that repairs clearly misheard words.
+ * Make an on-device model the AI-cleanup engine, keeping the prompt layer
+ * coherent with it.
+ * 
+ * One command rather than the three round-trips the UI used to make, because
+ * the three have to agree: the provider must be the built-in engine, the model
+ * must be assigned to it, and the selected cleanup prompt has to suit the model.
+ * That last part is the reason this exists at all — SpeakoFlow Mini is trained
+ * on one short prompt and is measurably worse when handed the long
+ * general-purpose one, and the long prompt is what a general chat model needs to
+ * stay on task. Getting that pairing wrong looks like "the model is bad", so the
+ * app pairs them.
+ * 
+ * Only the two *shipped* prompts are ever swapped. Anything the user selected or
+ * wrote themselves is left exactly as it is — a silent switch away from
+ * someone's own prompt would be worse than a suboptimal default.
  */
-async changePostProcessFixMisheardSetting(enabled: boolean) : Promise<Result<null, string>> {
+async setCleanupLocalModel(modelId: string) : Promise<Result<null, string>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("change_post_process_fix_misheard_setting", { enabled }) };
+    return { status: "ok", data: await TAURI_INVOKE("set_cleanup_local_model", { modelId }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
 },
 /**
- * Set how aggressively dictation cleanup condenses the transcript
- * (Light/Balanced/Aggressive). Separate from the writing-style tone.
+ * Restore a shipped cleanup prompt to the exact text the app ships.
+ * 
+ * Needed because the SpeakoFlow Mini prompt is editable like any other: a user
+ * who experiments with it (or pastes over it) otherwise has no way back to the
+ * text the fine-tune was actually trained on, and no way to know they have
+ * drifted from it.
  */
-async changePostProcessCleanupStrengthSetting(strength: PostProcessCleanupStrength) : Promise<Result<null, string>> {
+async restorePostProcessPrompt(id: string) : Promise<Result<null, string>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("change_post_process_cleanup_strength_setting", { strength }) };
+    return { status: "ok", data: await TAURI_INVOKE("restore_post_process_prompt", { id }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -969,6 +987,67 @@ async listHuggingfaceGgufFiles(repoId: string) : Promise<Result<HfRepoFiles, str
 async addCustomLlmModel(repoId: string, filename: string, sizeMb: number, mmprojFilename: string | null) : Promise<Result<ModelInfo, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("add_custom_llm_model", { repoId, filename, sizeMb, mmprojFilename }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Register models the user already has on disk, from paths they picked.
+ * 
+ * Nothing is copied or moved — each entry points at the file where it lives.
+ */
+async addLocalModels(paths: string[]) : Promise<Result<LocalModelImport, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("add_local_models", { paths }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Link a folder of existing models and scan it. Returns how many were found.
+ */
+async addModelFolder(path: string) : Promise<Result<number, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("add_model_folder", { path }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Unlink a folder. Its models leave the catalog; the files stay where they are.
+ */
+async removeModelFolder(path: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("remove_model_folder", { path }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * The currently linked model folders, in the order they were added.
+ */
+async getModelFolders() : Promise<Result<string[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_model_folders") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Re-scan every linked folder and re-check every registered local file.
+ * 
+ * The manual counterpart to the scan that runs at startup, for when the user
+ * has just added a model to a linked folder or reconnected a drive. Returns the
+ * total number of local models now registered.
+ */
+async rescanLocalModels() : Promise<Result<number, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("rescan_local_models") };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -2220,6 +2299,18 @@ overlay_style?: OverlayStyle;
  */
 assistant_overlay_style?: OverlayStyle; debug_mode?: boolean; log_level?: LogLevel; custom_words?: string[]; 
 /**
+ * Folders the user keeps their own models in. Each is scanned recursively
+ * and every `.gguf` / Whisper `.bin` found is registered as a catalog entry
+ * pointing at its real location — nothing is copied into the app's models
+ * directory. Any number of folders can be linked, which is the point: model
+ * collections are routinely spread across an internal drive, an external
+ * one, and a fine-tuning output directory.
+ * 
+ * Stored as absolute paths. Missing folders (unplugged drive) are skipped
+ * with a warning rather than dropped, so the link survives a reconnect.
+ */
+model_folders?: string[]; 
+/**
  * Convert explicit spoken commands such as `happy emoji` into their
  * Unicode emoji during ordinary dictation. This pass is fully local and
  * deterministic; it is opt-in so the same words remain literal by default.
@@ -2260,17 +2351,17 @@ post_process_custom_tones?: CustomPostProcessTone[];
  */
 post_process_selected_tone_id?: string | null; post_process_timeout_secs?: number; 
 /**
- * Opt-in AI-cleanup behavior: actively repair words the speech-to-text
- * clearly misheard (homophones, near-miss pronunciations, nonsense words
- * where a specific word obviously belongs). Off by default because it
- * gives the model license to guess; useful for non-native speakers.
+ * The cloud provider the user last had selected for AI cleanup, remembered
+ * so the device ⇄ cloud switch can put it back.
+ * 
+ * `post_process_provider_id` is a single slot: choosing "On my device"
+ * overwrites it with `builtin` and destroys the record of which cloud
+ * provider was configured. This used to be React state, which meant the
+ * choice survived a toggle but not a navigation away from the page — the
+ * user came back, switched to cloud, and landed on some other provider with
+ * their model selection apparently gone.
  */
-post_process_fix_misheard?: boolean; 
-/**
- * How aggressively cleanup condenses the transcript (Light/Balanced/
- * Aggressive). Separate from the writing-style tone; defaults to Balanced.
- */
-post_process_cleanup_strength?: PostProcessCleanupStrength; 
+post_process_last_cloud_provider_id?: string | null; 
 /**
  * "Generate with Flow": when on, a dictation that begins with the
  * activation phrase becomes a one-shot AI generation command whose result
@@ -2298,7 +2389,13 @@ flow_screen_access?: boolean; mute_while_recording?: boolean; append_trailing_sp
  * the app does. Kept separate from the provider/model settings on purpose:
  * "Generate with Flow" and AI Correction share those and keep working.
  */
-assistant_enabled?: boolean; assistant_provider_id?: string; assistant_models?: Partial<{ [key in string]: string }>; assistant_system_prompt?: string; 
+assistant_enabled?: boolean; assistant_provider_id?: string; 
+/**
+ * The cloud provider the assistant last used, remembered so its device ⇄
+ * cloud switch restores the user's choice instead of guessing. Same
+ * reasoning as `post_process_last_cloud_provider_id`.
+ */
+assistant_last_cloud_provider_id?: string | null; assistant_models?: Partial<{ [key in string]: string }>; assistant_system_prompt?: string; 
 /**
  * Controls whether screen capture is off, user-triggered, or agent-decided.
  */
@@ -2785,6 +2882,23 @@ port: number;
  * The last start error, if the most recent start attempt failed.
  */
 error: string | null }
+/**
+ * One file that couldn't be registered, and why.
+ */
+export type LocalModelFailure = { path: string; 
+/**
+ * User-facing explanation, e.g. that the file is a vision projector rather
+ * than a model in its own right.
+ */
+message: string }
+/**
+ * Result of registering a batch of picked files.
+ * 
+ * Deliberately not a plain `Result`: the picker is multi-select, and one
+ * unusable file among five shouldn't discard the other four. The UI reports
+ * what landed and what didn't.
+ */
+export type LocalModelImport = { added: ModelInfo[]; failed: LocalModelFailure[] }
 export type LogLevel = "trace" | "debug" | "info" | "warn" | "error"
 /**
  * How sure we are about a remembered fact. Facts the user stated explicitly
@@ -2831,7 +2945,31 @@ export type ModelInfo = { id: string; name: string; description: string; filenam
  * Overall recommendation rank (1 = top); `None` when unranked. Mirrors the
  * GGUF catalog `recommended_rank` and drives the model-list ordering.
  */
-recommended_rank: number | null; supported_languages: string[]; supports_language_selection: boolean; is_custom: boolean }
+recommended_rank: number | null; supported_languages: string[]; supports_language_selection: boolean; is_custom: boolean; 
+/**
+ * True for a model fine-tuned specifically for dictation cleanup (see
+ * [`is_cleanup_specialist`]). The cleanup catalog features these and the
+ * settings UI recommends leaving the prompt layers alone for them; the
+ * assistant catalog hides them, because a cleanup fine-tune cannot chat.
+ */
+is_cleanup_specialist?: boolean; 
+/**
+ * Absolute path to a model the user already had on disk, outside the app's
+ * own models directory — either a file they picked or one found in a linked
+ * folder. `None` for every managed model, which resolves to
+ * `<models_dir>/<filename>` as before.
+ * 
+ * Set means "this file is not ours": it is never downloaded, never moved,
+ * and never deleted. [`ModelManager::delete_model`] only forgets the path.
+ */
+local_path: string | null; 
+/**
+ * The linked folder this model was discovered in, when it came from a
+ * folder scan rather than an individually picked file. This is what
+ * separates "unlink the whole folder" from "remove just this entry", and it
+ * lets the UI show where an entry came from.
+ */
+local_folder: string | null }
 export type ModelLoadStatus = { is_loaded: boolean; current_model: string | null }
 export type ModelUnloadTimeout = "never" | "immediately" | "min_2" | "min_5" | "min_10" | "min_15" | "hour_1" | "sec_15"
 export type OrtAcceleratorSetting = "auto" | "cpu" | "cuda" | "directml" | "rocm"
@@ -2849,25 +2987,6 @@ export type PaginatedAssistantHistory = { entries: AssistantHistoryEntry[]; has_
 export type PaginatedHistory = { entries: HistoryEntry[]; has_more: boolean }
 export type PasteMethod = "ctrl_v" | "direct" | "none" | "shift_insert" | "ctrl_shift_v" | "external_script"
 export type PermissionAccess = "allowed" | "denied" | "unknown"
-/**
- * How aggressively dictation cleanup condenses the transcript. This is
- * deliberately separate from the writing-style tone (which changes *register*):
- * strength controls how much of the speaker's rambling, repetition, and false
- * starts get tidied away, from a near-verbatim touch-up to a tight rewrite.
- */
-export type PostProcessCleanupStrength = 
-/**
- * Fix mechanics + obvious filler only; keep the speaker's wording/structure.
- */
-"light" | 
-/**
- * Also collapse repetition/restatements and drop false starts (the default).
- */
-"balanced" | 
-/**
- * Also tighten rambling and reorder for clarity into clean, concise prose.
- */
-"aggressive"
 export type PostProcessConfigSource = "dedicated_cleanup_selection" | "assistant_fallback"
 export type PostProcessProvider = { id: string; label: string; base_url: string; allow_base_url_edit?: boolean; models_endpoint?: string | null; supports_structured_output?: boolean }
 export type PostProcessReadiness = { state: "ready"; source: PostProcessConfigSource; provider_id: string; provider_label: string; model: string } | { state: "unavailable"; reason: PostProcessUnavailableReason; source: PostProcessConfigSource | null; provider_id: string | null; provider_label: string | null }

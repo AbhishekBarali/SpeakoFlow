@@ -970,7 +970,40 @@ pub fn change_auto_submit_key_setting(app: AppHandle, key: String) -> Result<(),
 #[specta::specta]
 pub fn get_post_process_readiness(app: AppHandle) -> settings::PostProcessReadiness {
     let current = settings::get_settings(&app);
-    settings::post_process_readiness(&current)
+    let readiness = settings::post_process_readiness(&current);
+
+    // `post_process_readiness` is a pure function over settings, so it can check
+    // that a model is *selected* but not that it is still *there*. For the
+    // built-in engine that distinction matters: a downloaded model can be deleted,
+    // and a model the user registered from their own disk can be moved, renamed,
+    // or sit on a drive that isn't plugged in. Settings-only readiness then says
+    // "Ready" while every dictation quietly pastes the raw transcript, with
+    // nothing in the UI connecting the two. The model catalog is the only place
+    // that knows what is on disk, so the check belongs here rather than there.
+    if let settings::PostProcessReadiness::Ready {
+        source,
+        provider_id,
+        provider_label,
+        model,
+    } = &readiness
+    {
+        if provider_id == settings::BUILTIN_POST_PROCESS_PROVIDER_ID {
+            let on_disk = app
+                .try_state::<std::sync::Arc<crate::managers::model::ModelManager>>()
+                .and_then(|manager| manager.get_model_info(model))
+                .is_some_and(|info| info.is_downloaded);
+            if !on_disk {
+                return settings::PostProcessReadiness::Unavailable {
+                    reason: settings::PostProcessUnavailableReason::NoModelConfigured,
+                    source: Some(*source),
+                    provider_id: Some(provider_id.clone()),
+                    provider_label: Some(provider_label.clone()),
+                };
+            }
+        }
+    }
+
+    readiness
 }
 
 #[tauri::command]
@@ -1003,33 +1036,6 @@ pub fn change_post_process_enabled_setting(app: AppHandle, enabled: bool) -> Res
 pub fn change_flow_enabled_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
     let mut settings = settings::get_settings(&app);
     settings.flow_enabled = enabled;
-    settings::write_settings(&app, settings);
-    Ok(())
-}
-
-/// Toggle the opt-in cleanup behavior that repairs clearly misheard words.
-#[tauri::command]
-#[specta::specta]
-pub fn change_post_process_fix_misheard_setting(
-    app: AppHandle,
-    enabled: bool,
-) -> Result<(), String> {
-    let mut settings = settings::get_settings(&app);
-    settings.post_process_fix_misheard = enabled;
-    settings::write_settings(&app, settings);
-    Ok(())
-}
-
-/// Set how aggressively dictation cleanup condenses the transcript
-/// (Light/Balanced/Aggressive). Separate from the writing-style tone.
-#[tauri::command]
-#[specta::specta]
-pub fn change_post_process_cleanup_strength_setting(
-    app: AppHandle,
-    strength: settings::PostProcessCleanupStrength,
-) -> Result<(), String> {
-    let mut settings = settings::get_settings(&app);
-    settings.post_process_cleanup_strength = strength;
     settings::write_settings(&app, settings);
     Ok(())
 }
@@ -1275,8 +1281,90 @@ pub fn change_post_process_model_setting(
 pub fn set_post_process_provider(app: AppHandle, provider_id: String) -> Result<(), String> {
     let mut settings = settings::get_settings(&app);
     validate_provider_exists(&settings, &provider_id)?;
+    // Remember the cloud choice before it is overwritten. `post_process_provider_id`
+    // is one slot, so without this the "On my device" switch silently erases
+    // which cloud provider (and therefore which model) the user had configured.
+    if provider_id != settings::BUILTIN_POST_PROCESS_PROVIDER_ID {
+        settings.post_process_last_cloud_provider_id = Some(provider_id.clone());
+    }
     settings.post_process_provider_id = provider_id;
     settings::write_settings(&app, settings);
+    Ok(())
+}
+
+/// Make an on-device model the AI-cleanup engine, keeping the prompt layer
+/// coherent with it.
+///
+/// One command rather than the three round-trips the UI used to make, because
+/// the three have to agree: the provider must be the built-in engine, the model
+/// must be assigned to it, and the selected cleanup prompt has to suit the model.
+/// That last part is the reason this exists at all — SpeakoFlow Mini is trained
+/// on one short prompt and is measurably worse when handed the long
+/// general-purpose one, and the long prompt is what a general chat model needs to
+/// stay on task. Getting that pairing wrong looks like "the model is bad", so the
+/// app pairs them.
+///
+/// Only the two *shipped* prompts are ever swapped. Anything the user selected or
+/// wrote themselves is left exactly as it is — a silent switch away from
+/// someone's own prompt would be worse than a suboptimal default.
+#[tauri::command]
+#[specta::specta]
+pub fn set_cleanup_local_model(app: AppHandle, model_id: String) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    let provider_id = settings::BUILTIN_POST_PROCESS_PROVIDER_ID.to_string();
+    validate_provider_exists(&settings, &provider_id)?;
+
+    let specialist = crate::managers::model::is_cleanup_specialist(&model_id);
+    let selected_prompt = settings
+        .post_process_selected_prompt_id
+        .as_deref()
+        .unwrap_or("");
+
+    let repaired_prompt_id =
+        if specialist && selected_prompt == settings::DEFAULT_POST_PROCESS_PROMPT_ID {
+            Some(settings::SPEAKOFLOW_MINI_PROMPT_ID.to_string())
+        } else if !specialist && selected_prompt == settings::SPEAKOFLOW_MINI_PROMPT_ID {
+            Some(settings::DEFAULT_POST_PROCESS_PROMPT_ID.to_string())
+        } else {
+            None
+        };
+    if let Some(prompt_id) = repaired_prompt_id {
+        settings.post_process_selected_prompt_id = Some(prompt_id);
+    }
+
+    settings
+        .post_process_models
+        .insert(provider_id.clone(), model_id);
+    settings.post_process_provider_id = provider_id;
+    settings::write_settings(&app, settings);
+    Ok(())
+}
+
+/// Restore a shipped cleanup prompt to the exact text the app ships.
+///
+/// Needed because the SpeakoFlow Mini prompt is editable like any other: a user
+/// who experiments with it (or pastes over it) otherwise has no way back to the
+/// text the fine-tune was actually trained on, and no way to know they have
+/// drifted from it.
+#[tauri::command]
+#[specta::specta]
+pub fn restore_post_process_prompt(app: AppHandle, id: String) -> Result<(), String> {
+    let shipped = match id.as_str() {
+        settings::DEFAULT_POST_PROCESS_PROMPT_ID => {
+            settings::default_improve_transcriptions_prompt()
+        }
+        settings::SPEAKOFLOW_MINI_PROMPT_ID => settings::speakoflow_mini_prompt_text(),
+        _ => return Err(format!("'{}' is not a shipped prompt", id)),
+    };
+
+    let mut settings_value = settings::get_settings(&app);
+    let prompt = settings_value
+        .post_process_prompts
+        .iter_mut()
+        .find(|prompt| prompt.id == id)
+        .ok_or_else(|| format!("prompt '{}' not found", id))?;
+    prompt.prompt = shipped.to_string();
+    settings::write_settings(&app, settings_value);
     Ok(())
 }
 
@@ -1408,14 +1496,18 @@ pub async fn fetch_post_process_models(
 pub fn set_post_process_selected_prompt(app: AppHandle, id: String) -> Result<(), String> {
     let mut settings = settings::get_settings(&app);
 
-    // Verify the prompt exists and is usable.
-    let selected = settings
-        .post_process_prompts
-        .iter()
-        .find(|prompt| prompt.id == id)
-        .ok_or_else(|| format!("Prompt with id '{}' not found", id))?;
-    if selected.prompt.trim().is_empty() {
-        return Err("Cannot select an empty cleanup prompt".to_string());
+    // "No prompt" is a valid selection with nothing to look up: cleanup still
+    // runs, the model just gets the transcript and the output contract only.
+    if id != settings::NONE_POST_PROCESS_PROMPT_ID {
+        // Verify the prompt exists and is usable.
+        let selected = settings
+            .post_process_prompts
+            .iter()
+            .find(|prompt| prompt.id == id)
+            .ok_or_else(|| format!("Prompt with id '{}' not found", id))?;
+        if selected.prompt.trim().is_empty() {
+            return Err("Cannot select an empty cleanup prompt".to_string());
+        }
     }
 
     settings.post_process_selected_prompt_id = Some(id);

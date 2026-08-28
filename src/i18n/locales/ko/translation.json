@@ -509,6 +509,32 @@
         "add": "다운로드",
         "adding": "시작 중…",
         "addError": "이 모델을 추가할 수 없습니다. 다시 시도해주세요."
+      },
+      "localModel": {
+        "addButton": "로컬 모델 사용",
+        "title": "이미 가지고 있는 모델 사용하기",
+        "subtitle": "이 기기의 어느 위치에 있든 .gguf 또는 Whisper .bin 파일을 추가하거나, 모델을 보관하는 폴더를 연결하세요. 복사하지도, 다운로드하지도 않습니다.",
+        "pickFiles": "모델 파일 선택",
+        "pickFilesHint": ".gguf 또는 .bin 파일을 하나 이상 선택하세요. 방금 만든 모델 하나를 추가할 때 좋습니다.",
+        "linkFolder": "폴더 연결",
+        "linkFolderHint": "하위 폴더까지 자동으로 검사합니다. 원하는 만큼 폴더를 연결할 수 있습니다.",
+        "fileFilter": "모델 파일",
+        "filesAdded_one": "모델 {{count}}개를 추가했습니다.",
+        "filesAdded_other": "모델 {{count}}개를 추가했습니다.",
+        "folderAdded_one": "폴더를 연결했습니다. 모델 {{count}}개를 찾았습니다.",
+        "folderAdded_other": "폴더를 연결했습니다. 모델 {{count}}개를 찾았습니다.",
+        "folderRemoved": "폴더 연결을 해제했습니다. 파일은 그대로 있습니다.",
+        "foldersTitle": "연결된 폴더",
+        "foldersEmpty": "아직 연결된 폴더가 없습니다. 폴더를 연결하면 그 안의 모든 모델이 목록에 나타납니다.",
+        "removeFolder": "{{folder}} 연결 해제",
+        "rescan": "다시 검사",
+        "rescanning": "다시 검사 중…",
+        "rescanDone_one": "로컬 모델 {{count}}개를 찾았습니다.",
+        "rescanDone_other": "로컬 모델 {{count}}개를 찾았습니다.",
+        "footnote": "연결된 폴더는 SpeakoFlow가 시작될 때 다시 검사되므로, 나중에 폴더에 넣은 모델도 저절로 나타납니다. 폴더 연결을 해제하거나 모델을 제거해도 이 목록에서만 사라지며 — 파일은 원래 자리에 그대로 남습니다.",
+        "removeTitle": "목록에서 제거할까요?",
+        "removeConfirm": "모델 목록에서 “{{modelName}}”을(를) 제거할까요?\n\n파일 자체는 원래 자리에 그대로 있습니다:\n{{path}}",
+        "fileMissing": "이 모델의 파일이 더 이상 존재하지 않습니다:\n{{path}}\n\n옮겨졌거나 이름이 바뀌었을 수 있고, 연결되지 않은 드라이브에 있을 수도 있습니다."
       }
     },
     "sound": {
@@ -869,21 +895,10 @@
       },
       "aiCleanup": {
         "groupTitle": "AI 정리",
-        "styleGroupTitle": "문체",
-        "styleGroupDescription": "기본 제공 문체를 선택하거나, 정리된 받아쓰기가 어떤 느낌이어야 하는지 직접 규칙을 저장하세요.",
         "modelGroupTitle": "정리 모델",
         "promptGroupTitle": "정리 프롬프트",
         "title": "AI로 받아쓰기 다듬기",
         "caption": "실험적 기능 — 받아쓰기 후 문장 부호와 군더더기를 정리합니다.",
-        "strengthLabel": "정리 강도",
-        "strengthDescription": "AI가 문장을 얼마나 고쳐 쓰는지 정합니다. 약하게는 오류와 군더더기만 고칩니다. 보통은 반복되는 내용과 말을 더듬은 부분까지 정리합니다. 강하게는 늘어지는 말을 간결하고 잘 짜인 글로 다듬습니다 — 사실과 의미는 항상 그대로 둡니다.",
-        "strengthOptions": {
-          "light": "약하게",
-          "balanced": "보통",
-          "aggressive": "강하게"
-        },
-        "fixMisheardLabel": "잘못 들은 단어 고치기",
-        "fixMisheardDescription": "문장에 분명히 맞지 않는 단어 — 동음이의어나 비슷하게 들린 발음 — 를 원래 의도한 단어로 바꿉니다. 억양이 강할 때 유용하며, AI는 의도한 단어가 분명할 때만 고칩니다.",
         "info": "받아쓰기 결과에 언어 모델을 적용해 문장 부호를 고치고, 군더더기 말을 지우고, 필요하면 어조도 조정합니다. 받아쓰기에만 적용되며 전용 단축키로 실행됩니다. 말을 마친 뒤 약간의 지연이 생기고, 모델이 실패하거나 시간이 초과되면 원본 텍스트가 대신 사용됩니다. 아직 개발 중입니다."
       },
       "spokenEmoji": {

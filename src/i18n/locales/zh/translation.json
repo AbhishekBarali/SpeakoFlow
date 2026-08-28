@@ -509,6 +509,32 @@
         "add": "下载",
         "adding": "正在开始…",
         "addError": "无法添加此模型。请重试。"
+      },
+      "localModel": {
+        "addButton": "使用本地模型",
+        "title": "使用你已有的模型",
+        "subtitle": "从本设备的任意位置添加 .gguf 或 Whisper .bin 文件，也可以链接你存放模型的文件夹。不会复制，也不会下载。",
+        "pickFiles": "选择模型文件",
+        "pickFilesHint": "选择一个或多个 .gguf 或 .bin 文件。适合添加刚刚构建好的单个模型。",
+        "linkFolder": "链接文件夹",
+        "linkFolderHint": "会自动扫描，包括子文件夹。可以链接任意多个文件夹。",
+        "fileFilter": "模型文件",
+        "filesAdded_one": "已添加 {{count}} 个模型。",
+        "filesAdded_other": "已添加 {{count}} 个模型。",
+        "folderAdded_one": "已链接文件夹，找到 {{count}} 个模型。",
+        "folderAdded_other": "已链接文件夹，找到 {{count}} 个模型。",
+        "folderRemoved": "已取消链接该文件夹。你的文件未被改动。",
+        "foldersTitle": "已链接的文件夹",
+        "foldersEmpty": "尚未链接任何文件夹。链接一个后，其中的所有模型都会出现在列表中。",
+        "removeFolder": "取消链接 {{folder}}",
+        "rescan": "重新扫描",
+        "rescanning": "正在重新扫描…",
+        "rescanDone_one": "找到 {{count}} 个本地模型。",
+        "rescanDone_other": "找到 {{count}} 个本地模型。",
+        "footnote": "SpeakoFlow 启动时会重新扫描已链接的文件夹，因此你之后放进去的模型会自动出现。取消链接文件夹或移除模型只会将其从此列表中移除——你的文件仍留在原处。",
+        "removeTitle": "从列表中移除？",
+        "removeConfirm": "要从模型列表中移除“{{modelName}}”吗？\n\n文件本身仍留在原处：\n{{path}}",
+        "fileMissing": "此模型的文件已不存在：\n{{path}}\n\n它可能已被移动或重命名，或者位于未连接的驱动器上。"
       }
     },
     "sound": {
@@ -869,21 +895,10 @@
       },
       "aiCleanup": {
         "groupTitle": "AI 清理",
-        "styleGroupTitle": "写作风格",
-        "styleGroupDescription": "选择内置风格，或保存您自己的规则，决定清理后的语音输入读起来是什么感觉。",
         "modelGroupTitle": "清理模型",
         "promptGroupTitle": "清理提示词",
         "title": "用 AI 优化我的语音输入",
         "caption": "实验性功能——在您说完后整理标点和口头语。",
-        "strengthLabel": "清理强度",
-        "strengthDescription": "AI 对您原话的改写程度。轻度只修正错误和口头语。均衡还会删掉重复的内容和说错重来的部分。强力会把冗长的话收紧成简洁、结构清晰的文字——但始终保留您的事实和原意。",
-        "strengthOptions": {
-          "light": "轻度",
-          "balanced": "均衡",
-          "aggressive": "强力"
-        },
-        "fixMisheardLabel": "修正听错的词",
-        "fixMisheardDescription": "当某个词明显不符合句意时——比如同音词或发音相近的词——将其替换成您想说的词。这对口音很有帮助；只有在能明确判断本意时，AI 才会修正。",
         "info": "用语言模型处理您的语音输入，修正标点、去除口头语，并可选地调整语气。仅适用于语音输入，并使用独立的快捷键。说完后会略有延迟；如果模型失败或超时，则会使用原始文本。仍在开发中。"
       },
       "spokenEmoji": {

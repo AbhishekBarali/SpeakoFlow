@@ -7,8 +7,8 @@ use crate::managers::history::HistoryManager;
 use crate::managers::transcription::TranscriptionManager;
 use crate::settings::{
     get_settings, resolve_post_process_config, AppSettings, ModelUnloadTimeout,
-    PostProcessCleanupStrength, PostProcessConfigSource, PostProcessResolutionError,
-    PostProcessUnavailableReason, ResolvedPostProcessConfig, APPLE_INTELLIGENCE_PROVIDER_ID,
+    PostProcessConfigSource, PostProcessResolutionError, PostProcessUnavailableReason,
+    ResolvedPostProcessConfig, APPLE_INTELLIGENCE_PROVIDER_ID,
 };
 use crate::shortcut;
 use crate::tray::{change_tray_icon, TrayIconState};
@@ -109,45 +109,20 @@ fn build_system_prompt(prompt_template: &str) -> String {
     prompt_template.replace("${output}", "").trim().to_string()
 }
 
-/// Append an optional built-in or custom writing-style instruction after the
-/// cleanup prompt. The final-output contract is appended separately and always
-/// comes last, so a custom style can shape wording but cannot turn cleanup into
-/// an explanation or assistant response.
-fn append_tone_directive(prompt: &mut String, instruction: Option<&str>) {
+/// Append the writing-style layer — the second and last of the two layers the
+/// user controls.
+///
+/// The hierarchy is deliberate and fixed: the cleanup **system prompt** decides
+/// what corrections happen, the **style** sits on top of it and decides how the
+/// result reads, and (for a general-purpose model) the final-output contract is
+/// appended after both so a style can shape wording but cannot turn cleanup into
+/// an explanation or an assistant reply.
+fn append_style_layer(prompt: &mut String, instruction: Option<&str>) {
     if let Some(instruction) = instruction.map(str::trim).filter(|text| !text.is_empty()) {
         prompt
             .push_str("\n\n---\nWRITING STYLE (apply this while preserving the source message):\n");
         prompt.push_str(instruction);
     }
-}
-
-/// Append the cleanup-intensity directive (Light dials the base prompt back to a
-/// near-verbatim touch-up; Aggressive pushes it toward a tight rewrite).
-/// `Balanced` appends nothing — the base cleanup prompt already describes that
-/// level — so the common case adds no extra tokens.
-fn append_cleanup_strength_directive(prompt: &mut String, strength: PostProcessCleanupStrength) {
-    if let Some(directive) = strength.directive() {
-        prompt.push_str("\n\n---\n");
-        prompt.push_str(directive);
-    }
-}
-
-/// Opt-in directive letting cleanup repair clearly misheard words. Kept
-/// deliberately conservative: it licenses fixing obvious recognition misses
-/// (useful for non-native speakers), never free rewriting.
-fn append_misheard_directive(prompt: &mut String, enabled: bool) {
-    if !enabled {
-        return;
-    }
-    prompt.push_str(
-        "\n\n---\nMISHEARD WORDS (the user opted in):\n\
-         The speaker may mispronounce words, or the speech-to-text may mishear them. When a word or short \
-         phrase is clearly wrong in its context — a homophone, a near-miss pronunciation, or a nonsense \
-         word where one specific word obviously belongs — replace it with the word the speaker clearly \
-         intended. Correct only when the intended word is unmistakable from the surrounding context; when \
-         in doubt, keep the original wording. Never \"improve\" correct words, and never swap names or \
-         technical terms for more common ones unless the context makes the intended term certain.",
-    );
 }
 
 /// Absolute response-shape rules shared by structured and plain providers.
@@ -343,11 +318,28 @@ fn build_post_process_request(
     config: &ResolvedPostProcessConfig,
     transcription: &str,
 ) -> PostProcessRequest {
+    // Layer 1 — the cleanup system prompt the user selected.
     let mut system_prompt = build_system_prompt(&config.prompt);
-    append_cleanup_strength_directive(&mut system_prompt, config.cleanup_strength);
-    append_tone_directive(&mut system_prompt, config.tone_instruction.as_deref());
-    append_misheard_directive(&mut system_prompt, config.fix_misheard);
-    append_final_output_contract(&mut system_prompt);
+    // Layer 2 — the writing style, on top of it. Always applied: it is an
+    // explicit user choice, so it is sent even to a fine-tune (which is why the
+    // UI recommends, rather than enforces, leaving it at "None" for one).
+    append_style_layer(&mut system_prompt, config.tone_instruction.as_deref());
+    // App-added scaffolding, and the one part that is not a user choice. It
+    // exists to stop a general-purpose chat model from narrating its plan
+    // instead of returning the transcript, and it announces that it overrides
+    // the prompt above it — which is exactly why a model already trained on this
+    // task must not receive it.
+    if !config.trained_for_cleanup {
+        append_final_output_contract(&mut system_prompt);
+    }
+    // Every appender leads with its own `\n\n---\n` separator, which is correct
+    // after a base prompt and stray garbage without one — and the base prompt is
+    // empty whenever the user selects "no cleanup prompt".
+    let system_prompt = system_prompt
+        .trim_start()
+        .trim_start_matches('-')
+        .trim_start()
+        .to_string();
     let (reasoning_effort, reasoning) = cleanup_reasoning_options(&config.provider.id);
 
     PostProcessRequest {
@@ -440,15 +432,23 @@ fn transcription_allows_empty_output(transcription: &str) -> bool {
         })
 }
 
+/// Validate an LLM's cleanup output before it can be pasted.
+///
+/// `enforce_length` gates the [`is_implausibly_long`] guard. It is on for the
+/// assistive path, where output that balloons means the model narrated instead
+/// of cleaning. Raw-prompt mode turns it off: the app no longer tells the model
+/// what shape to return, so it has no basis to call a longer answer wrong — the
+/// user's own prompt may legitimately ask for expansion.
 fn validate_cleaned_output(
     transcription: &str,
     output: &str,
+    enforce_length: bool,
 ) -> Result<String, PostProcessFailureKind> {
     let cleaned = sanitize_post_process_output(output);
     if cleaned.is_empty() && !transcription_allows_empty_output(transcription) {
         return Err(PostProcessFailureKind::EmptyResponse);
     }
-    if is_implausibly_long(transcription, &cleaned) {
+    if enforce_length && is_implausibly_long(transcription, &cleaned) {
         return Err(PostProcessFailureKind::MalformedResponse);
     }
     Ok(cleaned)
@@ -484,7 +484,7 @@ fn parse_structured_output(
         .get(TRANSCRIPTION_FIELD)
         .and_then(|value| value.as_str())
         .ok_or(PostProcessFailureKind::MalformedResponse)?;
-    validate_cleaned_output(transcription, value)
+    validate_cleaned_output(transcription, value, true)
 }
 
 fn classify_chat_error(error: &crate::llm_client::ChatCompletionError) -> PostProcessFailureKind {
@@ -527,6 +527,42 @@ fn transcription_schema() -> serde_json::Value {
     })
 }
 
+/// Provider+model pairs whose chat template rejected a `system` message.
+/// Remembered so the extra round trip happens at most once per model per run.
+static SYSTEM_ROLE_REJECTED: Lazy<Mutex<HashSet<String>>> =
+    Lazy::new(|| Mutex::new(HashSet::new()));
+
+fn system_role_rejected(provider_id: &str, model: &str) -> bool {
+    SYSTEM_ROLE_REJECTED
+        .lock()
+        .map(|set| set.contains(&suppression_key(provider_id, model)))
+        .unwrap_or(false)
+}
+
+fn remember_system_role_rejected(provider_id: &str, model: &str) {
+    if let Ok(mut set) = SYSTEM_ROLE_REJECTED.lock() {
+        set.insert(suppression_key(provider_id, model));
+    }
+}
+
+/// Whether a failure looks like the chat template refusing a `system` role.
+///
+/// Gemma-style templates raise a template error rather than a clean 400, so
+/// llama.cpp answers 500. Matching the message keeps an unrelated 500 from
+/// silently disabling the system role for the model.
+fn is_system_role_error(error: &crate::llm_client::ChatCompletionError) -> bool {
+    match error {
+        crate::llm_client::ChatCompletionError::HttpStatus { detail, .. } => {
+            let detail = detail.to_lowercase();
+            detail.contains("system")
+                && (detail.contains("role")
+                    || detail.contains("template")
+                    || detail.contains("instruction"))
+        }
+        _ => false,
+    }
+}
+
 async fn send_post_process_request(
     config: &ResolvedPostProcessConfig,
     request: &PostProcessRequest,
@@ -540,10 +576,47 @@ async fn send_post_process_request(
         (None, None)
     };
     let sent_suppression = effort.is_some() || reasoning.is_some();
+    // A cleanup fine-tune was trained with a real system prompt, so the built-in
+    // engine's system-role folding is skipped for it — unless this model's
+    // template has already refused a system role once.
+    let keep_system_role = config.trained_for_cleanup
+        && !request.system_prompt.trim().is_empty()
+        && !system_role_rejected(&config.provider.id, &config.model);
 
-    let result =
-        send_one_post_process_request(config, request, schema.clone(), endpoint, effort, reasoning)
-            .await;
+    let result = send_one_post_process_request(
+        config,
+        request,
+        schema.clone(),
+        endpoint,
+        effort.clone(),
+        reasoning.clone(),
+        keep_system_role,
+    )
+    .await;
+
+    // A chat template that has no `system` role must not cost the user the whole
+    // feature: fold the prompt into the user turn and remember, so this costs at
+    // most one extra request per model.
+    let result = match result {
+        Err(ref error) if keep_system_role && is_system_role_error(error) => {
+            debug!(
+                "Model '{}' on provider '{}' rejected a system role; folding the prompt into the user turn",
+                config.model, config.provider.id
+            );
+            remember_system_role_rejected(&config.provider.id, &config.model);
+            send_one_post_process_request(
+                config,
+                request,
+                schema.clone(),
+                endpoint,
+                effort,
+                reasoning,
+                false,
+            )
+            .await
+        }
+        other => other,
+    };
 
     // A provider that refuses `reasoning_effort` must not cost the user the
     // whole feature. Retry once without it and remember, so this happens at most
@@ -559,12 +632,24 @@ async fn send_post_process_request(
                 config.provider.id, config.model
             );
             remember_suppression_rejected(&config.provider.id, &config.model);
-            send_one_post_process_request(config, request, schema, endpoint, None, None).await
+            send_one_post_process_request(
+                config,
+                request,
+                schema,
+                endpoint,
+                None,
+                None,
+                config.trained_for_cleanup
+                    && !request.system_prompt.trim().is_empty()
+                    && !system_role_rejected(&config.provider.id, &config.model),
+            )
+            .await
         }
         other => other,
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn send_one_post_process_request(
     config: &ResolvedPostProcessConfig,
     request: &PostProcessRequest,
@@ -572,6 +657,7 @@ async fn send_one_post_process_request(
     endpoint: Option<&str>,
     effort: Option<String>,
     reasoning: Option<crate::llm_client::ReasoningConfig>,
+    keep_system_role: bool,
 ) -> Result<Option<String>, crate::llm_client::ChatCompletionError> {
     // The built-in provider's stored base URL points at the assistant engine.
     // Cleanup runs on its own engine process/port, so the caller passes that
@@ -594,6 +680,7 @@ async fn send_one_post_process_request(
         schema,
         effort,
         reasoning,
+        keep_system_role,
     )
     .await
 }
@@ -605,8 +692,14 @@ async fn run_provider_post_process(
     endpoint: Option<&str>,
 ) -> PostProcessAttemptOutcome {
     let request = build_post_process_request(config, transcription);
+    // A cleanup fine-tune is never asked for structured output. The schema
+    // becomes a decoding grammar on the built-in engine, which forces the model
+    // to emit a JSON object — the opposite of the bare cleaned text it was
+    // trained to produce. The length check goes with it: it is calibrated for a
+    // chat model that might start explaining itself.
+    let enforce_length = !config.trained_for_cleanup;
 
-    if config.provider.supports_structured_output {
+    if config.provider.supports_structured_output && !config.trained_for_cleanup {
         let now = TokioInstant::now();
         let remaining = deadline.saturating_duration_since(now);
         if remaining.is_zero() {
@@ -679,10 +772,12 @@ async fn run_provider_post_process(
             fallback_started.elapsed()
         );
         return match plain {
-            Ok(Ok(Some(content))) => match validate_cleaned_output(transcription, &content) {
-                Ok(cleaned) => PostProcessAttemptOutcome::Applied(cleaned),
-                Err(failure) => PostProcessAttemptOutcome::Failed(failure),
-            },
+            Ok(Ok(Some(content))) => {
+                match validate_cleaned_output(transcription, &content, enforce_length) {
+                    Ok(cleaned) => PostProcessAttemptOutcome::Applied(cleaned),
+                    Err(failure) => PostProcessAttemptOutcome::Failed(failure),
+                }
+            }
             Ok(Ok(None)) => {
                 PostProcessAttemptOutcome::Failed(PostProcessFailureKind::EmptyResponse)
             }
@@ -703,10 +798,12 @@ async fn run_provider_post_process(
         attempt_started.elapsed()
     );
     match plain {
-        Ok(Ok(Some(content))) => match validate_cleaned_output(transcription, &content) {
-            Ok(cleaned) => PostProcessAttemptOutcome::Applied(cleaned),
-            Err(failure) => PostProcessAttemptOutcome::Failed(failure),
-        },
+        Ok(Ok(Some(content))) => {
+            match validate_cleaned_output(transcription, &content, enforce_length) {
+                Ok(cleaned) => PostProcessAttemptOutcome::Applied(cleaned),
+                Err(failure) => PostProcessAttemptOutcome::Failed(failure),
+            }
+        }
         Ok(Ok(None)) => PostProcessAttemptOutcome::Failed(PostProcessFailureKind::EmptyResponse),
         Ok(Err(error)) => PostProcessAttemptOutcome::Failed(classify_chat_error(&error)),
         Err(_) => PostProcessAttemptOutcome::TimedOut,
@@ -763,10 +860,12 @@ async fn post_process_transcription(
                 )
             });
             return match tokio::time::timeout_at(deadline, task).await {
-                Ok(Ok(Ok(content))) => match validate_cleaned_output(transcription, &content) {
-                    Ok(cleaned) => PostProcessAttemptOutcome::Applied(cleaned),
-                    Err(failure) => PostProcessAttemptOutcome::Failed(failure),
-                },
+                Ok(Ok(Ok(content))) => {
+                    match validate_cleaned_output(transcription, &content, enforce_length) {
+                        Ok(cleaned) => PostProcessAttemptOutcome::Applied(cleaned),
+                        Err(failure) => PostProcessAttemptOutcome::Failed(failure),
+                    }
+                }
                 Ok(Ok(Err(_))) | Ok(Err(_)) => {
                     PostProcessAttemptOutcome::Failed(PostProcessFailureKind::ProviderRequest)
                 }
@@ -1879,12 +1978,12 @@ pub static ACTION_MAP: Lazy<HashMap<String, Arc<dyn ShortcutAction>>> = Lazy::ne
 #[cfg(test)]
 mod tests {
     use super::{
-        append_tone_directive, build_post_process_request, build_system_prompt,
-        cleanup_reasoning_options, finalize_post_process_attempt, parse_structured_output,
-        run_provider_post_process, sanitize_post_process_output, suppression_rejected,
-        transcription_allows_empty_output, uses_ai_cleanup, validate_cleaned_output,
-        PostProcessAttemptOutcome, PostProcessFailureKind, PostProcessFallbackReason,
-        PostProcessResultEvent, APPLE_INTELLIGENCE_PROVIDER_ID,
+        append_style_layer, build_post_process_request, build_system_prompt,
+        cleanup_reasoning_options, finalize_post_process_attempt, is_system_role_error,
+        parse_structured_output, run_provider_post_process, sanitize_post_process_output,
+        suppression_rejected, transcription_allows_empty_output, uses_ai_cleanup,
+        validate_cleaned_output, PostProcessAttemptOutcome, PostProcessFailureKind,
+        PostProcessFallbackReason, PostProcessResultEvent, APPLE_INTELLIGENCE_PROVIDER_ID,
     };
     use crate::settings::{
         PostProcessConfigSource, PostProcessProvider, PostProcessTone,
@@ -1902,7 +2001,7 @@ mod tests {
     fn missing_style_instruction_adds_no_style_block() {
         let base = "Clean up the transcript. Do not paraphrase.".to_string();
         let mut prompt = base.clone();
-        append_tone_directive(&mut prompt, None);
+        append_style_layer(&mut prompt, None);
         assert_eq!(prompt, base, "cleanup-only must not add a style block");
     }
 
@@ -1920,7 +2019,7 @@ mod tests {
              **Drafting the cleaned text:** The meeting is at six. \
              **Review against constraints:** output only the cleaned text.";
         assert_eq!(
-            validate_cleaned_output(transcription, monologue),
+            validate_cleaned_output(transcription, monologue, true),
             Err(PostProcessFailureKind::MalformedResponse)
         );
     }
@@ -1934,13 +2033,13 @@ mod tests {
         let cleaned = "So, the meeting is at six. We need to discuss the Q3 budget with the \
              SpeakoFlow team.\nAlso, ping Tori about the GGUF thing.";
         assert_eq!(
-            validate_cleaned_output(transcription, cleaned),
+            validate_cleaned_output(transcription, cleaned, true),
             Ok(cleaned.to_string())
         );
 
         // Short utterances legitimately grow (spoken punctuation, capitalization).
         assert_eq!(
-            validate_cleaned_output("ok", "Okay."),
+            validate_cleaned_output("ok", "Okay.", true),
             Ok("Okay.".to_string()),
             "the character floor must protect very short dictations"
         );
@@ -1950,7 +2049,7 @@ mod tests {
     fn style_directive_is_appended_after_cleanup_prompt() {
         let mut prompt = "Clean up the transcript. Output exactly the cleaned text.".to_string();
         let directive = PostProcessTone::Formal.directive().unwrap();
-        append_tone_directive(&mut prompt, Some(directive));
+        append_style_layer(&mut prompt, Some(directive));
 
         assert!(prompt.contains(directive));
         assert!(prompt.contains("WRITING STYLE"));
@@ -2125,8 +2224,7 @@ mod tests {
             prompt: prompt.to_string(),
             tone_id: tone.id().to_string(),
             tone_instruction: tone.directive().map(str::to_string),
-            fix_misheard: false,
-            cleanup_strength: crate::settings::PostProcessCleanupStrength::Balanced,
+            trained_for_cleanup: false,
             source: PostProcessConfigSource::DedicatedCleanupSelection,
             api_key: String::new(),
         }
@@ -2204,23 +2302,125 @@ mod tests {
     }
 
     #[test]
-    fn misheard_word_repair_is_opt_in_and_precedes_the_contract() {
+    fn a_cleanup_fine_tune_gets_only_the_layers_the_user_chose() {
         let mut config = test_config(
             "http://127.0.0.1:1/v1".to_string(),
-            false,
+            true,
             PostProcessTone::None,
+            "Clean up the following English dictation transcript. Output only the cleaned text. ${output}",
+        );
+        config.trained_for_cleanup = true;
+
+        let request = build_post_process_request(&config, "um the meeting is at six");
+
+        // Layer 1 and nothing else: the app's output contract is scaffolding for
+        // a general chat model and actively fights a trained one.
+        assert_eq!(
+            request.system_prompt,
+            "Clean up the following English dictation transcript. Output only the cleaned text."
+        );
+        assert!(!request.system_prompt.contains("FINAL OUTPUT CONTRACT"));
+        assert_eq!(request.user_content, "um the meeting is at six");
+    }
+
+    #[test]
+    fn a_style_chosen_for_a_fine_tune_is_still_honoured() {
+        // The UI recommends leaving style at "None" for a specialist, but a
+        // recommendation is not a lock: an explicit choice must still reach the
+        // model, or the setting would be silently dead.
+        let mut config = test_config(
+            "http://127.0.0.1:1/v1".to_string(),
+            true,
+            PostProcessTone::Formal,
+            "Clean up the following English dictation transcript. Output only the cleaned text.",
+        );
+        config.trained_for_cleanup = true;
+
+        let system = build_post_process_request(&config, "um the meeting is at six").system_prompt;
+
+        assert!(system.contains("WRITING STYLE"));
+        assert!(system.contains("Rewrite in a formal register"));
+        // Still no app scaffolding.
+        assert!(!system.contains("FINAL OUTPUT CONTRACT"));
+    }
+
+    #[test]
+    fn a_general_model_keeps_the_full_stack() {
+        let config = test_config(
+            "http://127.0.0.1:1/v1".to_string(),
+            true,
+            PostProcessTone::Formal,
             "Clean the transcript without changing facts.",
         );
+        assert!(!config.trained_for_cleanup);
 
-        let disabled = build_post_process_request(&config, "raw words").system_prompt;
-        assert!(!disabled.contains("MISHEARD WORDS"));
+        let system = build_post_process_request(&config, "um the meeting is at six").system_prompt;
 
-        config.fix_misheard = true;
-        let enabled = build_post_process_request(&config, "raw words").system_prompt;
-        let directive_position = enabled.find("MISHEARD WORDS").unwrap();
-        let contract_position = enabled.find("FINAL OUTPUT CONTRACT").unwrap();
-        assert!(directive_position < contract_position);
-        assert!(enabled.contains("when in doubt, keep the original wording"));
+        // Fixed hierarchy: cleanup prompt, then style, then the contract last.
+        let style = system.find("WRITING STYLE").unwrap();
+        let contract = system.find("FINAL OUTPUT CONTRACT").unwrap();
+        assert!(system.find("Clean the transcript").unwrap() < style);
+        assert!(style < contract);
+    }
+
+    #[test]
+    fn a_fine_tune_is_not_judged_by_the_length_heuristic() {
+        // The "implausibly long" check catches a chat model narrating its plan.
+        // A model driven only by the user's own prompt may legitimately expand
+        // the text, and the app no longer dictates output shape, so it has no
+        // basis to call that malformed.
+        let transcription = "ok";
+        let expanded = "Okay, that works for me — I will get it done well before the deadline \
+             and send you a short summary once it is finished.";
+        assert_eq!(
+            validate_cleaned_output(transcription, expanded, false),
+            Ok(expanded.to_string())
+        );
+        assert_eq!(
+            validate_cleaned_output(transcription, expanded, true),
+            Err(PostProcessFailureKind::MalformedResponse)
+        );
+        // The empty-output guard survives in both modes.
+        assert_eq!(
+            validate_cleaned_output("send the report", "", false),
+            Err(PostProcessFailureKind::EmptyResponse)
+        );
+    }
+
+    #[test]
+    fn only_template_shaped_errors_disable_the_system_role() {
+        use crate::llm_client::ChatCompletionError;
+
+        assert!(is_system_role_error(&ChatCompletionError::HttpStatus {
+            status: 500,
+            detail: "{\"error\":{\"message\":\"System role not supported\"}}".to_string(),
+        }));
+        // An unrelated failure must not permanently fold the prompt into the
+        // user turn for this model.
+        assert!(!is_system_role_error(&ChatCompletionError::HttpStatus {
+            status: 500,
+            detail: "{\"error\":{\"message\":\"context shift disabled\"}}".to_string(),
+        }));
+        assert!(!is_system_role_error(&ChatCompletionError::Transport(
+            "connection refused".to_string()
+        )));
+    }
+
+    #[test]
+    fn the_specialist_is_recognized_however_the_user_obtained_it() {
+        use crate::managers::model::is_cleanup_specialist;
+
+        // Prompting policy is a property of the weights, so every delivery route
+        // for the same model has to resolve the same way.
+        assert!(is_cleanup_specialist("speakoflow-mini"));
+        assert!(is_cleanup_specialist("SpeakoFlow Mini"));
+        assert!(is_cleanup_specialist("speakoflow-mini-Q8_0.gguf"));
+        assert!(is_cleanup_specialist("speakoflow_mini:latest"));
+
+        assert!(!is_cleanup_specialist("gemma-4-e4b"));
+        assert!(!is_cleanup_specialist("gpt-4o-mini"));
+        // "SpeakoFlow" alone is the app name, not the model.
+        assert!(!is_cleanup_specialist("speakoflow"));
     }
 
     #[test]
@@ -2268,7 +2468,7 @@ mod tests {
             Err(PostProcessFailureKind::MalformedResponse)
         );
         assert_eq!(
-            validate_cleaned_output(raw, "```\n\n```"),
+            validate_cleaned_output(raw, "```\n\n```", true),
             Err(PostProcessFailureKind::EmptyResponse)
         );
     }
@@ -2283,7 +2483,10 @@ mod tests {
     fn only_filler_input_may_clean_to_empty() {
         assert!(transcription_allows_empty_output("um, uh, you know, like"));
         assert!(!transcription_allows_empty_output("I like Rust"));
-        assert_eq!(validate_cleaned_output("um uh", "  "), Ok(String::new()));
+        assert_eq!(
+            validate_cleaned_output("um uh", "  ", true),
+            Ok(String::new())
+        );
     }
 
     #[test]

@@ -190,7 +190,16 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
   const { models } = useModelStore();
   const llmModels = useMemo(
     () =>
-      models.filter((m) => getModelCategory(m) === "llm" && m.is_downloaded),
+      models.filter(
+        (m) =>
+          getModelCategory(m) === "llm" &&
+          m.is_downloaded &&
+          // A dictation-cleanup fine-tune can't hold a conversation. It is
+          // hidden here for the same reason the assistant catalog hides it: an
+          // 0.8B single-transform model chosen as the brain doesn't fail
+          // loudly, it just answers badly, and the user blames the assistant.
+          !m.is_cleanup_specialist,
+      ),
     [models],
   );
   const [localLlmStatus, setLocalLlmStatus] = useState<LocalLlmStatus | null>(
@@ -223,16 +232,14 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
   // Manual playback-speed entry (string while editing; committed on blur).
   const [ttsSpeedInput, setTtsSpeedInput] = useState("1");
 
-  // Remember the last cloud (non-built-in) provider so flipping the brain
-  // picker back to "Cloud provider" restores the user's choice instead of
-  // resetting to a default.
-  const [lastCloudProviderId, setLastCloudProviderId] = useState<string>(
-    selectedProvider &&
-      selectedProvider.id !== BUILTIN_PROVIDER_ID &&
-      selectedProvider.id !== "apple_intelligence"
-      ? selectedProvider.id
-      : "custom",
-  );
+  // Which cloud provider to return to when the brain picker flips back from "On
+  // my device". Read from settings, not component state: `assistant_provider_id`
+  // is a single slot that the device switch overwrites, and keeping the memory
+  // in React meant it survived a toggle but not a navigation away and back —
+  // the user returned, chose Cloud, and landed on someone else's provider with
+  // their model apparently gone.
+  const lastCloudProviderId =
+    settings?.assistant_last_cloud_provider_id ?? null;
   const providerSwitchSequence = useRef(0);
   const providerSwitchQueue = useRef<Promise<void>>(Promise.resolve());
   const [isProviderSwitching, setIsProviderSwitching] = useState(false);
@@ -655,14 +662,6 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
     [providerOptions],
   );
 
-  useEffect(() => {
-    if (
-      cloudProviderOptions.some((option) => option.value === selectedProviderId)
-    ) {
-      setLastCloudProviderId(selectedProviderId);
-    }
-  }, [cloudProviderOptions, selectedProviderId]);
-
   // Options for the searchable assistant-model picker: loaded models for the
   // current provider plus the currently-set model (so a hand-typed value still
   // shows as selected). The Select is creatable, so users can type any model.
@@ -765,11 +764,13 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
     }
     if (!isBuiltin) return;
 
-    const target = cloudProviderOptions.some(
-      (option) => option.value === lastCloudProviderId,
-    )
-      ? lastCloudProviderId
-      : cloudProviderOptions[0]?.value;
+    const target =
+      lastCloudProviderId &&
+      cloudProviderOptions.some(
+        (option) => option.value === lastCloudProviderId,
+      )
+        ? lastCloudProviderId
+        : cloudProviderOptions[0]?.value;
     if (target) handleProviderSelect(target);
   };
 
@@ -1104,14 +1105,10 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
   );
 
   const brainGroup = (
-    <SettingsGroup
-      title={t("settings.assistant.brain.title")}
-      description={t("settings.assistant.brain.description")}
-      icon={Sparkles}
-    >
+    <SettingsGroup title={t("settings.assistant.brain.title")} icon={Sparkles}>
       <SettingContainer
         title={t("settings.assistant.brain.whereLabel")}
-        layout="stacked"
+        layout="horizontal"
         grouped={true}
       >
         <ProviderModeToggle

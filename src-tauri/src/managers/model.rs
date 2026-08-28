@@ -1,3 +1,4 @@
+use crate::managers::local_models::{self, DiscoveredModel};
 use crate::settings::{get_settings, write_settings};
 use anyhow::Result;
 use flate2::read::GzDecoder;
@@ -94,6 +95,68 @@ pub const RECOMMENDED_MULTILINGUAL_MODEL_ID: &str = "nemotron-3.5-asr-streaming-
 /// not emit the normal download-failed toast.
 pub const DOWNLOAD_CANCELLED_ERROR: &str = "Download cancelled";
 
+/// SpeakoFlow Mini — the bundled dictation-cleanup fine-tune.
+///
+/// It is a `LlamaCpp` model like the chat models, but it is not a chat model:
+/// 0.8B parameters trained on exactly one transform (raw English dictation →
+/// cleaned English text) with one short system prompt. That makes it the
+/// recommended AI-cleanup engine and a poor assistant, which is why the two
+/// catalogs feature different models even though they share one download list.
+pub const SPEAKOFLOW_MINI_MODEL_ID: &str = "speakoflow-mini";
+
+// Download coordinates for SpeakoFlow Mini, kept together so publishing the
+// fine-tune is a three-line change.
+//
+// TODO(speakoflow-mini): point these at the published repo before release. Until
+// the weights are uploaded the entry is still safe to ship — a download failure
+// surfaces as a normal failed download and cleanup falls back to whichever model
+// the user already has — but it must not reach a release in this state.
+const SPEAKOFLOW_MINI_REPO_ID: &str = "speakoflow/speakoflow-mini-GGUF";
+const SPEAKOFLOW_MINI_FILENAME: &str = "speakoflow-mini-Q8_0.gguf";
+const SPEAKOFLOW_MINI_SIZE_MB: u64 = 850;
+
+/// Every model known to be fine-tuned specifically for dictation cleanup.
+///
+/// Being on this list changes how the app prompts the model: see
+/// [`ResolvedPostProcessConfig::trained_for_cleanup`](crate::settings) — the
+/// app's own steering (final-output contract, JSON schema) is dropped, because
+/// each of those exists to keep a general-purpose chat model on task and each
+/// one fights a model already trained for it.
+const CLEANUP_SPECIALIST_MODEL_IDS: &[&str] = &[SPEAKOFLOW_MINI_MODEL_ID];
+
+/// Whether `model` is a dictation-cleanup fine-tune.
+///
+/// Matched on a normalized *name* rather than only the catalog id, so the same
+/// weights are recognized however the user got hold of them: the bundled
+/// download (`speakoflow-mini`), a `.gguf` they imported from disk
+/// (`SpeakoFlow-Mini-Q8_0.gguf`), or a model served by their own Ollama / LM
+/// Studio endpoint (`speakoflow_mini:latest`). Prompting is a property of the
+/// weights, so recognizing it must not depend on the delivery route.
+pub fn is_cleanup_specialist(model: &str) -> bool {
+    let normalized: String = model
+        .to_ascii_lowercase()
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
+        .collect();
+    CLEANUP_SPECIALIST_MODEL_IDS
+        .iter()
+        .any(|id| normalized.contains(id))
+}
+
+/// Fill in the derived fields of a `ModelInfo` on its way out to a caller.
+///
+/// Applied at the two read accessors rather than at the ~30 construction sites
+/// so that a model reaching the catalog by *any* route — bundled literal,
+/// `catalog.json`, a Hugging Face import, a folder scan — is classified by the
+/// same rule. The stored copies keep the default; nothing internal reads the
+/// field, because the request path asks [`is_cleanup_specialist`] about the
+/// resolved model string directly.
+fn stamped(mut info: ModelInfo) -> ModelInfo {
+    info.is_cleanup_specialist =
+        is_cleanup_specialist(&info.id) || is_cleanup_specialist(&info.name);
+    info
+}
+
 /// For vision (multimodal) LLM models, the companion multimodal projector that
 /// llama.cpp's server needs (passed via `--mmproj`). Returns the local filename
 /// to save it as and the download URL, or `None` for text-only models.
@@ -160,6 +223,25 @@ pub struct ModelInfo {
     pub supported_languages: Vec<String>, // Languages this model can transcribe
     pub supports_language_selection: bool, // Whether the user can explicitly pick a language
     pub is_custom: bool,                  // Whether this is a user-provided custom model
+    /// True for a model fine-tuned specifically for dictation cleanup (see
+    /// [`is_cleanup_specialist`]). The cleanup catalog features these and the
+    /// settings UI recommends leaving the prompt layers alone for them; the
+    /// assistant catalog hides them, because a cleanup fine-tune cannot chat.
+    #[serde(default)]
+    pub is_cleanup_specialist: bool,
+    /// Absolute path to a model the user already had on disk, outside the app's
+    /// own models directory — either a file they picked or one found in a linked
+    /// folder. `None` for every managed model, which resolves to
+    /// `<models_dir>/<filename>` as before.
+    ///
+    /// Set means "this file is not ours": it is never downloaded, never moved,
+    /// and never deleted. [`ModelManager::delete_model`] only forgets the path.
+    pub local_path: Option<String>,
+    /// The linked folder this model was discovered in, when it came from a
+    /// folder scan rather than an individually picked file. This is what
+    /// separates "unlink the whole folder" from "remove just this entry", and it
+    /// lets the UI show where an entry came from.
+    pub local_folder: Option<String>,
 }
 
 /// Persisted metadata for a user-added custom GGUF language model.
@@ -185,6 +267,39 @@ pub struct CustomModelRecord {
     pub mmproj_url: Option<String>,
     #[serde(default)]
     pub is_vision: bool,
+}
+
+/// Persisted metadata for a model the user already had on disk.
+///
+/// This is the counterpart to [`CustomModelRecord`]: that one describes
+/// something to *download*, this one describes something that is already there.
+/// The defining property is that the file is **not ours** — it lives wherever
+/// the user keeps it, and registering it copies nothing.
+///
+/// Only records with `folder: None` (a file the user picked individually) are
+/// written to `local_models.json`. Folder-derived records are deliberately not
+/// persisted: they are re-derived from `settings.model_folders` on every scan, so
+/// a model added to or removed from a linked folder shows up or disappears on its
+/// own instead of leaving a dead catalog entry behind.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LocalModelRecord {
+    pub id: String,
+    pub name: String,
+    /// Absolute path to the model file.
+    pub path: String,
+    pub engine_type: EngineType,
+    pub size_mb: u64,
+    /// Companion vision projector found beside the model, enabling screen vision.
+    #[serde(default)]
+    pub mmproj_path: Option<String>,
+    /// `general.architecture` from the GGUF header, shown to the user so an
+    /// otherwise anonymous fine-tune is still identifiable.
+    #[serde(default)]
+    pub architecture: Option<String>,
+    /// The linked folder this was discovered in; `None` for an individually
+    /// picked file. See the note above on why that distinction matters.
+    #[serde(default)]
+    pub folder: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
@@ -230,6 +345,11 @@ pub struct ModelManager {
     /// custom entries in `available_models` but retains the download URL and
     /// projector metadata needed to (re)download and serve them.
     custom_models: Mutex<HashMap<String, CustomModelRecord>>,
+    /// Models the user already had on disk, keyed by model id — both files they
+    /// picked individually and everything found in their linked folders. Holds
+    /// the absolute path that every path-resolution site reads instead of
+    /// `<models_dir>/<filename>`.
+    local_models: Mutex<HashMap<String, LocalModelRecord>>,
 }
 
 impl ModelManager {
@@ -288,6 +408,9 @@ impl ModelManager {
                 supported_languages: whisper_languages.clone(),
                 supports_language_selection: true,
                 is_custom: false,
+                local_path: None,
+                local_folder: None,
+                is_cleanup_specialist: false,
             },
         );
 
@@ -318,6 +441,9 @@ impl ModelManager {
                 supported_languages: whisper_languages.clone(),
                 supports_language_selection: true,
                 is_custom: false,
+                local_path: None,
+                local_folder: None,
+                is_cleanup_specialist: false,
             },
         );
 
@@ -347,6 +473,9 @@ impl ModelManager {
                 supported_languages: whisper_languages.clone(),
                 supports_language_selection: true,
                 is_custom: false,
+                local_path: None,
+                local_folder: None,
+                is_cleanup_specialist: false,
             },
         );
 
@@ -376,6 +505,9 @@ impl ModelManager {
                 supported_languages: whisper_languages.clone(),
                 supports_language_selection: true,
                 is_custom: false,
+                local_path: None,
+                local_folder: None,
+                is_cleanup_specialist: false,
             },
         );
 
@@ -406,6 +538,9 @@ impl ModelManager {
                 supported_languages: whisper_languages,
                 supports_language_selection: true,
                 is_custom: false,
+                local_path: None,
+                local_folder: None,
+                is_cleanup_specialist: false,
             },
         );
 
@@ -436,6 +571,9 @@ impl ModelManager {
                 supported_languages: vec!["en".to_string()],
                 supports_language_selection: false,
                 is_custom: false,
+                local_path: None,
+                local_folder: None,
+                is_cleanup_specialist: false,
             },
         );
 
@@ -480,6 +618,9 @@ impl ModelManager {
                 supported_languages: parakeet_v3_languages,
                 supports_language_selection: false,
                 is_custom: false,
+                local_path: None,
+                local_folder: None,
+                is_cleanup_specialist: false,
             },
         );
 
@@ -509,6 +650,9 @@ impl ModelManager {
                 supported_languages: vec!["en".to_string()],
                 supports_language_selection: false,
                 is_custom: false,
+                local_path: None,
+                local_folder: None,
+                is_cleanup_specialist: false,
             },
         );
 
@@ -540,6 +684,9 @@ impl ModelManager {
                 supported_languages: vec!["en".to_string()],
                 supports_language_selection: false,
                 is_custom: false,
+                local_path: None,
+                local_folder: None,
+                is_cleanup_specialist: false,
             },
         );
 
@@ -571,6 +718,9 @@ impl ModelManager {
                 supported_languages: vec!["en".to_string()],
                 supports_language_selection: false,
                 is_custom: false,
+                local_path: None,
+                local_folder: None,
+                is_cleanup_specialist: false,
             },
         );
 
@@ -602,6 +752,9 @@ impl ModelManager {
                 supported_languages: vec!["en".to_string()],
                 supports_language_selection: false,
                 is_custom: false,
+                local_path: None,
+                local_folder: None,
+                is_cleanup_specialist: false,
             },
         );
 
@@ -639,6 +792,9 @@ impl ModelManager {
                 supported_languages: sense_voice_languages,
                 supports_language_selection: true,
                 is_custom: false,
+                local_path: None,
+                local_folder: None,
+                is_cleanup_specialist: false,
             },
         );
 
@@ -671,6 +827,9 @@ impl ModelManager {
                 supported_languages: gigaam_languages,
                 supports_language_selection: false,
                 is_custom: false,
+                local_path: None,
+                local_folder: None,
+                is_cleanup_specialist: false,
             },
         );
 
@@ -707,6 +866,9 @@ impl ModelManager {
                 supported_languages: canary_flash_languages,
                 supports_language_selection: true,
                 is_custom: false,
+                local_path: None,
+                local_folder: None,
+                is_cleanup_specialist: false,
             },
         );
 
@@ -746,6 +908,9 @@ impl ModelManager {
                 supported_languages: canary_1b_languages,
                 supports_language_selection: true,
                 is_custom: false,
+                local_path: None,
+                local_folder: None,
+                is_cleanup_specialist: false,
             },
         );
 
@@ -783,6 +948,9 @@ impl ModelManager {
                 supported_languages: cohere_languages,
                 supports_language_selection: true,
                 is_custom: false,
+                local_path: None,
+                local_folder: None,
+                is_cleanup_specialist: false,
             },
         );
 
@@ -814,296 +982,354 @@ impl ModelManager {
         .map(String::from)
         .collect();
 
-        // Gemma 3 1B - text only, tiny, and suitable for low-memory systems.
+        // SpeakoFlow Mini — our own dictation-cleanup fine-tune.
+        //
+        // Listed first because it is the recommended AI-cleanup engine, and it
+        // is deliberately NOT recommended for the assistant: at 0.8B, trained on
+        // a single English text-to-text transform, it cannot hold a
+        // conversation. `is_recommended` stays false for exactly that reason —
+        // that flag drives the shared model-catalog ordering, and the cleanup
+        // catalog features Mini through `is_cleanup_specialist` instead.
+        //
+        // English only: the fine-tune saw no other language, so cleanup on a
+        // non-English dictation should stay on a general multilingual model.
         available_models.insert(
-            "gemma-3-1b".to_string(),
+            SPEAKOFLOW_MINI_MODEL_ID.to_string(),
             ModelInfo {
-                id: "gemma-3-1b".to_string(),
-                name: "Gemma 3 1B".to_string(),
-                description: "The lightest option for simple chat and writing help. Text only."
-                    .to_string(),
-                filename: "gemma-3-1b-it-Q4_K_M.gguf".to_string(),
-                url: Some(
-                    "https://huggingface.co/ggml-org/gemma-3-1b-it-GGUF/resolve/main/gemma-3-1b-it-Q4_K_M.gguf"
+                id: SPEAKOFLOW_MINI_MODEL_ID.to_string(),
+                name: "SpeakoFlow Mini".to_string(),
+                description:
+                    "Our own dictation-cleanup model. Tiny, fast, and trained for one job: turning spoken English into clean written English. English only."
                         .to_string(),
-                ),
-                sha256: None, // GGUF hashes not pinned; verification skipped
-                size_mb: 806,
+                filename: SPEAKOFLOW_MINI_FILENAME.to_string(),
+                url: Some(format!(
+                    "https://huggingface.co/{}/resolve/main/{}",
+                    SPEAKOFLOW_MINI_REPO_ID, SPEAKOFLOW_MINI_FILENAME
+                )),
+                sha256: None,
+                size_mb: SPEAKOFLOW_MINI_SIZE_MB,
                 is_downloaded: false,
                 is_downloading: false,
                 partial_size: 0,
                 is_directory: false,
                 engine_type: EngineType::LlamaCpp,
-                accuracy_score: 0.45,
-                speed_score: 0.97,
+                // Scored for its actual job. It beats a general 4B model on
+                // dictation cleanup and loses badly at everything else, so these
+                // numbers describe cleanup quality, not chat ability.
+                accuracy_score: 0.72,
+                speed_score: 0.99,
                 supports_translation: false,
                 supports_streaming: false,
                 is_recommended: false,
                 recommended_rank: None,
-                supported_languages: llm_languages.clone(),
+                supported_languages: vec!["en".to_string()],
                 supports_language_selection: false,
                 is_custom: false,
+                local_path: None,
+                local_folder: None,
+                is_cleanup_specialist: true,
             },
+        );
+
+        // Gemma 3 1B - text only, tiny, and suitable for low-memory systems.
+        available_models.insert(
+            "gemma-3-1b".to_string(),
+            ModelInfo {
+id: "gemma-3-1b".to_string(),
+            name: "Gemma 3 1B".to_string(),
+            description: "The lightest option for simple chat and writing help. Text only."
+                .to_string(),
+            filename: "gemma-3-1b-it-Q4_K_M.gguf".to_string(),
+            url: Some(
+                "https://huggingface.co/ggml-org/gemma-3-1b-it-GGUF/resolve/main/gemma-3-1b-it-Q4_K_M.gguf"
+                    .to_string(),
+            ),
+            sha256: None, // GGUF hashes not pinned; verification skipped
+            size_mb: 806,
+            is_downloaded: false,
+            is_downloading: false,
+            partial_size: 0,
+            is_directory: false,
+            engine_type: EngineType::LlamaCpp,
+            accuracy_score: 0.45,
+            speed_score: 0.97,
+            supports_translation: false,
+            supports_streaming: false,
+            is_recommended: false,
+            recommended_rank: None,
+            supported_languages: llm_languages.clone(),
+            supports_language_selection: false,
+            is_custom: false,
+            local_path: None,
+            local_folder: None, is_cleanup_specialist: false },
         );
 
         // Qwen3.5 2B — newest small multimodal model (text + vision).
         available_models.insert(
             "qwen3.5-2b".to_string(),
             ModelInfo {
-                id: "qwen3.5-2b".to_string(),
-                name: "Qwen3.5 2B (Vision)".to_string(),
-                description: "Small, fast, and sees images. Good on most laptops.".to_string(),
-                filename: "Qwen_Qwen3.5-2B-Q4_K_M.gguf".to_string(),
-                url: Some(
-                    "https://huggingface.co/bartowski/Qwen_Qwen3.5-2B-GGUF/resolve/main/Qwen_Qwen3.5-2B-Q4_K_M.gguf"
-                        .to_string(),
-                ),
-                sha256: None,
-                size_mb: 2350,
-                is_downloaded: false,
-                is_downloading: false,
-                partial_size: 0,
-                is_directory: false,
-                engine_type: EngineType::LlamaCpp,
-                accuracy_score: 0.58,
-                speed_score: 0.82,
-                supports_translation: false,
-                supports_streaming: false,
-                is_recommended: false,
-                recommended_rank: None,
-                supported_languages: llm_languages.clone(),
-                supports_language_selection: false,
-                is_custom: false,
-            },
+id: "qwen3.5-2b".to_string(),
+            name: "Qwen3.5 2B (Vision)".to_string(),
+            description: "Small, fast, and sees images. Good on most laptops.".to_string(),
+            filename: "Qwen_Qwen3.5-2B-Q4_K_M.gguf".to_string(),
+            url: Some(
+                "https://huggingface.co/bartowski/Qwen_Qwen3.5-2B-GGUF/resolve/main/Qwen_Qwen3.5-2B-Q4_K_M.gguf"
+                    .to_string(),
+            ),
+            sha256: None,
+            size_mb: 2350,
+            is_downloaded: false,
+            is_downloading: false,
+            partial_size: 0,
+            is_directory: false,
+            engine_type: EngineType::LlamaCpp,
+            accuracy_score: 0.58,
+            speed_score: 0.82,
+            supports_translation: false,
+            supports_streaming: false,
+            is_recommended: false,
+            recommended_rank: None,
+            supported_languages: llm_languages.clone(),
+            supports_language_selection: false,
+            is_custom: false,
+            local_path: None,
+            local_folder: None, is_cleanup_specialist: false },
         );
 
         // Qwen3.5 4B - the everyday multimodal recommendation.
         available_models.insert(
             "qwen3.5-4b".to_string(),
             ModelInfo {
-                id: "qwen3.5-4b".to_string(),
-                name: "Qwen3.5 4B (Vision)".to_string(),
-                description: "A quick everyday assistant with screen vision.".to_string(),
-                filename: "Qwen_Qwen3.5-4B-Q4_K_M.gguf".to_string(),
-                url: Some(
-                    "https://huggingface.co/bartowski/Qwen_Qwen3.5-4B-GGUF/resolve/main/Qwen_Qwen3.5-4B-Q4_K_M.gguf"
-                        .to_string(),
-                ),
-                sha256: None,
-                // Main Q4_K_M weights plus the automatically downloaded F16 projector.
-                size_mb: 3515,
-                is_downloaded: false,
-                is_downloading: false,
-                partial_size: 0,
-                is_directory: false,
-                engine_type: EngineType::LlamaCpp,
-                accuracy_score: 0.74,
-                speed_score: 0.62,
-                supports_translation: false,
-                supports_streaming: false,
-                is_recommended: false,
-                recommended_rank: None,
-                supported_languages: llm_languages.clone(),
-                supports_language_selection: false,
-                is_custom: false,
-            },
+id: "qwen3.5-4b".to_string(),
+            name: "Qwen3.5 4B (Vision)".to_string(),
+            description: "A quick everyday assistant with screen vision.".to_string(),
+            filename: "Qwen_Qwen3.5-4B-Q4_K_M.gguf".to_string(),
+            url: Some(
+                "https://huggingface.co/bartowski/Qwen_Qwen3.5-4B-GGUF/resolve/main/Qwen_Qwen3.5-4B-Q4_K_M.gguf"
+                    .to_string(),
+            ),
+            sha256: None,
+            // Main Q4_K_M weights plus the automatically downloaded F16 projector.
+            size_mb: 3515,
+            is_downloaded: false,
+            is_downloading: false,
+            partial_size: 0,
+            is_directory: false,
+            engine_type: EngineType::LlamaCpp,
+            accuracy_score: 0.74,
+            speed_score: 0.62,
+            supports_translation: false,
+            supports_streaming: false,
+            is_recommended: false,
+            recommended_rank: None,
+            supported_languages: llm_languages.clone(),
+            supports_language_selection: false,
+            is_custom: false,
+            local_path: None,
+            local_folder: None, is_cleanup_specialist: false },
         );
 
         // Qwen3.5 9B - stronger answers for higher-memory desktops.
         available_models.insert(
             "qwen3.5-9b".to_string(),
             ModelInfo {
-                id: "qwen3.5-9b".to_string(),
-                name: "Qwen3.5 9B (Vision)".to_string(),
-                description: "Stronger answers and screen vision for powerful computers."
+id: "qwen3.5-9b".to_string(),
+            name: "Qwen3.5 9B (Vision)".to_string(),
+            description: "Stronger answers and screen vision for powerful computers."
+                .to_string(),
+            filename: "Qwen3.5-9B-Q4_K_M.gguf".to_string(),
+            url: Some(
+                "https://huggingface.co/unsloth/Qwen3.5-9B-GGUF/resolve/main/Qwen3.5-9B-Q4_K_M.gguf"
                     .to_string(),
-                filename: "Qwen3.5-9B-Q4_K_M.gguf".to_string(),
-                url: Some(
-                    "https://huggingface.co/unsloth/Qwen3.5-9B-GGUF/resolve/main/Qwen3.5-9B-Q4_K_M.gguf"
-                        .to_string(),
-                ),
-                sha256: None,
-                // Verified Q4_K_M weights plus the automatically downloaded F16 projector.
-                size_mb: 6293,
-                is_downloaded: false,
-                is_downloading: false,
-                partial_size: 0,
-                is_directory: false,
-                engine_type: EngineType::LlamaCpp,
-                accuracy_score: 0.84,
-                speed_score: 0.44,
-                supports_translation: false,
-                supports_streaming: false,
-                is_recommended: false,
-                recommended_rank: None,
-                supported_languages: llm_languages.clone(),
-                supports_language_selection: false,
-                is_custom: false,
-            },
+            ),
+            sha256: None,
+            // Verified Q4_K_M weights plus the automatically downloaded F16 projector.
+            size_mb: 6293,
+            is_downloaded: false,
+            is_downloading: false,
+            partial_size: 0,
+            is_directory: false,
+            engine_type: EngineType::LlamaCpp,
+            accuracy_score: 0.84,
+            speed_score: 0.44,
+            supports_translation: false,
+            supports_streaming: false,
+            is_recommended: false,
+            recommended_rank: None,
+            supported_languages: llm_languages.clone(),
+            supports_language_selection: false,
+            is_custom: false,
+            local_path: None,
+            local_folder: None, is_cleanup_specialist: false },
         );
 
         // Qwen3.5 27B - highest-quality curated option for workstations.
         available_models.insert(
             "qwen3.5-27b".to_string(),
             ModelInfo {
-                id: "qwen3.5-27b".to_string(),
-                name: "Qwen3.5 27B (Vision)".to_string(),
-                description: "The best local quality for high-memory desktops and workstations."
+id: "qwen3.5-27b".to_string(),
+            name: "Qwen3.5 27B (Vision)".to_string(),
+            description: "The best local quality for high-memory desktops and workstations."
+                .to_string(),
+            filename: "Qwen3.5-27B-Q4_K_M.gguf".to_string(),
+            url: Some(
+                "https://huggingface.co/unsloth/Qwen3.5-27B-GGUF/resolve/main/Qwen3.5-27B-Q4_K_M.gguf"
                     .to_string(),
-                filename: "Qwen3.5-27B-Q4_K_M.gguf".to_string(),
-                url: Some(
-                    "https://huggingface.co/unsloth/Qwen3.5-27B-GGUF/resolve/main/Qwen3.5-27B-Q4_K_M.gguf"
-                        .to_string(),
-                ),
-                sha256: None,
-                // Verified Q4_K_M weights plus the automatically downloaded F16 projector.
-                size_mb: 16850,
-                is_downloaded: false,
-                is_downloading: false,
-                partial_size: 0,
-                is_directory: false,
-                engine_type: EngineType::LlamaCpp,
-                accuracy_score: 0.93,
-                speed_score: 0.20,
-                supports_translation: false,
-                supports_streaming: false,
-                is_recommended: false,
-                recommended_rank: None,
-                supported_languages: llm_languages.clone(),
-                supports_language_selection: false,
-                is_custom: false,
-            },
+            ),
+            sha256: None,
+            // Verified Q4_K_M weights plus the automatically downloaded F16 projector.
+            size_mb: 16850,
+            is_downloaded: false,
+            is_downloading: false,
+            partial_size: 0,
+            is_directory: false,
+            engine_type: EngineType::LlamaCpp,
+            accuracy_score: 0.93,
+            speed_score: 0.20,
+            supports_translation: false,
+            supports_streaming: false,
+            is_recommended: false,
+            recommended_rank: None,
+            supported_languages: llm_languages.clone(),
+            supports_language_selection: false,
+            is_custom: false,
+            local_path: None,
+            local_folder: None, is_cleanup_specialist: false },
         );
 
         // Gemma 4 E2B — current on-device model, optimized for responsiveness.
         available_models.insert(
             "gemma-4-e2b".to_string(),
             ModelInfo {
-                id: "gemma-4-e2b".to_string(),
-                name: "Gemma 4 E2B (Vision)".to_string(),
-                description: "The quickest current Gemma for everyday conversation. Less capable on complex requests."
+id: "gemma-4-e2b".to_string(),
+            name: "Gemma 4 E2B (Vision)".to_string(),
+            description: "The quickest current Gemma for everyday conversation. Less capable on complex requests."
+                .to_string(),
+            filename: "gemma-4-E2B_q4_0-it.gguf".to_string(),
+            url: Some(
+                "https://huggingface.co/google/gemma-4-E2B-it-qat-q4_0-gguf/resolve/main/gemma-4-E2B_q4_0-it.gguf"
                     .to_string(),
-                filename: "gemma-4-E2B_q4_0-it.gguf".to_string(),
-                url: Some(
-                    "https://huggingface.co/google/gemma-4-E2B-it-qat-q4_0-gguf/resolve/main/gemma-4-E2B_q4_0-it.gguf"
-                        .to_string(),
-                ),
-                sha256: None,
-                // Official QAT Q4_0 weights plus the automatically downloaded projector.
-                size_mb: 4135,
-                is_downloaded: false,
-                is_downloading: false,
-                partial_size: 0,
-                is_directory: false,
-                engine_type: EngineType::LlamaCpp,
-                accuracy_score: 0.66,
-                speed_score: 0.86,
-                supports_translation: false,
-                supports_streaming: false,
-                is_recommended: true,
-                recommended_rank: Some(2),
-                supported_languages: llm_languages.clone(),
-                supports_language_selection: false,
-                is_custom: false,
-            },
+            ),
+            sha256: None,
+            // Official QAT Q4_0 weights plus the automatically downloaded projector.
+            size_mb: 4135,
+            is_downloaded: false,
+            is_downloading: false,
+            partial_size: 0,
+            is_directory: false,
+            engine_type: EngineType::LlamaCpp,
+            accuracy_score: 0.66,
+            speed_score: 0.86,
+            supports_translation: false,
+            supports_streaming: false,
+            is_recommended: true,
+            recommended_rank: Some(2),
+            supported_languages: llm_languages.clone(),
+            supports_language_selection: false,
+            is_custom: false,
+            local_path: None,
+            local_folder: None, is_cleanup_specialist: false },
         );
 
         // Gemma 4 E4B — default conversational balance, with thinking opt-in.
         available_models.insert(
             "gemma-4-e4b".to_string(),
             ModelInfo {
-                id: "gemma-4-e4b".to_string(),
-                name: "Gemma 4 E4B (Vision)".to_string(),
-                description: "Recommended for conversation: a stronger quality-and-speed balance without default thinking."
+id: "gemma-4-e4b".to_string(),
+            name: "Gemma 4 E4B (Vision)".to_string(),
+            description: "Recommended for conversation: a stronger quality-and-speed balance without default thinking."
+                .to_string(),
+            filename: "gemma-4-E4B_q4_0-it.gguf".to_string(),
+            url: Some(
+                "https://huggingface.co/google/gemma-4-E4B-it-qat-q4_0-gguf/resolve/main/gemma-4-E4B_q4_0-it.gguf"
                     .to_string(),
-                filename: "gemma-4-E4B_q4_0-it.gguf".to_string(),
-                url: Some(
-                    "https://huggingface.co/google/gemma-4-E4B-it-qat-q4_0-gguf/resolve/main/gemma-4-E4B_q4_0-it.gguf"
-                        .to_string(),
-                ),
-                sha256: None,
-                // Official QAT Q4_0 weights plus the automatically downloaded projector.
-                size_mb: 5862,
-                is_downloaded: false,
-                is_downloading: false,
-                partial_size: 0,
-                is_directory: false,
-                engine_type: EngineType::LlamaCpp,
-                accuracy_score: 0.80,
-                speed_score: 0.68,
-                supports_translation: false,
-                supports_streaming: false,
-                is_recommended: true,
-                recommended_rank: Some(1),
-                supported_languages: llm_languages.clone(),
-                supports_language_selection: false,
-                is_custom: false,
-            },
+            ),
+            sha256: None,
+            // Official QAT Q4_0 weights plus the automatically downloaded projector.
+            size_mb: 5862,
+            is_downloaded: false,
+            is_downloading: false,
+            partial_size: 0,
+            is_directory: false,
+            engine_type: EngineType::LlamaCpp,
+            accuracy_score: 0.80,
+            speed_score: 0.68,
+            supports_translation: false,
+            supports_streaming: false,
+            is_recommended: true,
+            recommended_rank: Some(1),
+            supported_languages: llm_languages.clone(),
+            supports_language_selection: false,
+            is_custom: false,
+            local_path: None,
+            local_folder: None, is_cleanup_specialist: false },
         );
 
         // Gemma 4 12B — stronger answers, with a clear latency tradeoff.
         available_models.insert(
             "gemma-4-12b".to_string(),
             ModelInfo {
-                id: "gemma-4-12b".to_string(),
-                name: "Gemma 4 12B (Vision)".to_string(),
-                description: "More capable for nuanced questions, but noticeably slower and best with a strong GPU."
+id: "gemma-4-12b".to_string(),
+            name: "Gemma 4 12B (Vision)".to_string(),
+            description: "More capable for nuanced questions, but noticeably slower and best with a strong GPU."
+                .to_string(),
+            filename: "gemma-4-12b-it-qat-q4_0.gguf".to_string(),
+            url: Some(
+                "https://huggingface.co/google/gemma-4-12B-it-qat-q4_0-gguf/resolve/main/gemma-4-12b-it-qat-q4_0.gguf"
                     .to_string(),
-                filename: "gemma-4-12b-it-qat-q4_0.gguf".to_string(),
-                url: Some(
-                    "https://huggingface.co/google/gemma-4-12B-it-qat-q4_0-gguf/resolve/main/gemma-4-12b-it-qat-q4_0.gguf"
-                        .to_string(),
-                ),
-                sha256: None,
-                // Official QAT Q4_0 weights plus the automatically downloaded projector.
-                size_mb: 6821,
-                is_downloaded: false,
-                is_downloading: false,
-                partial_size: 0,
-                is_directory: false,
-                engine_type: EngineType::LlamaCpp,
-                accuracy_score: 0.91,
-                speed_score: 0.38,
-                supports_translation: false,
-                supports_streaming: false,
-                is_recommended: true,
-                recommended_rank: Some(3),
-                supported_languages: llm_languages.clone(),
-                supports_language_selection: false,
-                is_custom: false,
-            },
+            ),
+            sha256: None,
+            // Official QAT Q4_0 weights plus the automatically downloaded projector.
+            size_mb: 6821,
+            is_downloaded: false,
+            is_downloading: false,
+            partial_size: 0,
+            is_directory: false,
+            engine_type: EngineType::LlamaCpp,
+            accuracy_score: 0.91,
+            speed_score: 0.38,
+            supports_translation: false,
+            supports_streaming: false,
+            is_recommended: true,
+            recommended_rank: Some(3),
+            supported_languages: llm_languages.clone(),
+            supports_language_selection: false,
+            is_custom: false,
+            local_path: None,
+            local_folder: None, is_cleanup_specialist: false },
         );
 
         // Gemma 3 4B — Google multimodal (text + vision), clean output.
         available_models.insert(
             "gemma-3-4b".to_string(),
             ModelInfo {
-                id: "gemma-3-4b".to_string(),
-                name: "Gemma 3 4B (Vision)".to_string(),
-                description: "Google's multimodal model. Clean, reliable answers and fast responses."
+id: "gemma-3-4b".to_string(),
+            name: "Gemma 3 4B (Vision)".to_string(),
+            description: "Google's multimodal model. Clean, reliable answers and fast responses."
+                .to_string(),
+            filename: "gemma-3-4b-it-Q4_K_M.gguf".to_string(),
+            url: Some(
+                "https://huggingface.co/ggml-org/gemma-3-4b-it-GGUF/resolve/main/gemma-3-4b-it-Q4_K_M.gguf"
                     .to_string(),
-                filename: "gemma-3-4b-it-Q4_K_M.gguf".to_string(),
-                url: Some(
-                    "https://huggingface.co/ggml-org/gemma-3-4b-it-GGUF/resolve/main/gemma-3-4b-it-Q4_K_M.gguf"
-                        .to_string(),
-                ),
-                sha256: None,
-                size_mb: 3350,
-                is_downloaded: false,
-                is_downloading: false,
-                partial_size: 0,
-                is_directory: false,
-                engine_type: EngineType::LlamaCpp,
-                accuracy_score: 0.70,
-                speed_score: 0.60,
-                supports_translation: false,
-                supports_streaming: false,
-                is_recommended: false,
-                recommended_rank: None,
-                supported_languages: llm_languages,
-                supports_language_selection: false,
-                is_custom: false,
-            },
+            ),
+            sha256: None,
+            size_mb: 3350,
+            is_downloaded: false,
+            is_downloading: false,
+            partial_size: 0,
+            is_directory: false,
+            engine_type: EngineType::LlamaCpp,
+            accuracy_score: 0.70,
+            speed_score: 0.60,
+            supports_translation: false,
+            supports_streaming: false,
+            is_recommended: false,
+            recommended_rank: None,
+            supported_languages: llm_languages,
+            supports_language_selection: false,
+            is_custom: false,
+            local_path: None,
+            local_folder: None, is_cleanup_specialist: false },
         );
 
         // ---------------------------------------------------------------
@@ -1138,6 +1364,9 @@ impl ModelManager {
                 supported_languages: vec!["en".to_string()],
                 supports_language_selection: false,
                 is_custom: false,
+                local_path: None,
+                local_folder: None,
+                is_cleanup_specialist: false,
             },
         );
 
@@ -1161,6 +1390,7 @@ impl ModelManager {
             cancel_flags: Arc::new(Mutex::new(HashMap::new())),
             extracting_models: Arc::new(Mutex::new(HashSet::new())),
             custom_models: Mutex::new(custom_models),
+            local_models: Mutex::new(HashMap::new()),
         };
 
         // Migrate any bundled models to user directory
@@ -1168,6 +1398,14 @@ impl ModelManager {
 
         // Migrate GigaAM from single-file to directory format
         manager.migrate_gigaam_to_directory()?;
+
+        // Register everything the user already has on disk: individually picked
+        // files plus every model in their linked folders. Done before the status
+        // and header passes below so local models go through exactly the same
+        // availability check and capability probe as downloaded ones — and so
+        // `auto_select_model_if_needed` can pick one, which matters on a fresh
+        // install whose only model is a linked local file.
+        manager.rebuild_local_entries();
 
         // Check which models are already downloaded
         manager.update_download_status()?;
@@ -1185,12 +1423,12 @@ impl ModelManager {
 
     pub fn get_available_models(&self) -> Vec<ModelInfo> {
         let models = self.available_models.lock().unwrap();
-        models.values().cloned().collect()
+        models.values().cloned().map(stamped).collect()
     }
 
     pub fn get_model_info(&self, model_id: &str) -> Option<ModelInfo> {
         let models = self.available_models.lock().unwrap();
-        models.get(model_id).cloned()
+        models.get(model_id).cloned().map(stamped)
     }
 
     /// Insert the transcribe.cpp GGUF models from the bundled catalog
@@ -1252,6 +1490,9 @@ impl ModelManager {
                     // A language can be explicitly chosen only on multilingual models.
                     supports_language_selection: model.language_count > 1,
                     is_custom: false,
+                    local_path: None,
+                    local_folder: None,
+                    is_cleanup_specialist: false,
                 },
             );
         }
@@ -1310,18 +1551,17 @@ impl ModelManager {
     fn apply_gguf_header_hints(&self, model_id: &str) {
         use crate::managers::model_capabilities::{CapabilityProber, GgufHeaderProber};
 
-        let filename = {
+        let path = {
             let models = self.available_models.lock().unwrap();
             match models.get(model_id) {
                 Some(m)
                     if matches!(m.engine_type, EngineType::TranscribeCpp) && m.is_downloaded =>
                 {
-                    m.filename.clone()
+                    self.resolve_model_file(m)
                 }
                 _ => return,
             }
         };
-        let path = self.models_dir.join(&filename);
         if !path.exists() {
             return;
         }
@@ -1446,7 +1686,24 @@ impl ModelManager {
                 })
                 .collect()
         };
+        // A local model's projector is an absolute path rather than a managed
+        // filename, so it is snapshotted separately and checked as-is.
+        let local_projectors: HashMap<String, String> = {
+            let locals = self.local_models.lock().unwrap();
+            locals
+                .iter()
+                .filter_map(|(id, record)| {
+                    record
+                        .mmproj_path
+                        .as_ref()
+                        .map(|path| (id.clone(), path.clone()))
+                })
+                .collect()
+        };
         let projector_ready = |model_id: &str| {
+            if let Some(path) = local_projectors.get(model_id) {
+                return Path::new(path).exists();
+            }
             let filename = mmproj_for(model_id)
                 .map(|(filename, _)| filename.to_string())
                 .or_else(|| custom_projectors.get(model_id).cloned());
@@ -1462,6 +1719,18 @@ impl ModelManager {
             // always considered available; there is no file on disk to check.
             if model.engine_type == EngineType::Kokoro {
                 model.is_downloaded = true;
+                model.is_downloading = false;
+                model.partial_size = 0;
+                continue;
+            }
+            // A model the user already had on disk: availability is simply
+            // whether their file is still reachable. There is no download to be
+            // in progress and no `.partial` to account for, and an unplugged
+            // external drive correctly reads as unavailable rather than as a
+            // model that fails at load time.
+            if let Some(local_path) = model.local_path.clone() {
+                model.is_downloaded =
+                    Path::new(&local_path).is_file() && projector_ready(&model.id);
                 model.is_downloading = false;
                 model.partial_size = 0;
                 continue;
@@ -1723,6 +1992,9 @@ impl ModelManager {
                     supported_languages: vec![],
                     supports_language_selection: true,
                     is_custom: true,
+                    local_path: None,
+                    local_folder: None,
+                    is_cleanup_specialist: false,
                 },
             );
         }
@@ -1789,6 +2061,9 @@ impl ModelManager {
             supported_languages: Self::default_llm_languages(),
             supports_language_selection: false,
             is_custom: true,
+            local_path: None,
+            local_folder: None,
+            is_cleanup_specialist: false,
         }
     }
 
@@ -1960,6 +2235,463 @@ impl ModelManager {
                 _ => None,
             }
         })
+    }
+
+    // -----------------------------------------------------------------
+    // Models the user already has on disk
+    //
+    // Two ways in — pick a file, or link a folder that gets scanned — both
+    // ending as catalog entries whose `local_path` points at the user's own
+    // file. The invariant across all of it: we read those files and never
+    // write, move, or delete them.
+    // -----------------------------------------------------------------
+
+    /// Path to the persisted set of individually picked local models. Linked
+    /// folders live in settings instead, since their contents are re-derived.
+    fn local_models_path(models_dir: &Path) -> PathBuf {
+        models_dir.join("local_models.json")
+    }
+
+    /// A stable key for a path, used only for identity — never for I/O.
+    /// Separators are unified and, on Windows, case is folded, because
+    /// `C:\Models\a.gguf` and `c:/models/a.gguf` are the same file there and
+    /// must not produce two catalog entries.
+    fn normalized_path_key(path: &Path) -> String {
+        let raw = path.to_string_lossy().replace('\\', "/");
+        let trimmed = raw.trim_end_matches('/').to_string();
+        if cfg!(windows) {
+            trimmed.to_lowercase()
+        } else {
+            trimmed
+        }
+    }
+
+    /// Deterministic catalog id for a local model, derived purely from its path.
+    ///
+    /// Determinism is the whole requirement: the selected transcription model and
+    /// the assistant's model are stored *by id*, so an id that shifted between
+    /// runs would silently unselect the user's model on restart. The path hash is
+    /// always included rather than only on collision, so the id of one model
+    /// never depends on which other models happen to be present — two files with
+    /// the same name in different folders coexist, and adding a third changes
+    /// neither.
+    fn local_model_id(path: &Path) -> String {
+        let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("model");
+        let mut hasher = Sha256::new();
+        hasher.update(Self::normalized_path_key(path).as_bytes());
+        let digest = format!("{:x}", hasher.finalize());
+        format!("local-{}-{}", Self::slugify(stem), &digest[..8])
+    }
+
+    /// Turn a filename stem into a display name: `my_fine-tune v2` -> `My Fine Tune V2`.
+    fn prettify_stem(stem: &str) -> String {
+        stem.replace(['-', '_'], " ")
+            .split_whitespace()
+            .map(|word| {
+                let mut chars = word.chars();
+                match chars.next() {
+                    None => String::new(),
+                    Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
+                }
+            })
+            .collect::<Vec<_>>()
+            .join(" ")
+    }
+
+    /// Card description for a local model. The full path is the most useful
+    /// thing we can say — with several fine-tunes of the same base model, the
+    /// path is often the only thing telling them apart — followed by the GGUF
+    /// architecture and whether a projector was paired with it.
+    fn local_description(record: &LocalModelRecord) -> String {
+        let mut description = record.path.clone();
+        if let Some(arch) = &record.architecture {
+            description.push_str(&format!(" · {}", arch));
+        }
+        if record.mmproj_path.is_some() {
+            description.push_str(" · Supports vision.");
+        }
+        description
+    }
+
+    /// Build a catalog entry from a local record.
+    ///
+    /// Capabilities start deliberately blank for transcription models:
+    /// [`Self::apply_gguf_header_hints`] fills in the real language list,
+    /// streaming, and translation support by reading the model's own GGUF header,
+    /// and a load settles anything the header omits. Claiming capabilities we
+    /// haven't verified would be worse than showing none.
+    fn local_record_to_model_info(record: &LocalModelRecord) -> ModelInfo {
+        let is_llm = matches!(record.engine_type, EngineType::LlamaCpp);
+        ModelInfo {
+            id: record.id.clone(),
+            name: record.name.clone(),
+            // Derived, not stored, so wording changes reach existing entries.
+            description: Self::local_description(record),
+            filename: Path::new(&record.path)
+                .file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_else(|| record.path.clone()),
+            url: None,    // nothing to download; it's already here
+            sha256: None, // the user's own file; there is no expected digest
+            size_mb: record.size_mb,
+            // Set by `update_download_status` from whether the file is still
+            // there, so an unplugged drive shows as unavailable rather than
+            // failing at load time.
+            is_downloaded: false,
+            is_downloading: false,
+            partial_size: 0,
+            is_directory: false,
+            engine_type: record.engine_type.clone(),
+            accuracy_score: 0.0, // Sentinel: UI hides score bars when both are 0
+            speed_score: 0.0,
+            supports_translation: false,
+            supports_streaming: false,
+            is_recommended: false,
+            recommended_rank: None,
+            supported_languages: if is_llm {
+                Self::default_llm_languages()
+            } else {
+                vec![]
+            },
+            supports_language_selection: !is_llm,
+            is_custom: true,
+            local_path: Some(record.path.clone()),
+            local_folder: record.folder.clone(),
+            is_cleanup_specialist: false,
+        }
+    }
+
+    /// Turn a classified file into a persistable record. `folder` is the linked
+    /// folder it was found in, or `None` when the user picked the file directly.
+    fn record_from_discovered(
+        discovered: &DiscoveredModel,
+        folder: Option<&Path>,
+    ) -> LocalModelRecord {
+        let stem = discovered
+            .path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("Local model");
+        LocalModelRecord {
+            id: Self::local_model_id(&discovered.path),
+            name: Self::prettify_stem(stem),
+            path: discovered.path.to_string_lossy().to_string(),
+            engine_type: discovered.engine_type(),
+            size_mb: discovered.size_bytes / (1024 * 1024),
+            mmproj_path: discovered
+                .mmproj_path
+                .as_ref()
+                .map(|p| p.to_string_lossy().to_string()),
+            architecture: discovered.architecture().map(|a| a.to_string()),
+            folder: folder.map(|f| f.to_string_lossy().to_string()),
+        }
+    }
+
+    /// Load individually picked local models from `local_models.json`.
+    ///
+    /// A corrupt file is reported and treated as empty rather than failing
+    /// startup: losing the list of registered paths is recoverable by re-adding
+    /// them, but refusing to start is not.
+    fn load_local_model_records(models_dir: &Path) -> Vec<LocalModelRecord> {
+        let path = Self::local_models_path(models_dir);
+        if !path.exists() {
+            return Vec::new();
+        }
+        match fs::read_to_string(&path).map(|c| serde_json::from_str::<Vec<LocalModelRecord>>(&c)) {
+            Ok(Ok(records)) => records,
+            Ok(Err(e)) => {
+                warn!("Invalid local_models.json ({}); ignoring it", e);
+                Vec::new()
+            }
+            Err(e) => {
+                warn!("Failed to read local_models.json: {}", e);
+                Vec::new()
+            }
+        }
+    }
+
+    /// Persist the individually picked local models. Folder-derived entries are
+    /// intentionally excluded — writing them would resurrect models the user has
+    /// since deleted from a linked folder.
+    fn save_local_models(&self) -> Result<()> {
+        let records: Vec<LocalModelRecord> = {
+            let locals = self.local_models.lock().unwrap();
+            locals
+                .values()
+                .filter(|record| record.folder.is_none())
+                .cloned()
+                .collect()
+        };
+        let path = Self::local_models_path(&self.models_dir);
+        fs::write(&path, serde_json::to_string_pretty(&records)?)?;
+        Ok(())
+    }
+
+    /// The linked folders from settings, as paths.
+    pub fn model_folders(&self) -> Vec<String> {
+        get_settings(&self.app_handle).model_folders
+    }
+
+    /// Rebuild every local catalog entry from scratch: the persisted picked
+    /// files, then a fresh scan of each linked folder.
+    ///
+    /// A full rebuild rather than an incremental update, because that is what
+    /// makes a linked folder behave like a view of the filesystem instead of a
+    /// one-time import — a model dropped into the folder appears, one deleted
+    /// disappears, and running it twice changes nothing.
+    ///
+    /// Returns the number of local models registered.
+    fn rebuild_local_entries(&self) -> usize {
+        use crate::managers::local_models::scan_folder;
+
+        // Every local entry is identified by `local_path`, so a single sweep
+        // clears both picked files and folder finds with no bookkeeping.
+        {
+            let mut models = self.available_models.lock().unwrap();
+            models.retain(|_, model| model.local_path.is_none());
+        }
+
+        let mut records: HashMap<String, LocalModelRecord> = HashMap::new();
+
+        // Individually picked files first, so they win over the same file also
+        // appearing inside a linked folder (both produce the same id anyway,
+        // since the id is derived from the path).
+        for record in Self::load_local_model_records(&self.models_dir) {
+            records.insert(record.id.clone(), record);
+        }
+
+        // Never rescan our own models directory: everything in it is already a
+        // catalog entry, and a second entry for the same file would let the user
+        // "remove" a managed model through the local-model path.
+        let mut skip_dirs = HashSet::new();
+        skip_dirs.insert(local_models::absolute_path(&self.models_dir));
+
+        for folder in self.model_folders() {
+            let root = PathBuf::from(&folder);
+            for discovered in scan_folder(&root, &skip_dirs) {
+                let record = Self::record_from_discovered(&discovered, Some(&root));
+                // A file reachable from two linked folders (nested links) is one
+                // model, registered once.
+                records.entry(record.id.clone()).or_insert(record);
+            }
+        }
+
+        let mut count = 0;
+        {
+            let mut models = self.available_models.lock().unwrap();
+            for record in records.values() {
+                // A local file must never shadow a built-in catalog id. Ids are
+                // path-derived and prefixed, so this is belt-and-braces.
+                if models.contains_key(&record.id) {
+                    warn!(
+                        "Local model id '{}' collides with an existing model; skipping {}",
+                        record.id, record.path
+                    );
+                    continue;
+                }
+                models.insert(record.id.clone(), Self::local_record_to_model_info(record));
+                count += 1;
+            }
+        }
+
+        *self.local_models.lock().unwrap() = records;
+
+        if count > 0 {
+            info!("Registered {} local model(s) from disk", count);
+        }
+        count
+    }
+
+    /// Rebuild local entries and bring their availability and capabilities up to
+    /// date. This is the entry point for anything that changes what's on disk or
+    /// which folders are linked.
+    pub fn refresh_local_models(&self) -> Result<usize> {
+        let count = self.rebuild_local_entries();
+        self.update_download_status()?;
+        // Read real capabilities (languages, streaming, translation) out of each
+        // local GGUF's own header, so a user's fine-tuned ASR model arrives with
+        // an accurate language list instead of a blank one.
+        self.reconcile_downloaded_cpp_headers();
+        let _ = self.app_handle.emit("model-state-changed", ());
+        Ok(count)
+    }
+
+    /// Register a single model file the user picked, wherever it lives.
+    ///
+    /// Rejects a path that isn't a usable model, and rejects a bare vision
+    /// projector with an explanation, because both produce a catalog entry that
+    /// could never load. Adding the same path twice is not an error — it
+    /// resolves to the same id, so the existing entry is returned.
+    pub fn add_local_model_file(&self, path: &str) -> Result<ModelInfo> {
+        use crate::managers::local_models::describe_model_file;
+
+        let path = Path::new(path.trim());
+        if path.as_os_str().is_empty() {
+            return Err(anyhow::anyhow!("No file was selected"));
+        }
+        if !path.is_file() {
+            return Err(anyhow::anyhow!(
+                "That file no longer exists: {}",
+                path.display()
+            ));
+        }
+
+        // Absolute, so the entry keeps working regardless of the process's
+        // working directory on a later launch.
+        let path = local_models::absolute_path(path);
+
+        let discovered = describe_model_file(&path).map_err(|e| anyhow::anyhow!("{}", e))?;
+        let record = Self::record_from_discovered(&discovered, None);
+
+        // Already registered (possibly via a linked folder): promote it to a
+        // picked file so it survives that folder being unlinked, and hand back
+        // the entry rather than reporting a spurious error.
+        let already_present = {
+            let models = self.available_models.lock().unwrap();
+            models.contains_key(&record.id)
+        };
+
+        let model_info = Self::local_record_to_model_info(&record);
+        {
+            let mut models = self.available_models.lock().unwrap();
+            models.insert(record.id.clone(), model_info);
+        }
+        {
+            let mut locals = self.local_models.lock().unwrap();
+            locals.insert(record.id.clone(), record.clone());
+        }
+        self.save_local_models()?;
+
+        // Resolve availability and read the header's real capabilities.
+        self.update_download_status()?;
+        self.apply_gguf_header_hints(&record.id);
+        let _ = self.app_handle.emit("model-state-changed", ());
+
+        if already_present {
+            debug!("Local model '{}' was already registered", record.id);
+        } else {
+            info!(
+                "Registered local model '{}' at {}",
+                record.id,
+                path.display()
+            );
+        }
+
+        self.get_model_info(&record.id)
+            .ok_or_else(|| anyhow::anyhow!("Failed to register {}", path.display()))
+    }
+
+    /// Link a folder and scan it. Returns how many models were found in it.
+    ///
+    /// Finding nothing is an error rather than a silent success: a folder with no
+    /// models in it is almost always the wrong folder, and saying so immediately
+    /// is more useful than adding an empty entry to the list.
+    pub fn add_model_folder(&self, folder: &str) -> Result<usize> {
+        use crate::managers::local_models::scan_folder;
+
+        let folder = folder.trim();
+        if folder.is_empty() {
+            return Err(anyhow::anyhow!("No folder was selected"));
+        }
+        let root = PathBuf::from(folder);
+        if !root.is_dir() {
+            return Err(anyhow::anyhow!(
+                "That folder doesn't exist: {}",
+                root.display()
+            ));
+        }
+        let root = local_models::absolute_path(&root);
+
+        // Refuse the app's own models directory: its contents are already in the
+        // catalog, and linking it would create a second, removable entry for
+        // every managed model.
+        let managed = local_models::absolute_path(&self.models_dir);
+        if Self::normalized_path_key(&root) == Self::normalized_path_key(&managed) {
+            return Err(anyhow::anyhow!(
+                "That's the app's own models folder — everything in it is already listed."
+            ));
+        }
+
+        let folder_string = root.to_string_lossy().to_string();
+        let key = Self::normalized_path_key(&root);
+
+        let mut settings = get_settings(&self.app_handle);
+        if settings
+            .model_folders
+            .iter()
+            .any(|existing| Self::normalized_path_key(Path::new(existing)) == key)
+        {
+            return Err(anyhow::anyhow!("That folder is already linked."));
+        }
+
+        let mut skip_dirs = HashSet::new();
+        skip_dirs.insert(managed);
+        let found = scan_folder(&root, &skip_dirs).len();
+        if found == 0 {
+            return Err(anyhow::anyhow!(
+                "No models found in that folder. SpeakoFlow looks for .gguf and Whisper .bin files."
+            ));
+        }
+
+        settings.model_folders.push(folder_string);
+        write_settings(&self.app_handle, settings);
+
+        let total = self.refresh_local_models()?;
+        info!(
+            "Linked model folder {} ({} model(s) found, {} local total)",
+            root.display(),
+            found,
+            total
+        );
+        Ok(found)
+    }
+
+    /// Unlink a folder. Its models leave the catalog; the files are untouched.
+    pub fn remove_model_folder(&self, folder: &str) -> Result<()> {
+        let key = Self::normalized_path_key(Path::new(folder.trim()));
+        let mut settings = get_settings(&self.app_handle);
+        let before = settings.model_folders.len();
+        settings
+            .model_folders
+            .retain(|existing| Self::normalized_path_key(Path::new(existing)) != key);
+        if settings.model_folders.len() == before {
+            return Err(anyhow::anyhow!("That folder isn't linked."));
+        }
+        write_settings(&self.app_handle, settings);
+        self.refresh_local_models()?;
+        info!("Unlinked model folder {}", folder);
+        Ok(())
+    }
+
+    /// Where a model's vision projector actually lives, if it has one.
+    ///
+    /// The one place that resolves a projector for *both* kinds of model: a
+    /// downloaded one sits in the models directory under a known filename, a
+    /// local one is wherever the user's file is. Callers get a path and don't
+    /// need to know which case they're in.
+    pub fn resolve_mmproj_path(&self, model_id: &str) -> Option<PathBuf> {
+        {
+            let locals = self.local_models.lock().unwrap();
+            if let Some(record) = locals.get(model_id) {
+                // Local models resolve only here; they have no managed filename.
+                return record.mmproj_path.as_ref().map(PathBuf::from);
+            }
+        }
+        let (filename, _) = self.resolve_mmproj(model_id)?;
+        Some(self.models_dir.join(filename))
+    }
+
+    /// Where a model's weights live: the user's own path for a local model,
+    /// otherwise the managed `<models_dir>/<filename>`.
+    ///
+    /// Every path-resolution site funnels through this so a local model can
+    /// never accidentally be looked for in the models directory (or, worse, be
+    /// written to there).
+    fn resolve_model_file(&self, model: &ModelInfo) -> PathBuf {
+        match &model.local_path {
+            Some(path) => PathBuf::from(path),
+            None => self.models_dir.join(&model.filename),
+        }
     }
 
     /// Verifies the SHA256 of `path` against `expected_sha256` (if provided).
@@ -2249,6 +2981,16 @@ impl ModelManager {
 
         let model_info =
             model_info.ok_or_else(|| anyhow::anyhow!("Model not found: {}", model_id))?;
+
+        // A local model is already on disk by definition; there is nothing to
+        // fetch and no URL to fetch it from. Reachable if the UI ever routes a
+        // "download" at one, so answer plainly instead of falling through to a
+        // confusing "no download URL".
+        if model_info.local_path.is_some() {
+            return Err(anyhow::anyhow!(
+                "This model is already on your device — there's nothing to download."
+            ));
+        }
 
         // Build the ordered list of sources to try (reliable mirror first, then
         // the canonical URL). Empty only if the model has no URL at all.
@@ -2595,6 +3337,46 @@ impl ModelManager {
 
         debug!("ModelManager: Found model info: {:?}", model_info);
 
+        // A model the user already had on disk is not ours to delete. "Removing"
+        // it unregisters the path and nothing else — deleting someone's own
+        // model file because they tidied up a list would be unforgivable, so the
+        // file-touching code below is never reached for these.
+        if let Some(local_path) = &model_info.local_path {
+            if let Some(folder) = &model_info.local_folder {
+                // Re-derived by the next scan, so removing it individually would
+                // silently undo itself. Say what actually works instead.
+                return Err(anyhow::anyhow!(
+                    "This model comes from the linked folder {}. Unlink that folder to remove it, \
+                     or delete the file yourself if you no longer want it.",
+                    folder
+                ));
+            }
+
+            let removed = self.local_models.lock().unwrap().remove(model_id);
+            if removed.is_none() {
+                return Err(anyhow::anyhow!("No saved entry found to remove"));
+            }
+            if let Err(error) = self.save_local_models() {
+                // Roll back so the in-memory state matches what a restart will
+                // load, and what we're about to tell the caller.
+                if let Some(record) = removed {
+                    self.local_models
+                        .lock()
+                        .unwrap()
+                        .insert(model_id.to_string(), record);
+                }
+                return Err(error);
+            }
+
+            self.available_models.lock().unwrap().remove(model_id);
+            info!(
+                "Unregistered local model '{}' (file left in place at {})",
+                model_id, local_path
+            );
+            let _ = self.app_handle.emit("model-deleted", model_id);
+            return Ok(());
+        }
+
         let model_path = self.models_dir.join(&model_info.filename);
         let partial_path = self
             .models_dir
@@ -2701,6 +3483,20 @@ impl ModelManager {
             return Err(anyhow::anyhow!(
                 "Model is currently downloading: {}",
                 model_id
+            ));
+        }
+
+        // A model the user already had on disk resolves to their own path. No
+        // `.partial` companion exists for it, so the only question is whether the
+        // file is still there.
+        if let Some(local_path) = &model_info.local_path {
+            let path = PathBuf::from(local_path);
+            if path.is_file() {
+                return Ok(path);
+            }
+            return Err(anyhow::anyhow!(
+                "This model's file is no longer at {}. It may have been moved, renamed, or be on a drive that isn't connected.",
+                local_path
             ));
         }
 
@@ -2897,6 +3693,9 @@ mod tests {
             supported_languages: vec!["en".to_string()],
             supports_language_selection: false,
             is_custom: false,
+            local_path: None,
+            local_folder: None,
+            is_cleanup_specialist: false,
         }
     }
 
@@ -3052,6 +3851,9 @@ mod tests {
                 supported_languages: vec!["en".to_string()],
                 supports_language_selection: true,
                 is_custom: false,
+                local_path: None,
+                local_folder: None,
+                is_cleanup_specialist: false,
             },
         );
 
@@ -3177,5 +3979,234 @@ mod tests {
             ModelManager::verify_sha256(&missing_path, Some("anyexpectedhash"), "missing_model");
 
         assert!(result.is_err(), "missing file must return an error");
+    }
+
+    // -----------------------------------------------------------------
+    // Models the user already has on disk
+    // -----------------------------------------------------------------
+
+    fn discovered(path: &str, engine: EngineType, mmproj: Option<&str>) -> DiscoveredModel {
+        use crate::managers::local_models::LocalModelKind;
+        let kind = match engine {
+            EngineType::LlamaCpp => LocalModelKind::Llm {
+                architecture: Some("qwen3".to_string()),
+            },
+            engine => LocalModelKind::Transcription {
+                engine,
+                architecture: Some("whisper".to_string()),
+            },
+        };
+        DiscoveredModel {
+            path: PathBuf::from(path),
+            kind,
+            size_bytes: 3 * 1024 * 1024 * 1024,
+            mmproj_path: mmproj.map(PathBuf::from),
+        }
+    }
+
+    /// The selected transcription model and the assistant's model are persisted
+    /// *by id*, so an id that changed between runs would silently deselect the
+    /// user's model on restart. Same path must always mean same id.
+    #[test]
+    fn local_model_id_is_deterministic_for_a_path() {
+        let path = Path::new("/home/user/models/my-finetune-Q4_K_M.gguf");
+        let first = ModelManager::local_model_id(path);
+        let second = ModelManager::local_model_id(path);
+        assert_eq!(first, second);
+        assert!(
+            first.starts_with("local-my-finetune-q4-k-m-"),
+            "id should stay readable: {first}"
+        );
+    }
+
+    /// Two fine-tunes with the same filename in different folders is the normal
+    /// case when someone trains iteratively, so they must not collide — and the
+    /// id must not depend on which other models happen to be registered.
+    #[test]
+    fn same_filename_in_different_folders_gets_distinct_ids() {
+        let a = ModelManager::local_model_id(Path::new("/models/run-1/model.gguf"));
+        let b = ModelManager::local_model_id(Path::new("/models/run-2/model.gguf"));
+        assert_ne!(a, b);
+    }
+
+    /// A path typed or picked with different separators (or, on Windows,
+    /// different case) is the same file and must not produce a second entry.
+    #[test]
+    fn path_identity_ignores_separator_style() {
+        let a = ModelManager::normalized_path_key(Path::new("C:/models/sub/model.gguf"));
+        let b = ModelManager::normalized_path_key(Path::new("C:\\models\\sub\\model.gguf"));
+        assert_eq!(a, b);
+
+        // Trailing separators must not create a distinct folder identity either.
+        assert_eq!(
+            ModelManager::normalized_path_key(Path::new("/models/dir/")),
+            ModelManager::normalized_path_key(Path::new("/models/dir"))
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn path_identity_is_case_insensitive_on_windows() {
+        assert_eq!(
+            ModelManager::local_model_id(Path::new(r"C:\Models\Model.gguf")),
+            ModelManager::local_model_id(Path::new(r"c:\models\model.gguf"))
+        );
+    }
+
+    #[test]
+    fn local_entry_points_at_the_users_file_and_never_downloads() {
+        let record = ModelManager::record_from_discovered(
+            &discovered("/models/chat-Q4_K_M.gguf", EngineType::LlamaCpp, None),
+            None,
+        );
+        let info = ModelManager::local_record_to_model_info(&record);
+
+        assert_eq!(
+            info.local_path.as_deref(),
+            Some("/models/chat-Q4_K_M.gguf"),
+            "the entry must resolve to the user's own path"
+        );
+        assert!(
+            info.url.is_none() && info.sha256.is_none(),
+            "there is nothing to download and no expected digest for a user's file"
+        );
+        assert!(info.is_custom, "local models group with the user's models");
+        assert!(
+            info.local_folder.is_none(),
+            "a picked file belongs to no linked folder"
+        );
+        assert_eq!(info.engine_type, EngineType::LlamaCpp);
+        assert!(
+            !info.supports_language_selection,
+            "language choice is a transcription concept, not an LLM one"
+        );
+        assert_eq!(info.size_mb, 3072, "size should be reported in MB");
+        assert_eq!(
+            info.name, "Chat Q4 K M",
+            "name is derived from the filename"
+        );
+    }
+
+    /// Capabilities must not be invented for a model we haven't inspected past
+    /// its architecture: the header probe and a real load fill these in.
+    #[test]
+    fn local_transcription_entry_starts_with_no_claimed_capabilities() {
+        let record = ModelManager::record_from_discovered(
+            &discovered("/models/ggml-custom.bin", EngineType::Whisper, None),
+            None,
+        );
+        let info = ModelManager::local_record_to_model_info(&record);
+
+        assert_eq!(info.engine_type, EngineType::Whisper);
+        assert!(info.supported_languages.is_empty());
+        assert!(!info.supports_streaming);
+        assert!(!info.supports_translation);
+        assert!(
+            info.supports_language_selection,
+            "the user can still pick a language for a transcription model"
+        );
+        assert!(
+            !info.is_recommended && info.recommended_rank.is_none(),
+            "an unknown local model must not be promoted over the catalog"
+        );
+    }
+
+    #[test]
+    fn folder_derived_entry_records_the_folder_it_came_from() {
+        let record = ModelManager::record_from_discovered(
+            &discovered("/vault/asr/tuned.gguf", EngineType::TranscribeCpp, None),
+            Some(Path::new("/vault")),
+        );
+        assert_eq!(record.folder.as_deref(), Some("/vault"));
+
+        let info = ModelManager::local_record_to_model_info(&record);
+        assert_eq!(
+            info.local_folder.as_deref(),
+            Some("/vault"),
+            "the UI needs this to say 'unlink the folder' instead of 'remove'"
+        );
+    }
+
+    #[test]
+    fn a_paired_projector_is_carried_through_and_described() {
+        let record = ModelManager::record_from_discovered(
+            &discovered(
+                "/models/vlm-Q4_K_M.gguf",
+                EngineType::LlamaCpp,
+                Some("/models/mmproj-f16.gguf"),
+            ),
+            None,
+        );
+        assert_eq!(
+            record.mmproj_path.as_deref(),
+            Some("/models/mmproj-f16.gguf")
+        );
+
+        let description = ModelManager::local_description(&record);
+        assert!(
+            description.contains("/models/vlm-Q4_K_M.gguf"),
+            "the path is the only reliable way to tell fine-tunes apart: {description}"
+        );
+        assert!(description.contains("Supports vision."), "{description}");
+        assert!(description.contains("qwen3"), "{description}");
+    }
+
+    /// Only picked files are persisted. Folder finds are re-derived every scan,
+    /// so persisting them would resurrect models the user has since deleted.
+    #[test]
+    fn only_picked_files_are_persisted() {
+        let picked = ModelManager::record_from_discovered(
+            &discovered("/models/picked.gguf", EngineType::LlamaCpp, None),
+            None,
+        );
+        let scanned = ModelManager::record_from_discovered(
+            &discovered("/vault/scanned.gguf", EngineType::LlamaCpp, None),
+            Some(Path::new("/vault")),
+        );
+
+        let persisted: Vec<&LocalModelRecord> = [&picked, &scanned]
+            .into_iter()
+            .filter(|record| record.folder.is_none())
+            .collect();
+
+        assert_eq!(persisted.len(), 1);
+        assert_eq!(persisted[0].path, "/models/picked.gguf");
+    }
+
+    #[test]
+    fn a_record_survives_a_json_round_trip() {
+        let record = ModelManager::record_from_discovered(
+            &discovered(
+                "/models/vlm.gguf",
+                EngineType::LlamaCpp,
+                Some("/models/mmproj.gguf"),
+            ),
+            None,
+        );
+        let json = serde_json::to_string(&record).unwrap();
+        let back: LocalModelRecord = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(back.id, record.id);
+        assert_eq!(back.path, record.path);
+        assert_eq!(back.engine_type, record.engine_type);
+        assert_eq!(back.mmproj_path, record.mmproj_path);
+        assert_eq!(back.architecture, record.architecture);
+    }
+
+    /// Older `local_models.json` files (and hand-edited ones) omit the optional
+    /// fields; they must load rather than invalidate the whole list.
+    #[test]
+    fn a_minimal_record_json_still_loads() {
+        let json = r#"{
+            "id": "local-old-1234abcd",
+            "name": "Old Entry",
+            "path": "/models/old.gguf",
+            "engine_type": "LlamaCpp",
+            "size_mb": 100
+        }"#;
+        let record: LocalModelRecord = serde_json::from_str(json).unwrap();
+        assert!(record.mmproj_path.is_none());
+        assert!(record.architecture.is_none());
+        assert!(record.folder.is_none());
     }
 }

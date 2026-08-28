@@ -509,6 +509,32 @@
         "add": "Herunterladen",
         "adding": "Wird gestartet…",
         "addError": "Dieses Modell konnte nicht hinzugefügt werden. Bitte versuche es erneut."
+      },
+      "localModel": {
+        "addButton": "Lokales Modell verwenden",
+        "title": "Ein Modell verwenden, das du schon hast",
+        "subtitle": "Füge eine .gguf- oder Whisper-.bin-Datei von irgendwo auf diesem Gerät hinzu oder verknüpfe einen Ordner, in dem du deine Modelle sammelst. Es wird nichts kopiert und nichts heruntergeladen.",
+        "pickFiles": "Modelldateien auswählen",
+        "pickFilesHint": "Wähle eine oder mehrere .gguf- oder .bin-Dateien. Gut für ein einzelnes Modell, das du gerade erstellt hast.",
+        "linkFolder": "Ordner verknüpfen",
+        "linkFolderHint": "Wird automatisch durchsucht, inklusive Unterordner. Verknüpfe so viele Ordner, wie du magst.",
+        "fileFilter": "Modelldateien",
+        "filesAdded_one": "{{count}} Modell hinzugefügt.",
+        "filesAdded_other": "{{count}} Modelle hinzugefügt.",
+        "folderAdded_one": "Ordner verknüpft. {{count}} Modell gefunden.",
+        "folderAdded_other": "Ordner verknüpft. {{count}} Modelle gefunden.",
+        "folderRemoved": "Ordnerverknüpfung aufgehoben. Deine Dateien wurden nicht angetastet.",
+        "foldersTitle": "Verknüpfte Ordner",
+        "foldersEmpty": "Noch keine Ordner verknüpft. Verknüpfe einen, und jedes Modell darin erscheint in deiner Liste.",
+        "removeFolder": "Verknüpfung von {{folder}} aufheben",
+        "rescan": "Neu durchsuchen",
+        "rescanning": "Wird neu durchsucht…",
+        "rescanDone_one": "{{count}} lokales Modell gefunden.",
+        "rescanDone_other": "{{count}} lokale Modelle gefunden.",
+        "footnote": "Verknüpfte Ordner werden beim Start von SpeakoFlow erneut durchsucht, sodass später hinzugefügte Modelle von selbst auftauchen. Wenn du eine Ordnerverknüpfung aufhebst oder ein Modell entfernst, verschwindet es nur aus dieser Liste — deine Dateien bleiben, wo sie sind.",
+        "removeTitle": "Aus der Liste entfernen?",
+        "removeConfirm": "„{{modelName}}“ aus deiner Modellliste entfernen?\n\nDie Datei selbst bleibt, wo sie ist:\n{{path}}",
+        "fileMissing": "Die Datei dieses Modells ist nicht mehr da:\n{{path}}\n\nSie wurde vielleicht verschoben oder umbenannt, oder sie liegt auf einem Laufwerk, das nicht verbunden ist."
       }
     },
     "sound": {
@@ -869,21 +895,10 @@
       },
       "aiCleanup": {
         "groupTitle": "KI-Bereinigung",
-        "styleGroupTitle": "Schreibstil",
-        "styleGroupDescription": "Wähle einen mitgelieferten Stil oder speichere eigene Regeln dafür, wie bereinigtes Diktat klingen soll.",
         "modelGroupTitle": "Bereinigungsmodell",
         "promptGroupTitle": "Bereinigungs-Prompt",
         "title": "Mein Diktat mit KI aufräumen",
         "caption": "Experimentell — glättet Zeichensetzung und Füllwörter nach dem Diktieren.",
-        "strengthLabel": "Stärke der Bereinigung",
-        "strengthDescription": "Wie stark die KI deine Worte umschreibt. Leicht korrigiert nur Fehler und Füllwörter. Ausgewogen kürzt zusätzlich Wiederholungen und Satzanfänge, die ins Leere laufen. Stark verdichtet Weitschweifiges zu knappem, gut strukturiertem Text — Fakten und Bedeutung bleiben immer erhalten.",
-        "strengthOptions": {
-          "light": "Leicht",
-          "balanced": "Ausgewogen",
-          "aggressive": "Stark"
-        },
-        "fixMisheardLabel": "Falsch gehörte Wörter korrigieren",
-        "fixMisheardDescription": "Wenn ein Wort im Satz klar falsch ist — ein Homophon oder eine knapp verfehlte Aussprache — wird es durch das gemeinte Wort ersetzt. Hilfreich bei Akzenten; die KI korrigiert nur, wenn das gemeinte Wort offensichtlich ist.",
         "info": "Lässt ein Sprachmodell über dein Diktat laufen, um die Zeichensetzung zu korrigieren, Füllwörter zu entfernen und optional den Tonfall anzupassen. Gilt nur für das Diktat und läuft über ein eigenes Tastenkürzel. Nach dem Sprechen entsteht eine kurze Verzögerung; scheitert das Modell oder läuft es in einen Timeout, wird stattdessen dein Rohtext verwendet. Noch in Entwicklung."
       },
       "spokenEmoji": {

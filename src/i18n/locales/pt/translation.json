@@ -509,6 +509,32 @@
         "add": "Baixar",
         "adding": "Iniciando…",
         "addError": "Não foi possível adicionar este modelo. Tente novamente."
+      },
+      "localModel": {
+        "addButton": "Usar um modelo local",
+        "title": "Use um modelo que você já tem",
+        "subtitle": "Adicione um arquivo .gguf ou um .bin do Whisper de qualquer lugar deste dispositivo, ou vincule uma pasta onde você guarda seus modelos. Nada é copiado e nada é baixado.",
+        "pickFiles": "Escolher arquivos de modelo",
+        "pickFilesHint": "Escolha um ou mais arquivos .gguf ou .bin. Bom para um único modelo que você acabou de criar.",
+        "linkFolder": "Vincular uma pasta",
+        "linkFolderHint": "É verificada automaticamente, incluindo as subpastas. Vincule quantas pastas quiser.",
+        "fileFilter": "Arquivos de modelo",
+        "filesAdded_one": "{{count}} modelo adicionado.",
+        "filesAdded_other": "{{count}} modelos adicionados.",
+        "folderAdded_one": "Pasta vinculada. {{count}} modelo encontrado.",
+        "folderAdded_other": "Pasta vinculada. {{count}} modelos encontrados.",
+        "folderRemoved": "Pasta desvinculada. Seus arquivos não foram mexidos.",
+        "foldersTitle": "Pastas vinculadas",
+        "foldersEmpty": "Nenhuma pasta vinculada ainda. Vincule uma e todos os modelos dentro dela aparecem na sua lista.",
+        "removeFolder": "Desvincular {{folder}}",
+        "rescan": "Verificar de novo",
+        "rescanning": "Verificando de novo…",
+        "rescanDone_one": "{{count}} modelo local encontrado.",
+        "rescanDone_other": "{{count}} modelos locais encontrados.",
+        "footnote": "As pastas vinculadas são verificadas de novo quando o SpeakoFlow inicia, então os modelos que você adicionar depois aparecem sozinhos. Desvincular uma pasta ou remover um modelo só tira ele desta lista — seus arquivos continuam onde estão.",
+        "removeTitle": "Remover da lista?",
+        "removeConfirm": "Remover “{{modelName}}” da sua lista de modelos?\n\nO arquivo em si continua onde está:\n{{path}}",
+        "fileMissing": "O arquivo deste modelo não está mais lá:\n{{path}}\n\nEle pode ter sido movido ou renomeado, ou estar em uma unidade que não está conectada."
       }
     },
     "sound": {
@@ -869,21 +895,10 @@
       },
       "aiCleanup": {
         "groupTitle": "Limpeza com IA",
-        "styleGroupTitle": "Estilo de escrita",
-        "styleGroupDescription": "Escolha um estilo integrado ou salve suas próprias regras de como o ditado limpo deve soar.",
         "modelGroupTitle": "Modelo de limpeza",
         "promptGroupTitle": "Prompt de limpeza",
         "title": "Ajeitar meu ditado com IA",
         "caption": "Experimental — arruma a pontuação e as palavras de preenchimento depois que você dita.",
-        "strengthLabel": "Intensidade da limpeza",
-        "strengthDescription": "Quanto a IA reescreve suas palavras. Leve corrige só os erros e as palavras de preenchimento. Equilibrada também tira pontos repetidos e começos em falso. Agressiva transforma a divagação em um texto conciso e bem estruturado — sempre preservando seus fatos e o seu sentido.",
-        "strengthOptions": {
-          "light": "Leve",
-          "balanced": "Equilibrada",
-          "aggressive": "Agressiva"
-        },
-        "fixMisheardLabel": "Corrigir palavras ouvidas errado",
-        "fixMisheardDescription": "Quando uma palavra está claramente errada para a frase — um homófono ou uma pronúncia por pouco — troque pela palavra que você quis dizer. Ajuda com sotaques; a IA só corrige quando a palavra pretendida é óbvia.",
         "info": "Passa um modelo de linguagem pelo seu ditado para corrigir a pontuação, remover palavras de preenchimento e, se você quiser, ajustar o tom. Vale apenas para o ditado, no seu próprio atalho. Isso adiciona uma pequena espera depois que você fala; se o modelo falhar ou expirar, o texto bruto é usado no lugar. Ainda em desenvolvimento."
       },
       "spokenEmoji": {

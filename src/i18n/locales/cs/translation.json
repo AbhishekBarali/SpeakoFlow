@@ -509,6 +509,32 @@
         "add": "Stáhnout",
         "adding": "Spouštím…",
         "addError": "Tento model se nepodařilo přidat. Zkuste to prosím znovu."
+      },
+      "localModel": {
+        "addButton": "Použít místní model",
+        "title": "Použijte model, který už máte",
+        "subtitle": "Přidejte soubor .gguf nebo .bin pro Whisper odkudkoli z tohoto zařízení, nebo připojte složku, ve které modely držíte. Nic se nekopíruje a nic se nestahuje.",
+        "pickFiles": "Vybrat soubory modelů",
+        "pickFilesHint": "Vyberte jeden nebo více souborů .gguf či .bin. Hodí se pro jediný model, který jste právě vytvořili.",
+        "linkFolder": "Připojit složku",
+        "linkFolderHint": "Prohledává se automaticky, včetně podsložek. Připojte klidně víc složek.",
+        "fileFilter": "Soubory modelů",
+        "filesAdded_one": "Přidán {{count}} model.",
+        "filesAdded_other": "Přidáno {{count}} modelů.",
+        "folderAdded_one": "Složka připojena. Nalezen {{count}} model.",
+        "folderAdded_other": "Složka připojena. Nalezeno {{count}} modelů.",
+        "folderRemoved": "Složka odpojena. Vašich souborů se to nedotklo.",
+        "foldersTitle": "Připojené složky",
+        "foldersEmpty": "Zatím není připojena žádná složka. Připojte ji a každý model v ní se objeví ve vašem seznamu.",
+        "removeFolder": "Odpojit {{folder}}",
+        "rescan": "Prohledat znovu",
+        "rescanning": "Prohledávám…",
+        "rescanDone_one": "Nalezen {{count}} místní model.",
+        "rescanDone_other": "Nalezeno {{count}} místních modelů.",
+        "footnote": "Připojené složky se znovu prohledají při spuštění SpeakoFlow, takže modely, které do nich přidáte později, se objeví samy. Odpojení složky nebo odebrání modelu ho odstraní jen z tohoto seznamu — vaše soubory zůstanou tam, kde jsou.",
+        "removeTitle": "Odebrat ze seznamu?",
+        "removeConfirm": "Odebrat „{{modelName}}“ ze seznamu modelů?\n\nSamotný soubor zůstane tam, kde je:\n{{path}}",
+        "fileMissing": "Soubor tohoto modelu už tam není:\n{{path}}\n\nMohl být přesunut nebo přejmenován, případně je na disku, který není připojený."
       }
     },
     "sound": {
@@ -869,21 +895,10 @@
       },
       "aiCleanup": {
         "groupTitle": "Čištění pomocí AI",
-        "styleGroupTitle": "Styl psaní",
-        "styleGroupDescription": "Vyberte vestavěný styl nebo si uložte vlastní pravidla, jak má vyčištěné diktování znít.",
         "modelGroupTitle": "Model pro čištění",
         "promptGroupTitle": "Prompt pro čištění",
         "title": "Vylepšit mé diktování pomocí AI",
         "caption": "Experimentální — po diktování uklidí interpunkci a vycpávková slova.",
-        "strengthLabel": "Míra čištění",
-        "strengthDescription": "Jak moc AI přepisuje vaše slova. Nízká opravuje jen chyby a vycpávková slova. Vyvážená navíc odstraní opakované myšlenky a nedokončené začátky. Agresivní stáhne rozvláčnou řeč do stručného, dobře strukturovaného textu — vždy se zachováním vašich faktů a významu.",
-        "strengthOptions": {
-          "light": "Nízká",
-          "balanced": "Vyvážená",
-          "aggressive": "Agresivní"
-        },
-        "fixMisheardLabel": "Opravovat přeslechnutá slova",
-        "fixMisheardDescription": "Když je slovo pro danou větu zjevně chybné — homofon nebo skoro správná výslovnost — nahradí se slovem, které jste mysleli. Pomáhá u přízvuků; AI opravuje jen tehdy, když je zamýšlené slovo zřejmé.",
         "info": "Spustí nad vaším diktováním jazykový model, který opraví interpunkci, odstraní vycpávková slova a případně upraví tón. Platí pouze pro diktování a má vlastní zkratku. Po domluvení přidává krátké zpoždění; pokud model selže nebo vyprší časový limit, použije se váš původní text. Stále ve vývoji."
       },
       "spokenEmoji": {

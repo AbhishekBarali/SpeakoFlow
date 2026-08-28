@@ -509,6 +509,32 @@
         "add": "Tải xuống",
         "adding": "Đang bắt đầu…",
         "addError": "Không thể thêm mô hình này. Vui lòng thử lại."
+      },
+      "localModel": {
+        "addButton": "Dùng mô hình có sẵn trên máy",
+        "title": "Dùng mô hình bạn đã có",
+        "subtitle": "Thêm một tệp .gguf hoặc tệp .bin của Whisper từ bất kỳ đâu trên thiết bị này, hoặc liên kết thư mục bạn dùng để lưu mô hình. Không có gì được sao chép và không có gì được tải xuống.",
+        "pickFiles": "Chọn tệp mô hình",
+        "pickFilesHint": "Chọn một hoặc nhiều tệp .gguf hoặc .bin. Phù hợp khi bạn vừa tạo xong một mô hình.",
+        "linkFolder": "Liên kết một thư mục",
+        "linkFolderHint": "Được quét tự động, kể cả thư mục con. Bạn có thể liên kết bao nhiêu thư mục cũng được.",
+        "fileFilter": "Tệp mô hình",
+        "filesAdded_one": "Đã thêm {{count}} mô hình.",
+        "filesAdded_other": "Đã thêm {{count}} mô hình.",
+        "folderAdded_one": "Đã liên kết thư mục. Tìm thấy {{count}} mô hình.",
+        "folderAdded_other": "Đã liên kết thư mục. Tìm thấy {{count}} mô hình.",
+        "folderRemoved": "Đã bỏ liên kết thư mục. Các tệp của bạn không bị thay đổi.",
+        "foldersTitle": "Thư mục đã liên kết",
+        "foldersEmpty": "Chưa liên kết thư mục nào. Hãy liên kết một thư mục và mọi mô hình bên trong sẽ xuất hiện trong danh sách của bạn.",
+        "removeFolder": "Bỏ liên kết {{folder}}",
+        "rescan": "Quét lại",
+        "rescanning": "Đang quét lại…",
+        "rescanDone_one": "Tìm thấy {{count}} mô hình trên máy.",
+        "rescanDone_other": "Tìm thấy {{count}} mô hình trên máy.",
+        "footnote": "Các thư mục đã liên kết sẽ được quét lại mỗi khi SpeakoFlow khởi động, nên những mô hình bạn thêm vào sau đó sẽ tự xuất hiện. Bỏ liên kết một thư mục hoặc xóa một mô hình chỉ loại nó khỏi danh sách này — các tệp của bạn vẫn ở nguyên chỗ cũ.",
+        "removeTitle": "Xóa khỏi danh sách?",
+        "removeConfirm": "Xóa “{{modelName}}” khỏi danh sách mô hình của bạn?\n\nBản thân tệp vẫn ở nguyên chỗ cũ:\n{{path}}",
+        "fileMissing": "Không còn thấy tệp của mô hình này:\n{{path}}\n\nCó thể nó đã bị di chuyển, bị đổi tên, hoặc đang ở một ổ đĩa chưa được kết nối."
       }
     },
     "sound": {
@@ -869,21 +895,10 @@
       },
       "aiCleanup": {
         "groupTitle": "Dọn dẹp bằng AI",
-        "styleGroupTitle": "Văn phong",
-        "styleGroupDescription": "Chọn một văn phong có sẵn hoặc lưu quy tắc riêng của bạn về cách phần đọc chính tả sau khi dọn dẹp nên nghe ra sao.",
         "modelGroupTitle": "Mô hình dọn dẹp",
         "promptGroupTitle": "Prompt dọn dẹp",
         "title": "Dùng AI chỉnh lại phần đọc chính tả của tôi",
         "caption": "Thử nghiệm — dọn dấu câu và từ đệm sau khi bạn đọc chính tả.",
-        "strengthLabel": "Mức độ dọn dẹp",
-        "strengthDescription": "AI viết lại câu chữ của bạn nhiều đến đâu. Nhẹ chỉ sửa lỗi và từ đệm. Cân bằng còn cắt những ý lặp lại và những câu bỏ dở. Mạnh siết phần nói lan man thành văn bản ngắn gọn, có cấu trúc rõ — luôn giữ nguyên thông tin và ý của bạn.",
-        "strengthOptions": {
-          "light": "Nhẹ",
-          "balanced": "Cân bằng",
-          "aggressive": "Mạnh"
-        },
-        "fixMisheardLabel": "Sửa từ bị nghe nhầm",
-        "fixMisheardDescription": "Khi một từ rõ ràng không đúng với câu — từ đồng âm hoặc phát âm gần giống — hãy thay bằng từ bạn muốn nói. Hữu ích với các giọng địa phương; AI chỉ sửa khi từ đúng là hiển nhiên.",
         "info": "Chạy một mô hình ngôn ngữ trên phần đọc chính tả của bạn để sửa dấu câu, loại bỏ từ đệm và tùy chọn điều chỉnh văn phong. Chỉ áp dụng cho đọc chính tả, bằng phím tắt riêng. Nó thêm một khoảng chờ ngắn sau khi bạn nói; nếu mô hình thất bại hoặc quá thời gian, văn bản gốc của bạn sẽ được dùng. Vẫn đang phát triển."
       },
       "spokenEmoji": {

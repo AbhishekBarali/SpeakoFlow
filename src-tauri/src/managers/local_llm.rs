@@ -728,7 +728,11 @@ impl LocalLlmManager {
         Ok(())
     }
 
-    /// Resolve the on-disk GGUF path for a downloaded local-LLM model id.
+    /// Resolve the on-disk GGUF path for a local-LLM model id.
+    ///
+    /// Uses the model manager's resolution so a model the user registered from
+    /// their own disk works exactly like a downloaded one — its weights are
+    /// wherever they keep them, not in the app's models directory.
     fn gguf_path_for(&self, model_id: &str) -> Result<PathBuf, String> {
         let model_manager = self.app_handle.state::<Arc<ModelManager>>();
         let info = model_manager
@@ -737,6 +741,17 @@ impl LocalLlmManager {
 
         if info.engine_type != EngineType::LlamaCpp {
             return Err(format!("Model '{}' is not a local LLM", model_id));
+        }
+
+        if let Some(local_path) = &info.local_path {
+            let path = PathBuf::from(local_path);
+            if !path.is_file() {
+                return Err(format!(
+                    "This model's file is no longer at {}. It may have been moved, or be on a drive that isn't connected.",
+                    local_path
+                ));
+            }
+            return Ok(path);
         }
 
         let path = self.models_dir.join(&info.filename);
@@ -851,11 +866,14 @@ impl LocalLlmManager {
     }
 
     /// On-disk path to the model's vision projector, if it's a multimodal
-    /// model and the projector has been downloaded.
+    /// model and the projector is actually present.
+    ///
+    /// Resolution is delegated to the model manager because a projector can live
+    /// in either place: beside the managed weights for a downloaded model, or
+    /// next to the user's own file for a local one.
     fn mmproj_path_for(&self, model_id: &str) -> Option<PathBuf> {
         let model_manager = self.app_handle.state::<Arc<ModelManager>>();
-        let (name, _) = model_manager.resolve_mmproj(model_id)?;
-        let path = self.models_dir.join(name);
+        let path = model_manager.resolve_mmproj_path(model_id)?;
         if path.is_file() {
             Some(path)
         } else {

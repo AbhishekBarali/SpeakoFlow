@@ -509,6 +509,32 @@
         "add": "Pobierz",
         "adding": "Rozpoczynanie…",
         "addError": "Nie udało się dodać tego modelu. Spróbuj ponownie."
+      },
+      "localModel": {
+        "addButton": "Użyj modelu lokalnego",
+        "title": "Użyj modelu, który już masz",
+        "subtitle": "Dodaj plik .gguf lub .bin dla Whisper z dowolnego miejsca na tym urządzeniu albo podłącz folder, w którym trzymasz modele. Nic nie jest kopiowane ani pobierane.",
+        "pickFiles": "Wybierz pliki modeli",
+        "pickFilesHint": "Wskaż jeden lub więcej plików .gguf albo .bin. Dobre rozwiązanie dla jednego modelu, który właśnie zbudowałeś.",
+        "linkFolder": "Podłącz folder",
+        "linkFolderHint": "Skanowany automatycznie, razem z podfolderami. Podłącz tyle folderów, ile chcesz.",
+        "fileFilter": "Pliki modeli",
+        "filesAdded_one": "Dodano {{count}} model.",
+        "filesAdded_other": "Dodano {{count}} modeli.",
+        "folderAdded_one": "Folder podłączony. Znaleziono {{count}} model.",
+        "folderAdded_other": "Folder podłączony. Znaleziono {{count}} modeli.",
+        "folderRemoved": "Folder odłączony. Twoje pliki pozostały nietknięte.",
+        "foldersTitle": "Podłączone foldery",
+        "foldersEmpty": "Nie podłączono jeszcze żadnego folderu. Podłącz jeden, a każdy model w środku pojawi się na Twojej liście.",
+        "removeFolder": "Odłącz {{folder}}",
+        "rescan": "Skanuj ponownie",
+        "rescanning": "Skanowanie…",
+        "rescanDone_one": "Znaleziono {{count}} model lokalny.",
+        "rescanDone_other": "Znaleziono {{count}} modeli lokalnych.",
+        "footnote": "Podłączone foldery są skanowane ponownie przy starcie SpeakoFlow, więc modele dodane do nich później pojawią się same. Odłączenie folderu lub usunięcie modelu usuwa go tylko z tej listy — Twoje pliki zostają tam, gdzie są.",
+        "removeTitle": "Usunąć z listy?",
+        "removeConfirm": "Usunąć „{{modelName}}” z listy modeli?\n\nSam plik zostaje tam, gdzie jest:\n{{path}}",
+        "fileMissing": "Pliku tego modelu już tam nie ma:\n{{path}}\n\nMógł zostać przeniesiony lub zmienić nazwę, albo znajduje się na dysku, który nie jest podłączony."
       }
     },
     "sound": {
@@ -869,21 +895,10 @@
       },
       "aiCleanup": {
         "groupTitle": "Czyszczenie AI",
-        "styleGroupTitle": "Styl pisania",
-        "styleGroupDescription": "Wybierz wbudowany styl albo zapisz własne reguły określające, jak ma brzmieć oczyszczone dyktowanie.",
         "modelGroupTitle": "Model czyszczenia",
         "promptGroupTitle": "Prompt czyszczenia",
         "title": "Popraw moje dyktowanie za pomocą AI",
         "caption": "Eksperymentalne — po dyktowaniu porządkuje interpunkcję i słowa wypełniające.",
-        "strengthLabel": "Siła czyszczenia",
-        "strengthDescription": "Jak mocno AI przepisuje Twoje słowa. Lekkie poprawia tylko błędy i słowa wypełniające. Zrównoważone usuwa dodatkowo powtórzenia i nieudane początki zdań. Agresywne skraca rozwlekłe wypowiedzi do zwięzłego, dobrze ułożonego tekstu — zawsze zachowując Twoje fakty i sens.",
-        "strengthOptions": {
-          "light": "Lekkie",
-          "balanced": "Zrównoważone",
-          "aggressive": "Agresywne"
-        },
-        "fixMisheardLabel": "Poprawiaj źle usłyszane słowa",
-        "fixMisheardDescription": "Gdy słowo wyraźnie nie pasuje do zdania — homofon albo niemal trafiona wymowa — zamień je na słowo, o które Ci chodziło. Pomaga przy akcentach; AI poprawia tylko wtedy, gdy zamierzone słowo jest oczywiste.",
         "info": "Przepuszcza Twoje dyktowanie przez model językowy, aby poprawić interpunkcję, usunąć słowa wypełniające i opcjonalnie dostosować ton. Dotyczy tylko dyktowania i działa pod własnym skrótem. Dodaje krótkie opóźnienie po tym, jak przestaniesz mówić; jeśli model zawiedzie lub przekroczy limit czasu, używany jest surowy tekst. Wciąż w trakcie tworzenia."
       },
       "spokenEmoji": {
