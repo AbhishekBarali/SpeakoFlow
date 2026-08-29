@@ -918,6 +918,8 @@
         },
         "promptGroupTitle": "Cleanup instructions",
         "tunedModelNotice": "This model is fine-tuned for English dictation cleanup, so it works best on the recommended prompt with no style.",
+        "tunedModelNoticeDismiss": "Hide this tip",
+        "tunedModelNoticeRestore": "Show model tip",
         "title": "Fix up my dictation with AI",
         "caption": "Experimental — tidies punctuation and filler after you dictate.",
         "info": "Runs a language model over your dictation to fix punctuation, remove filler words, and optionally adjust the tone. Applies to dictation only, on its own shortcut. It adds a short delay after you speak; if the model fails or times out, your raw text is used instead. Still in development."
@@ -965,6 +967,7 @@
       "originalTranscriptionLabel": "Original transcription",
       "flowOutputLabel": "Flow output",
       "finalTextLabel": "Final text",
+      "cleanupNoChanges": "AI cleanup ran, nothing to fix",
       "flowNoOutput": "No Flow output was generated.",
       "copyToClipboard": "Copy transcription to clipboard",
       "copyFlowOutput": "Copy Flow output",

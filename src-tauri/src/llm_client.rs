@@ -58,6 +58,11 @@ struct ChatCompletionRequest {
     reasoning_effort: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     reasoning: Option<ReasoningConfig>,
+    /// Sampling temperature. Left unset for the assistant, where the provider's
+    /// own default is the right creative behaviour, and pinned to 0 for cleanup,
+    /// which is a deterministic transform.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    temperature: Option<f32>,
     /// llama.cpp-specific template options. Sent only to the built-in engine.
     #[serde(skip_serializing_if = "Option::is_none")]
     chat_template_kwargs: Option<Value>,
@@ -77,6 +82,7 @@ struct ChatRequestOptions {
     json_schema: Option<Value>,
     reasoning_effort: Option<String>,
     reasoning: Option<ReasoningConfig>,
+    temperature: Option<f32>,
     stream: Option<bool>,
     tools: Option<Value>,
     tool_choice: Option<Value>,
@@ -119,6 +125,7 @@ fn build_chat_completion_request(
         response_format,
         reasoning_effort: options.reasoning_effort,
         reasoning: options.reasoning,
+        temperature: options.temperature,
         chat_template_kwargs: builtin_chat_template_kwargs(provider),
         stream: options.stream,
         tools: options.tools,
@@ -456,6 +463,7 @@ impl std::fmt::Display for ChatCompletionError {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) async fn send_chat_completion_with_schema_typed(
     provider: &PostProcessProvider,
     api_key: String,
@@ -465,6 +473,7 @@ pub(crate) async fn send_chat_completion_with_schema_typed(
     json_schema: Option<Value>,
     reasoning_effort: Option<String>,
     reasoning: Option<ReasoningConfig>,
+    temperature: Option<f32>,
     keep_system_role: bool,
 ) -> Result<Option<String>, ChatCompletionError> {
     let base_url = effective_base_url(provider);
@@ -488,6 +497,7 @@ pub(crate) async fn send_chat_completion_with_schema_typed(
             json_schema,
             reasoning_effort,
             reasoning,
+            temperature,
             keep_system_role,
             ..Default::default()
         },
@@ -545,6 +555,8 @@ pub async fn send_chat_completion_with_schema(
         json_schema,
         reasoning_effort,
         reasoning,
+        // Assistant/memory callers keep the provider's default temperature.
+        None,
         // Assistant/memory callers keep the historical folding behavior.
         false,
     )

@@ -42,6 +42,155 @@ impl std::fmt::Display for HttpStatusError {
 
 impl std::error::Error for HttpStatusError {}
 
+/// Byte span one worker claims per range request.
+///
+/// 8 MiB is large enough that per-request overhead (a TLS handshake plus the
+/// Hugging Face → CDN redirect) is amortised, and small enough that a dropped
+/// connection costs little and progress stays responsive.
+const DOWNLOAD_CHUNK_SIZE: u64 = 8 * 1024 * 1024;
+
+/// Concurrent range requests per download.
+///
+/// A single TCP stream to a distant origin is limited by bandwidth-delay
+/// product, not by available bandwidth: one stream measured 10.1 MB/s from
+/// Kathmandu to `us-east-1` while eight measured 19.1 MB/s on the same link at
+/// the same moment. Eight is where the measured gain flattened; more connections
+/// mostly add load without adding throughput.
+const DOWNLOAD_CONCURRENCY: usize = 8;
+
+/// Below this, a download finishes before parallelism can pay back its setup
+/// (a probe request, preallocation, and a completion record).
+const PARALLEL_DOWNLOAD_MIN_BYTES: u64 = 16 * 1024 * 1024;
+
+/// Buffer for the sequential fallback path, so a chunk arriving off the socket
+/// is not one unbuffered `write` syscall.
+const DOWNLOAD_WRITE_BUFFER: usize = 4 * 1024 * 1024;
+
+/// HTTP client for model downloads.
+///
+/// **HTTP/1.1 only, deliberately.** hyper's HTTP/2 flow-control window defaults
+/// to 64 KiB per stream, and a window that small throttles a long transfer to
+/// roughly `window / round-trip time` regardless of link capacity — on a
+/// high-latency path to `us-east-1` that is a fraction of a megabyte per second,
+/// which is what users far from the origin were seeing. HTTP/2 multiplexing buys
+/// nothing for bulk file transfer, and on 1.1 each parallel range request gets
+/// its own connection with no shared window to throttle it.
+fn download_client() -> reqwest::Result<reqwest::Client> {
+    reqwest::Client::builder()
+        .connect_timeout(Duration::from_secs(30))
+        .user_agent(concat!("SpeakoFlow/", env!("CARGO_PKG_VERSION")))
+        .http1_only()
+        .tcp_nodelay(true)
+        .pool_max_idle_per_host(DOWNLOAD_CONCURRENCY)
+        .build()
+}
+
+/// Sidecar recording which chunks of a `.partial` are complete.
+///
+/// Parallel workers write out of order, so file length no longer implies
+/// progress the way it does for a sequential append. Without this record a
+/// resumed download cannot tell a written chunk from a preallocated hole, and
+/// would produce a file that only fails checksum verification at the very end.
+/// One byte per chunk: simple to write incrementally and impossible to
+/// half-parse.
+fn parts_path_for(partial_path: &Path) -> PathBuf {
+    let mut name = partial_path.as_os_str().to_os_string();
+    name.push(".parts");
+    PathBuf::from(name)
+}
+
+/// Write `buf` at an absolute offset without disturbing any other worker's
+/// file position. `File::write_all` seeks, which is why it cannot be shared.
+fn write_all_at(file: &File, buf: &[u8], offset: u64) -> std::io::Result<()> {
+    let mut written = 0usize;
+    while written < buf.len() {
+        let n = {
+            #[cfg(windows)]
+            {
+                use std::os::windows::fs::FileExt;
+                file.seek_write(&buf[written..], offset + written as u64)?
+            }
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::FileExt;
+                file.write_at(&buf[written..], offset + written as u64)?
+            }
+        };
+        if n == 0 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::WriteZero,
+                "positioned write made no progress",
+            ));
+        }
+        written += n;
+    }
+    Ok(())
+}
+
+/// Total transfer size, but only when the host honours byte ranges.
+///
+/// Asks for a single byte and reads the total out of `Content-Range`. A plain
+/// `HEAD` is not enough: it reports `Content-Length` without proving that a
+/// ranged request will be answered with `206`, and a host that silently ignores
+/// `Range` would hand every worker the whole body.
+async fn probe_ranged_total(client: &reqwest::Client, url: &str) -> Option<u64> {
+    let response = client
+        .get(url)
+        .header(reqwest::header::RANGE, "bytes=0-0")
+        .send()
+        .await
+        .ok()?;
+    if response.status() != reqwest::StatusCode::PARTIAL_CONTENT {
+        return None;
+    }
+    let header = response
+        .headers()
+        .get(reqwest::header::CONTENT_RANGE)?
+        .to_str()
+        .ok()?;
+    // "bytes 0-0/833591776"
+    let total = header.rsplit('/').next()?.trim().parse::<u64>().ok()?;
+    (total > 0).then_some(total)
+}
+
+/// How many bytes of `partial_path` are actually downloaded.
+///
+/// File length answers this for a sequential append, but not for the parallel
+/// path: that preallocates the file to its full size up front, so length would
+/// report a download as complete the instant it started. When the chunk record
+/// exists it is the only honest source, so count the chunks marked done.
+fn real_partial_size(partial_path: &Path) -> u64 {
+    let Ok(meta) = partial_path.metadata() else {
+        return 0;
+    };
+    let total = meta.len();
+    let Ok(record) = fs::read(parts_path_for(partial_path)) else {
+        return total;
+    };
+    let chunk_count = record.len() as u64;
+    if chunk_count == 0 || total.div_ceil(DOWNLOAD_CHUNK_SIZE) != chunk_count {
+        // The record does not describe this file, so it cannot be trusted to
+        // describe its progress either.
+        return total;
+    }
+    record
+        .iter()
+        .enumerate()
+        .filter(|(_, done)| **done == 1)
+        .map(|(index, _)| {
+            let start = index as u64 * DOWNLOAD_CHUNK_SIZE;
+            DOWNLOAD_CHUNK_SIZE.min(total - start)
+        })
+        .sum()
+}
+
+/// Delete a `.partial` together with its chunk record, so a later download
+/// cannot find a record describing a file that is no longer there.
+fn remove_partial(partial_path: &Path) {
+    let _ = fs::remove_file(parts_path_for(partial_path));
+    let _ = fs::remove_file(partial_path);
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
 pub enum EngineType {
     Whisper,
@@ -104,16 +253,23 @@ pub const DOWNLOAD_CANCELLED_ERROR: &str = "Download cancelled";
 /// catalogs feature different models even though they share one download list.
 pub const SPEAKOFLOW_MINI_MODEL_ID: &str = "speakoflow-mini";
 
-// Download coordinates for SpeakoFlow Mini, kept together so publishing the
-// fine-tune is a three-line change.
+// Download coordinates for SpeakoFlow Mini, kept together so re-pointing at a
+// new build is a four-line change.
 //
-// TODO(speakoflow-mini): point these at the published repo before release. Until
-// the weights are uploaded the entry is still safe to ship — a download failure
-// surfaces as a normal failed download and cleanup falls back to whichever model
-// the user already has — but it must not reach a release in this state.
-const SPEAKOFLOW_MINI_REPO_ID: &str = "speakoflow/speakoflow-mini-GGUF";
-const SPEAKOFLOW_MINI_FILENAME: &str = "speakoflow-mini-Q8_0.gguf";
-const SPEAKOFLOW_MINI_SIZE_MB: u64 = 850;
+// Q8_0 is the reference build: it is the file every published evaluation number
+// describes, and the repo's own quantisation table puts Q6_K/Q5_K_M/Q4_K_M
+// within one case of it on every axis — a difference this evaluation cannot
+// resolve — while 7.3% of Q4_K_M outputs differ from Q8_0. So the smaller files
+// are not measurably worse, they are just unmeasured, and the default should be
+// the build the numbers belong to.
+const SPEAKOFLOW_MINI_REPO_ID: &str = "SpeakoFlow/speakoflow-mini-0.8b-GGUF";
+const SPEAKOFLOW_MINI_FILENAME: &str = "SpeakoFlow-Mini-0.8B-Q8_0.gguf";
+/// 833,591,776 bytes, reported in MiB like every other catalog entry.
+const SPEAKOFLOW_MINI_SIZE_MB: u64 = 795;
+/// SHA-256 of the Q8_0 reference build, so a truncated or substituted download
+/// is caught instead of silently becoming the cleanup engine.
+const SPEAKOFLOW_MINI_SHA256: &str =
+    "696769bb6911f51bc231b112926e934cf7bfc760e6cdfa24212907bc5ad41fc9";
 
 /// Every model known to be fine-tuned specifically for dictation cleanup.
 ///
@@ -313,25 +469,62 @@ pub struct DownloadProgress {
 /// RAII guard that cleans up download state (`is_downloading` flag and cancel flag)
 /// when dropped, unless explicitly disarmed. This ensures consistent cleanup on
 /// every error path without requiring manual cleanup at each `?` or `return Err`.
+///
+/// Cleanup is **ownership-checked**, not keyed on the model id alone. A cancelled
+/// download can take seconds to notice its flag (the byte stream only yields at
+/// chunk boundaries, and on a slow connection that is a long time), so the user
+/// can press Download again and start a replacement before the old task has
+/// finished unwinding. When the old task then dropped its guard it cleared
+/// `is_downloading` and removed the cancel flag that by then belonged to the
+/// *replacement*: the UI offered a Download button for a model that was actively
+/// downloading, pressing it started a second writer appending to the same
+/// `.partial`, and Cancel had no flag left to set. Comparing the flag by pointer
+/// identity is what makes a superseded guard a no-op.
 struct DownloadCleanup<'a> {
     available_models: &'a Mutex<HashMap<String, ModelInfo>>,
     cancel_flags: &'a Arc<Mutex<HashMap<String, Arc<AtomicBool>>>>,
     model_id: String,
+    /// This download's own cancel flag, used to prove the registry entry is
+    /// still ours before any shared state is cleared.
+    cancel_flag: Arc<AtomicBool>,
     disarmed: bool,
 }
 
-impl<'a> Drop for DownloadCleanup<'a> {
+/// Remove `model_id`'s cancel flag, but only while `cancel_flag` is still the
+/// registered one. Returns whether the caller still owned the slot.
+///
+/// Lock order here is cancel_flags → available_models. Every other site releases
+/// `available_models` before touching `cancel_flags`, so no thread ever holds
+/// them in the opposite order and this cannot deadlock.
+fn release_download_ownership(
+    cancel_flags: &Arc<Mutex<HashMap<String, Arc<AtomicBool>>>>,
+    model_id: &str,
+    cancel_flag: &Arc<AtomicBool>,
+) -> bool {
+    let mut flags = cancel_flags.lock().unwrap();
+    let is_ours = flags
+        .get(model_id)
+        .is_some_and(|registered| Arc::ptr_eq(registered, cancel_flag));
+    if is_ours {
+        flags.remove(model_id);
+    }
+    is_ours
+}
+
+impl Drop for DownloadCleanup<'_> {
     fn drop(&mut self) {
         if self.disarmed {
             return;
         }
-        {
-            let mut models = self.available_models.lock().unwrap();
-            if let Some(model) = models.get_mut(self.model_id.as_str()) {
-                model.is_downloading = false;
-            }
+        // A newer download owns this model id now; clearing its state would
+        // strand it as an invisible, uncancellable background transfer.
+        if !release_download_ownership(self.cancel_flags, &self.model_id, &self.cancel_flag) {
+            return;
         }
-        self.cancel_flags.lock().unwrap().remove(&self.model_id);
+        let mut models = self.available_models.lock().unwrap();
+        if let Some(model) = models.get_mut(self.model_id.as_str()) {
+            model.is_downloading = false;
+        }
     }
 }
 
@@ -1006,7 +1199,7 @@ impl ModelManager {
                     "https://huggingface.co/{}/resolve/main/{}",
                     SPEAKOFLOW_MINI_REPO_ID, SPEAKOFLOW_MINI_FILENAME
                 )),
-                sha256: None,
+                sha256: Some(SPEAKOFLOW_MINI_SHA256.to_string()),
                 size_mb: SPEAKOFLOW_MINI_SIZE_MB,
                 is_downloaded: false,
                 is_downloading: false,
@@ -1760,7 +1953,7 @@ id: "gemma-3-4b".to_string(),
 
                 // Get partial file size if it exists (for the .tar.gz being downloaded)
                 if partial_path.exists() {
-                    model.partial_size = partial_path.metadata().map(|m| m.len()).unwrap_or(0);
+                    model.partial_size = real_partial_size(&partial_path);
                 } else {
                     model.partial_size = 0;
                 }
@@ -1774,7 +1967,7 @@ id: "gemma-3-4b".to_string(),
 
                 // Get partial file size if it exists
                 if partial_path.exists() {
-                    model.partial_size = partial_path.metadata().map(|m| m.len()).unwrap_or(0);
+                    model.partial_size = real_partial_size(&partial_path);
                 } else {
                     model.partial_size = 0;
                 }
@@ -2855,6 +3048,229 @@ id: "gemma-3-4b".to_string(),
     /// `Cancelled` if the user aborted mid-stream, or an `Err` for a transport,
     /// stream, or HTTP error (which the caller may retry). The partial file is
     /// preserved on error so the next attempt resumes instead of restarting.
+    /// Download `url` into `partial_path` using concurrent range requests.
+    ///
+    /// Returns `Ok(None)` when the host cannot support this (no `206`, unknown
+    /// total, or a file too small to be worth it), leaving the caller to use the
+    /// sequential path. Every other failure is an `Err` the retry loop can act
+    /// on, and the `.partial` plus its completion record survive so the next
+    /// attempt resumes only the chunks that are actually missing.
+    async fn attempt_parallel_download(
+        &self,
+        model_id: &str,
+        url: &str,
+        partial_path: &Path,
+        cancel_flag: &Arc<AtomicBool>,
+    ) -> Result<Option<AttemptOutcome>> {
+        let client = download_client()?;
+        let Some(total_size) = probe_ranged_total(&client, url).await else {
+            debug!("{} does not support ranged requests; using one stream", url);
+            return Ok(None);
+        };
+        if total_size < PARALLEL_DOWNLOAD_MIN_BYTES {
+            return Ok(None);
+        }
+
+        let chunk_count = total_size.div_ceil(DOWNLOAD_CHUNK_SIZE) as usize;
+        let parts_path = parts_path_for(partial_path);
+
+        // Resume only when the preallocated file and the completion record both
+        // agree with the size just probed. Any mismatch means the pair cannot be
+        // trusted, and trusting it is how out-of-order writes become a corrupt
+        // file that passes as complete.
+        let mut done = vec![false; chunk_count];
+        let sizes_agree = partial_path
+            .metadata()
+            .map(|meta| meta.len() == total_size)
+            .unwrap_or(false);
+        let record = fs::read(&parts_path)
+            .ok()
+            .filter(|b| b.len() == chunk_count);
+        match record.filter(|_| sizes_agree) {
+            Some(bytes) => {
+                for (slot, byte) in done.iter_mut().zip(bytes) {
+                    *slot = byte == 1;
+                }
+                let resumed = done.iter().filter(|d| **d).count();
+                if resumed > 0 {
+                    info!(
+                        "Resuming {} with {}/{} chunks already on disk",
+                        model_id, resumed, chunk_count
+                    );
+                }
+            }
+            None => {
+                let file = File::create(partial_path)?;
+                file.set_len(total_size)?;
+                fs::write(&parts_path, vec![0u8; chunk_count])?;
+            }
+        }
+
+        let chunk_len = |index: usize| -> u64 {
+            let start = index as u64 * DOWNLOAD_CHUNK_SIZE;
+            DOWNLOAD_CHUNK_SIZE.min(total_size - start)
+        };
+        let already: u64 = done
+            .iter()
+            .enumerate()
+            .filter(|(_, d)| **d)
+            .map(|(i, _)| chunk_len(i))
+            .sum();
+
+        let file = Arc::new(std::fs::OpenOptions::new().write(true).open(partial_path)?);
+        let done = Arc::new(Mutex::new(done));
+        let downloaded = Arc::new(std::sync::atomic::AtomicU64::new(already));
+        let next_index = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let failure: Arc<Mutex<Option<anyhow::Error>>> = Arc::new(Mutex::new(None));
+
+        let mut workers = Vec::with_capacity(DOWNLOAD_CONCURRENCY);
+        for _ in 0..DOWNLOAD_CONCURRENCY.min(chunk_count) {
+            let client = client.clone();
+            let url = url.to_string();
+            let file = file.clone();
+            let done = done.clone();
+            let parts_path = parts_path.clone();
+            let downloaded = downloaded.clone();
+            let next_index = next_index.clone();
+            let failure = failure.clone();
+            let cancel_flag = cancel_flag.clone();
+
+            workers.push(tauri::async_runtime::spawn(async move {
+                loop {
+                    if cancel_flag.load(Ordering::Relaxed) || failure.lock().unwrap().is_some() {
+                        return;
+                    }
+                    let index = next_index.fetch_add(1, Ordering::Relaxed);
+                    if index >= done.lock().unwrap().len() {
+                        return;
+                    }
+                    if done.lock().unwrap()[index] {
+                        continue;
+                    }
+
+                    let start = index as u64 * DOWNLOAD_CHUNK_SIZE;
+                    let end = (start + DOWNLOAD_CHUNK_SIZE).min(total_size) - 1;
+                    let expected = (end - start + 1) as usize;
+
+                    let outcome: Result<()> = async {
+                        let response = client
+                            .get(&url)
+                            .header(reqwest::header::RANGE, format!("bytes={start}-{end}"))
+                            .send()
+                            .await?;
+                        let status = response.status();
+                        if status != reqwest::StatusCode::PARTIAL_CONTENT {
+                            return Err(HttpStatusError { status }.into());
+                        }
+                        let mut buffer = Vec::with_capacity(expected);
+                        let mut stream = response.bytes_stream();
+                        while let Some(part) = stream.next().await {
+                            if cancel_flag.load(Ordering::Relaxed) {
+                                return Ok(());
+                            }
+                            buffer.extend_from_slice(&part?);
+                        }
+                        if buffer.len() != expected {
+                            return Err(anyhow::anyhow!(
+                                "short chunk {}: got {} of {} bytes",
+                                index,
+                                buffer.len(),
+                                expected
+                            ));
+                        }
+                        // Record the chunk only after its bytes are durably
+                        // placed, so a crash between the two can only ever
+                        // under-report progress, never over-report it.
+                        let file = file.clone();
+                        tauri::async_runtime::spawn_blocking(move || {
+                            write_all_at(&file, &buffer, start)
+                        })
+                        .await??;
+                        Ok(())
+                    }
+                    .await;
+
+                    match outcome {
+                        Ok(()) if cancel_flag.load(Ordering::Relaxed) => return,
+                        Ok(()) => {
+                            let snapshot = {
+                                let mut done = done.lock().unwrap();
+                                done[index] = true;
+                                done.iter().map(|d| u8::from(*d)).collect::<Vec<u8>>()
+                            };
+                            let _ = fs::write(&parts_path, &snapshot);
+                            downloaded.fetch_add(expected as u64, Ordering::Relaxed);
+                        }
+                        Err(error) => {
+                            *failure.lock().unwrap() = Some(error);
+                            return;
+                        }
+                    }
+                }
+            }));
+        }
+
+        // Progress is reported from here rather than from the workers: eight
+        // workers finishing chunks would otherwise emit in bursts, and the
+        // frontend only needs a steady tick.
+        let progress = {
+            let app = self.app_handle.clone();
+            let model_id = model_id.to_string();
+            let downloaded = downloaded.clone();
+            let cancel_flag = cancel_flag.clone();
+            tauri::async_runtime::spawn(async move {
+                loop {
+                    tokio::time::sleep(Duration::from_millis(100)).await;
+                    let bytes = downloaded.load(Ordering::Relaxed);
+                    let _ = app.emit(
+                        "model-download-progress",
+                        &DownloadProgress {
+                            model_id: model_id.clone(),
+                            downloaded: bytes,
+                            total: total_size,
+                            percentage: (bytes as f64 / total_size as f64) * 100.0,
+                        },
+                    );
+                    if bytes >= total_size || cancel_flag.load(Ordering::Relaxed) {
+                        return;
+                    }
+                }
+            })
+        };
+
+        for worker in workers {
+            let _ = worker.await;
+        }
+        progress.abort();
+
+        if let Some(error) = failure.lock().unwrap().take() {
+            return Err(error);
+        }
+        if cancel_flag.load(Ordering::Relaxed) {
+            info!("Download cancelled for: {}", model_id);
+            return Ok(Some(AttemptOutcome::Cancelled));
+        }
+        if !done.lock().unwrap().iter().all(|d| *d) {
+            return Err(anyhow::anyhow!(
+                "parallel download for {} finished with chunks missing",
+                model_id
+            ));
+        }
+
+        file.sync_all()?;
+        let _ = fs::remove_file(&parts_path);
+        let _ = self.app_handle.emit(
+            "model-download-progress",
+            &DownloadProgress {
+                model_id: model_id.to_string(),
+                downloaded: total_size,
+                total: total_size,
+                percentage: 100.0,
+            },
+        );
+        Ok(Some(AttemptOutcome::Completed))
+    }
+
     async fn attempt_download(
         &self,
         model_id: &str,
@@ -2863,6 +3279,16 @@ id: "gemma-3-4b".to_string(),
         cancel_flag: &Arc<AtomicBool>,
     ) -> Result<AttemptOutcome> {
         // Resume from the current partial size, if present.
+        //
+        // A `.parts` record means this `.partial` was preallocated to full size
+        // by the parallel path, so its length says nothing about how much is
+        // real. Appending to it would splice fresh bytes onto a file full of
+        // holes, producing something that looks complete and cannot be. Start
+        // clean instead.
+        let parts_path = parts_path_for(partial_path);
+        if parts_path.exists() {
+            remove_partial(partial_path);
+        }
         let mut resume_from = if partial_path.exists() {
             partial_path.metadata()?.len()
         } else {
@@ -2872,10 +3298,7 @@ id: "gemma-3-4b".to_string(),
         // A tuned client: a connect timeout stops a dead endpoint from hanging
         // forever, and a User-Agent keeps hosts like Hugging Face from rejecting
         // the request. Redirects (HF → CDN) are followed by default.
-        let client = reqwest::Client::builder()
-            .connect_timeout(Duration::from_secs(30))
-            .user_agent(concat!("SpeakoFlow/", env!("CARGO_PKG_VERSION")))
-            .build()?;
+        let client = download_client()?;
 
         let mut request = client.get(url);
         if resume_from > 0 {
@@ -2909,14 +3332,20 @@ id: "gemma-3-4b".to_string(),
 
         let mut downloaded = resume_from;
         let mut stream = response.bytes_stream();
-        let mut file = if resume_from > 0 {
-            std::fs::OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open(partial_path)?
-        } else {
-            std::fs::File::create(partial_path)?
-        };
+        // Buffered: reqwest hands back chunks in the tens of kilobytes, and
+        // writing each one straight through was a syscall per chunk for the
+        // whole file.
+        let mut file = std::io::BufWriter::with_capacity(
+            DOWNLOAD_WRITE_BUFFER,
+            if resume_from > 0 {
+                std::fs::OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open(partial_path)?
+            } else {
+                std::fs::File::create(partial_path)?
+            },
+        );
 
         let emit_progress = |downloaded: u64| {
             let _ = self.app_handle.emit(
@@ -2942,6 +3371,10 @@ id: "gemma-3-4b".to_string(),
 
         while let Some(chunk) = stream.next().await {
             if cancel_flag.load(Ordering::Relaxed) {
+                // Flush before giving up so the bytes already accepted are on
+                // disk and a later resume picks up from the real offset rather
+                // than re-fetching a buffer's worth.
+                let _ = file.flush();
                 drop(file);
                 info!("Download cancelled for: {}", model_id);
                 return Ok(AttemptOutcome::Cancelled);
@@ -3008,7 +3441,7 @@ id: "gemma-3-4b".to_string(),
         // keeps progress, cancellation, and completion events consistent.
         if model_path.exists() {
             if partial_path.exists() {
-                let _ = fs::remove_file(&partial_path);
+                remove_partial(&partial_path);
             }
 
             let cancel_flag = Arc::new(AtomicBool::new(false));
@@ -3026,6 +3459,7 @@ id: "gemma-3-4b".to_string(),
                 available_models: &self.available_models,
                 cancel_flags: &self.cancel_flags,
                 model_id: model_id.to_string(),
+                cancel_flag: cancel_flag.clone(),
                 disarmed: false,
             };
 
@@ -3042,12 +3476,44 @@ id: "gemma-3-4b".to_string(),
                 if cancel_flag.load(Ordering::Relaxed) {
                     return Err(anyhow::anyhow!(DOWNLOAD_CANCELLED_ERROR));
                 }
-                flags.remove(model_id);
+                if flags
+                    .get(model_id)
+                    .is_some_and(|registered| Arc::ptr_eq(registered, &cancel_flag))
+                {
+                    flags.remove(model_id);
+                }
             }
             cleanup.disarmed = true;
             self.update_download_status()?;
             let _ = self.app_handle.emit("model-download-complete", model_id);
             return Ok(());
+        }
+
+        // Claim this model id for exactly one in-flight download, atomically.
+        //
+        // Without this, a second transfer could start for a model that already
+        // has one running, and both would append to the same `.partial` —
+        // interleaving their writes into a file that can only fail checksum
+        // verification after the user has waited out the whole download.
+        // `cancel_flags` is the authoritative "a task is live" registry, so the
+        // claim is a vacant-entry insert under a single lock: checking and
+        // inserting separately would leave a window for two callers to both pass
+        // the check.
+        let cancel_flag = Arc::new(AtomicBool::new(false));
+        {
+            let mut flags = self.cancel_flags.lock().unwrap();
+            match flags.entry(model_id.to_string()) {
+                std::collections::hash_map::Entry::Occupied(_) => {
+                    debug!(
+                        "Ignoring duplicate download request for {}: one is already in flight",
+                        model_id
+                    );
+                    return Ok(());
+                }
+                std::collections::hash_map::Entry::Vacant(slot) => {
+                    slot.insert(cancel_flag.clone());
+                }
+            }
         }
 
         // Mark as downloading
@@ -3058,19 +3524,13 @@ id: "gemma-3-4b".to_string(),
             }
         }
 
-        // Create cancellation flag for this download
-        let cancel_flag = Arc::new(AtomicBool::new(false));
-        {
-            let mut flags = self.cancel_flags.lock().unwrap();
-            flags.insert(model_id.to_string(), cancel_flag.clone());
-        }
-
         // Guard ensures is_downloading and cancel_flags are cleaned up on every
         // error path. Disarmed only on success (which sets is_downloaded = true).
         let mut cleanup = DownloadCleanup {
             available_models: &self.available_models,
             cancel_flags: &self.cancel_flags,
             model_id: model_id.to_string(),
+            cancel_flag: cancel_flag.clone(),
             disarmed: false,
         };
 
@@ -3098,10 +3558,21 @@ id: "gemma-3-4b".to_string(),
                     return Err(anyhow::anyhow!(DOWNLOAD_CANCELLED_ERROR));
                 }
 
-                match self
-                    .attempt_download(model_id, url, &partial_path, &cancel_flag)
+                // Prefer concurrent range requests; fall back to one stream when
+                // the host will not serve ranges or the file is small.
+                let attempt_result = match self
+                    .attempt_parallel_download(model_id, url, &partial_path, &cancel_flag)
                     .await
                 {
+                    Ok(Some(outcome)) => Ok(outcome),
+                    Ok(None) => {
+                        self.attempt_download(model_id, url, &partial_path, &cancel_flag)
+                            .await
+                    }
+                    Err(error) => Err(error),
+                };
+
+                match attempt_result {
                     Ok(AttemptOutcome::Completed) => {
                         downloaded_ok = true;
                         break 'sources;
@@ -3214,7 +3685,7 @@ id: "gemma-3-4b".to_string(),
                 let _ = fs::remove_dir_all(&temp_extract_dir);
                 // Delete the corrupt partial file so the next download attempt starts fresh
                 // instead of resuming from a broken archive (issue #858).
-                let _ = fs::remove_file(&partial_path);
+                remove_partial(&partial_path);
                 // Remove from extracting set
                 {
                     let mut extracting = self.extracting_models.lock().unwrap();
@@ -3263,7 +3734,7 @@ id: "gemma-3-4b".to_string(),
             let _ = self.app_handle.emit("model-extraction-completed", model_id);
 
             // Remove the downloaded tar.gz file
-            let _ = fs::remove_file(&partial_path);
+            remove_partial(&partial_path);
         } else {
             // Move partial file to final location for file-based models
             fs::rename(&partial_path, &model_path)?;
@@ -3288,12 +3759,20 @@ id: "gemma-3-4b".to_string(),
         // its flag is observed and success is withheld. If completion wins,
         // the flag is removed first so a late Cancel reports that the download
         // has already finished instead of pretending it was cancelled.
+        //
+        // The removal is ownership-checked for the same reason the guard is: this
+        // download must never evict a replacement's flag.
         {
             let mut flags = self.cancel_flags.lock().unwrap();
             if cancel_flag.load(Ordering::Relaxed) {
                 return Err(anyhow::anyhow!(DOWNLOAD_CANCELLED_ERROR));
             }
-            flags.remove(model_id);
+            if flags
+                .get(model_id)
+                .is_some_and(|registered| Arc::ptr_eq(registered, &cancel_flag))
+            {
+                flags.remove(model_id);
+            }
         }
 
         // Disarm the guard - success path does its own state cleanup and marks
@@ -3407,6 +3886,7 @@ id: "gemma-3-4b".to_string(),
         // Delete partial file if it exists (same for both types)
         if partial_path.exists() {
             info!("Deleting partial file at: {:?}", partial_path);
+            let _ = fs::remove_file(parts_path_for(&partial_path));
             fs::remove_file(&partial_path)?;
             info!("Partial file deleted successfully");
             deleted_something = true;
@@ -3564,6 +4044,258 @@ mod tests {
     use super::*;
     use std::io::Write;
     use tempfile::TempDir;
+
+    /// The primitive the whole parallel path rests on: eight workers writing at
+    /// their own offsets into one preallocated file, in whatever order they
+    /// finish, must assemble exactly the original bytes. `File::write_all` seeks,
+    /// so it cannot be shared this way; this is what replaces it.
+    #[test]
+    fn positioned_writes_assemble_a_file_out_of_order() {
+        let dir = TempDir::new().expect("temp dir");
+        let path = dir.path().join("assembled.bin");
+
+        const CHUNK: usize = 1024;
+        const CHUNKS: usize = 8;
+        let expected: Vec<u8> = (0..CHUNK * CHUNKS).map(|i| (i % 251) as u8).collect();
+
+        let file = File::create(&path).expect("create");
+        file.set_len((CHUNK * CHUNKS) as u64).expect("preallocate");
+
+        // Deliberately not sequential, and the last chunk first.
+        for index in [7usize, 0, 4, 2, 6, 1, 5, 3] {
+            let start = index * CHUNK;
+            write_all_at(&file, &expected[start..start + CHUNK], start as u64)
+                .expect("positioned write");
+        }
+        file.sync_all().expect("sync");
+        drop(file);
+
+        assert_eq!(fs::read(&path).expect("read back"), expected);
+    }
+
+    /// Progress must come from the chunk record, not from file length.
+    ///
+    /// The parallel path preallocates the `.partial` to its full size on the
+    /// first byte, so reporting length would show every download as finished the
+    /// moment it began.
+    #[test]
+    fn progress_for_a_preallocated_partial_counts_chunks_not_length() {
+        let dir = TempDir::new().expect("temp dir");
+        let partial = dir.path().join("model.gguf.partial");
+
+        let total = DOWNLOAD_CHUNK_SIZE * 4 + 500;
+        let chunk_count = total.div_ceil(DOWNLOAD_CHUNK_SIZE) as usize;
+        assert_eq!(chunk_count, 5);
+        File::create(&partial)
+            .and_then(|f| f.set_len(total))
+            .expect("preallocate");
+
+        // Nothing recorded yet: fully preallocated, genuinely zero downloaded.
+        fs::write(parts_path_for(&partial), vec![0u8; chunk_count]).expect("record");
+        assert_eq!(real_partial_size(&partial), 0);
+
+        // Two whole chunks plus the short trailing chunk.
+        let mut record = vec![0u8; chunk_count];
+        record[0] = 1;
+        record[2] = 1;
+        record[4] = 1;
+        fs::write(parts_path_for(&partial), &record).expect("record");
+        assert_eq!(real_partial_size(&partial), DOWNLOAD_CHUNK_SIZE * 2 + 500);
+
+        // Without a record, length is the honest answer (sequential append).
+        fs::remove_file(parts_path_for(&partial)).expect("drop record");
+        assert_eq!(real_partial_size(&partial), total);
+    }
+
+    /// A record that does not describe this file must never be believed.
+    #[test]
+    fn a_mismatched_resume_record_is_ignored() {
+        let dir = TempDir::new().expect("temp dir");
+        let partial = dir.path().join("model.gguf.partial");
+        let total = DOWNLOAD_CHUNK_SIZE * 2;
+        File::create(&partial)
+            .and_then(|f| f.set_len(total))
+            .expect("preallocate");
+
+        // Claims nine chunks for a two-chunk file: a leftover from a different
+        // download. Falling back to length is the safe reading.
+        fs::write(parts_path_for(&partial), vec![1u8; 9]).expect("record");
+        assert_eq!(real_partial_size(&partial), total);
+    }
+
+    #[test]
+    fn removing_a_partial_also_removes_its_record() {
+        let dir = TempDir::new().expect("temp dir");
+        let partial = dir.path().join("model.gguf.partial");
+        fs::write(&partial, b"partial bytes").expect("write partial");
+        fs::write(parts_path_for(&partial), vec![0u8; 3]).expect("write record");
+
+        remove_partial(&partial);
+
+        assert!(!partial.exists(), "partial removed");
+        assert!(
+            !parts_path_for(&partial).exists(),
+            "a record must never outlive the file it describes"
+        );
+    }
+
+    #[test]
+    fn the_resume_record_sits_beside_the_partial() {
+        let parts = parts_path_for(Path::new("/models/model.gguf.partial"));
+        assert_eq!(
+            parts,
+            PathBuf::from("/models/model.gguf.partial.parts"),
+            "the record must not collide with the partial or the final file"
+        );
+    }
+
+    /// A trailing chunk is short whenever the total is not a whole multiple of
+    /// the chunk size, which is the normal case. Getting this wrong writes past
+    /// the end of the file or leaves a hole at the tail.
+    #[test]
+    fn the_last_chunk_covers_only_the_remaining_bytes() {
+        let total: u64 = DOWNLOAD_CHUNK_SIZE * 3 + 12345;
+        let chunk_count = total.div_ceil(DOWNLOAD_CHUNK_SIZE) as usize;
+        assert_eq!(chunk_count, 4);
+
+        let spans: Vec<(u64, u64)> = (0..chunk_count)
+            .map(|index| {
+                let start = index as u64 * DOWNLOAD_CHUNK_SIZE;
+                let end = (start + DOWNLOAD_CHUNK_SIZE).min(total) - 1;
+                (start, end)
+            })
+            .collect();
+
+        assert_eq!(spans[0], (0, DOWNLOAD_CHUNK_SIZE - 1));
+        assert_eq!(spans[3], (DOWNLOAD_CHUNK_SIZE * 3, total - 1));
+        // Contiguous, no gaps, no overlap, and ending exactly on the last byte.
+        for pair in spans.windows(2) {
+            assert_eq!(pair[1].0, pair[0].1 + 1);
+        }
+        let covered: u64 = spans.iter().map(|(s, e)| e - s + 1).sum();
+        assert_eq!(covered, total);
+    }
+
+    /// A `ModelInfo` for the download-state tests. Built through an existing
+    /// constructor so it stays valid as fields are added; only `is_downloading`
+    /// matters to the guard under test.
+    fn downloading_model_info(model_id: &str) -> ModelInfo {
+        let mut info = ModelManager::local_record_to_model_info(&LocalModelRecord {
+            id: model_id.to_string(),
+            name: "SpeakoFlow Mini".to_string(),
+            path: "C:/models/SpeakoFlow-Mini-0.8B-Q8_0.gguf".to_string(),
+            engine_type: EngineType::LlamaCpp,
+            size_mb: 795,
+            mmproj_path: None,
+            architecture: Some("qwen35".to_string()),
+            folder: None,
+        });
+        info.is_downloading = true;
+        info
+    }
+
+    /// Reproduces the observed failure: Cancel, then Download again before the
+    /// cancelled transfer has noticed its flag.
+    ///
+    /// Timeline from a real log (a 795 MB download at ~0.5 MB/s):
+    ///   15:03:21  cancel_download  -> flag A set to true
+    ///   15:03:23  download again    -> flag B registered, replacing A
+    ///   15:03:24  A finally observes its flag and unwinds
+    ///
+    /// A's guard used to clear `is_downloading` and remove the registered flag
+    /// keyed only on the model id, so it wiped B's state: the UI offered a
+    /// Download button while B was still transferring, and Cancel had no flag to
+    /// set. The superseded guard must be a no-op instead.
+    #[test]
+    fn a_superseded_download_guard_does_not_clear_its_replacement() {
+        let available_models: Mutex<HashMap<String, ModelInfo>> = Mutex::new(HashMap::new());
+        let cancel_flags: Arc<Mutex<HashMap<String, Arc<AtomicBool>>>> =
+            Arc::new(Mutex::new(HashMap::new()));
+        let model_id = "speakoflow-mini";
+
+        available_models
+            .lock()
+            .unwrap()
+            .insert(model_id.to_string(), downloading_model_info(model_id));
+
+        // Download A starts and is then cancelled.
+        let flag_a = Arc::new(AtomicBool::new(false));
+        cancel_flags
+            .lock()
+            .unwrap()
+            .insert(model_id.to_string(), flag_a.clone());
+        flag_a.store(true, Ordering::Relaxed);
+
+        // Download B starts before A has unwound, taking over the registry slot.
+        let flag_b = Arc::new(AtomicBool::new(false));
+        cancel_flags
+            .lock()
+            .unwrap()
+            .insert(model_id.to_string(), flag_b.clone());
+
+        // A unwinds now. Its guard must leave B's state completely alone.
+        drop(DownloadCleanup {
+            available_models: &available_models,
+            cancel_flags: &cancel_flags,
+            model_id: model_id.to_string(),
+            cancel_flag: flag_a,
+            disarmed: false,
+        });
+
+        assert!(
+            available_models
+                .lock()
+                .unwrap()
+                .get(model_id)
+                .map(|m| m.is_downloading)
+                .unwrap(),
+            "B is still downloading, so the UI must not be told otherwise"
+        );
+        let flags = cancel_flags.lock().unwrap();
+        let registered = flags
+            .get(model_id)
+            .expect("B's cancel flag must survive so Cancel still works");
+        assert!(
+            Arc::ptr_eq(registered, &flag_b),
+            "the registered flag must still be B's own"
+        );
+    }
+
+    /// The mirror case: with no replacement, the guard must still clean up.
+    #[test]
+    fn an_uncontested_download_guard_still_cleans_up() {
+        let available_models: Mutex<HashMap<String, ModelInfo>> = Mutex::new(HashMap::new());
+        let cancel_flags: Arc<Mutex<HashMap<String, Arc<AtomicBool>>>> =
+            Arc::new(Mutex::new(HashMap::new()));
+        let model_id = "speakoflow-mini";
+
+        available_models
+            .lock()
+            .unwrap()
+            .insert(model_id.to_string(), downloading_model_info(model_id));
+
+        let flag = Arc::new(AtomicBool::new(false));
+        cancel_flags
+            .lock()
+            .unwrap()
+            .insert(model_id.to_string(), flag.clone());
+
+        drop(DownloadCleanup {
+            available_models: &available_models,
+            cancel_flags: &cancel_flags,
+            model_id: model_id.to_string(),
+            cancel_flag: flag,
+            disarmed: false,
+        });
+
+        assert!(!available_models
+            .lock()
+            .unwrap()
+            .get(model_id)
+            .map(|m| m.is_downloading)
+            .unwrap());
+        assert!(cancel_flags.lock().unwrap().is_empty());
+    }
 
     #[test]
     fn gemma_4_projectors_use_official_google_artifacts() {

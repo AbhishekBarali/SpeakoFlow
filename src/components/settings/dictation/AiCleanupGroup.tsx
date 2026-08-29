@@ -5,6 +5,7 @@ import { SettingsGroup } from "@/components/ui/SettingsGroup";
 import { ToggleSwitch } from "@/components/ui/ToggleSwitch";
 import { Alert } from "@/components/ui/Alert";
 import { useSettings } from "@/hooks/useSettings";
+import { useDismissibleNotice } from "@/hooks/useDismissibleNotice";
 import { useModelStore } from "@/stores/modelStore";
 import { isCleanupSpecialistModel } from "@/lib/utils/cleanupSpecialist";
 import {
@@ -69,6 +70,7 @@ export const AiCleanupGroup: React.FC<AiCleanupGroupProps> = ({
     models.some(
       (model) => model.id === resolvedModel && model.is_cleanup_specialist,
     );
+  const tunedNotice = useDismissibleNotice("cleanup-tuned-model");
 
   return (
     <>
@@ -111,11 +113,32 @@ export const AiCleanupGroup: React.FC<AiCleanupGroupProps> = ({
             title={t("settings.dictation.aiCleanup.promptGroupTitle")}
             icon={Layers}
           >
-            {specialistActive && (
-              <Alert variant="info" contained>
-                {t("settings.dictation.aiCleanup.tunedModelNotice")}
-              </Alert>
-            )}
+            {specialistActive &&
+              (tunedNotice.visible ? (
+                <Alert
+                  variant="info"
+                  contained
+                  onDismiss={tunedNotice.dismiss}
+                  dismissLabel={t(
+                    "settings.dictation.aiCleanup.tunedModelNoticeDismiss",
+                  )}
+                >
+                  {t("settings.dictation.aiCleanup.tunedModelNotice")}
+                </Alert>
+              ) : (
+                // Hidden rather than gone. The guidance still matters when the
+                // user later changes the prompt or adds a style, so closing it
+                // must not be a one-way door.
+                <div className="flex justify-end px-4 pt-3">
+                  <button
+                    type="button"
+                    onClick={tunedNotice.restore}
+                    className="text-xs text-mid-gray/80 underline decoration-dotted underline-offset-2 transition-colors hover:text-logo-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-logo-primary/50 rounded"
+                  >
+                    {t("settings.dictation.aiCleanup.tunedModelNoticeRestore")}
+                  </button>
+                </div>
+              ))}
             <PostProcessingSettingsPrompts />
             <PostProcessingTone />
           </SettingsGroup>

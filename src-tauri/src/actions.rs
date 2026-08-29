@@ -318,6 +318,18 @@ struct PostProcessRequest {
 
 const MIN_PLAIN_FALLBACK_BUDGET: Duration = Duration::from_millis(750);
 
+/// Cleanup is a deterministic transform, so it is sampled greedily.
+///
+/// This is not a tuning preference. Without it the request inherits the server's
+/// default (llama.cpp samples at 0.8), which is the wrong policy for a task
+/// whose success case is often returning the input unchanged: every token of an
+/// already-correct transcript becomes a coin flip against a plausible synonym.
+/// SpeakoFlow Mini's published restraint and edit-accuracy rates were both
+/// measured at temperature 0, so anything else is a configuration those numbers
+/// do not describe. Sent to every provider, not just the built-in engine —
+/// remote providers default to non-zero too.
+const CLEANUP_TEMPERATURE: f32 = 0.0;
+
 fn build_post_process_request(
     config: &ResolvedPostProcessConfig,
     transcription: &str,
@@ -684,6 +696,7 @@ async fn send_one_post_process_request(
         schema,
         effort,
         reasoning,
+        Some(CLEANUP_TEMPERATURE),
         keep_system_role,
     )
     .await
@@ -2456,6 +2469,10 @@ mod tests {
         assert!(is_cleanup_specialist("speakoflow-mini"));
         assert!(is_cleanup_specialist("SpeakoFlow Mini"));
         assert!(is_cleanup_specialist("speakoflow-mini-Q8_0.gguf"));
+        // The filename actually published on the Hub, which carries the
+        // parameter count between the name and the quantisation.
+        assert!(is_cleanup_specialist("SpeakoFlow-Mini-0.8B-Q8_0.gguf"));
+        assert!(is_cleanup_specialist("SpeakoFlow-Mini-0.8B-Q4_K_M.gguf"));
         assert!(is_cleanup_specialist("speakoflow_mini:latest"));
 
         assert!(!is_cleanup_specialist("gemma-4-e4b"));
