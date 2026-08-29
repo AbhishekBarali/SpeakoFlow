@@ -2089,6 +2089,15 @@ pub fn preferred_gpu_device() -> Option<GpuDeviceOption> {
     select_preferred_gpu_device(cached_gpu_devices()).cloned()
 }
 
+/// Every compute device this machine reports, in enumeration order.
+///
+/// [`preferred_gpu_device`] answers "which one is best"; this answers "what else
+/// is there", which is what a consumer needs in order to *exclude* a device
+/// rather than merely rank it (see `local_llm::pinned_device_arg`).
+pub fn gpu_devices() -> Vec<GpuDeviceOption> {
+    cached_gpu_devices().to_vec()
+}
+
 #[derive(Serialize, Clone, Debug, Type)]
 pub struct AvailableAccelerators {
     pub whisper: Vec<String>,

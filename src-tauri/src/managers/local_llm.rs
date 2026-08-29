@@ -18,6 +18,7 @@
 //! feature works with zero manual setup.
 
 use crate::managers::model::{EngineType, ModelManager};
+use crate::managers::transcription::GpuDeviceOption;
 use anyhow::Result;
 use log::{debug, error, info, warn};
 use serde::Serialize;
@@ -83,6 +84,207 @@ pub const MAX_CONTEXT_SIZE: u32 = 32_768;
 /// Max time to wait for the engine to load a model and start serving. Large
 /// models, slow disks, and first-run GPU shader compilation can take a while.
 const READY_TIMEOUT: Duration = Duration::from_secs(180);
+
+/// Max time to wait for the engine's `--list-devices` probe (measured at ~210ms
+/// on a warm two-GPU Windows box).
+///
+/// Bounded on purpose: this runs on the path that *starts* the engine, so a
+/// wedged Vulkan driver has to cost us the device hint rather than the whole
+/// feature. [`READY_TIMEOUT`] cannot cover it — that clock only starts once the
+/// server process is already spawned.
+const LIST_DEVICES_TIMEOUT: Duration = Duration::from_secs(10);
+
+/// One compute device as the **engine itself** names it, parsed out of
+/// `llama-server --list-devices`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct EngineDevice {
+    /// ggml's device identifier — the token `--device` accepts (e.g. `Vulkan0`).
+    name: String,
+    /// Human-readable adapter description (e.g. `NVIDIA GeForce RTX 4070 Ti SUPER`).
+    description: String,
+}
+
+/// `--list-devices` output, probed at most once per app run.
+static ENGINE_DEVICES: std::sync::OnceLock<Vec<EngineDevice>> = std::sync::OnceLock::new();
+
+/// Tokens that vendors sprinkle into adapter strings inconsistently across
+/// backends and drivers ("AMD Radeon(TM) Graphics" vs "AMD Radeon Graphics"), so
+/// they must not decide whether two names refer to the same card.
+const ADAPTER_NOISE_TOKENS: [&str; 3] = ["tm", "r", "c"];
+
+/// Reduce an adapter string to comparable words: lowercase, alphanumeric only,
+/// vendor decorations dropped.
+fn normalized_adapter_name(raw: &str) -> String {
+    raw.split(|c: char| !c.is_alphanumeric())
+        .filter(|token| !token.is_empty())
+        .map(|token| token.to_ascii_lowercase())
+        .filter(|token| !ADAPTER_NOISE_TOKENS.contains(&token.as_str()))
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// Parse `llama-server --list-devices`, whose stdout looks like:
+///
+/// ```text
+/// Available devices:
+///   Vulkan0: NVIDIA GeForce RTX 4070 Ti SUPER (16063 MiB, 15295 MiB free)
+///   Vulkan1: AMD Radeon(TM) Graphics (16180 MiB, 15371 MiB free)
+/// ```
+///
+/// Parsing is scoped to the contiguous block after the header, and a row must
+/// carry the trailing memory summary. Both guards exist because `<word>: <text>`
+/// also describes an ordinary engine log line (`load_backend: loaded Vulkan
+/// backend from ...`), and mistaking one for a device would hand `--device` a
+/// name the engine then refuses to start with.
+fn parse_engine_devices(stdout: &str) -> Vec<EngineDevice> {
+    let mut devices = Vec::new();
+    let mut in_listing = false;
+
+    for line in stdout.lines() {
+        let line = line.trim();
+        if !in_listing {
+            in_listing = line.eq_ignore_ascii_case("available devices:");
+            continue;
+        }
+        if line.is_empty() {
+            break;
+        }
+        let Some((name, rest)) = line.split_once(':') else {
+            break;
+        };
+        let name = name.trim();
+        let rest = rest.trim();
+        // Drop the trailing "(16063 MiB, 15295 MiB free)" memory summary, and
+        // treat its absence as "this is not a device row".
+        let Some(memory_start) = rest.rfind('(') else {
+            break;
+        };
+        let description = rest[..memory_start].trim();
+        // A device id never contains whitespace.
+        if name.is_empty() || name.contains(char::is_whitespace) || description.is_empty() {
+            break;
+        }
+        devices.push(EngineDevice {
+            name: name.to_string(),
+            description: description.to_string(),
+        });
+    }
+
+    devices
+}
+
+/// Whether this machine's device mix is one where an explicit `--device` is
+/// needed — i.e. it has a dedicated GPU *and* an integrated one that inference
+/// could land on by accident.
+///
+/// Everywhere else (one GPU, several dedicated GPUs, no GPU at all) the engine's
+/// own choice is already right, and staying out of the way keeps multi-GPU layer
+/// splitting working exactly as before.
+fn needs_device_pinning(probed: &[GpuDeviceOption]) -> bool {
+    let integrated = |device: &GpuDeviceOption| device.kind.eq_ignore_ascii_case("integrated");
+    probed.iter().any(integrated) && probed.iter().any(|device| !integrated(device))
+}
+
+/// Build the `--device` value that pins inference to the dedicated GPU(s),
+/// biggest first, by matching our probe against the engine's own device list.
+///
+/// The two enumerations are separate and their order need not agree, so the
+/// match is on the adapter *description* rather than on an index.
+fn select_engine_device_arg(
+    engine_devices: &[EngineDevice],
+    probed: &[GpuDeviceOption],
+) -> Option<String> {
+    if !needs_device_pinning(probed) {
+        return None;
+    }
+
+    let mut dedicated: Vec<&GpuDeviceOption> = probed
+        .iter()
+        .filter(|device| !device.kind.eq_ignore_ascii_case("integrated"))
+        .collect();
+    // Biggest dedicated card first, so it becomes the engine's device 0.
+    dedicated.sort_by_key(|device| std::cmp::Reverse(device.total_vram_mb));
+
+    let mut names: Vec<String> = Vec::new();
+    for device in dedicated {
+        let wanted = normalized_adapter_name(&device.name);
+        if wanted.is_empty() {
+            continue;
+        }
+        // Exact first; containment only as a fallback, so a short name can't
+        // steal a match from the card that actually spells it out.
+        let matched = engine_devices
+            .iter()
+            .find(|candidate| normalized_adapter_name(&candidate.description) == wanted)
+            .or_else(|| {
+                engine_devices.iter().find(|candidate| {
+                    let have = normalized_adapter_name(&candidate.description);
+                    !have.is_empty() && (have.contains(&wanted) || wanted.contains(&have))
+                })
+            });
+        if let Some(matched) = matched {
+            if !names.contains(&matched.name) {
+                names.push(matched.name.clone());
+            }
+        }
+    }
+
+    if names.is_empty() {
+        None
+    } else {
+        Some(names.join(","))
+    }
+}
+
+/// Ask the engine binary which devices it can see, once per app run.
+fn engine_devices(engine: &Path) -> &'static [EngineDevice] {
+    ENGINE_DEVICES.get_or_init(|| {
+        let mut child = match Command::new(engine)
+            .arg("--list-devices")
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .spawn()
+        {
+            Ok(child) => child,
+            Err(error) => {
+                warn!("llama.cpp --list-devices failed to start ({error}) — continuing without a GPU device hint");
+                return Vec::new();
+            }
+        };
+
+        let deadline = Instant::now() + LIST_DEVICES_TIMEOUT;
+        loop {
+            match child.try_wait() {
+                Ok(Some(_)) => break,
+                Ok(None) => {
+                    if Instant::now() >= deadline {
+                        warn!("llama.cpp --list-devices timed out — continuing without a GPU device hint");
+                        let _ = child.kill();
+                        let _ = child.wait();
+                        return Vec::new();
+                    }
+                    std::thread::sleep(Duration::from_millis(25));
+                }
+                Err(error) => {
+                    warn!("llama.cpp --list-devices could not be awaited ({error}) — continuing without a GPU device hint");
+                    return Vec::new();
+                }
+            }
+        }
+
+        // The listing is a couple of hundred bytes, so it cannot fill the pipe
+        // buffer while we wait for exit — reading after the wait is safe here.
+        let mut stdout = String::new();
+        if let Some(mut pipe) = child.stdout.take() {
+            use std::io::Read;
+            let _ = pipe.read_to_string(&mut stdout);
+        }
+        let devices = parse_engine_devices(&stdout);
+        debug!("llama.cpp reports {} device(s): {:?}", devices.len(), devices);
+        devices
+    })
+}
 
 #[derive(Debug, Clone, Serialize, Type)]
 pub struct LocalLlmStatus {
@@ -899,6 +1101,19 @@ impl LocalLlmManager {
         ALL_GPU_LAYERS
     }
 
+    /// The `--device` value for this machine, or `None` to let the engine decide.
+    ///
+    /// The cheap check comes first on purpose: the engine probe costs a process
+    /// spawn plus a Vulkan driver load, and only a mixed dedicated + integrated
+    /// machine needs the answer.
+    fn pinned_device_arg(&self, engine: &Path) -> Option<String> {
+        let probed = crate::managers::transcription::gpu_devices();
+        if !needs_device_pinning(&probed) {
+            return None;
+        }
+        select_engine_device_arg(engine_devices(engine), &probed)
+    }
+
     fn spawn_server(
         &self,
         engine: &Path,
@@ -964,15 +1179,41 @@ impl LocalLlmManager {
         }
 
         // Keep local chat on the same dedicated-first GPU policy used by the
-        // rest of the app. This matters on hybrid Windows/Linux systems where
-        // an integrated adapter can report more shared memory than a discrete
-        // card. Metal exposes a single device, so index 0 remains a no-op there.
-        if let Some(device) = crate::managers::transcription::preferred_gpu_device() {
-            info!(
-                "Selecting llama.cpp main GPU {}: {} ({}, {} MiB)",
-                device.id, device.name, device.kind, device.total_vram_mb
-            );
-            cmd.arg("--main-gpu").arg(device.id.to_string());
+        // rest of the app — but with the flag that actually enforces it.
+        //
+        // `--main-gpu` does NOT select which device runs the model, which is why
+        // it used to be the only flag here. Measured on a 4070 Ti SUPER + Ryzen
+        // iGPU machine with this exact engine build: `--main-gpu 1` (the iGPU)
+        // still generated at 213 tok/s, identical to the dedicated card, because
+        // under the default `--split-mode layer` that index only picks where
+        // small tensors and KV live among the devices ALREADY in use, and a model
+        // that fits on device 0 stays entirely on device 0. `--device` is the
+        // flag that chooses the device set: `--device Vulkan1` on the same
+        // machine measured 7 tok/s — 30x slower, and 3x slower than the CPU's
+        // 21.8 tok/s. So on any machine whose ggml device 0 happens to be the
+        // integrated GPU, the engine silently ran there and the dedicated-first
+        // policy was never enforced for llama.cpp at all.
+        //
+        // The value is resolved from the engine's OWN `--list-devices` output,
+        // not from our device index: the two enumerations are independent and
+        // their order need not agree.
+        match self.pinned_device_arg(engine) {
+            Some(devices) => {
+                info!("Pinning llama.cpp to dedicated GPU device(s): {devices}");
+                cmd.arg("--device").arg(&devices);
+            }
+            None => {
+                // Nothing to correct on this machine's device mix, so leave
+                // selection to the engine and keep the historical hint (which
+                // still matters for `--split-mode none`/`row`).
+                if let Some(device) = crate::managers::transcription::preferred_gpu_device() {
+                    info!(
+                        "llama.cpp main-GPU hint {}: {} ({}, {} MiB)",
+                        device.id, device.name, device.kind, device.total_vram_mb
+                    );
+                    cmd.arg("--main-gpu").arg(device.id.to_string());
+                }
+            }
         }
 
         // Flash Attention in "auto" mode: the engine enables it only on backends
@@ -1483,6 +1724,160 @@ mod tests {
         // CPU, but generation was ~6x slower, and generation is what runs on
         // every dictation.
         assert_eq!(ALL_GPU_LAYERS, 999);
+    }
+
+    fn gpu(id: i32, name: &str, kind: &str, vram_mb: usize) -> GpuDeviceOption {
+        GpuDeviceOption {
+            id,
+            name: name.to_string(),
+            kind: kind.to_string(),
+            total_vram_mb: vram_mb,
+        }
+    }
+
+    // Verified against the real output of `llama-server --list-devices` on the
+    // pinned engine build.
+    #[test]
+    fn engine_device_listing_is_parsed_and_headers_ignored() {
+        let listing = "Available devices:\n  \
+             Vulkan0: NVIDIA GeForce RTX 4070 Ti SUPER (16063 MiB, 15295 MiB free)\n  \
+             Vulkan1: AMD Radeon(TM) Graphics (16180 MiB, 15371 MiB free)\n";
+
+        let devices = parse_engine_devices(listing);
+
+        assert_eq!(
+            devices,
+            vec![
+                EngineDevice {
+                    name: "Vulkan0".into(),
+                    description: "NVIDIA GeForce RTX 4070 Ti SUPER".into(),
+                },
+                EngineDevice {
+                    name: "Vulkan1".into(),
+                    description: "AMD Radeon(TM) Graphics".into(),
+                },
+            ],
+            "the 'Available devices:' header must not parse as a device"
+        );
+    }
+
+    // A log line can also read `<word>: <text>`; only rows inside the listing
+    // block, carrying a memory summary, count as devices.
+    #[test]
+    fn engine_device_parsing_rejects_log_noise() {
+        let noise = "0.00.171.291 E gguf_init_from_file: failed to open GGUF file\n\
+             load_backend: loaded Vulkan backend from ggml-vulkan.dll\n";
+        assert!(parse_engine_devices(noise).is_empty());
+
+        let trailing_noise = "Available devices:\n  \
+             Vulkan0: NVIDIA GeForce RTX 4070 Ti SUPER (16063 MiB, 15295 MiB free)\n\
+             load_backend: loaded CPU backend from ggml-cpu-zen4.dll\n";
+        assert_eq!(
+            parse_engine_devices(trailing_noise),
+            vec![EngineDevice {
+                name: "Vulkan0".into(),
+                description: "NVIDIA GeForce RTX 4070 Ti SUPER".into(),
+            }],
+            "a log line after the listing must not become a device"
+        );
+    }
+
+    // The bug this whole path exists for: on a dedicated + integrated machine the
+    // engine must be pinned to the dedicated card. `--main-gpu` could not do it
+    // (measured: `--main-gpu 1` still ran on the dedicated GPU at 213 tok/s),
+    // while landing on the iGPU costs 7 tok/s against 212.
+    #[test]
+    fn dedicated_gpu_is_pinned_when_an_igpu_could_be_chosen() {
+        let engine = parse_engine_devices(
+            "Available devices:\n  \
+             Vulkan0: AMD Radeon(TM) Graphics (16180 MiB, 15371 MiB free)\n  \
+             Vulkan1: NVIDIA GeForce RTX 4070 Ti SUPER (16063 MiB, 15295 MiB free)\n",
+        );
+        let probed = vec![
+            gpu(0, "AMD Radeon Graphics", "integrated", 16180),
+            gpu(1, "NVIDIA GeForce RTX 4070 Ti SUPER", "dedicated", 16063),
+        ];
+
+        assert_eq!(
+            select_engine_device_arg(&engine, &probed).as_deref(),
+            Some("Vulkan1"),
+            "the iGPU must be excluded even though the engine lists it first"
+        );
+    }
+
+    // Several dedicated cards stay available so layer splitting keeps working for
+    // a model too large for one of them; only the iGPU is dropped.
+    #[test]
+    fn multiple_dedicated_gpus_are_kept_biggest_first() {
+        let engine = parse_engine_devices(
+            "Available devices:\n  \
+             Vulkan0: Intel(R) UHD Graphics (8192 MiB, 8000 MiB free)\n  \
+             Vulkan1: NVIDIA GeForce RTX 3060 (12288 MiB, 12000 MiB free)\n  \
+             Vulkan2: NVIDIA GeForce RTX 4090 (24576 MiB, 24000 MiB free)\n",
+        );
+        let probed = vec![
+            gpu(0, "Intel(R) UHD Graphics", "integrated", 8192),
+            gpu(1, "NVIDIA GeForce RTX 3060", "dedicated", 12288),
+            gpu(2, "NVIDIA GeForce RTX 4090", "dedicated", 24576),
+        ];
+
+        assert_eq!(
+            select_engine_device_arg(&engine, &probed).as_deref(),
+            Some("Vulkan2,Vulkan1"),
+            "the biggest dedicated card must lead so it becomes the engine's device 0"
+        );
+    }
+
+    // Staying out of the way is the default: with nothing to exclude, the engine
+    // keeps its own (already correct) device choice and the historical
+    // `--main-gpu` hint.
+    #[test]
+    fn unmixed_machines_are_left_to_the_engine() {
+        let single_dedicated = vec![gpu(
+            0,
+            "NVIDIA GeForce RTX 4070 Ti SUPER",
+            "dedicated",
+            16063,
+        )];
+        let only_integrated = vec![gpu(0, "AMD Radeon Graphics", "integrated", 16180)];
+
+        assert!(!needs_device_pinning(&single_dedicated));
+        assert!(!needs_device_pinning(&only_integrated));
+        assert!(
+            !needs_device_pinning(&[]),
+            "a CPU-only machine must not probe"
+        );
+        assert_eq!(select_engine_device_arg(&[], &single_dedicated), None);
+    }
+
+    // Our probe and the engine's listing are independent enumerations, so the
+    // match is on the adapter description — and vendor decorations like "(TM)"
+    // appear in one string and not the other.
+    #[test]
+    fn adapter_names_match_across_vendor_decorations() {
+        assert_eq!(
+            normalized_adapter_name("AMD Radeon(TM) Graphics"),
+            normalized_adapter_name("AMD Radeon Graphics")
+        );
+        assert_eq!(
+            normalized_adapter_name("Intel(R)  Arc(TM)  A770"),
+            "intel arc a770"
+        );
+    }
+
+    // A description the engine spells differently must not silently fall back to
+    // some other card — no match means no flag, not the wrong flag.
+    #[test]
+    fn unmatched_dedicated_gpu_yields_no_device_flag() {
+        let engine = parse_engine_devices(
+            "Available devices:\n  Vulkan0: AMD Radeon(TM) Graphics (16180 MiB, 15371 MiB free)\n",
+        );
+        let probed = vec![
+            gpu(0, "AMD Radeon Graphics", "integrated", 16180),
+            gpu(1, "Some Unlisted Accelerator", "dedicated", 8192),
+        ];
+
+        assert_eq!(select_engine_device_arg(&engine, &probed), None);
     }
 
     // Asset naming was verified live against the llama.cpp b10075 release:
