@@ -18,6 +18,17 @@ interface CleanupModelRowProps {
 }
 
 /**
+ * Collapse a model name or filename to its bare characters, so two spellings of
+ * the same thing compare equal: `FLOW Qwen3.5-2B.Q8_0.gguf` and the display name
+ * derived from it, `FLOW Qwen3.5 2B.Q8 0`, both become `flowqwen352bq80`.
+ */
+const comparableName = (value: string): string =>
+  value
+    .replace(/\.(gguf|bin|safetensors)$/i, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "");
+
+/**
  * The on-device cleanup model, as a card rather than a dropdown entry.
  *
  * A dropdown was the wrong control here: it showed a filename and nothing that
@@ -63,12 +74,23 @@ export const CleanupModelRow: React.FC<CleanupModelRowProps> = ({
     /\s*\(vision\)\s*$/i,
     "",
   );
-  // A registered local model's description is its full path, which can be longer
-  // than the card. Show the filename, keep the path in the tooltip: the path
-  // matters when something breaks, not while reading the row.
-  const subtitle = model.local_path
+  // The line under the name has to carry a *second* fact. For a catalog model it
+  // does: the description says what the model is for. For a model the user
+  // registered from disk there is none — its description is the file path, and
+  // the filename that collapses to is the very string the display name is
+  // derived from ("FLOW Qwen3.5 2B.Q8 0" over "FLOW Qwen3.5-2B.Q8_0.gguf"). Two
+  // renderings of one string is not a second fact, so the subtitle is dropped
+  // whenever it merely restates the name. The full path stays in the tooltip,
+  // where it matters when something breaks rather than while reading the row.
+  const candidateSubtitle = model.local_path
     ? (model.local_path.split(/[\\/]/).pop() ?? model.local_path)
     : getTranslatedModelDescription(model, t);
+  const subtitle =
+    candidateSubtitle &&
+    comparableName(candidateSubtitle) !== comparableName(displayName)
+      ? candidateSubtitle
+      : null;
+  const size = formatModelSize(Number(model.size_mb));
 
   return (
     <div className="flex flex-col gap-3 px-4 py-3.5 sm:flex-row sm:items-center">
@@ -100,11 +122,17 @@ export const CleanupModelRow: React.FC<CleanupModelRowProps> = ({
             className="mt-1 truncate text-xs leading-relaxed text-muted"
             title={model.local_path ?? undefined}
           >
-            {subtitle}
-            <span className="text-muted-soft">
-              {" · "}
-              {formatModelSize(Number(model.size_mb))}
-            </span>
+            {subtitle ? (
+              <>
+                {subtitle}
+                <span className="text-muted-soft">
+                  {" · "}
+                  {size}
+                </span>
+              </>
+            ) : (
+              size
+            )}
           </p>
         </div>
       </div>
