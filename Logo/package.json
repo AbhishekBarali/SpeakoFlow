@@ -6,7 +6,11 @@
   "description": "Tooling to generate SpeakoFlow logo assets at standard sizes",
   "scripts": {
     "bbox": "node compute-bbox.mjs",
-    "build": "node build-logos.mjs"
+    "build": "node build-logos.mjs",
+    "build:icon-v2": "node build-new-icon.mjs",
+    "build:lockup-v2": "node build-new-lockup.mjs",
+    "apply:app": "node apply-icon-to-app.mjs",
+    "verify:icon-v2": "node verify-new-icon.mjs"
   },
   "dependencies": {
     "opentype.js": "^2.0.0",
