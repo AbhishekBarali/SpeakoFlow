@@ -1504,7 +1504,8 @@
     "notices": {
       "flowNotConfigured": "Flow needs an assistant model — pasted as dictation",
       "flowFailed": "Flow couldn't generate — nothing was pasted",
-      "flowEmpty": "Say a command after the activation phrase"
+      "flowEmpty": "Say a command after the activation phrase",
+      "cleanupFallback": "AI cleanup didn't run — pasted the raw text"
     },
     "listening": "Listening…",
     "locked": "Recording hands-free — press the hotkey again to stop",
