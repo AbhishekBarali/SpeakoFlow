@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <title>SpeakoFlow</title>
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#38c6c0"/>
+      <stop offset="1" stop-color="#04616e"/>
+    </linearGradient>
+    <radialGradient id="gloss" cx="0.3" cy="0.24" r="0.72">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <clipPath id="tileClip">
+      <rect x="0" y="0" width="1024" height="1024" rx="230.400" ry="230.400"/>
+    </clipPath>
+  </defs>
+  <g clip-path="url(#tileClip)">
+    <rect x="0" y="0" width="1024" height="1024" fill="url(#tile)"/>
+    <rect x="0" y="0" width="1024" height="1024" fill="url(#gloss)"/>
+    <rect x="195" y="440" width="83" height="144" rx="41.500" ry="41.500" fill="#ffffff"/>
+    <rect x="333" y="348" width="83" height="329" rx="41.500" ry="41.500" fill="#ffffff"/>
+    <rect x="471" y="268" width="83" height="489" rx="41.500" ry="41.500" fill="#ffffff"/>
+    <rect x="609" y="345" width="83" height="334" rx="41.500" ry="41.500" fill="#ffffff"/>
+    <rect x="747" y="437" width="83" height="150" rx="41.500" ry="41.500" fill="#ffffff"/>
+  </g>
+</svg>

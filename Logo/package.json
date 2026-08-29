@@ -9,7 +9,9 @@
     "build": "node build-logos.mjs",
     "build:icon-v2": "node build-new-icon.mjs",
     "build:lockup-v2": "node build-new-lockup.mjs",
+    "build:small": "node build-small-icon.mjs",
     "apply:app": "node apply-icon-to-app.mjs",
+    "apply:icns": "node patch-icns-small.mjs",
     "verify:icon-v2": "node verify-new-icon.mjs"
   },
   "dependencies": {

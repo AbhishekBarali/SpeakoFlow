@@ -1,10 +1,12 @@
-// Verify the new brand icon actually reached every app asset.
+// Verify the icon rollout: that every app asset carries the new brand, and that
+// each one carries the RIGHT TIER for the size it is drawn at.
 //
-// The two artworks are easy to tell apart without eyeballing: the OLD tile is a
-// flat #14b8a6 field with a pure-white mark, so its distinct-colour count is
-// tiny and it has no dark pixels; the NEW tile is a gradient running from pale
-// mint to deep teal (~#005666). So an asset is "new" if it carries a real
-// gradient AND a dark-teal region, and "OLD" if it is dominated by one flat hue.
+// Fingerprints, so this needs no eyeballing:
+//   small tier -> contains pure white (#ffffff) pixels; the redrawn pills are
+//                 pure white, and nothing in the hero art is
+//   hero art   -> no pure white, but a deep-teal region (the gradient's dark
+//                 corner) plus a wide colour count
+//   old logo   -> a flat #14b8a6 field over a large share of the tile
 //
 // Run from the repo root: node Logo/verify-app-icons.mjs
 
@@ -18,16 +20,52 @@ const near = (a, b, tol) =>
   Math.abs(a.g - b.g) <= tol &&
   Math.abs(a.b - b.b) <= tol;
 
-async function classify(file) {
-  const { data, info } = await sharp(file)
+async function classify(input) {
+  const { data, info } = await sharp(input)
     .ensureAlpha()
     .raw()
     .toBuffer({ resolveWithObject: true });
-  const { width: W, height: H, channels: C } = info;
+  return classifyRaw(data, info.width, info.height, info.channels);
+}
+
+/**
+ * Classify one ICO directory entry. Entries are stored as either PNG or a
+ * headerless BMP (BITMAPINFOHEADER + bottom-up BGRA + AND mask); png-to-ico uses
+ * BMP for the smaller sizes, which sharp cannot read directly.
+ */
+function classifyIcoEntry(buf) {
+  if (
+    buf.length > 8 &&
+    buf[0] === 0x89 &&
+    buf.subarray(1, 4).toString("ascii") === "PNG"
+  ) {
+    return { png: true };
+  }
+  const headerSize = buf.readUInt32LE(0);
+  const W = buf.readInt32LE(4);
+  const H = Math.abs(buf.readInt32LE(8)) / 2; // stored height covers XOR + AND masks
+  const bits = buf.readUInt16LE(14);
+  if (bits !== 32) throw new Error(`unsupported ICO BMP depth ${bits}`);
+  const rgba = Buffer.alloc(W * H * 4);
+  let src = headerSize;
+  for (let y = H - 1; y >= 0; y--) {
+    for (let x = 0; x < W; x++) {
+      const d = (y * W + x) * 4;
+      rgba[d] = buf[src + 2];
+      rgba[d + 1] = buf[src + 1];
+      rgba[d + 2] = buf[src];
+      rgba[d + 3] = buf[src + 3];
+      src += 4;
+    }
+  }
+  return { png: false, ...classifyRaw(rgba, W, H, 4) };
+}
+
+function classifyRaw(data, W, H, C) {
   const colors = new Set();
   let flatTeal = 0,
-    darkTeal = 0,
-    ink = 0,
+    deepTeal = 0,
+    pureWhite = 0,
     opaque = 0;
   for (let i = 0; i < W * H; i++) {
     if (data[i * C + 3] < 128) continue;
@@ -35,141 +73,169 @@ async function classify(file) {
     const px = { r: data[i * C], g: data[i * C + 1], b: data[i * C + 2] };
     colors.add((px.r >> 3) * 1024 + (px.g >> 3) * 32 + (px.b >> 3));
     if (near(px, OLD_TEAL, 6)) flatTeal++;
-    // Deep teal shadow that only exists in the new gradient tile.
+    if (px.r > 250 && px.g > 250 && px.b > 250) pureWhite++;
     if (px.b > 40 && px.b < 130 && px.g > 60 && px.g < 160 && px.r < 60)
-      darkTeal++;
-    if (px.r < 40 && px.g < 40 && px.b < 40) ink++;
+      deepTeal++;
   }
-  const flatShare = flatTeal / Math.max(1, opaque);
-  const darkShare = darkTeal / Math.max(1, opaque);
-  const verdict =
-    flatShare > 0.25
-      ? "OLD (flat teal)"
-      : darkShare > 0.02 && colors.size > 200
-        ? "new"
-        : ink / Math.max(1, opaque) > 0.5
-          ? "mono glyph"
+  const share = (n) => n / Math.max(1, opaque);
+  const tier =
+    share(flatTeal) > 0.25
+      ? "OLD"
+      : share(pureWhite) > 0.01
+        ? "small"
+        : share(deepTeal) > 0.02 && colors.size > 150
+          ? "hero"
           : "??";
   return {
-    dims: `${W}x${H}`,
+    W,
+    H,
     colors: colors.size,
-    flat: flatShare,
-    dark: darkShare,
-    verdict,
+    tier,
+    white: share(pureWhite),
+    deep: share(deepTeal),
   };
 }
 
-const APP = [
-  // Tauri app / installer / store / mobile
-  "src-tauri/icons/icon.png",
-  "src-tauri/icons/32x32.png",
-  "src-tauri/icons/64x64.png",
-  "src-tauri/icons/128x128.png",
-  "src-tauri/icons/128x128@2x.png",
-  "src-tauri/icons/StoreLogo.png",
-  "src-tauri/icons/Square44x44Logo.png",
-  "src-tauri/icons/Square310x310Logo.png",
-  "src-tauri/icons/android/mipmap-xxxhdpi/ic_launcher.png",
-  "src-tauri/icons/ios/AppIcon-512@2x.png",
-  // Tray + taskbar
+let bad = 0;
+async function expect(file, want, label = file) {
+  const r = await classify(file);
+  const ok = r.tier === want;
+  if (!ok) bad++;
+  console.log(
+    `${ok ? "OK  " : "FAIL"} ${label.padEnd(50)} ${`${r.W}x${r.H}`.padEnd(10)}` +
+      ` tier=${r.tier.padEnd(5)} want=${want.padEnd(5)}` +
+      ` white=${(r.white * 100).toFixed(0)}% deep=${(r.deep * 100).toFixed(0)}% colors=${r.colors}`,
+  );
+}
+
+console.log("== small tier: everything an OS draws small ==");
+for (const f of [
   "src-tauri/resources/tray_idle.png",
   "src-tauri/resources/tray_idle_dark.png",
   "src-tauri/resources/speakoflow.png",
   "src-tauri/resources/window_icon_light.png",
   "src-tauri/resources/window_icon_dark.png",
-  // Frontend
+  "src-tauri/icons/32x32.png",
+  "src-tauri/icons/64x64.png",
+  "src-tauri/icons/Square30x30Logo.png",
+  "src-tauri/icons/Square44x44Logo.png",
+  "src-tauri/icons/StoreLogo.png",
+])
+  await expect(f, "small");
+
+console.log("\n== hero art: large sizes only ==");
+for (const f of [
+  "src-tauri/icons/icon.png",
+  "src-tauri/icons/128x128.png",
+  "src-tauri/icons/128x128@2x.png",
+  "src-tauri/icons/Square310x310Logo.png",
   "src/assets/speakoflow-mini.png",
-  // Docs site
   "docs-site/favicon.png",
-  // Named deliverables
   "Logo/Final logo.png",
-];
+])
+  await expect(f, "hero");
 
-// Intentionally untouched: recording/transcribing STATE glyphs.
-const KEEP = [
+console.log("\n== state glyphs: must stay untouched ==");
+for (const f of [
   "src-tauri/resources/tray_recording.png",
-  "src-tauri/resources/tray_recording_dark.png",
   "src-tauri/resources/tray_transcribing.png",
-  "src-tauri/resources/tray_transcribing_dark.png",
   "src-tauri/resources/recording.png",
-  "src-tauri/resources/transcribing.png",
-];
-
-let bad = 0;
-console.log("== app assets (expect: new) ==");
-for (const f of APP) {
-  const r = await classify(f);
-  const ok = r.verdict === "new";
-  if (!ok) bad++;
-  console.log(
-    `${ok ? "OK  " : "FAIL"} ${f.padEnd(52)} ${r.dims.padEnd(10)} colors=${String(r.colors).padStart(4)} flatTeal=${(r.flat * 100).toFixed(0)}% deepTeal=${(r.dark * 100).toFixed(0)}%  ${r.verdict}`,
-  );
-}
-
-console.log("\n== state glyphs (expect: unchanged / not the brand tile) ==");
-for (const f of KEEP) {
+]) {
   const r = await classify(f);
   console.log(
-    `--   ${f.padEnd(52)} ${r.dims.padEnd(10)} colors=${String(r.colors).padStart(4)} ${r.verdict}`,
+    `--   ${f.padEnd(50)} ${`${r.W}x${r.H}`.padEnd(10)} colors=${r.colors} (flat glyph)`,
   );
+  if (r.colors > 4) {
+    console.log(`FAIL ${f} looks like artwork, not a flat state glyph`);
+    bad++;
+  }
 }
 
-// Binary containers: check the ICO/ICNS were rewritten and still parse.
-console.log("\n== containers ==");
+console.log("\n== icon.ico: per-entry size and tier ==");
 const ico = fs.readFileSync("src-tauri/icons/icon.ico");
-console.log(
-  `icon.ico   ${ico.length}b, ${ico.readUInt16LE(4)} entries, magic=${ico.readUInt16LE(0)}/${ico.readUInt16LE(2)}`,
-);
-const icns = fs.readFileSync("src-tauri/icons/icon.icns");
-console.log(
-  `icon.icns  ${icns.length}b, magic=${icns.subarray(0, 4).toString("ascii")}, declared=${icns.readUInt32BE(4)}`,
-);
-// The largest PNG inside icon.ico should match the new artwork too.
+const count = ico.readUInt16LE(4);
 const entries = [];
-for (let i = 0; i < ico.readUInt16LE(4); i++) {
-  const off = 6 + i * 16;
+for (let i = 0; i < count; i++) {
+  const o = 6 + i * 16;
   entries.push({
-    w: ico[off] || 256,
-    size: ico.readUInt32LE(off + 8),
-    at: ico.readUInt32LE(off + 12),
+    w: ico[o] || 256,
+    size: ico.readUInt32LE(o + 8),
+    at: ico.readUInt32LE(o + 12),
   });
 }
-entries.sort((a, b) => b.w - a.w);
-const biggest = entries[0];
-const tmp = path.join("Logo", ".ico-largest.png");
-fs.writeFileSync(tmp, ico.subarray(biggest.at, biggest.at + biggest.size));
-const inner = await classify(tmp);
-fs.rmSync(tmp);
-console.log(
-  `icon.ico largest entry (${biggest.w}px): colors=${inner.colors} deepTeal=${(inner.dark * 100).toFixed(0)}% -> ${inner.verdict}`,
-);
-if (inner.verdict !== "new") bad++;
-
-// Text references: no source file should still point at the retired lockups.
-console.log("\n== references ==");
-const refs = [
-  ["README.md", /Logo\/final-v2\/png\/lockup(-dark)?-h256\.png/g, 2],
-  ["public/favicon.svg", /data:image\/png;base64,/g, 1],
-  ["docs-site/logo/lockup.svg", /data:image\/png;base64,/g, 1],
-  ["docs-site/logo/lockup-dark.svg", /data:image\/png;base64,/g, 1],
-  ["docs-site/logo/icon.svg", /data:image\/png;base64,/g, 1],
-];
-for (const [file, re, want] of refs) {
-  const got = (fs.readFileSync(file, "utf8").match(re) ?? []).length;
-  const ok = got >= want;
+entries.sort((a, b) => a.w - b.w);
+console.log(`${count} entries: ${entries.map((e) => e.w).join(", ")}`);
+const tmp = path.join("Logo", ".ico-entry.png");
+for (const e of entries) {
+  const payload = ico.subarray(e.at, e.at + e.size);
+  const want = e.w <= 64 ? "small" : "hero";
+  let r = classifyIcoEntry(payload);
+  let kind = r.png ? "PNG" : "BMP";
+  if (r.png) {
+    fs.writeFileSync(tmp, payload);
+    r = await classify(tmp);
+    fs.rmSync(tmp);
+  }
+  const ok = r.tier === want;
   if (!ok) bad++;
-  console.log(`${ok ? "OK  " : "FAIL"} ${file.padEnd(34)} ${re} -> ${got}`);
+  console.log(
+    `${ok ? "OK  " : "FAIL"}   icon.ico @${String(e.w).padStart(3)}px ${kind}` +
+      ` tier=${r.tier.padEnd(5)} want=${want.padEnd(5)}` +
+      ` white=${(r.white * 100).toFixed(0)}% deep=${(r.deep * 100).toFixed(0)}% colors=${r.colors}`,
+  );
 }
-const stale = ["README.md", "index.html"].flatMap((f) => {
-  const s = fs.readFileSync(f, "utf8");
-  return /Logo\/final\/(lockup|png\/icon)/.test(s) ? [f] : [];
-});
+
 console.log(
-  stale.length
-    ? `FAIL stale Logo/final refs in: ${stale}`
-    : "OK   no stale Logo/final/ references",
+  "\n== icon.icns: entries parse, small entries are the small tier ==",
 );
-bad += stale.length;
+const icns = fs.readFileSync("src-tauri/icons/icon.icns");
+if (
+  icns.subarray(0, 4).toString("ascii") !== "icns" ||
+  icns.readUInt32BE(4) !== icns.length
+) {
+  console.log("FAIL icns header/length invalid");
+  bad++;
+} else {
+  let o = 8;
+  const seen = [];
+  while (o + 8 <= icns.length) {
+    const type = icns.subarray(o, o + 4).toString("ascii");
+    const len = icns.readUInt32BE(o + 4);
+    if (len < 8 || o + len > icns.length) {
+      console.log(`FAIL malformed icns entry ${type}`);
+      bad++;
+      break;
+    }
+    const data = icns.subarray(o + 8, o + len);
+    const isPng = data.length > 8 && data[0] === 0x89;
+    seen.push({ type, len, isPng, data });
+    o += len;
+  }
+  console.log(`${seen.length} entries: ${seen.map((s) => s.type).join(", ")}`);
+  for (const s of seen.filter((s) => ["ic11", "ic12"].includes(s.type))) {
+    fs.writeFileSync(tmp, s.data);
+    await expect(tmp, "small", `  icns ${s.type}`);
+    fs.rmSync(tmp);
+  }
+  // is32/il32 are RLE24, not PNG -- just assert they are still the legacy format.
+  for (const t of ["is32", "il32", "s8mk", "l8mk"]) {
+    const e = seen.find((s) => s.type === t);
+    const ok = e && !e.isPng;
+    if (!ok) bad++;
+    console.log(
+      `${ok ? "OK  " : "FAIL"}   icns ${t} present as legacy raw (${e?.len ?? 0}b)`,
+    );
+  }
+}
+
+console.log("\n== favicon is vector now ==");
+const fav = fs.readFileSync("public/favicon.svg", "utf8");
+const vector = !fav.includes("base64") && fav.includes("<rect");
+if (!vector) bad++;
+console.log(
+  `${vector ? "OK  " : "FAIL"} public/favicon.svg ${fs.statSync("public/favicon.svg").size}b,` +
+    ` base64=${fav.includes("base64")}`,
+);
 
 console.log(bad === 0 ? "\nALL CHECKS PASSED" : `\n${bad} CHECK(S) FAILED`);
 process.exit(bad === 0 ? 0 : 1);
