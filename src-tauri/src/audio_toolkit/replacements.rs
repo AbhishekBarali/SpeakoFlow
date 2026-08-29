@@ -18,6 +18,57 @@ use chrono::Local;
 use log::warn;
 use regex::Regex;
 
+/// Escape a literal search term so it matches verbatim, except that its **first
+/// character may match in either case**, and anchor it to word boundaries.
+///
+/// **Case.** Only the first character, and only for literal rules. A dictated
+/// phrase gets capitalized purely by position — at the start of an utterance,
+/// after a sentence boundary, or by an AI-cleanup pass that punctuates the text
+/// — and a fully case-sensitive match then silently stops firing. Measured on
+/// the real cleanup model, exactly this made the difference between a rule
+/// landing and vanishing on 4 of 11 dictations.
+///
+/// Full case-insensitivity is deliberately NOT used: it would make an all-caps
+/// acronym rule ("US" → "United States") start rewriting the ordinary word
+/// "us". Leading-character-only keeps the mechanical case change working
+/// without turning every acronym into a footgun.
+///
+/// **Boundaries.** A literal rule is a *spoken phrase*, so it must match whole
+/// words. Unanchored, "US" → "United States" turned "USA today" into
+/// "United StatesA today", and "clod" → "claude" turned "unclod" into
+/// "unclaude". The anchors are added only on a side that actually begins/ends
+/// with a word character, so a rule for punctuation or an emoticon still works.
+fn literal_pattern(search: &str) -> String {
+    let mut chars = search.chars();
+    let Some(first) = chars.next() else {
+        return String::new();
+    };
+    let rest = regex::escape(chars.as_str());
+    let lower: String = first.to_lowercase().collect();
+    let upper: String = first.to_uppercase().collect();
+
+    let body = if lower == upper {
+        format!("{}{}", regex::escape(&lower), rest)
+    } else {
+        // Alternation rather than a character class, so a character whose case
+        // mapping is multi-character (ß → SS) still works.
+        format!(
+            "(?:{}|{}){}",
+            regex::escape(&lower),
+            regex::escape(&upper),
+            rest
+        )
+    };
+
+    let is_word = |c: char| c.is_alphanumeric() || c == '_';
+    let open = if is_word(first) { r"\b" } else { "" };
+    let close = match search.chars().last() {
+        Some(last) if is_word(last) => r"\b",
+        _ => "",
+    };
+    format!("{open}{body}{close}")
+}
+
 /// Applies an ordered list of [`Replacement`] rules to `text`.
 ///
 /// Rules are applied in order, so later rules see the output of earlier ones.
@@ -32,12 +83,13 @@ pub fn apply_replacements(text: &str, replacements: &[Replacement]) -> String {
         }
 
         // Literal searches are regex-escaped so special characters match
-        // verbatim. The optional surrounding `\s*` (for trim) is part of the
-        // match and is therefore removed from the output.
+        // verbatim, with a leading-character case allowance (see
+        // `literal_pattern`). The optional surrounding `\s*` (for trim) is part
+        // of the match and is therefore removed from the output.
         let core = if rule.is_regex {
             rule.search.clone()
         } else {
-            regex::escape(&rule.search)
+            literal_pattern(&rule.search)
         };
         let prefix = if rule.trim_before { r"\s*" } else { "" };
         let suffix = if rule.trim_after { r"\s*" } else { "" };
@@ -143,10 +195,114 @@ mod tests {
         }
     }
 
+    // A literal rule is a spoken *phrase*, so it must not fire inside a longer
+    // word. Unanchored, "US" -> "United States" turned "USA today" into
+    // "United StatesA today".
+    #[test]
+    fn literal_rule_matches_whole_words_only() {
+        let acronym = vec![rule("US", "United States")];
+        assert_eq!(
+            apply_replacements("USA today", &acronym),
+            "USA today",
+            "a rule must not fire inside a longer word"
+        );
+        assert_eq!(
+            apply_replacements("the US economy", &acronym),
+            "the United States economy"
+        );
+
+        let short = vec![rule("clod", "claude")];
+        assert_eq!(apply_replacements("unclod it", &short), "unclod it");
+        assert_eq!(
+            apply_replacements("clods everywhere", &short),
+            "clods everywhere"
+        );
+        assert_eq!(apply_replacements("ask clod now", &short), "ask claude now");
+        // Punctuation next to the phrase is still a boundary.
+        assert_eq!(
+            apply_replacements("ask clod, then wait", &short),
+            "ask claude, then wait"
+        );
+    }
+
+    // A rule whose search is punctuation has no word boundary to anchor to, so
+    // anchors must be omitted rather than making it unmatchable.
+    #[test]
+    fn punctuation_rules_are_not_boundary_anchored() {
+        let rules = vec![rule(":)", "🙂")];
+        assert_eq!(apply_replacements("nice :) ok", &rules), "nice 🙂 ok");
+        assert_eq!(apply_replacements("nice:)ok", &rules), "nice🙂ok");
+    }
+
     #[test]
     fn literal_replacement() {
         let rules = vec![rule("teh", "the")];
         assert_eq!(apply_replacements("teh cat", &rules), "the cat");
+    }
+
+    // Measured against the real cleanup model: a rule trigger at the start of an
+    // utterance, or after a sentence boundary, comes back capitalized — from the
+    // speaker, the ASR, or the AI-cleanup pass that punctuates the text. A fully
+    // case-sensitive literal match silently stopped firing there, so the user's
+    // substitution just vanished with no error anywhere.
+    #[test]
+    fn literal_rule_tolerates_a_capitalized_first_character() {
+        let rules = vec![rule("my name", "Alex Rivera")];
+        assert_eq!(
+            apply_replacements("my name is on the contract", &rules),
+            "Alex Rivera is on the contract"
+        );
+        assert_eq!(
+            apply_replacements("My name is on the contract", &rules),
+            "Alex Rivera is on the contract",
+            "positional capitalization must not break the rule"
+        );
+        assert_eq!(
+            apply_replacements("The contract is signed. My name is on page four.", &rules),
+            "The contract is signed. Alex Rivera is on page four.",
+            "capitalization after a sentence boundary must not break the rule"
+        );
+    }
+
+    // The reason this is leading-character-only rather than a blanket `(?i)`:
+    // an acronym rule must not start rewriting an ordinary lowercase word.
+    #[test]
+    fn only_the_first_character_is_case_flexible() {
+        let acronym = vec![rule("US", "United States")];
+        assert_eq!(
+            apply_replacements("between us and them", &acronym),
+            "between us and them",
+            "a lowercase word must not match an all-caps acronym rule"
+        );
+        assert_eq!(
+            apply_replacements("US exports rose", &acronym),
+            "United States exports rose",
+            "the rule still matches its own spelling"
+        );
+
+        // Interior case still has to match exactly.
+        let rules = vec![rule("my Name", "X")];
+        assert_eq!(apply_replacements("my name here", &rules), "my name here");
+    }
+
+    #[test]
+    fn case_flexibility_handles_non_alphabetic_and_wide_case_mappings() {
+        // A leading character with no case (digit/punctuation) must still match.
+        assert_eq!(
+            apply_replacements("call 4030 now", &[rule("4030", "5150")]),
+            "call 5150 now"
+        );
+        // ß uppercases to the two-character "SS", which would break a character
+        // class; the pattern uses alternation for exactly this reason.
+        let rules = vec![rule("ßeta", "beta")];
+        assert_eq!(
+            apply_replacements("the ßeta build", &rules),
+            "the beta build"
+        );
+        assert_eq!(
+            apply_replacements("the SSeta build", &rules),
+            "the beta build"
+        );
     }
 
     #[test]
