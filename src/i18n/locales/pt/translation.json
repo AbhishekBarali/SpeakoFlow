@@ -92,6 +92,7 @@
       },
       "seesScreen": "Vê sua tela",
       "textOnly": "Apenas texto",
+      "recommendedForAssistant": "Recomendado para o assistente",
       "download": "Baixar modelo",
       "useDownloaded": "Usar modelo baixado",
       "skip": "Ignorar por agora",
@@ -99,6 +100,14 @@
       "continue": "Continuar",
       "downloadingHint": "Seu modelo está sendo baixado em segundo plano — você pode começar a usar o app imediatamente.",
       "downloadStarted": "Baixando seu modelo de IA em segundo plano."
+    },
+    "cleanup": {
+      "cardTitle": "SpeakoFlow Mini",
+      "cardDescription": "Aplica edições faladas como “new paragraph” e “scratch that”. Apenas inglês.",
+      "pill": "Limpa seu ditado",
+      "recommendedForDictation": "Recomendado para ditado",
+      "download": "Baixar e ativar",
+      "useDownloaded": "Ativar"
     },
     "ready": {
       "title": "Tudo pronto.",
@@ -534,6 +543,7 @@
         "footnote": "As pastas vinculadas são verificadas de novo quando o SpeakoFlow inicia, então os modelos que você adicionar depois aparecem sozinhos. Desvincular uma pasta ou remover um modelo só tira ele desta lista — seus arquivos continuam onde estão.",
         "removeTitle": "Remover da lista?",
         "removeConfirm": "Remover “{{modelName}}” da sua lista de modelos?\n\nO arquivo em si continua onde está:\n{{path}}",
+        "missingBadge": "Arquivo ausente",
         "fileMissing": "O arquivo deste modelo não está mais lá:\n{{path}}\n\nEle pode ter sido movido ou renomeado, ou estar em uma unidade que não está conectada."
       }
     },
@@ -774,6 +784,7 @@
         "promptSelectFailed": "O prompt foi criado, mas não foi possível selecioná-lo.",
         "promptUpdateFailed": "Não foi possível atualizar o prompt.",
         "promptDeleteFailed": "Não foi possível excluir o prompt.",
+        "promptRestoreFailed": "Não foi possível restaurar o prompt.",
         "toneSelectFailed": "Não foi possível selecionar o estilo de escrita.",
         "toneCreateFailed": "Não foi possível criar o estilo de escrita.",
         "toneSelectAfterCreateFailed": "O estilo foi criado, mas não foi possível selecioná-lo.",
@@ -860,6 +871,7 @@
           "description": "Selecione um modelo para refinar transcrições ou crie um novo. Use ${output} dentro do texto do prompt para referenciar a transcrição capturada."
         },
         "noPrompts": "Nenhum prompt disponível",
+        "nonePrompt": "Nenhum (sem prompt)",
         "selectPrompt": "Selecionar um prompt",
         "createNew": "Criar Novo Prompt",
         "edit": "Editar",
@@ -871,6 +883,7 @@
         "promptTip": "Dica: Seu texto transcrito é enviado ao modelo automaticamente — basta escrever as instruções. (Prompts antigos que usam <code>${output}</code> continuam funcionando.)",
         "updatePrompt": "Atualizar Prompt",
         "deletePrompt": "Excluir Prompt",
+        "restorePrompt": "Restaurar o recomendado",
         "createPrompt": "Criar Prompt",
         "cancel": "Cancelar",
         "selectToEdit": "Selecione um prompt acima para visualizar e editar seus detalhes.",
@@ -896,7 +909,26 @@
       "aiCleanup": {
         "groupTitle": "Limpeza com IA",
         "modelGroupTitle": "Modelo de limpeza",
+        "unloadTimeout": {
+          "title": "Manter o modelo de limpeza carregado",
+          "description": "Por quanto tempo o modelo de limpeza que roda no dispositivo fica na memória depois que você para de usá-lo. Mais tempo significa nenhum recarregamento antes do próximo ditado; um modelo parado ocupa memória, mas não usa CPU. Independente da configuração do assistente."
+        },
+        "model": {
+          "emptyTitle": "Nenhum modelo de limpeza ainda",
+          "emptyDescription": "O SpeakoFlow Mini é um download pequeno feito para isso.",
+          "choose": "Escolher um modelo",
+          "tunedBadge": "Ajustado para limpeza"
+        },
+        "catalog": {
+          "title": "Escolha seu modelo de limpeza",
+          "description": "A limpeza roda depois de cada ditado, então velocidade importa mais que tamanho. Tudo roda offline.",
+          "recommendedTitle": "Recomendado para limpeza",
+          "recommendedDescription": "O SpeakoFlow Mini é treinado só para esta tarefa e se sai melhor nela que modelos muito maiores."
+        },
         "promptGroupTitle": "Prompt de limpeza",
+        "tunedModelNotice": "Este modelo é ajustado para a limpeza de ditado em inglês, então funciona melhor com o prompt recomendado e sem estilo.",
+        "tunedModelNoticeDismiss": "Ocultar esta dica",
+        "tunedModelNoticeRestore": "Mostrar dica do modelo",
         "title": "Ajeitar meu ditado com IA",
         "caption": "Experimental — arruma a pontuação e as palavras de preenchimento depois que você dita.",
         "info": "Passa um modelo de linguagem pelo seu ditado para corrigir a pontuação, remover palavras de preenchimento e, se você quiser, ajustar o tom. Vale apenas para o ditado, no seu próprio atalho. Isso adiciona uma pequena espera depois que você fala; se o modelo falhar ou expirar, o texto bruto é usado no lugar. Ainda em desenvolvimento."
@@ -944,6 +976,7 @@
       "originalTranscriptionLabel": "Transcrição original",
       "flowOutputLabel": "Saída do Flow",
       "finalTextLabel": "Texto final",
+      "cleanupNoChanges": "A limpeza com IA rodou, nada a corrigir",
       "flowNoOutput": "Nenhuma saída do Flow foi gerada.",
       "copyToClipboard": "Copiar transcrição para área de transferência",
       "copyFlowOutput": "Copiar saída do Flow",
@@ -1081,12 +1114,16 @@
       }
     },
     "assistant": {
+      "enable": {
+        "title": "Assistente",
+        "label": "Ativar o assistente",
+        "description": "Desative isto para deixar o SpeakoFlow apenas para ditado. O painel flutuante é fechado e nunca carregado, seus atalhos são liberados e a memória que ele usa é devolvida. O Gerar com o Flow e a limpeza com IA continuam funcionando."
+      },
       "shortcuts": {
         "title": "Atalhos"
       },
       "brain": {
         "title": "Cérebro do assistente",
-        "description": "Escolha se o seu assistente roda de forma privada neste dispositivo ou por meio de um provedor na nuvem.",
         "whereLabel": "Onde ele roda",
         "onDevice": "No meu dispositivo",
         "cloud": "Provedor na nuvem",
@@ -1106,17 +1143,18 @@
         "acceleratorUnknownWithMemory": "Memória de vídeo indisponível · {{memory}} GB de RAM do sistema para o modo CPU",
         "acceleratorUnknown": "Memória de vídeo indisponível · não é possível prever a velocidade das respostas",
         "details": "Detalhes",
+        "detailFile": "Arquivo",
+        "detailLocation": "Local",
+        "detailFormat": "Formato",
+        "detailId": "ID do modelo",
         "switchBeforeDelete": "Troque o assistente integrado para outro modelo antes de excluir este.",
         "deleteModelConfirm": "Excluir {{modelName}}? Os arquivos baixados e o registro salvo serão removidos.",
         "deleteModelFailed": "Não foi possível excluir o modelo.",
-        "visionModelNote": "A visão de tela baixa automaticamente um arquivo de imagem adicional.",
         "finderSectionTitle": "Mais modelos no dispositivo",
-        "finderSectionDescription": "Busque no Hugging Face quando precisar de outro tamanho ou outra capacidade de modelo.",
         "finderTitle": "Explorar o Hugging Face",
         "finderDescription": "Busque entre milhares de modelos GGUF e baixe um direto para o SpeakoFlow.",
         "finderAction": "Encontrar um modelo",
         "huggingFaceTitle": "Seus modelos",
-        "huggingFaceDescription": "Modelos baixados e modelos que você adicionou do Hugging Face.",
         "catalogEmpty": "Nenhum modelo local recomendado está disponível agora."
       },
       "subpages": {
@@ -1254,6 +1292,7 @@
         "timing": {
           "label": "Quando capturar",
           "description": "Para perguntas por voz: capturar no momento em que você começa a perguntar ou esperar até a mensagem ser enviada. Mensagens digitadas sempre capturam no envio.",
+          "descriptionAgent": "As duas opções preparam a captura de tela com antecedência, então o assistente nunca te deixa esperando por ela. A diferença é o que a imagem mostra: “Quando eu pergunto” pega a tela como ela estava quando você começou a falar; “Quando a mensagem é enviada” pega como ela está agora. Nos dois casos a imagem fica no seu dispositivo e só é enviada se o assistente realmente pedir para vê-la.",
           "options": {
             "immediate": "Quando eu pergunto",
             "on_send": "Quando a mensagem é enviada"
@@ -1477,7 +1516,8 @@
     "notices": {
       "flowNotConfigured": "O Flow precisa de um modelo de assistente — colado como ditado",
       "flowFailed": "O Flow não conseguiu gerar — nada foi colado",
-      "flowEmpty": "Diga um comando depois da frase de ativação"
+      "flowEmpty": "Diga um comando depois da frase de ativação",
+      "cleanupFallback": "A limpeza com IA não rodou — o texto bruto foi colado"
     },
     "listening": "Ouvindo…",
     "locked": "Gravando mãos livres — pressione a tecla de atalho novamente para parar",
@@ -1493,6 +1533,7 @@
     "empty": "Pergunte por voz com o atalho do assistente\nou digite abaixo.",
     "inputPlaceholder": "Mensagem…",
     "inputPlaceholderScreen": "Pergunte sobre sua tela…",
+    "queuedUntilReady": "Na fila — envio assim que esta resposta terminar.",
     "send": "Enviar",
     "stop": "Parar",
     "cancel": "Cancelar",
@@ -1549,6 +1590,12 @@
       "thinking": "Pensando...",
       "speaking": "Falando..."
     },
+    "tool": {
+      "search": "Pesquisando na web",
+      "screen": "Olhando sua tela",
+      "working": "Trabalhando nisso",
+      "elapsed": "{{seconds}}s"
+    },
     "errors": {
       "generic": "Algo deu errado. Tente novamente.",
       "genericShort": "Algo deu errado",
@@ -1560,6 +1607,8 @@
       "engine_startShort": "O modelo não conseguiu iniciar",
       "provider": "O modelo não conseguiu responder. Verifique sua chave da API e sua conexão e tente novamente.",
       "providerShort": "Não foi possível obter uma resposta",
+      "empty_reply": "O modelo terminou sem escrever uma resposta. Tente perguntar de novo ou escolha outro modelo em Configurações → Assistente.",
+      "empty_replyShort": "Resposta vazia",
       "vision_unsupported": "Este modelo não consegue ler sua tela. Escolha um modelo com visão em Configurações → Assistente ou pergunte de novo sem a visão de tela.",
       "vision_unsupportedShort": "O modelo não vê imagens",
       "screenshot_too_large": "A captura de tela ficou grande demais para este provedor. Tente novamente — ela será comprimida com mais força.",

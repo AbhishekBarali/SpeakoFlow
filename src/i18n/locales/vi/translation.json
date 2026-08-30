@@ -92,6 +92,7 @@
       },
       "seesScreen": "Xem được màn hình",
       "textOnly": "Chỉ văn bản",
+      "recommendedForAssistant": "Đề xuất cho trợ lý",
       "download": "Tải mô hình",
       "useDownloaded": "Dùng mô hình đã tải",
       "skip": "Bỏ qua bây giờ",
@@ -99,6 +100,14 @@
       "continue": "Tiếp tục",
       "downloadingHint": "Mô hình của bạn đang được tải xuống ở chế độ nền — bạn có thể bắt đầu sử dụng ứng dụng ngay.",
       "downloadStarted": "Đang tải mô hình AI của bạn ở chế độ nền."
+    },
+    "cleanup": {
+      "cardTitle": "SpeakoFlow Mini",
+      "cardDescription": "Áp dụng các lệnh nói như “new paragraph” hay “scratch that”. Chỉ tiếng Anh.",
+      "pill": "Dọn dẹp phần đọc chính tả",
+      "recommendedForDictation": "Đề xuất cho đọc chính tả",
+      "download": "Tải và bật",
+      "useDownloaded": "Bật lên"
     },
     "ready": {
       "title": "Bạn đã sẵn sàng.",
@@ -534,6 +543,7 @@
         "footnote": "Các thư mục đã liên kết sẽ được quét lại mỗi khi SpeakoFlow khởi động, nên những mô hình bạn thêm vào sau đó sẽ tự xuất hiện. Bỏ liên kết một thư mục hoặc xóa một mô hình chỉ loại nó khỏi danh sách này — các tệp của bạn vẫn ở nguyên chỗ cũ.",
         "removeTitle": "Xóa khỏi danh sách?",
         "removeConfirm": "Xóa “{{modelName}}” khỏi danh sách mô hình của bạn?\n\nBản thân tệp vẫn ở nguyên chỗ cũ:\n{{path}}",
+        "missingBadge": "Thiếu tệp",
         "fileMissing": "Không còn thấy tệp của mô hình này:\n{{path}}\n\nCó thể nó đã bị di chuyển, bị đổi tên, hoặc đang ở một ổ đĩa chưa được kết nối."
       }
     },
@@ -774,6 +784,7 @@
         "promptSelectFailed": "Đã tạo prompt, nhưng không thể chọn nó.",
         "promptUpdateFailed": "Không thể cập nhật prompt.",
         "promptDeleteFailed": "Không thể xóa prompt.",
+        "promptRestoreFailed": "Không thể phục hồi prompt.",
         "toneSelectFailed": "Không thể chọn văn phong.",
         "toneCreateFailed": "Không thể tạo văn phong.",
         "toneSelectAfterCreateFailed": "Đã tạo văn phong, nhưng không thể chọn nó.",
@@ -860,6 +871,7 @@
           "description": "Chọn một mẫu để tinh chỉnh bản ghi hoặc tạo mới. Sử dụng ${output} trong văn bản prompt để tham chiếu bản ghi đã chụp."
         },
         "noPrompts": "Không có prompt nào",
+        "nonePrompt": "Không dùng (không có prompt)",
         "selectPrompt": "Chọn một prompt",
         "createNew": "Tạo Prompt mới",
         "edit": "Sửa",
@@ -871,6 +883,7 @@
         "promptTip": "Mẹo: Văn bản đã chuyển đổi của bạn được gửi tới mô hình tự động — bạn chỉ cần viết hướng dẫn. (Các prompt cũ dùng <code>${output}</code> vẫn hoạt động.)",
         "updatePrompt": "Cập nhật Prompt",
         "deletePrompt": "Xóa Prompt",
+        "restorePrompt": "Phục hồi bản đề xuất",
         "createPrompt": "Tạo Prompt",
         "cancel": "Hủy",
         "selectToEdit": "Chọn một prompt ở trên để xem và chỉnh sửa chi tiết.",
@@ -896,7 +909,26 @@
       "aiCleanup": {
         "groupTitle": "Dọn dẹp bằng AI",
         "modelGroupTitle": "Mô hình dọn dẹp",
+        "unloadTimeout": {
+          "title": "Giữ mô hình dọn dẹp trong bộ nhớ",
+          "description": "Mô hình dọn dẹp trên máy sẽ nằm trong bộ nhớ bao lâu sau khi bạn ngừng dùng. Lâu hơn nghĩa là không phải nạp lại trước lần đọc chính tả kế tiếp; mô hình đang rảnh chiếm bộ nhớ nhưng không dùng CPU. Cài đặt này tách riêng với cài đặt của trợ lý."
+        },
+        "model": {
+          "emptyTitle": "Chưa có mô hình dọn dẹp nào",
+          "emptyDescription": "SpeakoFlow Mini là một bản tải nhỏ được làm riêng cho việc này.",
+          "choose": "Chọn một mô hình",
+          "tunedBadge": "Tinh chỉnh cho dọn dẹp"
+        },
+        "catalog": {
+          "title": "Chọn mô hình dọn dẹp của bạn",
+          "description": "Dọn dẹp chạy sau mỗi lần đọc chính tả, nên tốc độ quan trọng hơn kích thước. Mọi thứ đều chạy ngoại tuyến.",
+          "recommendedTitle": "Đề xuất cho dọn dẹp",
+          "recommendedDescription": "SpeakoFlow Mini được huấn luyện riêng cho việc này và làm tốt hơn cả những mô hình lớn hơn nhiều."
+        },
         "promptGroupTitle": "Prompt dọn dẹp",
+        "tunedModelNotice": "Mô hình này được tinh chỉnh để dọn dẹp phần đọc chính tả tiếng Anh, nên hoạt động tốt nhất với prompt được đề xuất và không dùng văn phong.",
+        "tunedModelNoticeDismiss": "Ẩn mẹo này",
+        "tunedModelNoticeRestore": "Hiện mẹo về mô hình",
         "title": "Dùng AI chỉnh lại phần đọc chính tả của tôi",
         "caption": "Thử nghiệm — dọn dấu câu và từ đệm sau khi bạn đọc chính tả.",
         "info": "Chạy một mô hình ngôn ngữ trên phần đọc chính tả của bạn để sửa dấu câu, loại bỏ từ đệm và tùy chọn điều chỉnh văn phong. Chỉ áp dụng cho đọc chính tả, bằng phím tắt riêng. Nó thêm một khoảng chờ ngắn sau khi bạn nói; nếu mô hình thất bại hoặc quá thời gian, văn bản gốc của bạn sẽ được dùng. Vẫn đang phát triển."
@@ -944,6 +976,7 @@
       "originalTranscriptionLabel": "Bản chuyển đổi gốc",
       "flowOutputLabel": "Kết quả từ Flow",
       "finalTextLabel": "Văn bản cuối",
+      "cleanupNoChanges": "Đã chạy dọn dẹp bằng AI, không có gì cần sửa",
       "flowNoOutput": "Flow không tạo ra kết quả nào.",
       "copyToClipboard": "Sao chép bản ghi vào clipboard",
       "copyFlowOutput": "Sao chép kết quả từ Flow",
@@ -1081,12 +1114,16 @@
       }
     },
     "assistant": {
+      "enable": {
+        "title": "Trợ lý",
+        "label": "Bật trợ lý",
+        "description": "Tắt tùy chọn này để SpeakoFlow chỉ làm việc đọc chính tả. Bảng nổi sẽ đóng và không bao giờ được nạp, các phím tắt của nó được giải phóng, và bộ nhớ nó dùng được trả lại. Tạo nội dung với Flow và dọn dẹp bằng AI vẫn hoạt động."
+      },
       "shortcuts": {
         "title": "Phím tắt"
       },
       "brain": {
         "title": "Bộ não trợ lý",
-        "description": "Chọn xem trợ lý của bạn chạy riêng tư trên thiết bị này hay qua một nhà cung cấp đám mây.",
         "whereLabel": "Nơi chạy",
         "onDevice": "Trên máy của tôi",
         "cloud": "Nhà cung cấp đám mây",
@@ -1106,17 +1143,18 @@
         "acceleratorUnknownWithMemory": "Không rõ bộ nhớ đồ họa · {{memory}} GB RAM hệ thống để dự phòng bằng CPU",
         "acceleratorUnknown": "Không rõ bộ nhớ đồ họa · không thể dự đoán tốc độ trả lời",
         "details": "Chi tiết",
+        "detailFile": "Tệp",
+        "detailLocation": "Vị trí",
+        "detailFormat": "Định dạng",
+        "detailId": "ID mô hình",
         "switchBeforeDelete": "Hãy chuyển trợ lý tích hợp sang mô hình khác trước khi xóa mô hình này.",
         "deleteModelConfirm": "Xóa {{modelName}}? Các tệp đã tải và mục đã lưu của nó sẽ bị loại bỏ.",
         "deleteModelFailed": "Không thể xóa mô hình.",
-        "visionModelNote": "Khả năng xem màn hình sẽ tự động tải thêm một tệp hình ảnh.",
         "finderSectionTitle": "Thêm mô hình chạy trên thiết bị",
-        "finderSectionDescription": "Tìm trên Hugging Face khi bạn cần một mô hình có kích thước hoặc khả năng khác.",
         "finderTitle": "Xem trên Hugging Face",
         "finderDescription": "Tìm trong hàng nghìn mô hình GGUF và tải một mô hình trực tiếp vào SpeakoFlow.",
         "finderAction": "Tìm một mô hình",
         "huggingFaceTitle": "Mô hình của bạn",
-        "huggingFaceDescription": "Các mô hình đã tải và các mô hình bạn thêm từ Hugging Face.",
         "catalogEmpty": "Hiện không có mô hình cục bộ được đề xuất nào."
       },
       "subpages": {
@@ -1254,6 +1292,7 @@
         "timing": {
           "label": "Chụp khi nào",
           "description": "Với câu hỏi bằng giọng nói: chụp ngay lúc bạn bắt đầu hỏi, hoặc chờ đến khi tin nhắn được gửi. Tin nhắn gõ tay luôn chụp lúc gửi.",
+          "descriptionAgent": "Cả hai tùy chọn đều chuẩn bị ảnh màn hình trước, nên trợ lý không bao giờ để bạn phải chờ. Khác biệt nằm ở nội dung ảnh: “Khi tôi bắt đầu hỏi” lấy màn hình như lúc bạn bắt đầu nói, “Khi tin nhắn được gửi” lấy màn hình như hiện tại. Dù chọn cách nào, ảnh vẫn ở trên máy của bạn và chỉ được gửi đi nếu trợ lý thực sự cần xem.",
           "options": {
             "immediate": "Khi tôi bắt đầu hỏi",
             "on_send": "Khi tin nhắn được gửi"
@@ -1477,7 +1516,8 @@
     "notices": {
       "flowNotConfigured": "Flow cần một mô hình trợ lý — đã dán như đọc chính tả",
       "flowFailed": "Flow không tạo được nội dung — không có gì được dán",
-      "flowEmpty": "Hãy nói một câu lệnh sau cụm từ kích hoạt"
+      "flowEmpty": "Hãy nói một câu lệnh sau cụm từ kích hoạt",
+      "cleanupFallback": "Dọn dẹp bằng AI không chạy — đã dán văn bản gốc"
     },
     "listening": "Đang lắng nghe…",
     "locked": "Đang ghi âm rảnh tay — nhấn lại phím tắt để dừng",
@@ -1493,6 +1533,7 @@
     "empty": "Hỏi bằng giọng nói với phím tắt trợ lý,\nhoặc gõ bên dưới.",
     "inputPlaceholder": "Tin nhắn…",
     "inputPlaceholderScreen": "Hỏi về màn hình của bạn…",
+    "queuedUntilReady": "Đã xếp hàng — sẽ gửi ngay khi câu trả lời này xong.",
     "send": "Gửi",
     "stop": "Dừng",
     "cancel": "Hủy",
@@ -1549,6 +1590,12 @@
       "thinking": "Đang suy nghĩ...",
       "speaking": "Đang nói..."
     },
+    "tool": {
+      "search": "Đang tìm trên web",
+      "screen": "Đang xem màn hình của bạn",
+      "working": "Đang xử lý",
+      "elapsed": "{{seconds}}s"
+    },
     "errors": {
       "generic": "Đã xảy ra lỗi. Vui lòng thử lại.",
       "genericShort": "Đã xảy ra lỗi",
@@ -1560,6 +1607,8 @@
       "engine_startShort": "Mô hình không khởi động được",
       "provider": "Mô hình không trả lời được. Hãy kiểm tra khóa API và kết nối của bạn, rồi thử lại.",
       "providerShort": "Không nhận được câu trả lời",
+      "empty_reply": "Mô hình đã kết thúc mà không viết câu trả lời. Hãy thử hỏi lại, hoặc chọn mô hình khác trong Cài đặt → Trợ lý.",
+      "empty_replyShort": "Câu trả lời trống",
       "vision_unsupported": "Mô hình này không đọc được màn hình của bạn. Hãy chọn một mô hình xem được hình ảnh trong Cài đặt → Trợ lý, hoặc hỏi lại mà không dùng khả năng xem màn hình.",
       "vision_unsupportedShort": "Mô hình không xem được hình ảnh",
       "screenshot_too_large": "Ảnh màn hình quá lớn với nhà cung cấp này. Vui lòng thử lại — ảnh sẽ được nén mạnh hơn.",

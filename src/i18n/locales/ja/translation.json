@@ -92,6 +92,7 @@
       },
       "seesScreen": "画面を認識",
       "textOnly": "テキストのみ",
+      "recommendedForAssistant": "アシスタントにおすすめ",
       "download": "モデルをダウンロード",
       "useDownloaded": "ダウンロード済みのモデルを使う",
       "skip": "今はスキップ",
@@ -99,6 +100,14 @@
       "continue": "続ける",
       "downloadingHint": "モデルはバックグラウンドでダウンロード中です。すぐにアプリを使い始められます。",
       "downloadStarted": "AIモデルをバックグラウンドでダウンロードしています。"
+    },
+    "cleanup": {
+      "cardTitle": "SpeakoFlow Mini",
+      "cardDescription": "“new paragraph” や “scratch that” といった音声での指示を反映します。英語のみ。",
+      "pill": "音声入力を整えます",
+      "recommendedForDictation": "音声入力におすすめ",
+      "download": "ダウンロードしてオンにする",
+      "useDownloaded": "オンにする"
     },
     "ready": {
       "title": "準備完了です。",
@@ -534,6 +543,7 @@
         "footnote": "リンクしたフォルダーはSpeakoFlowの起動時に再スキャンされるため、後から追加したモデルも自動的に表示されます。フォルダーのリンク解除やモデルの削除は、このリストから取り除くだけです。ファイルは元の場所に残ります。",
         "removeTitle": "リストから削除しますか？",
         "removeConfirm": "「{{modelName}}」をモデルリストから削除しますか？\n\nファイル自体は元の場所に残ります:\n{{path}}",
+        "missingBadge": "ファイルなし",
         "fileMissing": "このモデルのファイルが見つかりません:\n{{path}}\n\n移動または名前が変更されたか、接続されていないドライブにある可能性があります。"
       }
     },
@@ -774,6 +784,7 @@
         "promptSelectFailed": "プロンプトを作成しましたが、選択できませんでした。",
         "promptUpdateFailed": "プロンプトを更新できませんでした。",
         "promptDeleteFailed": "プロンプトを削除できませんでした。",
+        "promptRestoreFailed": "プロンプトを復元できませんでした。",
         "toneSelectFailed": "文体を選択できませんでした。",
         "toneCreateFailed": "文体を作成できませんでした。",
         "toneSelectAfterCreateFailed": "文体を作成しましたが、選択できませんでした。",
@@ -860,6 +871,7 @@
           "description": "文字起こしを改善するテンプレートを選択するか、新しく作成します。プロンプトテキスト内で${output}を使用して、キャプチャした文字起こしを参照します。"
         },
         "noPrompts": "プロンプトがありません",
+        "nonePrompt": "なし（プロンプトなし）",
         "selectPrompt": "プロンプトを選択",
         "createNew": "新しいプロンプトを作成",
         "edit": "編集",
@@ -871,6 +883,7 @@
         "promptTip": "ヒント：文字起こしされたテキストは自動でモデルに送られるので、指示だけを書いてください。（<code>${output}</code> を使う古いプロンプトも動作します。）",
         "updatePrompt": "プロンプトを更新",
         "deletePrompt": "プロンプトを削除",
+        "restorePrompt": "推奨に戻す",
         "createPrompt": "プロンプトを作成",
         "cancel": "キャンセル",
         "selectToEdit": "上からプロンプトを選択して、詳細を表示・編集します。",
@@ -896,7 +909,26 @@
       "aiCleanup": {
         "groupTitle": "AI整形",
         "modelGroupTitle": "整形に使うモデル",
+        "unloadTimeout": {
+          "title": "整形モデルを読み込んだままにする",
+          "description": "使うのをやめたあと、デバイス上の整形モデルをメモリに保持する時間です。長くすると次の音声入力の前に読み込み直す必要がなくなります。待機中のモデルはメモリを使いますが、CPUは使いません。アシスタントの設定とは別です。"
+        },
+        "model": {
+          "emptyTitle": "整形モデルがまだありません",
+          "emptyDescription": "SpeakoFlow Mini は、この用途のために作られた小さなダウンロードです。",
+          "choose": "モデルを選択",
+          "tunedBadge": "整形向けに調整済み"
+        },
+        "catalog": {
+          "title": "整形に使うモデルを選択",
+          "description": "整形は音声入力のたびに実行されるため、サイズよりも速度が重要です。すべてオフラインで動作します。",
+          "recommendedTitle": "整形におすすめ",
+          "recommendedDescription": "SpeakoFlow Mini はこの仕事だけのために学習しており、はるかに大きなモデルよりも優れています。"
+        },
         "promptGroupTitle": "整形用のプロンプト",
+        "tunedModelNotice": "このモデルは英語の音声入力の整形に特化してファインチューニングされているため、推奨プロンプトで文体を指定しないときに最も高い性能を発揮します。",
+        "tunedModelNoticeDismiss": "このヒントを隠す",
+        "tunedModelNoticeRestore": "モデルのヒントを表示",
         "title": "音声入力をAIで整える",
         "caption": "実験的機能 — 音声入力のあとに句読点やつなぎ言葉を整えます。",
         "info": "音声入力の結果に言語モデルを通し、句読点を整え、つなぎ言葉を削除し、必要に応じてトーンも調整します。対象は音声入力のみで、専用のショートカットで動作します。話し終えたあとに少し遅延が生じ、モデルが失敗またはタイムアウトした場合は元のテキストが使われます。まだ開発中の機能です。"
@@ -944,6 +976,7 @@
       "originalTranscriptionLabel": "元の文字起こし",
       "flowOutputLabel": "Flowの出力",
       "finalTextLabel": "最終テキスト",
+      "cleanupNoChanges": "AI整形を実行しましたが、直すところはありませんでした",
       "flowNoOutput": "Flowの出力は生成されませんでした。",
       "copyToClipboard": "文字起こしをクリップボードにコピー",
       "copyFlowOutput": "Flowの出力をコピー",
@@ -1081,12 +1114,16 @@
       }
     },
     "assistant": {
+      "enable": {
+        "title": "アシスタント",
+        "label": "アシスタントを有効にする",
+        "description": "オフにすると、SpeakoFlow は音声入力専用になります。フローティングパネルは閉じられて読み込まれなくなり、そのホットキーは解放され、使っていたメモリも返されます。Flowで生成 と AI整形はそのまま使えます。"
+      },
       "shortcuts": {
         "title": "ショートカット"
       },
       "brain": {
         "title": "アシスタントの頭脳",
-        "description": "アシスタントをこのデバイス上でプライベートに動かすか、クラウドプロバイダー経由で動かすかを選びます。",
         "whereLabel": "実行場所",
         "onDevice": "このデバイス上",
         "cloud": "クラウドプロバイダー",
@@ -1106,17 +1143,18 @@
         "acceleratorUnknownWithMemory": "グラフィックスメモリを取得できません · CPUで動作する場合のシステムRAMは {{memory}} GB",
         "acceleratorUnknown": "グラフィックスメモリを取得できません · 応答速度は予測できません",
         "details": "詳細",
+        "detailFile": "ファイル",
+        "detailLocation": "場所",
+        "detailFormat": "形式",
+        "detailId": "モデルID",
         "switchBeforeDelete": "このモデルを削除する前に、内蔵アシスタントを別のモデルに切り替えてください。",
         "deleteModelConfirm": "{{modelName}}を削除しますか？ダウンロード済みのファイルと保存された項目が削除されます。",
         "deleteModelFailed": "モデルを削除できませんでした。",
-        "visionModelNote": "画面認識では、画像用の追加ファイルが自動的にダウンロードされます。",
         "finderSectionTitle": "デバイス上で動く他のモデル",
-        "finderSectionDescription": "別のサイズや機能のモデルが必要なときは、Hugging Faceを検索してください。",
         "finderTitle": "Hugging Faceを見る",
         "finderDescription": "数千のGGUFモデルを検索し、SpeakoFlowに直接ダウンロードできます。",
         "finderAction": "モデルを探す",
         "huggingFaceTitle": "あなたのモデル",
-        "huggingFaceDescription": "ダウンロード済みのモデルと、Hugging Faceから追加したモデル。",
         "catalogEmpty": "現在、おすすめのローカルモデルはありません。"
       },
       "subpages": {
@@ -1254,6 +1292,7 @@
         "timing": {
           "label": "キャプチャのタイミング",
           "description": "音声で質問する場合：質問を始めた瞬間にキャプチャするか、メッセージが送信されるまで待ちます。入力したメッセージは常に送信時にキャプチャします。",
+          "descriptionAgent": "どちらを選んでもスクリーンショットは事前に用意されるため、アシスタントを待つことはありません。違うのは画像に写る内容です。「質問した瞬間」は話し始めたときの画面、「メッセージ送信時」は今の画面を取得します。どちらの場合も画像はデバイス上に留まり、アシスタントが実際に見たいと求めたときにだけ送信されます。",
           "options": {
             "immediate": "質問した瞬間",
             "on_send": "メッセージ送信時"
@@ -1477,7 +1516,8 @@
     "notices": {
       "flowNotConfigured": "Flowにはアシスタントのモデルが必要です — 音声入力として貼り付けました",
       "flowFailed": "Flowが生成できませんでした — 何も貼り付けられていません",
-      "flowEmpty": "起動フレーズのあとに指示を話してください"
+      "flowEmpty": "起動フレーズのあとに指示を話してください",
+      "cleanupFallback": "AI整形は実行されませんでした — 元のテキストを貼り付けました"
     },
     "listening": "聞いています…",
     "locked": "ハンズフリーで録音中 — 停止するにはもう一度ホットキーを押してください",
@@ -1493,6 +1533,7 @@
     "empty": "アシスタントのショートカットで音声で質問するか、\n下に入力してください。",
     "inputPlaceholder": "メッセージ…",
     "inputPlaceholderScreen": "画面について質問…",
+    "queuedUntilReady": "順番待ち — この返信が終わり次第、送信します。",
     "send": "送信",
     "stop": "停止",
     "cancel": "キャンセル",
@@ -1549,6 +1590,12 @@
       "thinking": "考えています...",
       "speaking": "読み上げ中..."
     },
+    "tool": {
+      "search": "ウェブを検索中",
+      "screen": "画面を確認中",
+      "working": "処理中",
+      "elapsed": "{{seconds}}秒"
+    },
     "errors": {
       "generic": "問題が発生しました。もう一度お試しください。",
       "genericShort": "問題が発生しました",
@@ -1560,6 +1607,8 @@
       "engine_startShort": "モデルを起動できません",
       "provider": "モデルが回答できませんでした。APIキーと接続を確認して、もう一度お試しください。",
       "providerShort": "回答を取得できません",
+      "empty_reply": "モデルは返信を書かずに終了しました。もう一度質問するか、設定 → アシスタントで別のモデルを選択してください。",
+      "empty_replyShort": "返信が空です",
       "vision_unsupported": "このモデルは画面を読み取れません。設定 → アシスタントで画像対応のモデルを選ぶか、画面認識なしでもう一度質問してください。",
       "vision_unsupportedShort": "モデルは画像を認識できません",
       "screenshot_too_large": "画面キャプチャがこのプロバイダーには大きすぎました。もう一度お試しください — より強く圧縮されます。",

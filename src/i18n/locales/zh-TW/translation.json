@@ -92,6 +92,7 @@
       },
       "seesScreen": "可看見螢幕",
       "textOnly": "僅支援文字",
+      "recommendedForAssistant": "推薦用於助理",
       "download": "下載模型",
       "useDownloaded": "使用已下載的模型",
       "skip": "暫時略過",
@@ -99,6 +100,14 @@
       "continue": "繼續",
       "downloadingHint": "您的模型正在背景下載——您可以立即開始使用應用程式。",
       "downloadStarted": "正在背景下載您的 AI 模型。"
+    },
+    "cleanup": {
+      "cardTitle": "SpeakoFlow Mini",
+      "cardDescription": "會套用口說指令，例如「new paragraph」與「scratch that」。僅支援英文。",
+      "pill": "整理您的語音輸入",
+      "recommendedForDictation": "推薦用於語音輸入",
+      "download": "下載並開啟",
+      "useDownloaded": "開啟"
     },
     "ready": {
       "title": "準備完成。",
@@ -534,6 +543,7 @@
         "footnote": "SpeakoFlow 啟動時會重新掃描已連結的資料夾，因此你之後放進去的模型會自動出現。取消連結資料夾或移除模型，只會從這份清單中移除——你的檔案會留在原處。",
         "removeTitle": "要從清單中移除嗎？",
         "removeConfirm": "要從模型清單中移除「{{modelName}}」嗎？\n\n檔案本身會留在原處：\n{{path}}",
+        "missingBadge": "檔案遺失",
         "fileMissing": "找不到此模型的檔案：\n{{path}}\n\n它可能已被移動或重新命名，也可能位於尚未連接的磁碟機上。"
       }
     },
@@ -774,6 +784,7 @@
         "promptSelectFailed": "已建立提示詞，但無法選取它。",
         "promptUpdateFailed": "無法更新提示詞。",
         "promptDeleteFailed": "無法刪除提示詞。",
+        "promptRestoreFailed": "無法還原提示詞。",
         "toneSelectFailed": "無法選取文字風格。",
         "toneCreateFailed": "無法建立文字風格。",
         "toneSelectAfterCreateFailed": "已建立文字風格，但無法選取它。",
@@ -860,6 +871,7 @@
           "description": "選擇用於最佳化轉錄的範本或建立新範本。在提示詞文字中使用 ${output} 來引用轉錄結果"
         },
         "noPrompts": "沒有可用的提示詞",
+        "nonePrompt": "無（不使用提示詞）",
         "selectPrompt": "選擇提示詞",
         "createNew": "建立新提示詞",
         "edit": "編輯",
@@ -871,6 +883,7 @@
         "promptTip": "提示：轉錄文字會自動傳送給模型——您只需寫下指令。（使用 <code>${output}</code> 的舊提示詞仍然有效。）",
         "updatePrompt": "更新提示詞",
         "deletePrompt": "刪除提示詞",
+        "restorePrompt": "還原推薦版本",
         "createPrompt": "建立提示詞",
         "cancel": "取消",
         "selectToEdit": "選擇上方的提示詞以檢視和編輯其詳細資訊",
@@ -896,7 +909,26 @@
       "aiCleanup": {
         "groupTitle": "AI 整理",
         "modelGroupTitle": "整理模型",
+        "unloadTimeout": {
+          "title": "讓整理模型保持載入",
+          "description": "停止使用後，裝置上的整理模型會在記憶體中保留多久。時間越長，下次語音輸入前就不必重新載入；閒置的模型會佔用記憶體，但不佔用 CPU。與助理的同類設定各自獨立。"
+        },
+        "model": {
+          "emptyTitle": "還沒有整理模型",
+          "emptyDescription": "SpeakoFlow Mini 是專為此打造的小型下載。",
+          "choose": "選擇模型",
+          "tunedBadge": "專為整理調校"
+        },
+        "catalog": {
+          "title": "選擇您的整理模型",
+          "description": "每次語音輸入後都會執行整理，因此速度比大小更重要。全部離線執行。",
+          "recommendedTitle": "推薦用於整理",
+          "recommendedDescription": "SpeakoFlow Mini 專為這一件事訓練，在這方面勝過大得多的模型。"
+        },
         "promptGroupTitle": "整理提示詞",
+        "tunedModelNotice": "此模型針對英文語音輸入整理做過微調，因此搭配推薦的提示詞、不設文字風格時效果最好。",
+        "tunedModelNoticeDismiss": "隱藏此提示",
+        "tunedModelNoticeRestore": "顯示模型提示",
         "title": "用 AI 修飾我的語音輸入",
         "caption": "實驗性功能——在您語音輸入後整理標點與語助詞。",
         "info": "以語言模型處理您的語音輸入，修正標點、移除語助詞，並可選擇調整語氣。僅套用於語音輸入，並使用專屬的快捷鍵。說完後會有短暫延遲；若模型失敗或逾時，則會改用未經處理的原始文字。仍在開發中。"
@@ -944,6 +976,7 @@
       "originalTranscriptionLabel": "原始轉錄",
       "flowOutputLabel": "Flow 輸出",
       "finalTextLabel": "最終文字",
+      "cleanupNoChanges": "已執行 AI 整理，沒有需要修改的地方",
       "flowNoOutput": "沒有產生 Flow 輸出。",
       "copyToClipboard": "複製轉錄到剪貼簿",
       "copyFlowOutput": "複製 Flow 輸出",
@@ -1081,12 +1114,16 @@
       }
     },
     "assistant": {
+      "enable": {
+        "title": "助理",
+        "label": "啟用助理",
+        "description": "關閉後，SpeakoFlow 只做語音輸入。浮動面板會關閉且不再載入，它的快捷鍵會釋放，佔用的記憶體也會歸還。使用 Flow 生成 與 AI 整理仍可正常使用。"
+      },
       "shortcuts": {
         "title": "快捷鍵"
       },
       "brain": {
         "title": "助理大腦",
-        "description": "選擇助理要在這台裝置上私密執行，還是透過雲端供應商執行。",
         "whereLabel": "執行位置",
         "onDevice": "在我的裝置上",
         "cloud": "雲端供應商",
@@ -1106,17 +1143,18 @@
         "acceleratorUnknownWithMemory": "無法取得顯示記憶體 · 改用 CPU 時可用系統記憶體 {{memory}} GB",
         "acceleratorUnknown": "無法取得顯示記憶體 · 無法預估回應速度",
         "details": "詳細資訊",
+        "detailFile": "檔案",
+        "detailLocation": "位置",
+        "detailFormat": "格式",
+        "detailId": "模型 ID",
         "switchBeforeDelete": "請先將內建助理切換到其他模型，再刪除這一個。",
         "deleteModelConfirm": "要刪除 {{modelName}} 嗎？其下載的檔案與已儲存的項目都會一併移除。",
         "deleteModelFailed": "無法刪除模型。",
-        "visionModelNote": "螢幕視覺會自動額外下載一個影像檔案。",
         "finderSectionTitle": "更多裝置端模型",
-        "finderSectionDescription": "需要不同大小或能力的模型時，可搜尋 Hugging Face。",
         "finderTitle": "瀏覽 Hugging Face",
         "finderDescription": "搜尋數千個 GGUF 模型，直接下載到 SpeakoFlow。",
         "finderAction": "尋找模型",
         "huggingFaceTitle": "我的模型",
-        "huggingFaceDescription": "已下載的模型，以及您從 Hugging Face 新增的模型。",
         "catalogEmpty": "目前沒有可用的推薦本機模型。"
       },
       "subpages": {
@@ -1254,6 +1292,7 @@
         "timing": {
           "label": "擷取時機",
           "description": "語音提問時：在您開始提問的那一刻擷取，或等到訊息送出時再擷取。以文字輸入的訊息一律在送出時擷取。",
+          "descriptionAgent": "兩個選項都會事先準備好螢幕截圖，因此助理絕不會讓您等待。差別在於圖片的內容：「開始提問時」擷取的是您開始說話時的螢幕，「訊息送出時」擷取的是目前的螢幕。無論選哪一個，圖片都留在您的裝置上，只有助理確實要求查看時才會傳送。",
           "options": {
             "immediate": "開始提問時",
             "on_send": "訊息送出時"
@@ -1477,7 +1516,8 @@
     "notices": {
       "flowNotConfigured": "Flow 需要助理模型——已改以一般語音輸入貼上",
       "flowFailed": "Flow 無法生成——未貼上任何內容",
-      "flowEmpty": "請在啟動語句後說出指令"
+      "flowEmpty": "請在啟動語句後說出指令",
+      "cleanupFallback": "AI 整理未執行——已貼上原始文字"
     },
     "listening": "正在聆聽…",
     "locked": "免持錄製中——再按一次快捷鍵即可停止",
@@ -1493,6 +1533,7 @@
     "empty": "用助理快捷鍵以語音提問，\n或在下方輸入文字。",
     "inputPlaceholder": "訊息…",
     "inputPlaceholderScreen": "詢問您的螢幕內容…",
+    "queuedUntilReady": "已排入佇列——這則回覆結束後立即傳送。",
     "send": "送出",
     "stop": "停止",
     "cancel": "取消",
@@ -1549,6 +1590,12 @@
       "thinking": "正在思考...",
       "speaking": "正在朗讀..."
     },
+    "tool": {
+      "search": "正在搜尋網路",
+      "screen": "正在查看您的螢幕",
+      "working": "正在處理",
+      "elapsed": "{{seconds}}秒"
+    },
     "errors": {
       "generic": "發生錯誤，請重試。",
       "genericShort": "發生錯誤",
@@ -1560,6 +1607,8 @@
       "engine_startShort": "模型無法啟動",
       "provider": "模型無法回答。請檢查您的 API 金鑰與網路連線後重試。",
       "providerShort": "無法取得回答",
+      "empty_reply": "模型結束了卻沒有寫出回答。請再問一次，或在「設定」→「助理」中改選其他模型。",
+      "empty_replyShort": "回答為空",
       "vision_unsupported": "此模型無法讀取您的螢幕。請在「設定」→「助理」中選擇支援視覺的模型，或在不使用螢幕視覺的情況下再提問。",
       "vision_unsupportedShort": "模型無法看圖片",
       "screenshot_too_large": "螢幕擷取的畫面對此供應商來說太大。請重試——系統會以更高的壓縮率處理。",

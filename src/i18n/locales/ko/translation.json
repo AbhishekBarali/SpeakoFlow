@@ -92,6 +92,7 @@
       },
       "seesScreen": "화면 인식 가능",
       "textOnly": "텍스트 전용",
+      "recommendedForAssistant": "어시스턴트에 추천",
       "download": "모델 다운로드",
       "useDownloaded": "다운로드한 모델 사용",
       "skip": "지금은 건너뛰기",
@@ -99,6 +100,14 @@
       "continue": "계속",
       "downloadingHint": "모델을 백그라운드에서 다운로드하고 있습니다. 바로 앱을 사용할 수 있습니다.",
       "downloadStarted": "AI 모델을 백그라운드에서 다운로드하고 있습니다."
+    },
+    "cleanup": {
+      "cardTitle": "SpeakoFlow Mini",
+      "cardDescription": "“new paragraph”, “scratch that” 같은 음성 편집 지시를 반영합니다. 영어 전용.",
+      "pill": "받아쓰기를 정리합니다",
+      "recommendedForDictation": "받아쓰기에 추천",
+      "download": "다운로드하고 켜기",
+      "useDownloaded": "켜기"
     },
     "ready": {
       "title": "준비가 끝났습니다.",
@@ -534,6 +543,7 @@
         "footnote": "연결된 폴더는 SpeakoFlow가 시작될 때 다시 검사되므로, 나중에 폴더에 넣은 모델도 저절로 나타납니다. 폴더 연결을 해제하거나 모델을 제거해도 이 목록에서만 사라지며 — 파일은 원래 자리에 그대로 남습니다.",
         "removeTitle": "목록에서 제거할까요?",
         "removeConfirm": "모델 목록에서 “{{modelName}}”을(를) 제거할까요?\n\n파일 자체는 원래 자리에 그대로 있습니다:\n{{path}}",
+        "missingBadge": "파일 없음",
         "fileMissing": "이 모델의 파일이 더 이상 존재하지 않습니다:\n{{path}}\n\n옮겨졌거나 이름이 바뀌었을 수 있고, 연결되지 않은 드라이브에 있을 수도 있습니다."
       }
     },
@@ -774,6 +784,7 @@
         "promptSelectFailed": "프롬프트를 만들었지만 선택할 수 없습니다.",
         "promptUpdateFailed": "프롬프트를 업데이트할 수 없습니다.",
         "promptDeleteFailed": "프롬프트를 삭제할 수 없습니다.",
+        "promptRestoreFailed": "프롬프트를 복원할 수 없습니다.",
         "toneSelectFailed": "문체를 선택할 수 없습니다.",
         "toneCreateFailed": "문체를 만들 수 없습니다.",
         "toneSelectAfterCreateFailed": "문체를 만들었지만 선택할 수 없습니다.",
@@ -860,6 +871,7 @@
           "description": "텍스트 변환을 개선하기 위한 템플릿을 선택하거나 새로 만드세요. 프롬프트 텍스트 내에서 ${output}를 사용하여 캡처된 텍스트를 참조하세요."
         },
         "noPrompts": "사용 가능한 프롬프트 없음",
+        "nonePrompt": "없음 (프롬프트 없음)",
         "selectPrompt": "프롬프트 선택",
         "createNew": "새 프롬프트 만들기",
         "edit": "편집",
@@ -871,6 +883,7 @@
         "promptTip": "팁: 변환된 텍스트는 모델에 자동으로 전달되므로 지시만 적으면 됩니다. (<code>${output}</code>을 사용하는 기존 프롬프트도 계속 작동합니다.)",
         "updatePrompt": "프롬프트 업데이트",
         "deletePrompt": "프롬프트 삭제",
+        "restorePrompt": "추천값으로 되돌리기",
         "createPrompt": "프롬프트 만들기",
         "cancel": "취소",
         "selectToEdit": "세부 정보를 보고 편집하려면 위에서 프롬프트를 선택하세요.",
@@ -896,7 +909,26 @@
       "aiCleanup": {
         "groupTitle": "AI 정리",
         "modelGroupTitle": "정리 모델",
+        "unloadTimeout": {
+          "title": "정리 모델을 메모리에 유지",
+          "description": "사용을 멈춘 뒤 기기 안의 정리 모델을 메모리에 얼마나 오래 둘지 정합니다. 길게 두면 다음 받아쓰기 전에 다시 불러오지 않습니다. 쉬고 있는 모델은 메모리를 쓰지만 CPU는 쓰지 않습니다. 어시스턴트 설정과는 별개입니다."
+        },
+        "model": {
+          "emptyTitle": "아직 정리 모델이 없습니다",
+          "emptyDescription": "SpeakoFlow Mini는 이 일을 위해 만든 작은 다운로드입니다.",
+          "choose": "모델 선택",
+          "tunedBadge": "정리에 맞게 조정됨"
+        },
+        "catalog": {
+          "title": "정리 모델 선택",
+          "description": "정리는 받아쓰기마다 실행되므로 크기보다 속도가 중요합니다. 모두 오프라인으로 동작합니다.",
+          "recommendedTitle": "정리에 추천",
+          "recommendedDescription": "SpeakoFlow Mini는 이 한 가지 일만 학습해서, 훨씬 큰 모델보다 잘합니다."
+        },
         "promptGroupTitle": "정리 프롬프트",
+        "tunedModelNotice": "이 모델은 영어 받아쓰기 정리에 맞춰 미세 조정되었으므로, 추천 프롬프트에 문체를 지정하지 않을 때 가장 잘 작동합니다.",
+        "tunedModelNoticeDismiss": "이 팁 숨기기",
+        "tunedModelNoticeRestore": "모델 팁 보기",
         "title": "AI로 받아쓰기 다듬기",
         "caption": "실험적 기능 — 받아쓰기 후 문장 부호와 군더더기를 정리합니다.",
         "info": "받아쓰기 결과에 언어 모델을 적용해 문장 부호를 고치고, 군더더기 말을 지우고, 필요하면 어조도 조정합니다. 받아쓰기에만 적용되며 전용 단축키로 실행됩니다. 말을 마친 뒤 약간의 지연이 생기고, 모델이 실패하거나 시간이 초과되면 원본 텍스트가 대신 사용됩니다. 아직 개발 중입니다."
@@ -944,6 +976,7 @@
       "originalTranscriptionLabel": "원본 전사",
       "flowOutputLabel": "Flow 결과",
       "finalTextLabel": "최종 텍스트",
+      "cleanupNoChanges": "AI 정리를 실행했지만 고칠 것이 없었습니다",
       "flowNoOutput": "Flow 결과가 생성되지 않았습니다.",
       "copyToClipboard": "녹음 내용을 클립보드에 복사",
       "copyFlowOutput": "Flow 결과 복사",
@@ -1081,12 +1114,16 @@
       }
     },
     "assistant": {
+      "enable": {
+        "title": "어시스턴트",
+        "label": "어시스턴트 사용",
+        "description": "이 기능을 끄면 SpeakoFlow는 받아쓰기 전용이 됩니다. 떠 있는 패널은 닫히고 아예 불러오지 않으며, 단축키는 풀리고 쓰던 메모리도 돌려줍니다. Flow로 생성하기와 AI 정리는 계속 작동합니다."
+      },
       "shortcuts": {
         "title": "단축키"
       },
       "brain": {
         "title": "어시스턴트 두뇌",
-        "description": "어시스턴트를 이 기기에서 비공개로 실행할지, 클라우드 제공자를 통해 실행할지 선택하세요.",
         "whereLabel": "실행 위치",
         "onDevice": "내 기기에서",
         "cloud": "클라우드 제공자",
@@ -1106,17 +1143,18 @@
         "acceleratorUnknownWithMemory": "그래픽 메모리를 확인할 수 없음 · CPU 대체 실행용 시스템 RAM {{memory}} GB",
         "acceleratorUnknown": "그래픽 메모리를 확인할 수 없음 · 응답 속도를 예측할 수 없습니다",
         "details": "세부 정보",
+        "detailFile": "파일",
+        "detailLocation": "위치",
+        "detailFormat": "형식",
+        "detailId": "모델 ID",
         "switchBeforeDelete": "이 모델을 삭제하기 전에 내장 어시스턴트를 다른 모델로 바꾸세요.",
         "deleteModelConfirm": "{{modelName}}을(를) 삭제하시겠습니까? 다운로드한 파일과 저장된 항목이 제거됩니다.",
         "deleteModelFailed": "모델을 삭제할 수 없습니다.",
-        "visionModelNote": "화면 인식을 쓰면 이미지 파일이 자동으로 추가 다운로드됩니다.",
         "finderSectionTitle": "더 많은 기기 내 모델",
-        "finderSectionDescription": "다른 크기나 기능의 모델이 필요하면 Hugging Face에서 검색하세요.",
         "finderTitle": "Hugging Face 살펴보기",
         "finderDescription": "수천 개의 GGUF 모델을 검색해 SpeakoFlow로 바로 다운로드하세요.",
         "finderAction": "모델 찾기",
         "huggingFaceTitle": "내 모델",
-        "huggingFaceDescription": "다운로드한 모델과 Hugging Face에서 직접 추가한 모델입니다.",
         "catalogEmpty": "지금은 사용할 수 있는 추천 로컬 모델이 없습니다."
       },
       "subpages": {
@@ -1254,6 +1292,7 @@
         "timing": {
           "label": "캡처 시점",
           "description": "음성 질문의 경우: 질문을 시작하는 순간에 캡처하거나, 메시지가 전송될 때까지 기다립니다. 타이핑한 메시지는 항상 전송할 때 캡처합니다.",
+          "descriptionAgent": "두 방식 모두 스크린샷을 미리 준비하므로 어시스턴트 때문에 기다릴 일은 없습니다. 다른 점은 이미지에 담기는 내용입니다. “질문할 때”는 말을 시작한 순간의 화면을, “메시지를 보낼 때”는 지금의 화면을 담습니다. 어느 쪽이든 이미지는 기기에 남고, 어시스턴트가 실제로 보겠다고 요청할 때만 전송됩니다.",
           "options": {
             "immediate": "질문할 때",
             "on_send": "메시지를 보낼 때"
@@ -1477,7 +1516,8 @@
     "notices": {
       "flowNotConfigured": "Flow에는 어시스턴트 모델이 필요합니다 — 받아쓰기로 붙여넣었습니다",
       "flowFailed": "Flow가 생성하지 못했습니다 — 아무것도 붙여넣지 않았습니다",
-      "flowEmpty": "활성화 문구 뒤에 명령을 말하세요"
+      "flowEmpty": "활성화 문구 뒤에 명령을 말하세요",
+      "cleanupFallback": "AI 정리가 실행되지 않았습니다 — 원본 텍스트를 붙여넣었습니다"
     },
     "listening": "듣고 있습니다…",
     "locked": "핸즈프리로 녹음 중 — 단축키를 다시 누르면 정지합니다",
@@ -1493,6 +1533,7 @@
     "empty": "어시스턴트 단축키로 음성으로 물어보거나,\n아래에 입력하세요.",
     "inputPlaceholder": "메시지…",
     "inputPlaceholderScreen": "화면에 대해 물어보세요…",
+    "queuedUntilReady": "대기 중 — 이 답변이 끝나면 바로 보냅니다.",
     "send": "보내기",
     "stop": "정지",
     "cancel": "취소",
@@ -1549,6 +1590,12 @@
       "thinking": "생각하는 중...",
       "speaking": "말하는 중..."
     },
+    "tool": {
+      "search": "웹 검색 중",
+      "screen": "화면을 보는 중",
+      "working": "처리하는 중",
+      "elapsed": "{{seconds}}초"
+    },
     "errors": {
       "generic": "문제가 발생했습니다. 다시 시도해주세요.",
       "genericShort": "문제가 발생했습니다",
@@ -1560,6 +1607,8 @@
       "engine_startShort": "모델을 시작할 수 없음",
       "provider": "모델이 답변하지 못했습니다. API 키와 연결을 확인한 뒤 다시 시도하세요.",
       "providerShort": "답변을 받지 못했습니다",
+      "empty_reply": "모델이 답변을 쓰지 않고 끝냈습니다. 다시 물어보거나 설정 → 어시스턴트에서 다른 모델을 선택하세요.",
+      "empty_replyShort": "빈 답변",
       "vision_unsupported": "이 모델은 화면을 읽을 수 없습니다. 설정 → 어시스턴트에서 이미지를 인식하는 모델을 선택하거나, 화면 인식 없이 다시 물어보세요.",
       "vision_unsupportedShort": "이미지를 볼 수 없는 모델",
       "screenshot_too_large": "화면 캡처가 이 제공자에게 너무 컸습니다. 다시 시도해주세요 — 더 강하게 압축됩니다.",

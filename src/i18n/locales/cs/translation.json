@@ -92,6 +92,7 @@
       },
       "seesScreen": "Vidí vaši obrazovku",
       "textOnly": "Pouze text",
+      "recommendedForAssistant": "Doporučeno pro asistenta",
       "download": "Stáhnout model",
       "useDownloaded": "Použít stažený model",
       "skip": "Zatím přeskočit",
@@ -99,6 +100,14 @@
       "continue": "Pokračovat",
       "downloadingHint": "Váš model se stahuje na pozadí — aplikaci můžete začít používat ihned.",
       "downloadStarted": "Stahování vašeho modelu AI na pozadí."
+    },
+    "cleanup": {
+      "cardTitle": "SpeakoFlow Mini",
+      "cardDescription": "Použije vyslovené úpravy jako “new paragraph” nebo “scratch that”. Pouze v angličtině.",
+      "pill": "Vyčistí vaše diktování",
+      "recommendedForDictation": "Doporučeno pro diktování",
+      "download": "Stáhnout a zapnout",
+      "useDownloaded": "Zapnout"
     },
     "ready": {
       "title": "Vše je připraveno.",
@@ -534,6 +543,7 @@
         "footnote": "Připojené složky se znovu prohledají při spuštění SpeakoFlow, takže modely, které do nich přidáte později, se objeví samy. Odpojení složky nebo odebrání modelu ho odstraní jen z tohoto seznamu — vaše soubory zůstanou tam, kde jsou.",
         "removeTitle": "Odebrat ze seznamu?",
         "removeConfirm": "Odebrat „{{modelName}}“ ze seznamu modelů?\n\nSamotný soubor zůstane tam, kde je:\n{{path}}",
+        "missingBadge": "Soubor chybí",
         "fileMissing": "Soubor tohoto modelu už tam není:\n{{path}}\n\nMohl být přesunut nebo přejmenován, případně je na disku, který není připojený."
       }
     },
@@ -774,6 +784,7 @@
         "promptSelectFailed": "Prompt byl vytvořen, ale nepodařilo se ho vybrat.",
         "promptUpdateFailed": "Prompt se nepodařilo aktualizovat.",
         "promptDeleteFailed": "Prompt se nepodařilo smazat.",
+        "promptRestoreFailed": "Prompt se nepodařilo obnovit.",
         "toneSelectFailed": "Styl psaní se nepodařilo vybrat.",
         "toneCreateFailed": "Styl psaní se nepodařilo vytvořit.",
         "toneSelectAfterCreateFailed": "Styl byl vytvořen, ale nepodařilo se ho vybrat.",
@@ -860,6 +871,7 @@
           "description": "Vyberte šablonu pro zpřesnění přepisu nebo vytvořte novou. V textu promptu použijte ${output} pro vložení zachyceného přepisu."
         },
         "noPrompts": "Nejsou k dispozici žádné prompty",
+        "nonePrompt": "Žádný (bez promptu)",
         "selectPrompt": "Vyberte prompt",
         "createNew": "Vytvořit nový prompt",
         "edit": "Upravit",
@@ -871,6 +883,7 @@
         "promptTip": "Tip: Přepsaný text se modelu odesílá automaticky — stačí napsat instrukce. (Starší prompty s <code>${output}</code> stále fungují.)",
         "updatePrompt": "Aktualizovat prompt",
         "deletePrompt": "Smazat prompt",
+        "restorePrompt": "Obnovit doporučený",
         "createPrompt": "Vytvořit prompt",
         "cancel": "Zrušit",
         "selectToEdit": "Vyberte výše prompt, abyste zobrazili a upravili jeho podrobnosti.",
@@ -896,7 +909,26 @@
       "aiCleanup": {
         "groupTitle": "Čištění pomocí AI",
         "modelGroupTitle": "Model pro čištění",
+        "unloadTimeout": {
+          "title": "Ponechat model pro čištění načtený",
+          "description": "Jak dlouho zůstane místní model pro čištění v paměti po tom, co ho přestanete používat. Delší doba znamená žádné načítání před dalším diktováním; nečinný model zabírá paměť, ale ne procesor. Nezávislé na nastavení asistenta."
+        },
+        "model": {
+          "emptyTitle": "Zatím žádný model pro čištění",
+          "emptyDescription": "SpeakoFlow Mini je malé stažení vytvořené právě pro tohle.",
+          "choose": "Vybrat model",
+          "tunedBadge": "Vyladěn na čištění"
+        },
+        "catalog": {
+          "title": "Vyberte si model pro čištění",
+          "description": "Čištění se spustí po každém diktování, takže rychlost je důležitější než velikost. Vše běží offline.",
+          "recommendedTitle": "Doporučeno pro čištění",
+          "recommendedDescription": "SpeakoFlow Mini je vytrénovaný právě na tuhle jednu úlohu a zvládá ji lépe než mnohem větší modely."
+        },
         "promptGroupTitle": "Prompt pro čištění",
+        "tunedModelNotice": "Tento model je doladěný na čištění anglického diktování, takže funguje nejlépe s doporučeným promptem a bez stylu.",
+        "tunedModelNoticeDismiss": "Skrýt tento tip",
+        "tunedModelNoticeRestore": "Zobrazit tip k modelu",
         "title": "Vylepšit mé diktování pomocí AI",
         "caption": "Experimentální — po diktování uklidí interpunkci a vycpávková slova.",
         "info": "Spustí nad vaším diktováním jazykový model, který opraví interpunkci, odstraní vycpávková slova a případně upraví tón. Platí pouze pro diktování a má vlastní zkratku. Po domluvení přidává krátké zpoždění; pokud model selže nebo vyprší časový limit, použije se váš původní text. Stále ve vývoji."
@@ -944,6 +976,7 @@
       "originalTranscriptionLabel": "Původní přepis",
       "flowOutputLabel": "Výstup Flow",
       "finalTextLabel": "Konečný text",
+      "cleanupNoChanges": "Čištění pomocí AI proběhlo, nebylo co opravit",
       "flowNoOutput": "Flow nevygeneroval žádný výstup.",
       "copyToClipboard": "Kopírovat přepis do schránky",
       "copyFlowOutput": "Kopírovat výstup Flow",
@@ -1081,12 +1114,16 @@
       }
     },
     "assistant": {
+      "enable": {
+        "title": "Asistent",
+        "label": "Zapnout asistenta",
+        "description": "Vypnutím necháte ze SpeakoFlow jen diktování. Plovoucí panel se zavře a už se nenačte, jeho zkratky se uvolní a paměť, kterou zabírá, se vrátí. Generovat s Flow a čištění pomocí AI fungují dál."
+      },
       "shortcuts": {
         "title": "Zkratky"
       },
       "brain": {
         "title": "Mozek asistenta",
-        "description": "Vyberte, jestli má váš asistent běžet privátně na tomto zařízení, nebo přes cloudového poskytovatele.",
         "whereLabel": "Kde to běží",
         "onDevice": "Na mém zařízení",
         "cloud": "Cloudový poskytovatel",
@@ -1106,17 +1143,18 @@
         "acceleratorUnknownWithMemory": "Grafická paměť není k dispozici · {{memory}} GB systémové RAM pro záložní běh na CPU",
         "acceleratorUnknown": "Grafická paměť není k dispozici · rychlost odpovědí nelze předpovědět",
         "details": "Podrobnosti",
+        "detailFile": "Soubor",
+        "detailLocation": "Umístění",
+        "detailFormat": "Formát",
+        "detailId": "ID modelu",
         "switchBeforeDelete": "Než tento model smažete, přepněte vestavěného asistenta na jiný.",
         "deleteModelConfirm": "Smazat {{modelName}}? Odeberou se jeho stažené soubory i uložený záznam.",
         "deleteModelFailed": "Model se nepodařilo smazat.",
-        "visionModelNote": "Zobrazení obrazovky automaticky stáhne další obrazový soubor.",
         "finderSectionTitle": "Další modely na zařízení",
-        "finderSectionDescription": "Když potřebujete jinou velikost nebo schopnost modelu, prohledejte Hugging Face.",
         "finderTitle": "Procházet Hugging Face",
         "finderDescription": "Prohledejte tisíce modelů GGUF a stáhněte si jeden přímo do SpeakoFlow.",
         "finderAction": "Najít model",
         "huggingFaceTitle": "Vaše modely",
-        "huggingFaceDescription": "Stažené modely a modely, které jste přidali z Hugging Face.",
         "catalogEmpty": "Právě teď nejsou dostupné žádné doporučené místní modely."
       },
       "subpages": {
@@ -1254,6 +1292,7 @@
         "timing": {
           "label": "Kdy snímat",
           "description": "U hlasových dotazů: sejmout obrazovku ve chvíli, kdy se začnete ptát, nebo počkat na odeslání zprávy. Napsané zprávy snímají obrazovku vždy při odeslání.",
+          "descriptionAgent": "Obě možnosti připraví snímek obrazovky předem, takže vás asistent nikdy nenechá čekat. Rozdíl je v tom, co obrázek zachycuje: „Když se začnu ptát“ vezme obrazovku tak, jak vypadala, když jste začali mluvit, „Při odeslání zprávy“ ji vezme tak, jak vypadá teď. V obou případech obrázek zůstává na vašem zařízení a odešle se jen tehdy, když si ho asistent skutečně vyžádá.",
           "options": {
             "immediate": "Když se začnu ptát",
             "on_send": "Při odeslání zprávy"
@@ -1477,7 +1516,8 @@
     "notices": {
       "flowNotConfigured": "Flow potřebuje model asistenta — vloženo jako diktování",
       "flowFailed": "Flow nedokázal nic vygenerovat — nic se nevložilo",
-      "flowEmpty": "Po aktivační frázi vyslovte příkaz"
+      "flowEmpty": "Po aktivační frázi vyslovte příkaz",
+      "cleanupFallback": "Čištění pomocí AI neproběhlo — vložen původní text"
     },
     "listening": "Poslouchám…",
     "locked": "Nahrávám bez držení — dalším stiskem zkratky nahrávání zastavíte",
@@ -1493,6 +1533,7 @@
     "empty": "Zeptejte se hlasem pomocí zkratky asistenta,\nnebo pište níže.",
     "inputPlaceholder": "Zpráva…",
     "inputPlaceholderScreen": "Zeptejte se na svou obrazovku…",
+    "queuedUntilReady": "Ve frontě — odešle se, jakmile tato odpověď skončí.",
     "send": "Odeslat",
     "stop": "Zastavit",
     "cancel": "Zrušit",
@@ -1549,6 +1590,12 @@
       "thinking": "Přemýšlím...",
       "speaking": "Mluvím..."
     },
+    "tool": {
+      "search": "Hledám na webu",
+      "screen": "Dívám se na vaši obrazovku",
+      "working": "Pracuji na tom",
+      "elapsed": "{{seconds}} s"
+    },
     "errors": {
       "generic": "Něco se pokazilo. Zkuste to prosím znovu.",
       "genericShort": "Něco se pokazilo",
@@ -1560,6 +1607,8 @@
       "engine_startShort": "Model se nespustil",
       "provider": "Model nedokázal odpovědět. Zkontrolujte svůj API klíč a připojení a zkuste to znovu.",
       "providerShort": "Odpověď se nepodařilo získat",
+      "empty_reply": "Model skončil, aniž by napsal odpověď. Zkuste se zeptat znovu, nebo vyberte jiný model v Nastavení → Asistent.",
+      "empty_replyShort": "Prázdná odpověď",
       "vision_unsupported": "Tento model neumí číst vaši obrazovku. Vyberte v Nastavení → Asistent model, který zvládá obraz, nebo se zeptejte znovu bez zobrazení obrazovky.",
       "vision_unsupportedShort": "Model nevidí obrázky",
       "screenshot_too_large": "Snímek obrazovky byl pro tohoto poskytovatele příliš velký. Zkuste to prosím znovu — komprimuje se víc.",

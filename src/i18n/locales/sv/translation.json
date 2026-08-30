@@ -92,6 +92,7 @@
       },
       "seesScreen": "Ser din skärm",
       "textOnly": "Endast text",
+      "recommendedForAssistant": "Rekommenderas för assistenten",
       "download": "Ladda ner modell",
       "useDownloaded": "Använd nedladdad modell",
       "skip": "Hoppa över tills vidare",
@@ -99,6 +100,14 @@
       "continue": "Fortsätt",
       "downloadingHint": "Din modell laddas ner i bakgrunden — du kan börja använda appen direkt.",
       "downloadStarted": "Laddar ner din AI-modell i bakgrunden."
+    },
+    "cleanup": {
+      "cardTitle": "SpeakoFlow Mini",
+      "cardDescription": "Utför talade ändringar som ”nytt stycke” och ”stryk det”. Endast engelska.",
+      "pill": "Rensar din diktering",
+      "recommendedForDictation": "Rekommenderas för diktering",
+      "download": "Ladda ner och slå på",
+      "useDownloaded": "Slå på den"
     },
     "ready": {
       "title": "Du är klar.",
@@ -534,6 +543,7 @@
         "footnote": "Länkade mappar genomsöks igen när SpeakoFlow startar, så modeller du lägger till i dem senare dyker upp av sig själva. Att ta bort länken till en mapp eller ta bort en modell tar bara bort den från den här listan — dina filer ligger kvar där de är.",
         "removeTitle": "Ta bort från listan?",
         "removeConfirm": "Ta bort ”{{modelName}}” från din modellista?\n\nSjälva filen ligger kvar där den är:\n{{path}}",
+        "missingBadge": "Filen saknas",
         "fileMissing": "Filen för den här modellen finns inte längre:\n{{path}}\n\nDen kan ha flyttats eller bytt namn, eller ligga på en enhet som inte är ansluten."
       }
     },
@@ -774,6 +784,7 @@
         "promptSelectFailed": "Prompten skapades, men kunde inte väljas.",
         "promptUpdateFailed": "Kunde inte uppdatera prompten.",
         "promptDeleteFailed": "Kunde inte ta bort prompten.",
+        "promptRestoreFailed": "Kunde inte återställa prompten.",
         "toneSelectFailed": "Kunde inte välja skrivstilen.",
         "toneCreateFailed": "Kunde inte skapa skrivstilen.",
         "toneSelectAfterCreateFailed": "Stilen skapades, men kunde inte väljas.",
@@ -860,6 +871,7 @@
           "description": "Välj en mall för att förfina transkriptioner eller skapa en ny. Använd ${output} inuti prompttexten för att referera till den fångade transkriptionen."
         },
         "noPrompts": "Inga prompter tillgängliga",
+        "nonePrompt": "Ingen (ingen prompt)",
         "selectPrompt": "Välj en prompt",
         "createNew": "Skapa ny prompt",
         "edit": "Redigera",
@@ -871,6 +883,7 @@
         "promptTip": "Tips: Din transkriberade text skickas till modellen automatiskt — skriv bara instruktioner. (Äldre prompter som använder <code>${output}</code> fungerar fortfarande.)",
         "updatePrompt": "Uppdatera prompt",
         "deletePrompt": "Ta bort prompt",
+        "restorePrompt": "Återställ rekommenderad",
         "createPrompt": "Skapa prompt",
         "cancel": "Avbryt",
         "selectToEdit": "Välj en prompt ovan för att visa och redigera dess detaljer.",
@@ -896,7 +909,26 @@
       "aiCleanup": {
         "groupTitle": "AI-rensning",
         "modelGroupTitle": "Modell för rensning",
+        "unloadTimeout": {
+          "title": "Håll rensningsmodellen laddad",
+          "description": "Hur länge rensningsmodellen på enheten stannar i minnet efter att du slutat använda den. Längre betyder ingen omladdning före nästa diktering; en vilande modell tar minne men ingen CPU. Skild från assistentens inställning."
+        },
+        "model": {
+          "emptyTitle": "Ingen rensningsmodell än",
+          "emptyDescription": "SpeakoFlow Mini är en liten nedladdning byggd för just detta.",
+          "choose": "Välj en modell",
+          "tunedBadge": "Trimmad för rensning"
+        },
+        "catalog": {
+          "title": "Välj din rensningsmodell",
+          "description": "Rensningen körs efter varje diktering, så hastighet betyder mer än storlek. Allt körs offline.",
+          "recommendedTitle": "Rekommenderas för rensning",
+          "recommendedDescription": "SpeakoFlow Mini är tränad för just den här uppgiften och slår mycket större modeller på den."
+        },
         "promptGroupTitle": "Prompt för rensning",
+        "tunedModelNotice": "Den här modellen är finjusterad för rensning av engelsk diktering, så den fungerar bäst med den rekommenderade prompten och utan stil.",
+        "tunedModelNoticeDismiss": "Dölj tipset",
+        "tunedModelNoticeRestore": "Visa modelltips",
         "title": "Snygga till min diktering med AI",
         "caption": "Experimentellt — snyggar till skiljetecken och utfyllnadsord efter att du dikterat.",
         "info": "Kör en språkmodell över din diktering för att rätta skiljetecken, ta bort utfyllnadsord och eventuellt justera tonen. Gäller endast diktering, på sitt eget kortkommando. Det ger en kort fördröjning efter att du talat; om modellen misslyckas eller tar för lång tid används din råa text i stället. Fortfarande under utveckling."
@@ -944,6 +976,7 @@
       "originalTranscriptionLabel": "Ursprunglig transkription",
       "flowOutputLabel": "Flow-resultat",
       "finalTextLabel": "Slutlig text",
+      "cleanupNoChanges": "AI-rensningen kördes, inget att rätta",
       "flowNoOutput": "Inget Flow-resultat genererades.",
       "copyToClipboard": "Kopiera transkription till urklipp",
       "copyFlowOutput": "Kopiera Flow-resultatet",
@@ -1081,12 +1114,16 @@
       }
     },
     "assistant": {
+      "enable": {
+        "title": "Assistent",
+        "label": "Aktivera assistenten",
+        "description": "Stäng av det här för att göra SpeakoFlow till enbart diktering. Den flytande panelen stängs och laddas aldrig, dess kortkommandon frigörs och minnet den använder lämnas tillbaka. Generera med Flow och AI-rensning fortsätter att fungera."
+      },
       "shortcuts": {
         "title": "Kortkommandon"
       },
       "brain": {
         "title": "Assistentens hjärna",
-        "description": "Välj om din assistent ska köras privat på den här enheten eller via en molnleverantör.",
         "whereLabel": "Var den körs",
         "onDevice": "På min enhet",
         "cloud": "Molnleverantör",
@@ -1106,17 +1143,18 @@
         "acceleratorUnknownWithMemory": "Grafikminnet är okänt · {{memory}} GB systemminne för CPU-läge",
         "acceleratorUnknown": "Grafikminnet är okänt · svarshastigheten kan inte förutsägas",
         "details": "Detaljer",
+        "detailFile": "Fil",
+        "detailLocation": "Plats",
+        "detailFormat": "Format",
+        "detailId": "Modell-ID",
         "switchBeforeDelete": "Byt den inbyggda assistenten till en annan modell innan du tar bort den här.",
         "deleteModelConfirm": "Ta bort {{modelName}}? Dess nedladdade filer och sparade post tas bort.",
         "deleteModelFailed": "Kunde inte ta bort modellen.",
-        "visionModelNote": "Skärmvisning laddar ner en extra bildfil automatiskt.",
         "finderSectionTitle": "Fler modeller på enheten",
-        "finderSectionDescription": "Sök på Hugging Face när du behöver en annan modellstorlek eller förmåga.",
         "finderTitle": "Utforska Hugging Face",
         "finderDescription": "Sök bland tusentals GGUF-modeller och ladda ner en direkt till SpeakoFlow.",
         "finderAction": "Hitta en modell",
         "huggingFaceTitle": "Dina modeller",
-        "huggingFaceDescription": "Nedladdade modeller och modeller du lagt till från Hugging Face.",
         "catalogEmpty": "Inga rekommenderade lokala modeller är tillgängliga just nu."
       },
       "subpages": {
@@ -1254,6 +1292,7 @@
         "timing": {
           "label": "När skärmen fångas",
           "description": "För röstfrågor: fånga skärmen i samma stund som du börjar fråga, eller vänta till meddelandet skickas. Skrivna meddelanden fångar alltid skärmen när de skickas.",
+          "descriptionAgent": "Båda alternativen förbereder skärmbilden i förväg, så assistenten låter dig aldrig vänta på en. Skillnaden är vad bilden visar: ”När jag frågar” tar skärmen som den såg ut när du började tala, ”När meddelandet skickas” tar den som den ser ut nu. Oavsett vilket stannar bilden på din enhet och skickas bara om assistenten faktiskt ber om att få se den.",
           "options": {
             "immediate": "När jag frågar",
             "on_send": "När meddelandet skickas"
@@ -1477,7 +1516,8 @@
     "notices": {
       "flowNotConfigured": "Flow behöver en assistentmodell — inklistrat som diktering",
       "flowFailed": "Flow kunde inte generera — inget klistrades in",
-      "flowEmpty": "Säg ett kommando efter aktiveringsfrasen"
+      "flowEmpty": "Säg ett kommando efter aktiveringsfrasen",
+      "cleanupFallback": "AI-rensningen kördes inte — klistrade in råtexten"
     },
     "listening": "Lyssnar…",
     "locked": "Spelar in handsfree — tryck på kortkommandot igen för att stoppa",
@@ -1493,6 +1533,7 @@
     "empty": "Fråga med röst via ditt assistentkortkommando,\neller skriv nedan.",
     "inputPlaceholder": "Meddelande…",
     "inputPlaceholderScreen": "Fråga om din skärm…",
+    "queuedUntilReady": "I kö — skickas så snart det här svaret är klart.",
     "send": "Skicka",
     "stop": "Stoppa",
     "cancel": "Avbryt",
@@ -1549,6 +1590,12 @@
       "thinking": "Tänker...",
       "speaking": "Talar..."
     },
+    "tool": {
+      "search": "Söker på webben",
+      "screen": "Tittar på din skärm",
+      "working": "Jobbar på det",
+      "elapsed": "{{seconds}} s"
+    },
     "errors": {
       "generic": "Något gick fel. Försök igen.",
       "genericShort": "Något gick fel",
@@ -1560,6 +1607,8 @@
       "engine_startShort": "Modellen kunde inte starta",
       "provider": "Modellen kunde inte svara. Kontrollera din API-nyckel och anslutning och försök igen.",
       "providerShort": "Fick inget svar",
+      "empty_reply": "Modellen blev klar utan att skriva något svar. Försök fråga igen eller välj en annan modell i Inställningar → Assistent.",
+      "empty_replyShort": "Tomt svar",
       "vision_unsupported": "Den här modellen kan inte läsa din skärm. Välj en modell med skärmvisning i Inställningar → Assistent, eller fråga igen utan skärmvisning.",
       "vision_unsupportedShort": "Modellen kan inte se bilder",
       "screenshot_too_large": "Skärmbilden var för stor för den här leverantören. Försök igen — den komprimeras hårdare.",

@@ -1,6 +1,7 @@
 {
   "ar": {
     "sameAsEnglish": [
+      "onboarding.cleanup.cardTitle",
       "onboarding.models.breeze-asr.name",
       "onboarding.models.canary-180m-flash.name",
       "onboarding.models.canary-1b-v2.name",
@@ -45,6 +46,7 @@
   "bg": {
     "sameAsEnglish": [
       "modelSelector.downloadSpeed",
+      "onboarding.cleanup.cardTitle",
       "onboarding.models.breeze-asr.name",
       "onboarding.models.canary-180m-flash.name",
       "onboarding.models.canary-1b-v2.name",
@@ -85,6 +87,7 @@
   "cs": {
     "sameAsEnglish": [
       "modelSelector.downloadSpeed",
+      "onboarding.cleanup.cardTitle",
       "onboarding.models.breeze-asr.name",
       "onboarding.models.canary-180m-flash.name",
       "onboarding.models.canary-1b-v2.name",
@@ -137,6 +140,7 @@
       "appearance.system",
       "modelSelector.capabilities.streaming",
       "modelSelector.downloadSpeed",
+      "onboarding.cleanup.cardTitle",
       "onboarding.models.breeze-asr.name",
       "onboarding.models.canary-180m-flash.name",
       "onboarding.models.canary-1b-v2.name",
@@ -167,6 +171,7 @@
       "settings.advanced.textReplacements.regex",
       "settings.advanced.textReplacements.replacePlaceholder",
       "settings.assistant.appearance.panelSizes.standard",
+      "settings.assistant.brain.detailFormat",
       "settings.assistant.brain.details",
       "settings.assistant.characters.avatarLabel",
       "settings.assistant.characters.nameLabel",
@@ -203,6 +208,7 @@
     "sameAsEnglish": [
       "common.no",
       "modelSelector.downloadSpeed",
+      "onboarding.cleanup.cardTitle",
       "onboarding.models.breeze-asr.name",
       "onboarding.models.canary-180m-flash.name",
       "onboarding.models.canary-1b-v2.name",
@@ -257,6 +263,7 @@
       "assistant.pill.idle",
       "assistant.title",
       "modelSelector.capabilities.streaming",
+      "onboarding.cleanup.cardTitle",
       "onboarding.models.breeze-asr.name",
       "onboarding.models.canary-180m-flash.name",
       "onboarding.models.canary-1b-v2.name",
@@ -284,7 +291,9 @@
       "settings.advanced.textReplacements.replacePlaceholder",
       "settings.assistant.appearance.panelSizes.compact",
       "settings.assistant.appearance.panelSizes.standard",
+      "settings.assistant.brain.detailFormat",
       "settings.assistant.characters.avatarLabel",
+      "settings.assistant.enable.title",
       "settings.assistant.tts.engines.azure",
       "settings.assistant.tts.engines.elevenlabs",
       "settings.assistant.tts.engines.openrouter",
@@ -318,6 +327,7 @@
   "he": {
     "sameAsEnglish": [
       "modelSelector.downloadSpeed",
+      "onboarding.cleanup.cardTitle",
       "onboarding.models.breeze-asr.name",
       "onboarding.models.canary-180m-flash.name",
       "onboarding.models.canary-1b-v2.name",
@@ -365,6 +375,7 @@
       "common.no",
       "modelSelector.capabilities.streaming",
       "modelSelector.downloadSpeed",
+      "onboarding.cleanup.cardTitle",
       "onboarding.models.breeze-asr.name",
       "onboarding.models.canary-180m-flash.name",
       "onboarding.models.canary-1b-v2.name",
@@ -392,6 +403,7 @@
       "settings.advanced.textReplacements.regex",
       "settings.advanced.textReplacements.replacePlaceholder",
       "settings.assistant.appearance.panelSizes.standard",
+      "settings.assistant.brain.detailFile",
       "settings.assistant.characters.avatarLabel",
       "settings.assistant.provider.providerLabel",
       "settings.assistant.tts.engines.azure",
@@ -422,6 +434,7 @@
   "ja": {
     "sameAsEnglish": [
       "modelSelector.downloadSpeed",
+      "onboarding.cleanup.cardTitle",
       "onboarding.models.breeze-asr.name",
       "onboarding.models.canary-180m-flash.name",
       "onboarding.models.canary-1b-v2.name",
@@ -465,6 +478,7 @@
   "ko": {
     "sameAsEnglish": [
       "modelSelector.downloadSpeed",
+      "onboarding.cleanup.cardTitle",
       "onboarding.models.breeze-asr.name",
       "onboarding.models.canary-180m-flash.name",
       "onboarding.models.canary-1b-v2.name",
@@ -510,6 +524,7 @@
   "pl": {
     "sameAsEnglish": [
       "modelSelector.downloadSpeed",
+      "onboarding.cleanup.cardTitle",
       "onboarding.models.breeze-asr.name",
       "onboarding.models.canary-180m-flash.name",
       "onboarding.models.canary-1b-v2.name",
@@ -533,6 +548,7 @@
       "settings.advanced.autoSubmit.options.superEnter",
       "settings.advanced.textReplacements.regex",
       "settings.advanced.textReplacements.replacePlaceholder",
+      "settings.assistant.brain.detailFormat",
       "settings.assistant.provider.modelLabel",
       "settings.assistant.tts.engines.azure",
       "settings.assistant.tts.engines.elevenlabs",
@@ -559,8 +575,10 @@
   },
   "pt": {
     "sameAsEnglish": [
+      "assistant.tool.elapsed",
       "modelSelector.capabilities.streaming",
       "modelSelector.downloadSpeed",
+      "onboarding.cleanup.cardTitle",
       "onboarding.models.breeze-asr.name",
       "onboarding.models.canary-180m-flash.name",
       "onboarding.models.canary-1b-v2.name",
@@ -612,6 +630,7 @@
   },
   "ru": {
     "sameAsEnglish": [
+      "onboarding.cleanup.cardTitle",
       "onboarding.models.breeze-asr.name",
       "onboarding.models.canary-180m-flash.name",
       "onboarding.models.canary-1b-v2.name",
@@ -655,6 +674,7 @@
       "appearance.system",
       "modelSelector.capabilities.streaming",
       "modelSelector.downloadSpeed",
+      "onboarding.cleanup.cardTitle",
       "onboarding.models.breeze-asr.name",
       "onboarding.models.canary-180m-flash.name",
       "onboarding.models.canary-1b-v2.name",
@@ -683,6 +703,7 @@
       "settings.advanced.textReplacements.regex",
       "settings.advanced.textReplacements.replacePlaceholder",
       "settings.assistant.appearance.panelSizes.standard",
+      "settings.assistant.brain.detailFormat",
       "settings.assistant.characters.avatarLabel",
       "settings.assistant.tts.engines.azure",
       "settings.assistant.tts.engines.elevenlabs",
@@ -712,6 +733,7 @@
   "tr": {
     "sameAsEnglish": [
       "modelSelector.downloadSpeed",
+      "onboarding.cleanup.cardTitle",
       "onboarding.models.breeze-asr.name",
       "onboarding.models.canary-180m-flash.name",
       "onboarding.models.canary-1b-v2.name",
@@ -761,6 +783,7 @@
   "uk": {
     "sameAsEnglish": [
       "modelSelector.downloadSpeed",
+      "onboarding.cleanup.cardTitle",
       "onboarding.models.breeze-asr.name",
       "onboarding.models.canary-180m-flash.name",
       "onboarding.models.canary-1b-v2.name",
@@ -801,7 +824,9 @@
   },
   "vi": {
     "sameAsEnglish": [
+      "assistant.tool.elapsed",
       "modelSelector.downloadSpeed",
+      "onboarding.cleanup.cardTitle",
       "onboarding.models.breeze-asr.name",
       "onboarding.models.canary-180m-flash.name",
       "onboarding.models.canary-1b-v2.name",
@@ -847,6 +872,7 @@
   "zh": {
     "sameAsEnglish": [
       "modelSelector.downloadSpeed",
+      "onboarding.cleanup.cardTitle",
       "onboarding.models.breeze-asr.name",
       "onboarding.models.canary-180m-flash.name",
       "onboarding.models.canary-1b-v2.name",
@@ -887,6 +913,7 @@
   "zh-TW": {
     "sameAsEnglish": [
       "modelSelector.downloadSpeed",
+      "onboarding.cleanup.cardTitle",
       "onboarding.models.breeze-asr.name",
       "onboarding.models.canary-180m-flash.name",
       "onboarding.models.canary-1b-v2.name",
