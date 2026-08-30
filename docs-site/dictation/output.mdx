@@ -6,32 +6,34 @@ icon: "clipboard"
 
 The defaults are right for most people. Change these only if a specific app misbehaves.
 
-Everything here lives in *Settings → Dictation → Output options*.
+Everything here lives in _Settings → Dictation → Output options_.
 
 ## Paste method
 
 The default is `Ctrl+V` on Windows, `Cmd+V` on macOS, and `Direct` on Linux, because clipboard paste is less dependable across Linux compositors.
 
-| Method | Platforms | What it does |
-| --- | --- | --- |
-| `Ctrl+V` / `Cmd+V` | All | Writes the text to the clipboard, sends the paste combo, then puts your previous clipboard contents back. Fast and reliable in almost every app. |
-| `Direct` | All | Types the text key by key. Slower, but works in apps that block or ignore synthetic paste. |
-| `None` | All | Inserts nothing. Pair it with *Copy to clipboard* when you would rather paste manually. |
-| `Ctrl+Shift+V` | Windows, Linux | The paste-as-plain-text combo in many terminals and editors. |
-| `Shift+Insert` | Windows, Linux | For apps that only accept the legacy combo. |
-| `External script` | Linux | Runs a script you point to, passing the text as its single argument. The path field appears under the dropdown once you select this. |
+| Method             | Platforms      | What it does                                                                                                                                     |
+| ------------------ | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `Ctrl+V` / `Cmd+V` | All            | Writes the text to the clipboard, sends the paste combo, then puts your previous clipboard contents back. Fast and reliable in almost every app. |
+| `Direct`           | All            | Types the text key by key. Slower, but works in apps that block or ignore synthetic paste.                                                       |
+| `None`             | All            | Inserts nothing. Pair it with _Copy to clipboard_ when you would rather paste manually.                                                          |
+| `Ctrl+Shift+V`     | Windows, Linux | The paste-as-plain-text combo in many terminals and editors.                                                                                     |
+| `Shift+Insert`     | Windows, Linux | For apps that only accept the legacy combo.                                                                                                      |
+| `External script`  | Linux          | Runs a script you point to, passing the text as its single argument. The path field appears under the dropdown once you select this.             |
 
 ## The other settings
 
-| Setting | Default | What it does |
-| --- | --- | --- |
-| Clipboard handling | `Don't modify clipboard` | Clipboard paste saves and restores whatever you had copied. Switch to `Copy to clipboard` to leave the transcription there instead. |
-| Append trailing space | Off | Adds one space after the inserted text so back-to-back dictations do not run together. |
-| Auto submit | `Off` | Sends a key combination once the text is in. Options are `Off`, `Enter`, `Ctrl+Enter`, and `Cmd+Enter` on macOS or `Super+Enter` elsewhere. |
-| Always-on microphone | Off | Keeps the mic warm so the first words are never clipped, at the cost of a little battery. |
+| Setting               | Default                  | What it does                                                                                                                                |
+| --------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| Clipboard handling    | `Don't modify clipboard` | Clipboard paste saves and restores whatever you had copied. Switch to `Copy to clipboard` to leave the transcription there instead.         |
+| Append trailing space | Off                      | Adds one space after the inserted text so back-to-back dictations do not run together.                                                      |
+| Auto submit           | `Off`                    | Sends a key combination once the text is in. Options are `Off`, `Enter`, `Ctrl+Enter`, and `Cmd+Enter` on macOS or `Super+Enter` elsewhere. |
+| Always-on microphone  | Off                      | Keeps the mic warm so the first words are never clipped, at the cost of a little battery.                                                   |
 
 <Tip>
-  If a specific app misbehaves with clipboard paste, try `Direct`. If text is occasionally cut off, raise the extra recording buffer. If the wrong text pastes, raise the paste delay.
+  If a specific app misbehaves with clipboard paste, try `Direct`. If text is
+  occasionally cut off, raise the extra recording buffer. If the wrong text
+  pastes, raise the paste delay.
 </Tip>
 
 ## Details
@@ -41,6 +43,7 @@ The default is `Ctrl+V` on Windows, `Cmd+V` on macOS, and `Direct` on Linux, bec
     It is wrong as often as it is right. Dictating mid-sentence into an editor that already handles spacing ends up with doubles.
 
     Generate with Flow never appends the space, so a generated draft lands exactly as produced.
+
   </Accordion>
 
   <Accordion title="When auto submit is skipped">
@@ -49,6 +52,7 @@ The default is `Ctrl+V` on Windows, `Cmd+V` on macOS, and `Direct` on Linux, bec
     Auto submit is skipped when the paste method is `None`, because there would be nothing to submit, and when the paste itself failed.
 
     It waits 50 ms after the insert before sending the key. Generate with Flow does not auto-submit either.
+
   </Accordion>
 
   <Accordion title="Linux: typing tools and the clipboard chain">
@@ -57,6 +61,7 @@ The default is `Ctrl+V` on Windows, `Cmd+V` on macOS, and `Direct` on Linux, bec
     Clipboard writes prefer `wl-copy` under Wayland, which handles umlauts and other non-ASCII text better.
 
     The paste keystroke is sent by whichever native tool is available: `wtype` on non-KDE Wayland, then `dotool`, then `ydotool`. On X11 it is `xdotool`, then `ydotool`. If none is installed, SpeakoFlow falls back to its own key synthesis.
+
   </Accordion>
 
   <Accordion title="Timing knobs in Debug">
@@ -65,12 +70,14 @@ The default is `Ctrl+V` on Windows, `Cmd+V` on macOS, and `Direct` on Linux, bec
     **Paste delay** (default 60 ms). How long to wait after writing the clipboard before sending the paste combo. Only applies to the clipboard-based methods. Increase it if the *wrong* text pastes, which means the app read the clipboard before SpeakoFlow finished writing it.
 
     **Extra recording buffer** (default 0 ms). How much longer to keep recording after you release the key. Increase it if your last word or two gets cut off.
+
   </Accordion>
 
   <Accordion title="Modifiers are always released">
     Any method that synthesizes keystrokes releases every modifier afterwards, even if the combo was interrupted partway through.
 
     That is the guard against the classic failure where `Ctrl` or `Shift` appears stuck down after a paste.
+
   </Accordion>
 
   <Accordion title="The order things happen in">
@@ -93,5 +100,6 @@ The default is `Ctrl+V` on Windows, `Cmd+V` on macOS, and `Direct` on Linux, bec
         Trailing space, paste method, then auto submit.
       </Step>
     </Steps>
+
   </Accordion>
 </AccordionGroup>

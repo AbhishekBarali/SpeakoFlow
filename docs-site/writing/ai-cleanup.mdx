@@ -4,30 +4,32 @@ description: "AI cleanup runs a language model over a dictation to strip filler 
 icon: "pen"
 ---
 
-Speak messy, paste polished. Press *Dictate and clean up* instead of your normal dictate shortcut, and the text that lands has the filler stripped and the grammar and punctuation fixed.
+Speak messy, paste polished. Press _Dictate and clean up_ instead of your normal dictate shortcut, and the text that lands has the filler stripped and the grammar and punctuation fixed.
 
-| Platform | Shortcut |
-| --- | --- |
-| Windows and Linux | `Ctrl` + `Shift` + `Space` |
-| macOS | `Option` + `Shift` + `Space` |
+| Platform          | Shortcut                     |
+| ----------------- | ---------------------------- |
+| Windows and Linux | `Ctrl` + `Shift` + `Space`   |
+| macOS             | `Option` + `Shift` + `Space` |
 
-Cleanup is off by default. Turn it on in *Settings → Dictation → AI cleanup*. It is not hidden behind the Experimental features toggle, and while the cleanup toggle is off that shortcut does nothing at all.
+Cleanup is off by default. Turn it on in _Settings → Dictation → AI cleanup_. It is not hidden behind the Experimental features toggle, and while the cleanup toggle is off that shortcut does nothing at all.
 
 Your normal dictate shortcut still pastes raw text, so you choose per recording. Cleanup applies to dictation only, never to the assistant chat.
 
 <Warning>
-  Cleanup adds a short delay after you speak, because the model runs after transcription. If it fails, times out, or is not configured, your raw text is pasted instead. You never lose your words.
+  Cleanup adds a short delay after you speak, because the model runs after
+  transcription. If it fails, times out, or is not configured, your raw text is
+  pasted instead. You never lose your words.
 </Warning>
 
 ## The two controls you will actually touch
 
 **Cleanup strength** decides how much gets rewritten.
 
-| Strength | What it changes |
-| --- | --- |
-| **Light** | Spelling, capitalization, punctuation, and obvious filler. Your repetition, sentence order, and exact phrasing survive. |
-| **Balanced** (default) | The above, plus collapsing repeated points and dropping false starts. |
-| **Aggressive** | The above, plus tightening rambling, merging fragments, and reordering sentences for clarity. |
+| Strength               | What it changes                                                                                                         |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| **Light**              | Spelling, capitalization, punctuation, and obvious filler. Your repetition, sentence order, and exact phrasing survive. |
+| **Balanced** (default) | The above, plus collapsing repeated points and dropping false starts.                                                   |
+| **Aggressive**         | The above, plus tightening rambling, merging fragments, and reordering sentences for clarity.                           |
 
 All three keep every fact, name, number, date, and request, and all three write in your first-person voice.
 
@@ -51,12 +53,14 @@ Strength and style are separate dials. Strength decides how much gets tidied awa
     On an Apple Silicon Mac, **Apple Intelligence** also appears in the provider list. It runs fully on-device with no key and no network, and needs macOS Tahoe 26.0 or later with Apple Intelligence enabled in System Settings. If it is not available, cleanup falls back to pasting your raw text rather than failing loudly.
 
     If the provider you selected here is not usable, meaning no model chosen or a cloud provider with no key, cleanup quietly falls back to your [assistant's](/assistant/providers) provider and model instead. That is deliberate. Once the assistant works, cleanup works, with nothing extra to set up.
+
   </Accordion>
 
   <Accordion title="Editing the cleanup prompt">
     SpeakoFlow ships one prompt, **Improve Transcriptions**, and it is selected out of the box. You can edit it, add your own, and switch between them. You cannot delete the last remaining prompt, because cleanup needs one to run.
 
     Your transcribed text is sent to the model automatically, so just write instructions. For example: *"Fix grammar and punctuation, then rewrite as a polished, professional message."*
+
   </Accordion>
 
   <Accordion title="AI cleanup timeout">
@@ -65,6 +69,7 @@ Strength and style are separate dials. Strength decides how much gets tidied awa
     How long to wait before giving up and pasting your raw transcription instead.
 
     This is the whole budget, not just the model call. On the built-in local engine, loading the model from disk on first use counts against it, so allow more time if your first cleanup of a session keeps timing out.
+
   </Accordion>
 
   <Accordion title="When cleanup does not run">
@@ -77,9 +82,12 @@ Strength and style are separate dials. Strength decides how much gets tidied awa
     - the model runs past the timeout
 
     History records both versions of a cleaned dictation, so you can always compare the original transcription with the final text.
+
   </Accordion>
 </AccordionGroup>
 
 <Note>
-  Cleanup and [Generate with Flow](/writing/generate-with-flow) are separate paths on separate shortcuts. Cleanup never runs over Flow output, and Flow never triggers on the *Dictate and clean up* shortcut.
+  Cleanup and [Generate with Flow](/writing/generate-with-flow) are separate
+  paths on separate shortcuts. Cleanup never runs over Flow output, and Flow
+  never triggers on the *Dictate and clean up* shortcut.
 </Note>

@@ -76,6 +76,7 @@ standard app maintenance; the ones that send your content are **optional,
 off by default, and routed to a provider you choose** — never through us.
 
 ### 1. Automatic update check
+
 To tell you when a new version is available, the app checks a file published on
 our GitHub Releases page. This is a normal file download; as with any web
 request, the server (GitHub) can see your IP address and general request
@@ -83,6 +84,7 @@ metadata. No personal data is sent by SpeakoFlow. You can ignore or disable
 update checks in Settings.
 
 ### 2. Downloading models and engines
+
 When you choose to download a speech, language, or voice model, SpeakoFlow
 fetches the model file from its host — typically Hugging Face, or a mirror on
 GitHub. The local AI engine (llama.cpp) may likewise be fetched from GitHub. These
@@ -90,9 +92,11 @@ are plain file downloads of publicly available software; no personal data or
 content is sent, though the host can see your IP address like any download.
 
 ### 3. The AI assistant and AI cleanup (optional)
+
 If you use the assistant or the AI text-cleanup feature, your message (and
 conversation context) is sent to the **model provider you have configured**. You
 control which provider that is:
+
 - a **fully offline, built-in model** that runs on your machine (nothing leaves
   your device), or
 - a **local server** you run (e.g. Ollama or LM Studio), or
@@ -104,6 +108,7 @@ machine to the provider you selected. What that provider does with the data is
 governed by **their** privacy policy.
 
 ### 4. Screen vision (optional, on request)
+
 When you explicitly ask the assistant about your screen, SpeakoFlow captures a
 screenshot and includes it with that request to your chosen AI provider. It only
 captures when you ask, and — like all assistant traffic — it goes only to the
@@ -111,12 +116,14 @@ provider you configured. If you use the offline built-in model, the screenshot
 never leaves your device.
 
 ### 5. Text-to-speech (optional)
+
 If you have spoken replies enabled, the assistant's answer text is converted to
 audio either **locally** (the built-in Kokoro voice) or by a **TTS provider you
 choose** (e.g. an OpenAI-compatible service, ElevenLabs, or Azure) using your own
 key. Only the answer text needed to synthesize speech is sent to that provider.
 
 ### 6. Web search (optional, off by default)
+
 If you enable web search, the assistant can send a search query to the **search
 provider you configure** (e.g. Serper, Brave, Tavily, Exa, SerpAPI, or TinyFish) using your
 own key, to fetch current information. This is off until you turn it on.

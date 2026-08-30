@@ -17,12 +17,14 @@ Find your symptom and open it.
     ```
 
     Full explanation in [Install](/start/install).
+
   </Accordion>
 
   <Accordion title="The Linux AppImage has no icon or app menu entry" icon="linux">
     Expected. An AppImage is one self-contained file and cannot register an icon or app-menu entry with your desktop, so the file stays generic in your file manager. The icon does appear once the app is running.
 
     Install the `.deb` instead on Debian, Ubuntu 24.04+, Mint 22+, Pop!\_OS, or Tuxedo OS. A helper like Gear Lever or AppImageLauncher also adds the integration. Details in [Install](/start/install).
+
   </Accordion>
 
   <Accordion title="SpeakoFlow cannot hear my microphone" icon="microphone-slash">
@@ -31,15 +33,18 @@ Find your symptom and open it.
     - **Windows**. *Settings → Privacy & security → Microphone*, including desktop-app access.
     - **macOS**. *System Settings → Privacy & Security → Microphone*.
     - **Linux**. Your system's sound or privacy settings.
+
   </Accordion>
 
-  <Accordion title="Nothing gets typed after I dictate (macOS)" icon="keyboard">
-    SpeakoFlow needs Accessibility permission to type into other apps. Grant it in *System Settings → Privacy & Security → Accessibility*, then restart the app.
-  </Accordion>
+<Accordion title="Nothing gets typed after I dictate (macOS)" icon="keyboard">
+  SpeakoFlow needs Accessibility permission to type into other apps. Grant it in
+  *System Settings → Privacy & Security → Accessibility*, then restart the app.
+</Accordion>
 
-  <Accordion title="Screen vision does nothing (macOS)" icon="eye-slash">
-    Grant Screen Recording permission in *System Settings → Privacy & Security → Screen Recording*, then restart SpeakoFlow for it to take effect.
-  </Accordion>
+<Accordion title="Screen vision does nothing (macOS)" icon="eye-slash">
+  Grant Screen Recording permission in *System Settings → Privacy & Security →
+  Screen Recording*, then restart SpeakoFlow for it to take effect.
+</Accordion>
 
   <Accordion title="The recording overlay will not stay on top of other windows (Linux)" icon="window-restore">
     The overlay has to float above every other window. On Linux that requires either the `wlr-layer-shell` protocol (wlroots compositors like Sway and Hyprland, and KDE Plasma) or classic X11 "keep above" stacking.
@@ -54,6 +59,7 @@ Find your symptom and open it.
     - **Disable layer shell**, if the overlay misbehaves under a layer-shell compositor: `SPEAKOFLOW_NO_GTK_LAYER_SHELL=1`.
 
     Setting `GDK_BACKEND` yourself always wins. SpeakoFlow never overrides an explicit choice.
+
   </Accordion>
 
   <Accordion title="My hotkeys do nothing and the log repeats PermissionDenied (Linux)" icon="key">
@@ -68,6 +74,7 @@ Find your symptom and open it.
     Then log out and back in, because group membership only applies to new sessions.
 
     Or switch the keyboard engine to **Tauri** in *Settings → General → Experimental*, which uses the compositor's global-shortcut API and needs no special permissions. Tauri is already the default engine on Linux, so this only affects you if you switched to handy-keys. See [General settings](/settings/general).
+
   </Accordion>
 
   <Accordion title="The app crashes when I pinch-to-zoom on my touchpad (Linux)" icon="hand">
@@ -76,18 +83,21 @@ Find your symptom and open it.
     This is a bug in **WebKitGTK**, the Linux web engine Tauri uses, not in SpeakoFlow. It affects many WebKitGTK-based apps and is tracked upstream in [tauri#13115](https://github.com/tauri-apps/tauri/issues/13115) and [wry#544](https://github.com/tauri-apps/wry/issues/544).
 
     Until there is an upstream fix, avoid pinch-to-zoom inside the app window. Updating your system's `webkit2gtk-4.1` packages can also help, since newer releases handle the gesture more gracefully.
+
   </Accordion>
 
   <Accordion title="The wrong text pastes, or my last words get clipped" icon="clipboard">
     Increase the paste delay and the extra recording buffer in [Debug settings](/settings/debug).
 
     If one specific app misbehaves with clipboard paste, try the **Direct** [paste method](/dictation/output).
+
   </Accordion>
 
   <Accordion title="The automatic update failed (Windows)" icon="rotate">
     Portable installs cannot update automatically.
 
     Download the latest NSIS installer from GitHub Releases, install it to the same folder, then copy your `Data/` folder (settings, models, recordings) from the old version to the new one.
+
   </Accordion>
 </AccordionGroup>
 

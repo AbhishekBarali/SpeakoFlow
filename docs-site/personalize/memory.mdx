@@ -6,15 +6,15 @@ icon: "note-sticky"
 
 Personal memory is **off by default**. Nothing is stored and nothing is learned until you turn it on.
 
-When it is on, everything it knows lives on your device and is yours to read, edit, or delete in *Settings → Assistant → Memory*. Nothing is hidden from you.
+When it is on, everything it knows lives on your device and is yours to read, edit, or delete in _Settings → Assistant → Memory_. Nothing is hidden from you.
 
 ## The three controls
 
-| Control | Default | What it does |
-| --- | --- | --- |
-| **Remember me** | Off | Lets the assistant keep and use a personal memory. |
-| **Incognito chat** | Off | For the current conversation only, use nothing and learn nothing. |
-| **Memory detail** | `Balanced` | How much memory is allowed into each reply. `Light`, `Balanced`, or `Detailed`. |
+| Control            | Default    | What it does                                                                    |
+| ------------------ | ---------- | ------------------------------------------------------------------------------- |
+| **Remember me**    | Off        | Lets the assistant keep and use a personal memory.                              |
+| **Incognito chat** | Off        | For the current conversation only, use nothing and learn nothing.               |
+| **Memory detail**  | `Balanced` | How much memory is allowed into each reply. `Light`, `Balanced`, or `Detailed`. |
 
 ## What it stores
 
@@ -32,7 +32,8 @@ Every note is a plain text field you can edit or delete, and the summary has its
 <Note>
   **Safety by design.** The same filter runs at capture, at consolidation, and on import. Text mentioning passwords, keys, tokens, card or ID numbers, and similar secrets is refused outright, as is instruction-shaped text like "ignore previous instructions" or "always reply...". Memory is injected into the system prompt, so a stored instruction would be a prompt-injection foothold.
 
-  What does get injected is wrapped in an explicit delimiter and labeled advisory. The model is told to use it only when relevant, never to let it override your current message, and not to repeat it back unless you ask.
+What does get injected is wrapped in an explicit delimiter and labeled advisory. The model is told to use it only when relevant, never to let it override your current message, and not to repeat it back unless you ask.
+
 </Note>
 
 ## How it works underneath
@@ -46,18 +47,21 @@ Every note is a plain text field you can edit or delete, and the summary has its
     The pass reuses your active assistant provider and model, which can be the fully offline built-in engine.
 
     The extractor is told to save only facts that are durable, actionable, and explicitly stated: stable preferences, tools and languages you use, ongoing projects, your role, recurring constraints. One-off details, the assistant's own words, and anything it had to guess at are left out.
+
   </Accordion>
 
   <Accordion title="Why the assistant does not see all your notes at once">
     For each message, SpeakoFlow scores every note by keyword overlap with what you just said, then packs the best-matching ones into the remaining budget. Any leftover space is filled with your most recent high-confidence notes.
 
     That keeps the assistant feeling personal on small talk without paying for the whole store on every turn.
+
   </Accordion>
 
   <Accordion title="What Memory detail actually changes">
     It is a budget dial, not a quality dial. Each turn, memory is packed into a fixed character budget: roughly 150 tokens on `Light`, 400 on `Balanced`, and 800 on `Detailed`. The cost of having memory on stays flat no matter how much you have accumulated.
 
     The summary is reserved first and whatever remains goes to notes. So `Light` has room for little beyond the summary, `Balanced` fits a few relevant notes, and `Detailed` fits more.
+
   </Accordion>
 
   <Accordion title="Dedupe, decay, and the 80-note cap">
@@ -66,6 +70,7 @@ Every note is a plain text field you can edit or delete, and the summary has its
     - **Dedupe and merge.** A new fact that substantially overlaps an existing note updates that note instead of piling up beside it, taking the newer phrasing and the higher confidence. So "switched to Go" replaces "works in Rust" rather than contradicting it.
     - **Decay.** Auto-learned, low-confidence notes that have not been re-confirmed in about 45 days are forgotten. Notes you added yourself, and anything at medium or high confidence, never decay.
     - **Hard cap.** The store tops out at 80 notes, dropping the weakest first, meaning lowest confidence and then oldest.
+
   </Accordion>
 </AccordionGroup>
 

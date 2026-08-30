@@ -6,26 +6,28 @@ icon: "microchip"
 
 Every model runs on your machine. They trade accuracy for speed, so pick the one that fits your hardware and languages.
 
-Open the catalog from *Settings → Dictation → Change model*.
+Open the catalog from _Settings → Dictation → Change model_.
 
 ## Recommended models
 
 These five run on SpeakoFlow's current engine, a native ggml/GGUF build. Sizes are the exact download.
 
-| Model | Size | Languages | Streams | Translates |
-| --- | --- | --- | --- | --- |
-| **Parakeet Unified EN 0.6B** (default) | 697 MB | English only | Yes | No |
-| **Nemotron Streaming 3.5** | 716 MB | 28 | Yes | No |
-| **Canary 180M Flash** | 208 MB | 4 | No | Yes |
-| **Cohere Transcribe** | 1.7 GB | 14 | No | No |
-| **Whisper Medium** | 793 MB | 99 | No | Yes |
+| Model                                  | Size   | Languages    | Streams | Translates |
+| -------------------------------------- | ------ | ------------ | ------- | ---------- |
+| **Parakeet Unified EN 0.6B** (default) | 697 MB | English only | Yes     | No         |
+| **Nemotron Streaming 3.5**             | 716 MB | 28           | Yes     | No         |
+| **Canary 180M Flash**                  | 208 MB | 4            | No      | Yes        |
+| **Cohere Transcribe**                  | 1.7 GB | 14           | No      | No         |
+| **Whisper Medium**                     | 793 MB | 99           | No      | Yes        |
 
 Pick **Parakeet Unified EN 0.6B** for fast everyday English, **Canary 180M Flash** on a weak machine, **Whisper Medium** for the widest language coverage, and **Cohere Transcribe** when accuracy matters more than speed. Canary covers English, German, Spanish, and French.
 
 Only catalog entries flagged `recommended` appear in this list. Everything else lives under **Older models**.
 
 <Note>
-  Streaming models can transcribe as you speak, which is what [live transcription](/dictation/live-transcription) needs. Everything else transcribes in one pass when you stop talking.
+  Streaming models can transcribe as you speak, which is what [live
+  transcription](/dictation/live-transcription) needs. Everything else
+  transcribes in one pass when you stop talking.
 </Note>
 
 ## Managing models
@@ -53,6 +55,7 @@ A brand-new install is seeded with **Parakeet Unified EN 0.6B**. If it is not on
     - **Breeze ASR.** Tuned for Taiwanese Mandarin with English code-switching.
 
     The group stays folded so a first-timer only sees the recommended few. It opens automatically as soon as you type in the search box.
+
   </Accordion>
 
   <Accordion title="Downloads survive a bad connection">
@@ -61,17 +64,20 @@ A brand-new install is seeded with **Parakeet Unified EN 0.6B**. If it is not on
     Each source is retried up to four times with exponential backoff. A server error, a timeout, or a dropped connection is treated as worth retrying. A permanent client error such as a 404 is not, and moves straight on.
 
     Cancelling keeps the partial file, so resuming later picks up where you left off.
+
   </Accordion>
 
   <Accordion title="Which downloads are checksum-verified">
     Older-engine models ship with a SHA-256 checksum and are verified after download.
 
     The current GGUF catalog carries no per-file hashes, so those models are **not** checksum-verified.
+
   </Accordion>
 </AccordionGroup>
 
 <Tip>
-  If a download looks stuck at 0%, it is usually still negotiating the redirect to Hugging Face's CDN. Give it a few seconds before cancelling.
+  If a download looks stuck at 0%, it is usually still negotiating the redirect
+  to Hugging Face's CDN. Give it a few seconds before cancelling.
 </Tip>
 
 <CardGroup cols={2}>

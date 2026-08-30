@@ -128,7 +128,6 @@ jobs:
             echo "id=${CREATED_ID}" >> "$GITHUB_OUTPUT"
           fi
 
-
   publish:
     permissions:
       contents: write

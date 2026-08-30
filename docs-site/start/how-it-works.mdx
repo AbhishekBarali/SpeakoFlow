@@ -19,13 +19,15 @@ Three jobs live under that layer.
     Audio is captured from the input device you picked in [General settings](/settings/general).
   </Step>
 
-  <Step title="Voice-activity detection" icon="filter">
-    Silero VAD filters out silence, so pauses while you think don't become gaps in your text.
-  </Step>
+<Step title="Voice-activity detection" icon="filter">
+  Silero VAD filters out silence, so pauses while you think don't become gaps in
+  your text.
+</Step>
 
-  <Step title="Speech-to-text, on your hardware" icon="microchip">
-    whisper.cpp or Parakeet runs the model on your GPU, or your CPU if no GPU is available. See [Acceleration & GPU](/models/acceleration).
-  </Step>
+<Step title="Speech-to-text, on your hardware" icon="microchip">
+  whisper.cpp or Parakeet runs the model on your GPU, or your CPU if no GPU is
+  available. See [Acceleration & GPU](/models/acceleration).
+</Step>
 
   <Step title="Text into the active app" icon="clipboard">
     Inserted via the clipboard or typed directly. See [Output & pasting](/dictation/output).
@@ -44,7 +46,7 @@ An assistant turn is not a single request. The model gets a small set of tools, 
 
 ## Where things run
 
-Speech-to-text is always local. The assistant is where you choose your comfort level, in *Settings → Assistant*.
+Speech-to-text is always local. The assistant is where you choose your comfort level, in _Settings → Assistant_.
 
 - **Built-in**. A small local model, fully on your machine. No key, no network.
 - **Local server**. Ollama or LM Studio on your own machine.

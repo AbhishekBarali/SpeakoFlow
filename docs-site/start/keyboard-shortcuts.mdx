@@ -4,16 +4,16 @@ description: "Every SpeakoFlow keyboard shortcut and its default on Windows, mac
 icon: "keyboard"
 ---
 
-These are the defaults. Every shortcut is configurable in *Settings → General → Shortcuts*.
+These are the defaults. Every shortcut is configurable in _Settings → General → Shortcuts_.
 
-| Action | Windows | macOS | Linux |
-| --- | --- | --- | --- |
-| **Dictate**<br />Start/stop recording, type it out | `Left Ctrl` + `Left Win` | `Option` + `Space` | `Ctrl` + `Space` |
-| **Dictate & clean up**<br />Dictate, then AI-clean before pasting | `Ctrl` + `Shift` + `Space` | `Option` + `Shift` + `Space` | `Ctrl` + `Shift` + `Space` |
-| **Ask the assistant**<br />Voice question into the panel | `Left Ctrl` + `Left Alt` | `Option` + `Ctrl` + `Space` | `Ctrl` + `Alt` + `Space` |
-| **Show / hide panel**<br />Toggle the floating assistant | `Ctrl` + `Shift` + `A` | `Option` + `Ctrl` + `A` | `Ctrl` + `Alt` + `A` |
-| **Cancel**<br />Stop a recording or streaming reply | Unset. Bind any key (e.g. `Esc`) in Settings | | |
-| **Debug mode**<br />Reveal diagnostics | `Ctrl` + `Shift` + `D` | `Cmd` + `Shift` + `D` | `Ctrl` + `Shift` + `D` |
+| Action                                                            | Windows                                      | macOS                        | Linux                      |
+| ----------------------------------------------------------------- | -------------------------------------------- | ---------------------------- | -------------------------- |
+| **Dictate**<br />Start/stop recording, type it out                | `Left Ctrl` + `Left Win`                     | `Option` + `Space`           | `Ctrl` + `Space`           |
+| **Dictate & clean up**<br />Dictate, then AI-clean before pasting | `Ctrl` + `Shift` + `Space`                   | `Option` + `Shift` + `Space` | `Ctrl` + `Shift` + `Space` |
+| **Ask the assistant**<br />Voice question into the panel          | `Left Ctrl` + `Left Alt`                     | `Option` + `Ctrl` + `Space`  | `Ctrl` + `Alt` + `Space`   |
+| **Show / hide panel**<br />Toggle the floating assistant          | `Ctrl` + `Shift` + `A`                       | `Option` + `Ctrl` + `A`      | `Ctrl` + `Alt` + `A`       |
+| **Cancel**<br />Stop a recording or streaming reply               | Unset. Bind any key (e.g. `Esc`) in Settings |                              |                            |
+| **Debug mode**<br />Reveal diagnostics                            | `Ctrl` + `Shift` + `D`                       | `Cmd` + `Shift` + `D`        | `Ctrl` + `Shift` + `D`     |
 
 Cancel is the only one unset out of the box. Bind it to whatever you like. It stops an active recording, a streaming assistant reply, or a Flow generation in progress.
 
@@ -21,7 +21,7 @@ Debug mode is not a global shortcut. It only fires while the Settings window is 
 
 ## Hold or Tap
 
-One setting in *Settings → General* controls all three recording shortcuts: dictation, dictation with cleanup, and the assistant.
+One setting in _Settings → General_ controls all three recording shortcuts: dictation, dictation with cleanup, and the assistant.
 
 - **Hold** (default). Records while you hold the shortcut, and types out when you let go.
 - **Tap**. One press starts recording, the next press stops it. This is how you record hands-free.
@@ -33,6 +33,7 @@ Cancel works in both modes. The overlay's tick button finishes a hands-free reco
     Holding `Left Ctrl` + `Left Win` keeps every letter and the Space bar free, so the shortcut can't collide with text shortcuts inside your apps.
 
     Left-side keys specifically, so an international `AltGr` layout won't trigger the assistant by accident.
+
   </Accordion>
 
   <Accordion title="Tap to lock does nothing in the current build">
@@ -43,9 +44,12 @@ Cancel works in both modes. The overlay's tick button finishes a hands-free reco
     Use the **Tap** recording behavior instead. It is the same outcome by a different route.
 
     For reference, the stored defaults are `Space` on Windows and `Shift` on macOS and Linux. `Space` on Windows because the Windows record shortcuts are modifier-only and leave Space free. `Shift` elsewhere because the default macOS and Linux shortcuts already hold Space, and a lock key that overlaps the record shortcut could never work anyway.
+
   </Accordion>
 </AccordionGroup>
 
 <Tip>
-  Prefer a hardware key or a window-manager binding? SpeakoFlow also accepts [command-line flags](/settings/cli) like `--toggle-transcription` that you can wire to anything.
+  Prefer a hardware key or a window-manager binding? SpeakoFlow also accepts
+  [command-line flags](/settings/cli) like `--toggle-transcription` that you can
+  wire to anything.
 </Tip>

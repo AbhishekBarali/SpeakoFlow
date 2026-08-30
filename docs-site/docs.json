@@ -45,16 +45,28 @@
         "header": "SpeakoFlow",
         "items": [
           { "label": "Download", "href": "https://www.speakoflow.com" },
-          { "label": "Releases", "href": "https://github.com/AbhishekBarali/SpeakoFlow/releases" },
-          { "label": "Repository", "href": "https://github.com/AbhishekBarali/SpeakoFlow" }
+          {
+            "label": "Releases",
+            "href": "https://github.com/AbhishekBarali/SpeakoFlow/releases"
+          },
+          {
+            "label": "Repository",
+            "href": "https://github.com/AbhishekBarali/SpeakoFlow"
+          }
         ]
       },
       {
         "header": "Help",
         "items": [
-          { "label": "Troubleshooting", "href": "/docs/reference/troubleshooting" },
+          {
+            "label": "Troubleshooting",
+            "href": "/docs/reference/troubleshooting"
+          },
           { "label": "Privacy", "href": "/docs/reference/privacy" },
-          { "label": "Report an issue", "href": "https://github.com/AbhishekBarali/SpeakoFlow/issues" }
+          {
+            "label": "Report an issue",
+            "href": "https://github.com/AbhishekBarali/SpeakoFlow/issues"
+          }
         ]
       }
     ]
@@ -89,7 +101,10 @@
   },
   "redirects": [
     { "source": "/dictation/translate", "destination": "/models/languages" },
-    { "source": "/dictation/spoken-emoji", "destination": "/dictation/text-replacements" },
+    {
+      "source": "/dictation/spoken-emoji",
+      "destination": "/dictation/text-replacements"
+    },
     { "source": "/assistant/brain", "destination": "/assistant/providers" },
     { "source": "/assistant/appearance", "destination": "/assistant/panel" },
     { "source": "/models/memory", "destination": "/models/acceleration" }
@@ -197,4 +212,3 @@
     ]
   }
 }
-

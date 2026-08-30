@@ -4,15 +4,15 @@ description: "What SpeakoFlow's About section shows, where it keeps your data an
 icon: "circle-info"
 ---
 
-*Settings → About* is the small housekeeping page.
+_Settings → About_ is the small housekeeping page.
 
-| Row | What it gives you |
-| --- | --- |
-| Version | The build you are running. |
-| Check for updates | A manual check, the same one the tray item runs. Disabled if you turned automatic update checks off in *Settings → General*, which are on by default. |
-| App language | The language of the SpeakoFlow interface. |
-| Source code, License | Links to the repository and the license file. |
-| Folders | Your app data folder (models, history, settings) and your log directory, each with a button to open it. |
+| Row                  | What it gives you                                                                                                                                     |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Version              | The build you are running.                                                                                                                            |
+| Check for updates    | A manual check, the same one the tray item runs. Disabled if you turned automatic update checks off in _Settings → General_, which are on by default. |
+| App language         | The language of the SpeakoFlow interface.                                                                                                             |
+| Source code, License | Links to the repository and the license file.                                                                                                         |
+| Folders              | Your app data folder (models, history, settings) and your log directory, each with a button to open it.                                               |
 
 ## Known limitations
 
@@ -22,7 +22,9 @@ icon: "circle-info"
 - **Unsigned builds cannot auto-update on macOS.** Updating means downloading the new `.dmg` and repeating the one-time command.
 
 <Note>
-  The release pipeline is already wired for signing. It needs the paid Apple Developer membership and a Windows certificate. Steps for the macOS command are in [Install](/start/install).
+  The release pipeline is already wired for signing. It needs the paid Apple
+  Developer membership and a Windows certificate. Steps for the macOS command
+  are in [Install](/start/install).
 </Note>
 
 ## Roadmap
@@ -44,12 +46,12 @@ The assistant, screen vision, Generate with Flow, translation, text-to-speech, a
 
 <AccordionGroup>
   <Accordion title="Tech stack">
-    | Layer | What it uses |
-    | --- | --- |
-    | App | Tauri 2, with a Rust backend and a React and TypeScript frontend. |
-    | Speech-to-text | whisper.cpp and Parakeet with GPU acceleration, plus Silero VAD for voice detection. |
-    | Assistant | A built-in llama.cpp engine, or any OpenAI-compatible provider you configure. |
-    | Text-to-speech | Kokoro locally, with OpenAI-compatible, ElevenLabs, and Azure options. |
+    | Layer | What it uses | | --- | --- | | App | Tauri 2, with a Rust backend
+    and a React and TypeScript frontend. | | Speech-to-text | whisper.cpp and
+    Parakeet with GPU acceleration, plus Silero VAD for voice detection. | |
+    Assistant | A built-in llama.cpp engine, or any OpenAI-compatible provider
+    you configure. | | Text-to-speech | Kokoro locally, with OpenAI-compatible,
+    ElevenLabs, and Azure options. |
   </Accordion>
 </AccordionGroup>
 

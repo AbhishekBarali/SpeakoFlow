@@ -13,13 +13,13 @@ Four things are true no matter how you configure SpeakoFlow.
 
 ## What leaves your machine, and when
 
-| What | When | Where it goes |
-| --- | --- | --- |
-| Assistant, [AI cleanup](/writing/ai-cleanup), [Generate with Flow](/writing/generate-with-flow), spoken answers | Only when you use them, and only if you configured a remote provider | The provider you chose, and nowhere else |
-| [Web search](/assistant/web-search) | Off by default. When on, only when the assistant decides a search would help | Your chosen search backend |
-| Screen captures | Only when you ask for them | The provider you chose |
-| Model downloads | When you download a transcription or local assistant model | The model host |
-| Update checks | **On by default.** Toggle in *Settings → General* | This project's GitHub releases page |
+| What                                                                                                            | When                                                                         | Where it goes                            |
+| --------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- | ---------------------------------------- |
+| Assistant, [AI cleanup](/writing/ai-cleanup), [Generate with Flow](/writing/generate-with-flow), spoken answers | Only when you use them, and only if you configured a remote provider         | The provider you chose, and nowhere else |
+| [Web search](/assistant/web-search)                                                                             | Off by default. When on, only when the assistant decides a search would help | Your chosen search backend               |
+| Screen captures                                                                                                 | Only when you ask for them                                                   | The provider you chose                   |
+| Model downloads                                                                                                 | When you download a transcription or local assistant model                   | The model host                           |
+| Update checks                                                                                                   | **On by default.** Toggle in _Settings → General_                            | This project's GitHub releases page      |
 
 Pick a local provider for the first three rows and the app never opens a connection at all.
 
@@ -30,6 +30,7 @@ Pick a local provider for the first three rows and the app never opens a connect
     Screen vision captures nothing unless you ask it to, and then only the monitor under your mouse cursor.
 
     The full-resolution frame is sent once to the model provider you chose and is not kept. What persists locally is a small thumbnail attached to the message, so you can see later what the assistant was looking at. Details in [Screen vision](/assistant/screen-vision).
+
   </Accordion>
 
   <Accordion title="Personal memory">
@@ -38,6 +39,7 @@ Pick a local provider for the first three rows and the app never opens a connect
     Memory is advisory only, so injected memory never overrides what you asked for in the current message. It actively refuses to keep secrets, personal identifiers, or instruction-shaped text at capture, consolidation, and injection time.
 
     An Incognito toggle skips both using and learning memory for a single conversation.
+
   </Accordion>
 
   <Accordion title="History and recordings">
@@ -49,6 +51,7 @@ Pick a local provider for the first three rows and the app never opens a connect
     Both apply only to unstarred dictation and Flow recordings. Starred recordings are always kept, and assistant chats are never counted or auto-deleted.
 
     Changes apply immediately, so lowering the limit deletes the excess right away.
+
   </Accordion>
 
   <Accordion title="API keys">
@@ -59,12 +62,14 @@ Pick a local provider for the first three rows and the app never opens a connect
     <Note>
       If the platform store is not available, a headless Linux box with no Secret Service for example, the app keeps the key in its settings file rather than losing it. On such a machine the key is on disk in plain text, so it is worth knowing.
     </Note>
+
   </Accordion>
 
   <Accordion title="Keyboard access">
     Global shortcuts have to observe your keyboard to know when you pressed one. Nothing logs or stores what you type.
 
     On Linux the handy-keys engine reads `/dev/input/event*` directly, which is why it needs your user in the `input` group. The Tauri engine, the default on Linux, uses the compositor's global-shortcut API and reads nothing.
+
   </Accordion>
 </AccordionGroup>
 
