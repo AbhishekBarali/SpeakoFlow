@@ -1771,7 +1771,7 @@ const LEGACY_SPEAKOFLOW_MINI_SYSTEM_PROMPT: &str =
 /// **Keep this byte-identical to the training prompt.** Editing it is a model
 /// change, not a copy change. The reference is the "The system prompt is part of
 /// the model" section of
-/// <https://huggingface.co/SpeakoFlow/speakoflow-mini-0.8b-GGUF>.
+/// <https://huggingface.co/SpeakoFlow/speakoflow-mini>.
 ///
 /// It is longer than a general reader would expect a "short" specialist prompt
 /// to be, and that is fine: length is not the property that matters here, being

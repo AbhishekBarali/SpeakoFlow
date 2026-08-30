@@ -262,7 +262,7 @@ pub const SPEAKOFLOW_MINI_MODEL_ID: &str = "speakoflow-mini";
 // resolve — while 7.3% of Q4_K_M outputs differ from Q8_0. So the smaller files
 // are not measurably worse, they are just unmeasured, and the default should be
 // the build the numbers belong to.
-const SPEAKOFLOW_MINI_REPO_ID: &str = "SpeakoFlow/speakoflow-mini-0.8b-GGUF";
+const SPEAKOFLOW_MINI_REPO_ID: &str = "SpeakoFlow/speakoflow-mini";
 const SPEAKOFLOW_MINI_FILENAME: &str = "SpeakoFlow-Mini-0.8B-Q8_0.gguf";
 /// 833,591,776 bytes, reported in MiB like every other catalog entry.
 const SPEAKOFLOW_MINI_SIZE_MB: u64 = 795;
