@@ -902,6 +902,12 @@ async fn post_process_transcription(
             }
             let request = build_post_process_request(config, transcription);
             let token_limit = config.model.trim().parse::<i32>().unwrap_or(0);
+            // Same rule as `run_provider_post_process`: the length guard is
+            // calibrated for a chat model that might start explaining itself, so
+            // a cleanup fine-tune is exempt. Apple Intelligence returns here
+            // rather than going through that function, so the value is derived
+            // again instead of shared.
+            let enforce_length = !config.trained_for_cleanup;
             let task = tauri::async_runtime::spawn_blocking(move || {
                 apple_intelligence::process_text_with_system_prompt(
                     &request.system_prompt,
