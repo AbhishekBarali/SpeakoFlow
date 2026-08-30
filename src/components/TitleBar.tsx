@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { platform } from "@tauri-apps/plugin-os";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Copy, Minus, Square, X } from "lucide-react";
+import { useSafeWindowDrag } from "@/lib/useSafeWindowDrag";
 import Wordmark from "./Wordmark";
 
 /**
@@ -19,6 +20,10 @@ import Wordmark from "./Wordmark";
  */
 export const TitleBar: React.FC = () => {
   const { t } = useTranslation();
+  // Same Windows move-loop hazard as the assistant pill: a click on the drag
+  // region can leave the window stuck to the cursor and the desktop
+  // unclickable (see useSafeWindowDrag).
+  useSafeWindowDrag();
   const isMac = platform() === "macos";
   const appWindow = React.useMemo(() => getCurrentWindow(), []);
   const [isMaximized, setIsMaximized] = useState(false);

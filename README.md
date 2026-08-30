@@ -119,10 +119,24 @@ don't need it.
 Speak another language and get clean English, on your device, with a Whisper model.
 No cloud round-trip.
 
-### AI cleanup: strip filler and set the tone
+### AI cleanup, by a model we trained for it
 
-Remove filler words and fix grammar in a tone you choose: Professional, Friendly,
-Concise, or your own custom instruction.
+SpeakoFlow Mini is our own model, and it does one thing, turning what you said
+into clean text. It strips filler, fixes grammar and punctuation, and applies
+spoken edits, so saying "new paragraph" or "scratch that" mid-dictation does what
+you meant instead of getting typed out. It is a 795 MB download, it runs on your
+machine, and it handles English only for now. Layer a writing style on top:
+Professional, Friendly, Concise, or your own instruction. Any other local or
+cloud model can do the job instead if you would rather use one you already trust.
+
+### Use the models you already have
+
+If a model is already on your disk, SpeakoFlow will use it where it sits. Add a
+`.gguf` or a Whisper `.bin`, or link a folder and every model inside it appears,
+subfolders included. Nothing is copied, nothing is moved, and removing an entry
+only takes it off the list. Downloads that do happen are faster now, roughly
+0.5 MB/s to 19 MB/s on the same connection, because they fetch eight chunks at
+once and resume where they stopped.
 
 ### Web search, profiles, and personal memory
 
