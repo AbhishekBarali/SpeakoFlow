@@ -95,3 +95,8 @@ pub fn get_available_accelerators() -> AvailableAccelerators {
 pub fn preferred_gpu_device() -> Option<GpuDeviceOption> {
     None
 }
+
+/// No GPU is available in the CI mock.
+pub fn gpu_devices() -> Vec<GpuDeviceOption> {
+    Vec::new()
+}

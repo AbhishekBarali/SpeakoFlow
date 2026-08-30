@@ -27,10 +27,7 @@ export const QuitOnClose: React.FC<QuitOnCloseProps> = React.memo(
       <ToggleSwitch
         checked={quitOnClose}
         onChange={(enabled) =>
-          updateSetting(
-            "close_behavior",
-            enabled ? "quit" : "minimize_to_tray",
-          )
+          updateSetting("close_behavior", enabled ? "quit" : "minimize_to_tray")
         }
         isUpdating={isUpdating("close_behavior")}
         label={t("settings.advanced.closeBehavior.label")}

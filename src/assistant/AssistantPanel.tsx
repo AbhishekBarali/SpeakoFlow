@@ -468,6 +468,9 @@ const AssistantPanel: React.FC = () => {
   // read. A brand-new message (their own) always scrolls into view.
   const stickToBottomRef = useRef(true);
   const prevHistoryLenRef = useRef(0);
+  // Pending animation frame for the scroll-to-bottom that runs when the panel is
+  // shown, so a fast hide/show can't leave two of them queued.
+  const rafRef = useRef<number | null>(null);
   // Remembers the last pipeline state so we can tell a brand-new turn (idle →
   // active) from a mid-turn transition — used to clear a stale notice only at
   // the start of the next turn, never mid-turn.
@@ -627,6 +630,54 @@ const AssistantPanel: React.FC = () => {
     if (grew && lastIsUser) stickToBottomRef.current = true;
     if (stickToBottomRef.current) el.scrollTop = el.scrollHeight;
   }, [history, stream, state, error, notice]);
+
+  // Re-pin after the browser has actually laid the content out.
+  //
+  // The effect above runs on the React commit, which is *before* markdown
+  // reflows, inline image thumbnails decode, and web fonts settle — so
+  // `scrollHeight` at that moment is short and the "scroll to bottom" landed
+  // partway up. Worse, the panel window is hidden rather than destroyed, and a
+  // hidden window measures as zero-height: every scroll performed while it was
+  // off screen was a no-op, so re-opening the panel showed the top of the
+  // conversation and left the user to scroll down to their last message by hand.
+  //
+  // Observing the list covers both: any size change while we're sticking to the
+  // bottom re-pins, including the one that happens when the window is shown.
+  useEffect(() => {
+    const el = listRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const pin = () => {
+      if (stickToBottomRef.current) el.scrollTop = el.scrollHeight;
+    };
+    const observer = new ResizeObserver(pin);
+    observer.observe(el);
+    for (const child of Array.from(el.children)) observer.observe(child);
+    return () => observer.disconnect();
+  }, [history.length]);
+
+  // Showing the panel always returns to the newest message. Re-opening a chat is
+  // a fresh look at it, so an old scroll position (or a stale "user scrolled up"
+  // flag from the previous session) must not survive the reopen.
+  useEffect(() => {
+    if (!panelVisible) return;
+    stickToBottomRef.current = true;
+    const el = listRef.current;
+    if (!el) return;
+    // Two frames: the first is when the shown window gets a real layout, the
+    // second is after that layout has been measured.
+    const outer = requestAnimationFrame(() => {
+      el.scrollTop = el.scrollHeight;
+      const inner = requestAnimationFrame(() => {
+        el.scrollTop = el.scrollHeight;
+      });
+      rafRef.current = inner;
+    });
+    rafRef.current = outer;
+    return () => {
+      cancelAnimationFrame(outer);
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+    };
+  }, [panelVisible, collapsed]);
 
   // Track whether the message list is scrolled to (near) the bottom, so the
   // auto-scroll effect knows whether to keep following the reply as it streams.

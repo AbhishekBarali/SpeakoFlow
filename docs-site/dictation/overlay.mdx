@@ -8,33 +8,36 @@ A small on-screen indicator that shows SpeakoFlow is listening, so you are never
 
 ## Overlay style
 
-*Settings → General → Overlay → Overlay.*
+_Settings → General → Overlay → Overlay._
 
-| Style | What you see | Streaming |
-| --- | --- | --- |
-| `Auto` | Follows the model: `Live` when it can stream, `Minimal` when it cannot. | Follows the model |
-| `Live` | An enlarged, readable card (400 × 120) showing the running transcript. | On |
-| `Minimal` | A compact pill: a waveform while you speak, a spinner while it works. | Off |
-| `None` | No overlay. | Off |
+| Style     | What you see                                                            | Streaming         |
+| --------- | ----------------------------------------------------------------------- | ----------------- |
+| `Auto`    | Follows the model: `Live` when it can stream, `Minimal` when it cannot. | Follows the model |
+| `Live`    | An enlarged, readable card (400 × 120) showing the running transcript.  | On                |
+| `Minimal` | A compact pill: a waveform while you speak, a spinner while it works.   | Off               |
+| `None`    | No overlay.                                                             | Off               |
 
 A fresh install is on `Auto`, which is why you get the live card without configuring anything. See [Live vs. batch transcription](/dictation/live-transcription).
 
 ## Overlay position
 
-*Settings → General → Overlay → Overlay position.*
+_Settings → General → Overlay → Overlay position._
 
-| Platform | Default position |
-| --- | --- |
-| Windows | `Bottom` |
-| macOS | `Bottom` |
-| Linux | `None`, so the overlay is hidden |
+| Platform | Default position                 |
+| -------- | -------------------------------- |
+| Windows  | `Bottom`                         |
+| macOS    | `Bottom`                         |
+| Linux    | `None`, so the overlay is hidden |
 
-The other choices are `Top` and `None`. Setting *either* the style or the position to `None` hides the overlay, because they are checked independently.
+The other choices are `Top` and `None`. Setting _either_ the style or the position to `None` hides the overlay, because they are checked independently.
 
 Linux defaults to `None` because a native GNOME/Wayland session gives an app no reliable way to float a window above everything else. Set it to `Bottom` or `Top` if your compositor handles it.
 
 <Note>
-  This one style setting governs the overlay for assistant voice turns too. A separate assistant overlay style exists in the settings file, but nothing reads it in the current build and there is no control for it, so changing it has no effect.
+  This one style setting governs the overlay for assistant voice turns too. A
+  separate assistant overlay style exists in the settings file, but nothing
+  reads it in the current build and there is no control for it, so changing it
+  has no effect.
 </Note>
 
 ## Details
@@ -44,6 +47,7 @@ Linux defaults to `None` because a native GNOME/Wayland session gives an app no 
     `Auto` is not offered in the dropdown. The dropdown shows you which option `Auto` currently resolves to, and picking anything writes a concrete value that overrides `Auto` from then on.
 
     `Live` is only honored on a model that natively streams. On any other model it degrades to `Minimal`, so a batch model never shows an empty live window even if `Live` was explicitly chosen.
+
   </Accordion>
 
   <Accordion title="What each overlay state means">
@@ -57,15 +61,20 @@ Linux defaults to `None` because a native GNOME/Wayland session gives an app no 
     | *Looking at your screen…* | A screen capture is being taken for Flow. |
 
     A short notice appears when something did not work, for example *"Flow needs an assistant model, pasted as dictation."* It auto-hides after a moment.
+
   </Accordion>
 
-  <Accordion title="There is no cancel button">
-    To abandon a recording, use the Cancel shortcut. It has no default binding, because a global `Esc` would swallow `Esc` presses meant for other apps. Bind a key for it in *Settings → General → Recording*.
-  </Accordion>
+<Accordion title="There is no cancel button">
+  To abandon a recording, use the Cancel shortcut. It has no default binding,
+  because a global `Esc` would swallow `Esc` presses meant for other apps. Bind
+  a key for it in *Settings → General → Recording*.
+</Accordion>
 
-  <Accordion title="Why it never flashes in the wrong place">
-    The overlay is re-centered for whichever size the current state needs before it is shown, so a switch between the pill and the live card does not leave it briefly misplaced.
-  </Accordion>
+<Accordion title="Why it never flashes in the wrong place">
+  The overlay is re-centered for whichever size the current state needs before
+  it is shown, so a switch between the pill and the live card does not leave it
+  briefly misplaced.
+</Accordion>
 
   <Accordion title="Linux: keeping the overlay on top">
     On a native GNOME/Wayland session the overlay cannot stay above other windows. Mutter does not implement `wlr-layer-shell`, and Wayland gives apps no way to raise themselves.
@@ -73,5 +82,6 @@ Linux defaults to `None` because a native GNOME/Wayland session gives an app no 
     SpeakoFlow detects GNOME on Wayland and runs under XWayland, where "keep above" works. That is automatic and needs no setup. X11 and KDE/wlroots Wayland sessions already work.
 
     To force native Wayland anyway, launch with `SPEAKOFLOW_ALLOW_WAYLAND=1`. To disable GTK layer shell under a layer-shell compositor, use `SPEAKOFLOW_NO_GTK_LAYER_SHELL=1`. More in [Troubleshooting](/reference/troubleshooting).
+
   </Accordion>
 </AccordionGroup>

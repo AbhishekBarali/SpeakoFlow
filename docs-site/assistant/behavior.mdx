@@ -4,13 +4,13 @@ description: "Control how much conversation context the SpeakoFlow assistant sen
 icon: "sliders"
 ---
 
-Tune how the assistant carries a conversation, in *Settings → Assistant → Behavior*.
+Tune how the assistant carries a conversation, in _Settings → Assistant → Behavior_.
 
-| Setting | Default | Options |
-| --- | --- | --- |
-| Conversation memory | `12` | 0 to 200 messages |
-| Summarize long chats | `On` | On, Off |
-| Response length | `No effect` | No effect, Short, Medium, Long |
+| Setting              | Default     | Options                        |
+| -------------------- | ----------- | ------------------------------ |
+| Conversation memory  | `12`        | 0 to 200 messages              |
+| Summarize long chats | `On`        | On, Off                        |
+| Response length      | `No effect` | No effect, Short, Medium, Long |
 
 ## Conversation memory
 
@@ -33,19 +33,25 @@ Each option tells the model to still match your intent, so a greeting gets a sho
     Cloud providers get exactly the number of messages you ask for. Azure and local engines (the built-in one, or an Ollama or LM Studio server on loopback) also get a character cap on top.
 
     Azure's gateway rejects oversized request bodies, and a local model runs a small context window, so sending your full history there would fail rather than work slowly. Turns carrying a screenshot trim harder on those same providers, since the image already dominates the budget.
+
   </Accordion>
 
   <Accordion title="What triggers a summary, and when it runs">
     The trigger is the message-history window above, not the model's context window.
 
     The fold runs in the background after a reply finishes, so it never delays an answer, and a subtle indicator shows while it is working. If it fails, the summary is left alone and the next turn tries again.
+
   </Accordion>
 </AccordionGroup>
 
 <Tip>
-  You can compact a conversation on demand by typing `/summarize` in the panel. That one replaces the visible transcript with its summary, rather than working quietly in the background.
+  You can compact a conversation on demand by typing `/summarize` in the panel.
+  That one replaces the visible transcript with its summary, rather than working
+  quietly in the background.
 </Tip>
 
 <Note>
-  This is short-term, per-conversation context. For durable facts the assistant remembers across chats, see [Personal memory](/personalize/memory), a separate opt-in feature.
+  This is short-term, per-conversation context. For durable facts the assistant
+  remembers across chats, see [Personal memory](/personalize/memory), a separate
+  opt-in feature.
 </Note>

@@ -1,5 +1,5 @@
 import React from "react";
-import { AlertCircle, AlertTriangle, Info, CheckCircle } from "lucide-react";
+import { AlertCircle, AlertTriangle, Info, CheckCircle, X } from "lucide-react";
 
 type AlertVariant = "error" | "warning" | "info" | "success";
 
@@ -7,6 +7,14 @@ interface AlertProps {
   variant?: AlertVariant;
   /** When true, removes rounded corners for use inside containers */
   contained?: boolean;
+  /**
+   * Renders a close button. Only pass this for advisory notices whose content
+   * is available elsewhere: an alert the user must act on should not be
+   * dismissible, or they can hide the reason something is not working.
+   */
+  onDismiss?: () => void;
+  /** Accessible label for the close button. Required whenever `onDismiss` is set. */
+  dismissLabel?: string;
   children: React.ReactNode;
   className?: string;
 }
@@ -47,6 +55,8 @@ const variantIcons: Record<AlertVariant, React.ElementType> = {
 export const Alert: React.FC<AlertProps> = ({
   variant = "error",
   contained = false,
+  onDismiss,
+  dismissLabel,
   children,
   className = "",
 }) => {
@@ -58,7 +68,18 @@ export const Alert: React.FC<AlertProps> = ({
       className={`flex items-start gap-3 p-4 ${styles.container} ${contained ? "" : "rounded-lg"} ${className}`}
     >
       <Icon className={`w-5 h-5 shrink-0 mt-0.5 ${styles.icon}`} />
-      <p className={`text-sm ${styles.text}`}>{children}</p>
+      <p className={`text-sm flex-1 ${styles.text}`}>{children}</p>
+      {onDismiss && (
+        <button
+          type="button"
+          onClick={onDismiss}
+          aria-label={dismissLabel}
+          title={dismissLabel}
+          className={`shrink-0 -mr-1 -mt-1 rounded p-1 opacity-60 transition-opacity hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-current ${styles.icon}`}
+        >
+          <X className="w-4 h-4" />
+        </button>
+      )}
     </div>
   );
 };

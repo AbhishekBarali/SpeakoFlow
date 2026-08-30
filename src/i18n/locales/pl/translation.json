@@ -92,6 +92,7 @@
       },
       "seesScreen": "Widzi Twój ekran",
       "textOnly": "Tylko tekst",
+      "recommendedForAssistant": "Polecany do asystenta",
       "download": "Pobierz model",
       "useDownloaded": "Użyj pobranego modelu",
       "skip": "Pomiń na razie",
@@ -99,6 +100,14 @@
       "continue": "Kontynuuj",
       "downloadingHint": "Twój model pobiera się w tle — możesz od razu zacząć korzystać z aplikacji.",
       "downloadStarted": "Pobieranie modelu AI w tle."
+    },
+    "cleanup": {
+      "cardTitle": "SpeakoFlow Mini",
+      "cardDescription": "Wykonuje wypowiedziane polecenia, takie jak “new paragraph” i “scratch that”. Tylko angielski.",
+      "pill": "Czyści Twoje dyktowanie",
+      "recommendedForDictation": "Polecany do dyktowania",
+      "download": "Pobierz i włącz",
+      "useDownloaded": "Włącz go"
     },
     "ready": {
       "title": "Wszystko gotowe.",
@@ -509,6 +518,33 @@
         "add": "Pobierz",
         "adding": "Rozpoczynanie…",
         "addError": "Nie udało się dodać tego modelu. Spróbuj ponownie."
+      },
+      "localModel": {
+        "addButton": "Użyj modelu lokalnego",
+        "title": "Użyj modelu, który już masz",
+        "subtitle": "Dodaj plik .gguf lub .bin dla Whisper z dowolnego miejsca na tym urządzeniu albo podłącz folder, w którym trzymasz modele. Nic nie jest kopiowane ani pobierane.",
+        "pickFiles": "Wybierz pliki modeli",
+        "pickFilesHint": "Wskaż jeden lub więcej plików .gguf albo .bin. Dobre rozwiązanie dla jednego modelu, który właśnie zbudowałeś.",
+        "linkFolder": "Podłącz folder",
+        "linkFolderHint": "Skanowany automatycznie, razem z podfolderami. Podłącz tyle folderów, ile chcesz.",
+        "fileFilter": "Pliki modeli",
+        "filesAdded_one": "Dodano {{count}} model.",
+        "filesAdded_other": "Dodano {{count}} modeli.",
+        "folderAdded_one": "Folder podłączony. Znaleziono {{count}} model.",
+        "folderAdded_other": "Folder podłączony. Znaleziono {{count}} modeli.",
+        "folderRemoved": "Folder odłączony. Twoje pliki pozostały nietknięte.",
+        "foldersTitle": "Podłączone foldery",
+        "foldersEmpty": "Nie podłączono jeszcze żadnego folderu. Podłącz jeden, a każdy model w środku pojawi się na Twojej liście.",
+        "removeFolder": "Odłącz {{folder}}",
+        "rescan": "Skanuj ponownie",
+        "rescanning": "Skanowanie…",
+        "rescanDone_one": "Znaleziono {{count}} model lokalny.",
+        "rescanDone_other": "Znaleziono {{count}} modeli lokalnych.",
+        "footnote": "Podłączone foldery są skanowane ponownie przy starcie SpeakoFlow, więc modele dodane do nich później pojawią się same. Odłączenie folderu lub usunięcie modelu usuwa go tylko z tej listy — Twoje pliki zostają tam, gdzie są.",
+        "removeTitle": "Usunąć z listy?",
+        "removeConfirm": "Usunąć „{{modelName}}” z listy modeli?\n\nSam plik zostaje tam, gdzie jest:\n{{path}}",
+        "missingBadge": "Brak pliku",
+        "fileMissing": "Pliku tego modelu już tam nie ma:\n{{path}}\n\nMógł zostać przeniesiony lub zmienić nazwę, albo znajduje się na dysku, który nie jest podłączony."
       }
     },
     "sound": {
@@ -748,6 +784,7 @@
         "promptSelectFailed": "Prompt został utworzony, ale nie udało się go wybrać.",
         "promptUpdateFailed": "Nie udało się zaktualizować promptu.",
         "promptDeleteFailed": "Nie udało się usunąć promptu.",
+        "promptRestoreFailed": "Nie udało się przywrócić promptu.",
         "toneSelectFailed": "Nie udało się wybrać stylu pisania.",
         "toneCreateFailed": "Nie udało się utworzyć stylu pisania.",
         "toneSelectAfterCreateFailed": "Styl został utworzony, ale nie udało się go wybrać.",
@@ -834,6 +871,7 @@
           "description": "Wybierz szablon do ulepszania transkrypcji lub utwórz nowy. Użyj ${output} w treści, aby odwołać się do przechwyconej transkrypcji."
         },
         "noPrompts": "Brak dostępnych promptów",
+        "nonePrompt": "Brak (bez promptu)",
         "selectPrompt": "Wybierz prompt",
         "createNew": "Utwórz nowy prompt",
         "edit": "Edytuj",
@@ -845,6 +883,7 @@
         "promptTip": "Wskazówka: transkrybowany tekst jest wysyłany do modelu automatycznie — wystarczy napisać instrukcje. (Starsze prompty z <code>${output}</code> nadal działają.)",
         "updatePrompt": "Zaktualizuj prompt",
         "deletePrompt": "Usuń prompt",
+        "restorePrompt": "Przywróć zalecany",
         "createPrompt": "Utwórz prompt",
         "cancel": "Anuluj",
         "selectToEdit": "Wybierz prompt powyżej, aby zobaczyć i edytować jego szczegóły.",
@@ -869,21 +908,29 @@
       },
       "aiCleanup": {
         "groupTitle": "Czyszczenie AI",
-        "styleGroupTitle": "Styl pisania",
-        "styleGroupDescription": "Wybierz wbudowany styl albo zapisz własne reguły określające, jak ma brzmieć oczyszczone dyktowanie.",
         "modelGroupTitle": "Model czyszczenia",
+        "unloadTimeout": {
+          "title": "Trzymaj model czyszczenia w pamięci",
+          "description": "Jak długo model czyszczenia działający na urządzeniu ma pozostać w pamięci po tym, jak przestaniesz go używać. Dłużej oznacza brak ponownego wczytywania przed następnym dyktowaniem; bezczynny model zajmuje pamięć, ale nie obciąża procesora. Niezależne od ustawienia asystenta."
+        },
+        "model": {
+          "emptyTitle": "Brak modelu czyszczenia",
+          "emptyDescription": "SpeakoFlow Mini to mały plik do pobrania, stworzony właśnie do tego.",
+          "choose": "Wybierz model",
+          "tunedBadge": "Dostrojony do czyszczenia"
+        },
+        "catalog": {
+          "title": "Wybierz model czyszczenia",
+          "description": "Czyszczenie działa po każdym dyktowaniu, więc szybkość liczy się bardziej niż rozmiar. Wszystko działa offline.",
+          "recommendedTitle": "Polecane do czyszczenia",
+          "recommendedDescription": "SpeakoFlow Mini jest trenowany do tego jednego zadania i wypada w nim lepiej niż znacznie większe modele."
+        },
         "promptGroupTitle": "Prompt czyszczenia",
+        "tunedModelNotice": "Ten model jest dostrojony do czyszczenia dyktowania po angielsku, więc działa najlepiej z zalecanym promptem i bez stylu.",
+        "tunedModelNoticeDismiss": "Ukryj tę wskazówkę",
+        "tunedModelNoticeRestore": "Pokaż wskazówkę o modelu",
         "title": "Popraw moje dyktowanie za pomocą AI",
         "caption": "Eksperymentalne — po dyktowaniu porządkuje interpunkcję i słowa wypełniające.",
-        "strengthLabel": "Siła czyszczenia",
-        "strengthDescription": "Jak mocno AI przepisuje Twoje słowa. Lekkie poprawia tylko błędy i słowa wypełniające. Zrównoważone usuwa dodatkowo powtórzenia i nieudane początki zdań. Agresywne skraca rozwlekłe wypowiedzi do zwięzłego, dobrze ułożonego tekstu — zawsze zachowując Twoje fakty i sens.",
-        "strengthOptions": {
-          "light": "Lekkie",
-          "balanced": "Zrównoważone",
-          "aggressive": "Agresywne"
-        },
-        "fixMisheardLabel": "Poprawiaj źle usłyszane słowa",
-        "fixMisheardDescription": "Gdy słowo wyraźnie nie pasuje do zdania — homofon albo niemal trafiona wymowa — zamień je na słowo, o które Ci chodziło. Pomaga przy akcentach; AI poprawia tylko wtedy, gdy zamierzone słowo jest oczywiste.",
         "info": "Przepuszcza Twoje dyktowanie przez model językowy, aby poprawić interpunkcję, usunąć słowa wypełniające i opcjonalnie dostosować ton. Dotyczy tylko dyktowania i działa pod własnym skrótem. Dodaje krótkie opóźnienie po tym, jak przestaniesz mówić; jeśli model zawiedzie lub przekroczy limit czasu, używany jest surowy tekst. Wciąż w trakcie tworzenia."
       },
       "spokenEmoji": {
@@ -929,6 +976,7 @@
       "originalTranscriptionLabel": "Oryginalna transkrypcja",
       "flowOutputLabel": "Wynik Flow",
       "finalTextLabel": "Tekst końcowy",
+      "cleanupNoChanges": "Czyszczenie AI zadziałało, nie było czego poprawiać",
       "flowNoOutput": "Flow nie wygenerował żadnego wyniku.",
       "copyToClipboard": "Kopiuj transkrypcję do schowka",
       "copyFlowOutput": "Kopiuj wynik Flow",
@@ -1066,12 +1114,16 @@
       }
     },
     "assistant": {
+      "enable": {
+        "title": "Asystent",
+        "label": "Włącz asystenta",
+        "description": "Wyłącz to, aby SpeakoFlow służył tylko do dyktowania. Pływający panel zostaje zamknięty i nigdy się nie wczytuje, jego skróty są zwalniane, a zajmowana pamięć wraca do systemu. Generuj z Flow i czyszczenie AI działają dalej."
+      },
       "shortcuts": {
         "title": "Skróty"
       },
       "brain": {
         "title": "Mózg asystenta",
-        "description": "Wybierz, czy asystent ma działać prywatnie na tym urządzeniu, czy przez dostawcę w chmurze.",
         "whereLabel": "Gdzie działa",
         "onDevice": "Na moim urządzeniu",
         "cloud": "Dostawca w chmurze",
@@ -1091,17 +1143,18 @@
         "acceleratorUnknownWithMemory": "Pamięć graficzna niedostępna · {{memory}} GB pamięci RAM do pracy na CPU",
         "acceleratorUnknown": "Pamięć graficzna niedostępna · nie można przewidzieć szybkości odpowiedzi",
         "details": "Szczegóły",
+        "detailFile": "Plik",
+        "detailLocation": "Lokalizacja",
+        "detailFormat": "Format",
+        "detailId": "ID modelu",
         "switchBeforeDelete": "Przełącz wbudowanego asystenta na inny model, zanim usuniesz ten.",
         "deleteModelConfirm": "Usunąć {{modelName}}? Pobrane pliki i zapisany wpis zostaną usunięte.",
         "deleteModelFailed": "Nie udało się usunąć modelu.",
-        "visionModelNote": "Podgląd ekranu automatycznie pobiera dodatkowy plik do obsługi obrazu.",
         "finderSectionTitle": "Więcej modeli na urządzeniu",
-        "finderSectionDescription": "Poszukaj na Hugging Face, jeśli potrzebujesz innego rozmiaru lub innych możliwości modelu.",
         "finderTitle": "Przeglądaj Hugging Face",
         "finderDescription": "Przeszukaj tysiące modeli GGUF i pobierz wybrany wprost do SpeakoFlow.",
         "finderAction": "Znajdź model",
         "huggingFaceTitle": "Twoje modele",
-        "huggingFaceDescription": "Pobrane modele i modele dodane przez Ciebie z Hugging Face.",
         "catalogEmpty": "Obecnie nie ma dostępnych polecanych modeli lokalnych."
       },
       "subpages": {
@@ -1239,6 +1292,7 @@
         "timing": {
           "label": "Kiedy przechwytywać",
           "description": "Przy pytaniach głosowych: przechwyć ekran w chwili, gdy zaczynasz pytać, albo poczekaj do wysłania wiadomości. Wpisywane wiadomości zawsze przechwytują ekran przy wysłaniu.",
+          "descriptionAgent": "Obie opcje przygotowują zrzut ekranu z wyprzedzeniem, więc asystent nigdy nie każe Ci na niego czekać. Różnica jest w tym, co widać na obrazie: „Gdy zadaję pytanie” zapisuje ekran z chwili, gdy zaczynasz mówić, a „Gdy wiadomość jest wysyłana” — taki, jaki jest teraz. W obu przypadkach obraz zostaje na Twoim urządzeniu i jest wysyłany tylko wtedy, gdy asystent naprawdę poprosi, aby go zobaczyć.",
           "options": {
             "immediate": "Gdy zadaję pytanie",
             "on_send": "Gdy wiadomość jest wysyłana"
@@ -1462,7 +1516,8 @@
     "notices": {
       "flowNotConfigured": "Flow wymaga modelu asystenta — wklejono jako dyktowanie",
       "flowFailed": "Flow nie zdołał nic wygenerować — nic nie wklejono",
-      "flowEmpty": "Po frazie aktywującej wypowiedz polecenie"
+      "flowEmpty": "Po frazie aktywującej wypowiedz polecenie",
+      "cleanupFallback": "Czyszczenie AI nie zadziałało — wklejono surowy tekst"
     },
     "listening": "Słucham…",
     "locked": "Nagrywanie bez trzymania klawisza — naciśnij skrót ponownie, aby zakończyć",
@@ -1478,6 +1533,7 @@
     "empty": "Zapytaj głosem skrótem asystenta\nalbo napisz poniżej.",
     "inputPlaceholder": "Wiadomość…",
     "inputPlaceholderScreen": "Zapytaj o swój ekran…",
+    "queuedUntilReady": "W kolejce — wyślę, gdy tylko ta odpowiedź się skończy.",
     "send": "Wyślij",
     "stop": "Zatrzymaj",
     "cancel": "Anuluj",
@@ -1534,6 +1590,12 @@
       "thinking": "Myślę...",
       "speaking": "Mówię..."
     },
+    "tool": {
+      "search": "Szukam w sieci",
+      "screen": "Patrzę na Twój ekran",
+      "working": "Pracuję nad tym",
+      "elapsed": "{{seconds}} s"
+    },
     "errors": {
       "generic": "Coś poszło nie tak. Spróbuj ponownie.",
       "genericShort": "Coś poszło nie tak",
@@ -1545,6 +1607,8 @@
       "engine_startShort": "Model się nie uruchomił",
       "provider": "Model nie mógł odpowiedzieć. Sprawdź klucz API i połączenie, a potem spróbuj ponownie.",
       "providerShort": "Brak odpowiedzi",
+      "empty_reply": "Model zakończył pracę bez napisania odpowiedzi. Zapytaj ponownie albo wybierz inny model w Ustawienia → Asystent.",
+      "empty_replyShort": "Pusta odpowiedź",
       "vision_unsupported": "Ten model nie potrafi czytać Twojego ekranu. Wybierz model z obsługą obrazu w Ustawienia → Asystent albo zapytaj ponownie bez podglądu ekranu.",
       "vision_unsupportedShort": "Model nie widzi obrazów",
       "screenshot_too_large": "Zrzut ekranu był zbyt duży dla tego dostawcy. Spróbuj ponownie — zostanie mocniej skompresowany.",

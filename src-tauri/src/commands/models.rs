@@ -2,6 +2,8 @@ use crate::huggingface::{self, HfModelSummary, HfRepoFiles};
 use crate::managers::model::{ModelInfo, ModelManager, DOWNLOAD_CANCELLED_ERROR};
 use crate::managers::transcription::{ModelStateEvent, TranscriptionManager};
 use crate::settings::{get_settings, write_settings, ModelUnloadTimeout};
+use serde::{Deserialize, Serialize};
+use specta::Type;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager, State};
 
@@ -57,12 +59,25 @@ pub async fn delete_model(
     let settings = get_settings(&app_handle);
     if settings
         .assistant_models
-        .get("builtin")
+        .get(crate::settings::BUILTIN_POST_PROCESS_PROVIDER_ID)
         .is_some_and(|active_id| active_id == &model_id)
     {
         return Err(
             "Switch the built-in assistant to another model before deleting this one.".to_string(),
         );
+    }
+    // The same protection for AI cleanup, which has its own slot pointing at the
+    // same built-in engine. Without this the two are asymmetric: deleting the
+    // cleanup model from the assistant's catalog (or the Models page, where it is
+    // just one more language model) succeeded and left cleanup pointing at a file
+    // that no longer exists — which shows up later as dictation silently pasting
+    // the raw transcript, a symptom with no visible connection to the deletion.
+    if settings
+        .post_process_models
+        .get(crate::settings::BUILTIN_POST_PROCESS_PROVIDER_ID)
+        .is_some_and(|active_id| active_id == &model_id)
+    {
+        return Err("Switch AI cleanup to another model before deleting this one.".to_string());
     }
 
     // If deleting the active transcription model, unload it and clear the setting.
@@ -287,4 +302,119 @@ pub async fn add_custom_llm_model(
     let _ = app_handle.emit("model-state-changed", ());
 
     Ok(info)
+}
+
+// ---------------------------------------------------------------------
+// Models the user already has on disk
+// ---------------------------------------------------------------------
+
+/// One file that couldn't be registered, and why.
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+pub struct LocalModelFailure {
+    pub path: String,
+    /// User-facing explanation, e.g. that the file is a vision projector rather
+    /// than a model in its own right.
+    pub message: String,
+}
+
+/// Result of registering a batch of picked files.
+///
+/// Deliberately not a plain `Result`: the picker is multi-select, and one
+/// unusable file among five shouldn't discard the other four. The UI reports
+/// what landed and what didn't.
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+pub struct LocalModelImport {
+    pub added: Vec<ModelInfo>,
+    pub failed: Vec<LocalModelFailure>,
+}
+
+/// Register models the user already has on disk, from paths they picked.
+///
+/// Nothing is copied or moved — each entry points at the file where it lives.
+#[tauri::command]
+#[specta::specta]
+pub async fn add_local_models(
+    model_manager: State<'_, Arc<ModelManager>>,
+    paths: Vec<String>,
+) -> Result<LocalModelImport, String> {
+    if paths.is_empty() {
+        return Err("No files were selected".to_string());
+    }
+
+    let manager = model_manager.inner().clone();
+    // Reading a GGUF header per file is blocking I/O, and a batch of them off an
+    // external drive is slow enough to matter, so keep it off the async runtime.
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut added = Vec::new();
+        let mut failed = Vec::new();
+        for path in paths {
+            match manager.add_local_model_file(&path) {
+                Ok(info) => added.push(info),
+                Err(e) => failed.push(LocalModelFailure {
+                    path,
+                    message: e.to_string(),
+                }),
+            }
+        }
+        LocalModelImport { added, failed }
+    })
+    .await
+    .map_err(|e| format!("Failed to add local models: {}", e))
+}
+
+/// Link a folder of existing models and scan it. Returns how many were found.
+#[tauri::command]
+#[specta::specta]
+pub async fn add_model_folder(
+    model_manager: State<'_, Arc<ModelManager>>,
+    path: String,
+) -> Result<u32, String> {
+    let manager = model_manager.inner().clone();
+    // A linked folder can be large; scanning it blocks.
+    tauri::async_runtime::spawn_blocking(move || manager.add_model_folder(&path))
+        .await
+        .map_err(|e| format!("Failed to scan folder: {}", e))?
+        .map(|found| found as u32)
+        .map_err(|e| e.to_string())
+}
+
+/// Unlink a folder. Its models leave the catalog; the files stay where they are.
+#[tauri::command]
+#[specta::specta]
+pub async fn remove_model_folder(
+    model_manager: State<'_, Arc<ModelManager>>,
+    path: String,
+) -> Result<(), String> {
+    let manager = model_manager.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || manager.remove_model_folder(&path))
+        .await
+        .map_err(|e| format!("Failed to unlink folder: {}", e))?
+        .map_err(|e| e.to_string())
+}
+
+/// The currently linked model folders, in the order they were added.
+#[tauri::command]
+#[specta::specta]
+pub async fn get_model_folders(
+    model_manager: State<'_, Arc<ModelManager>>,
+) -> Result<Vec<String>, String> {
+    Ok(model_manager.model_folders())
+}
+
+/// Re-scan every linked folder and re-check every registered local file.
+///
+/// The manual counterpart to the scan that runs at startup, for when the user
+/// has just added a model to a linked folder or reconnected a drive. Returns the
+/// total number of local models now registered.
+#[tauri::command]
+#[specta::specta]
+pub async fn rescan_local_models(
+    model_manager: State<'_, Arc<ModelManager>>,
+) -> Result<u32, String> {
+    let manager = model_manager.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || manager.refresh_local_models())
+        .await
+        .map_err(|e| format!("Failed to rescan: {}", e))?
+        .map(|count| count as u32)
+        .map_err(|e| e.to_string())
 }

@@ -740,6 +740,18 @@ const HistoryEntryComponent: React.FC<HistoryEntryProps> = ({
   const hasDistinctProcessedText =
     processedText !== null &&
     processedText.trim() !== entry.transcription_text.trim();
+  /**
+   * Cleanup ran and deliberately changed nothing.
+   *
+   * `post_processed_text` is present-but-identical in that case, and absent when
+   * cleanup never ran, so the two are distinguishable — but the row used to
+   * render them the same way, as a single block of text. With a restrained
+   * cleanup model that returns already-correct dictation byte for byte (which is
+   * the common case, and the point of a cleanup fine-tune) the feature looked
+   * broken every time it worked perfectly.
+   */
+  const cleanupMadeNoChanges =
+    !flowEntry && processedText !== null && !hasDistinctProcessedText;
   const secondaryText = flowEntry
     ? processedText
     : hasDistinctProcessedText
@@ -842,6 +854,11 @@ const HistoryEntryComponent: React.FC<HistoryEntryProps> = ({
             <p className="select-text whitespace-pre-wrap break-words text-[13px] leading-relaxed text-ink">
               {secondaryText}
             </p>
+          </div>
+        ) : cleanupMadeNoChanges ? (
+          <div className="inline-flex items-center gap-1.5 text-[11px] font-medium text-muted">
+            <Sparkles width={11} height={11} />
+            {t("settings.history.cleanupNoChanges")}
           </div>
         ) : flowEntry ? (
           <div className="inline-flex items-center gap-1.5 rounded-lg border border-hairline bg-surface-strong/40 px-3 py-2 text-xs text-muted">

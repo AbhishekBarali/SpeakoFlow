@@ -92,6 +92,7 @@
       },
       "seesScreen": "可查看屏幕",
       "textOnly": "仅文字",
+      "recommendedForAssistant": "推荐用于助手",
       "download": "下载模型",
       "useDownloaded": "使用已下载的模型",
       "skip": "暂时跳过",
@@ -99,6 +100,14 @@
       "continue": "继续",
       "downloadingHint": "您的模型正在后台下载——您可以立即开始使用应用。",
       "downloadStarted": "正在后台下载您的 AI 模型。"
+    },
+    "cleanup": {
+      "cardTitle": "SpeakoFlow Mini",
+      "cardDescription": "识别口述指令，例如“new paragraph”和“scratch that”。仅支持英语。",
+      "pill": "清理您的语音输入",
+      "recommendedForDictation": "推荐用于语音输入",
+      "download": "下载并开启",
+      "useDownloaded": "开启"
     },
     "ready": {
       "title": "一切就绪。",
@@ -509,6 +518,33 @@
         "add": "下载",
         "adding": "正在开始…",
         "addError": "无法添加此模型。请重试。"
+      },
+      "localModel": {
+        "addButton": "使用本地模型",
+        "title": "使用你已有的模型",
+        "subtitle": "从本设备的任意位置添加 .gguf 或 Whisper .bin 文件，也可以链接你存放模型的文件夹。不会复制，也不会下载。",
+        "pickFiles": "选择模型文件",
+        "pickFilesHint": "选择一个或多个 .gguf 或 .bin 文件。适合添加刚刚构建好的单个模型。",
+        "linkFolder": "链接文件夹",
+        "linkFolderHint": "会自动扫描，包括子文件夹。可以链接任意多个文件夹。",
+        "fileFilter": "模型文件",
+        "filesAdded_one": "已添加 {{count}} 个模型。",
+        "filesAdded_other": "已添加 {{count}} 个模型。",
+        "folderAdded_one": "已链接文件夹，找到 {{count}} 个模型。",
+        "folderAdded_other": "已链接文件夹，找到 {{count}} 个模型。",
+        "folderRemoved": "已取消链接该文件夹。你的文件未被改动。",
+        "foldersTitle": "已链接的文件夹",
+        "foldersEmpty": "尚未链接任何文件夹。链接一个后，其中的所有模型都会出现在列表中。",
+        "removeFolder": "取消链接 {{folder}}",
+        "rescan": "重新扫描",
+        "rescanning": "正在重新扫描…",
+        "rescanDone_one": "找到 {{count}} 个本地模型。",
+        "rescanDone_other": "找到 {{count}} 个本地模型。",
+        "footnote": "SpeakoFlow 启动时会重新扫描已链接的文件夹，因此你之后放进去的模型会自动出现。取消链接文件夹或移除模型只会将其从此列表中移除——你的文件仍留在原处。",
+        "removeTitle": "从列表中移除？",
+        "removeConfirm": "要从模型列表中移除“{{modelName}}”吗？\n\n文件本身仍留在原处：\n{{path}}",
+        "missingBadge": "文件缺失",
+        "fileMissing": "此模型的文件已不存在：\n{{path}}\n\n它可能已被移动或重命名，或者位于未连接的驱动器上。"
       }
     },
     "sound": {
@@ -748,6 +784,7 @@
         "promptSelectFailed": "提示词已创建，但无法选中。",
         "promptUpdateFailed": "无法更新提示词。",
         "promptDeleteFailed": "无法删除提示词。",
+        "promptRestoreFailed": "无法恢复提示词。",
         "toneSelectFailed": "无法选择写作风格。",
         "toneCreateFailed": "无法创建写作风格。",
         "toneSelectAfterCreateFailed": "风格已创建，但无法选中。",
@@ -834,6 +871,7 @@
           "description": "选择用于优化转录的模板或创建新模板。在提示词文本中使用 ${output} 来引用捕获的转录。"
         },
         "noPrompts": "没有可用的提示词",
+        "nonePrompt": "无（不使用提示词）",
         "selectPrompt": "选择提示词",
         "createNew": "创建新提示词",
         "edit": "编辑",
@@ -845,6 +883,7 @@
         "promptTip": "提示：转录文本会自动发送给模型——您只需写下指令。（使用 <code>${output}</code> 的旧提示词仍然有效。）",
         "updatePrompt": "更新提示词",
         "deletePrompt": "删除提示词",
+        "restorePrompt": "恢复推荐版本",
         "createPrompt": "创建提示词",
         "cancel": "取消",
         "selectToEdit": "选择上方的提示词以查看和编辑其详细信息。",
@@ -869,21 +908,29 @@
       },
       "aiCleanup": {
         "groupTitle": "AI 清理",
-        "styleGroupTitle": "写作风格",
-        "styleGroupDescription": "选择内置风格，或保存您自己的规则，决定清理后的语音输入读起来是什么感觉。",
         "modelGroupTitle": "清理模型",
+        "unloadTimeout": {
+          "title": "让清理模型保持加载",
+          "description": "停止使用后，设备上的清理模型在内存中保留多久。时间越长，下次语音输入前就无需重新加载；闲置的模型占用内存但不占用 CPU。与助手的同类设置相互独立。"
+        },
+        "model": {
+          "emptyTitle": "还没有清理模型",
+          "emptyDescription": "SpeakoFlow Mini 是专为此打造的小型下载。",
+          "choose": "选择模型",
+          "tunedBadge": "为清理调优"
+        },
+        "catalog": {
+          "title": "选择您的清理模型",
+          "description": "每次语音输入后都会运行清理，因此速度比体积更重要。全部离线运行。",
+          "recommendedTitle": "推荐用于清理",
+          "recommendedDescription": "SpeakoFlow Mini 专为这一件事训练，在这方面胜过体积大得多的模型。"
+        },
         "promptGroupTitle": "清理提示词",
+        "tunedModelNotice": "该模型针对英语语音输入清理做过微调，因此配合推荐的提示词、不设写作风格时效果最好。",
+        "tunedModelNoticeDismiss": "隐藏此提示",
+        "tunedModelNoticeRestore": "显示模型提示",
         "title": "用 AI 优化我的语音输入",
         "caption": "实验性功能——在您说完后整理标点和口头语。",
-        "strengthLabel": "清理强度",
-        "strengthDescription": "AI 对您原话的改写程度。轻度只修正错误和口头语。均衡还会删掉重复的内容和说错重来的部分。强力会把冗长的话收紧成简洁、结构清晰的文字——但始终保留您的事实和原意。",
-        "strengthOptions": {
-          "light": "轻度",
-          "balanced": "均衡",
-          "aggressive": "强力"
-        },
-        "fixMisheardLabel": "修正听错的词",
-        "fixMisheardDescription": "当某个词明显不符合句意时——比如同音词或发音相近的词——将其替换成您想说的词。这对口音很有帮助；只有在能明确判断本意时，AI 才会修正。",
         "info": "用语言模型处理您的语音输入，修正标点、去除口头语，并可选地调整语气。仅适用于语音输入，并使用独立的快捷键。说完后会略有延迟；如果模型失败或超时，则会使用原始文本。仍在开发中。"
       },
       "spokenEmoji": {
@@ -929,6 +976,7 @@
       "originalTranscriptionLabel": "原始转录",
       "flowOutputLabel": "Flow 输出",
       "finalTextLabel": "最终文本",
+      "cleanupNoChanges": "已运行 AI 清理，没有需要修改的地方",
       "flowNoOutput": "未生成任何 Flow 输出。",
       "copyToClipboard": "复制转录到剪贴板",
       "copyFlowOutput": "复制 Flow 输出",
@@ -1066,12 +1114,16 @@
       }
     },
     "assistant": {
+      "enable": {
+        "title": "助手",
+        "label": "启用助手",
+        "description": "关闭后，SpeakoFlow 只做语音输入。悬浮面板会关闭且不再加载，它的快捷键被释放，占用的内存也会归还。用 Flow 生成 和 AI 清理仍照常工作。"
+      },
       "shortcuts": {
         "title": "快捷键"
       },
       "brain": {
         "title": "助手大脑",
-        "description": "选择让助手在本设备上私密运行，还是通过云端提供商运行。",
         "whereLabel": "运行位置",
         "onDevice": "在我的设备上",
         "cloud": "云端提供商",
@@ -1091,17 +1143,18 @@
         "acceleratorUnknownWithMemory": "无法获取显存信息 · 回退到 CPU 时可用系统内存 {{memory}} GB",
         "acceleratorUnknown": "无法获取显存信息 · 无法预估响应速度",
         "details": "详情",
+        "detailFile": "文件",
+        "detailLocation": "位置",
+        "detailFormat": "格式",
+        "detailId": "模型 ID",
         "switchBeforeDelete": "删除此模型前，请先把内置助手切换到其他模型。",
         "deleteModelConfirm": "删除 {{modelName}}？其已下载的文件和保存的条目都将被移除。",
         "deleteModelFailed": "无法删除该模型。",
-        "visionModelNote": "屏幕视觉会自动额外下载一个图像文件。",
         "finderSectionTitle": "更多本地模型",
-        "finderSectionDescription": "需要不同大小或能力的模型时，可搜索 Hugging Face。",
         "finderTitle": "浏览 Hugging Face",
         "finderDescription": "搜索数千个 GGUF 模型，并直接下载到 SpeakoFlow。",
         "finderAction": "查找模型",
         "huggingFaceTitle": "我的模型",
-        "huggingFaceDescription": "已下载的模型，以及您从 Hugging Face 添加的模型。",
         "catalogEmpty": "当前没有可用的推荐本地模型。"
       },
       "subpages": {
@@ -1239,6 +1292,7 @@
         "timing": {
           "label": "捕获时机",
           "description": "对于语音提问：在您开始提问的那一刻捕获，或等到消息发送时再捕获。输入的消息始终在发送时捕获。",
+          "descriptionAgent": "两个选项都会提前准备好屏幕截图，因此助手绝不会让您等待。区别在于图片的内容：“提问时”截取的是您开始说话时的屏幕，“消息发送时”截取的是当前的屏幕。无论选哪个，图片都留在您的设备上，只有助手确实要求查看时才会发送。",
           "options": {
             "immediate": "提问时",
             "on_send": "消息发送时"
@@ -1462,7 +1516,8 @@
     "notices": {
       "flowNotConfigured": "Flow 需要一个助手模型——已作为普通语音输入粘贴",
       "flowFailed": "Flow 无法生成——未粘贴任何内容",
-      "flowEmpty": "请在激活短语之后说出指令"
+      "flowEmpty": "请在激活短语之后说出指令",
+      "cleanupFallback": "AI 清理未运行——已粘贴原始文本"
     },
     "listening": "正在聆听…",
     "locked": "免持录制中——再次按下快捷键即可停止",
@@ -1478,6 +1533,7 @@
     "empty": "用助手快捷键语音提问，\n或在下方输入。",
     "inputPlaceholder": "输入消息…",
     "inputPlaceholderScreen": "询问您屏幕上的内容…",
+    "queuedUntilReady": "已排队——本条回复结束后立即发送。",
     "send": "发送",
     "stop": "停止",
     "cancel": "取消",
@@ -1534,6 +1590,12 @@
       "thinking": "正在思考...",
       "speaking": "正在朗读..."
     },
+    "tool": {
+      "search": "正在搜索网络",
+      "screen": "正在查看您的屏幕",
+      "working": "正在处理",
+      "elapsed": "{{seconds}}秒"
+    },
     "errors": {
       "generic": "出了点问题。请重试。",
       "genericShort": "出了点问题",
@@ -1545,6 +1607,8 @@
       "engine_startShort": "模型无法启动",
       "provider": "模型无法作答。请检查您的 API 密钥和网络连接，然后重试。",
       "providerShort": "未能获得回答",
+      "empty_reply": "模型结束了却没有写出回答。请再问一次，或在“设置 → 助手”中换一个模型。",
+      "empty_replyShort": "回答为空",
       "vision_unsupported": "此模型无法读取您的屏幕。请在“设置 → 助手”中选择支持视觉的模型，或不使用屏幕视觉再问一次。",
       "vision_unsupportedShort": "模型无法识别图像",
       "screenshot_too_large": "此提供商无法接受这么大的屏幕截图。请重试——系统会进一步压缩。",

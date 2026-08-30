@@ -1,12 +1,13 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
-import { Feather, Sparkles } from "lucide-react";
+import { Layers, Sparkles } from "lucide-react";
 import { SettingsGroup } from "@/components/ui/SettingsGroup";
-import { SettingContainer } from "@/components/ui/SettingContainer";
-import { Dropdown } from "@/components/ui/Dropdown";
 import { ToggleSwitch } from "@/components/ui/ToggleSwitch";
+import { Alert } from "@/components/ui/Alert";
 import { useSettings } from "@/hooks/useSettings";
-import { type PostProcessCleanupStrength } from "@/bindings";
+import { useDismissibleNotice } from "@/hooks/useDismissibleNotice";
+import { useModelStore } from "@/stores/modelStore";
+import { isCleanupSpecialistModel } from "@/lib/utils/cleanupSpecialist";
 import {
   PostProcessingSettingsApi,
   PostProcessingSettingsPrompts,
@@ -16,19 +17,60 @@ import { PostProcessTimeout } from "../PostProcessTimeout";
 import { PostProcessUnloadTimeout } from "../PostProcessUnloadTimeout";
 import { ShortcutInput } from "../ShortcutInput";
 
+interface AiCleanupGroupProps {
+  /** Opens the cleanup-model catalog, which the page above owns as a sub-page. */
+  onBrowseCleanupModels: () => void;
+}
+
 /**
- * "AI cleanup" — dedicated dictation cleanup controls with clear separation:
- * the shortcut, how the writing should sound, where the model runs, and what
- * cleanup instructions it follows.
+ * "AI cleanup" — three groups answering three questions in order: is it on,
+ * which model does it, and what is that model told.
+ *
+ * The instruction part is a fixed two-layer hierarchy, which is the whole point
+ * of this layout. Layer 1 (the cleanup system prompt) decides what corrections
+ * happen; layer 2 (the writing style) sits on top and decides how the result
+ * reads. Anything else the app used to add — a strength dial, a misheard-word
+ * toggle, and a "use my prompt exactly" switch — is gone: the first two were
+ * extra prose competing with the prompt for the model's attention, and the third
+ * asked the user to know something the app can work out itself, since whether a
+ * model needs the app's scaffolding is a property of the model.
  */
-export const AiCleanupGroup: React.FC = () => {
+export const AiCleanupGroup: React.FC<AiCleanupGroupProps> = ({
+  onBrowseCleanupModels,
+}) => {
   const { t } = useTranslation();
-  const { getSetting, updateSetting, isUpdating } = useSettings();
+  const {
+    getSetting,
+    updateSetting,
+    isUpdating,
+    settings,
+    postProcessReadiness,
+  } = useSettings();
+  const { models } = useModelStore();
 
   const enabled = getSetting("post_process_enabled") ?? false;
-  const fixMisheard = getSetting("post_process_fix_misheard") ?? false;
-  const cleanupStrength =
-    getSetting("post_process_cleanup_strength") ?? "balanced";
+
+  // Is the model doing cleanup one that was trained for it? If so the app sends
+  // only the layers the user chose, and the copy says so — otherwise a user would
+  // reasonably assume the long default prompt is helping when it is not.
+  //
+  // Read from readiness first, because that is the model the backend actually
+  // resolved: cleanup falls back to the assistant's provider when the dedicated
+  // selection is incomplete, so the stored selection alone can disagree with what
+  // will really run. The stored selection is the fallback for the moment before
+  // the first readiness check lands.
+  const resolvedModel =
+    postProcessReadiness?.state === "ready"
+      ? postProcessReadiness.model
+      : (settings?.post_process_models?.[
+          settings?.post_process_provider_id ?? ""
+        ] ?? "");
+  const specialistActive =
+    isCleanupSpecialistModel(resolvedModel) ||
+    models.some(
+      (model) => model.id === resolvedModel && model.is_cleanup_specialist,
+    );
+  const tunedNotice = useDismissibleNotice("cleanup-tuned-model");
 
   return (
     <>
@@ -45,89 +87,60 @@ export const AiCleanupGroup: React.FC = () => {
           grouped={true}
         />
         {enabled && (
-          <>
-            <ShortcutInput
-              shortcutId="transcribe_with_post_process"
-              grouped={true}
-            />
-            <SettingContainer
-              title={t("settings.dictation.aiCleanup.strengthLabel")}
-              info={t("settings.dictation.aiCleanup.strengthDescription")}
-              layout="horizontal"
-              grouped={true}
-            >
-              <Dropdown
-                options={[
-                  {
-                    value: "light",
-                    label: t(
-                      "settings.dictation.aiCleanup.strengthOptions.light",
-                    ),
-                  },
-                  {
-                    value: "balanced",
-                    label: t(
-                      "settings.dictation.aiCleanup.strengthOptions.balanced",
-                    ),
-                  },
-                  {
-                    value: "aggressive",
-                    label: t(
-                      "settings.dictation.aiCleanup.strengthOptions.aggressive",
-                    ),
-                  },
-                ]}
-                selectedValue={cleanupStrength}
-                onSelect={(value) =>
-                  updateSetting(
-                    "post_process_cleanup_strength",
-                    value as PostProcessCleanupStrength,
-                  )
-                }
-                disabled={isUpdating("post_process_cleanup_strength")}
-                className="min-w-[150px]"
-              />
-            </SettingContainer>
-            <ToggleSwitch
-              checked={fixMisheard}
-              onChange={(value) =>
-                updateSetting("post_process_fix_misheard", value)
-              }
-              isUpdating={isUpdating("post_process_fix_misheard")}
-              label={t("settings.dictation.aiCleanup.fixMisheardLabel")}
-              description={t(
-                "settings.dictation.aiCleanup.fixMisheardDescription",
-              )}
-              grouped={true}
-            />
-          </>
+          <ShortcutInput
+            shortcutId="transcribe_with_post_process"
+            grouped={true}
+          />
         )}
       </SettingsGroup>
 
       {enabled && (
         <>
-          <SettingsGroup
-            title={t("settings.dictation.aiCleanup.styleGroupTitle")}
-            description={t(
-              "settings.dictation.aiCleanup.styleGroupDescription",
-            )}
-            icon={Feather}
-          >
-            <PostProcessingTone />
-          </SettingsGroup>
-
+          {/* No group description here on purpose: the segmented "On my device /
+              Cloud provider" control below says it faster than a sentence can,
+              and the row keeps its tooltip for the detail. */}
           <SettingsGroup
             title={t("settings.dictation.aiCleanup.modelGroupTitle")}
           >
-            <PostProcessingSettingsApi />
+            <PostProcessingSettingsApi onBrowseModels={onBrowseCleanupModels} />
             <PostProcessTimeout grouped={true} />
             <PostProcessUnloadTimeout grouped={true} />
           </SettingsGroup>
 
+          {/* Title only. "1 ·" and "2 ·" on the rows already say which layer runs
+              first, and each row keeps its own detail in a tooltip. */}
           <SettingsGroup
             title={t("settings.dictation.aiCleanup.promptGroupTitle")}
+            icon={Layers}
           >
+            {specialistActive &&
+              (tunedNotice.visible ? (
+                <Alert
+                  variant="info"
+                  contained
+                  onDismiss={tunedNotice.dismiss}
+                  dismissLabel={t(
+                    "settings.dictation.aiCleanup.tunedModelNoticeDismiss",
+                  )}
+                >
+                  {t("settings.dictation.aiCleanup.tunedModelNotice")}
+                </Alert>
+              ) : (
+                // Hidden rather than gone. The guidance still matters when the
+                // user later changes the prompt or adds a style, so closing it
+                // must not be a one-way door.
+                <div className="flex justify-end px-4 pt-3">
+                  <button
+                    type="button"
+                    onClick={tunedNotice.restore}
+                    className="text-xs text-mid-gray/80 underline decoration-dotted underline-offset-2 transition-colors hover:text-logo-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-logo-primary/50 rounded"
+                  >
+                    {t("settings.dictation.aiCleanup.tunedModelNoticeRestore")}
+                  </button>
+                </div>
+              ))}
             <PostProcessingSettingsPrompts />
+            <PostProcessingTone />
           </SettingsGroup>
         </>
       )}

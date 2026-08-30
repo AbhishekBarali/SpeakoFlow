@@ -58,6 +58,11 @@ struct ChatCompletionRequest {
     reasoning_effort: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     reasoning: Option<ReasoningConfig>,
+    /// Sampling temperature. Left unset for the assistant, where the provider's
+    /// own default is the right creative behaviour, and pinned to 0 for cleanup,
+    /// which is a deterministic transform.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    temperature: Option<f32>,
     /// llama.cpp-specific template options. Sent only to the built-in engine.
     #[serde(skip_serializing_if = "Option::is_none")]
     chat_template_kwargs: Option<Value>,
@@ -77,9 +82,17 @@ struct ChatRequestOptions {
     json_schema: Option<Value>,
     reasoning_effort: Option<String>,
     reasoning: Option<ReasoningConfig>,
+    temperature: Option<f32>,
     stream: Option<bool>,
     tools: Option<Value>,
     tool_choice: Option<Value>,
+    /// Skip the built-in engine's system-role folding and send the `system`
+    /// message as-is. Only the raw-prompt cleanup path sets this: a fine-tune
+    /// trained with a system prompt behaves differently when that text arrives
+    /// glued to the front of the user turn instead. Chat templates that reject
+    /// a `system` role (Gemma-style) make the request fail, so the caller is
+    /// responsible for retrying folded — see `send_post_process_request`.
+    keep_system_role: bool,
 }
 
 /// Build an OpenAI-compatible request body without performing any I/O.
@@ -93,7 +106,7 @@ fn build_chat_completion_request(
     mut messages: Vec<Value>,
     options: ChatRequestOptions,
 ) -> ChatCompletionRequest {
-    if provider.id == "builtin" {
+    if provider.id == "builtin" && !options.keep_system_role {
         fold_system_into_first_user(&mut messages);
     }
 
@@ -112,6 +125,7 @@ fn build_chat_completion_request(
         response_format,
         reasoning_effort: options.reasoning_effort,
         reasoning: options.reasoning,
+        temperature: options.temperature,
         chat_template_kwargs: builtin_chat_template_kwargs(provider),
         stream: options.stream,
         tools: options.tools,
@@ -449,6 +463,7 @@ impl std::fmt::Display for ChatCompletionError {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) async fn send_chat_completion_with_schema_typed(
     provider: &PostProcessProvider,
     api_key: String,
@@ -458,6 +473,8 @@ pub(crate) async fn send_chat_completion_with_schema_typed(
     json_schema: Option<Value>,
     reasoning_effort: Option<String>,
     reasoning: Option<ReasoningConfig>,
+    temperature: Option<f32>,
+    keep_system_role: bool,
 ) -> Result<Option<String>, ChatCompletionError> {
     let base_url = effective_base_url(provider);
     let url = format!("{}/chat/completions", base_url);
@@ -480,6 +497,8 @@ pub(crate) async fn send_chat_completion_with_schema_typed(
             json_schema,
             reasoning_effort,
             reasoning,
+            temperature,
+            keep_system_role,
             ..Default::default()
         },
     );
@@ -536,6 +555,10 @@ pub async fn send_chat_completion_with_schema(
         json_schema,
         reasoning_effort,
         reasoning,
+        // Assistant/memory callers keep the provider's default temperature.
+        None,
+        // Assistant/memory callers keep the historical folding behavior.
+        false,
     )
     .await
     .map_err(|error| error.to_string())
@@ -1230,6 +1253,43 @@ mod tests {
         let before = messages.clone();
         fold_system_into_first_user(&mut messages);
         assert_eq!(messages, before);
+    }
+
+    #[test]
+    fn builtin_keeps_the_system_role_when_asked() {
+        let messages = vec![
+            serde_json::json!({"role": "system", "content": "fine-tune instructions"}),
+            serde_json::json!({"role": "user", "content": "um the meeting is at six"}),
+        ];
+
+        // Default: the built-in engine folds, because Gemma-style templates
+        // reject a system role outright.
+        let folded = serde_json::to_value(build_chat_completion_request(
+            &provider("builtin", "http://127.0.0.1:11436/v1"),
+            "local-model",
+            messages.clone(),
+            ChatRequestOptions::default(),
+        ))
+        .unwrap();
+        assert_eq!(folded["messages"].as_array().unwrap().len(), 1);
+        assert_eq!(folded["messages"][0]["role"], "user");
+
+        // Raw-prompt cleanup: the system prompt stays a system message, which is
+        // what a fine-tune was trained on.
+        let kept = serde_json::to_value(build_chat_completion_request(
+            &provider("builtin", "http://127.0.0.1:11436/v1"),
+            "local-model",
+            messages,
+            ChatRequestOptions {
+                keep_system_role: true,
+                ..Default::default()
+            },
+        ))
+        .unwrap();
+        assert_eq!(kept["messages"].as_array().unwrap().len(), 2);
+        assert_eq!(kept["messages"][0]["role"], "system");
+        assert_eq!(kept["messages"][0]["content"], "fine-tune instructions");
+        assert_eq!(kept["messages"][1]["content"], "um the meeting is at six");
     }
 
     fn decode_sse(chunks: impl IntoIterator<Item = Vec<u8>>) -> (ChatRound, Vec<String>) {

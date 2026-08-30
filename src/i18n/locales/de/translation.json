@@ -92,6 +92,7 @@
       },
       "seesScreen": "Sieht deinen Bildschirm",
       "textOnly": "Nur Text",
+      "recommendedForAssistant": "Empfohlen für den Assistenten",
       "download": "Modell herunterladen",
       "useDownloaded": "Heruntergeladenes Modell verwenden",
       "skip": "Vorerst überspringen",
@@ -99,6 +100,14 @@
       "continue": "Weiter",
       "downloadingHint": "Dein Modell wird im Hintergrund heruntergeladen — du kannst die App sofort verwenden.",
       "downloadStarted": "Dein KI-Modell wird im Hintergrund heruntergeladen."
+    },
+    "cleanup": {
+      "cardTitle": "SpeakoFlow Mini",
+      "cardDescription": "Setzt gesprochene Korrekturen wie “new paragraph” und “scratch that” um. Nur Englisch.",
+      "pill": "Räumt dein Diktat auf",
+      "recommendedForDictation": "Empfohlen fürs Diktat",
+      "download": "Herunterladen und aktivieren",
+      "useDownloaded": "Aktivieren"
     },
     "ready": {
       "title": "Alles bereit.",
@@ -509,6 +518,33 @@
         "add": "Herunterladen",
         "adding": "Wird gestartet…",
         "addError": "Dieses Modell konnte nicht hinzugefügt werden. Bitte versuche es erneut."
+      },
+      "localModel": {
+        "addButton": "Lokales Modell verwenden",
+        "title": "Ein Modell verwenden, das du schon hast",
+        "subtitle": "Füge eine .gguf- oder Whisper-.bin-Datei von irgendwo auf diesem Gerät hinzu oder verknüpfe einen Ordner, in dem du deine Modelle sammelst. Es wird nichts kopiert und nichts heruntergeladen.",
+        "pickFiles": "Modelldateien auswählen",
+        "pickFilesHint": "Wähle eine oder mehrere .gguf- oder .bin-Dateien. Gut für ein einzelnes Modell, das du gerade erstellt hast.",
+        "linkFolder": "Ordner verknüpfen",
+        "linkFolderHint": "Wird automatisch durchsucht, inklusive Unterordner. Verknüpfe so viele Ordner, wie du magst.",
+        "fileFilter": "Modelldateien",
+        "filesAdded_one": "{{count}} Modell hinzugefügt.",
+        "filesAdded_other": "{{count}} Modelle hinzugefügt.",
+        "folderAdded_one": "Ordner verknüpft. {{count}} Modell gefunden.",
+        "folderAdded_other": "Ordner verknüpft. {{count}} Modelle gefunden.",
+        "folderRemoved": "Ordnerverknüpfung aufgehoben. Deine Dateien wurden nicht angetastet.",
+        "foldersTitle": "Verknüpfte Ordner",
+        "foldersEmpty": "Noch keine Ordner verknüpft. Verknüpfe einen, und jedes Modell darin erscheint in deiner Liste.",
+        "removeFolder": "Verknüpfung von {{folder}} aufheben",
+        "rescan": "Neu durchsuchen",
+        "rescanning": "Wird neu durchsucht…",
+        "rescanDone_one": "{{count}} lokales Modell gefunden.",
+        "rescanDone_other": "{{count}} lokale Modelle gefunden.",
+        "footnote": "Verknüpfte Ordner werden beim Start von SpeakoFlow erneut durchsucht, sodass später hinzugefügte Modelle von selbst auftauchen. Wenn du eine Ordnerverknüpfung aufhebst oder ein Modell entfernst, verschwindet es nur aus dieser Liste — deine Dateien bleiben, wo sie sind.",
+        "removeTitle": "Aus der Liste entfernen?",
+        "removeConfirm": "„{{modelName}}“ aus deiner Modellliste entfernen?\n\nDie Datei selbst bleibt, wo sie ist:\n{{path}}",
+        "missingBadge": "Datei fehlt",
+        "fileMissing": "Die Datei dieses Modells ist nicht mehr da:\n{{path}}\n\nSie wurde vielleicht verschoben oder umbenannt, oder sie liegt auf einem Laufwerk, das nicht verbunden ist."
       }
     },
     "sound": {
@@ -748,6 +784,7 @@
         "promptSelectFailed": "Der Prompt wurde erstellt, konnte aber nicht ausgewählt werden.",
         "promptUpdateFailed": "Der Prompt konnte nicht aktualisiert werden.",
         "promptDeleteFailed": "Der Prompt konnte nicht gelöscht werden.",
+        "promptRestoreFailed": "Der Prompt konnte nicht wiederhergestellt werden.",
         "toneSelectFailed": "Der Schreibstil konnte nicht ausgewählt werden.",
         "toneCreateFailed": "Der Schreibstil konnte nicht erstellt werden.",
         "toneSelectAfterCreateFailed": "Der Stil wurde erstellt, konnte aber nicht ausgewählt werden.",
@@ -834,6 +871,7 @@
           "description": "Wähle eine Vorlage zur Verfeinerung von Transkriptionen oder erstelle eine neue. Verwende ${output} im Prompt-Text, um auf das erfasste Transkript zu verweisen."
         },
         "noPrompts": "Keine Prompts verfügbar",
+        "nonePrompt": "Keiner (kein Prompt)",
         "selectPrompt": "Prompt auswählen",
         "createNew": "Neuen Prompt erstellen",
         "edit": "Bearbeiten",
@@ -845,6 +883,7 @@
         "promptTip": "Tipp: Dein transkribierter Text wird automatisch an das Modell gesendet — schreibe einfach die Anweisungen. (Ältere Prompts mit <code>${output}</code> funktionieren weiterhin.)",
         "updatePrompt": "Prompt aktualisieren",
         "deletePrompt": "Prompt löschen",
+        "restorePrompt": "Empfohlenen wiederherstellen",
         "createPrompt": "Prompt erstellen",
         "cancel": "Abbrechen",
         "selectToEdit": "Wähle oben einen Prompt aus, um dessen Details anzuzeigen und zu bearbeiten.",
@@ -869,21 +908,29 @@
       },
       "aiCleanup": {
         "groupTitle": "KI-Bereinigung",
-        "styleGroupTitle": "Schreibstil",
-        "styleGroupDescription": "Wähle einen mitgelieferten Stil oder speichere eigene Regeln dafür, wie bereinigtes Diktat klingen soll.",
         "modelGroupTitle": "Bereinigungsmodell",
+        "unloadTimeout": {
+          "title": "Bereinigungsmodell geladen halten",
+          "description": "Wie lange das lokale Bereinigungsmodell nach der letzten Nutzung im Speicher bleibt. Länger heißt kein Neuladen vor deinem nächsten Diktat; ein untätiges Modell belegt Speicher, aber keine CPU. Unabhängig von der Einstellung des Assistenten."
+        },
+        "model": {
+          "emptyTitle": "Noch kein Bereinigungsmodell",
+          "emptyDescription": "SpeakoFlow Mini ist ein kleiner Download, der genau dafür gebaut ist.",
+          "choose": "Modell wählen",
+          "tunedBadge": "Für Bereinigung optimiert"
+        },
+        "catalog": {
+          "title": "Wähle dein Bereinigungsmodell",
+          "description": "Die Bereinigung läuft nach jedem Diktat, deshalb zählt Geschwindigkeit mehr als Größe. Alles läuft offline.",
+          "recommendedTitle": "Empfohlen für die Bereinigung",
+          "recommendedDescription": "SpeakoFlow Mini ist genau für diese eine Aufgabe trainiert und schlägt darin deutlich größere Modelle."
+        },
         "promptGroupTitle": "Bereinigungs-Prompt",
+        "tunedModelNotice": "Dieses Modell ist auf die Bereinigung englischer Diktate feinabgestimmt und funktioniert deshalb am besten mit dem empfohlenen Prompt und ohne Stil.",
+        "tunedModelNoticeDismiss": "Diesen Tipp ausblenden",
+        "tunedModelNoticeRestore": "Modell-Tipp anzeigen",
         "title": "Mein Diktat mit KI aufräumen",
         "caption": "Experimentell — glättet Zeichensetzung und Füllwörter nach dem Diktieren.",
-        "strengthLabel": "Stärke der Bereinigung",
-        "strengthDescription": "Wie stark die KI deine Worte umschreibt. Leicht korrigiert nur Fehler und Füllwörter. Ausgewogen kürzt zusätzlich Wiederholungen und Satzanfänge, die ins Leere laufen. Stark verdichtet Weitschweifiges zu knappem, gut strukturiertem Text — Fakten und Bedeutung bleiben immer erhalten.",
-        "strengthOptions": {
-          "light": "Leicht",
-          "balanced": "Ausgewogen",
-          "aggressive": "Stark"
-        },
-        "fixMisheardLabel": "Falsch gehörte Wörter korrigieren",
-        "fixMisheardDescription": "Wenn ein Wort im Satz klar falsch ist — ein Homophon oder eine knapp verfehlte Aussprache — wird es durch das gemeinte Wort ersetzt. Hilfreich bei Akzenten; die KI korrigiert nur, wenn das gemeinte Wort offensichtlich ist.",
         "info": "Lässt ein Sprachmodell über dein Diktat laufen, um die Zeichensetzung zu korrigieren, Füllwörter zu entfernen und optional den Tonfall anzupassen. Gilt nur für das Diktat und läuft über ein eigenes Tastenkürzel. Nach dem Sprechen entsteht eine kurze Verzögerung; scheitert das Modell oder läuft es in einen Timeout, wird stattdessen dein Rohtext verwendet. Noch in Entwicklung."
       },
       "spokenEmoji": {
@@ -929,6 +976,7 @@
       "originalTranscriptionLabel": "Ursprüngliche Transkription",
       "flowOutputLabel": "Flow-Ausgabe",
       "finalTextLabel": "Endgültiger Text",
+      "cleanupNoChanges": "KI-Bereinigung lief, es gab nichts zu korrigieren",
       "flowNoOutput": "Es wurde keine Flow-Ausgabe erzeugt.",
       "copyToClipboard": "Transkription in Zwischenablage kopieren",
       "copyFlowOutput": "Flow-Ausgabe kopieren",
@@ -1066,12 +1114,16 @@
       }
     },
     "assistant": {
+      "enable": {
+        "title": "Assistent",
+        "label": "Assistenten aktivieren",
+        "description": "Schalte das aus, damit SpeakoFlow nur noch diktiert. Das schwebende Panel wird geschlossen und nie geladen, seine Tastenkürzel werden frei, und der belegte Speicher wird zurückgegeben. Mit Flow generieren und die KI-Bereinigung funktionieren weiter."
+      },
       "shortcuts": {
         "title": "Tastenkürzel"
       },
       "brain": {
         "title": "Gehirn des Assistenten",
-        "description": "Wähle, ob dein Assistent privat auf diesem Gerät oder über einen Cloud-Anbieter läuft.",
         "whereLabel": "Wo es läuft",
         "onDevice": "Auf meinem Gerät",
         "cloud": "Cloud-Anbieter",
@@ -1091,17 +1143,18 @@
         "acceleratorUnknownWithMemory": "Grafikspeicher nicht verfügbar · {{memory}} GB System-RAM für den CPU-Rückfall",
         "acceleratorUnknown": "Grafikspeicher nicht verfügbar · die Antwortgeschwindigkeit lässt sich nicht abschätzen",
         "details": "Details",
+        "detailFile": "Datei",
+        "detailLocation": "Speicherort",
+        "detailFormat": "Format",
+        "detailId": "Modell-ID",
         "switchBeforeDelete": "Stelle den integrierten Assistenten auf ein anderes Modell um, bevor du dieses löschst.",
         "deleteModelConfirm": "{{modelName}} löschen? Die heruntergeladenen Dateien und der gespeicherte Eintrag werden entfernt.",
         "deleteModelFailed": "Das Modell konnte nicht gelöscht werden.",
-        "visionModelNote": "Für die Bildschirmansicht wird automatisch eine zusätzliche Bilddatei heruntergeladen.",
         "finderSectionTitle": "Weitere Modelle für dieses Gerät",
-        "finderSectionDescription": "Suche auf Hugging Face, wenn du eine andere Modellgröße oder Fähigkeit brauchst.",
         "finderTitle": "Hugging Face durchsuchen",
         "finderDescription": "Durchsuche tausende GGUF-Modelle und lade eines direkt in SpeakoFlow herunter.",
         "finderAction": "Modell finden",
         "huggingFaceTitle": "Deine Modelle",
-        "huggingFaceDescription": "Heruntergeladene Modelle und Modelle, die du von Hugging Face hinzugefügt hast.",
         "catalogEmpty": "Derzeit sind keine empfohlenen lokalen Modelle verfügbar."
       },
       "subpages": {
@@ -1239,6 +1292,7 @@
         "timing": {
           "label": "Wann aufgenommen wird",
           "description": "Bei Sprachfragen: in dem Moment aufnehmen, in dem du zu fragen beginnst, oder warten, bis die Nachricht gesendet wird. Getippte Nachrichten nehmen immer beim Senden auf.",
+          "descriptionAgent": "Beide Optionen bereiten den Screenshot im Voraus vor, damit der Assistent dich nie darauf warten lässt. Der Unterschied ist, was das Bild zeigt: „Wenn ich frage“ nimmt den Bildschirm so auf, wie er beim Sprechbeginn aussah, „Wenn die Nachricht gesendet wird“ nimmt ihn so auf, wie er jetzt aussieht. In beiden Fällen bleibt das Bild auf deinem Gerät und wird nur gesendet, wenn der Assistent es tatsächlich sehen will.",
           "options": {
             "immediate": "Wenn ich frage",
             "on_send": "Wenn die Nachricht gesendet wird"
@@ -1462,7 +1516,8 @@
     "notices": {
       "flowNotConfigured": "Flow braucht ein Assistenzmodell — als Diktat eingefügt",
       "flowFailed": "Flow konnte nichts generieren — es wurde nichts eingefügt",
-      "flowEmpty": "Sage nach der Aktivierungsphrase einen Befehl"
+      "flowEmpty": "Sage nach der Aktivierungsphrase einen Befehl",
+      "cleanupFallback": "KI-Bereinigung lief nicht — Rohtext eingefügt"
     },
     "listening": "Hört zu…",
     "locked": "Freihändige Aufnahme — drücke das Tastenkürzel erneut zum Stoppen",
@@ -1478,6 +1533,7 @@
     "empty": "Frage per Stimme mit deinem Assistenten-Tastenkürzel\noder tippe unten.",
     "inputPlaceholder": "Nachricht…",
     "inputPlaceholderScreen": "Frag zu deinem Bildschirm…",
+    "queuedUntilReady": "In der Warteschlange — wird gesendet, sobald diese Antwort fertig ist.",
     "send": "Senden",
     "stop": "Stoppen",
     "cancel": "Abbrechen",
@@ -1534,6 +1590,12 @@
       "thinking": "Denkt nach...",
       "speaking": "Spricht..."
     },
+    "tool": {
+      "search": "Sucht im Web",
+      "screen": "Schaut auf deinen Bildschirm",
+      "working": "Arbeitet daran",
+      "elapsed": "{{seconds}} s"
+    },
     "errors": {
       "generic": "Etwas ist schiefgelaufen. Bitte versuche es erneut.",
       "genericShort": "Etwas ist schiefgelaufen",
@@ -1545,6 +1607,8 @@
       "engine_startShort": "Modell konnte nicht starten",
       "provider": "Das Modell konnte nicht antworten. Prüfe deinen API-Schlüssel und deine Verbindung und versuche es erneut.",
       "providerShort": "Keine Antwort erhalten",
+      "empty_reply": "Das Modell war fertig, ohne eine Antwort zu schreiben. Frag noch einmal oder wähle unter Einstellungen → Assistent ein anderes Modell.",
+      "empty_replyShort": "Leere Antwort",
       "vision_unsupported": "Dieses Modell kann deinen Bildschirm nicht lesen. Wähle unter Einstellungen → Assistent ein Modell mit Bildverständnis oder frage ohne Bildschirmansicht erneut.",
       "vision_unsupportedShort": "Modell kann keine Bilder sehen",
       "screenshot_too_large": "Die Bildschirmaufnahme war für diesen Anbieter zu groß. Bitte versuche es erneut — sie wird stärker komprimiert.",

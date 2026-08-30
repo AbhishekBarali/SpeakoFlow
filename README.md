@@ -1,8 +1,8 @@
 <div align="center">
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="Logo/final/lockup-dark.svg" />
-  <img src="Logo/final/lockup.svg" alt="SpeakoFlow" width="340" />
+  <source media="(prefers-color-scheme: dark)" srcset="Logo/final-v2/png/lockup-dark-h256.png" />
+  <img src="Logo/final-v2/png/lockup-h256.png" alt="SpeakoFlow" width="340" />
 </picture>
 
 # SpeakoFlow: free voice dictation and an AI assistant for Windows, macOS, and Linux

@@ -92,6 +92,7 @@
       },
       "seesScreen": "Ekranınızı görür",
       "textOnly": "Yalnızca metin",
+      "recommendedForAssistant": "Asistan için önerilir",
       "download": "Modeli indir",
       "useDownloaded": "İndirilen modeli kullan",
       "skip": "Şimdilik atla",
@@ -99,6 +100,14 @@
       "continue": "Devam et",
       "downloadingHint": "Modeliniz arka planda indiriliyor — uygulamayı hemen kullanmaya başlayabilirsiniz.",
       "downloadStarted": "Yapay zekâ modeliniz arka planda indiriliyor."
+    },
+    "cleanup": {
+      "cardTitle": "SpeakoFlow Mini",
+      "cardDescription": "“yeni paragraf” ve “onu sil” gibi sözlü düzenlemeleri uygular. Yalnızca İngilizce.",
+      "pill": "Diktenizi temizler",
+      "recommendedForDictation": "Dikte için önerilir",
+      "download": "İndir ve aç",
+      "useDownloaded": "Aç"
     },
     "ready": {
       "title": "Hazırsınız.",
@@ -509,6 +518,33 @@
         "add": "İndir",
         "adding": "Başlatılıyor…",
         "addError": "Bu model eklenemedi. Lütfen tekrar deneyin."
+      },
+      "localModel": {
+        "addButton": "Yerel bir model kullan",
+        "title": "Zaten sahip olduğunuz bir modeli kullanın",
+        "subtitle": "Bu cihazdaki herhangi bir yerden bir .gguf ya da Whisper .bin dosyası ekleyin veya modellerinizi tuttuğunuz bir klasörü bağlayın. Hiçbir şey kopyalanmaz, hiçbir şey indirilmez.",
+        "pickFiles": "Model dosyalarını seç",
+        "pickFilesHint": "Bir veya daha fazla .gguf ya da .bin dosyası seçin. Yeni oluşturduğunuz tek bir model için idealdir.",
+        "linkFolder": "Bir klasör bağla",
+        "linkFolderHint": "Alt klasörler dahil otomatik olarak taranır. İstediğiniz kadar klasör bağlayabilirsiniz.",
+        "fileFilter": "Model dosyaları",
+        "filesAdded_one": "{{count}} model eklendi.",
+        "filesAdded_other": "{{count}} model eklendi.",
+        "folderAdded_one": "Klasör bağlandı. {{count}} model bulundu.",
+        "folderAdded_other": "Klasör bağlandı. {{count}} model bulundu.",
+        "folderRemoved": "Klasör bağlantısı kaldırıldı. Dosyalarınıza dokunulmadı.",
+        "foldersTitle": "Bağlı klasörler",
+        "foldersEmpty": "Henüz bağlı klasör yok. Bir klasör bağlayın; içindeki her model listenizde görünür.",
+        "removeFolder": "{{folder}} bağlantısını kaldır",
+        "rescan": "Yeniden tara",
+        "rescanning": "Yeniden taranıyor…",
+        "rescanDone_one": "{{count}} yerel model bulundu.",
+        "rescanDone_other": "{{count}} yerel model bulundu.",
+        "footnote": "Bağlı klasörler SpeakoFlow her açıldığında yeniden taranır; bu yüzden sonradan eklediğiniz modeller kendiliğinden görünür. Bir klasörün bağlantısını kaldırmak veya bir modeli kaldırmak onu yalnızca bu listeden siler — dosyalarınız olduğu yerde kalır.",
+        "removeTitle": "Listeden kaldırılsın mı?",
+        "removeConfirm": "“{{modelName}}” model listenizden kaldırılsın mı?\n\nDosyanın kendisi olduğu yerde kalır:\n{{path}}",
+        "missingBadge": "Dosya yok",
+        "fileMissing": "Bu modelin dosyası artık orada değil:\n{{path}}\n\nTaşınmış ya da adı değiştirilmiş olabilir veya bağlı olmayan bir sürücüde olabilir."
       }
     },
     "sound": {
@@ -748,6 +784,7 @@
         "promptSelectFailed": "Prompt oluşturuldu, ancak seçilemedi.",
         "promptUpdateFailed": "Prompt güncellenemedi.",
         "promptDeleteFailed": "Prompt silinemedi.",
+        "promptRestoreFailed": "Prompt geri yüklenemedi.",
         "toneSelectFailed": "Yazım stili seçilemedi.",
         "toneCreateFailed": "Yazım stili oluşturulamadı.",
         "toneSelectAfterCreateFailed": "Stil oluşturuldu, ancak seçilemedi.",
@@ -834,6 +871,7 @@
           "description": "Transkripsiyonları iyileştirmek için bir şablon seçin veya yeni bir tane oluşturun. Yakalanan transkripte referans vermek için prompt metni içinde ${output} kullanın."
         },
         "noPrompts": "Kullanılabilir prompt yok",
+        "nonePrompt": "Yok (prompt kullanma)",
         "selectPrompt": "Prompt Seç",
         "createNew": "Yeni Prompt Oluştur",
         "edit": "Düzenle",
@@ -845,6 +883,7 @@
         "promptTip": "İpucu: Transkribe edilen metniniz modele otomatik olarak gönderilir — yalnızca talimat yazın. (<code>${output}</code> kullanan eski prompt'lar hâlâ çalışır.)",
         "updatePrompt": "Promptu Güncelle",
         "deletePrompt": "Promptu Sil",
+        "restorePrompt": "Önerileni geri yükle",
         "createPrompt": "Prompt Oluştur",
         "cancel": "İptal",
         "selectToEdit": "Ayrıntılarını görüntülemek ve düzenlemek için yukarıdan bir prompt seçin.",
@@ -869,21 +908,29 @@
       },
       "aiCleanup": {
         "groupTitle": "Yapay zekâ temizleme",
-        "styleGroupTitle": "Yazım stili",
-        "styleGroupDescription": "Yerleşik bir stil seçin ya da temizlenmiş diktenin nasıl bir tonda olacağına dair kendi kurallarınızı kaydedin.",
         "modelGroupTitle": "Temizleme modeli",
+        "unloadTimeout": {
+          "title": "Temizleme modelini yüklü tut",
+          "description": "Cihazdaki temizleme modelinin, kullanmayı bıraktıktan sonra ne kadar süre bellekte kalacağı. Daha uzun süre, sonraki diktenizden önce yeniden yükleme olmaması demektir; boşta duran bir model bellek kullanır ama CPU kullanmaz. Asistanın ayarından ayrıdır."
+        },
+        "model": {
+          "emptyTitle": "Henüz temizleme modeli yok",
+          "emptyDescription": "SpeakoFlow Mini, tam bu iş için hazırlanmış küçük bir indirmedir.",
+          "choose": "Bir model seç",
+          "tunedBadge": "Temizleme için ayarlanmış"
+        },
+        "catalog": {
+          "title": "Temizleme modelinizi seçin",
+          "description": "Temizleme her diktenin ardından çalışır; bu yüzden hız boyuttan önemlidir. Her şey çevrimdışı çalışır.",
+          "recommendedTitle": "Temizleme için önerilir",
+          "recommendedDescription": "SpeakoFlow Mini yalnızca bu iş için eğitildi ve bu işte çok daha büyük modelleri geride bırakıyor."
+        },
         "promptGroupTitle": "Temizleme prompt'u",
+        "tunedModelNotice": "Bu model İngilizce dikte temizliği için ince ayarlandı; bu yüzden en iyi sonucu önerilen prompt ile ve stil olmadan verir.",
+        "tunedModelNoticeDismiss": "Bu ipucunu gizle",
+        "tunedModelNoticeRestore": "Model ipucunu göster",
         "title": "Diktemi yapay zekâ ile düzelt",
         "caption": "Deneysel — dikte ettikten sonra noktalamayı ve dolgu sözcüklerini toparlar.",
-        "strengthLabel": "Temizleme gücü",
-        "strengthDescription": "Yapay zekânın sözlerinizi ne kadar yeniden yazacağı. Hafif yalnızca hataları ve dolgu sözcüklerini düzeltir. Dengeli, ayrıca yinelenen noktaları ve yarım kalmış başlangıçları kırpar. Agresif, dağınık anlatımı öz ve düzenli bir metne dönüştürür — bilgilerinizi ve anlamı her zaman koruyarak.",
-        "strengthOptions": {
-          "light": "Hafif",
-          "balanced": "Dengeli",
-          "aggressive": "Agresif"
-        },
-        "fixMisheardLabel": "Yanlış duyulan kelimeleri düzelt",
-        "fixMisheardDescription": "Bir kelime cümle için açıkça yanlışsa — sesteş bir kelime ya da az farkla kaçırılmış bir telaffuz — onu kastettiğiniz kelimeyle değiştirir. Aksanlarda işe yarar; yapay zekâ yalnızca kastedilen kelime apaçıkken düzeltir.",
         "info": "Noktalama işaretlerini düzeltmek, dolgu sözcüklerini kaldırmak ve isteğe bağlı olarak tonu ayarlamak için diktenizin üzerinde bir dil modeli çalıştırır. Yalnızca dikteye uygulanır ve kendi kısayoluyla çalışır. Konuşmanızın ardından kısa bir gecikme ekler; model başarısız olursa veya zaman aşımına uğrarsa ham metniniz kullanılır. Hâlâ geliştirme aşamasında."
       },
       "spokenEmoji": {
@@ -929,6 +976,7 @@
       "originalTranscriptionLabel": "Özgün transkripsiyon",
       "flowOutputLabel": "Flow çıktısı",
       "finalTextLabel": "Son metin",
+      "cleanupNoChanges": "Yapay zekâ temizleme çalıştı, düzeltilecek bir şey yok",
       "flowNoOutput": "Flow çıktısı üretilmedi.",
       "copyToClipboard": "Transkripsiyonu panoya kopyala",
       "copyFlowOutput": "Flow çıktısını kopyala",
@@ -1066,12 +1114,16 @@
       }
     },
     "assistant": {
+      "enable": {
+        "title": "Asistan",
+        "label": "Asistanı etkinleştir",
+        "description": "SpeakoFlow'u yalnızca dikte için kullanmak istiyorsanız bunu kapatın. Yüzen panel kapatılır ve hiç yüklenmez, kısayolları serbest bırakılır ve kullandığı bellek geri verilir. Flow ile oluştur ve yapay zekâ temizleme çalışmayı sürdürür."
+      },
       "shortcuts": {
         "title": "Kısayollar"
       },
       "brain": {
         "title": "Asistanın beyni",
-        "description": "Asistanınızın bu cihazda gizlilik içinde mi, yoksa bir bulut sağlayıcısı üzerinden mi çalışacağını seçin.",
         "whereLabel": "Nerede çalışır",
         "onDevice": "Cihazımda",
         "cloud": "Bulut sağlayıcısı",
@@ -1091,17 +1143,18 @@
         "acceleratorUnknownWithMemory": "Grafik belleği bilgisi yok · CPU'ya geri dönüş için {{memory}} GB sistem RAM'i",
         "acceleratorUnknown": "Grafik belleği bilgisi yok · yanıt hızı öngörülemiyor",
         "details": "Ayrıntılar",
+        "detailFile": "Dosya",
+        "detailLocation": "Konum",
+        "detailFormat": "Biçim",
+        "detailId": "Model kimliği",
         "switchBeforeDelete": "Bunu silmeden önce yerleşik asistanı başka bir modele geçirin.",
         "deleteModelConfirm": "{{modelName}} silinsin mi? İndirilen dosyaları ve kayıtlı girdisi kaldırılacak.",
         "deleteModelFailed": "Model silinemedi.",
-        "visionModelNote": "Ekran görüşü için otomatik olarak ek bir görüntü dosyası indirilir.",
         "finderSectionTitle": "Daha fazla cihaz içi model",
-        "finderSectionDescription": "Farklı bir model boyutuna veya yeteneğine ihtiyaç duyduğunuzda Hugging Face'te arayın.",
         "finderTitle": "Hugging Face'e göz at",
         "finderDescription": "Binlerce GGUF modeli arasında arama yapın ve birini doğrudan SpeakoFlow'a indirin.",
         "finderAction": "Model bul",
         "huggingFaceTitle": "Modelleriniz",
-        "huggingFaceDescription": "İndirdiğiniz modeller ve Hugging Face'ten eklediğiniz modeller.",
         "catalogEmpty": "Şu anda önerilen bir yerel model yok."
       },
       "subpages": {
@@ -1239,6 +1292,7 @@
         "timing": {
           "label": "Ne zaman yakalanacak",
           "description": "Sesli sorular için: sormaya başladığınız anı yakalayın ya da mesaj gönderilene kadar bekleyin. Yazılan mesajlar her zaman gönderim anında yakalar.",
+          "descriptionAgent": "Her iki seçenek de ekran görüntüsünü önceden hazırlar; böylece asistan sizi asla bekletmez. Fark, görüntünün neyi gösterdiğidir: “Sorduğum anda”, konuşmaya başladığınız andaki ekranı alır; “Mesaj gönderildiğinde” ise ekranı şu anki hâliyle alır. Her durumda görüntü cihazınızda kalır ve yalnızca asistan gerçekten görmek isterse gönderilir.",
           "options": {
             "immediate": "Sorduğum anda",
             "on_send": "Mesaj gönderildiğinde"
@@ -1462,7 +1516,8 @@
     "notices": {
       "flowNotConfigured": "Flow bir asistan modeline ihtiyaç duyuyor — dikte olarak yapıştırıldı",
       "flowFailed": "Flow oluşturamadı — hiçbir şey yapıştırılmadı",
-      "flowEmpty": "Etkinleştirme ifadesinden sonra bir komut söyleyin"
+      "flowEmpty": "Etkinleştirme ifadesinden sonra bir komut söyleyin",
+      "cleanupFallback": "Yapay zekâ temizleme çalışmadı — ham metin yapıştırıldı"
     },
     "listening": "Dinleniyor…",
     "locked": "Eller serbest kaydediliyor — durdurmak için kısayola tekrar basın",
@@ -1478,6 +1533,7 @@
     "empty": "Asistan kısayolunuzla sesle sorun,\nya da aşağıya yazın.",
     "inputPlaceholder": "Mesaj…",
     "inputPlaceholderScreen": "Ekranınız hakkında sorun…",
+    "queuedUntilReady": "Sırada — bu yanıt biter bitmez gönderilecek.",
     "send": "Gönder",
     "stop": "Durdur",
     "cancel": "İptal",
@@ -1534,6 +1590,12 @@
       "thinking": "Düşünüyor...",
       "speaking": "Konuşuyor..."
     },
+    "tool": {
+      "search": "Web'de aranıyor",
+      "screen": "Ekranınıza bakılıyor",
+      "working": "Üzerinde çalışılıyor",
+      "elapsed": "{{seconds}} sn"
+    },
     "errors": {
       "generic": "Bir şeyler ters gitti. Lütfen tekrar deneyin.",
       "genericShort": "Bir şeyler ters gitti",
@@ -1545,6 +1607,8 @@
       "engine_startShort": "Model başlatılamadı",
       "provider": "Model yanıt veremedi. API anahtarınızı ve bağlantınızı kontrol edip tekrar deneyin.",
       "providerShort": "Yanıt alınamadı",
+      "empty_reply": "Model yanıt yazmadan tamamlandı. Tekrar sormayı deneyin ya da Ayarlar → Asistan bölümünden farklı bir model seçin.",
+      "empty_replyShort": "Boş yanıt",
       "vision_unsupported": "Bu model ekranınızı okuyamıyor. Ayarlar → Asistan bölümünden görüş yeteneği olan bir model seçin ya da ekran görüşü olmadan yeniden sorun.",
       "vision_unsupportedShort": "Model görüntüleri göremiyor",
       "screenshot_too_large": "Ekran yakalaması bu sağlayıcı için çok büyüktü. Lütfen tekrar deneyin — daha fazla sıkıştırılacak.",

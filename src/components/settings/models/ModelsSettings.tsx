@@ -1,10 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ask } from "@tauri-apps/plugin-dialog";
+import { toast } from "sonner";
 import {
   ChevronDown,
   ChevronRight,
   Globe,
+  HardDrive,
   Plus,
   Search,
   X,
@@ -22,6 +24,7 @@ import { getTranslatedModelName } from "@/lib/utils/modelTranslation";
 import { commands, type ModelInfo } from "@/bindings";
 import { Button } from "@/components/ui/Button";
 import { AddCustomModelDialog } from "./AddCustomModelDialog";
+import { AddLocalModelDialog } from "./AddLocalModelDialog";
 
 // check if model supports a language based on its supported_languages list
 const modelSupportsLanguage = (model: ModelInfo, langCode: string): boolean => {
@@ -44,6 +47,7 @@ export const ModelsSettings: React.FC<ModelsSettingsProps> = ({
   const [categoryTab, setCategoryTab] = useState<ModelCategory>("stt");
   const categoryFilter = lockedCategory ?? categoryTab;
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [localDialogOpen, setLocalDialogOpen] = useState(false);
   const [nameSearch, setNameSearch] = useState("");
   const [showOlderModels, setShowOlderModels] = useState(false);
   const [languageFilter, setLanguageFilter] = useState("all");
@@ -70,6 +74,9 @@ export const ModelsSettings: React.FC<ModelsSettingsProps> = ({
   // The active local LLM is the model assigned to the built-in provider in the
   // Assistant settings. Used to show/select the "Active" Language Model here.
   const activeLlmId = settings?.assistant_models?.["builtin"] ?? "";
+  // A cleanup fine-tune is "active" when it is the cleanup engine — it is never
+  // the assistant brain, so checking the assistant slot would always say no.
+  const activeCleanupLlmId = settings?.post_process_models?.["builtin"] ?? "";
 
   // click outside handler for language dropdown
   useEffect(() => {
@@ -136,8 +143,13 @@ export const ModelsSettings: React.FC<ModelsSettingsProps> = ({
     if (category === "stt" && modelId === currentModel) {
       return "active";
     }
-    if (category === "llm" && modelId === activeLlmId) {
-      return "active";
+    if (category === "llm") {
+      const activeId = model.is_cleanup_specialist
+        ? activeCleanupLlmId
+        : activeLlmId;
+      if (modelId === activeId) {
+        return "active";
+      }
     }
     return "available";
   };
@@ -152,21 +164,45 @@ export const ModelsSettings: React.FC<ModelsSettingsProps> = ({
     return stats?.speed;
   };
 
+  /**
+   * A local model whose file has gone missing (moved, renamed, or on a drive
+   * that isn't connected). There is nothing to download in that case, so say
+   * what's actually wrong instead of letting a "download" fail obscurely.
+   */
+  const reportIfLocalFileMissing = (model: ModelInfo | undefined): boolean => {
+    if (!model?.local_path || model.is_downloaded) return false;
+    toast.error(
+      t("settings.models.localModel.fileMissing", { path: model.local_path }),
+    );
+    return true;
+  };
+
   const handleModelSelect = async (modelId: string) => {
     const model = models.find((m: ModelInfo) => m.id === modelId);
     const category = model ? getModelCategory(model) : "stt";
     // TTS (Kokoro) has no "active" selection here — it is configured per
     // engine in the Assistant tab.
     if (category === "tts") return;
+    if (reportIfLocalFileMissing(model)) return;
 
     setSwitchingModelId(modelId);
     try {
       if (category === "llm") {
-        // Never point the assistant at a model that isn't on disk — that's the
-        // state that used to strand users. If somehow triggered for a missing
-        // model, download it instead of marking it active.
+        // Never point anything at a model that isn't on disk — that's the state
+        // that used to strand users. If somehow triggered for a missing model,
+        // download it instead of marking it active.
         if (!model?.is_downloaded) {
           await downloadModel(modelId);
+          return;
+        }
+        // "Use model" has to mean the job the model can actually do. A cleanup
+        // fine-tune cannot hold a conversation, so assigning it as the assistant
+        // brain — which is what this page does for every other language model —
+        // would quietly break the assistant. Send it to dictation cleanup
+        // instead, which is the only thing it is for.
+        if (model.is_cleanup_specialist) {
+          await commands.setCleanupLocalModel(modelId);
+          await refreshSettings();
           return;
         }
         // Assign the model to the built-in (local) assistant provider and make
@@ -185,6 +221,8 @@ export const ModelsSettings: React.FC<ModelsSettingsProps> = ({
   };
 
   const handleModelDownload = async (modelId: string) => {
+    const model = models.find((m: ModelInfo) => m.id === modelId);
+    if (reportIfLocalFileMissing(model)) return;
     await downloadModel(modelId);
   };
 
@@ -193,14 +231,26 @@ export const ModelsSettings: React.FC<ModelsSettingsProps> = ({
     const modelName = model?.name || modelId;
     const category = model ? getModelCategory(model) : "stt";
     const isActive =
-      category === "llm" ? modelId === activeLlmId : modelId === currentModel;
+      category === "llm"
+        ? modelId ===
+          (model?.is_cleanup_specialist ? activeCleanupLlmId : activeLlmId)
+        : modelId === currentModel;
 
     const confirmed = await ask(
-      isActive
-        ? t("settings.models.deleteActiveConfirm", { modelName })
-        : t("settings.models.deleteConfirm", { modelName }),
+      // A local model is only unregistered — saying "delete" would imply we
+      // remove the user's own file, which we never do.
+      model?.local_path
+        ? t("settings.models.localModel.removeConfirm", {
+            modelName,
+            path: model.local_path,
+          })
+        : isActive
+          ? t("settings.models.deleteActiveConfirm", { modelName })
+          : t("settings.models.deleteConfirm", { modelName }),
       {
-        title: t("settings.models.deleteTitle"),
+        title: model?.local_path
+          ? t("settings.models.localModel.removeTitle")
+          : t("settings.models.deleteTitle"),
         kind: "warning",
       },
     );
@@ -213,7 +263,6 @@ export const ModelsSettings: React.FC<ModelsSettingsProps> = ({
       }
     }
   };
-
   const handleModelCancel = async (modelId: string) => {
     try {
       await cancelDownload(modelId);
@@ -271,10 +320,17 @@ export const ModelsSettings: React.FC<ModelsSettingsProps> = ({
       }
     }
 
-    // The "active" model depends on the category: STT uses the recording
-    // model, LLM uses the built-in assistant model.
-    const activeIdForCategory =
-      categoryFilter === "llm" ? activeLlmId : currentModel;
+    // Which model counts as "active" depends on the category, and for language
+    // models also on the model: STT uses the recording model, a cleanup
+    // fine-tune uses the cleanup slot, and every other LLM uses the assistant
+    // slot. This has to match the badge logic in `getModelStatus`, or a model
+    // could show "Active" without sorting to the top.
+    const isActiveForCategory = (m: ModelInfo): boolean => {
+      if (categoryFilter !== "llm") return m.id === currentModel;
+      return (
+        m.id === (m.is_cleanup_specialist ? activeCleanupLlmId : activeLlmId)
+      );
+    };
 
     // Recommendation order key: ranked-recommended first (by rank, 1 = top),
     // then recommended-without-rank, then everything else. Mirrors Handy's
@@ -285,8 +341,8 @@ export const ModelsSettings: React.FC<ModelsSettingsProps> = ({
     // Sort: active model first, then by recommendation order, then non-custom
     // before custom, with accuracy as the final tie-breaker.
     downloaded.sort((a, b) => {
-      if (a.id === activeIdForCategory) return -1;
-      if (b.id === activeIdForCategory) return 1;
+      if (isActiveForCategory(a)) return -1;
+      if (isActiveForCategory(b)) return 1;
       if (a.is_custom !== b.is_custom) return a.is_custom ? 1 : -1;
       const rankDiff = rankOf(a) - rankOf(b);
       if (rankDiff !== 0) return rankDiff;
@@ -315,6 +371,7 @@ export const ModelsSettings: React.FC<ModelsSettingsProps> = ({
     extractingModels,
     currentModel,
     activeLlmId,
+    activeCleanupLlmId,
     categoryFilter,
   ]);
 
@@ -334,7 +391,14 @@ export const ModelsSettings: React.FC<ModelsSettingsProps> = ({
       status={getModelStatus(model.id)}
       onSelect={handleModelSelect}
       onDownload={handleModelDownload}
-      onDelete={categoryFilter === "tts" ? undefined : handleModelDelete}
+      onDelete={
+        // Models from a linked folder can't be removed one at a time — the next
+        // scan would just find them again. Unlinking the folder is the action
+        // that works, so don't offer one that doesn't.
+        categoryFilter === "tts" || model.local_folder
+          ? undefined
+          : handleModelDelete
+      }
       onCancel={handleModelCancel}
       downloadProgress={getDownloadProgress(model.id)}
       downloadSpeed={getDownloadSpeed(model.id)}
@@ -503,6 +567,16 @@ export const ModelsSettings: React.FC<ModelsSettingsProps> = ({
             )}
           </div>
         )}
+        {categoryFilter !== "tts" && (
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setLocalDialogOpen(true)}
+          >
+            <HardDrive className="w-4 h-4" />
+            {t("settings.models.localModel.addButton")}
+          </Button>
+        )}
         {categoryFilter === "llm" && (
           <Button
             variant="secondary"
@@ -577,6 +651,10 @@ export const ModelsSettings: React.FC<ModelsSettingsProps> = ({
       <AddCustomModelDialog
         open={addDialogOpen}
         onClose={() => setAddDialogOpen(false)}
+      />
+      <AddLocalModelDialog
+        open={localDialogOpen}
+        onClose={() => setLocalDialogOpen(false)}
       />
     </div>
   );

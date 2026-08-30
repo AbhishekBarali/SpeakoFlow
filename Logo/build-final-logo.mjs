@@ -1,3 +1,9 @@
+// RETIRED (kept for reference). This builds the PREVIOUS brand mark — the white
+// speech-bubble waveform from "Only Logo.svg" on a flat teal box. The current
+// icon is the gradient tile in Logo/final-v2, built by build-new-icon.mjs and
+// rolled out by apply-icon-to-app.mjs / build-new-lockup.mjs. Running this script
+// only rewrites Logo/final/ (the old set); it does not touch the app.
+//
 // Build the FINAL SpeakoFlow logo: the white mark composited inside the
 // brand teal rounded box (app-icon style), plus a horizontal wordmark lockup
 // (teal box + two-tone "SpeakoFlow"). Reuses the mark paths from

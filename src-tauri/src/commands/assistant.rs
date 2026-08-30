@@ -300,6 +300,13 @@ pub fn set_assistant_provider(app: AppHandle, provider_id: String) -> Result<(),
             provider.label
         ));
     }
+    // Remember the cloud choice before it is overwritten. `assistant_provider_id`
+    // is a single slot, so switching to "On my device" would otherwise erase
+    // which cloud provider the user had set up, and the switch back would land
+    // on an arbitrary one.
+    if provider_id != crate::settings::BUILTIN_POST_PROCESS_PROVIDER_ID {
+        settings.assistant_last_cloud_provider_id = Some(provider_id.clone());
+    }
     settings.assistant_provider_id = provider_id;
     write_settings(&app, settings);
     Ok(())

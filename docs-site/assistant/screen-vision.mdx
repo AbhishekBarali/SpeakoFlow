@@ -6,20 +6,22 @@ icon: "eye"
 
 Ask about what is on your screen and the assistant answers with that context. It only looks when you let it.
 
-Set it up in *Settings → Assistant → Screen vision*. You need a vision-capable model. Most curated local models qualify (the catalog marks them "Vision"), as do the mainstream cloud multimodal models.
+Set it up in _Settings → Assistant → Screen vision_. You need a vision-capable model. Most curated local models qualify (the catalog marks them "Vision"), as do the mainstream cloud multimodal models.
 
 ## Screen access
 
-| Mode | What happens |
-| --- | --- |
-| **Off** | Screen capture is disabled. The panel's camera and region controls are hidden. |
-| **Manual** (default) | You decide. Click the camera in the panel and your screen is attached to every message until you turn it off again, or snip just a region. |
-| **Agent decides** | The model gets a `capture_screen` tool and may take one screenshot per message when your question clearly refers to something on screen. It is told not to capture for self-contained questions. |
+| Mode                 | What happens                                                                                                                                                                                     |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Off**              | Screen capture is disabled. The panel's camera and region controls are hidden.                                                                                                                   |
+| **Manual** (default) | You decide. Click the camera in the panel and your screen is attached to every message until you turn it off again, or snip just a region.                                                       |
+| **Agent decides**    | The model gets a `capture_screen` tool and may take one screenshot per message when your question clearly refers to something on screen. It is told not to capture for self-contained questions. |
 
 Every screenshot that goes to the model is shown in the conversation, in both active modes, so there is always a visible record of when the assistant looked.
 
 <Warning>
-  **macOS.** Screen vision needs macOS Screen Recording permission. Grant it in *System Settings → Privacy & Security → Screen Recording*, then restart SpeakoFlow for it to take effect.
+  **macOS.** Screen vision needs macOS Screen Recording permission. Grant it in
+  *System Settings → Privacy & Security → Screen Recording*, then restart
+  SpeakoFlow for it to take effect.
 </Warning>
 
 ## What actually gets sent
@@ -38,6 +40,7 @@ Only a compact thumbnail is stored in the conversation and in [History](/persona
     - **When the message sends**. Grabs it after you stop talking and the speech is transcribed.
 
     Typed messages always capture on send, since the panel is already in front of you either way.
+
   </Accordion>
 
   <Accordion title="How much image quality each provider gets">
@@ -48,6 +51,7 @@ Only a compact thumbnail is stored in the conversation and in [History](/persona
     | Azure | Smallest | Azure's gateway rejects oversized request bodies outright. |
     | Built-in or a local server | Middle | Keeps on-screen text legible without spending a huge share of a small local context on vision tokens. |
     | Other cloud providers | Largest | Sharpest, so fine text, code, and error messages stay readable. |
+
   </Accordion>
 
   <Accordion title="What happens if your model cannot read images">

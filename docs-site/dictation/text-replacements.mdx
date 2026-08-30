@@ -6,10 +6,10 @@ icon: "right-left"
 
 Two local passes rewrite your transcript before it is inserted. Both are off by default, and neither involves a model or the network.
 
-| Pass | Where | What it does |
-| --- | --- | --- |
-| Text replacements | *Settings → Dictation → Output options → Text replacements* | Swaps a phrase you say for text you use often. |
-| Spoken emoji | *Settings → Dictation → Output options → Spoken emoji* | Turns "thumbs up emoji" into 👍. |
+| Pass              | Where                                                       | What it does                                   |
+| ----------------- | ----------------------------------------------------------- | ---------------------------------------------- |
+| Text replacements | _Settings → Dictation → Output options → Text replacements_ | Swaps a phrase you say for text you use often. |
+| Spoken emoji      | _Settings → Dictation → Output options → Spoken emoji_      | Turns "thumbs up emoji" into 👍.               |
 
 ## Text replacements
 
@@ -32,14 +32,14 @@ The whole list exports to and imports from a JSON file.
 
 Use these inside the inserted text.
 
-| Token | Expands to |
-| --- | --- |
-| `[date]` | Today's local date as `YYYY-MM-DD` |
-| `[time]` | The current local time as `HH:MM` |
-| `[uppercase]` | UPPERCASES the whole rule output (alias: `[upper]`) |
-| `[lowercase]` | lowercases the whole rule output (alias: `[lower]`) |
-| `[capitalize]` | Capitalizes the first character of the output |
-| `[nospace]` | Strips all whitespace from the output |
+| Token          | Expands to                                          |
+| -------------- | --------------------------------------------------- |
+| `[date]`       | Today's local date as `YYYY-MM-DD`                  |
+| `[time]`       | The current local time as `HH:MM`                   |
+| `[uppercase]`  | UPPERCASES the whole rule output (alias: `[upper]`) |
+| `[lowercase]`  | lowercases the whole rule output (alias: `[lower]`) |
+| `[capitalize]` | Capitalizes the first character of the output       |
+| `[nospace]`    | Strips all whitespace from the output               |
 
 Transform tokens act on the entire rule output no matter where you put them, and they are removed from the result. If a token and the **Caps** dropdown disagree, Caps is applied last and wins.
 
@@ -54,6 +54,7 @@ Transform tokens act on the entire rule output no matter where you put them, and
     **An invalid regex is skipped**, with a warning in the log. It will not break the rest of your rules.
 
     **Empty spoken phrases are skipped**, so a half-finished rule is harmless.
+
   </Accordion>
 
   <Accordion title="What an imported JSON file can contain">
@@ -76,6 +77,7 @@ Anything it does not recognize is left exactly as transcribed, punctuation and s
     The trailing keyword is accepted within one edit of "emoji", so "emojii" and "emoj" still work.
 
     Names are matched exactly first, then fuzzily, so "smily", "thumps up", and "rokcet" all land. Fuzzy matching is skipped for names shorter than five characters, because short words are too easy to confuse ("bad" versus "sad"). An ambiguous match is rejected rather than guessed.
+
   </Accordion>
 </AccordionGroup>
 

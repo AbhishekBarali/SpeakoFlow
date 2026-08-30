@@ -6,15 +6,15 @@ icon: "clock-rotate-left"
 
 Your recent dictations, Flow generations, and assistant chats are kept on this device, and they are yours to reuse or delete.
 
-Open the *History* section. It is one feed, newest first, filtered by **All**, **Dictations**, **Flow**, or **Assistant chats**. There is no search box, so use the filters and page through the feed.
+Open the _History_ section. It is one feed, newest first, filtered by **All**, **Dictations**, **Flow**, or **Assistant chats**. There is no search box, so use the filters and page through the feed.
 
 ## What each row shows
 
-| Type | Contents |
-| --- | --- |
-| **Dictations** | The transcription. If it was cleaned with AI, the row shows *Original transcription* on top and *Final text* below, so you can see what cleanup changed. |
-| **Flow** | *You said*, the spoken command as transcribed, and *Flow output*, the exact text that was pasted. Failed and cancelled generations still appear, marked as having produced no output. |
-| **Assistant chats** | One row per conversation, titled from your first message. Expand it to read the whole thing as it appeared in the panel. |
+| Type                | Contents                                                                                                                                                                              |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Dictations**      | The transcription. If it was cleaned with AI, the row shows _Original transcription_ on top and _Final text_ below, so you can see what cleanup changed.                              |
+| **Flow**            | _You said_, the spoken command as transcribed, and _Flow output_, the exact text that was pasted. Failed and cancelled generations still appear, marked as having produced no output. |
+| **Assistant chats** | One row per conversation, titled from your first message. Expand it to read the whole thing as it appeared in the panel.                                                              |
 
 ## What you can do
 
@@ -32,15 +32,16 @@ Assistant chats can be copied, continued, and deleted, but not starred or re-tra
 
 The storage controls sit above the feed. Changes apply immediately.
 
-| Setting | Default | Options |
-| --- | --- | --- |
-| **Auto-delete recordings** | `Keep a set number` | `Never`, `Keep a set number`, `After 3 days`, `After 2 weeks`, `After 3 months` |
-| **Recording limit** | `20` | The maximum number of unstarred recordings to keep. Only shown when auto-delete is `Keep a set number`. |
+| Setting                    | Default             | Options                                                                                                 |
+| -------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------- |
+| **Auto-delete recordings** | `Keep a set number` | `Never`, `Keep a set number`, `After 3 days`, `After 2 weeks`, `After 3 months`                         |
+| **Recording limit**        | `20`                | The maximum number of unstarred recordings to keep. Only shown when auto-delete is `Keep a set number`. |
 
 Starred recordings are always kept and do not count toward the limit.
 
 <Note>
-  These controls affect **dictation and Flow recordings only**. Assistant chats have separate storage and are never counted or auto-deleted by these rules.
+  These controls affect **dictation and Flow recordings only**. Assistant chats
+  have separate storage and are never counted or auto-deleted by these rules.
 </Note>
 
 <AccordionGroup>
@@ -48,11 +49,13 @@ Starred recordings are always kept and do not count toward the limit.
     Messages that carried an image keep a small thumbnail inline, and screen captures get a camera badge. Click one to open it full size.
 
     Only the compact thumbnail is stored. The full-resolution frame was sent to the model and never saved.
+
   </Accordion>
 
   <Accordion title="When the audio file actually gets deleted">
     Deleting an entry removes its audio file too, unless an older entry still points at the same file. In that case the file survives until the last reference to it is gone.
 
     The auto-delete policy is re-applied every time a new recording is saved, not just at startup, so the list always matches what you asked for.
+
   </Accordion>
 </AccordionGroup>

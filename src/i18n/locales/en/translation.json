@@ -77,8 +77,8 @@
       "downloadStarted": "Downloading your model in the background."
     },
     "aiModel": {
-      "title": "Set up the local assistant (optional)",
-      "subtitle": "Choose by response speed and capability. E4B is the balanced default; 12B is sharper but slower.",
+      "title": "Add local AI (optional)",
+      "subtitle": "An assistant to talk to, plus our own model that cleans up your dictation. Take either, or both.",
       "tiers": {
         "small": {
           "description": "Runs on any machine. Great for tidying up your writing."
@@ -90,15 +90,24 @@
           "description": "The sharpest answers, and it can see your screen."
         }
       },
-      "seesScreen": "Sees your screen",
+      "seesScreen": "Vision model",
       "textOnly": "Text only",
+      "recommendedForAssistant": "Recommended for assistant",
       "download": "Download model",
       "useDownloaded": "Use downloaded model",
       "skip": "Skip for now",
-      "skipHint": "You can do this later in Settings > Assistant > On my device.",
+      "skipHint": "You can add either of these later in Settings.",
       "continue": "Continue",
       "downloadingHint": "It downloads in the background. Start using the app right away.",
       "downloadStarted": "Downloading your model in the background."
+    },
+    "cleanup": {
+      "cardTitle": "SpeakoFlow Mini",
+      "cardDescription": "Applies spoken edits like \"new paragraph\" and \"scratch that\". English only.",
+      "pill": "Cleans your dictation",
+      "recommendedForDictation": "Recommended for dictation",
+      "download": "Download and turn on",
+      "useDownloaded": "Turn it on"
     },
     "ready": {
       "title": "You're ready.",
@@ -167,7 +176,7 @@
         "description": "The quickest current Gemma for everyday conversation. Less capable on complex requests."
       },
       "gemma-4-e4b": {
-        "description": "Recommended for conversation: a stronger quality-and-speed balance without default thinking."
+        "description": "A stronger quality-and-speed balance, and it doesn't think by default."
       },
       "gemma-4-12b": {
         "description": "More capable for nuanced questions, but noticeably slower and best with a strong GPU."
@@ -509,6 +518,33 @@
         "add": "Download",
         "adding": "Starting…",
         "addError": "Couldn't add this model. Please try again."
+      },
+      "localModel": {
+        "addButton": "Use a local model",
+        "title": "Use a model you already have",
+        "subtitle": "Add a .gguf or Whisper .bin from this device, or link a folder. Nothing is copied.",
+        "pickFiles": "Choose model files",
+        "pickFilesHint": "Pick one or more .gguf or .bin files. Good for a single model you just built.",
+        "linkFolder": "Link a folder",
+        "linkFolderHint": "Scanned automatically, including subfolders. Link as many folders as you like.",
+        "fileFilter": "Model files",
+        "filesAdded_one": "Added {{count}} model.",
+        "filesAdded_other": "Added {{count}} models.",
+        "folderAdded_one": "Folder linked. Found {{count}} model.",
+        "folderAdded_other": "Folder linked. Found {{count}} models.",
+        "folderRemoved": "Folder unlinked. Your files were not touched.",
+        "foldersTitle": "Linked folders",
+        "foldersEmpty": "No folders linked yet. Link one and every model inside it appears in your list.",
+        "removeFolder": "Unlink {{folder}}",
+        "rescan": "Rescan",
+        "rescanning": "Rescanning…",
+        "rescanDone_one": "{{count}} local model found.",
+        "rescanDone_other": "{{count}} local models found.",
+        "footnote": "Linked folders are rescanned when SpeakoFlow starts, so models you add to them later show up on their own. Unlinking a folder or removing a model only removes it from this list — your files stay where they are.",
+        "removeTitle": "Remove from list?",
+        "removeConfirm": "Remove \"{{modelName}}\" from your model list?\n\nThe file itself stays where it is:\n{{path}}",
+        "missingBadge": "File missing",
+        "fileMissing": "This model's file isn't there any more:\n{{path}}\n\nIt may have been moved or renamed, or be on a drive that isn't connected."
       }
     },
     "sound": {
@@ -748,6 +784,7 @@
         "promptSelectFailed": "Created the prompt, but couldn’t select it.",
         "promptUpdateFailed": "Couldn’t update the prompt.",
         "promptDeleteFailed": "Couldn’t delete the prompt.",
+        "promptRestoreFailed": "Couldn’t restore the prompt.",
         "toneSelectFailed": "Couldn’t select the writing style.",
         "toneCreateFailed": "Couldn’t create the writing style.",
         "toneSelectAfterCreateFailed": "Created the style, but couldn’t select it.",
@@ -761,8 +798,8 @@
         "title": "Shortcut"
       },
       "tone": {
-        "title": "Style preset",
-        "description": "Choose how the cleaned dictation should sound. Cleanup-only fixes the text without intentionally changing its voice.",
+        "title": "2 · Writing style",
+        "description": "Layered on top of the system prompt: it changes how the cleaned text reads, not what gets corrected. “None” leaves your voice alone.",
         "options": {
           "none": "None (cleanup only)",
           "formal": "Formal",
@@ -830,10 +867,11 @@
       "prompts": {
         "title": "Prompt",
         "selectedPrompt": {
-          "title": "Selected prompt",
-          "description": "Select a template for cleaning up transcriptions, or create your own. Your transcribed text is sent to the model automatically — just write instructions."
+          "title": "1 · System prompt",
+          "description": "The base instruction: what the model corrects, and what it must leave alone. Your transcribed text is sent separately, so just write instructions."
         },
         "noPrompts": "No prompts available",
+        "nonePrompt": "None (no prompt)",
         "selectPrompt": "Select a prompt",
         "createNew": "Create new prompt",
         "edit": "Edit",
@@ -845,6 +883,7 @@
         "promptTip": "Tip: Your transcribed text is sent to the model automatically — just write instructions. (Older prompts that use <code>${output}</code> still work.)",
         "updatePrompt": "Update prompt",
         "deletePrompt": "Delete prompt",
+        "restorePrompt": "Restore recommended",
         "createPrompt": "Create prompt",
         "cancel": "Cancel",
         "selectToEdit": "Select a prompt above to view and edit its details.",
@@ -869,25 +908,29 @@
       },
       "aiCleanup": {
         "groupTitle": "AI cleanup",
-        "styleGroupTitle": "Writing style",
-        "styleGroupDescription": "Choose a built-in style or save your own rules for how cleaned dictation should sound.",
         "modelGroupTitle": "Cleanup model",
         "unloadTimeout": {
           "title": "Keep cleanup model loaded",
           "description": "How long the on-device cleanup model stays in memory after you stop using it. Longer means no reload before your next dictation; an idle model uses memory but no CPU. Separate from the assistant's setting."
         },
-        "promptGroupTitle": "Cleanup prompt",
+        "model": {
+          "emptyTitle": "No cleanup model yet",
+          "emptyDescription": "SpeakoFlow Mini is a small download built for this.",
+          "choose": "Choose a model",
+          "tunedBadge": "Tuned for cleanup"
+        },
+        "catalog": {
+          "title": "Choose your cleanup model",
+          "description": "Cleanup runs after every dictation, so speed matters more than size. Everything runs offline.",
+          "recommendedTitle": "Recommended for cleanup",
+          "recommendedDescription": "SpeakoFlow Mini is trained for this one job and beats much larger models at it."
+        },
+        "promptGroupTitle": "Cleanup instructions",
+        "tunedModelNotice": "This model is fine-tuned for English dictation cleanup, so it works best on the recommended prompt with no style.",
+        "tunedModelNoticeDismiss": "Hide this tip",
+        "tunedModelNoticeRestore": "Show model tip",
         "title": "Fix up my dictation with AI",
         "caption": "Experimental — tidies punctuation and filler after you dictate.",
-        "strengthLabel": "Cleanup strength",
-        "strengthDescription": "How much the AI rewrites your words. Light fixes only mistakes and filler. Balanced also trims repeated points and false starts. Aggressive tightens rambling into concise, well-structured text — always keeping your facts and meaning.",
-        "strengthOptions": {
-          "light": "Light",
-          "balanced": "Balanced",
-          "aggressive": "Aggressive"
-        },
-        "fixMisheardLabel": "Fix misheard words",
-        "fixMisheardDescription": "When a word is clearly wrong for the sentence — a homophone or a near-miss pronunciation — replace it with the word you meant. Helpful for accents; the AI only corrects when the intended word is obvious.",
         "info": "Runs a language model over your dictation to fix punctuation, remove filler words, and optionally adjust the tone. Applies to dictation only, on its own shortcut. It adds a short delay after you speak; if the model fails or times out, your raw text is used instead. Still in development."
       },
       "spokenEmoji": {
@@ -933,6 +976,7 @@
       "originalTranscriptionLabel": "Original transcription",
       "flowOutputLabel": "Flow output",
       "finalTextLabel": "Final text",
+      "cleanupNoChanges": "AI cleanup ran, nothing to fix",
       "flowNoOutput": "No Flow output was generated.",
       "copyToClipboard": "Copy transcription to clipboard",
       "copyFlowOutput": "Copy Flow output",
@@ -1080,7 +1124,6 @@
       },
       "brain": {
         "title": "Assistant brain",
-        "description": "Choose whether your assistant runs privately on this device or through a cloud provider.",
         "whereLabel": "Where it runs",
         "onDevice": "On my device",
         "cloud": "Cloud provider",
@@ -1100,17 +1143,18 @@
         "acceleratorUnknownWithMemory": "Graphics memory unavailable · {{memory}} GB system RAM for CPU fallback",
         "acceleratorUnknown": "Graphics memory unavailable · response speed cannot be predicted",
         "details": "Details",
-        "switchBeforeDelete": "Switch the built-in assistant to another model before deleting this one.",
+        "detailFile": "File",
+        "detailLocation": "Location",
+        "detailFormat": "Format",
+        "detailId": "Model ID",
+        "switchBeforeDelete": "This model is in use. Switch to another one before deleting it.",
         "deleteModelConfirm": "Delete {{modelName}}? Its downloaded files and saved entry will be removed.",
         "deleteModelFailed": "Could not delete the model.",
-        "visionModelNote": "Screen vision downloads an additional image file automatically.",
         "finderSectionTitle": "More on-device models",
-        "finderSectionDescription": "Search Hugging Face when you need a different model size or capability.",
         "finderTitle": "Browse Hugging Face",
         "finderDescription": "Search thousands of GGUF models and download one directly to SpeakoFlow.",
         "finderAction": "Find a model",
         "huggingFaceTitle": "Your models",
-        "huggingFaceDescription": "Downloaded models and models you added from Hugging Face.",
         "catalogEmpty": "No recommended local models are available right now."
       },
       "subpages": {
@@ -1472,7 +1516,8 @@
     "notices": {
       "flowNotConfigured": "Flow needs an assistant model — pasted as dictation",
       "flowFailed": "Flow couldn't generate — nothing was pasted",
-      "flowEmpty": "Say a command after the activation phrase"
+      "flowEmpty": "Say a command after the activation phrase",
+      "cleanupFallback": "AI cleanup didn't run — pasted the raw text"
     },
     "listening": "Listening…",
     "locked": "Recording hands-free — press the hotkey again to stop",
