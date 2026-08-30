@@ -57,6 +57,12 @@ pub const CLEANUP_CONTEXT_SIZE: u32 = 4096;
 /// roles take the GPU when one exists.
 const ALL_GPU_LAYERS: u32 = 999;
 
+/// Repetition penalty for the assistant engine.
+const ASSISTANT_REPEAT_PENALTY: f32 = 1.1;
+
+/// llama.cpp's "no repetition penalty" value. Used by the cleanup engine.
+const REPEAT_PENALTY_OFF: f32 = 1.0;
+
 /// Pinned llama.cpp release used as a fallback when the GitHub "latest" API is
 /// unreachable or rate-limited. Its assets are fetched directly from the
 /// release-download host, which — unlike `api.github.com` — is NOT subject to
@@ -352,6 +358,15 @@ fn context_size_for(role: LlmRole, configured: u32) -> u32 {
     match role {
         LlmRole::Assistant => configured,
         LlmRole::Cleanup => configured.min(CLEANUP_CONTEXT_SIZE),
+    }
+}
+
+/// Repetition penalty to launch with, per role. Pure so it is testable without
+/// an `AppHandle`; see [`LocalLlmManager::repeat_penalty`] for why they differ.
+fn repeat_penalty_for(role: LlmRole) -> f32 {
+    match role {
+        LlmRole::Assistant => ASSISTANT_REPEAT_PENALTY,
+        LlmRole::Cleanup => REPEAT_PENALTY_OFF,
     }
 }
 
@@ -1101,6 +1116,37 @@ impl LocalLlmManager {
         ALL_GPU_LAYERS
     }
 
+    /// Repetition penalty for this role's engine.
+    ///
+    /// The assistant keeps a penalty to discourage the short repetition loops
+    /// small chat models fall into (e.g. printing "Repeat: ..." and re-emitting
+    /// the same sentence).
+    ///
+    /// Cleanup turns it off. Both roles used to share 1.1, which was reasoned
+    /// about as a chat setting and never re-examined for a copy task — and
+    /// cleanup is a copy task: the correct output is mostly the input reproduced
+    /// verbatim, so penalising tokens already in the window penalises being
+    /// correct.
+    ///
+    /// Measured, at greedy so sampling noise could not mask it, on a transcript
+    /// with heavy legitimate repetition ("So the plan is the plan we agreed on.
+    /// The team said the team is ready. I think I think we should ship the thing
+    /// and then ship the next thing."):
+    ///
+    /// - 1.0 returned it correctly, collapsing only the "I think I think"
+    ///   stutter and preserving both sentences.
+    /// - 1.1 returned "The plan we agreed on is the plan we should ship the thing
+    ///   and then ship the next thing." — the entire "team" sentence deleted and
+    ///   the remainder fused into ungrammatical text.
+    ///
+    /// Silent sentence loss is the worst failure this feature has, since the user
+    /// only sees well-formed output and has no reason to suspect a sentence is
+    /// missing. That is what a repetition penalty buys on a task whose input is
+    /// repetitive by nature: dictation restates things.
+    fn repeat_penalty(&self) -> f32 {
+        repeat_penalty_for(self.role)
+    }
+
     /// The `--device` value for this machine, or `None` to let the engine decide.
     ///
     /// The cheap check comes first on purpose: the engine probe costs a process
@@ -1155,10 +1201,9 @@ impl LocalLlmManager {
             // Use the model's embedded Jinja chat template — needed for correct
             // prompting, tool calls, and reasoning separation on modern models.
             .arg("--jinja")
-            // Discourage the short repetition loops small models fall into
-            // (e.g. printing "Repeat: ..." and re-emitting the same sentence).
+            // Repetition penalty, per role — see `repeat_penalty()`.
             .arg("--repeat-penalty")
-            .arg("1.1");
+            .arg(format!("{:.2}", self.repeat_penalty()));
 
         // Cleanup is a rewrite, not a conversation: thinking is pure cost here.
         // Left to their defaults, current small chat models spend the whole
@@ -1714,6 +1759,22 @@ mod tests {
             context_size_for(LlmRole::Cleanup, 1024),
             1024,
             "a smaller configured window is respected, not padded up"
+        );
+    }
+
+    // Cleanup reproduces most of its input verbatim, so a penalty on tokens
+    // already in the window is a penalty on being correct. The assistant keeps
+    // one to break the repetition loops small chat models fall into.
+    #[test]
+    fn cleanup_runs_without_a_repetition_penalty() {
+        assert_eq!(
+            repeat_penalty_for(LlmRole::Cleanup),
+            1.0,
+            "1.0 is llama.cpp's 'penalty off'"
+        );
+        assert!(
+            repeat_penalty_for(LlmRole::Assistant) > 1.0,
+            "the assistant still needs a repetition penalty"
         );
     }
 

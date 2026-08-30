@@ -328,6 +328,34 @@ const MIN_PLAIN_FALLBACK_BUDGET: Duration = Duration::from_millis(750);
 /// measured at temperature 0, so anything else is a configuration those numbers
 /// do not describe. Sent to every provider, not just the built-in engine —
 /// remote providers default to non-zero too.
+///
+/// The base model's own sampling recipe is tempting to adopt wholesale here and
+/// must not be. Qwen3.5-0.8B documents temperature 0.7 / top-p 0.8 / top-k 20 /
+/// presence-penalty 1.5 for non-thinking use, and cleanup is non-thinking, so it
+/// looks like the right column. Measured on Mini over four real dictations, 8
+/// runs each, 11 assertions per configuration, it was the *worst* setting tried:
+/// 84% of expected edits applied against 91% for greedy, and the only one that
+/// corrupted text at all.
+///
+/// `presence_penalty` is why it does not transfer. It penalises tokens already
+/// present in the context, and a cleanup pass has to REPRODUCE most of its
+/// input, so it actively rewards not copying. Observed: a leading "I mean,"
+/// silently deleted in 4 of 8 runs, and "go out on Friday? Sorry, I made you say
+/// Thursday" rewritten as "go out on Thursday instead of Friday" — inventing
+/// "instead of" outright. Qwen's figure is for open-ended chat, where
+/// suppressing repetition is the goal rather than the bug.
+///
+/// Sampling *without* the presence penalty (0.6-0.7 plus top-p) scored 92-94%,
+/// indistinguishable from greedy across 88 trials, and led on exactly one check:
+/// adding punctuation to a transcript dictated with none, which greedy never
+/// does. That is a prompt gap rather than a sampling gap — this prompt never
+/// mentions punctuation — so it is not worth buying with non-determinism. Greedy
+/// also means one dictation yields one answer, which is what makes a bad result
+/// reportable instead of "it feels inconsistent".
+///
+/// `min_p` was investigated as a suspect, since llama.cpp silently applies 0.05
+/// when a request omits it, and cleared: pinning it to 0 changed nothing at
+/// greedy, as truncation cannot move an argmax.
 const CLEANUP_TEMPERATURE: f32 = 0.0;
 
 fn build_post_process_request(
