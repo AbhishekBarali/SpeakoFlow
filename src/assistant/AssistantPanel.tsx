@@ -49,6 +49,7 @@ import { FONT_SIZES, errorKind, type AssistantError } from "./appearance";
 import { useKokoroTts } from "./useKokoroTts";
 import { localTtsActive } from "./localTts";
 import { useLocalLlmEngineStatus } from "@/hooks/useLocalLlmEngineStatus";
+import { useSafeWindowDrag } from "@/lib/useSafeWindowDrag";
 import "./AssistantPanel.css";
 
 type AssistantState =
@@ -402,6 +403,10 @@ const ResizeHandles: React.FC = () => {
 
 const AssistantPanel: React.FC = () => {
   const { t } = useTranslation();
+  // Window dragging with a movement threshold. The pill is one big drag
+  // surface, so without this every click on it enters Windows' modal move loop
+  // (see useSafeWindowDrag).
+  useSafeWindowDrag();
   // Conversation snapshots from the backend are the single source of truth;
   // `stream` only holds the in-flight answer between snapshots. This makes
   // rendering idempotent: duplicate events can never duplicate messages.
