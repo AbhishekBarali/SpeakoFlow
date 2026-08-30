@@ -268,7 +268,8 @@ function App() {
   };
 
   const handleLlmComplete = () => {
-    // AI model step finished (chosen or skipped) — show the "You're ready" step.
+    // Local-AI step finished (assistant and/or cleanup chosen, or skipped) —
+    // show the "You're ready" step.
     setOnboardingStep("ready");
   };
 

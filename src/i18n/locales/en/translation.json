@@ -77,8 +77,8 @@
       "downloadStarted": "Downloading your model in the background."
     },
     "aiModel": {
-      "title": "Set up the local assistant (optional)",
-      "subtitle": "Choose by response speed and capability. E4B is the balanced default; 12B is sharper but slower.",
+      "title": "Add local AI (optional)",
+      "subtitle": "An assistant to talk to, plus our own model that cleans up your dictation. Take either, or both.",
       "tiers": {
         "small": {
           "description": "Runs on any machine. Great for tidying up your writing."
@@ -90,15 +90,24 @@
           "description": "The sharpest answers, and it can see your screen."
         }
       },
-      "seesScreen": "Sees your screen",
+      "seesScreen": "Vision model",
       "textOnly": "Text only",
+      "recommendedForAssistant": "Recommended for assistant",
       "download": "Download model",
       "useDownloaded": "Use downloaded model",
       "skip": "Skip for now",
-      "skipHint": "You can do this later in Settings > Assistant > On my device.",
+      "skipHint": "You can add either of these later in Settings.",
       "continue": "Continue",
       "downloadingHint": "It downloads in the background. Start using the app right away.",
       "downloadStarted": "Downloading your model in the background."
+    },
+    "cleanup": {
+      "cardTitle": "SpeakoFlow Mini",
+      "cardDescription": "Applies spoken edits like \"new paragraph\" and \"scratch that\". English only.",
+      "pill": "Cleans your dictation",
+      "recommendedForDictation": "Recommended for dictation",
+      "download": "Download and turn on",
+      "useDownloaded": "Turn it on"
     },
     "ready": {
       "title": "You're ready.",
@@ -167,7 +176,7 @@
         "description": "The quickest current Gemma for everyday conversation. Less capable on complex requests."
       },
       "gemma-4-e4b": {
-        "description": "Recommended for conversation: a stronger quality-and-speed balance without default thinking."
+        "description": "A stronger quality-and-speed balance, and it doesn't think by default."
       },
       "gemma-4-12b": {
         "description": "More capable for nuanced questions, but noticeably slower and best with a strong GPU."

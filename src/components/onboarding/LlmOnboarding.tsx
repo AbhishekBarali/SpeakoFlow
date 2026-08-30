@@ -7,7 +7,7 @@ import {
   getTranslatedModelName,
 } from "@/lib/utils/modelTranslation";
 import { useSettings } from "@/hooks/useSettings";
-import { GemmaLogo } from "../icons/BrandLogos";
+import { GemmaLogo, getModelBrand } from "../icons/BrandLogos";
 import type { WelcomeCardPhase } from "./WelcomeChoiceCard";
 import WelcomeChoiceCard from "./WelcomeChoiceCard";
 import OnboardingLayout from "./OnboardingLayout";
@@ -17,19 +17,27 @@ import { useModelStore } from "../../stores/modelStore";
 /** The built-in (local) llama.cpp provider id, mirrored from the backend. */
 const BUILTIN_PROVIDER_ID = "builtin";
 
-/** Three current Gemma 4 choices, ordered by response/quality tradeoff. */
+/** Catalog id of our own cleanup fine-tune, mirrored from the backend. */
+const SPEAKOFLOW_MINI_ID = "speakoflow-mini";
+
+/**
+ * The two assistant choices offered on first run.
+ *
+ * Gemma 4 12B is deliberately absent even though the catalog carries it: at
+ * 6.7 GB it is a poor first-run default, it needs a strong GPU to feel usable,
+ * and a third conversational card pushed the one card that is actually ours
+ * below the fold. It stays one click away in Settings for anyone who wants it.
+ */
 const TIERS = {
   /** Quickest current option; lower capability on complex requests. */
   quick: "gemma-4-e2b",
   /** Recommended conversational quality/latency balance. */
   balanced: "gemma-4-e4b",
-  /** More capable, but noticeably slower. */
-  capable: "gemma-4-12b",
 } as const;
 
 type Tier = keyof typeof TIERS;
 
-const TIER_ORDER: Tier[] = ["quick", "balanced", "capable"];
+const TIER_ORDER: Tier[] = ["quick", "balanced"];
 
 const GEMMA_TILE = "bg-[#4285f4] text-white shadow-sm";
 
@@ -54,12 +62,6 @@ const TIER_META: Record<
     pillKey: "seesScreen",
     isRecommended: true,
   },
-  capable: {
-    icon: <GemmaLogo size={19} />,
-    tileClassName: GEMMA_TILE,
-    pillKey: "seesScreen",
-    isRecommended: false,
-  },
 };
 
 interface LlmOnboardingProps {
@@ -68,15 +70,23 @@ interface LlmOnboardingProps {
 }
 
 /**
- * Step 2 of the welcome flow: "Give it a brain (optional)."
+ * Step 2 of the welcome flow: "Add local AI (optional)."
  *
- * Three current Gemma 4 cards expose the real tradeoff: E2B responds
- * quickest, E4B is the recommended conversational balance, and 12B is more
- * capable but slower. The badge is editorial and never inferred from RAM or
- * VRAM. Tapping a card morphs it into a progress state in place and flips the
- * footer to "Continue" immediately: the download finishes in the background
- * and wires the built-in assistant provider to the model when it lands. "Skip
- * for now" always stays, reassuring the user they can add this later.
+ * Two current Gemma 4 cards expose the real assistant tradeoff (E2B responds
+ * quickest, E4B is the recommended balance), followed by SpeakoFlow Mini for
+ * dictation cleanup. Mini is here for discovery: it is hidden from the
+ * assistant catalog because it cannot converse, so otherwise the only route to
+ * the app's own model was knowing to go looking for it in Settings.
+ *
+ * The two choices are tracked separately, and that is the point of putting them
+ * on one step rather than two: an assistant and a cleanup model are not
+ * alternatives, and someone downloading 5.7 GB of Gemma almost certainly also
+ * wants the 795 MB model that tidies their dictation. A single-select step would
+ * have forced them to give one up.
+ *
+ * Tapping a card morphs it into a progress state in place and flips the footer
+ * to "Continue" immediately: downloads finish in the background and wire
+ * themselves up when the weights land. "Skip for now" always stays.
  */
 const LlmOnboarding: React.FC<LlmOnboardingProps> = ({ onComplete }) => {
   const { t } = useTranslation();
@@ -91,8 +101,10 @@ const LlmOnboarding: React.FC<LlmOnboardingProps> = ({ onComplete }) => {
     downloadProgress,
   } = useModelStore();
   const [chosenId, setChosenId] = useState<string | null>(null);
+  const [cleanupTaken, setCleanupTaken] = useState(false);
 
   const hasChosen = chosenId !== null;
+  const hasAnySelection = hasChosen || cleanupTaken;
 
   const phaseFor = (modelId: string): WelcomeCardPhase => {
     if (modelId in extractingModels) return "extracting";
@@ -151,23 +163,67 @@ const LlmOnboarding: React.FC<LlmOnboardingProps> = ({ onComplete }) => {
     if (cancelled) setChosenId(null);
   };
 
+  // Cleanup is a different destination from the assistant, so it gets its own
+  // wiring: point cleanup at the model, then turn the feature on. Model first —
+  // the reverse order would briefly enable a feature whose engine has nothing to
+  // load. `setCleanupLocalModel` is one command on purpose: it also keeps the
+  // selected cleanup prompt paired with the model, which two separate calls
+  // could not do atomically.
+  const handleChooseCleanup = async () => {
+    const model = models.find((m: ModelInfo) => m.id === SPEAKOFLOW_MINI_ID);
+    if (!model) return;
+    setCleanupTaken(true);
+
+    const enableCleanup = async () => {
+      try {
+        await commands.setCleanupLocalModel(SPEAKOFLOW_MINI_ID);
+        await commands.changePostProcessEnabledSetting(true);
+        await refreshSettings();
+      } catch (err) {
+        console.error("Failed to enable AI cleanup:", err);
+      }
+    };
+
+    if (model.is_downloaded) {
+      await enableCleanup();
+      return;
+    }
+
+    const success = await downloadModel(SPEAKOFLOW_MINI_ID);
+    if (success) {
+      await enableCleanup();
+    } else {
+      setCleanupTaken(false);
+    }
+  };
+
+  const handleCancelCleanup = async () => {
+    const cancelled = await cancelDownload(SPEAKOFLOW_MINI_ID);
+    if (cancelled) setCleanupTaken(false);
+  };
+
   const chosenCanBeCancelled =
     chosenId !== null && chosenId in downloadingModels;
+  const cleanupCanBeCancelled =
+    cleanupTaken && SPEAKOFLOW_MINI_ID in downloadingModels;
 
   const footer = (
     <>
       <p className="text-xs text-muted max-w-[55%]">
-        {hasChosen
+        {hasAnySelection
           ? t("onboarding.aiModel.downloadingHint")
           : t("onboarding.aiModel.skipHint")}
       </p>
-      {hasChosen ? (
+      {hasAnySelection ? (
         <div className="flex items-center gap-2">
-          {chosenCanBeCancelled && (
+          {(chosenCanBeCancelled || cleanupCanBeCancelled) && (
             <Button
               variant="ghost"
               size="lg"
-              onClick={() => void handleCancelChosen()}
+              onClick={() => {
+                if (chosenCanBeCancelled) void handleCancelChosen();
+                if (cleanupCanBeCancelled) void handleCancelCleanup();
+              }}
             >
               {t("modelSelector.cancelDownload")}
             </Button>
@@ -210,7 +266,11 @@ const LlmOnboarding: React.FC<LlmOnboardingProps> = ({ onComplete }) => {
             description={getTranslatedModelDescription(model, t)}
             sizeLabel={formatModelSize(Number(model.size_mb))}
             pill={t(`onboarding.aiModel.${meta.pillKey}`)}
-            badge={meta.isRecommended ? t("onboarding.recommended") : undefined}
+            badge={
+              meta.isRecommended
+                ? t("onboarding.aiModel.recommendedForAssistant")
+                : undefined
+            }
             selected={chosenId === model.id}
             disabled={hasChosen}
             phase={phaseFor(model.id)}
@@ -226,6 +286,37 @@ const LlmOnboarding: React.FC<LlmOnboardingProps> = ({ onComplete }) => {
           />
         );
       })}
+      {/* Our own cleanup model. Only disabled by its own selection, never by an
+          assistant pick: they are independent choices. */}
+      {(() => {
+        const mini = models.find((m: ModelInfo) => m.id === SPEAKOFLOW_MINI_ID);
+        if (!mini) return null;
+        const brand = getModelBrand(mini);
+        return (
+          <WelcomeChoiceCard
+            key={SPEAKOFLOW_MINI_ID}
+            icon={brand.icon}
+            tileClassName={brand.tileClass}
+            title={t("onboarding.cleanup.cardTitle")}
+            description={t("onboarding.cleanup.cardDescription")}
+            sizeLabel={formatModelSize(Number(mini.size_mb))}
+            pill={t("onboarding.cleanup.pill")}
+            badge={t("onboarding.cleanup.recommendedForDictation")}
+            selected={cleanupTaken}
+            disabled={cleanupTaken}
+            phase={phaseFor(mini.id)}
+            progress={downloadProgress[mini.id]?.percentage}
+            actionLabel={
+              mini.is_downloaded
+                ? t("onboarding.cleanup.useDownloaded")
+                : t("onboarding.cleanup.download")
+            }
+            onClick={() => {
+              if (!cleanupTaken) void handleChooseCleanup();
+            }}
+          />
+        );
+      })()}
     </OnboardingLayout>
   );
 };
