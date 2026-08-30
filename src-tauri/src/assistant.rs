@@ -1131,6 +1131,88 @@ fn force_panel_topmost(window: &tauri::webview::WebviewWindow) {
     });
 }
 
+/// Windows: hand the foreground back to the app underneath the panel.
+///
+/// `set_focusable(false)` adds `WS_EX_NOACTIVATE` to a live window, and Tauri
+/// documents the trap that leaves behind: "If the window is already focused, it
+/// is not possible to unfocus it after calling `set_focusable(false)`."
+/// Collapsing is driven by a click inside the panel, so the panel is exactly
+/// the focused window at that moment. What remains is a foreground window that
+/// refuses activation, and while it sits there no other application can take
+/// the foreground by being clicked: other windows stop responding to clicks and
+/// cannot be dragged until something else forces a foreground change.
+///
+/// So the foreground is handed on explicitly. The successor is the first window
+/// below the panel in z-order that the user could have alt-tabbed to, which on
+/// a normal desktop is the window they were working in before the panel took
+/// focus. `SetForegroundWindow` is allowed here precisely because we still own
+/// the foreground when this runs.
+#[cfg(target_os = "windows")]
+fn release_panel_foreground(window: &tauri::webview::WebviewWindow) {
+    use windows::Win32::Foundation::HWND;
+    use windows::Win32::System::Threading::GetCurrentProcessId;
+    use windows::Win32::UI::WindowsAndMessaging::{
+        GetForegroundWindow, GetWindow, GetWindowLongPtrW, GetWindowTextLengthW,
+        GetWindowThreadProcessId, IsIconic, IsWindowVisible, SetForegroundWindow, GWL_EXSTYLE,
+        GW_HWNDNEXT, GW_OWNER, WS_EX_TOOLWINDOW,
+    };
+
+    /// Would this window show up in alt-tab? Anything else is a poor successor:
+    /// tool windows, owned popups, minimized windows and the untitled helper
+    /// windows that most apps keep around.
+    ///
+    /// Our own windows are excluded too. The overlay, the snip surface and the
+    /// panel all pass `skip_taskbar(true)`, which tao implements with
+    /// `ITaskbarList::DeleteTab` rather than `WS_EX_TOOLWINDOW`, so the style
+    /// check alone would not spot them and the panel could hand the foreground
+    /// to the recording overlay instead of to the user's app.
+    unsafe fn is_alt_tab_candidate(hwnd: HWND, own_process: u32) -> bool {
+        if !IsWindowVisible(hwnd).as_bool() || IsIconic(hwnd).as_bool() {
+            return false;
+        }
+        if GetWindowTextLengthW(hwnd) == 0 {
+            return false;
+        }
+        if GetWindow(hwnd, GW_OWNER).is_ok_and(|owner| !owner.is_invalid()) {
+            return false;
+        }
+        let mut process_id = 0u32;
+        GetWindowThreadProcessId(hwnd, Some(&mut process_id));
+        if process_id == own_process {
+            return false;
+        }
+        let ex_style = GetWindowLongPtrW(hwnd, GWL_EXSTYLE) as u32;
+        ex_style & WS_EX_TOOLWINDOW.0 == 0
+    }
+
+    let window_clone = window.clone();
+    let _ = window.run_on_main_thread(move || {
+        let Ok(hwnd) = window_clone.hwnd() else {
+            return;
+        };
+        unsafe {
+            // Only act when the panel really holds the foreground. Collapsing
+            // by hotkey while another app is focused needs no repair, which is
+            // why this bug only showed up "sometimes".
+            if GetForegroundWindow() != hwnd {
+                return;
+            }
+            let own_process = GetCurrentProcessId();
+            let mut next = GetWindow(hwnd, GW_HWNDNEXT).ok();
+            while let Some(candidate) = next {
+                if candidate.is_invalid() {
+                    break;
+                }
+                if is_alt_tab_candidate(candidate, own_process) {
+                    let _ = SetForegroundWindow(candidate);
+                    return;
+                }
+                next = GetWindow(candidate, GW_HWNDNEXT).ok();
+            }
+        }
+    });
+}
+
 /// Storage key for the current mode's position slot.
 fn position_key() -> &'static str {
     if PILL_MODE.load(Ordering::SeqCst) {
@@ -1548,6 +1630,15 @@ pub fn set_panel_collapsed(app: &AppHandle, collapsed: bool) {
             new_y = new_y.clamp(my + 8.0, (my + mh - new_h - 8.0).max(my + 8.0));
         }
         let _ = window.set_position(tauri::LogicalPosition::new(new_x, new_y));
+
+        // The pill is deliberately non-activatable so typing keeps going to the
+        // app underneath. On Windows that flag has to be paired with giving the
+        // foreground away, or the desktop is left unable to activate anything
+        // (see `release_panel_foreground`).
+        #[cfg(target_os = "windows")]
+        if collapsed {
+            release_panel_foreground(&window);
+        }
 
         let _ = app.emit("assistant-collapsed", collapsed);
     } else {
