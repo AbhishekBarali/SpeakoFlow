@@ -1,5 +1,7 @@
 <div align="center">
 
+**English** · [繁體中文](README.zh-TW.md)
+
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="Logo/final-v2/png/lockup-dark-h256.png" />
   <img src="Logo/final-v2/png/lockup-h256.png" alt="SpeakoFlow" width="340" />
