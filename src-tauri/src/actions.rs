@@ -225,7 +225,7 @@ fn cleanup_llm(app: &AppHandle) -> Arc<crate::managers::local_llm::LocalLlmManag
 
 /// Same overlap trick for the assistant's own engine, which is a different
 /// process on a different port (and keeps its own model, projector and context).
-fn prewarm_assistant_llm(app: &AppHandle, model: String) {
+pub(crate) fn prewarm_assistant_llm(app: &AppHandle, model: String) {
     let manager = app
         .state::<Arc<crate::managers::local_llm::LocalLlmManager>>()
         .inner()
@@ -1211,8 +1211,23 @@ impl ShortcutAction for TranscribeAction {
         let tm = app.state::<Arc<TranscriptionManager>>();
         let rm = app.state::<Arc<AudioRecordingManager>>();
 
+        // Cloud transcription needs no weights on disk, so loading a local model
+        // here would occupy VRAM (and, on a fresh install, block on a download)
+        // for an engine that is never going to be asked to transcribe.
+        let cloud_stt = crate::stt_cloud::cloud_stt_active(&get_settings(app));
+
+        // Open the TLS connection to the provider now, while the user is still
+        // speaking. Measured against OpenRouter, the handshake was ~1.7s of a
+        // 3.4s round trip — moving it under the recording is the difference
+        // between "slow" and "about as fast as the provider itself".
+        if cloud_stt {
+            crate::stt_cloud::prewarm_cloud_stt(&get_settings(app));
+        }
+
         // Load ASR model and VAD model in parallel
-        tm.initiate_model_load();
+        if !cloud_stt {
+            tm.initiate_model_load();
+        }
 
         // Live/streaming transcription. Start the streaming worker now so it
         // waits for the model load and begins consuming frames as soon as
@@ -1226,13 +1241,21 @@ impl ShortcutAction for TranscribeAction {
         // toggle. A model that does not support streaming never starts the
         // worker (so streaming can't be attempted on it and misbehave), even if
         // the global live-transcription toggle happens to be on.
+        //
+        // A cloud provider with a realtime endpoint follows the same rule with
+        // its own capability check: `cloud_stt_streaming` is the user's switch,
+        // and the provider must actually have a realtime model selected.
         {
             let s = get_settings(app);
-            let supports_live = crate::overlay::selected_model_supports_live(app);
-            let want_stream = supports_live
-                && (s.live_transcription_enabled
-                    || crate::settings::resolve_overlay_style(s.overlay_style, supports_live)
-                        == crate::settings::OverlayStyle::Live);
+            let want_stream = if cloud_stt {
+                crate::stt_cloud::cloud_stt_streaming_active(&s)
+            } else {
+                let supports_live = crate::overlay::selected_model_supports_live(app);
+                supports_live
+                    && (s.live_transcription_enabled
+                        || crate::settings::resolve_overlay_style(s.overlay_style, supports_live)
+                            == crate::settings::OverlayStyle::Live)
+            };
             if want_stream {
                 tm.start_stream();
             }
@@ -1757,7 +1780,20 @@ impl ShortcutAction for TranscribeAction {
                                     error!("Failed to save failed history entry: {}", save_err);
                                 }
                             }
-                            utils::hide_recording_overlay(&ah);
+                            // On the local path a transcription failure means a
+                            // model problem the user can see in Settings. On the
+                            // cloud path it means a key, a quota, or a network —
+                            // none of which is visible anywhere, and all of which
+                            // otherwise present as dictation that silently pastes
+                            // nothing, every single time. Say so.
+                            if crate::stt_cloud::cloud_stt_active(&crate::settings::get_settings(
+                                &ah,
+                            )) {
+                                error!("Cloud transcription failed: {}", err);
+                                utils::show_overlay_notice(&ah, "cloudSttFailed");
+                            } else {
+                                utils::hide_recording_overlay(&ah);
+                            }
                             change_tray_icon(&ah, TrayIconState::Idle);
                         }
                     }

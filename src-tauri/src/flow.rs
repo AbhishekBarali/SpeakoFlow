@@ -498,9 +498,17 @@ fn sanitize_flow_output(raw: &str) -> Option<String> {
     Some(text.to_string())
 }
 
+/// Tags whose contents are a model's reasoning rather than its answer.
+const REASONING_TAGS: [&str; 3] = ["<think>", "<thinking>", "<reasoning>"];
+
 /// Remove leaked reasoning blocks (`<think>`, `<thinking>`, `<reasoning>`,
 /// case-insensitive). A block that never closes swallows the rest of the text
 /// — an unfinished thought is reasoning, not content.
+///
+/// A *closing* tag with no opener is the mirror image and just as common: many
+/// chat templates put `<think>` at the end of the prompt, so the model's output
+/// starts inside the block and only ever emits the close. Everything before
+/// that first unmatched close is therefore reasoning too.
 ///
 /// Shared with AI cleanup (`actions.rs`), which pastes model output straight
 /// into the user's document and must never leak a thinking monologue.
@@ -510,17 +518,39 @@ pub(crate) fn strip_reasoning_blocks(text: &str) -> String {
     // indices found in `lower` are valid for `text`.
     let lower = text.to_ascii_lowercase();
     let mut pos = 0usize;
+    // Only the FIRST unmatched close is read as "the block opened in the
+    // prompt". A stray close later on is more likely stray markup than a signal
+    // to discard an answer we have already collected.
+    let mut saw_block = false;
     while pos < text.len() {
         // Find the next reasoning-open tag at or after `pos`.
-        let next = ["<think>", "<thinking>", "<reasoning>"]
+        let next = REASONING_TAGS
             .iter()
             .filter_map(|tag| lower[pos..].find(*tag).map(|i| (pos + i, *tag)))
             .min_by_key(|(i, _)| *i);
+        if !saw_block {
+            // An unmatched close before any open: the block was opened by the
+            // prompt, so drop everything up to and including it.
+            let unmatched_close = REASONING_TAGS
+                .iter()
+                .map(|tag| format!("</{}", &tag[1..]))
+                .filter_map(|close| lower[pos..].find(&close).map(|i| (pos + i, close)))
+                .min_by_key(|(i, _)| *i);
+            if let Some((at, close)) = unmatched_close {
+                if next.is_none_or(|(open_at, _)| at < open_at) {
+                    out.clear();
+                    pos = at + close.len();
+                    saw_block = true;
+                    continue;
+                }
+            }
+        }
         let Some((start, tag)) = next else {
             out.push_str(&text[pos..]);
             break;
         };
         out.push_str(&text[pos..start]);
+        saw_block = true;
         // `tag` is like "<think>", so this yields the full "</think>".
         let close = format!("</{}", &tag[1..]);
         match lower[start..].find(&close) {
@@ -529,6 +559,118 @@ pub(crate) fn strip_reasoning_blocks(text: &str) -> String {
         }
     }
     out
+}
+
+/// Streaming counterpart to `strip_reasoning_blocks`, for a reply that is shown
+/// and spoken as it arrives.
+///
+/// A reasoning model that writes its monologue into the `content` channel (as
+/// opposed to a separate `reasoning` field, which we already ignore) cannot be
+/// cleaned up after the fact on this path: by the time `</think>` arrives, the
+/// panel has rendered the thoughts and the voice has read them out. So the
+/// tokens have to be filtered *before* they are forwarded anywhere.
+///
+/// The only real difficulty is that a tag arrives in pieces — `<`, then `think`,
+/// then `>` are frequently three separate deltas — so text that might still
+/// become a tag is held back until it can be decided either way. Nothing is held
+/// for longer than one tag's worth of bytes.
+#[derive(Default)]
+pub(crate) struct ReasoningStreamFilter {
+    /// Text withheld because it may still turn out to be a tag. Never longer
+    /// than one tag, and at end of stream it is simply dropped: the live stream
+    /// is not the authoritative copy of the reply (the turn ends by emitting the
+    /// recorded conversation, which is stripped in one pass), so a fragment that
+    /// looked like the start of `<think>` is better withheld than shown.
+    held: String,
+    /// The closing tag being waited for, while inside a reasoning block.
+    closing: Option<String>,
+}
+
+impl ReasoningStreamFilter {
+    /// Feed one streamed delta; returns the text safe to forward (often empty).
+    pub(crate) fn push(&mut self, token: &str) -> String {
+        self.held.push_str(token);
+        let mut out = String::new();
+        loop {
+            let lower = self.held.to_ascii_lowercase();
+            if let Some(close) = self.closing.clone() {
+                match lower.find(&close) {
+                    Some(at) => {
+                        self.held.drain(..at + close.len());
+                        self.closing = None;
+                    }
+                    None => {
+                        // Drop the thoughts, but keep a tail that could be the
+                        // start of the closing tag split across deltas.
+                        let keep = close.len().saturating_sub(1);
+                        if self.held.len() > keep {
+                            let cut = floor_char_boundary(&self.held, self.held.len() - keep);
+                            self.held.drain(..cut);
+                        }
+                        return out;
+                    }
+                }
+                continue;
+            }
+
+            let Some(at) = lower.find('<') else {
+                out.push_str(&self.held);
+                self.held.clear();
+                return out;
+            };
+            out.push_str(&self.held[..at]);
+            self.held.drain(..at);
+            let rest = &lower[at..];
+
+            // An opening tag: suppress until its close.
+            if let Some(tag) = REASONING_TAGS.iter().find(|tag| rest.starts_with(**tag)) {
+                self.closing = Some(format!("</{}", &tag[1..]));
+                self.held.drain(..tag.len());
+                continue;
+            }
+            // A stray closing tag (some templates open the block in the prompt,
+            // so the model only ever emits the close): drop the tag itself.
+            if let Some(tag) = REASONING_TAGS
+                .iter()
+                .map(|tag| format!("</{}", &tag[1..]))
+                .find(|close| rest.starts_with(close.as_str()))
+            {
+                self.held.drain(..tag.len());
+                continue;
+            }
+            // Still undecided: it is a prefix of a tag we may yet complete.
+            if REASONING_TAGS.iter().any(|tag| tag.starts_with(rest))
+                || REASONING_TAGS
+                    .iter()
+                    .any(|tag| format!("</{}", &tag[1..]).starts_with(rest))
+            {
+                return out;
+            }
+            // Not a tag at all — emit the `<` and keep scanning after it.
+            out.push('<');
+            self.held.drain(..1);
+        }
+    }
+
+    /// End of stream: a dangling `<…` was ordinary text, but an unclosed
+    /// reasoning block is dropped (an unfinished thought is not an answer).
+    #[cfg(test)]
+    fn finish(&mut self) -> String {
+        if self.closing.is_some() {
+            self.held.clear();
+            return String::new();
+        }
+        std::mem::take(&mut self.held)
+    }
+}
+
+/// Largest char boundary at or below `index` (std's is still unstable).
+fn floor_char_boundary(text: &str, index: usize) -> usize {
+    let mut at = index.min(text.len());
+    while at > 0 && !text.is_char_boundary(at) {
+        at -= 1;
+    }
+    at
 }
 
 /// If the ENTIRE output is a single Markdown code fence, unwrap it — the
@@ -820,6 +962,130 @@ pub async fn run_flow_generation(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Feed a whole reply through the streaming filter one delta at a time.
+    fn stream_in_chunks(text: &str, chunk_chars: usize) -> String {
+        let mut filter = ReasoningStreamFilter::default();
+        let mut out = String::new();
+        let chars: Vec<char> = text.chars().collect();
+        for chunk in chars.chunks(chunk_chars) {
+            out.push_str(&filter.push(&chunk.iter().collect::<String>()));
+        }
+        out.push_str(&filter.finish());
+        out
+    }
+
+    /// The reported failure: a reasoning model wrote its monologue into the
+    /// content channel, so the panel rendered it and the voice read it out.
+    #[test]
+    fn streamed_reasoning_never_reaches_the_reply() {
+        let reply = "<think> The user is asking for the funniest thing a person can buy. \
+                     My persona means I should be blunt.</think>Nicolas Cage pillowcases.";
+        // Whatever the delta boundaries are — including one character at a time,
+        // which splits every tag across several deltas.
+        for size in [1, 2, 3, 5, 7, 64] {
+            assert_eq!(
+                stream_in_chunks(reply, size),
+                "Nicolas Cage pillowcases.",
+                "chunk size {size}"
+            );
+        }
+    }
+
+    /// The streaming filter and the after-the-fact one must agree, or the panel
+    /// would flicker when `emit_conversation` replaces the streamed text with
+    /// the recorded turn at the end of a turn.
+    #[test]
+    fn streaming_and_whole_text_stripping_agree() {
+        for reply in [
+            "plain answer with no tags",
+            "<think>thoughts</think>answer",
+            "<THINKING>shouty thoughts</THINKING>answer",
+            "<reasoning>a</reasoning>b<think>c</think>d",
+            "before<think>middle</think>after",
+            "math: 3 < 5 and 6 > 2",
+            "a < b <think>t</think> c",
+            "not a tag: <thinkable> stays",
+        ] {
+            for size in [1, 2, 4, 9] {
+                assert_eq!(
+                    stream_in_chunks(reply, size),
+                    strip_reasoning_blocks(reply),
+                    "reply {reply:?} at chunk size {size}"
+                );
+            }
+        }
+    }
+
+    /// A reply whose last characters could still become a reasoning tag is the
+    /// one case where the live stream withholds text the recorded turn keeps.
+    /// The panel is corrected when the turn ends and emits the full conversation.
+    #[test]
+    fn a_trailing_tag_fragment_is_withheld_from_the_stream_but_kept_on_the_record() {
+        let mut filter = ReasoningStreamFilter::default();
+        assert_eq!(filter.push("answer<thin"), "answer");
+        assert_eq!(strip_reasoning_blocks("answer<thin"), "answer<thin");
+        // And it is released as soon as it turns out not to be a tag.
+        assert_eq!(filter.push("g about it"), "<thing about it");
+    }
+
+    /// Several chat templates open the block in the prompt itself, so the model
+    /// only ever emits the closing tag. Mid-stream the leading thoughts are
+    /// already on screen and cannot be unsaid, so the filter drops the tag and
+    /// carries on; the recorded turn (`strip_reasoning_blocks`) drops the
+    /// preceding thoughts too, which is what the panel ends up showing.
+    #[test]
+    fn a_stray_closing_tag_is_not_shown_as_text() {
+        assert_eq!(
+            stream_in_chunks("thoughts</think>Real answer.", 3),
+            "thoughtsReal answer."
+        );
+        assert_eq!(
+            strip_reasoning_blocks("thoughts</think>Real answer."),
+            "Real answer."
+        );
+    }
+
+    /// A stray close *after* a complete block is stray markup, not a signal to
+    /// throw away an answer already collected.
+    #[test]
+    fn a_later_stray_close_does_not_discard_the_answer() {
+        assert_eq!(
+            strip_reasoning_blocks("<think>t</think>the answer</think> tail"),
+            "the answer</think> tail"
+        );
+    }
+
+    /// An unclosed block is an unfinished thought, not an answer.
+    #[test]
+    fn an_unclosed_reasoning_block_is_dropped_at_end_of_stream() {
+        assert_eq!(stream_in_chunks("<think>I never stop thinking", 4), "");
+    }
+
+    /// Nothing is buffered indefinitely: a long monologue must not grow memory
+    /// while the filter waits for a close tag.
+    #[test]
+    fn suppressed_text_is_not_accumulated() {
+        let mut filter = ReasoningStreamFilter::default();
+        assert!(filter.push("<think>").is_empty());
+        for _ in 0..1000 {
+            assert!(filter.push("more thinking ").is_empty());
+        }
+        assert!(filter.held.len() < 16, "held {} bytes", filter.held.len());
+        assert_eq!(filter.push("</think>done"), "done");
+    }
+
+    /// Multi-byte characters inside a suppressed block must not be split when
+    /// the held tail is trimmed.
+    #[test]
+    fn suppressed_multibyte_text_does_not_panic() {
+        let mut filter = ReasoningStreamFilter::default();
+        filter.push("<think>");
+        for _ in 0..50 {
+            filter.push("思考しています — ");
+        }
+        assert_eq!(filter.push("</think>答え"), "答え");
+    }
 
     #[test]
     fn lenient_prewarm_matches_raw_live_speech() {

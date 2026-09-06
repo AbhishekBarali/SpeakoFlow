@@ -377,6 +377,154 @@ pub enum PostProcessConfigSource {
     AssistantFallback,
 }
 
+/// Where speech-to-text runs. `Local` is the app's original behaviour and the
+/// default: a Whisper/Parakeet/GGUF model on the user's own machine. `Cloud`
+/// sends the audio to a hosted transcription API instead.
+///
+/// This is a two-way switch rather than "just another provider in the model
+/// list" because the two paths have nothing in common operationally: the local
+/// path downloads and loads weights, occupies the GPU, and needs an unload
+/// policy, while the cloud path needs a key, a network round-trip, and costs
+/// money per minute. Keeping them separate is also what lets the app skip
+/// loading a local model entirely when the user is on cloud — otherwise a
+/// multi-gigabyte Whisper model would sit in VRAM being paid for twice.
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum SttEngineMode {
+    #[default]
+    Local,
+    Cloud,
+}
+
+/// Wire protocol a cloud speech-to-text provider speaks. The provider *list* is
+/// data (so a new endpoint is one entry, not new code), but the request shape
+/// is not interchangeable, so each family gets a variant:
+///
+/// - [`ElevenLabs`](Self::ElevenLabs): `POST /v1/speech-to-text` multipart with
+///   an `xi-api-key` header and a `model_id` field, plus the Scribe v2 Realtime
+///   WebSocket for live streaming.
+/// - [`OpenAiCompatible`](Self::OpenAiCompatible): `POST /audio/transcriptions`
+///   multipart with a bearer token and a `model` field. Covers OpenAI itself,
+///   Groq, Mistral, and any self-hosted server that copies the schema, which is
+///   why the custom entry exists at all.
+/// - [`Deepgram`](Self::Deepgram): `POST /v1/listen` with the audio as the raw
+///   request body (no multipart), `Authorization: Token <key>`, and everything
+///   else as query parameters.
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum CloudSttKind {
+    ElevenLabs,
+    OpenAiCompatible,
+    Deepgram,
+}
+
+/// A configurable cloud speech-to-text endpoint. Seeded from
+/// [`default_cloud_stt_providers`] and repaired on load, so a provider added in
+/// a later version appears for existing users without wiping their keys.
+#[derive(Serialize, Deserialize, Debug, Clone, Type)]
+pub struct CloudSttProvider {
+    pub id: String,
+    pub label: String,
+    /// API root without a trailing slash. Per-provider overrides live in
+    /// `cloud_stt_base_urls`, which is what `allow_base_url_edit` unlocks.
+    pub base_url: String,
+    #[serde(default)]
+    pub allow_base_url_edit: bool,
+    pub kind: CloudSttKind,
+    /// Model used when the user has not chosen one.
+    pub default_model: String,
+    /// Suggested models for the picker. Not a whitelist — the field stays
+    /// free-text so a model released after this build still works.
+    #[serde(default)]
+    pub models: Vec<String>,
+    /// Path to list models, relative to `base_url`. `None` means the provider
+    /// publishes a fixed set and the registry's [`Self::models`] is the answer.
+    ///
+    /// Carries its own query string where one is needed: OpenRouter keeps
+    /// transcription models out of the default catalog and only returns them for
+    /// `?output_modalities=transcription`, so a plain `/models` there lists
+    /// hundreds of chat models and not one that can transcribe.
+    #[serde(default)]
+    pub models_endpoint: Option<String>,
+    /// Whether this endpoint actually acts on the custom-word hints the app
+    /// sends it.
+    ///
+    /// This is not cosmetic. When a provider is biased upstream the app skips its
+    /// own fuzzy custom-word pass, on the grounds that a second guess at text the
+    /// model already got right can only make it worse. A provider that *accepts*
+    /// the field and ignores it — OpenRouter documents exactly that for `prompt`
+    /// on its multipart route — would therefore get neither correction: not the
+    /// provider's, and not the app's. False keeps the local pass.
+    #[serde(default)]
+    pub honors_keyterms: bool,
+    /// Whether this provider has a realtime streaming endpoint wired up (see
+    /// `crate::stt_cloud_stream`). Providers without one still transcribe, just
+    /// as a single request once the recording stops.
+    #[serde(default)]
+    pub supports_streaming: bool,
+    /// Where the user goes to get a key. Surfaced as a link in Settings so the
+    /// first-run path isn't "search the web for it".
+    #[serde(default)]
+    pub api_key_url: String,
+}
+
+/// Why cloud transcription can't run right now. Mirrors
+/// [`PostProcessUnavailableReason`]: the pipeline needs to know *why* it is
+/// falling back so the UI can say something more useful than "failed".
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum CloudSttUnavailableReason {
+    NotEnabled,
+    SelectedProviderMissing,
+    MissingApiKey,
+    NoModelConfigured,
+}
+
+/// Whether cloud transcription is ready, for display in Settings.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Type)]
+#[serde(tag = "state", rename_all = "snake_case")]
+pub enum CloudSttReadiness {
+    Ready {
+        provider_id: String,
+        provider_label: String,
+        model: String,
+        /// Realtime streaming will be used for the next recording.
+        streaming: bool,
+    },
+    Unavailable {
+        reason: CloudSttUnavailableReason,
+        provider_id: Option<String>,
+        provider_label: Option<String>,
+    },
+}
+
+/// Fully resolved cloud transcription configuration. Deliberately has no
+/// `Serialize`/`Type`/`Debug` derive because it carries the hydrated API key —
+/// same reasoning as [`ResolvedPostProcessConfig`].
+pub(crate) struct ResolvedCloudStt {
+    pub provider: CloudSttProvider,
+    pub model: String,
+    pub base_url: String,
+    pub api_key: String,
+    /// ISO language code, or `None` for auto-detect.
+    pub language: Option<String>,
+    /// The user's custom vocabulary, forwarded as provider-native biasing
+    /// (ElevenLabs `keyterms`, OpenAI `prompt`, Deepgram `keyterm`). The app
+    /// already collects these words for the local fuzzy-correction pass, so a
+    /// cloud model may as well be told about them before it guesses.
+    pub keyterms: Vec<String>,
+    /// Ask the provider to drop filler words and false starts server-side.
+    pub no_verbatim: bool,
+    pub timeout_secs: u64,
+}
+
+#[derive(Debug)]
+pub(crate) struct CloudSttResolutionError {
+    pub reason: CloudSttUnavailableReason,
+    pub provider_id: Option<String>,
+    pub provider_label: Option<String>,
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Type)]
 #[serde(rename_all = "snake_case")]
 pub enum PostProcessUnavailableReason {
@@ -953,6 +1101,58 @@ pub struct AppSettings {
     /// stays the compact pill exactly as before.
     #[serde(default = "default_live_transcription_window_enabled")]
     pub live_transcription_window_enabled: bool,
+    /// Local model on this machine, or a hosted transcription API. Defaults to
+    /// `Local`, so an existing install is untouched until the user opts in.
+    #[serde(default)]
+    pub stt_engine_mode: SttEngineMode,
+    /// Configurable cloud transcription endpoints. Seeded and repaired on load.
+    #[serde(default = "default_cloud_stt_providers")]
+    pub cloud_stt_providers: Vec<CloudSttProvider>,
+    /// Which entry of `cloud_stt_providers` is active.
+    #[serde(default = "default_cloud_stt_provider_id")]
+    pub cloud_stt_provider_id: String,
+    /// Per-provider model id. Keyed by provider id so switching providers
+    /// doesn't wipe the model chosen for the other one — the same reason
+    /// `assistant_tts_models` exists.
+    #[serde(default)]
+    pub cloud_stt_models: HashMap<String, String>,
+    /// Per-provider base-URL override, for the providers that allow editing it.
+    #[serde(default)]
+    pub cloud_stt_base_urls: HashMap<String, String>,
+    /// Per-provider API keys. Held in the OS keychain (see
+    /// [`crate::secret_store`]) and hydrated on load, exactly like the
+    /// post-processing and TTS keys.
+    #[serde(default)]
+    pub cloud_stt_api_keys: SecretMap,
+    /// Use the provider's realtime WebSocket when it has one, so text appears
+    /// while the user is still talking instead of after a round-trip on stop.
+    /// On by default: it is both faster to first word and the reason to pay for
+    /// a realtime model, and it degrades to a single batch request on any
+    /// failure rather than losing the recording.
+    #[serde(default = "default_true")]
+    pub cloud_stt_streaming: bool,
+    /// Forward the user's custom words as provider-native biasing hints.
+    #[serde(default = "default_true")]
+    pub cloud_stt_send_custom_words: bool,
+    /// Remove filler words ("um", "uh", false starts, repeats).
+    ///
+    /// **One switch, one outcome.** This asks the provider to strip them where
+    /// the provider supports it (ElevenLabs `no_verbatim`, Deepgram
+    /// `filler_words=false`) *and* gates the app's own filler filter, which used
+    /// to run unconditionally — so turning this off previously still deleted the
+    /// user's "um"s and the setting appeared to do nothing. Off means verbatim.
+    ///
+    /// Off by default: a cloud user asking for a frontier ASR model is usually
+    /// after an accurate record of what they said, and the optional cleanup pass
+    /// already removes fillers far more intelligently when they want that.
+    ///
+    /// Only applies on the cloud path. The local engines have always filtered
+    /// unconditionally and still do.
+    #[serde(default)]
+    pub cloud_stt_no_verbatim: bool,
+    /// Ceiling on a single batch transcription request.
+    #[serde(default = "default_cloud_stt_timeout_secs")]
+    pub cloud_stt_timeout_secs: u64,
     #[serde(default)]
     pub selected_microphone: Option<String>,
     #[serde(default)]
@@ -1646,6 +1846,296 @@ fn default_post_process_api_keys() -> SecretMap {
         map.insert(provider.id, String::new());
     }
     SecretMap(map)
+}
+
+/// Provider id of the cloud transcription service selected by default.
+pub const CLOUD_STT_ELEVENLABS: &str = "elevenlabs";
+
+pub fn default_cloud_stt_provider_id() -> String {
+    CLOUD_STT_ELEVENLABS.to_string()
+}
+
+fn default_cloud_stt_timeout_secs() -> u64 {
+    60
+}
+
+/// The cloud transcription services shipped with the app.
+///
+/// ElevenLabs is first because it is the only one here with both a
+/// state-of-the-art batch model and a realtime WebSocket that this app actually
+/// drives (Scribe v2 / Scribe v2 Realtime). Groq is second because it is the
+/// cheap fast option for the same Whisper weights the local path runs. Deepgram
+/// earns its own protocol variant for the same reason as ElevenLabs: real
+/// streaming. The custom entry is what makes the list open-ended — any
+/// OpenAI-compatible transcription server (a self-hosted `faster-whisper`,
+/// Azure OpenAI, a gateway) is reachable by editing the base URL instead of
+/// waiting for a new app release.
+pub fn default_cloud_stt_providers() -> Vec<CloudSttProvider> {
+    vec![
+        CloudSttProvider {
+            id: CLOUD_STT_ELEVENLABS.to_string(),
+            label: "ElevenLabs Scribe".to_string(),
+            base_url: "https://api.elevenlabs.io".to_string(),
+            allow_base_url_edit: false,
+            kind: CloudSttKind::ElevenLabs,
+            default_model: "scribe_v2".to_string(),
+            models: vec![
+                "scribe_v2".to_string(),
+                "scribe_v2_realtime".to_string(),
+                "scribe_v1".to_string(),
+            ],
+            models_endpoint: None,
+            honors_keyterms: true,
+            supports_streaming: true,
+            api_key_url: "https://elevenlabs.io/app/settings/api-keys".to_string(),
+        },
+        CloudSttProvider {
+            id: "groq".to_string(),
+            label: "Groq".to_string(),
+            base_url: "https://api.groq.com/openai/v1".to_string(),
+            allow_base_url_edit: false,
+            kind: CloudSttKind::OpenAiCompatible,
+            default_model: "whisper-large-v3-turbo".to_string(),
+            models: vec![
+                "whisper-large-v3-turbo".to_string(),
+                "whisper-large-v3".to_string(),
+            ],
+            models_endpoint: Some("/models".to_string()),
+            honors_keyterms: true,
+            supports_streaming: false,
+            api_key_url: "https://console.groq.com/keys".to_string(),
+        },
+        CloudSttProvider {
+            id: "openai".to_string(),
+            label: "OpenAI".to_string(),
+            base_url: "https://api.openai.com/v1".to_string(),
+            allow_base_url_edit: false,
+            kind: CloudSttKind::OpenAiCompatible,
+            default_model: "gpt-4o-transcribe".to_string(),
+            models: vec![
+                "gpt-4o-transcribe".to_string(),
+                "gpt-4o-mini-transcribe".to_string(),
+                "whisper-1".to_string(),
+            ],
+            models_endpoint: Some("/models".to_string()),
+            honors_keyterms: true,
+            supports_streaming: false,
+            api_key_url: "https://platform.openai.com/api-keys".to_string(),
+        },
+        // OpenRouter fronts several transcription vendors behind one key. It
+        // accepts the OpenAI multipart shape, so it needs no protocol of its own
+        // — only namespaced `vendor/model` slugs, its own model-discovery query,
+        // and the knowledge that it drops `prompt`.
+        CloudSttProvider {
+            id: "openrouter".to_string(),
+            label: "OpenRouter".to_string(),
+            base_url: "https://openrouter.ai/api/v1".to_string(),
+            allow_base_url_edit: false,
+            kind: CloudSttKind::OpenAiCompatible,
+            default_model: "openai/whisper-large-v3".to_string(),
+            // A curated subset of what the scoped listing returns, verified
+            // against the live endpoint. "Load models" fetches the full set.
+            // Whisper is the default because it is duration-priced and served by
+            // several vendors, so OpenRouter load-balances it.
+            models: vec![
+                "openai/whisper-large-v3".to_string(),
+                "openai/whisper-large-v3-turbo".to_string(),
+                "openai/gpt-4o-transcribe".to_string(),
+                "openai/gpt-4o-mini-transcribe".to_string(),
+                "microsoft/mai-transcribe-2".to_string(),
+                "deepgram/nova-3".to_string(),
+                "google/chirp-3".to_string(),
+                "mistralai/voxtral-mini-transcribe".to_string(),
+            ],
+            models_endpoint: Some("/models?output_modalities=transcription".to_string()),
+            // Documented as "accepted but ignored" on the multipart route.
+            honors_keyterms: false,
+            supports_streaming: false,
+            api_key_url: "https://openrouter.ai/settings/keys".to_string(),
+        },
+        CloudSttProvider {
+            id: "deepgram".to_string(),
+            label: "Deepgram".to_string(),
+            base_url: "https://api.deepgram.com".to_string(),
+            allow_base_url_edit: false,
+            kind: CloudSttKind::Deepgram,
+            default_model: "nova-3".to_string(),
+            models: vec![
+                "nova-3".to_string(),
+                "nova-2".to_string(),
+                "nova-3-general".to_string(),
+            ],
+            models_endpoint: None,
+            honors_keyterms: true,
+            supports_streaming: true,
+            api_key_url: "https://console.deepgram.com/".to_string(),
+        },
+        CloudSttProvider {
+            id: "mistral".to_string(),
+            label: "Mistral (Voxtral)".to_string(),
+            base_url: "https://api.mistral.ai/v1".to_string(),
+            allow_base_url_edit: false,
+            kind: CloudSttKind::OpenAiCompatible,
+            default_model: "voxtral-mini-latest".to_string(),
+            models: vec![
+                "voxtral-mini-latest".to_string(),
+                "voxtral-small-latest".to_string(),
+            ],
+            models_endpoint: Some("/models".to_string()),
+            honors_keyterms: true,
+            supports_streaming: false,
+            api_key_url: "https://console.mistral.ai/api-keys".to_string(),
+        },
+        // Custom always comes last, mirroring the post-processing provider list.
+        CloudSttProvider {
+            id: "custom".to_string(),
+            label: "Custom".to_string(),
+            base_url: "http://localhost:8000/v1".to_string(),
+            allow_base_url_edit: true,
+            kind: CloudSttKind::OpenAiCompatible,
+            default_model: "whisper-1".to_string(),
+            models: Vec::new(),
+            models_endpoint: Some("/models".to_string()),
+            honors_keyterms: true,
+            supports_streaming: false,
+            api_key_url: String::new(),
+        },
+    ]
+}
+
+fn default_cloud_stt_api_keys() -> SecretMap {
+    let mut map = HashMap::new();
+    for provider in default_cloud_stt_providers() {
+        map.insert(provider.id, String::new());
+    }
+    SecretMap(map)
+}
+
+fn default_cloud_stt_models() -> HashMap<String, String> {
+    default_cloud_stt_providers()
+        .into_iter()
+        .map(|p| (p.id, p.default_model))
+        .collect()
+}
+
+/// Add providers introduced by a newer build, and backfill the per-provider key
+/// and model slots, without disturbing anything the user has already set.
+///
+/// The label/URL/kind fields are refreshed from the shipped registry so a fixed
+/// endpoint or a renamed default model reaches existing installs — except for a
+/// base URL the user is allowed to edit, which is theirs to keep.
+pub(crate) fn ensure_cloud_stt_defaults(settings: &mut AppSettings) -> bool {
+    let mut changed = false;
+    for provider in default_cloud_stt_providers() {
+        match settings
+            .cloud_stt_providers
+            .iter_mut()
+            .find(|p| p.id == provider.id)
+        {
+            Some(existing) => {
+                let keep_base_url = existing.allow_base_url_edit;
+                let refreshed = CloudSttProvider {
+                    base_url: if keep_base_url {
+                        existing.base_url.clone()
+                    } else {
+                        provider.base_url.clone()
+                    },
+                    ..provider.clone()
+                };
+                if *existing != refreshed {
+                    *existing = refreshed;
+                    changed = true;
+                }
+            }
+            None => {
+                settings.cloud_stt_providers.push(provider.clone());
+                changed = true;
+            }
+        }
+
+        if !settings.cloud_stt_api_keys.contains_key(&provider.id) {
+            settings
+                .cloud_stt_api_keys
+                .insert(provider.id.clone(), String::new());
+            changed = true;
+        }
+
+        match settings.cloud_stt_models.get_mut(&provider.id) {
+            Some(existing) if existing.trim().is_empty() => {
+                *existing = provider.default_model.clone();
+                changed = true;
+            }
+            Some(_) => {}
+            None => {
+                settings
+                    .cloud_stt_models
+                    .insert(provider.id.clone(), provider.default_model.clone());
+                changed = true;
+            }
+        }
+    }
+
+    // A provider id from a future build (or a hand-edited store) must not leave
+    // the app pointing at nothing.
+    if !settings
+        .cloud_stt_providers
+        .iter()
+        .any(|p| p.id == settings.cloud_stt_provider_id)
+    {
+        settings.cloud_stt_provider_id = default_cloud_stt_provider_id();
+        changed = true;
+    }
+
+    // Reorder to match the shipped registry. Without this a provider added in a
+    // later version is simply appended, so an upgraded install shows it *after*
+    // "Custom" while a fresh install shows it before — the same list in two
+    // different orders depending on when the user installed. Anything not in the
+    // registry (a hand-added entry) keeps its relative position at the end.
+    {
+        let order: Vec<String> = default_cloud_stt_providers()
+            .into_iter()
+            .map(|p| p.id)
+            .collect();
+        let rank = |id: &str| {
+            order
+                .iter()
+                .position(|known| known == id)
+                .unwrap_or(usize::MAX)
+        };
+        if !settings
+            .cloud_stt_providers
+            .windows(2)
+            .all(|pair| rank(&pair[0].id) <= rank(&pair[1].id))
+        {
+            settings
+                .cloud_stt_providers
+                .sort_by_key(|provider| rank(&provider.id));
+            changed = true;
+        }
+    }
+
+    if settings.cloud_stt_timeout_secs == 0 {
+        settings.cloud_stt_timeout_secs = default_cloud_stt_timeout_secs();
+        changed = true;
+    }
+
+    changed
+}
+
+impl PartialEq for CloudSttProvider {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+            && self.label == other.label
+            && self.base_url == other.base_url
+            && self.allow_base_url_edit == other.allow_base_url_edit
+            && self.kind == other.kind
+            && self.default_model == other.default_model
+            && self.models == other.models
+            && self.models_endpoint == other.models_endpoint
+            && self.honors_keyterms == other.honors_keyterms
+            && self.supports_streaming == other.supports_streaming
+            && self.api_key_url == other.api_key_url
+    }
 }
 
 fn default_model_for_provider(provider_id: &str) -> String {
@@ -2612,6 +3102,16 @@ pub fn get_default_settings() -> AppSettings {
         always_on_microphone: false,
         live_transcription_enabled: false,
         live_transcription_window_enabled: false,
+        stt_engine_mode: SttEngineMode::default(),
+        cloud_stt_providers: default_cloud_stt_providers(),
+        cloud_stt_provider_id: default_cloud_stt_provider_id(),
+        cloud_stt_models: default_cloud_stt_models(),
+        cloud_stt_base_urls: HashMap::new(),
+        cloud_stt_api_keys: default_cloud_stt_api_keys(),
+        cloud_stt_streaming: true,
+        cloud_stt_send_custom_words: true,
+        cloud_stt_no_verbatim: false,
+        cloud_stt_timeout_secs: default_cloud_stt_timeout_secs(),
         selected_microphone: None,
         clamshell_microphone: None,
         selected_output_device: None,
@@ -3117,6 +3617,19 @@ fn persist_hydrated_secrets(settings: &mut AppSettings) {
             }
         }
     }
+    let provider_ids: Vec<String> = settings.cloud_stt_api_keys.keys().cloned().collect();
+    for id in provider_ids {
+        let value = settings
+            .cloud_stt_api_keys
+            .get(&id)
+            .cloned()
+            .unwrap_or_default();
+        if crate::secret_store::sync(&crate::secret_store::account_cloud_stt(&id), &value) {
+            if let Some(slot) = settings.cloud_stt_api_keys.get_mut(&id) {
+                slot.clear();
+            }
+        }
+    }
     // Per-engine assistant TTS keys → keychain, blanked on disk on success.
     // First make sure the active engine's slot mirrors the flat key so a direct
     // flat-field write can't be lost when we blank the flat copy below.
@@ -3187,6 +3700,22 @@ fn migrate_plaintext_secrets(settings: &mut AppSettings) -> bool {
             && crate::secret_store::set(&crate::secret_store::account_web_search(&id), &value)
         {
             if let Some(slot) = settings.web_search_api_keys.get_mut(&id) {
+                slot.clear();
+            }
+            changed = true;
+        }
+    }
+    let provider_ids: Vec<String> = settings.cloud_stt_api_keys.keys().cloned().collect();
+    for id in provider_ids {
+        let value = settings
+            .cloud_stt_api_keys
+            .get(&id)
+            .cloned()
+            .unwrap_or_default();
+        if !value.is_empty()
+            && crate::secret_store::set(&crate::secret_store::account_cloud_stt(&id), &value)
+        {
+            if let Some(slot) = settings.cloud_stt_api_keys.get_mut(&id) {
                 slot.clear();
             }
             changed = true;
@@ -3289,6 +3818,13 @@ fn hydrate_secrets(settings: &mut AppSettings) {
     for (provider_id, value) in settings.web_search_api_keys.iter_mut() {
         if let Some(secret) =
             crate::secret_store::get(&crate::secret_store::account_web_search(provider_id))
+        {
+            *value = secret;
+        }
+    }
+    for (provider_id, value) in settings.cloud_stt_api_keys.iter_mut() {
+        if let Some(secret) =
+            crate::secret_store::get(&crate::secret_store::account_cloud_stt(provider_id))
         {
             *value = secret;
         }
@@ -3479,7 +4015,10 @@ pub fn load_or_create_app_settings(app: &AppHandle) -> AppSettings {
         default_settings
     };
 
-    if ensure_post_process_defaults(&mut settings) | ensure_assistant_defaults(&mut settings) {
+    if ensure_post_process_defaults(&mut settings)
+        | ensure_assistant_defaults(&mut settings)
+        | ensure_cloud_stt_defaults(&mut settings)
+    {
         store.set("settings", serde_json::to_value(&settings).unwrap());
     }
 
@@ -3565,7 +4104,10 @@ pub fn get_settings(app: &AppHandle) -> AppSettings {
         (get_default_settings(), true)
     };
 
-    if ensure_post_process_defaults(&mut settings) | ensure_assistant_defaults(&mut settings) {
+    if ensure_post_process_defaults(&mut settings)
+        | ensure_assistant_defaults(&mut settings)
+        | ensure_cloud_stt_defaults(&mut settings)
+    {
         updated = true;
     }
     if updated {

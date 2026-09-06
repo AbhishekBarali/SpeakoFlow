@@ -53,6 +53,26 @@ pub fn handle_shortcut_event(
     // shortcut uses the default mode (push-to-talk hold by default); tapping the
     // lock key on top converts a hold to hands-free mid-recording.
     if is_transcribe_binding(base_id) {
+        // A live voice conversation already owns the microphone, and the
+        // assistant shortcut's whole job — open the assistant and record a turn
+        // — is what the conversation is doing continuously. Pressing it used to
+        // hang up the call and start a one-shot recording instead, so a stray
+        // press of the shortcut that opened the conversation destroyed it. Now
+        // it just brings the conversation's own window back to the front.
+        //
+        // Dictation still ends the conversation: it needs the same microphone,
+        // and it types into another app rather than talking back.
+        if crate::voice_conversation::is_active(app) {
+            if crate::assistant::is_assistant_binding(base_id) {
+                if is_pressed {
+                    crate::assistant::show_assistant_panel(app);
+                }
+                return;
+            }
+            if is_pressed {
+                crate::voice_conversation::end(app);
+            }
+        }
         if let Some(coordinator) = app.try_state::<TranscriptionCoordinator>() {
             // Every recording shortcut — dictation, dictation + post-processing,
             // and the assistant — follows the single Push-to-talk setting:
@@ -80,6 +100,9 @@ pub fn handle_shortcut_event(
     // an answer, OR while Flow is starting/generating, so Esc can stop every
     // long-running voice operation after recording ends. Only on key-press.
     if base_id == "cancel" {
+        if is_pressed {
+            crate::voice_conversation::end(app);
+        }
         let audio_manager = app.state::<Arc<AudioRecordingManager>>();
         let assistant_busy = app
             .try_state::<crate::assistant::AssistantConversation>()

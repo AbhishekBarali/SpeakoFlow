@@ -67,11 +67,23 @@ rubato = "0.16.2"
 hound = "3.5.1"
 log = "0.4.25"
 env_filter = "0.1.0"
-tokio = { version = "1.43.0", features = ["sync", "macros", "time"] }
+tokio = { version = "1.43.0", features = [
+  "sync",
+  "macros",
+  "time",
+  "rt",
+  "net",
+  "io-util",
+] }
 vad-rs = { git = "https://github.com/cjpais/vad-rs", default-features = false }
 enigo = "0.6.1"
 rodio = { git = "https://github.com/cjpais/rodio.git" }
-reqwest = { version = "0.12", features = ["json", "stream"] }
+reqwest = { version = "0.12", features = ["json", "stream", "multipart"] }
+# WebSocket client for realtime cloud speech-to-text (ElevenLabs Scribe v2
+# Realtime, Deepgram streaming). `native-tls` deliberately reuses the TLS stack
+# reqwest's default-tls already pulls in, so this adds a protocol client and not
+# a second TLS implementation. Pinned exactly (pre-1.0, breaking minor bumps).
+tokio-tungstenite = { version = "=0.30.0", features = ["native-tls"] }
 futures-util = "0.3"
 rustfft = "6.4.0"
 strsim = "0.11.0"

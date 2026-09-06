@@ -48,6 +48,9 @@ const LIVE_WIDTH: f64 = 560.0;
 const LIVE_HEIGHT: f64 = 188.0;
 
 fn collapsed_size(app: &AppHandle) -> (f64, f64) {
+    if crate::voice_conversation::is_active(app) {
+        return (PILL_WIDTH, PILL_HEIGHT);
+    }
     match get_settings(app).assistant_overlay_style {
         OverlayStyle::Live => (LIVE_WIDTH, LIVE_HEIGHT),
         _ => (PILL_WIDTH, PILL_HEIGHT),
@@ -112,6 +115,243 @@ fn expanded_size(app: &AppHandle) -> (f64, f64) {
     };
     // Always keep the panel within the current monitor so it fits any screen.
     clamp_to_monitor(app, base_w, base_h)
+}
+
+/// Voice conversation is a different shape of window from the chat panel: an
+/// orb, a status line and a call bar, centred, with no message list. It wants
+/// height more than width, and the chat presets are too small for the view's
+/// own container queries — the reply caption only appears past 440x600, which
+/// is why the default chat size (390x500) showed a voice session with no text
+/// at all. Sharing one size also meant a resize made for voice was written
+/// back over the chat panel's remembered size, so leaving a conversation left
+/// the chat wherever the orb view had been dragged.
+///
+/// So voice gets its own lane: its own base sizes, and its own session memory
+/// of a manual resize (below). Switching modes moves between the two lanes
+/// instead of overwriting either.
+fn conversation_preset_size(size: &str) -> (f64, f64) {
+    match size {
+        "mini" => (360.0, 480.0),
+        "compact" => (400.0, 540.0),
+        "large" => (520.0, 700.0),
+        _ => (450.0, 620.0),
+    }
+}
+
+/// How much bigger the transcript-reading form is than the orb view. One
+/// factor keeps both forms proportional to whichever base the size preset
+/// picked, rather than a second table of magic numbers, and makes the zoom
+/// control exactly reversible: expand multiplies, restore divides.
+const CONVERSATION_EXPAND_FACTOR: f64 = 1.3;
+
+/// Floor for a manual drag-resize during a conversation. The panel's own floor
+/// is the pill (240x44), which for the voice view means the user can drag the
+/// window down to a strip with no reachable Mute or End button. This is the
+/// smallest size at which the orb, the status line and the call bar all still
+/// fit (see the `max-height: 440px` band in `ConversationView.css`).
+const CONVERSATION_MIN_WIDTH: f64 = 300.0;
+const CONVERSATION_MIN_HEIGHT: f64 = 340.0;
+
+/// Session memory of a manual resize made during a conversation, always stored
+/// as the ORB-view base even when the resize happened in the larger transcript
+/// form. Kept apart from `EXPANDED_W`/`EXPANDED_H` so neither mode can silently
+/// rewrite the other's size.
+static CONVERSATION_W: AtomicU32 = AtomicU32::new(0);
+static CONVERSATION_H: AtomicU32 = AtomicU32::new(0);
+
+/// Whether the conversation window is in the larger transcript-reading form.
+/// Reset when a conversation ends, so the next one opens on the orb view.
+static CONVERSATION_EXPANDED: AtomicBool = AtomicBool::new(false);
+
+fn conversation_size(app: &AppHandle) -> (f64, f64) {
+    let w = CONVERSATION_W.load(Ordering::SeqCst);
+    let h = CONVERSATION_H.load(Ordering::SeqCst);
+    let (mut base_w, mut base_h) = if w == 0 || h == 0 {
+        conversation_preset_size(&get_settings(app).assistant_panel_size)
+    } else {
+        (w as f64, h as f64)
+    };
+    if CONVERSATION_EXPANDED.load(Ordering::SeqCst) {
+        base_w *= CONVERSATION_EXPAND_FACTOR;
+        base_h *= CONVERSATION_EXPAND_FACTOR;
+    }
+    clamp_to_monitor(app, base_w, base_h)
+}
+
+/// Which of the two size lanes a remembered resize belongs to.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum SizeLane {
+    /// The text chat panel.
+    Panel,
+    /// The voice conversation view.
+    Conversation,
+}
+
+fn current_size_lane(app: &AppHandle) -> SizeLane {
+    if crate::voice_conversation::is_active(app) {
+        SizeLane::Conversation
+    } else {
+        SizeLane::Panel
+    }
+}
+
+/// File the window's current size into one lane, so a manual drag-resize
+/// survives collapsing to the pill and switching between chat and voice.
+/// Degenerate (pill-sized) values are ignored, so a stray double-collapse can
+/// never shrink a remembered size.
+fn remember_size_in_lane(app: &AppHandle, lane: SizeLane) {
+    if PILL_MODE.load(Ordering::SeqCst) {
+        return;
+    }
+    let Some(window) = app.get_webview_window(PANEL_LABEL) else {
+        return;
+    };
+    let scale = window
+        .current_monitor()
+        .ok()
+        .flatten()
+        .map(|m| m.scale_factor())
+        .unwrap_or(1.0);
+    let Ok(size) = window.inner_size() else {
+        return;
+    };
+    let w = size.width as f64 / scale;
+    let h = size.height as f64 / scale;
+    if w <= PILL_WIDTH || h <= PILL_HEIGHT {
+        return;
+    }
+    match lane {
+        SizeLane::Panel => {
+            EXPANDED_W.store(w.round() as u32, Ordering::SeqCst);
+            EXPANDED_H.store(h.round() as u32, Ordering::SeqCst);
+        }
+        SizeLane::Conversation => {
+            // The stored value is the orb-view base; undo the growth factor so
+            // a resize made while reading the transcript doesn't compound.
+            let divisor = if CONVERSATION_EXPANDED.load(Ordering::SeqCst) {
+                CONVERSATION_EXPAND_FACTOR
+            } else {
+                1.0
+            };
+            CONVERSATION_W.store((w / divisor).round() as u32, Ordering::SeqCst);
+            CONVERSATION_H.store((h / divisor).round() as u32, Ordering::SeqCst);
+        }
+    }
+}
+
+/// The resize floor for one form of the window. Split out of
+/// [`apply_panel_min_size`] so the invariants that matter — a live call keeps
+/// its controls reachable, and collapsing to the pill is never refused — are
+/// testable without a window.
+fn panel_min_size(collapsed: bool, conversation: bool) -> (f64, f64) {
+    if !collapsed && conversation {
+        (CONVERSATION_MIN_WIDTH, CONVERSATION_MIN_HEIGHT)
+    } else {
+        (PILL_WIDTH, PILL_HEIGHT)
+    }
+}
+
+/// Re-apply the resize floor for the form the window is about to take. It has
+/// to move with the form: the pill is 240x44, so a conversation-sized floor
+/// left in place would refuse the collapse outright.
+fn apply_panel_min_size(app: &AppHandle, window: &tauri::WebviewWindow, collapsed: bool) {
+    let (w, h) = panel_min_size(collapsed, crate::voice_conversation::is_active(app));
+    let _ = window.set_min_size(Some(tauri::LogicalSize::new(w, h)));
+}
+
+/// Nudge the panel back inside its monitor after a resize — growing can push it
+/// past the right or bottom edge.
+fn keep_panel_on_monitor(window: &tauri::WebviewWindow, w: f64, h: f64) {
+    if let (Ok(pos), Ok(Some(monitor))) = (window.outer_position(), window.current_monitor()) {
+        let scale = monitor.scale_factor();
+        let mx = monitor.position().x as f64 / scale;
+        let my = monitor.position().y as f64 / scale;
+        let mw = monitor.size().width as f64 / scale;
+        let mh = monitor.size().height as f64 / scale;
+        let x = (pos.x as f64 / scale).clamp(mx + 8.0, (mx + mw - w - 8.0).max(mx + 8.0));
+        let y = (pos.y as f64 / scale).clamp(my + 8.0, (my + mh - h - 8.0).max(my + 8.0));
+        let _ = window.set_position(tauri::LogicalPosition::new(x, y));
+    }
+}
+
+/// Resize the window to whatever the current form (pill / chat panel / voice
+/// conversation) asks for. Main thread only: it touches the WebView window.
+fn apply_panel_form_size(app: &AppHandle) {
+    let Some(window) = app.get_webview_window(PANEL_LABEL) else {
+        return;
+    };
+    let collapsed = PILL_MODE.load(Ordering::SeqCst);
+    let (w, h) = if collapsed {
+        collapsed_size(app)
+    } else if crate::voice_conversation::is_active(app) {
+        conversation_size(app)
+    } else {
+        expanded_size(app)
+    };
+    apply_panel_min_size(app, &window, collapsed);
+    let _ = window.set_size(tauri::LogicalSize::new(w, h));
+    keep_panel_on_monitor(&window, w, h);
+    save_position(app);
+}
+
+/// A voice conversation is starting: park the chat panel's current size in its
+/// own lane, then move the window to the conversation lane's size. Safe on any
+/// thread — `assistant_conversation_start` is an async command, not the event
+/// loop.
+pub fn enter_conversation_size(app: &AppHandle) {
+    let app_main = app.clone();
+    if let Err(e) = app.run_on_main_thread(move || {
+        remember_size_in_lane(&app_main, SizeLane::Panel);
+        CONVERSATION_EXPANDED.store(false, Ordering::SeqCst);
+        apply_panel_form_size(&app_main);
+    }) {
+        error!("Could not queue conversation panel sizing: {}", e);
+    }
+}
+
+/// A voice conversation ended: park its size in the voice lane, drop the
+/// transcript form, and put the window back into the chat panel's lane. Called
+/// after the session ticket is cleared, so the lane lookups below already
+/// resolve to the chat panel.
+pub fn leave_conversation_size(app: &AppHandle) {
+    let app_main = app.clone();
+    if let Err(e) = app.run_on_main_thread(move || {
+        remember_size_in_lane(&app_main, SizeLane::Conversation);
+        CONVERSATION_EXPANDED.store(false, Ordering::SeqCst);
+        if PILL_MODE.load(Ordering::SeqCst) {
+            // The collapsed form changes shape too: the conversation pill gives
+            // way to whichever overlay style the user picked, and Live is a
+            // different size again.
+            set_panel_collapsed(&app_main, true);
+        } else {
+            apply_panel_form_size(&app_main);
+        }
+    }) {
+        error!("Could not queue conversation panel restore: {}", e);
+    }
+}
+
+/// Switch the conversation window between the orb view and the larger
+/// transcript-reading form. One flag drives both the window size and what the
+/// view renders, which is what makes the control a toggle in both directions
+/// instead of a one-way "grow".
+pub fn set_conversation_expanded(app: &AppHandle, expanded: bool) {
+    if !crate::voice_conversation::is_active(app) {
+        return;
+    }
+    let app_main = app.clone();
+    if let Err(e) = app.run_on_main_thread(move || {
+        if CONVERSATION_EXPANDED.load(Ordering::SeqCst) == expanded {
+            return;
+        }
+        // Capture a manual resize before the factor is applied or undone, so
+        // the two forms stay each other's exact inverse.
+        remember_size_in_lane(&app_main, SizeLane::Conversation);
+        CONVERSATION_EXPANDED.store(expanded, Ordering::SeqCst);
+        apply_panel_form_size(&app_main);
+    }) {
+        error!("Could not queue conversation resize: {}", e);
+    }
 }
 
 /// Whether the panel is currently collapsed to the pill. Starts collapsed so
@@ -1312,6 +1552,8 @@ fn build_assistant_panel(app: &AppHandle) {
     // and no-gesture autoplay for spoken replies. Must match every other
     // window's args (see WEBVIEW2_BROWSER_ARGS). Windows/WebView2 only.
     .additional_browser_args(crate::WEBVIEW2_BROWSER_ARGS)
+    // macOS otherwise suspends hidden webviews, including an active voice call.
+    .background_throttling(tauri::utils::config::BackgroundThrottlingPolicy::Disabled)
     .title("Assistant")
     .inner_size(init_w, init_h)
     .min_inner_size(PILL_WIDTH, PILL_HEIGHT)
@@ -1344,11 +1586,11 @@ fn build_assistant_panel(app: &AppHandle) {
                 match event {
                     tauri::WindowEvent::Moved(_) => save_position(&app_handle),
                     tauri::WindowEvent::CloseRequested { api, .. } => {
-                        // Treat a window-manager close request like dismissing
-                        // the HUD: keep the reusable webview alive and cancel
-                        // any active turn or speech before hiding it.
+                        // Dismiss the surface without hanging up a voice call.
                         api.prevent_close();
-                        crate::utils::cancel_current_operation(&app_handle);
+                        if !crate::voice_conversation::is_active(&app_handle) {
+                            crate::utils::cancel_current_operation(&app_handle);
+                        }
                         hide_assistant_panel(&app_handle);
                     }
                     _ => {}
@@ -1505,7 +1747,10 @@ pub fn hide_assistant_panel(app: &AppHandle) {
     // there's genuinely new content since the last pass, so opening/closing the
     // panel repeatedly never spends a wasted model call.
     let settings = crate::settings::get_settings(app);
-    if settings.assistant_memory_enabled && !settings.assistant_memory_incognito {
+    if !crate::voice_conversation::is_active(app)
+        && settings.assistant_memory_enabled
+        && !settings.assistant_memory_incognito
+    {
         if let Some(conversation) = app.try_state::<AssistantConversation>() {
             if let Some(messages) = conversation.take_distillable() {
                 let app_for_memory = app.clone();
@@ -1548,6 +1793,7 @@ pub fn toggle_assistant_panel(app: &AppHandle) {
 /// event loop's job, and doing it in order with a later re-create is what stops
 /// a rapid off/on from leaving the app believing in a window that is gone.
 pub fn destroy_assistant_panel(app: &AppHandle) {
+    crate::voice_conversation::end(app);
     let app_main = app.clone();
     if let Err(e) = app.run_on_main_thread(move || {
         if let Some(window) = app_main.get_webview_window(PANEL_LABEL) {
@@ -1577,28 +1823,23 @@ pub fn set_panel_collapsed(app: &AppHandle, collapsed: bool) {
         let old_pos = window.outer_position().ok();
         let old_size = window.inner_size().ok();
 
-        // Remember the current form's position + (for the panel) its size.
+        // Remember the current form's position + (for the panel) its size, in
+        // whichever lane it belongs to — chat panel or voice conversation.
         save_position(app);
-        if collapsed && !PILL_MODE.load(Ordering::SeqCst) {
-            if let Some(size) = old_size {
-                let w = (size.width as f64 / scale).round() as u32;
-                let h = (size.height as f64 / scale).round() as u32;
-                // Ignore degenerate sizes (e.g. already pill-sized) so a stray
-                // double-collapse can't shrink the remembered panel.
-                if w > PILL_WIDTH as u32 && h > PILL_HEIGHT as u32 {
-                    EXPANDED_W.store(w, Ordering::SeqCst);
-                    EXPANDED_H.store(h, Ordering::SeqCst);
-                }
-            }
+        if collapsed {
+            remember_size_in_lane(app, current_size_lane(app));
         }
         PILL_MODE.store(collapsed, Ordering::SeqCst);
         let _ = window.set_focusable(!collapsed);
 
         let (new_w, new_h) = if collapsed {
             collapsed_size(app)
+        } else if crate::voice_conversation::is_active(app) {
+            conversation_size(app)
         } else {
             expanded_size(app)
         };
+        apply_panel_min_size(app, &window, collapsed);
         let _ = window.set_size(tauri::LogicalSize::new(new_w, new_h));
 
         // Restore the target form's own remembered position; fall back to a
@@ -1646,15 +1887,18 @@ pub fn set_panel_collapsed(app: &AppHandle, collapsed: bool) {
     }
 }
 
-/// Apply a panel-size preset chosen in Panel Appearance settings. Remembers it
-/// as the session size (overriding an earlier manual drag-resize so the choice
-/// takes effect immediately and sticks across collapse/expand), and resizes the
-/// live window when the panel is currently expanded and on screen. The pill is
-/// unaffected.
-pub fn apply_panel_size(app: &AppHandle, size: &str) {
-    let (w, h) = panel_preset_size(size);
-    EXPANDED_W.store(w as u32, Ordering::SeqCst);
-    EXPANDED_H.store(h as u32, Ordering::SeqCst);
+/// Apply a panel-size preset chosen in Panel Appearance settings. Clears the
+/// session's manual drag-resize in BOTH size lanes — chat panel and voice
+/// conversation — so the new choice takes effect immediately in whichever form
+/// is on screen, and resizes the live window when it is currently expanded and
+/// visible. The pill is unaffected.
+pub fn apply_panel_size(app: &AppHandle) {
+    // 0 means "no manual resize this session", which sends each lane back to
+    // its own preset — read from the setting that was just written.
+    EXPANDED_W.store(0, Ordering::SeqCst);
+    EXPANDED_H.store(0, Ordering::SeqCst);
+    CONVERSATION_W.store(0, Ordering::SeqCst);
+    CONVERSATION_H.store(0, Ordering::SeqCst);
 
     // Only touch the window if the expanded panel is actually visible.
     if PILL_MODE.load(Ordering::SeqCst) {
@@ -1667,26 +1911,10 @@ pub fn apply_panel_size(app: &AppHandle, size: &str) {
         return;
     }
 
-    // Clamp the preset to the current monitor so a large size never overflows a
-    // small screen. The raw preset is remembered above (EXPANDED_W/H), so moving
-    // to a bigger display re-expands to the full chosen size.
-    let (cw, ch) = clamp_to_monitor(app, w, h);
-    let _ = window.set_size(tauri::LogicalSize::new(cw, ch));
-
-    // Keep the newly sized panel fully on its monitor (growing can push it past
-    // the right/bottom edge).
-    if let (Ok(pos), Ok(Some(monitor))) = (window.outer_position(), window.current_monitor()) {
-        let scale = monitor.scale_factor();
-        let mx = monitor.position().x as f64 / scale;
-        let my = monitor.position().y as f64 / scale;
-        let mw = monitor.size().width as f64 / scale;
-        let mh = monitor.size().height as f64 / scale;
-        let x = (pos.x as f64 / scale).clamp(mx + 8.0, (mx + mw - cw - 8.0).max(mx + 8.0));
-        let y = (pos.y as f64 / scale).clamp(my + 8.0, (my + mh - ch - 8.0).max(my + 8.0));
-        let _ = window.set_position(tauri::LogicalPosition::new(x, y));
-    }
-
-    save_position(app);
+    // The preset is clamped to the current monitor so a large size never
+    // overflows a small screen; the raw preset stays in settings, so moving to
+    // a bigger display re-expands to the full chosen size.
+    apply_panel_form_size(app);
 }
 
 // ---------------------------------------------------------------------------
@@ -2063,6 +2291,17 @@ pub async fn run_voice_turn(app: AppHandle, transcription: String) {
 /// Resets the busy flag when a turn finishes, on every exit path.
 struct BusyReset(AppHandle);
 
+/// Register before checking the sticky flag. A speech interruption can land
+/// between pipeline stages, when Notify alone has no waiter to wake.
+async fn wait_for_assistant_cancel(app: &AppHandle, signal: &Notify) {
+    let notified = signal.notified();
+    tokio::pin!(notified);
+    notified.as_mut().enable();
+    if !app.state::<AssistantConversation>().is_cancelled() {
+        notified.await;
+    }
+}
+
 impl Drop for BusyReset {
     fn drop(&mut self) {
         self.0
@@ -2105,6 +2344,30 @@ fn vision_unsupported_message(provider_id: &str, model: &str) -> String {
             model
         )
     }
+}
+
+/// Instructions attached to the retry that follows a rejected image. The model
+/// is told the picture never arrived and that saying so is part of its answer.
+/// Phrased as an instruction rather than a bare fact because a small model that
+/// is merely told "there was an image" will happily invent its contents.
+const VISION_DROPPED_NOTE: &str = "[System note: an image — a capture of the user's screen, or a picture they attached — was part of this request, but the model answering it cannot read images, so the image was removed and you cannot see it. Do not guess at or describe what it showed. Open your reply by telling the user in one short sentence that the current model can't see images and that they can choose a vision-capable model in Settings → Assistant. Then answer whatever part of their message you can without the image.]";
+
+/// Rebuild a request with every image dropped: the same system prompt and
+/// history, with the final user message reduced to its text plus
+/// `VISION_DROPPED_NOTE`. Used to retry a turn that a blind model rejected.
+///
+/// Built from the pieces rather than by cloning the outgoing request so the
+/// base64 frame — which can be hundreds of KB — is never duplicated in memory.
+fn strip_visuals_for_retry(messages: &[Value], user_content: &str) -> Vec<Value> {
+    let mut retry: Vec<Value> = match messages.split_last() {
+        Some((_, head)) => head.to_vec(),
+        None => Vec::new(),
+    };
+    retry.push(json!({
+        "role": "user",
+        "content": format!("{}\n\n{}", user_content, VISION_DROPPED_NOTE),
+    }));
+    retry
 }
 
 /// The "Tools" section of the system prompt, included whenever the turn
@@ -2530,6 +2793,45 @@ pub async fn run_assistant_turn(
     files: Vec<FileAttachment>,
     manual_screen_token: Option<ManualScreenToken>,
 ) {
+    run_assistant_turn_inner(
+        app,
+        user_text,
+        screenshot,
+        images,
+        files,
+        manual_screen_token,
+        None,
+    )
+    .await;
+}
+
+pub async fn run_conversation_turn(
+    app: AppHandle,
+    text: String,
+    ticket: crate::voice_conversation::VoiceTicket,
+) {
+    run_assistant_turn_inner(app, text, None, Vec::new(), Vec::new(), None, Some(ticket)).await;
+}
+
+async fn run_assistant_turn_inner(
+    app: AppHandle,
+    user_text: String,
+    screenshot: Option<String>,
+    images: Vec<String>,
+    files: Vec<FileAttachment>,
+    manual_screen_token: Option<ManualScreenToken>,
+    voice_ticket: Option<crate::voice_conversation::VoiceTicket>,
+) {
+    if voice_ticket.is_none()
+        && app
+            .state::<crate::voice_conversation::VoiceConversation>()
+            .is_active()
+    {
+        return;
+    }
+    if voice_ticket.is_some_and(|t| !crate::voice_conversation::is_current(&app, t)) {
+        return;
+    }
     if screenshot.is_some()
         && !manual_screen_token.is_some_and(|token| manual_screen_token_is_current(&app, token))
     {
@@ -2558,7 +2860,15 @@ pub async fn run_assistant_turn(
     // Fresh turn: clear any leftover cancel signal from a previous Stop.
     app.state::<AssistantConversation>().begin_turn();
 
-    let settings = get_settings(&app);
+    // Check again AFTER begin_turn: an interruption racing acquisition must not
+    // be erased by the shared pipeline's usual cancellation reset.
+    if voice_ticket.is_some_and(|t| !crate::voice_conversation::is_current(&app, t)) {
+        return;
+    }
+    let mut settings = get_settings(&app);
+    if voice_ticket.is_some() {
+        settings.assistant_tts_enabled = true;
+    }
 
     // Build the small display thumbnails once (screen capture first, then
     // attached images), before branching. Stored on the user message so the
@@ -2743,13 +3053,23 @@ pub async fn run_assistant_turn(
         if let Some(directive) = settings.effective_response_length().directive() {
             sections.push(directive.to_string());
         }
+        if voice_ticket.is_some() {
+            sections.push(crate::voice_conversation::voice_prompt(
+                settings.effective_response_length(),
+            ));
+        }
 
         // 2b. Spoken turns: the voice can only start once the first sentence
         //     exists, so a reply that opens with one short sentence is heard
         //     sooner than the identical reply that opens with a long one. Asking
         //     for a short opener is the cheapest way to cut time-to-first-word —
         //     no extra request, no machinery, and it reads better aloud anyway.
-        if settings.assistant_tts_enabled {
+        if settings.assistant_tts_enabled && voice_ticket.is_none() {
+            if settings.effective_response_length()
+                == crate::settings::AssistantResponseLength::Default
+            {
+                sections.push("Keep spoken replies brief by default: one short paragraph. Give more detail when the user asks for it, and avoid padding simple answers.".to_string());
+            }
             sections.push(
                 "This reply will be read aloud. Open with one short sentence that stands on its own, then continue. Write in speakable prose — no markdown, no bullet lists, no headings."
                     .to_string(),
@@ -2880,6 +3200,22 @@ pub async fn run_assistant_turn(
         messages.push(json!({"role": "user", "content": parts}));
     }
 
+    // Prepared now, while the request pieces are still in scope: the same turn
+    // with every image removed. A model that can't see images fails the request
+    // outright, and because Manual screen arming is sticky and the
+    // `capture_screen` tool stays on offer, that used to repeat on every
+    // following message — the conversation was over until the user worked out
+    // which setting to change. Retrying once without the image (below) turns a
+    // dead end into a normal, spoken reply that names the problem.
+    //
+    // Only built for turns that can actually hit it: something visual is
+    // attached, or the model may fetch a frame itself mid-turn.
+    let mut vision_fallback = if has_visual || agent_screen {
+        Some(strip_visuals_for_retry(&messages, &user_content))
+    } else {
+        None
+    };
+
     emit_state(&app, "thinking");
 
     // The built-in provider is backed by the bundled llama.cpp engine. Ensure
@@ -2905,7 +3241,7 @@ pub async fn run_assistant_turn(
             tokio::pin!(ensure);
             tokio::select! {
                 res = &mut ensure => res,
-                _ = cancel.notified() => {
+                _ = wait_for_assistant_cancel(&app, &cancel) => {
                     debug!("Assistant turn cancelled during engine load");
                     emit_state(&app, "idle");
                     return;
@@ -2952,9 +3288,14 @@ pub async fn run_assistant_turn(
         crate::tts::stop_remote();
         let epoch = crate::tts::current_epoch();
         Some((
-            Arc::new(Mutex::new(crate::speech_stream::SpeechPipeline::start(
-                &app, &settings, epoch,
-            ))),
+            Arc::new(Mutex::new(
+                crate::speech_stream::SpeechPipeline::start_for_voice(
+                    &app,
+                    &settings,
+                    epoch,
+                    voice_ticket,
+                ),
+            )),
             epoch,
         ))
     } else {
@@ -2991,6 +3332,12 @@ pub async fn run_assistant_turn(
         persist_assistant_session(&app);
     }
 
+    // Whether an image actually went on the wire this turn. Starts from the
+    // attachments and is also set by the tool loop, where an agent-decided
+    // `capture_screen` puts a frame into a request that started out text-only —
+    // so a rejection from that round is recognised as a vision failure too.
+    let image_dispatched = Arc::new(AtomicBool::new(has_visual));
+
     let outcome = if let Some(tools) = tool_capabilities {
         let partial_cb = partial.clone();
         let speech_cb = speech_sink.clone();
@@ -3001,6 +3348,7 @@ pub async fn run_assistant_turn(
         let model_c = model.clone();
         let settings_c = settings.clone();
         let timer_c = timer.clone();
+        let image_dispatched_c = image_dispatched.clone();
         let loop_fut = async move {
             let timer = timer_c;
             let mut msgs = messages;
@@ -3130,6 +3478,7 @@ pub async fn run_assistant_turn(
                         match agent_capture_screen(&app_state, &provider_c).await {
                             Ok(data_url) => {
                                 screen_captured = true;
+                                image_dispatched_c.store(true, Ordering::SeqCst);
                                 msgs.push(json!({
                                     "role": "tool",
                                     "tool_call_id": tc.id,
@@ -3210,7 +3559,7 @@ pub async fn run_assistant_turn(
         tokio::pin!(loop_fut);
         tokio::select! {
             result = &mut loop_fut => Some(result),
-            _ = cancel.notified() => None,
+            _ = wait_for_assistant_cancel(&app, &cancel) => None,
         }
     } else {
         let stream_fut = llm_client::send_chat_stream(
@@ -3231,8 +3580,83 @@ pub async fn run_assistant_turn(
         // Race the stream against a Stop request. notify_waiters wakes this select.
         tokio::select! {
             result = &mut stream_fut => Some(result),
-            _ = cancel.notified() => None,
+            _ = wait_for_assistant_cancel(&app, &cancel) => None,
         }
+    };
+
+    // The model turned out to be blind. That is a request the provider refuses
+    // before generating anything, so there is no partial reply to keep and
+    // nothing on screen to disturb: ask again with the image gone and a note
+    // explaining its absence, and the turn ends in an ordinary reply — streamed,
+    // spoken, and recorded in history like any other — instead of a red banner
+    // and silence. The error is still surfaced (localized, with the "pick a
+    // vision-capable model" hint) because the user does have a setting to fix.
+    //
+    // Retried once, never in a loop: the second request carries no image, so it
+    // cannot fail the same way, and any other failure it hits falls through to
+    // the normal error handling below.
+    let mut vision_notified = false;
+    let outcome = match outcome {
+        Some(Err(e))
+            if image_dispatched.load(Ordering::SeqCst)
+                && is_vision_unsupported_error(&e)
+                && vision_fallback.is_some()
+                && !app.state::<AssistantConversation>().is_cancelled() =>
+        {
+            warn!(
+                "Model '{}' rejected the image ({}); retrying without it",
+                model, e
+            );
+            emit_error(
+                &app,
+                "vision_unsupported",
+                vision_unsupported_message(&provider.id, &model),
+            );
+            vision_notified = true;
+            // Manual screen arming is sticky, so without this the next message
+            // would attach a fresh capture and take the same detour again. The
+            // panel's screen toggle follows the state, so the user sees vision
+            // switch itself off rather than silently misbehaving.
+            if screenshot.is_some() {
+                if let Err(disarm) = set_screen_armed_for_current_mode(&app, false) {
+                    debug!("Could not disarm screen vision after a vision failure: {disarm}");
+                }
+            }
+            // Whatever the refused round left buffered is void: no tokens were
+            // emitted, but a tool round may have queued speech.
+            if let Some((pipeline, _)) = &speech {
+                if let Ok(mut pipeline) = pipeline.lock() {
+                    pipeline.reset();
+                }
+            }
+            if let Ok(mut buffer) = partial.lock() {
+                buffer.clear();
+            }
+            emit_state(&app, "thinking");
+            // Deliberately the plain stream, with no tools: the retry needs no
+            // search, and re-offering `capture_screen` to a model that cannot
+            // see would invite it to fetch another image and fail again.
+            let retry_fut = llm_client::send_chat_stream(
+                &provider,
+                api_key.clone(),
+                &model,
+                vision_fallback.take().unwrap_or_default(),
+                None,
+                None,
+                assistant_token_sink(
+                    app.clone(),
+                    partial.clone(),
+                    speech_sink.clone(),
+                    timer.clone(),
+                ),
+            );
+            tokio::pin!(retry_fut);
+            tokio::select! {
+                result = &mut retry_fut => Some(result),
+                _ = wait_for_assistant_cancel(&app, &cancel) => None,
+            }
+        }
+        other => other,
     };
 
     // Whether a spoken reply is starting. When it is, the turn ends in a
@@ -3266,7 +3690,15 @@ pub async fn run_assistant_turn(
                 let mut history = conversation.messages.lock().unwrap();
                 history.push(ChatMessage {
                     role: "assistant".to_string(),
-                    content: partial_text,
+                    content: if voice_ticket.is_some() {
+                        format!(
+                            "{}\n{}",
+                            partial_text,
+                            crate::voice_conversation::INTERRUPTED_MARKER
+                        )
+                    } else {
+                        partial_text
+                    },
                     images: Vec::new(),
                 });
             }
@@ -3275,12 +3707,34 @@ pub async fn run_assistant_turn(
             debug!("Assistant turn cancelled by user");
         }
         Some(Ok(full_text)) => {
-            {
+            // The streamed copy was filtered token by token (see
+            // `assistant_token_sink`); the value the client returns is raw, so
+            // the recorded turn gets the same treatment. Otherwise history —
+            // and the end-of-turn `emit_conversation` that replaces the panel's
+            // streamed text — would put the thoughts back on screen.
+            let full_text = crate::flow::strip_reasoning_blocks(&full_text)
+                .trim()
+                .to_string();
+            // An empty answer is not a turn: it leaves a blank bubble in the
+            // panel and a content-free assistant message in history, which then
+            // breaks the strict user/assistant alternation that some chat
+            // templates (Gemma) require on every later request.
+            if full_text.trim().is_empty() {
+                warn!("Assistant produced an empty reply; not recording a turn");
+            } else {
                 let conversation = app.state::<AssistantConversation>();
                 let mut history = conversation.messages.lock().unwrap();
                 history.push(ChatMessage {
                     role: "assistant".to_string(),
-                    content: full_text,
+                    content: if voice_ticket.is_some() && conversation.is_cancelled() {
+                        format!(
+                            "{}\n{}",
+                            full_text,
+                            crate::voice_conversation::INTERRUPTED_MARKER
+                        )
+                    } else {
+                        full_text
+                    },
                     images: Vec::new(),
                 });
             }
@@ -3305,7 +3759,12 @@ pub async fn run_assistant_turn(
         Some(Err(e)) => {
             close_speech();
             error!("Assistant request failed: {}", e);
-            if e.contains("Unterminated string") && has_visual {
+            if vision_notified {
+                // The vision error is already on screen and names the setting
+                // that fixes it; a second, vaguer provider error would only
+                // replace it with less useful advice.
+                debug!("Image-free retry also failed: {}", e);
+            } else if e.contains("Unterminated string") && has_visual {
                 emit_error(&app, "screenshot_too_large", e);
             } else if has_visual && is_vision_unsupported_error(&e) {
                 emit_error(
@@ -3550,7 +4009,7 @@ pub async fn run_summarize_turn(app: AppHandle) {
 
     let outcome = tokio::select! {
         result = &mut stream_fut => Some(result),
-        _ = cancel.notified() => None,
+        _ = wait_for_assistant_cancel(&app, &cancel) => None,
     };
 
     match outcome {
@@ -3749,6 +4208,92 @@ mod tests {
     use super::*;
     use crate::llm_client::{ChatRound, ToolCall, ToolStreamOutcome};
 
+    /// The rejections this has to recognise, in the wording each provider
+    /// actually uses. Getting this wrong is expensive in both directions: a
+    /// miss leaves the turn dead, and a false positive would silently strip a
+    /// perfectly good image from a request that failed for another reason.
+    #[test]
+    fn vision_rejections_are_recognized() {
+        for error in [
+            // Bundled llama.cpp / LM Studio, model loaded without a projector.
+            "image input is not supported - hint: if this is unexpected, you may need to provide the mmproj",
+            // Ollama, non-multimodal model.
+            "model does not support images",
+            // OpenAI-compatible gateways.
+            "Invalid content type. image_url is only supported by certain models.",
+            "This model does not support image input",
+            "The model is not multimodal",
+        ] {
+            assert!(
+                is_vision_unsupported_error(error),
+                "should be treated as a vision failure: {error}"
+            );
+        }
+        // Ordinary failures must not be mistaken for one, or a turn that failed
+        // for an unrelated reason would quietly lose its image on the retry.
+        for error in [
+            "401 Unauthorized: invalid api key",
+            "429 Too Many Requests",
+            "context window exceeded",
+            "connection closed before message completed",
+        ] {
+            assert!(
+                !is_vision_unsupported_error(error),
+                "should not be treated as a vision failure: {error}"
+            );
+        }
+    }
+
+    #[test]
+    fn retry_request_keeps_history_and_drops_every_image() {
+        let messages = vec![
+            json!({"role": "system", "content": "persona"}),
+            json!({"role": "user", "content": "earlier question"}),
+            json!({"role": "assistant", "content": "earlier answer"}),
+            json!({"role": "user", "content": [
+                {"type": "text", "text": "what is this?"},
+                {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64,AAAA"}},
+                {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64,BBBB"}},
+            ]}),
+        ];
+
+        let retry = strip_visuals_for_retry(&messages, "what is this?");
+
+        // Same shape: the prefix is untouched (so a provider-side prompt cache
+        // still hits) and only the trailing user message is rewritten.
+        assert_eq!(retry.len(), messages.len());
+        assert_eq!(retry[..3], messages[..3]);
+
+        let last = retry.last().unwrap();
+        assert_eq!(last["role"], "user");
+        // Text only — no content parts survive, so no image can.
+        let content = last["content"].as_str().expect("content must be a string");
+        assert!(content.starts_with("what is this?"));
+        assert!(content.contains(VISION_DROPPED_NOTE));
+        let serialized = serde_json::to_string(&retry).unwrap();
+        assert!(!serialized.contains("image_url"));
+        assert!(!serialized.contains("base64"));
+    }
+
+    /// The agent-decided path starts out text-only (the model fetches the frame
+    /// itself mid-turn), so the rebuild has to work on a plain string message
+    /// too — that is the request the retry is built from.
+    #[test]
+    fn retry_request_handles_a_text_only_final_message() {
+        let messages = vec![
+            json!({"role": "system", "content": "persona"}),
+            json!({"role": "user", "content": "read my screen"}),
+        ];
+
+        let retry = strip_visuals_for_retry(&messages, "read my screen");
+
+        assert_eq!(retry.len(), 2);
+        assert_eq!(retry[0], messages[0]);
+        let content = retry[1]["content"].as_str().unwrap();
+        assert!(content.starts_with("read my screen"));
+        assert!(content.contains(VISION_DROPPED_NOTE));
+    }
+
     #[test]
     fn assistant_bindings_cover_both_assistant_shortcuts() {
         assert!(is_assistant_binding("assistant"));
@@ -3766,6 +4311,65 @@ mod tests {
                 .strip_suffix(crate::transcription_coordinator::LOCK_SUFFIX)
                 .unwrap()
         ));
+    }
+
+    /// The voice window has to clear the view's own container-query thresholds,
+    /// or a conversation runs with no visible text at all: `ConversationView.css`
+    /// only reveals the reply caption past 440x600 (minus the panel's 1px
+    /// border), which the chat panel's 390x500 default never reached.
+    #[test]
+    fn the_default_conversation_size_can_show_a_reply_caption() {
+        let (w, h) = conversation_preset_size("standard");
+        assert!(w - 2.0 >= 440.0, "width {w} leaves the caption hidden");
+        assert!(h - 2.0 >= 600.0, "height {h} leaves the caption hidden");
+        // Every preset must still be a usable window, not a pill.
+        for preset in ["mini", "compact", "standard", "large", "unknown-legacy"] {
+            let (w, h) = conversation_preset_size(preset);
+            assert!(w > PILL_WIDTH && h > PILL_HEIGHT, "{preset} is pill-sized");
+        }
+        // Voice is taller than the chat panel at the same preset: the orb, the
+        // status line and the call bar stack vertically.
+        for preset in ["mini", "compact", "standard", "large"] {
+            let (chat_w, chat_h) = panel_preset_size(preset);
+            let (voice_w, voice_h) = conversation_preset_size(preset);
+            assert!(voice_w >= chat_w && voice_h >= chat_h, "{preset} shrank");
+        }
+    }
+
+    /// The zoom control is one state read in both directions, so growing and
+    /// shrinking have to be exact inverses — otherwise repeated toggling walks
+    /// the window a few pixels every time (`remember_size_in_lane` divides by
+    /// the same factor `conversation_size` multiplies by).
+    #[test]
+    fn the_conversation_zoom_toggle_round_trips_to_the_same_size() {
+        for preset in ["mini", "compact", "standard", "large"] {
+            let (base_w, base_h) = conversation_preset_size(preset);
+            let expanded_w = (base_w * CONVERSATION_EXPAND_FACTOR).round();
+            let expanded_h = (base_h * CONVERSATION_EXPAND_FACTOR).round();
+            assert!(expanded_w > base_w && expanded_h > base_h);
+            assert_eq!((expanded_w / CONVERSATION_EXPAND_FACTOR).round(), base_w);
+            assert_eq!((expanded_h / CONVERSATION_EXPAND_FACTOR).round(), base_h);
+        }
+    }
+
+    /// The drag-resize floor has to sit under every preset (or the smallest one
+    /// could not be applied) and above the pill (or the user could drag a live
+    /// call down to a strip with no reachable Mute or End button) — and it must
+    /// drop back to the pill's floor on collapse, or the collapse is refused.
+    #[test]
+    fn the_conversation_resize_floor_sits_between_the_pill_and_every_preset() {
+        let (call_w, call_h) = panel_min_size(false, true);
+        let (pill_w, pill_h) = panel_min_size(true, true);
+        assert!(call_w > pill_w && call_h > pill_h);
+        assert_eq!(panel_min_size(true, true), panel_min_size(true, false));
+        assert_eq!(panel_min_size(false, false), (pill_w, pill_h));
+        for preset in ["mini", "compact", "standard", "large", "unknown-legacy"] {
+            let (w, h) = conversation_preset_size(preset);
+            assert!(
+                w >= call_w && h >= call_h,
+                "{preset} is below the conversation resize floor"
+            );
+        }
     }
 
     fn screen_inputs() -> VoiceScreenPlanInputs {
@@ -4191,8 +4795,18 @@ fn assistant_token_sink(
     const FLUSH_INTERVAL_MS: u128 = 40;
     let mut pending = String::new();
     let mut last_flush = Instant::now();
+    // A reasoning model that writes `<think>…</think>` into the content channel
+    // must not have those thoughts rendered in the panel or read aloud, and
+    // neither can be taken back once forwarded — so filter here, at the single
+    // point where every consumer gets its tokens.
+    let mut reasoning = crate::flow::ReasoningStreamFilter::default();
     move |token: &str| {
         timer.mark_first_token();
+        let token = reasoning.push(token);
+        if token.is_empty() {
+            return;
+        }
+        let token = token.as_str();
         if let Ok(mut buf) = partial.lock() {
             buf.push_str(token);
         }

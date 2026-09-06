@@ -1,0 +1,560 @@
+/* Voice is a quiet, spatial view. Text gets its own room in the transcript. */
+.conversation-hidden {
+  display: none !important;
+}
+.assistant-panel:has(> .assistant-conversation) {
+  container-type: size;
+}
+.assistant-header.conversation-header {
+  border-bottom: 0;
+  padding: 12px 12px 8px 18px;
+}
+.conversation-header-title {
+  color: var(--as-muted);
+  font-size: 11px;
+  font-weight: 450;
+  letter-spacing: 0.02em;
+}
+.conversation-header .assistant-icon-button {
+  width: 30px;
+  height: 30px;
+}
+.assistant-conversation {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 24px 22px;
+  color: var(--as-ink);
+  position: relative;
+}
+.conversation-profile-row {
+  display: flex;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 100%;
+  z-index: 5;
+}
+.voice-profile .assistant-character-switch {
+  padding: 8px 11px;
+  max-width: 260px;
+  border: 1px solid var(--as-hairline);
+  border-radius: 24px;
+  font-weight: 450;
+  font-size: 13px;
+  gap: 8px;
+}
+.assistant-character-avatar {
+  width: 20px;
+  height: 20px;
+  font-size: 10px;
+}
+.voice-profile .assistant-character-menu {
+  left: 50%;
+  transform: translateX(-50%);
+  width: 232px;
+  max-width: calc(100cqw - 32px);
+  max-height: min(300px, 65cqh);
+  padding: 6px;
+  border-radius: 14px;
+}
+.assistant-profile-heading {
+  padding: 8px 10px 10px;
+  color: var(--as-ink);
+  font-size: 12px;
+}
+.assistant-profile-heading p {
+  margin: 5px 0 0;
+  color: var(--as-muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.assistant-profile-error {
+  padding: 0 10px;
+  color: var(--as-error);
+  font-size: 12px;
+}
+.voice-profile .assistant-character-item {
+  padding: 10px;
+  min-height: 42px;
+}
+.assistant-character-item:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.assistant-character button:focus-visible {
+  outline: 2px solid var(--as-ink);
+  outline-offset: 2px;
+}
+.conversation-stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 30px;
+  padding: 30px 0;
+  width: 100%;
+}
+.conversation-status {
+  color: var(--as-body);
+  font-size: 13px;
+  font-weight: 450;
+  text-align: center;
+  line-height: 1.5;
+}
+
+/* A softly lit glass sphere. The flowing light represents an active session;
+   movement accelerates during playback and follows microphone energy on input. */
+.voice-orb {
+  --orb-size: 156px;
+  --orb-speed: 14s;
+  width: var(--orb-size);
+  height: var(--orb-size);
+  flex-shrink: 0;
+  position: relative;
+  isolation: isolate;
+}
+.voice-orb::before {
+  content: "";
+  position: absolute;
+  inset: -18%;
+  border-radius: 50%;
+  background: radial-gradient(circle, #9bbfe21a, transparent 68%);
+  opacity: 0.65;
+}
+.voice-orb-body {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  overflow: hidden;
+  background: radial-gradient(
+    circle at 34% 23%,
+    #eef9ff 0%,
+    #c7e5e9 20%,
+    #9eb9cd 42%,
+    #7774a1 65%,
+    #3d425d 85%,
+    #303b4e 100%
+  );
+  box-shadow:
+    inset 0 0 2px 1px #e1f2ff66,
+    inset -8px -12px 24px #27324b55,
+    0 0 36px #a1c4e012;
+  transform: scale(calc(1 + var(--voice-energy, 0) * 0.085));
+  transition:
+    transform 120ms ease-out,
+    filter 400ms,
+    opacity 400ms;
+}
+.voice-orb-flow {
+  position: absolute;
+  inset: -25%;
+  border-radius: 43%;
+  background: conic-gradient(
+    from 40deg,
+    transparent 8%,
+    #def7edbb 24%,
+    #6777a855 38%,
+    transparent 47%,
+    #c9bdecbf 64%,
+    #b7e7eabf 80%,
+    transparent 94%
+  );
+  filter: blur(13px);
+  animation: voice-orbit var(--orb-speed) linear infinite;
+}
+.voice-orb-light {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background:
+    radial-gradient(ellipse at 30% 19%, #faffffb3, transparent 43%),
+    radial-gradient(ellipse at 74% 87%, #e5d3ff77, transparent 37%);
+  box-shadow:
+    inset 1px 1px 5px #f4ffff77,
+    inset -2px -4px 8px #1e284866;
+}
+.voice-orb.speaking {
+  --orb-speed: 4s;
+}
+.voice-orb.speaking .voice-orb-body {
+  animation: voice-speak 1.4s ease-in-out infinite;
+}
+.voice-orb.hearing {
+  --orb-speed: 7s;
+}
+.voice-orb.hearing .voice-orb-body {
+  filter: saturate(1.15);
+}
+.voice-orb.responding,
+.voice-orb.transcribing {
+  --orb-speed: 5s;
+}
+.voice-orb.starting .voice-orb-body {
+  opacity: 0.6;
+  animation: voice-breathe 2s ease-in-out infinite;
+}
+.voice-orb.muted .voice-orb-body,
+.voice-orb.error .voice-orb-body,
+.voice-orb.off .voice-orb-body {
+  filter: grayscale(0.95);
+  opacity: 0.5;
+}
+.voice-orb.muted .voice-orb-flow,
+.voice-orb.error .voice-orb-flow,
+.voice-orb.off .voice-orb-flow {
+  animation-play-state: paused;
+}
+@keyframes voice-orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes voice-speak {
+  0%,
+  100% {
+    transform: scale(0.96);
+  }
+  48% {
+    transform: scale(1.04);
+  }
+}
+@keyframes voice-breathe {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.conversation-caption {
+  display: none;
+  flex-shrink: 0;
+  width: min(100%, 42ch);
+  padding: 0;
+  margin: 0 0 32px;
+  border: 0;
+  background: none;
+  text-align: center;
+  color: var(--as-body);
+  cursor: pointer;
+}
+.conversation-caption > span:first-child {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  overflow: hidden;
+  font-size: var(--as-msg-font, 15px);
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.conversation-caption-link {
+  display: block;
+  margin-top: 12px;
+  font-size: 11px;
+  color: var(--as-muted);
+}
+.conversation-caption:hover .conversation-caption-link {
+  color: var(--as-ink);
+  text-decoration: underline;
+}
+.conversation-footer {
+  flex-shrink: 0;
+  width: 100%;
+}
+.conversation-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+}
+.conversation-control,
+.conversation-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 1px solid var(--as-hairline-strong);
+  border-radius: 50%;
+  width: 50px;
+  height: 50px;
+  padding: 0;
+  background: var(--as-raise);
+  color: var(--as-ink);
+  cursor: pointer;
+  transition:
+    background 160ms,
+    color 160ms,
+    transform 160ms;
+}
+.conversation-control:hover {
+  background: var(--as-raise-strong);
+}
+.conversation-control:active,
+.conversation-secondary:active {
+  transform: scale(0.94);
+}
+.conversation-control.end {
+  border-color: transparent;
+  background: #eddfd9;
+  color: #743b3d;
+}
+.conversation-control.end:hover {
+  background: #fae7e1;
+  color: #a52236;
+}
+.conversation-control.muted {
+  background: var(--as-ink);
+  color: #292624;
+}
+.conversation-control:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.conversation-secondary {
+  width: 36px;
+  height: 36px;
+  background: none;
+  border-color: transparent;
+  color: var(--as-muted);
+}
+.conversation-secondary:hover,
+.conversation-secondary[aria-pressed="true"],
+.conversation-secondary[aria-expanded="true"] {
+  color: var(--as-ink);
+  background: var(--as-raise);
+}
+.conversation-footnote {
+  text-align: center;
+  color: var(--as-muted);
+  font-size: 11px;
+  line-height: 1.5;
+  margin: 18px 0 0;
+}
+.conversation-options {
+  position: relative;
+  display: flex;
+}
+.conversation-options-popover {
+  position: absolute;
+  right: -6px;
+  bottom: calc(100% + 14px);
+  width: 220px;
+  box-sizing: border-box;
+  padding: 16px;
+  background: #23211f;
+  border: 1px solid var(--as-hairline-strong);
+  border-radius: 14px;
+  z-index: 6;
+  box-shadow: 0 8px 28px #0005;
+}
+.conversation-options-popover label {
+  font-size: 12px;
+  font-weight: 550;
+}
+.conversation-options-popover p {
+  margin: 6px 0 14px;
+  font-size: 11px;
+  color: var(--as-muted);
+  line-height: 1.6;
+}
+.conversation-options-popover select {
+  width: 100%;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 12px;
+  border: 1px solid var(--as-hairline-strong);
+  border-radius: 7px;
+  color: var(--as-ink);
+  background: #171513;
+  color-scheme: dark;
+}
+.assistant-conversation button:focus-visible,
+.assistant-conversation select:focus-visible,
+.conversation-pill button:focus-visible {
+  outline: 2px solid var(--as-ink);
+  outline-offset: 3px;
+}
+.conversation-error {
+  overflow-y: auto;
+  flex: 1;
+  width: min(100%, 40ch);
+  font-size: 12px;
+  line-height: 1.6;
+  text-align: center;
+  color: var(--as-error);
+  padding: 8px 0 18px;
+  overflow-wrap: anywhere;
+}
+.conversation-error p {
+  margin: 0 0 10px;
+}
+.conversation-error details {
+  color: var(--as-muted);
+  font-size: 11px;
+  margin-bottom: 10px;
+}
+.conversation-error summary {
+  cursor: pointer;
+}
+.conversation-retry {
+  display: inline-flex;
+  gap: 7px;
+  align-items: center;
+  padding: 8px 12px;
+  background: var(--as-raise);
+  color: var(--as-ink);
+  border: 1px solid var(--as-hairline);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.assistant-conversation.has-error .conversation-stage {
+  flex: 0;
+  gap: 12px;
+  padding: 18px 0 8px;
+}
+.assistant-conversation.has-error .voice-orb {
+  --orb-size: 64px;
+}
+.assistant-conversation.compact {
+  flex: 0 0 auto;
+  padding: 8px 20px 14px;
+  border-bottom: 1px solid var(--as-hairline);
+  gap: 12px;
+}
+.assistant-conversation.compact .conversation-stage {
+  flex-direction: row;
+  justify-content: center;
+  padding: 0;
+  gap: 10px;
+}
+.assistant-conversation.compact .voice-orb {
+  --orb-size: 24px;
+}
+.assistant-conversation.compact .conversation-control {
+  width: 40px;
+  height: 40px;
+}
+.assistant-conversation.compact .conversation-footnote {
+  display: none;
+}
+.assistant-conversation.compact .conversation-error {
+  max-height: 120px;
+}
+
+/* Only reveal a reply preview when it has real space. Small windows stay calm. */
+@container (min-width: 440px) and (min-height: 600px) {
+  .conversation-caption {
+    display: block;
+  }
+  .conversation-stage .voice-orb {
+    --orb-size: 182px;
+  }
+  .assistant-conversation.compact .voice-orb {
+    --orb-size: 24px;
+  }
+}
+@container (max-height: 440px) {
+  .assistant-conversation {
+    padding: 0 16px 14px;
+  }
+  .conversation-stage {
+    gap: 18px;
+    padding: 20px 0;
+  }
+  .conversation-stage .voice-orb {
+    --orb-size: 106px;
+  }
+  .conversation-footnote {
+    margin-top: 12px;
+  }
+  .assistant-conversation.compact .voice-orb {
+    --orb-size: 24px;
+  }
+  .assistant-conversation.compact .conversation-stage {
+    display: none;
+  }
+}
+@container (max-height: 330px) {
+  .conversation-stage .voice-orb {
+    --orb-size: 62px;
+  }
+  .conversation-stage {
+    gap: 10px;
+    padding: 12px 0;
+  }
+  .conversation-footnote {
+    display: none;
+  }
+  .conversation-control {
+    width: 40px;
+    height: 40px;
+  }
+}
+
+.conversation-pill {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 6px 4px 10px;
+  box-sizing: border-box;
+  height: 40px;
+  width: 236px;
+  border-radius: 24px;
+  border: 1px solid var(--as-hairline-strong);
+  background: var(--as-chip-surface);
+  box-shadow: var(--as-inner);
+  cursor: grab;
+}
+.conversation-pill-open {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+  color: var(--as-body);
+  border: 0;
+  padding: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+  border-radius: 14px;
+}
+.conversation-pill-open > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10px;
+}
+.conversation-pill-open > svg {
+  color: var(--as-muted);
+  flex-shrink: 0;
+  width: 11px;
+}
+.conversation-pill .voice-orb {
+  --orb-size: 23px;
+}
+.conversation-pill .conversation-control {
+  width: 28px;
+  height: 28px;
+}
+.conversation-pill .conversation-control svg {
+  width: 13px;
+  height: 13px;
+}
+.conversation-pill .voice-orb-flow {
+  filter: blur(3px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .voice-orb *,
+  .voice-orb.speaking .voice-orb-body,
+  .voice-orb.starting .voice-orb-body {
+    animation: none;
+    transition: none;
+  }
+  .conversation-control,
+  .conversation-secondary {
+    transition: none;
+  }
+}

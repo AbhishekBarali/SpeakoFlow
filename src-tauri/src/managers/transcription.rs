@@ -2,7 +2,8 @@ use crate::audio_toolkit::{apply_custom_words, filter_transcription_output, norm
 use crate::managers::audio::AudioRecordingManager;
 use crate::managers::model::{EngineType, ModelManager};
 use crate::settings::{
-    get_settings, ModelUnloadTimeout, OrtAcceleratorSetting, WhisperAcceleratorSetting,
+    get_settings, ModelUnloadTimeout, OrtAcceleratorSetting, ResolvedCloudStt,
+    WhisperAcceleratorSetting,
 };
 use anyhow::Result;
 use log::{debug, error, info, warn};
@@ -758,6 +759,47 @@ impl TranscriptionManager {
             debug!("Applied input gain normalization: {:.2}x", applied_gain);
         }
 
+        // Cloud transcription, when the user has selected it and configured it
+        // completely. Checked before the model-loaded guard below because the
+        // cloud path has no local model to wait for — and must not require one,
+        // since a cloud user may have no model downloaded at all.
+        //
+        // An incomplete cloud configuration (no key, unknown provider) resolves
+        // to `None` here and falls through to the local engine rather than
+        // failing the dictation.
+        {
+            let settings = get_settings(&self.app_handle);
+            if let Ok(cfg) = crate::stt_cloud::resolve_cloud_stt(&settings) {
+                // The provider was already given the custom words as keyterm /
+                // prompt biasing, so a second fuzzy pass over its output would
+                // only risk rewriting words it already got right. With biasing
+                // turned off there is nothing upstream, so the local pass earns
+                // its place again.
+                let biased_upstream = !cfg.keyterms.is_empty();
+                let result = crate::stt_cloud::transcribe_cloud_blocking(&cfg, &audio);
+                match result {
+                    Ok(raw) => {
+                        let finished = self.finish_transcription(
+                            &settings,
+                            raw,
+                            st,
+                            biased_upstream,
+                            settings.cloud_stt_no_verbatim,
+                        );
+                        return Ok(finished);
+                    }
+                    Err(e) => {
+                        // Nothing local is loaded in cloud mode, so there is no
+                        // second engine to fall back to: surface the provider's
+                        // own message, which is the only thing that explains a
+                        // bad key or an exhausted quota.
+                        error!("Cloud transcription failed: {}", e);
+                        return Err(anyhow::anyhow!(e));
+                    }
+                }
+            }
+        }
+
         // Check if model is loaded, if not try to load it
         {
             // If the model is loading, wait for it to complete.
@@ -1004,23 +1046,58 @@ impl TranscriptionManager {
             .map(|info| matches!(info.engine_type, EngineType::Whisper))
             .unwrap_or(false);
 
-        let recognition_hints = recognition_words(&settings);
-        let corrected_result = if !recognition_hints.is_empty() && !is_whisper {
-            apply_custom_words(
-                &result,
-                &recognition_hints,
-                settings.word_correction_threshold,
-            )
+        // The local engines have always filtered fillers unconditionally; that
+        // stays true, so nothing changes for a user on a downloaded model.
+        Ok(self.finish_transcription(&settings, result, st, is_whisper, true))
+    }
+
+    /// Shared tail of every batch transcription: fuzzy custom-word correction,
+    /// the filler/hallucination filter, timing log, and the immediate-unload
+    /// check.
+    ///
+    /// Factored out so the cloud path gets *identical* treatment to the local
+    /// one. The user-visible behaviours here — a custom dictionary being
+    /// applied, "um" being dropped — are app features, not engine features, and
+    /// having them silently stop working on a cloud provider would read as the
+    /// provider being worse than it is.
+    ///
+    /// `skip_word_correction` is true for engines that were already told about
+    /// the custom words up front (Whisper's `initial_prompt`, and the cloud
+    /// providers' keyterm/prompt biasing), where a second fuzzy pass over the
+    /// output would only risk corrupting text the model already got right.
+    ///
+    /// `remove_fillers` is what makes "Remove filler words" mean something on the
+    /// cloud path. The app's own filler filter used to run unconditionally, so a
+    /// user who turned the setting off still got their "um"s deleted — the switch
+    /// only ever controlled the *provider-side* flag, which several providers
+    /// don't even implement. One switch now decides the outcome regardless of
+    /// which provider is answering. The local engines keep filtering
+    /// unconditionally, as they always have.
+    fn finish_transcription(
+        &self,
+        settings: &crate::settings::AppSettings,
+        raw: String,
+        started: std::time::Instant,
+        skip_word_correction: bool,
+        remove_fillers: bool,
+    ) -> String {
+        let recognition_hints = recognition_words(settings);
+        let corrected_result = if !recognition_hints.is_empty() && !skip_word_correction {
+            apply_custom_words(&raw, &recognition_hints, settings.word_correction_threshold)
         } else {
-            result
+            raw
         };
 
         // Filter out filler words and hallucinations
-        let filtered_result = filter_transcription_output(
-            &corrected_result,
-            &settings.app_language,
-            &settings.custom_filler_words,
-        );
+        let filtered_result = if remove_fillers {
+            filter_transcription_output(
+                &corrected_result,
+                &settings.app_language,
+                &settings.custom_filler_words,
+            )
+        } else {
+            corrected_result
+        };
 
         let et = std::time::Instant::now();
         let translation_note = if settings.translate_to_english {
@@ -1030,7 +1107,7 @@ impl TranscriptionManager {
         };
         info!(
             "Transcription completed in {}ms{}",
-            (et - st).as_millis(),
+            (et - started).as_millis(),
             translation_note
         );
 
@@ -1044,7 +1121,7 @@ impl TranscriptionManager {
 
         self.maybe_unload_immediately("transcription");
 
-        Ok(final_result)
+        final_result
     }
 
     /// Shared handle to the live-transcription router. Handed to the recorder
@@ -1074,8 +1151,108 @@ impl TranscriptionManager {
         let (rx, stream_generation) = self.stream_router.open();
         let this = self.clone();
         thread::spawn(move || {
+            // Cloud realtime streaming never touches the local engine, so it
+            // gets its own worker rather than a branch inside the engine-leasing
+            // one. Resolved here (on the worker thread) so a settings read never
+            // happens on the caller's path.
+            let settings = get_settings(&this.app_handle);
+            if settings.cloud_stt_streaming {
+                if let Ok(cfg) = crate::stt_cloud::resolve_cloud_stt(&settings) {
+                    if crate::stt_cloud_stream::supports_streaming(&cfg) {
+                        this.run_cloud_stream_worker(rx, cfg, stream_generation);
+                        return;
+                    }
+                }
+            }
             this.run_stream_worker(rx, stream_generation);
         });
+    }
+
+    /// Worker body for cloud realtime transcription.
+    ///
+    /// Structurally the same contract as [`run_stream_worker`](Self::run_stream_worker)
+    /// — consume the FIFO command channel, answer `Finalize` with the transcript
+    /// or `None` — but with no engine lease, because there is no local model
+    /// involved. Every failure answers `None`, which routes
+    /// [`finalize_stream`](Self::finalize_stream) to the batch path so the
+    /// complete recording is transcribed in one request instead of the dictation
+    /// being lost.
+    fn run_cloud_stream_worker(
+        &self,
+        rx: mpsc::Receiver<StreamCmd>,
+        cfg: ResolvedCloudStt,
+        stream_generation: u64,
+    ) {
+        // Live text is gated on the stream generation for the same reason the
+        // local worker gates its emissions: a late message arriving during the
+        // finalize window would otherwise paint one recording's words onto the
+        // next recording's overlay — and hand them to Flow's phrase watcher.
+        let app = self.app_handle.clone();
+        let router = self.stream_router.clone();
+        let sink: crate::stt_cloud_stream::LiveTextSink =
+            Box::new(move |committed: &str, tentative: &str| {
+                if !router.is_generation_current(stream_generation) {
+                    return;
+                }
+                // Flow's activation-phrase watcher reads the live transcript to
+                // prewarm the local model early; cloud streaming feeds it the
+                // same way local streaming does.
+                crate::flow::note_live_transcript(&app, committed);
+                let _ = app.emit(
+                    "stream-text",
+                    StreamTextPayload {
+                        committed: committed.to_string(),
+                        tentative: tentative.to_string(),
+                    },
+                );
+            });
+
+        let mut session = match crate::stt_cloud_stream::CloudStreamSession::connect(sink, &cfg) {
+            Ok(session) => session,
+            Err(e) => {
+                warn!(
+                    "Realtime cloud transcription unavailable ({}); the recording will be \
+                     transcribed in one request when it ends",
+                    e
+                );
+                self.drain_stream_no_model(rx);
+                self.stream_router.clear();
+                return;
+            }
+        };
+
+        let mut final_text: Option<String> = None;
+        let mut finalize_reply: Option<mpsc::Sender<Option<String>>> = None;
+        let mut cancelled = false;
+
+        while let Ok(cmd) = rx.recv() {
+            match cmd {
+                StreamCmd::Feed(frame) => {
+                    self.stream_router.note_feed_consumed();
+                    session.feed(&frame);
+                }
+                StreamCmd::Finalize(reply) => {
+                    finalize_reply = Some(reply);
+                    break;
+                }
+                StreamCmd::Cancel => {
+                    cancelled = true;
+                    break;
+                }
+            }
+        }
+
+        if cancelled {
+            session.abort();
+        } else {
+            final_text = session.finish();
+        }
+
+        self.stream_router.clear();
+
+        if let Some(reply) = finalize_reply {
+            let _ = reply.send(final_text.filter(|t| !t.trim().is_empty()));
+        }
     }
 
     /// Worker body: wait for any in-progress load, lease the engine, then drive
@@ -1600,23 +1777,41 @@ impl TranscriptionManager {
 
         // Mirror batch post-processing on the final text.
         let settings = get_settings(&self.app_handle);
-        let is_whisper = self
+        // Whisper is told about the custom words through its initial prompt, and
+        // a cloud provider through keyterm/prompt biasing; in both cases a
+        // second fuzzy pass would only risk rewriting correct words.
+        let cloud = crate::stt_cloud::resolve_cloud_stt(&settings).ok();
+        let biased_upstream = self
             .model_manager
             .get_model_info(&settings.selected_model)
             .map(|info| matches!(info.engine_type, EngineType::Whisper))
-            .unwrap_or(false);
+            .unwrap_or(false)
+            || cloud
+                .as_ref()
+                .map(|c| !c.keyterms.is_empty())
+                .unwrap_or(false);
+        // Same rule as the batch path: on cloud the switch decides, on a local
+        // engine fillers are always filtered.
+        let remove_fillers = match cloud.as_ref() {
+            Some(_) => settings.cloud_stt_no_verbatim,
+            None => true,
+        };
 
         let recognition_hints = recognition_words(&settings);
-        let corrected = if !recognition_hints.is_empty() && !is_whisper {
+        let corrected = if !recognition_hints.is_empty() && !biased_upstream {
             apply_custom_words(&raw, &recognition_hints, settings.word_correction_threshold)
         } else {
             raw
         };
-        let filtered = filter_transcription_output(
-            &corrected,
-            &settings.app_language,
-            &settings.custom_filler_words,
-        );
+        let filtered = if remove_fillers {
+            filter_transcription_output(
+                &corrected,
+                &settings.app_language,
+                &settings.custom_filler_words,
+            )
+        } else {
+            corrected
+        };
 
         if filtered.trim().is_empty() {
             return Ok(None);

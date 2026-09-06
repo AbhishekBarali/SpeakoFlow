@@ -49,6 +49,12 @@ name: "Test Build"
 
 on: workflow_dispatch
 
+# BRANCH-LOCAL MATRIX (test/vision-fallback-build only — do NOT merge to main).
+# Trimmed to the two targets the tester can actually run right now: Windows
+# x86_64 and Linux x86_64. macOS (both architectures) and Linux ARM64 are cut
+# because nothing here can verify them, and each one costs a full from-scratch
+# Rust + whisper.cpp build. main keeps the complete five-target matrix; restore
+# it from there before this branch is merged anywhere.
 jobs:
   test-build:
     permissions:
@@ -57,22 +63,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: "macos-26" # Apple Silicon (M1+)
-            args: "--target aarch64-apple-darwin"
-            target: "aarch64-apple-darwin"
-          # UNPROVEN — Intel Macs (x86_64), CPU-only. Test-build only; not in any
-          # release matrix until this is green AND a tester confirms it runs on a
-          # real Intel Mac. `fail-fast: false` above keeps a red Intel job from
-          # taking the other four targets down with it.
-          - platform: "macos-15-intel"
-            args: "--target x86_64-apple-darwin"
-            target: "x86_64-apple-darwin"
           - platform: "ubuntu-24.04" # AppImage + .deb, x86_64
             args: "--bundles appimage,deb"
             target: "x86_64-unknown-linux-gnu"
-          - platform: "ubuntu-24.04-arm" # AppImage + .deb, ARM64
-            args: "--bundles appimage,deb"
-            target: "aarch64-unknown-linux-gnu"
           - platform: "windows-latest" # .msi + NSIS .exe
             args: ""
             target: "x86_64-pc-windows-msvc"

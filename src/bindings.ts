@@ -1233,6 +1233,113 @@ async unloadModelManually() : Promise<Result<null, string>> {
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * The configured cloud transcription endpoints, for the provider picker.
+ */
+async getCloudSttProviders() : Promise<CloudSttProvider[]> {
+    return await TAURI_INVOKE("get_cloud_stt_providers");
+},
+/**
+ * Whether cloud transcription is ready, and if not, why.
+ */
+async getCloudSttReadiness() : Promise<CloudSttReadiness> {
+    return await TAURI_INVOKE("get_cloud_stt_readiness");
+},
+/**
+ * Switch between the local engine and cloud transcription.
+ * 
+ * A command rather than a raw settings write because turning cloud *off* has a
+ * side effect: the local model has not been loaded while the user was on cloud,
+ * so it is asked to start loading now instead of on the first press of the
+ * dictation key, where the wait would be visible.
+ */
+async setSttEngineMode(mode: SttEngineMode) : Promise<void> {
+    await TAURI_INVOKE("set_stt_engine_mode", { mode });
+},
+/**
+ * Store a provider's API key. Goes through settings so the keychain write in
+ * `write_settings` runs; the plaintext copy is blanked once the OS store
+ * confirms it holds the value.
+ */
+async setCloudSttApiKey(providerId: string, apiKey: string) : Promise<void> {
+    await TAURI_INVOKE("set_cloud_stt_api_key", { providerId, apiKey });
+},
+/**
+ * Select the active cloud provider.
+ */
+async setCloudSttProvider(providerId: string) : Promise<void> {
+    await TAURI_INVOKE("set_cloud_stt_provider", { providerId });
+},
+/**
+ * Set the model for one provider.
+ * 
+ * Per-provider rather than a whole-map write so switching providers, or two
+ * edits landing close together, cannot clobber the other provider's choice.
+ */
+async setCloudSttModel(providerId: string, model: string) : Promise<void> {
+    await TAURI_INVOKE("set_cloud_stt_model", { providerId, model });
+},
+/**
+ * Set the endpoint override for one provider. An empty value clears the
+ * override, restoring the shipped base URL.
+ */
+async setCloudSttBaseUrl(providerId: string, baseUrl: string) : Promise<void> {
+    await TAURI_INVOKE("set_cloud_stt_base_url", { providerId, baseUrl });
+},
+/**
+ * Use the provider's realtime endpoint where it has one.
+ */
+async setCloudSttStreaming(enabled: boolean) : Promise<void> {
+    await TAURI_INVOKE("set_cloud_stt_streaming", { enabled });
+},
+/**
+ * Forward the user's custom words to the provider as biasing hints.
+ */
+async setCloudSttSendCustomWords(enabled: boolean) : Promise<void> {
+    await TAURI_INVOKE("set_cloud_stt_send_custom_words", { enabled });
+},
+/**
+ * Ask the provider to strip filler words server-side.
+ */
+async setCloudSttNoVerbatim(enabled: boolean) : Promise<void> {
+    await TAURI_INVOKE("set_cloud_stt_no_verbatim", { enabled });
+},
+/**
+ * Whether a key is on file for each provider.
+ * 
+ * The UI shows "saved" from this rather than rendering the key back into a
+ * password field, so a stored secret is never round-tripped through the DOM and
+ * a paste of a new key is unambiguous. This is a display convenience, not an
+ * isolation boundary: `get_app_settings` returns the hydrated settings —
+ * including every provider key map — to the webview, exactly as it already does
+ * for the post-processing, web-search, and TTS keys.
+ */
+async getCloudSttKeyStatus() : Promise<([string, boolean])[]> {
+    return await TAURI_INVOKE("get_cloud_stt_key_status");
+},
+/**
+ * Ask the selected provider for its transcription models.
+ */
+async listCloudSttModels() : Promise<Result<string[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("list_cloud_stt_models") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Send one second of audio to confirm the key, the endpoint, and the model id
+ * all work — before the user finds out mid-dictation.
+ */
+async testCloudStt() : Promise<Result<string, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("test_cloud_stt") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async getHistoryEntries(cursor: number | null, limit: number | null) : Promise<Result<PaginatedHistory, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("get_history_entries", { cursor, limit }) };
@@ -1930,6 +2037,37 @@ async assistantStop() : Promise<Result<null, string>> {
     else return { status: "error", error: e  as any };
 }
 },
+async assistantConversationStart() : Promise<Result<VoiceTicket, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("assistant_conversation_start") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async assistantConversationEnd(session: number) : Promise<void> {
+    await TAURI_INVOKE("assistant_conversation_end", { session });
+},
+/**
+ * Switch between the orb view and the larger transcript-reading form. Window
+ * size and view layout are one state, so whichever control grows the window is
+ * also the control that shrinks it back.
+ */
+async assistantConversationSetExpanded(expanded: boolean) : Promise<void> {
+    await TAURI_INVOKE("assistant_conversation_set_expanded", { expanded });
+},
+/**
+ * Speech onset (also used by mute): invalidate pending inference and audio
+ * before the new utterance finishes. Returns the new turn's cancellation key.
+ */
+async assistantConversationInterrupt(session: number, interruptedReply: boolean) : Promise<Result<VoiceTicket, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("assistant_conversation_interrupt", { session, interruptedReply }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 /**
  * How many prior messages the model receives as conversation context.
  */
@@ -2287,7 +2425,69 @@ live_transcription_enabled?: boolean;
  * also on (there's no live text to show otherwise); when off, the overlay
  * stays the compact pill exactly as before.
  */
-live_transcription_window_enabled?: boolean; selected_microphone?: string | null; clamshell_microphone?: string | null; selected_output_device?: string | null; translate_to_english?: boolean; selected_language?: string; overlay_position?: OverlayPosition; 
+live_transcription_window_enabled?: boolean; 
+/**
+ * Local model on this machine, or a hosted transcription API. Defaults to
+ * `Local`, so an existing install is untouched until the user opts in.
+ */
+stt_engine_mode?: SttEngineMode; 
+/**
+ * Configurable cloud transcription endpoints. Seeded and repaired on load.
+ */
+cloud_stt_providers?: CloudSttProvider[]; 
+/**
+ * Which entry of `cloud_stt_providers` is active.
+ */
+cloud_stt_provider_id?: string; 
+/**
+ * Per-provider model id. Keyed by provider id so switching providers
+ * doesn't wipe the model chosen for the other one — the same reason
+ * `assistant_tts_models` exists.
+ */
+cloud_stt_models?: Partial<{ [key in string]: string }>; 
+/**
+ * Per-provider base-URL override, for the providers that allow editing it.
+ */
+cloud_stt_base_urls?: Partial<{ [key in string]: string }>; 
+/**
+ * Per-provider API keys. Held in the OS keychain (see
+ * [`crate::secret_store`]) and hydrated on load, exactly like the
+ * post-processing and TTS keys.
+ */
+cloud_stt_api_keys?: SecretMap; 
+/**
+ * Use the provider's realtime WebSocket when it has one, so text appears
+ * while the user is still talking instead of after a round-trip on stop.
+ * On by default: it is both faster to first word and the reason to pay for
+ * a realtime model, and it degrades to a single batch request on any
+ * failure rather than losing the recording.
+ */
+cloud_stt_streaming?: boolean; 
+/**
+ * Forward the user's custom words as provider-native biasing hints.
+ */
+cloud_stt_send_custom_words?: boolean; 
+/**
+ * Remove filler words ("um", "uh", false starts, repeats).
+ * 
+ * **One switch, one outcome.** This asks the provider to strip them where
+ * the provider supports it (ElevenLabs `no_verbatim`, Deepgram
+ * `filler_words=false`) *and* gates the app's own filler filter, which used
+ * to run unconditionally — so turning this off previously still deleted the
+ * user's "um"s and the setting appeared to do nothing. Off means verbatim.
+ * 
+ * Off by default: a cloud user asking for a frontier ASR model is usually
+ * after an accurate record of what they said, and the optional cleanup pass
+ * already removes fillers far more intelligently when they want that.
+ * 
+ * Only applies on the cloud path. The local engines have always filtered
+ * unconditionally and still do.
+ */
+cloud_stt_no_verbatim?: boolean; 
+/**
+ * Ceiling on a single batch transcription request.
+ */
+cloud_stt_timeout_secs?: number; selected_microphone?: string | null; clamshell_microphone?: string | null; selected_output_device?: string | null; translate_to_english?: boolean; selected_language?: string; overlay_position?: OverlayPosition; 
 /**
  * Recording (dictation) overlay style: Auto/None/Minimal/Live. Auto follows
  * the model's live-streaming support (Live if supported, else Minimal).
@@ -2760,6 +2960,86 @@ export type ClipboardHandling = "dont_modify" | "copy_to_clipboard"
  */
 export type CloseBehavior = "minimize_to_tray" | "quit"
 /**
+ * Wire protocol a cloud speech-to-text provider speaks. The provider *list* is
+ * data (so a new endpoint is one entry, not new code), but the request shape
+ * is not interchangeable, so each family gets a variant:
+ * 
+ * - [`ElevenLabs`](Self::ElevenLabs): `POST /v1/speech-to-text` multipart with
+ * an `xi-api-key` header and a `model_id` field, plus the Scribe v2 Realtime
+ * WebSocket for live streaming.
+ * - [`OpenAiCompatible`](Self::OpenAiCompatible): `POST /audio/transcriptions`
+ * multipart with a bearer token and a `model` field. Covers OpenAI itself,
+ * Groq, Mistral, and any self-hosted server that copies the schema, which is
+ * why the custom entry exists at all.
+ * - [`Deepgram`](Self::Deepgram): `POST /v1/listen` with the audio as the raw
+ * request body (no multipart), `Authorization: Token <key>`, and everything
+ * else as query parameters.
+ */
+export type CloudSttKind = "eleven_labs" | "open_ai_compatible" | "deepgram"
+/**
+ * A configurable cloud speech-to-text endpoint. Seeded from
+ * [`default_cloud_stt_providers`] and repaired on load, so a provider added in
+ * a later version appears for existing users without wiping their keys.
+ */
+export type CloudSttProvider = { id: string; label: string; 
+/**
+ * API root without a trailing slash. Per-provider overrides live in
+ * `cloud_stt_base_urls`, which is what `allow_base_url_edit` unlocks.
+ */
+base_url: string; allow_base_url_edit?: boolean; kind: CloudSttKind; 
+/**
+ * Model used when the user has not chosen one.
+ */
+default_model: string; 
+/**
+ * Suggested models for the picker. Not a whitelist — the field stays
+ * free-text so a model released after this build still works.
+ */
+models?: string[]; 
+/**
+ * Path to list models, relative to `base_url`. `None` means the provider
+ * publishes a fixed set and the registry's [`Self::models`] is the answer.
+ * 
+ * Carries its own query string where one is needed: OpenRouter keeps
+ * transcription models out of the default catalog and only returns them for
+ * `?output_modalities=transcription`, so a plain `/models` there lists
+ * hundreds of chat models and not one that can transcribe.
+ */
+models_endpoint?: string | null; 
+/**
+ * Whether this endpoint actually acts on the custom-word hints the app
+ * sends it.
+ * 
+ * This is not cosmetic. When a provider is biased upstream the app skips its
+ * own fuzzy custom-word pass, on the grounds that a second guess at text the
+ * model already got right can only make it worse. A provider that *accepts*
+ * the field and ignores it — OpenRouter documents exactly that for `prompt`
+ * on its multipart route — would therefore get neither correction: not the
+ * provider's, and not the app's. False keeps the local pass.
+ */
+honors_keyterms?: boolean; 
+/**
+ * Whether this provider has a realtime streaming endpoint wired up (see
+ * `crate::stt_cloud_stream`). Providers without one still transcribe, just
+ * as a single request once the recording stops.
+ */
+supports_streaming?: boolean; 
+/**
+ * Where the user goes to get a key. Surfaced as a link in Settings so the
+ * first-run path isn't "search the web for it".
+ */
+api_key_url?: string }
+/**
+ * Whether cloud transcription is ready, for display in Settings.
+ */
+export type CloudSttReadiness = { state: "ready"; provider_id: string; provider_label: string; model: string; streaming: boolean } | { state: "unavailable"; reason: CloudSttUnavailableReason; provider_id: string | null; provider_label: string | null }
+/**
+ * Why cloud transcription can't run right now. Mirrors
+ * [`PostProcessUnavailableReason`]: the pipeline needs to know *why* it is
+ * falling back so the UI can say something more useful than "failed".
+ */
+export type CloudSttUnavailableReason = "not_enabled" | "selected_provider_missing" | "missing_api_key" | "no_model_configured"
+/**
  * A user-created writing style for cleanup. It is deliberately separate from
  * `LLMPrompt`: cleanup prompts define what corrections happen; tone presets
  * define how the resulting wording should sound.
@@ -3062,6 +3342,20 @@ export type SoundTheme =
  */
 "dictation" | "marimba" | "pop" | "click" | "custom"
 /**
+ * Where speech-to-text runs. `Local` is the app's original behaviour and the
+ * default: a Whisper/Parakeet/GGUF model on the user's own machine. `Cloud`
+ * sends the audio to a hosted transcription API instead.
+ * 
+ * This is a two-way switch rather than "just another provider in the model
+ * list" because the two paths have nothing in common operationally: the local
+ * path downloads and loads weights, occupies the GPU, and needs an unload
+ * policy, while the cloud path needs a key, a network round-trip, and costs
+ * money per minute. Keeping them separate is also what lets the app skip
+ * loading a local model entirely when the user is on cloud — otherwise a
+ * multi-gigabyte Whisper model would sit in VRAM being paid for twice.
+ */
+export type SttEngineMode = "local" | "cloud"
+/**
  * UI appearance preference. `System` follows the OS; `Light` / `Dark` pin the
  * theme regardless of the OS setting. Serialized lowercase ("light", "dark",
  * "system") to match the `data-theme` attribute the frontend sets on <html>.
@@ -3130,6 +3424,7 @@ export type VisionCaptureTiming =
  * and it transcribes). The original behaviour.
  */
 "on_send"
+export type VoiceTicket = { session: number; turn: number }
 export type WhisperAcceleratorSetting = "auto" | "cpu" | "gpu"
 export type WindowsMicrophonePermissionStatus = { supported: boolean; overall_access: PermissionAccess; device_access: PermissionAccess; app_access: PermissionAccess; desktop_app_access: PermissionAccess }
 

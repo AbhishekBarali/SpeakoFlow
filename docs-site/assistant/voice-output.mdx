@@ -8,6 +8,24 @@ Off by default. Turn on _Speak responses aloud_ in _Settings → Assistant → V
 
 It runs locally and free with Kokoro, or through a cloud voice with your own key. With it on, the assistant is also told to write speech-friendly prose: short sentences, no tables or headings, because a Markdown table read aloud is gibberish.
 
+## Hands-free conversation
+
+Open the expanded assistant panel and click the **Conversation** waveform button in the header. The microphone stays open: speak, pause, and the assistant replies automatically. Speak again to interrupt its reply. Conversation uses your selected transcription model, assistant provider, profile, and voice engine, and keeps the same chat history.
+
+- **Mute** pauses the conversation, stops speech, and releases the microphone. **Unmute** opens it again.
+- Collapse to the small orb pill or hide the panel and keep talking. The microphone stays active until **End**, Escape, starting a dictation, or turning off the assistant. The pill keeps mute and end controls within reach. Your transcript stays available.
+- Small windows show an orb and simple controls. Larger windows also show a reply preview. The transcript button opens the full conversation and expands the window to give it room.
+- Change profiles from the picker above the orb at any time. The new profile applies to the next reply, using the same settings as regular assistant chat.
+- Under **Conversation options**, **Time to finish speaking** adjusts turn detection: Quick (450 ms), Natural (700 ms), or Patient (1.1 seconds). Choose Patient if you tend to pause mid-sentence.
+
+Conversation honors the active profile’s response-length preference, or the global assistant setting when the profile inherits it. With no explicit preference, replies default to one to three short sentences. Ask for detail when you want a longer answer. This mode enables speech for the session without changing the saved _Speak responses aloud_ switch. Ordinary spoken assistant replies also default to a short paragraph when no response-length preference is selected.
+
+Voice detection runs on your device using a bundled Silero model. The microphone requests echo cancellation and noise suppression; all conversation speech plays through the browser audio engine so echo cancellation can use it as a reference. Headphones help when speakers or room echo still trigger false interruptions. If a selected audio device cannot be used by the browser, choose the system default in Settings.
+
+This is a pipeline of speech recognition, assistant generation, and streamed speech synthesis. Recognition begins after a detected pause, so latency still depends on the selected models and providers. It does not use a provider's native speech-to-speech or semantic end-of-turn API. A continuous utterance has a one-minute limit; a longer recording stops with a retry message.
+
+The turn-taking work draws on the public [OpenAI voice-activity detection guide](https://developers.openai.com/api/docs/guides/realtime-vad) and [Deepgram end-of-turn guide](https://developers.deepgram.com/docs/flux/voice-agent-eager-eot).
+
 ## Engines
 
 | Engine                | Runs            | Needs                                                      |

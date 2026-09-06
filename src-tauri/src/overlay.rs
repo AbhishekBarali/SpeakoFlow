@@ -419,7 +419,15 @@ pub fn create_recording_overlay(app_handle: &AppHandle) {
 /// resolve `OverlayStyle::Auto` into Live vs Minimal, for both the recording
 /// overlay and the assistant. Returns false if the model info isn't available.
 pub fn selected_model_supports_live(app: &AppHandle) -> bool {
-    let selected = settings::get_settings(app).selected_model;
+    let settings = settings::get_settings(app);
+    // In cloud mode there is no local model to ask, and the answer comes from
+    // whether the selected provider has a realtime endpoint. Checked first
+    // because `selected_model` may still name a local model the user last used
+    // — or nothing at all, on an install that never downloaded one.
+    if crate::stt_cloud::cloud_stt_active(&settings) {
+        return crate::stt_cloud::cloud_stt_streaming_active(&settings);
+    }
+    let selected = settings.selected_model;
     app.try_state::<std::sync::Arc<crate::managers::model::ModelManager>>()
         .and_then(|mm| mm.get_model_info(&selected))
         .map(|info| info.supports_streaming)

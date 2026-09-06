@@ -273,6 +273,56 @@ fn get_filler_words_for_language(lang: &str) -> &'static [&'static str] {
 
 static MULTI_SPACE_PATTERN: Lazy<Regex> = Lazy::new(|| Regex::new(r"\s{2,}").unwrap());
 
+/// Two commas left adjacent by a deletion between them ("just, uh, fixing").
+static DOUBLED_COMMA_PATTERN: Lazy<Regex> = Lazy::new(|| Regex::new(r",(\s*,)+").unwrap());
+
+/// A comma stranded immediately after sentence-ending punctuation, which happens
+/// when the filler that owned it opened the sentence ("right? Uh, for" → "right? ,for").
+static ORPHAN_COMMA_PATTERN: Lazy<Regex> = Lazy::new(|| Regex::new(r"([.?!])\s*,\s*").unwrap());
+
+/// Whitespace before a comma or full stop, left by a deletion in front of it.
+static SPACE_BEFORE_PUNCT_PATTERN: Lazy<Regex> = Lazy::new(|| Regex::new(r"\s+([,.])").unwrap());
+
+/// A lowercase word opening a sentence after `?` or `!`. Only those two, never
+/// `.`: a full stop is ambiguous ("e.g. foo", "vs. the") and capitalising after
+/// it would corrupt abbreviations, while `?` and `!` always end a sentence.
+static LOWERCASE_AFTER_TERMINAL_PATTERN: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"([?!]\s+)(\p{Ll})").unwrap());
+
+/// Repairs the punctuation and casing seams that removing a word leaves behind.
+///
+/// Deleting a filler is not a clean excision: the filler often owned the comma
+/// after it and sat at the start of a sentence, so a naive removal turns
+/// "right? Uh, for example" into "right? for example" — a sentence opening in
+/// lowercase — and "just, uh, um, fixing" into "just, , fixing". The text is
+/// then pasted straight into the user's document, so these seams are the visible
+/// output, not an intermediate.
+///
+/// Only unambiguous repairs are made. Casing is fixed after `?` and `!` but never
+/// after `.`, because a full stop is also an abbreviation mark and
+/// "e.g. foo" must not become "e.g. Foo".
+fn repair_removal_seams(text: &str) -> String {
+    let mut out = DOUBLED_COMMA_PATTERN.replace_all(text, ",").to_string();
+    out = ORPHAN_COMMA_PATTERN.replace_all(&out, "$1 ").to_string();
+    out = SPACE_BEFORE_PUNCT_PATTERN
+        .replace_all(&out, "$1")
+        .to_string();
+    // A deletion at the very start can leave the text opening on its old
+    // separator.
+    out = out.trim_start_matches([',', '.', ' ']).to_string();
+    out = LOWERCASE_AFTER_TERMINAL_PATTERN
+        .replace_all(&out, |caps: &regex::Captures| {
+            format!("{}{}", &caps[1], caps[2].to_uppercase())
+        })
+        .to_string();
+    // Deliberately NOT capitalising the first character of the transcript.
+    // Dictation is frequently a continuation — the user is mid-sentence in a
+    // document with the cursor after "and then," — so forcing an initial capital
+    // would corrupt more text than it fixed. Only an interior sentence boundary
+    // is unambiguous.
+    out
+}
+
 /// Collapses repeated words (3+ repetitions) to a single instance.
 /// E.g., "wh wh wh wh" -> "wh", "I I I I" -> "I"
 fn collapse_stutters(text: &str) -> String {
@@ -347,8 +397,18 @@ pub fn filter_transcription_output(
     };
 
     // Remove filler words
+    let mut removed_any = false;
     for pattern in &patterns {
-        filtered = pattern.replace_all(&filtered, "").to_string();
+        if pattern.is_match(&filtered) {
+            removed_any = true;
+            filtered = pattern.replace_all(&filtered, "").to_string();
+        }
+    }
+
+    // Repair the seams the deletions left, but only if something was deleted —
+    // text that was never cut has no seams, and must pass through untouched.
+    if removed_any {
+        filtered = repair_removal_seams(&filtered);
     }
 
     // Collapse repeated 1-2 letter words (stutter artifacts like "wh wh wh wh")
@@ -408,6 +468,60 @@ mod tests {
         let text = "So uhm I was thinking uh about this";
         let result = filter_transcription_output(text, "en", &None);
         assert_eq!(result, "So I was thinking about this");
+    }
+
+    /// Removing a filler that opened a sentence used to leave the next word in
+    /// lowercase: "right? Uh, for example" became "right? for example". Observed
+    /// on a real cloud transcript.
+    #[test]
+    fn removing_a_sentence_opening_filler_keeps_the_sentence_capitalised() {
+        let text = "doing a few basic things, right? Uh, for example, making good sentences.";
+        let result = filter_transcription_output(text, "en", &None);
+        assert_eq!(
+            result,
+            "doing a few basic things, right? For example, making good sentences."
+        );
+    }
+
+    /// The same seam after an exclamation mark.
+    #[test]
+    fn capitalisation_repair_also_applies_after_an_exclamation() {
+        let result = filter_transcription_output("Stop! Um, wait a second.", "en", &None);
+        assert_eq!(result, "Stop! Wait a second.");
+    }
+
+    /// A full stop is also an abbreviation mark, so casing after it is left
+    /// alone — "e.g. foo" must not become "e.g. Foo".
+    #[test]
+    fn casing_after_a_full_stop_is_left_alone() {
+        let result = filter_transcription_output("Use a tool, uh, e.g. ripgrep here.", "en", &None);
+        assert_eq!(result, "Use a tool, e.g. ripgrep here.");
+    }
+
+    /// Two fillers in a row each owned a comma, which used to leave ", ,".
+    #[test]
+    fn consecutive_fillers_do_not_leave_a_doubled_comma() {
+        let text = "Sorry, I mean just, uh, um, fixing some small mistakes.";
+        let result = filter_transcription_output(text, "en", &None);
+        assert_eq!(result, "Sorry, I mean just, fixing some small mistakes.");
+        assert!(!result.contains(", ,"));
+        assert!(!result.contains(",,"));
+    }
+
+    /// Text with no fillers must come back byte-for-byte: the repair pass only
+    /// runs when something was actually cut, so it can never touch clean text.
+    #[test]
+    fn text_without_fillers_is_untouched_by_the_repair() {
+        let text = "Why? because it works. And e.g. this stays lowercase.";
+        assert_eq!(filter_transcription_output(text, "en", &None), text);
+    }
+
+    /// The documented way to turn filtering off entirely.
+    #[test]
+    fn an_empty_custom_list_disables_filler_removal() {
+        let text = "So uh I was, um, thinking";
+        let result = filter_transcription_output(text, "en", &Some(vec![]));
+        assert_eq!(result, text);
     }
 
     #[test]

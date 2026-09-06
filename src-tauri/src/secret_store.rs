@@ -55,6 +55,15 @@ pub fn account_web_search(provider_id: &str) -> String {
     format!("web_search:{provider_id}")
 }
 
+/// Account name for a cloud speech-to-text provider key, keyed by provider id
+/// (e.g. `cloud_stt:elevenlabs`). Namespaced separately from the LLM and
+/// web-search accounts on purpose: the same vendor can appear in more than one
+/// list (ElevenLabs does STT and TTS; Groq does LLM and STT) and the keys are
+/// not necessarily the same one.
+pub fn account_cloud_stt(provider_id: &str) -> String {
+    format!("cloud_stt:{provider_id}")
+}
+
 /// account -> cached value. `Some(None)` means "known to be absent" so repeated
 /// lookups of an unset key stay cache hits instead of re-hitting the keychain.
 fn cache() -> &'static Mutex<HashMap<String, Option<String>>> {

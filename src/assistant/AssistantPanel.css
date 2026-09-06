@@ -15,6 +15,8 @@
 
 /* ---------- Theme tokens (dark only) ---------- */
 
+@import "./ConversationView.css";
+
 .assistant-scope {
   /* --as-alpha (surface opacity) and --as-msg-font (message text size) are the
    * two runtime knobs. They are deliberately NOT declared here: the real panel

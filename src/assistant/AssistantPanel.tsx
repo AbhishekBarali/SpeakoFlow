@@ -14,13 +14,14 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
   AlertCircle,
+  AudioLines,
   ArrowUp,
   Camera,
   CameraOff,
-  ChevronDown,
   Check,
   Copy,
   Eraser,
+  Expand,
   FileText,
   Globe,
   ImagePlus,
@@ -32,22 +33,23 @@ import {
   Paperclip,
   RotateCcw,
   Scissors,
+  Shrink,
   Sparkles,
   Square,
   Volume2,
   VolumeX,
   X,
 } from "lucide-react";
-import {
-  commands,
-  type AppSettings,
-  type AssistantCharacter,
-} from "@/bindings";
+import { commands, type AppSettings } from "@/bindings";
 import { syncLanguageFromSettings } from "@/i18n";
 import { AudioWaveform } from "@/components/shared";
 import { FONT_SIZES, errorKind, type AssistantError } from "./appearance";
 import { useKokoroTts } from "./useKokoroTts";
 import { localTtsActive } from "./localTts";
+import { useVoiceConversation } from "./useVoiceConversation";
+import { ConversationView, ConversationPill } from "./ConversationView";
+import { AssistantProfilePicker } from "./AssistantProfilePicker";
+import { VOICE_INTERRUPTED_MARKER } from "./conversationPolicy";
 import { useLocalLlmEngineStatus } from "@/hooks/useLocalLlmEngineStatus";
 import { useSafeWindowDrag } from "@/lib/useSafeWindowDrag";
 import "./AssistantPanel.css";
@@ -110,38 +112,6 @@ const nextAttachmentId = (): string => `att-${++attachmentSeq}`;
 
 const IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "gif", "webp", "bmp"];
 
-/** Small round avatar for a character: the uploaded image, a cat emoji for the
- *  Cat, or the name's first initial. */
-const CharacterAvatar: React.FC<{
-  character: AssistantCharacter | null;
-  size: number;
-}> = ({ character, size }) => {
-  const dims = { width: size, height: size };
-  if (character?.avatar) {
-    return (
-      <img
-        className="assistant-character-avatar"
-        src={character.avatar}
-        alt=""
-        style={dims}
-      />
-    );
-  }
-  const fallback =
-    character?.kind === "cat"
-      ? "🐱"
-      : (character?.name.trim()[0] ?? "?").toUpperCase();
-  return (
-    <span
-      className="assistant-character-avatar"
-      style={{ ...dims, fontSize: Math.round(size * 0.5) }}
-      aria-hidden
-    >
-      {fallback}
-    </span>
-  );
-};
-
 /** Downscale a pasted image blob to a provider-friendly JPEG data URL (same
  *  1568px budget the backend uses for files picked from disk). */
 async function downscaleToDataUrl(blob: Blob): Promise<string> {
@@ -184,6 +154,7 @@ function toDisplay(raw: {
   const kept: string[] = [];
   for (const line of raw.content.split("\n")) {
     const trimmed = line.trim();
+    if (trimmed === VOICE_INTERRUPTED_MARKER) continue;
     if (trimmed === SCREENSHOT_MARKER) {
       screenshot = true;
       continue;
@@ -438,8 +409,6 @@ const AssistantPanel: React.FC = () => {
   // never the spoken sentence itself — printing that would just be noise.
   const [tool, setTool] = useState<ToolActivity | null>(null);
   const [toolElapsed, setToolElapsed] = useState(0);
-  const [characterMenuOpen, setCharacterMenuOpen] = useState(false);
-  const characterMenuRef = useRef<HTMLDivElement>(null);
   const [mounted, setMounted] = useState(false);
   const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
@@ -490,8 +459,40 @@ const AssistantPanel: React.FC = () => {
   const suppressTtsRef = useRef(false);
   // Only surface a local-Kokoro load failure once per failure.
   const kokoroErrorRef = useRef(false);
+  const localVoiceRef = useRef<ReturnType<typeof useKokoroTts> | null>(null);
+  const [showVoiceTranscript, setShowVoiceTranscript] = useState(false);
+  const voice = useVoiceConversation({
+    stopLocal: () => localVoiceRef.current?.stop(),
+    beginLocal: async (epoch) => {
+      await localVoiceRef.current?.beginStream(epoch);
+    },
+    pushLocal: (text) => localVoiceRef.current?.pushText(text),
+    endLocal: () => localVoiceRef.current?.endStream(),
+    microphone: settings?.selected_microphone,
+    outputDevice: settings?.selected_output_device,
+    volume: settings?.audio_feedback_volume,
+  });
 
-  const ttsEnabled = settings?.assistant_tts_enabled ?? false;
+  // The conversation view has two forms — the orb alone, and the orb strip
+  // above the transcript — and the window size belongs to the form, not to a
+  // separate "zoom" of its own. Holding them as one state is what makes the
+  // control reversible: the button that grows the window shrinks it back.
+  // Rust owns the geometry (see `assistant::set_conversation_expanded`), so it
+  // stays right when the same session is resized, collapsed, or ended.
+  const setVoiceTranscript = useCallback((show: boolean) => {
+    setShowVoiceTranscript(show);
+    void commands.assistantConversationSetExpanded(show);
+  }, []);
+
+  // A finished conversation leaves no transcript form behind: the next one
+  // opens on the orb again, matching the window size Rust restores.
+  useEffect(() => {
+    if (!voice.open) setShowVoiceTranscript(false);
+  }, [voice.open]);
+
+  const ttsEnabled =
+    (voice.open && voice.phase !== "error") ||
+    (settings?.assistant_tts_enabled ?? false);
   const ttsEngine = settings?.assistant_tts_engine ?? "kokoro";
   const ttsVoice = settings?.assistant_tts_voice ?? "af_heart";
   const ttsDtype = settings?.assistant_tts_kokoro_dtype ?? "fp32";
@@ -522,8 +523,10 @@ const AssistantPanel: React.FC = () => {
     // exists from launch (hidden) so the old unconditional preload paid the full
     // model cost in the background before the user had asked for anything. A
     // hidden panel still speaks on demand: `beginStream` loads lazily.
-    panelVisible,
+    panelVisible || voice.open,
+    voice.open ? voice.browserSink : undefined,
   );
+  localVoiceRef.current = tts;
   const speakRef = useRef(tts.speak);
   speakRef.current = tts.speak;
   // The event listeners are registered once on mount, so the streaming calls are
@@ -585,28 +588,12 @@ const AssistantPanel: React.FC = () => {
 
   const selectCharacter = useCallback(
     async (id: string) => {
-      setCharacterMenuOpen(false);
-      try {
-        await commands.setAssistantActiveCharacter(id);
-        await refreshSettings();
-      } catch {
-        // best-effort — the picker just won't change on failure
-      }
+      const result = await commands.setAssistantActiveCharacter(id);
+      if (result.status === "error") throw new Error(String(result.error));
+      await refreshSettings();
     },
     [refreshSettings],
   );
-
-  // Close the character switcher when clicking anywhere outside it.
-  useEffect(() => {
-    if (!characterMenuOpen) return;
-    const onDown = (e: MouseEvent) => {
-      if (!characterMenuRef.current?.contains(e.target as Node)) {
-        setCharacterMenuOpen(false);
-      }
-    };
-    window.addEventListener("mousedown", onDown);
-    return () => window.removeEventListener("mousedown", onDown);
-  }, [characterMenuOpen]);
 
   // Apply text size + surface opacity. The panel is dark-only (like the STT
   // overlay), so there is no theme resolution anymore.
@@ -903,7 +890,9 @@ const AssistantPanel: React.FC = () => {
       track(
         await listen("assistant-tts-stop", () => {
           suppressTtsRef.current = true;
-          tts.stop();
+          // The backend already invalidated the playback epoch. Echoing Stop
+          // back could invalidate a newer reply that started in the meantime.
+          tts.stop(false);
           // Stopping during the spoken-reply phase ends the turn.
           setState((s) => (s === "speaking" ? "idle" : s));
         }),
@@ -1433,6 +1422,27 @@ const AssistantPanel: React.FC = () => {
     collapsed ? "" : " expanded"
   }${mounted ? " fade-in" : ""}`;
 
+  const profilePicker = (
+    <AssistantProfilePicker
+      profiles={characters}
+      activeId={activeCharacterId}
+      onSelect={selectCharacter}
+      conversation={voice.open}
+    />
+  );
+
+  if (collapsed && voice.open) {
+    return (
+      <div className={shellClass}>
+        <ConversationPill
+          voice={voice}
+          name={activeCharacter?.name ?? t("assistant.title")}
+          onExpand={() => void collapse(false)}
+        />
+      </div>
+    );
+  }
+
   if (collapsed) {
     // ---- The voice pill: state carried by the waveform -------------------
     const isSearchingPhase = state === "searching";
@@ -1855,76 +1865,106 @@ const AssistantPanel: React.FC = () => {
             {t("assistant.attach.dropHint")}
           </div>
         )}
-        <div className="assistant-header">
-          <div className="assistant-title">
-            <span
-              className={`assistant-status-dot${busy ? " busy" : ""}`}
-              data-tauri-drag-region
-              title={busy ? t(`assistant.status.${state}`) : undefined}
-            />
-            <div className="assistant-character" ref={characterMenuRef}>
-              <button
-                type="button"
-                className="assistant-character-switch"
-                onClick={() => setCharacterMenuOpen((v) => !v)}
-                title={t("assistant.character.switch")}
-              >
-                <CharacterAvatar character={activeCharacter} size={18} />
-                <span className="assistant-character-name">
-                  {activeCharacter?.name ?? t("assistant.title")}
-                </span>
-                <ChevronDown size={12} className="as-chevron" />
-              </button>
-              {characterMenuOpen && (
-                <div className="assistant-character-menu">
-                  {characters.map((character) => (
-                    <button
-                      key={character.id}
-                      type="button"
-                      className={`assistant-character-item${
-                        character.id === activeCharacterId ? " active" : ""
-                      }`}
-                      onClick={() => selectCharacter(character.id)}
-                    >
-                      <CharacterAvatar character={character} size={18} />
-                      <span className="assistant-character-name">
-                        {character.name}
-                      </span>
-                      {character.id === activeCharacterId && (
-                        <Check size={13} className="as-check" />
-                      )}
-                    </button>
-                  ))}
-                </div>
-              )}
+        <div
+          className={`assistant-header${voice.open ? " conversation-header" : ""}`}
+        >
+          {voice.open ? (
+            <span className="conversation-header-title" data-tauri-drag-region>
+              {t("assistant.conversation.title")}
+            </span>
+          ) : (
+            <div className="assistant-title">
+              <span
+                className={`assistant-status-dot${busy ? " busy" : ""}`}
+                data-tauri-drag-region
+                title={busy ? t(`assistant.status.${state}`) : undefined}
+              />
+              {profilePicker}
             </div>
-          </div>
+          )}
           <div
             className="assistant-header-drag"
             data-tauri-drag-region
             aria-hidden="true"
           />
           <div className="assistant-header-actions">
-            <button
-              type="button"
-              className={`assistant-icon-button${ttsEnabled ? " active" : ""}${
-                tts.status === "loading" ? " pulsing" : ""
-              }`}
-              onClick={toggleTts}
-              onMouseDown={stopDrag}
-              title={ttsTitle}
-            >
-              {ttsEnabled ? <Volume2 size={14} /> : <VolumeX size={14} />}
-            </button>
-            <button
-              type="button"
-              className="assistant-icon-button"
-              onClick={clearConversation}
-              onMouseDown={stopDrag}
-              title={t("assistant.clear")}
-            >
-              <Eraser size={14} />
-            </button>
+            {voice.open ? (
+              <button
+                type="button"
+                className="assistant-icon-button"
+                onMouseDown={stopDrag}
+                disabled={voice.phase === "error"}
+                aria-pressed={showVoiceTranscript}
+                aria-label={t(
+                  showVoiceTranscript
+                    ? "assistant.conversation.shrink"
+                    : "assistant.conversation.expand",
+                )}
+                title={t(
+                  showVoiceTranscript
+                    ? "assistant.conversation.shrink"
+                    : "assistant.conversation.expand",
+                )}
+                onClick={() => setVoiceTranscript(!showVoiceTranscript)}
+              >
+                {showVoiceTranscript ? (
+                  <Shrink size={14} />
+                ) : (
+                  <Expand size={14} />
+                )}
+              </button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className={`assistant-icon-button${voice.open ? " active" : ""}`}
+                  onClick={() => {
+                    if (voice.open) voice.end();
+                    else {
+                      setShowVoiceTranscript(false);
+                      void voice.start();
+                    }
+                  }}
+                  onMouseDown={stopDrag}
+                  disabled={!voice.open && (busy || !settings)}
+                  aria-pressed={voice.open}
+                  aria-label={t(
+                    voice.open
+                      ? "assistant.conversation.end"
+                      : "assistant.conversation.start",
+                  )}
+                  title={t(
+                    voice.open
+                      ? "assistant.conversation.end"
+                      : "assistant.conversation.start",
+                  )}
+                >
+                  <AudioLines size={16} />
+                </button>
+                <button
+                  type="button"
+                  className={`assistant-icon-button${ttsEnabled ? " active" : ""}${
+                    tts.status === "loading" ? " pulsing" : ""
+                  }`}
+                  onClick={toggleTts}
+                  disabled={voice.open}
+                  onMouseDown={stopDrag}
+                  title={ttsTitle}
+                >
+                  {ttsEnabled ? <Volume2 size={14} /> : <VolumeX size={14} />}
+                </button>
+                <button
+                  type="button"
+                  className="assistant-icon-button"
+                  onClick={clearConversation}
+                  disabled={voice.open}
+                  onMouseDown={stopDrag}
+                  title={t("assistant.clear")}
+                >
+                  <Eraser size={14} />
+                </button>
+              </>
+            )}
             <button
               type="button"
               className="assistant-icon-button"
@@ -1946,8 +1986,22 @@ const AssistantPanel: React.FC = () => {
           </div>
         </div>
 
+        {voice.open && (
+          <ConversationView
+            voice={voice}
+            profilePicker={profilePicker}
+            answer={
+              stream ||
+              (history[history.length - 1]?.role === "assistant"
+                ? (history[history.length - 1]?.content ?? "")
+                : "")
+            }
+            showTranscript={showVoiceTranscript}
+            onToggleTranscript={() => setVoiceTranscript(!showVoiceTranscript)}
+          />
+        )}
         <div
-          className="assistant-messages"
+          className={`assistant-messages${voice.open && !showVoiceTranscript ? " conversation-hidden" : ""}`}
           ref={listRef}
           onScroll={handleMessagesScroll}
         >
@@ -1960,72 +2014,73 @@ const AssistantPanel: React.FC = () => {
               </p>
             </div>
           )}
-          {history.map((message, i) => (
-            <div key={i} className={`assistant-message ${message.role}`}>
-              <div className="assistant-message-content">
-                {message.role === "assistant" ? (
-                  <ReactMarkdown
-                    remarkPlugins={[remarkGfm]}
-                    components={MD_COMPONENTS}
-                  >
-                    {message.content}
-                  </ReactMarkdown>
-                ) : (
-                  message.content
-                )}
-              </div>
-              {message.thumbnails ? (
-                <MessageThumbnails
-                  urls={message.thumbnails}
-                  hasScreen={message.screenshot}
-                  screenLabel={t("assistant.screenAttached")}
-                />
-              ) : (
-                <>
-                  {message.screenshot && (
-                    <span className="screen-chip">
-                      <Camera size={11} />
-                      {t("assistant.screenAttached")}
-                    </span>
-                  )}
-                  {(message.images ?? 0) > 0 && (
-                    <span className="screen-chip">
-                      <ImagePlus size={11} />
-                      {t("assistant.attach.imageCount", {
-                        count: message.images,
-                      })}
-                    </span>
-                  )}
-                </>
-              )}
-              {message.files?.map((name) => (
-                <span className="screen-chip" key={name}>
-                  <FileText size={11} />
-                  {name}
-                </span>
-              ))}
-              {message.role === "assistant" && (
-                <CopyButton
-                  content={message.content}
-                  title={t("assistant.copy")}
-                />
-              )}
-              {message.role === "assistant" &&
-                i === history.length - 1 &&
-                !busy &&
-                stream === "" && (
-                  <div className="assistant-last-actions">
-                    <button
-                      onClick={() => void commands.assistantRegenerate()}
-                      title={t("assistant.regenerate")}
-                      aria-label={t("assistant.regenerate")}
+          {(!voice.open || showVoiceTranscript) &&
+            history.map((message, i) => (
+              <div key={i} className={`assistant-message ${message.role}`}>
+                <div className="assistant-message-content">
+                  {message.role === "assistant" ? (
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      components={MD_COMPONENTS}
                     >
-                      <RotateCcw size={12.5} />
-                    </button>
-                  </div>
+                      {message.content}
+                    </ReactMarkdown>
+                  ) : (
+                    message.content
+                  )}
+                </div>
+                {message.thumbnails ? (
+                  <MessageThumbnails
+                    urls={message.thumbnails}
+                    hasScreen={message.screenshot}
+                    screenLabel={t("assistant.screenAttached")}
+                  />
+                ) : (
+                  <>
+                    {message.screenshot && (
+                      <span className="screen-chip">
+                        <Camera size={11} />
+                        {t("assistant.screenAttached")}
+                      </span>
+                    )}
+                    {(message.images ?? 0) > 0 && (
+                      <span className="screen-chip">
+                        <ImagePlus size={11} />
+                        {t("assistant.attach.imageCount", {
+                          count: message.images,
+                        })}
+                      </span>
+                    )}
+                  </>
                 )}
-            </div>
-          ))}
+                {message.files?.map((name) => (
+                  <span className="screen-chip" key={name}>
+                    <FileText size={11} />
+                    {name}
+                  </span>
+                ))}
+                {message.role === "assistant" && (
+                  <CopyButton
+                    content={message.content}
+                    title={t("assistant.copy")}
+                  />
+                )}
+                {message.role === "assistant" &&
+                  i === history.length - 1 &&
+                  !busy &&
+                  stream === "" && (
+                    <div className="assistant-last-actions">
+                      <button
+                        onClick={() => void commands.assistantRegenerate()}
+                        title={t("assistant.regenerate")}
+                        aria-label={t("assistant.regenerate")}
+                      >
+                        <RotateCcw size={12.5} />
+                      </button>
+                    </div>
+                  )}
+              </div>
+            ))}
           {notice && (
             <div className="assistant-notice" role="status">
               <Globe size={12} strokeWidth={2} />
@@ -2046,7 +2101,7 @@ const AssistantPanel: React.FC = () => {
               {engineSetupLabel}
             </div>
           )}
-          {stream !== "" && (
+          {(!voice.open || showVoiceTranscript) && stream !== "" && (
             <div className="assistant-message assistant">
               <div className="assistant-message-content">
                 <ReactMarkdown
@@ -2118,46 +2173,51 @@ const AssistantPanel: React.FC = () => {
           )}
         </div>
 
-        {(pendingImages.length > 0 || pendingFiles.length > 0) && (
-          <div className="assistant-attachments">
-            {pendingImages.map((image) => (
-              <span className="attachment-chip" key={image.id}>
-                <img src={image.dataUrl} alt="" />
-                <span className="chip-name">{t("assistant.attach.image")}</span>
-                <button
-                  className="chip-remove"
-                  onClick={() =>
-                    setPendingImages((prev) =>
-                      prev.filter((i) => i.id !== image.id),
-                    )
-                  }
-                  title={t("assistant.attach.remove")}
-                >
-                  <X size={11} strokeWidth={2.5} />
-                </button>
-              </span>
-            ))}
-            {pendingFiles.map((file) => (
-              <span className="attachment-chip" key={file.id}>
-                <FileText size={13} />
-                <span className="chip-name">{file.name}</span>
-                <button
-                  className="chip-remove"
-                  onClick={() =>
-                    setPendingFiles((prev) =>
-                      prev.filter((f) => f.id !== file.id),
-                    )
-                  }
-                  title={t("assistant.attach.remove")}
-                >
-                  <X size={11} strokeWidth={2.5} />
-                </button>
-              </span>
-            ))}
-          </div>
-        )}
+        {!voice.open &&
+          (pendingImages.length > 0 || pendingFiles.length > 0) && (
+            <div className="assistant-attachments">
+              {pendingImages.map((image) => (
+                <span className="attachment-chip" key={image.id}>
+                  <img src={image.dataUrl} alt="" />
+                  <span className="chip-name">
+                    {t("assistant.attach.image")}
+                  </span>
+                  <button
+                    className="chip-remove"
+                    onClick={() =>
+                      setPendingImages((prev) =>
+                        prev.filter((i) => i.id !== image.id),
+                      )
+                    }
+                    title={t("assistant.attach.remove")}
+                  >
+                    <X size={11} strokeWidth={2.5} />
+                  </button>
+                </span>
+              ))}
+              {pendingFiles.map((file) => (
+                <span className="attachment-chip" key={file.id}>
+                  <FileText size={13} />
+                  <span className="chip-name">{file.name}</span>
+                  <button
+                    className="chip-remove"
+                    onClick={() =>
+                      setPendingFiles((prev) =>
+                        prev.filter((f) => f.id !== file.id),
+                      )
+                    }
+                    title={t("assistant.attach.remove")}
+                  >
+                    <X size={11} strokeWidth={2.5} />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
 
-        <div className="assistant-input-row">
+        <div
+          className={`assistant-input-row${voice.open ? " conversation-hidden" : ""}`}
+        >
           <button
             className={`assistant-attach-button${webSearchEnabled ? " armed" : ""}`}
             onClick={toggleWebSearch}

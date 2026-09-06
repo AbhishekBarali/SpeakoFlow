@@ -578,7 +578,10 @@ enum Delivery {
     /// The local Kokoro model runs in the panel webview (kokoro-js/WebGPU), so
     /// chunks are forwarded as events and the webview streams them into a
     /// splitter that stays open for the whole reply.
-    Local { app: tauri::AppHandle },
+    Local {
+        app: tauri::AppHandle,
+        voice_ticket: Option<crate::voice_conversation::VoiceTicket>,
+    },
     /// Remote HTTP engines are synthesized here, one chunk at a time, by a task
     /// that outlives the turn if playback is still catching up.
     Remote {
@@ -610,11 +613,20 @@ impl SpeechPipeline {
     ///
     /// `epoch` must be captured by the caller *before* generation starts, so a
     /// Stop pressed during generation still supersedes this reply.
-    pub fn start(
+    pub fn start_for_voice(
         app: &tauri::AppHandle,
         settings: &crate::settings::AppSettings,
         epoch: u64,
+        voice_ticket: Option<crate::voice_conversation::VoiceTicket>,
     ) -> Self {
+        if let Some(ticket) = voice_ticket {
+            use tauri::Emitter;
+            let _ = app.emit_to(
+                crate::assistant::PANEL_LABEL,
+                "assistant-conversation-audio-begin",
+                serde_json::json!({ "ticket": ticket, "epoch": epoch }),
+            );
+        }
         let delivery = if settings.assistant_tts_engine == "kokoro" {
             use tauri::Emitter;
             // Tells the webview to open a splitter for this reply. The hook
@@ -622,11 +634,22 @@ impl SpeechPipeline {
             // chunk the webview sends back can be attributed to this reply, and
             // a chunk still in flight when the user hits Stop is dropped instead
             // of being adopted by whatever comes next.
-            let _ = app.emit("assistant-tts-begin", epoch);
-            Delivery::Local { app: app.clone() }
+            if let Some(ticket) = voice_ticket {
+                let _ = app.emit_to(
+                    crate::assistant::PANEL_LABEL,
+                    "assistant-conversation-local",
+                    serde_json::json!({ "ticket": ticket, "epoch": epoch, "kind": "begin" }),
+                );
+            } else {
+                let _ = app.emit("assistant-tts-begin", epoch);
+            }
+            Delivery::Local {
+                app: app.clone(),
+                voice_ticket,
+            }
         } else {
             Delivery::Remote {
-                tx: spawn_remote_synthesis(app.clone(), settings.clone(), epoch),
+                tx: spawn_remote_synthesis(app.clone(), settings.clone(), epoch, voice_ticket),
             }
         };
         Self {
@@ -677,9 +700,17 @@ impl SpeechPipeline {
                 self.deliver(chunk);
             }
         }
-        if let Delivery::Local { app } = &self.delivery {
+        if let Delivery::Local { app, voice_ticket } = &self.delivery {
             use tauri::Emitter;
-            let _ = app.emit("assistant-tts-end", ());
+            if let Some(ticket) = voice_ticket {
+                let _ = app.emit_to(
+                    crate::assistant::PANEL_LABEL,
+                    "assistant-conversation-local",
+                    serde_json::json!({ "ticket": ticket, "epoch": self.epoch, "kind": "end" }),
+                );
+            } else {
+                let _ = app.emit("assistant-tts-end", ());
+            }
         }
         // Replacing the delivery drops the channel sender, which ends the
         // synthesis task; it releases the audio device once the queue has played.
@@ -688,9 +719,13 @@ impl SpeechPipeline {
 
     fn deliver(&mut self, chunk: String) {
         match &self.delivery {
-            Delivery::Local { app } => {
+            Delivery::Local { app, voice_ticket } => {
                 use tauri::Emitter;
-                let _ = app.emit("assistant-tts-chunk", chunk);
+                if let Some(ticket) = voice_ticket {
+                    let _ = app.emit_to(crate::assistant::PANEL_LABEL, "assistant-conversation-local", serde_json::json!({ "ticket": ticket, "epoch": self.epoch, "kind": "chunk", "text": chunk }));
+                } else {
+                    let _ = app.emit("assistant-tts-chunk", chunk);
+                }
                 self.spoke = true;
             }
             Delivery::Remote { tx } => {
@@ -739,16 +774,19 @@ fn spawn_chunk_synthesis(
     text: String,
     stitch_ids: Vec<String>,
 ) -> tokio::sync::oneshot::Receiver<Result<crate::tts::SynthesizedSpeech, String>> {
-    let (tx, rx) = tokio::sync::oneshot::channel();
+    let (mut tx, rx) = tokio::sync::oneshot::channel();
     tauri::async_runtime::spawn(async move {
-        let result = crate::tts::synthesize_speech(
+        let request = crate::tts::synthesize_speech(
             &settings,
             crate::tts::SpeechRequest {
                 text: &text,
                 previous_request_ids: &stitch_ids,
             },
-        )
-        .await;
+        );
+        let result = tokio::select! {
+            result = request => result,
+            _ = tx.closed() => return,
+        };
         // A closed receiver means the reply was superseded; the audio is simply
         // dropped.
         let _ = tx.send(result);
@@ -769,6 +807,7 @@ fn spawn_remote_synthesis(
     app: tauri::AppHandle,
     settings: crate::settings::AppSettings,
     epoch: u64,
+    voice_ticket: Option<crate::voice_conversation::VoiceTicket>,
 ) -> tokio::sync::mpsc::UnboundedSender<String> {
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<String>();
     tauri::async_runtime::spawn(async move {
@@ -844,6 +883,23 @@ fn spawn_remote_synthesis(
                     if let Some(id) = speech.request_id {
                         stitch_ids.push(id);
                     }
+                    if let Some(ticket) = voice_ticket {
+                        if crate::tts::current_epoch() != epoch
+                            || !crate::voice_conversation::is_current(&app, ticket)
+                        {
+                            break;
+                        }
+                        // Play beside the browser microphone so WebRTC's echo
+                        // canceller has the assistant audio as a reference.
+                        use base64::Engine;
+                        use tauri::Emitter;
+                        let _ = app.emit_to(crate::assistant::PANEL_LABEL, "assistant-conversation-audio", serde_json::json!({
+                            "ticket": ticket,
+                            "epoch": epoch,
+                            "audio": base64::engine::general_purpose::STANDARD.encode(&speech.bytes),
+                        }));
+                        continue;
+                    }
                     let app_play = app.clone();
                     let device = device.clone();
                     // Queueing can block briefly when playback is far behind, so
@@ -877,6 +933,14 @@ fn spawn_remote_synthesis(
             }
         }
         crate::tts::finish_speech_stream(epoch);
+        if let Some(ticket) = voice_ticket {
+            use tauri::Emitter;
+            let _ = app.emit_to(
+                crate::assistant::PANEL_LABEL,
+                "assistant-conversation-audio-end",
+                serde_json::json!({ "ticket": ticket, "epoch": epoch }),
+            );
+        }
     });
     tx
 }

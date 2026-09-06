@@ -44,6 +44,7 @@ import { useSettings } from "../../../hooks/useSettings";
 // Retention rows live at the bottom of the History page, below the list.
 import { RecordingRetentionPeriodSelector } from "../RecordingRetentionPeriod";
 import { HistoryLimit } from "../HistoryLimit";
+import { VOICE_INTERRUPTED_MARKER } from "@/assistant/conversationPolicy";
 
 /** Must match the marker constants in src-tauri/src/assistant.rs */
 const SCREENSHOT_MARKER = "[screenshot attached]";
@@ -67,6 +68,7 @@ const cleanMessageContent = (
   const kept: string[] = [];
   for (const line of raw.split("\n")) {
     const trimmed = line.trim();
+    if (trimmed === VOICE_INTERRUPTED_MARKER) continue;
     if (trimmed === SCREENSHOT_MARKER) {
       screenshot = true;
       continue;

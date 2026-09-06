@@ -1,6 +1,6 @@
 use crate::settings::PostProcessProvider;
 use futures_util::StreamExt;
-use log::debug;
+use log::{debug, warn};
 use once_cell::sync::Lazy;
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE, REFERER, USER_AGENT};
 use serde::{Deserialize, Serialize};
@@ -109,6 +109,10 @@ fn build_chat_completion_request(
     if provider.id == "builtin" && !options.keep_system_role {
         fold_system_into_first_user(&mut messages);
     }
+    // Applies to every provider: a strict chat template is a property of the
+    // model, not of who serves it (Gemma is strict locally and on a cloud
+    // gateway alike), and a well-formed conversation is left untouched.
+    enforce_alternating_roles(&mut messages);
 
     let response_format = options.json_schema.map(|schema| ResponseFormat {
         format_type: "json_schema".to_string(),
@@ -359,6 +363,103 @@ fn message_text(message: &Value) -> String {
     }
 }
 
+/// Whether a message may be merged with an adjacent one of the same role.
+///
+/// A `tool` result and an assistant turn that carries `tool_calls` are part of
+/// the tool-calling protocol and are paired by id, so they are never touched.
+fn is_mergeable_role(message: &Value) -> bool {
+    let role = message.get("role").and_then(|r| r.as_str());
+    matches!(role, Some("system") | Some("user") | Some("assistant"))
+        && message.get("tool_calls").is_none()
+}
+
+/// Append `extra`'s content onto `target`'s, preserving multimodal parts.
+fn append_message_content(target: &mut Value, extra: &Value) {
+    let extra_text = message_text(extra);
+    match (target.get_mut("content"), extra.get("content")) {
+        // Both plain strings: join as two paragraphs.
+        (Some(Value::String(existing)), _)
+            if !matches!(extra.get("content"), Some(Value::Array(_))) =>
+        {
+            if !extra_text.trim().is_empty() {
+                if existing.trim().is_empty() {
+                    *existing = extra_text;
+                } else {
+                    existing.push_str("\n\n");
+                    existing.push_str(&extra_text);
+                }
+            }
+        }
+        // Either side carries content parts (text + images): concatenate parts
+        // so an attached image is never dropped by the merge.
+        (Some(Value::Array(parts)), Some(Value::Array(extra_parts))) => {
+            parts.extend(extra_parts.iter().cloned());
+        }
+        (Some(Value::Array(parts)), _) => {
+            if !extra_text.trim().is_empty() {
+                parts.push(serde_json::json!({ "type": "text", "text": extra_text }));
+            }
+        }
+        (Some(existing @ Value::String(_)), Some(Value::Array(extra_parts))) => {
+            let mut parts = vec![serde_json::json!({
+                "type": "text",
+                "text": existing.as_str().unwrap_or_default(),
+            })];
+            parts.extend(extra_parts.iter().cloned());
+            *existing = Value::Array(parts);
+        }
+        _ => {
+            target["content"] = Value::String(extra_text);
+        }
+    }
+}
+
+/// Enforce the strictly-alternating message shape that several chat templates
+/// require, without changing what the user sees in the panel.
+///
+/// Gemma is the strict case and it is not only the local template: a Gemma
+/// served through a cloud gateway answers a request with two consecutive `user`
+/// messages with HTTP 400 "Conversation roles must alternate
+/// user/assistant/user/assistant/...". Our own history produces exactly that
+/// shape whenever a turn ends without a reply — a voice barge-in cancels
+/// generation before the first token, so the user message is recorded and no
+/// assistant message follows it. The offending pair then stays in the
+/// conversation, so *every* later turn fails the same way and the assistant
+/// goes permanently silent until the conversation is cleared.
+///
+/// Two passes fix it for every provider, and both are no-ops on a well-formed
+/// conversation:
+/// 1. Drop an assistant message that has neither text nor tool calls — it
+///    carries nothing and only breaks alternation (and is what an errored turn
+///    used to leave behind).
+/// 2. Merge adjacent same-role messages into one.
+fn enforce_alternating_roles(messages: &mut Vec<Value>) {
+    messages.retain(|message| {
+        let is_assistant = message.get("role").and_then(|r| r.as_str()) == Some("assistant");
+        !(is_assistant
+            && message.get("tool_calls").is_none()
+            && message_text(message).trim().is_empty())
+    });
+
+    let mut merged: Vec<Value> = Vec::with_capacity(messages.len());
+    for message in messages.drain(..) {
+        let same_role_as_previous = merged.last().is_some_and(|previous: &Value| {
+            is_mergeable_role(previous)
+                && is_mergeable_role(&message)
+                && previous.get("role") == message.get("role")
+        });
+        if same_role_as_previous {
+            // `merged` is non-empty whenever the predicate held.
+            if let Some(previous) = merged.last_mut() {
+                append_message_content(previous, &message);
+                continue;
+            }
+        }
+        merged.push(message);
+    }
+    *messages = merged;
+}
+
 /// Fold a leading `system` message into the first `user` message.
 ///
 /// The bundled llama.cpp engine (the "Built-in (Local)" provider) runs with
@@ -569,6 +670,54 @@ struct StreamChunk {
     choices: Vec<StreamChoice>,
 }
 
+/// An error the provider delivers *inside* a 200 SSE stream rather than as an
+/// HTTP status. Bedrock does this for a rejected request body, and it used to
+/// be indistinguishable from a malformed frame: the chunk failed to
+/// deserialize as a `StreamChunk`, was skipped at debug level, and the round
+/// resolved to an empty answer — so the panel showed no reply, no error, and
+/// nothing to act on.
+#[derive(Debug, Deserialize)]
+struct StreamErrorEnvelope {
+    error: StreamError,
+}
+
+#[derive(Debug, Deserialize)]
+struct StreamError {
+    #[serde(default)]
+    message: Option<String>,
+    #[serde(default, rename = "type")]
+    error_type: Option<String>,
+    #[serde(default)]
+    code: Option<Value>,
+}
+
+impl StreamError {
+    fn describe(&self) -> String {
+        let message = self
+            .message
+            .as_deref()
+            .map(str::trim)
+            .filter(|m| !m.is_empty())
+            .unwrap_or("the provider reported an error with no message");
+        match (
+            self.error_type.as_deref(),
+            self.code.as_ref().map(render_error_code),
+        ) {
+            (Some(kind), Some(code)) => format!("{message} ({kind}, {code})"),
+            (Some(kind), None) => format!("{message} ({kind})"),
+            (None, Some(code)) => format!("{message} ({code})"),
+            (None, None) => message.to_string(),
+        }
+    }
+}
+
+fn render_error_code(code: &Value) -> String {
+    match code {
+        Value::String(code) => code.clone(),
+        other => other.to_string(),
+    }
+}
+
 #[derive(Debug, Deserialize)]
 struct StreamChoice {
     delta: StreamDelta,
@@ -685,6 +834,8 @@ struct SseChatAccumulator {
     round: ChatRound,
     tool_call_parts: Vec<ToolCallParts>,
     done: bool,
+    /// First in-stream provider error seen, if any (see `StreamErrorEnvelope`).
+    error: Option<String>,
 }
 
 impl SseChatAccumulator {
@@ -745,6 +896,18 @@ impl SseChatAccumulator {
         match serde_json::from_str::<StreamChunk>(data) {
             Ok(parsed) => self.accumulate_chunk(parsed, on_token),
             Err(error) => {
+                // An error frame is not a malformed frame: it is the provider
+                // refusing the request on a 200 stream. Report it instead of
+                // resolving the round to a silent empty answer.
+                if let Ok(envelope) = serde_json::from_str::<StreamErrorEnvelope>(data) {
+                    let detail = envelope.error.describe();
+                    warn!("LLM stream returned a provider error: {}", detail);
+                    if self.error.is_none() {
+                        self.error = Some(detail);
+                    }
+                    self.done = true;
+                    return;
+                }
                 // Assistant wrappers historically skip malformed provider
                 // frames and continue streaming; preserve that behavior.
                 debug!("Skipping unparsable SSE chunk: {} ({})", data, error);
@@ -848,7 +1011,18 @@ async fn read_sse_round(
         }
     }
 
-    Ok(accumulator.finish(&mut on_token))
+    let stream_error = accumulator.error.take();
+    let round = accumulator.finish(&mut on_token);
+    // A provider error that arrives mid-stream truncates an answer whose tokens
+    // are already on screen; keep that text rather than making the panel go
+    // blank, and only fail the round when the error is all we got.
+    if let Some(error) = stream_error {
+        if round.text.trim().is_empty() && round.tool_calls.is_empty() {
+            return Err(error);
+        }
+        warn!("Keeping the partial reply that preceded a stream error: {error}");
+    }
+    Ok(round)
 }
 
 /// Send a streaming chat completion request to an OpenAI-compatible API.
@@ -1053,6 +1227,7 @@ pub async fn fetch_models(
 mod tests {
     use super::*;
     use crate::settings::PostProcessProvider;
+    use serde_json::json;
 
     fn provider(id: &str, base: &str) -> PostProcessProvider {
         PostProcessProvider {
@@ -1063,6 +1238,180 @@ mod tests {
             models_endpoint: Some("/models".to_string()),
             supports_structured_output: true,
         }
+    }
+
+    /// A voice barge-in cancels a turn before the first token, so history keeps
+    /// the user message with no assistant reply after it. Gemma (local template
+    /// or cloud gateway) answers the next request with HTTP 400 "Conversation
+    /// roles must alternate", and the pair persists, so the assistant stays
+    /// silent for the rest of the conversation. The request must be repaired.
+    #[test]
+    fn consecutive_user_turns_are_merged_for_strict_templates() {
+        let mut messages = vec![
+            json!({"role": "system", "content": "persona"}),
+            json!({"role": "user", "content": "first"}),
+            json!({"role": "assistant", "content": "reply"}),
+            // Cancelled turn: recorded, never answered.
+            json!({"role": "user", "content": "interrupted"}),
+            json!({"role": "user", "content": "second"}),
+        ];
+        enforce_alternating_roles(&mut messages);
+
+        let roles: Vec<&str> = messages
+            .iter()
+            .map(|m| m["role"].as_str().unwrap())
+            .collect();
+        assert_eq!(roles, ["system", "user", "assistant", "user"]);
+        assert_eq!(messages[3]["content"], "interrupted\n\nsecond");
+    }
+
+    #[test]
+    fn a_content_free_assistant_turn_is_dropped_rather_than_breaking_alternation() {
+        let mut messages = vec![
+            json!({"role": "user", "content": "first"}),
+            // What an errored turn used to leave behind.
+            json!({"role": "assistant", "content": ""}),
+            json!({"role": "user", "content": "second"}),
+        ];
+        enforce_alternating_roles(&mut messages);
+
+        let roles: Vec<&str> = messages
+            .iter()
+            .map(|m| m["role"].as_str().unwrap())
+            .collect();
+        assert_eq!(roles, ["user"]);
+        assert_eq!(messages[0]["content"], "first\n\nsecond");
+    }
+
+    #[test]
+    fn tool_protocol_messages_are_never_merged_away() {
+        let mut messages = vec![
+            json!({"role": "user", "content": "search"}),
+            json!({"role": "assistant", "content": "", "tool_calls": [
+                {"id": "c1", "type": "function", "function": {"name": "web_search", "arguments": "{}"}}
+            ]}),
+            json!({"role": "tool", "tool_call_id": "c1", "content": "results"}),
+            json!({"role": "tool", "tool_call_id": "c2", "content": "more results"}),
+        ];
+        let before = messages.clone();
+        enforce_alternating_roles(&mut messages);
+        assert_eq!(messages, before);
+    }
+
+    #[test]
+    fn merging_a_user_turn_keeps_its_attached_image() {
+        let mut messages = vec![
+            json!({"role": "user", "content": [
+                {"type": "text", "text": "look"},
+                {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64,AAA"}}
+            ]}),
+            json!({"role": "user", "content": "and answer"}),
+        ];
+        enforce_alternating_roles(&mut messages);
+
+        assert_eq!(messages.len(), 1);
+        let parts = messages[0]["content"].as_array().expect("content parts");
+        assert_eq!(parts.len(), 3);
+        assert_eq!(parts[1]["type"], "image_url");
+        assert_eq!(parts[2]["text"], "and answer");
+    }
+
+    /// The normalizer has to be on the actual request path, not only unit
+    /// tested: this is the exact body Bedrock rejected with HTTP 400.
+    #[test]
+    fn a_cloud_request_body_alternates_even_when_history_does_not() {
+        let request = build_chat_completion_request(
+            &provider("bedrock_mantle", "https://bedrock-mantle.example/v1"),
+            "google.gemma-3-27b-it",
+            vec![
+                json!({"role": "system", "content": "persona"}),
+                json!({"role": "user", "content": "all right, hello"}),
+                json!({"role": "assistant", "content": "Hi there!"}),
+                json!({"role": "user", "content": "so"}),
+                json!({"role": "user", "content": "basically what I was doing"}),
+            ],
+            ChatRequestOptions {
+                stream: Some(true),
+                ..Default::default()
+            },
+        );
+
+        let roles: Vec<&str> = request
+            .messages
+            .iter()
+            .map(|m| m["role"].as_str().unwrap())
+            .collect();
+        assert_eq!(roles, ["system", "user", "assistant", "user"]);
+        for pair in roles[1..].windows(2) {
+            assert_ne!(
+                pair[0], pair[1],
+                "roles must alternate after the system turn"
+            );
+        }
+    }
+
+    #[test]
+    fn merging_into_a_plain_user_turn_keeps_a_later_attached_image() {
+        let mut messages = vec![
+            json!({"role": "user", "content": "what is this"}),
+            json!({"role": "user", "content": [
+                {"type": "text", "text": "this"},
+                {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64,AAA"}}
+            ]}),
+        ];
+        enforce_alternating_roles(&mut messages);
+
+        assert_eq!(messages.len(), 1);
+        let parts = messages[0]["content"].as_array().expect("content parts");
+        assert_eq!(parts.len(), 3);
+        assert_eq!(parts[0]["text"], "what is this");
+        assert_eq!(parts[2]["type"], "image_url");
+    }
+
+    #[test]
+    fn a_well_formed_conversation_is_left_untouched() {
+        let mut messages = vec![
+            json!({"role": "system", "content": "persona"}),
+            json!({"role": "user", "content": "hi"}),
+            json!({"role": "assistant", "content": "hello"}),
+            json!({"role": "user", "content": "again"}),
+        ];
+        let before = messages.clone();
+        enforce_alternating_roles(&mut messages);
+        assert_eq!(messages, before);
+    }
+
+    /// Bedrock reports a rejected body inside a 200 SSE stream. That used to be
+    /// skipped as a malformed frame, so the turn resolved to an empty answer and
+    /// the user saw silence with no error anywhere.
+    #[test]
+    fn an_in_stream_provider_error_is_captured_instead_of_skipped() {
+        let mut accumulator = SseChatAccumulator::default();
+        let mut tokens = String::new();
+        accumulator.push(
+            br#"data: {"error":{"code":"validation_error","message":"Conversation roles must alternate user/assistant/user/assistant/...","type":"invalid_request_error"}}
+"#,
+            &mut |token| tokens.push_str(token),
+        );
+
+        let error = accumulator.error.clone().expect("error should be captured");
+        assert!(error.contains("Conversation roles must alternate"));
+        assert!(error.contains("invalid_request_error"));
+        assert!(accumulator.is_done());
+        assert!(tokens.is_empty());
+    }
+
+    #[test]
+    fn a_malformed_frame_is_still_skipped_without_failing_the_round() {
+        let mut accumulator = SseChatAccumulator::default();
+        let mut tokens = String::new();
+        accumulator.push(
+            b"data: {\"not\":\"a chunk\"}\ndata: {\"choices\":[{\"delta\":{\"content\":\"hi\"}}]}\n",
+            &mut |token| tokens.push_str(token),
+        );
+
+        assert!(accumulator.error.is_none());
+        assert_eq!(tokens, "hi");
     }
 
     #[test]

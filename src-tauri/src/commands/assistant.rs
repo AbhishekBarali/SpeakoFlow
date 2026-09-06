@@ -204,6 +204,7 @@ pub fn assistant_get_conversation(app: AppHandle) -> Result<Vec<ChatMessage>, St
 #[tauri::command]
 #[specta::specta]
 pub async fn assistant_regenerate(app: AppHandle) -> Result<(), String> {
+    crate::voice_conversation::end(&app);
     assistant::regenerate_last(app).await;
     Ok(())
 }
@@ -222,6 +223,7 @@ pub async fn assistant_summarize(app: AppHandle) -> Result<(), String> {
 #[tauri::command]
 #[specta::specta]
 pub fn assistant_resume_session(app: AppHandle, id: i64) -> Result<(), String> {
+    crate::voice_conversation::end(&app);
     let conversation = app.state::<AssistantConversation>();
     if conversation.is_busy() {
         return Err("The assistant is answering right now — stop it first.".to_string());
@@ -245,6 +247,7 @@ pub fn assistant_resume_session(app: AppHandle, id: i64) -> Result<(), String> {
 #[tauri::command]
 #[specta::specta]
 pub fn assistant_clear_conversation(app: AppHandle) -> Result<(), String> {
+    crate::voice_conversation::end(&app);
     let conversation = app.state::<AssistantConversation>();
     // Learn from the conversation before wiping it — but only if there's new,
     // substantial content since the last pass. `take_distillable` enforces that
@@ -630,9 +633,9 @@ pub fn set_assistant_panel_size(app: AppHandle, size: String) -> Result<(), Stri
         return Err(format!("Unknown panel size: {}", size));
     }
     let mut settings = get_settings(&app);
-    settings.assistant_panel_size = size.clone();
+    settings.assistant_panel_size = size;
     write_settings(&app, settings);
-    assistant::apply_panel_size(&app, &size);
+    assistant::apply_panel_size(&app);
     emit_settings_changed(&app);
     Ok(())
 }
@@ -710,6 +713,7 @@ pub fn get_assistant_screen_armed(app: AppHandle) -> bool {
 #[tauri::command]
 #[specta::specta]
 pub fn assistant_toggle_voice(app: AppHandle) -> Result<(), String> {
+    crate::voice_conversation::end(&app);
     let coordinator = app
         .try_state::<crate::TranscriptionCoordinator>()
         .ok_or_else(|| "Coordinator not initialized".to_string())?;

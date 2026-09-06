@@ -24,11 +24,18 @@ mod settings;
 mod shortcut;
 mod signal_handle;
 mod speech_stream;
+mod stt_cloud;
+#[cfg(test)]
+mod stt_cloud_bench;
+#[cfg(test)]
+mod stt_cloud_live_tests;
+mod stt_cloud_stream;
 mod transcription_coordinator;
 mod tray;
 mod tray_i18n;
 mod tts;
 mod utils;
+mod voice_conversation;
 mod web_search;
 
 pub use cli::CliArgs;
@@ -685,6 +692,19 @@ pub fn run(cli_args: CliArgs) {
             commands::transcription::set_model_unload_timeout,
             commands::transcription::get_model_load_status,
             commands::transcription::unload_model_manually,
+            commands::stt_cloud::get_cloud_stt_providers,
+            commands::stt_cloud::get_cloud_stt_readiness,
+            commands::stt_cloud::set_stt_engine_mode,
+            commands::stt_cloud::set_cloud_stt_api_key,
+            commands::stt_cloud::set_cloud_stt_provider,
+            commands::stt_cloud::set_cloud_stt_model,
+            commands::stt_cloud::set_cloud_stt_base_url,
+            commands::stt_cloud::set_cloud_stt_streaming,
+            commands::stt_cloud::set_cloud_stt_send_custom_words,
+            commands::stt_cloud::set_cloud_stt_no_verbatim,
+            commands::stt_cloud::get_cloud_stt_key_status,
+            commands::stt_cloud::list_cloud_stt_models,
+            commands::stt_cloud::test_cloud_stt,
             commands::history::get_history_entries,
             commands::history::toggle_history_entry_saved,
             commands::history::get_audio_file_path,
@@ -751,6 +771,10 @@ pub fn run(cli_args: CliArgs) {
             commands::assistant::assistant_list_tts_voices,
             commands::assistant::assistant_list_tts_models,
             commands::assistant::assistant_stop,
+            voice_conversation::assistant_conversation_start,
+            voice_conversation::assistant_conversation_end,
+            voice_conversation::assistant_conversation_set_expanded,
+            voice_conversation::assistant_conversation_interrupt,
             commands::assistant::set_assistant_max_history_messages,
             commands::assistant::set_assistant_auto_summarize,
             commands::assistant::set_assistant_web_search_enabled,
@@ -796,13 +820,18 @@ pub fn run(cli_args: CliArgs) {
     // A named function rather than a `let` binding, so the runtime type is
     // concrete instead of needing inference through the macro.
     fn raw_body_handler(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
-        let handler: fn(tauri::ipc::Invoke<tauri::Wry>) -> bool =
-            tauri::generate_handler![commands::assistant::assistant_play_local_tts_chunk];
+        let handler: fn(tauri::ipc::Invoke<tauri::Wry>) -> bool = tauri::generate_handler![
+            commands::assistant::assistant_play_local_tts_chunk,
+            voice_conversation::assistant_conversation_audio
+        ];
         handler(invoke)
     }
     let specta_handler = specta_builder.invoke_handler();
     let invoke_handler = move |invoke: tauri::ipc::Invoke<tauri::Wry>| {
-        if invoke.message.command() == "assistant_play_local_tts_chunk" {
+        if matches!(
+            invoke.message.command(),
+            "assistant_play_local_tts_chunk" | "assistant_conversation_audio"
+        ) {
             raw_body_handler(invoke)
         } else {
             specta_handler(invoke)
@@ -1016,6 +1045,7 @@ pub fn run(cli_args: CliArgs) {
                 app.manage(lock_watch::LockWatch::new(app_handle.clone()));
             }
             app.manage(assistant::AssistantConversation::new());
+            app.manage(voice_conversation::VoiceConversation::default());
 
             initialize_core_logic(&app_handle);
 

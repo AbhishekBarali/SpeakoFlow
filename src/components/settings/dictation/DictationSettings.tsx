@@ -6,6 +6,7 @@ import { SectionHeader } from "@/components/ui/SectionHeader";
 import { ModelsSettings } from "../models/ModelsSettings";
 import { LlmCatalog } from "../assistant/LlmCatalog";
 import { DictationModelCard } from "./DictationModelCard";
+import { CloudTranscriptionGroup } from "./CloudTranscriptionGroup";
 import { AiCleanupGroup } from "./AiCleanupGroup";
 import { GenerateWithFlowGroup } from "./GenerateWithFlowGroup";
 import { SpokenEmojiToggle } from "./SpokenEmojiToggle";
@@ -77,6 +78,11 @@ export const DictationSettings: React.FC = () => {
         description={t("sectionSubtitles.dictation")}
       />
       <DictationModelCard onChangeModel={() => setSubPage("transcription")} />
+
+      {/* Where transcription runs: this machine, or a hosted provider. Sits
+          directly under the model hero because it decides whether that hero is
+          what will actually be listening. */}
+      <CloudTranscriptionGroup />
 
       {/* Language / translate rows — only for models that support them. */}
       <ModelSettingsCard />

@@ -906,6 +906,57 @@
         "title": "Choose your model",
         "description": "Every model runs on your machine — trade accuracy for speed and pick the one that fits."
       },
+      "cloud": {
+        "groupTitle": "Where transcription runs",
+        "engine": {
+          "title": "Speech-to-text engine",
+          "description": "On this machine, or a hosted provider you bring a key for.",
+          "info": "On my device runs a model you downloaded: private, free, and offline. Cloud sends your recording to a provider you choose and is billed by them per minute of audio, in exchange for a frontier model with no download and no GPU."
+        },
+        "bypassNotice": "Cloud transcription is on, so the model above is not used and stays unloaded.",
+        "provider": {
+          "title": "Provider"
+        },
+        "key": {
+          "title": "API key",
+          "stored": "A key is saved in your system keychain.",
+          "missing": "No key saved yet for this provider.",
+          "placeholder": "Paste your API key",
+          "replacePlaceholder": "Paste a new key to replace the saved one",
+          "save": "Save",
+          "saved": "API key saved",
+          "clear": "Remove",
+          "getOne": "Get a key"
+        },
+        "endpoint": {
+          "title": "Endpoint",
+          "description": "Base URL of an OpenAI-compatible transcription server."
+        },
+        "model": {
+          "title": "Model",
+          "info": "Type any model the provider offers, or load the list. For ElevenLabs, pick scribe_v2_realtime to transcribe as you speak and scribe_v2 to transcribe once you stop.",
+          "load": "Load models"
+        },
+        "streaming": {
+          "label": "Transcribe as I speak",
+          "description": "Text arrives while you are still talking, so releasing the key only flushes the last few words.",
+          "needsRealtimeModel": "Choose a realtime model above to use this — the current one only transcribes after you stop."
+        },
+        "keyterms": {
+          "label": "Send my custom words",
+          "description": "Passes your custom vocabulary to the provider so it biases toward those spellings."
+        },
+        "noVerbatim": {
+          "label": "Remove filler words",
+          "description": "Drops \"um\", \"uh\", false starts, and repeats. Turn this off to get back exactly what you said, word for word."
+        },
+        "test": {
+          "title": "Test connection",
+          "description": "Sends one second of audio to check the key, endpoint, and model.",
+          "action": "Run test",
+          "running": "Testing…"
+        }
+      },
       "aiCleanup": {
         "groupTitle": "AI cleanup",
         "modelGroupTitle": "Cleanup model",
@@ -1516,6 +1567,7 @@
     "notices": {
       "flowNotConfigured": "Flow needs an assistant model — pasted as dictation",
       "flowFailed": "Flow couldn't generate — nothing was pasted",
+      "cloudSttFailed": "Cloud transcription failed — check your key and credit in Settings",
       "flowEmpty": "Say a command after the activation phrase",
       "cleanupFallback": "AI cleanup didn't run — pasted the raw text"
     },
@@ -1526,6 +1578,57 @@
     "askAssistant": "Ask the assistant instead of typing this"
   },
   "assistant": {
+    "conversation": {
+      "title": "Conversation",
+      "start": "Start voice conversation",
+      "transcript": "Show conversation transcript",
+      "hint": "Talk naturally with {{name}}. Speak to interrupt.",
+      "mutedHint": "Microphone off. Unmute to continue.",
+      "startingHint": "Preparing your microphone and voice detection…",
+      "errorHint": "Your microphone is off. Your conversation is saved.",
+      "mute": "Mute",
+      "unmute": "Unmute",
+      "end": "End",
+      "retry": "Try again",
+      "details": "Details",
+      "pace": "Time to finish speaking",
+      "paces": {
+        "quick": "Quick",
+        "natural": "Natural",
+        "patient": "Patient"
+      },
+      "phase": {
+        "off": "Conversation ended",
+        "starting": "Connecting",
+        "listening": "Listening",
+        "hearing": "Listening to you",
+        "transcribing": "Processing",
+        "responding": "Thinking",
+        "speaking": "Speaking",
+        "muted": "Microphone muted",
+        "error": "Connection interrupted"
+      },
+      "errors": {
+        "microphone": "Couldn't open your microphone. Allow microphone access and check that it isn't in use by another app.",
+        "device": "Your microphone disconnected. Reconnect it, then try again.",
+        "setup": "Couldn't start conversation. Check your microphone, speaker, and assistant model in Settings.",
+        "turn": "This reply couldn't finish. Check the details, then try again.",
+        "playback": "Couldn't play the voice reply. Check your voice provider and output device.",
+        "tooLong": "That recording reached the one-minute limit. Try again with a shorter turn."
+      },
+      "chooseProfile": "Change profile, currently {{name}}",
+      "profiles": "Profiles",
+      "profileHint": "Changes apply to your next reply.",
+      "chatOnlyProfile": "This profile is available in chat only.",
+      "profileError": "Could not switch profiles. Try again.",
+      "focusView": "Return to orb view",
+      "options": "Conversation options",
+      "paceHint": "How long to wait after you pause before replying.",
+      "interruptHint": "Speak freely. Interrupt anytime.",
+      "expand": "Enlarge window and show transcript",
+      "shrink": "Shrink window and hide transcript",
+      "readTranscript": "Read conversation"
+    },
     "title": "Assistant",
     "character": {
       "switch": "Switch persona"

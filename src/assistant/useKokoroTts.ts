@@ -20,6 +20,11 @@ export interface KokoroError {
   reason: KokoroErrorReason;
 }
 
+export interface BrowserSpeechSink {
+  enqueue: (blob: Blob, epoch: number | null) => Promise<void>;
+  finish: (epoch: number | null) => void;
+}
+
 /** Minimal surface of the kokoro-js model we use (erases its strict voice
  *  union type so the voice id can come from settings). */
 interface KokoroModel {
@@ -87,7 +92,10 @@ export function useKokoroTts(
   dtype: string = "fp32",
   speed: number = 1,
   preload: boolean = true,
+  browserSink?: BrowserSpeechSink,
 ) {
+  const browserSinkRef = useRef(browserSink);
+  browserSinkRef.current = browserSink;
   const modelRef = useRef<KokoroModel | null>(null);
   const loadingRef = useRef<Promise<KokoroModel> | null>(null);
   const dtypeRef = useRef(dtype);
@@ -396,7 +404,10 @@ export function useKokoroTts(
     setStatus((s) => (s === "speaking" ? "ready" : s));
   }, []);
 
-  const stop = useCallback(() => teardown(true), [teardown]);
+  const stop = useCallback(
+    (cancelNative = true) => teardown(cancelNative && !browserSinkRef.current),
+    [teardown],
+  );
 
   // When the dtype (precision) changes, drop the cached model so the next
   // synthesis reloads at the new precision.
@@ -460,7 +471,9 @@ export function useKokoroTts(
       // reply is complete lets it play out its queue and then release the audio
       // device; while synthesis is still running an empty queue only means we are
       // ahead, so the sink is left open to keep the next sentence gapless.
-      if (isTauri() && synthDoneRef.current) {
+      if (browserSinkRef.current && synthDoneRef.current) {
+        browserSinkRef.current.finish(streamEpochRef.current);
+      } else if (isTauri() && synthDoneRef.current) {
         void invoke("assistant_finish_local_tts", {
           epoch: streamEpochRef.current,
         }).catch(() => {});
@@ -469,6 +482,23 @@ export function useKokoroTts(
       return;
     }
     const url = URL.createObjectURL(next);
+
+    if (browserSinkRef.current) {
+      URL.revokeObjectURL(url);
+      nativePlayingRef.current = true;
+      void browserSinkRef.current
+        .enqueue(next, streamEpochRef.current)
+        .catch(() => {
+          if (generation === generationRef.current)
+            setError({ reason: "playback" });
+        })
+        .finally(() => {
+          if (generation !== generationRef.current) return;
+          nativePlayingRef.current = false;
+          pump(generation);
+        });
+      return;
+    }
 
     if (isTauri()) {
       // The HUD is deliberately non-focus-stealing. Route generated speech to
@@ -596,6 +626,11 @@ export function useKokoroTts(
   const finishSynthesis = useCallback((generation: number) => {
     if (generation !== generationRef.current) return;
     synthDoneRef.current = true;
+    if (browserSinkRef.current) {
+      if (queueRef.current.length === 0 && !nativePlayingRef.current)
+        browserSinkRef.current.finish(streamEpochRef.current);
+      return;
+    }
     if (
       isTauri() &&
       queueRef.current.length === 0 &&
