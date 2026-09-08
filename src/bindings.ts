@@ -730,6 +730,17 @@ async cancelOperation() : Promise<void> {
     await TAURI_INVOKE("cancel_operation");
 },
 /**
+ * Copy from the non-activating overlay and acknowledge the actual OS write.
+ */
+async copyOverlayTranscript(text: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("copy_overlay_transcript", { text }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * Finish the current recording right now and run the normal transcribe /
  * assistant pipeline on it. This is the "done" tick on the recording overlay
  * and the finish button on the assistant panel — the keyboard-free way to end
@@ -1842,6 +1853,30 @@ async setAssistantTtsSpeed(speed: number) : Promise<Result<null, string>> {
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * Loudness of the assistant's spoken replies (0.0–1.0).
+ */
+async setAssistantTtsVolume(volume: number) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_assistant_tts_volume", { volume }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * How long a hands-free conversation waits for you to finish speaking before it
+ * answers. Persisted, so it applies to every call rather than only the one it
+ * was changed in.
+ */
+async setAssistantConversationPace(pace: ConversationPace) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_assistant_conversation_pace", { pace }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async setAssistantPanelOpacity(opacity: number) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("set_assistant_panel_opacity", { opacity }) };
@@ -2059,6 +2094,11 @@ async assistantConversationSetExpanded(expanded: boolean) : Promise<void> {
 /**
  * Speech onset (also used by mute): invalidate pending inference and audio
  * before the new utterance finishes. Returns the new turn's cancellation key.
+ * 
+ * `async` on purpose: a synchronous command runs on the main thread, and this
+ * one can write the whole conversation to disk. Doing that at the instant the
+ * user starts talking stalled the event loop — a visible hitch in the orb and
+ * in window dragging on any conversation long enough to matter.
  */
 async assistantConversationInterrupt(session: number, interruptedReply: boolean) : Promise<Result<VoiceTicket, string>> {
     try {
@@ -2627,7 +2667,21 @@ assistant_tts_base_urls?: Partial<{ [key in string]: string }>; assistant_tts_mo
  * the webview audio element) and natively for remote engines where the
  * API supports it.
  */
-assistant_tts_speed?: number; assistant_max_history_messages?: number; 
+assistant_tts_speed?: number; 
+/**
+ * Loudness of the assistant's spoken replies, 0.0–1.0.
+ * 
+ * Its own setting rather than a share of `audio_feedback_volume`: that one
+ * belongs to the start/stop feedback beeps and its only control is greyed
+ * out whenever feedback sounds are off (the default). Turning the beeps
+ * down once and then switching them off therefore left the assistant's
+ * voice quiet with no reachable way to fix it.
+ */
+assistant_tts_volume?: number; 
+/**
+ * How long a hands-free conversation waits for you to finish speaking.
+ */
+assistant_conversation_pace?: ConversationPace; assistant_max_history_messages?: number; 
 /**
  * When on, once a conversation grows past the model's context window the
  * assistant folds older turns into a rolling summary (kept in context)
@@ -3039,6 +3093,30 @@ export type CloudSttReadiness = { state: "ready"; provider_id: string; provider_
  * falling back so the UI can say something more useful than "failed".
  */
 export type CloudSttUnavailableReason = "not_enabled" | "selected_provider_missing" | "missing_api_key" | "no_model_configured"
+/**
+ * How long the assistant waits for you to finish speaking before it treats an
+ * utterance as a complete turn, in a hands-free voice conversation.
+ * 
+ * This is the single most consequential dial in a spoken conversation: the
+ * pause it names is what separates "one thought with a breath in it" from "two
+ * questions". Too short and a thought spoken with a pause is split in two; too
+ * long and the assistant feels slow to answer. It lives in settings rather than
+ * in the panel's local state because a user who needs `Patient` needs it in
+ * every call, not just the one they set it in.
+ */
+export type ConversationPace = 
+/**
+ * ~450 ms. Answers fastest; most likely to cut in while you are thinking.
+ */
+"quick" | 
+/**
+ * ~700 ms. The default.
+ */
+"natural" | 
+/**
+ * ~1100 ms. Room to pause mid-sentence without being interrupted.
+ */
+"patient"
 /**
  * A user-created writing style for cleanup. It is deliberately separate from
  * `LLMPrompt`: cleanup prompts define what corrections happen; tone presets

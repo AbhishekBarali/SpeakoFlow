@@ -31,12 +31,9 @@ use crate::tray;
 
 // Note: Commands are accessed via shortcut::handy_keys:: in lib.rs
 
-// Hands-free recording is now reached at runtime via *tap-to-lock*: while a
-// push-to-talk recording is held, a quick Shift tap converts it to hands-free
-// (see `crate::lock_watch` and the transcription coordinator). There is no
-// longer a statically-registered Shift "lock" variant of each recording
-// shortcut — which also frees the Shift combinations (e.g. Ctrl+Shift+Space) so
-// they no longer collide with bindings like "Transcribe with Post-Processing".
+// Each recording shortcut has a Shift variant that selects the opposite
+// hold/toggle mode (see transcription_coordinator::recording_mode). The former
+// mid-recording tap-to-lock watcher is retired; no extra raw listener is needed.
 
 /// Initialize shortcuts using the configured implementation
 pub fn init_shortcuts(app: &AppHandle) {

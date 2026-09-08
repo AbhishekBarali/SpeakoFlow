@@ -362,6 +362,39 @@ fn collapse_stutters(text: &str) -> String {
     result.join(" ")
 }
 
+/// Whether a transcription carries no speech at all.
+///
+/// An empty string is the obvious case, but it is not the common one: a local
+/// engine handed silence does not answer with nothing. whisper.cpp emits
+/// `[BLANK_AUDIO]`; Whisper models also produce bracketed or parenthesised
+/// annotations (`[silence]`, `(music)`), a musical note for non-speech audio, or
+/// bare punctuation like `...` when there is nothing to hear. Every one of those
+/// arrives at the output pipeline as ordinary text, so it gets pasted into
+/// whatever the user was typing into — and with AI cleanup on, it first spends the
+/// entire cleanup budget, plus a cold engine start on top, asking a language model
+/// to tidy up a string with no content in it. From the user's side that is
+/// "nothing happens for ages and then it types garbage".
+///
+/// The test is deliberately about *content*, not about matching a list of known
+/// markers: text is speechless when nothing outside a bracketed group is
+/// alphanumeric. That covers annotations this code has never seen, in any script,
+/// while a real dictation — which always has a word in it — is never caught.
+pub fn is_speechless_transcription(text: &str) -> bool {
+    let mut square = 0usize;
+    let mut round = 0usize;
+    for ch in text.chars() {
+        match ch {
+            '[' => square += 1,
+            ']' => square = square.saturating_sub(1),
+            '(' => round += 1,
+            ')' => round = round.saturating_sub(1),
+            _ if square == 0 && round == 0 && ch.is_alphanumeric() => return false,
+            _ => {}
+        }
+    }
+    true
+}
+
 /// Filters transcription output by removing filler words and stutter artifacts.
 ///
 /// This function cleans up raw transcription text by:
@@ -423,6 +456,66 @@ pub fn filter_transcription_output(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn silence_markers_from_a_local_engine_count_as_no_speech() {
+        // The bug this closes: a recording with nothing in it does not arrive as
+        // an empty string, so it sailed past the empty check into AI cleanup —
+        // burning the whole cleanup budget (and a cold engine start) before
+        // pasting a marker the user never said.
+        for text in [
+            "",
+            "   ",
+            "\n\t ",
+            "[BLANK_AUDIO]",
+            " [BLANK_AUDIO] ",
+            "[blank_audio]\n[BLANK_AUDIO]",
+            "[silence]",
+            "[ Silence ]",
+            "(silence)",
+            "(music)",
+            "[MUSIC PLAYING]",
+            "...",
+            ".",
+            " . . . ",
+            "-",
+            "♪",
+            "♪♪♪",
+            "[BLANK_AUDIO].",
+        ] {
+            assert!(
+                super::is_speechless_transcription(text),
+                "expected no speech in {text:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_real_dictation_is_never_mistaken_for_silence() {
+        for text in [
+            "Hello.",
+            "yes",
+            "7",
+            "ok [BLANK_AUDIO]",
+            "[BLANK_AUDIO] but then I kept talking",
+            "See the note (below) for details.",
+            "Ship it.",
+            "a",
+            // Any script, because the test is for alphanumeric content rather
+            // than for a list of English markers.
+            "こんにちは",
+            "привет",
+            "नमस्ते",
+            "  spaced out  ",
+            // An unbalanced bracket must not swallow the words around it.
+            "Hello [world",
+            ") stray close",
+        ] {
+            assert!(
+                !super::is_speechless_transcription(text),
+                "expected speech in {text:?}"
+            );
+        }
+    }
     use super::*;
 
     #[test]

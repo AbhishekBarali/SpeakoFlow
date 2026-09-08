@@ -13,10 +13,10 @@ mod helpers;
 mod huggingface;
 mod input;
 mod llm_client;
-mod lock_watch;
 mod managers;
 mod memory;
 mod overlay;
+mod overlay_lifecycle;
 pub mod portable;
 mod screenshot;
 mod secret_store;
@@ -398,6 +398,11 @@ fn initialize_core_logic(app_handle: &AppHandle) {
         tray::update_tray_menu(&app_handle_for_listener, &tray::TrayIconState::Idle, None);
     });
 
+    // Pointer transitions wake the completed-card dismissal task; no polling.
+    app_handle.listen("overlay-hover", |event| {
+        overlay::set_overlay_hovered(event.payload().trim() == "true");
+    });
+
     // Get the autostart manager and configure based on user setting
     let autostart_manager = app_handle.autolaunch();
     let settings = settings::get_settings(&app_handle);
@@ -635,6 +640,7 @@ pub fn run(cli_args: CliArgs) {
             trigger_update_check,
             show_main_window_command,
             commands::cancel_operation,
+            commands::copy_overlay_transcript,
             commands::commit_recording,
             commands::toggle_dictation,
             commands::is_portable,
@@ -753,6 +759,8 @@ pub fn run(cli_args: CliArgs) {
             commands::assistant::set_assistant_tts_remote_voice,
             commands::assistant::set_assistant_tts_kokoro_dtype,
             commands::assistant::set_assistant_tts_speed,
+            commands::assistant::set_assistant_tts_volume,
+            commands::assistant::set_assistant_conversation_pace,
             commands::assistant::set_assistant_panel_opacity,
             commands::assistant::set_assistant_panel_size,
             commands::assistant::set_assistant_tts_stop_on_dictation,
@@ -1031,19 +1039,6 @@ pub fn run(cli_args: CliArgs) {
             FILE_LOG_LEVEL.store(file_log_level.to_level_filter() as u8, Ordering::Relaxed);
             let app_handle = app.handle().clone();
             app.manage(TranscriptionCoordinator::new(app_handle.clone()));
-            // Tap-to-lock needs a raw global keyboard listener. On Linux, only
-            // start it when the user explicitly selected the raw handy-keys
-            // backend; the normal Tauri/Hyprland path must never open
-            // /dev/input devices merely because the app is running. Other
-            // platforms keep their existing permission-gated behavior.
-            let should_start_lock_watch = !cfg!(target_os = "linux")
-                || matches!(
-                    settings.keyboard_implementation,
-                    settings::KeyboardImplementation::HandyKeys
-                );
-            if should_start_lock_watch {
-                app.manage(lock_watch::LockWatch::new(app_handle.clone()));
-            }
             app.manage(assistant::AssistantConversation::new());
             app.manage(voice_conversation::VoiceConversation::default());
 

@@ -745,6 +745,27 @@ pub enum VisionCaptureTiming {
     OnSend,
 }
 
+/// How long the assistant waits for you to finish speaking before it treats an
+/// utterance as a complete turn, in a hands-free voice conversation.
+///
+/// This is the single most consequential dial in a spoken conversation: the
+/// pause it names is what separates "one thought with a breath in it" from "two
+/// questions". Too short and a thought spoken with a pause is split in two; too
+/// long and the assistant feels slow to answer. It lives in settings rather than
+/// in the panel's local state because a user who needs `Patient` needs it in
+/// every call, not just the one they set it in.
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum ConversationPace {
+    /// ~450 ms. Answers fastest; most likely to cut in while you are thinking.
+    Quick,
+    /// ~700 ms. The default.
+    #[default]
+    Natural,
+    /// ~1100 ms. Room to pause mid-sentence without being interrupted.
+    Patient,
+}
+
 /// How thorough a web search should be. This is the single dial that replaces
 /// the old raw "max results" number: it controls how many queries run, how many
 /// pages get scraped, and how much source text the model receives. All three
@@ -1384,6 +1405,18 @@ pub struct AppSettings {
     /// API supports it.
     #[serde(default = "default_assistant_tts_speed")]
     pub assistant_tts_speed: f64,
+    /// Loudness of the assistant's spoken replies, 0.0–1.0.
+    ///
+    /// Its own setting rather than a share of `audio_feedback_volume`: that one
+    /// belongs to the start/stop feedback beeps and its only control is greyed
+    /// out whenever feedback sounds are off (the default). Turning the beeps
+    /// down once and then switching them off therefore left the assistant's
+    /// voice quiet with no reachable way to fix it.
+    #[serde(default = "default_assistant_tts_volume")]
+    pub assistant_tts_volume: f32,
+    /// How long a hands-free conversation waits for you to finish speaking.
+    #[serde(default)]
+    pub assistant_conversation_pace: ConversationPace,
     #[serde(default = "default_assistant_max_history_messages")]
     pub assistant_max_history_messages: u32,
     /// When on, once a conversation grows past the model's context window the
@@ -2480,6 +2513,12 @@ fn default_assistant_tts_speed() -> f64 {
     1.0
 }
 
+fn default_assistant_tts_volume() -> f32 {
+    // Full volume: the assistant's voice is the thing the user asked for, so it
+    // starts audible and is turned down only on purpose.
+    1.0
+}
+
 fn default_assistant_max_history_messages() -> u32 {
     // How many prior messages (user+assistant) the model sees as context.
     12
@@ -2754,6 +2793,10 @@ fn ensure_assistant_defaults(settings: &mut AppSettings) -> bool {
     }
     if !(0.5..=1.0).contains(&settings.assistant_panel_opacity) {
         settings.assistant_panel_opacity = default_assistant_panel_opacity();
+        changed = true;
+    }
+    if !(0.0..=1.0).contains(&settings.assistant_tts_volume) {
+        settings.assistant_tts_volume = default_assistant_tts_volume();
         changed = true;
     }
     if !matches!(
@@ -3198,6 +3241,8 @@ pub fn get_default_settings() -> AppSettings {
         assistant_tts_api_keys: SecretMap::default(),
         assistant_tts_kokoro_dtype: default_assistant_tts_kokoro_dtype(),
         assistant_tts_speed: default_assistant_tts_speed(),
+        assistant_tts_volume: default_assistant_tts_volume(),
+        assistant_conversation_pace: ConversationPace::default(),
         assistant_max_history_messages: default_assistant_max_history_messages(),
         assistant_auto_summarize: default_assistant_auto_summarize(),
         local_llm_context_size: default_local_llm_context_size(),

@@ -14,8 +14,21 @@ export class ConversationAudio {
     volume = 1,
   ) {
     this.gain = context.createGain();
-    this.gain.gain.value = Math.max(0, Math.min(1, volume));
     this.gain.connect(context.destination);
+    this.setVolume(volume);
+  }
+
+  /**
+   * Apply a new playback volume, including to audio already queued.
+   *
+   * The gain node is shared by every source, so this takes effect mid-reply:
+   * moving the voice-volume slider during a call should be audible in that call,
+   * not in the next one.
+   */
+  setVolume(volume: number) {
+    const level = Math.max(0, Math.min(1, volume));
+    if (this.gain.gain.value === level) return;
+    this.gain.gain.value = level;
   }
 
   begin(epoch: number) {

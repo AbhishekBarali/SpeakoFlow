@@ -1,0 +1,11 @@
+/* WebView2 can report document.visibilityState === "visible" after Tauri hides
+ * a native window. Use the window's existing show/hide state instead. Keep the
+ * mounted UI ready to reopen, but stop its compositor animations while hidden. */
+.native-window-hidden,
+.native-window-hidden *,
+.native-window-hidden::before,
+.native-window-hidden::after,
+.native-window-hidden *::before,
+.native-window-hidden *::after {
+  animation-play-state: paused !important;
+}

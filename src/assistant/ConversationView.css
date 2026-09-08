@@ -527,6 +527,12 @@
   white-space: nowrap;
   font-size: 10px;
 }
+/* The pill has room for one line, so a voice failure replaces the phase there.
+   Colour is what tells the two apart at a glance; the full text is in the
+   button's tooltip and in the expanded view. */
+.conversation-pill.has-error .conversation-pill-open > span {
+  color: var(--as-error);
+}
 .conversation-pill-open > svg {
   color: var(--as-muted);
   flex-shrink: 0;

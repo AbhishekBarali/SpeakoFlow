@@ -4,7 +4,9 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type { MicVAD } from "@ricky0123/vad-web";
 import { ConversationAudio } from "./conversationAudio";
 import {
+  DEFAULT_CONVERSATION_PACE,
   MAX_UTTERANCE_MS,
+  matchDeviceByName,
   sameVoiceTicket,
   TURN_PAUSE_MS,
   VoiceTurnGate,
@@ -34,6 +36,13 @@ interface VoiceCallbacks {
   microphone?: string | null;
   outputDevice?: string | null;
   volume?: number;
+  /**
+   * The persisted pace (`assistant_conversation_pace`). Owned by settings rather
+   * than by this hook so it survives a restart and a panel-window reload — a
+   * user who needs Patient needs it in every call.
+   */
+  pace?: ConversationPace | null;
+  onPaceChange: (pace: ConversationPace) => void;
 }
 interface Session {
   id: number;
@@ -61,7 +70,8 @@ export function useVoiceConversation(callbacks: VoiceCallbacks) {
   const [phase, setPhase] = useState<ConversationPhase>("off");
   const [error, setError] = useState<VoiceError | null>(null);
   const [level, setLevel] = useState(0);
-  const [pace, setPace] = useState<ConversationPace>("natural");
+  const pace = callbacks.pace ?? DEFAULT_CONVERSATION_PACE;
+  const setPace = callbacks.onPaceChange;
   const paceRef = useRef(pace);
   paceRef.current = pace;
   const sessionRef = useRef<Session | null>(null);
@@ -273,23 +283,29 @@ export function useVoiceConversation(callbacks: VoiceCallbacks) {
         const wanted = callbacksRef.current.microphone;
         if (wanted && wanted !== "default") {
           const devices = await navigator.mediaDevices.enumerateDevices();
-          const device = devices.find(
-            (d) => d.kind === "audioinput" && d.label === wanted,
-          );
-          if (!device) {
+          const device = matchDeviceByName(devices, "audioinput", wanted);
+          // No match is not a failure. The stored name comes from the recording
+          // engine's own device enumeration, which is a different naming scheme
+          // from the browser's labels — often identical on Windows, essentially
+          // never on Linux — so demanding an exact match made the call
+          // impossible to start for anyone who had picked a specific microphone.
+          // The default stream is already open and is a working microphone.
+          if (device) {
             stream.getTracks().forEach((t) => t.stop());
-            throw new Error("Selected microphone is unavailable");
+            stream = await navigator.mediaDevices.getUserMedia({
+              audio: {
+                deviceId: { exact: device.deviceId },
+                channelCount: 1,
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true,
+              },
+            });
+          } else {
+            console.warn(
+              `Voice conversation: microphone "${wanted}" was not found by the panel; using the system default.`,
+            );
           }
-          stream.getTracks().forEach((t) => t.stop());
-          stream = await navigator.mediaDevices.getUserMedia({
-            audio: {
-              deviceId: { exact: device.deviceId },
-              channelCount: 1,
-              echoCancellation: true,
-              noiseSuppression: true,
-              autoGainControl: true,
-            },
-          });
         }
         if (!lifecycle.current.accepts(generation)) {
           stream.getTracks().forEach((t) => t.stop());
@@ -307,18 +323,28 @@ export function useVoiceConversation(callbacks: VoiceCallbacks) {
       await acquire();
       const output = callbacksRef.current.outputDevice;
       if (output && output !== "default") {
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        const device = devices.find(
-          (d) => d.kind === "audiooutput" && d.label === output,
-        );
-        const ctx = context as AudioContext & {
-          setSinkId?: (id: string) => Promise<void>;
-        };
-        if (!device || !ctx.setSinkId)
-          throw new Error(
-            "Selected output device is unavailable for conversation. Choose the system default in Settings.",
+        // Best-effort, never fatal. `AudioContext.setSinkId` is Chromium-only
+        // (absent on WebKitGTK and WKWebView), `enumerateDevices` does not list
+        // outputs at all on WebKit, and the stored name is the playback engine's
+        // rather than the browser's — so this used to abort the whole call on
+        // macOS and Linux for anyone who had chosen an output device.
+        try {
+          const devices = await navigator.mediaDevices.enumerateDevices();
+          const device = matchDeviceByName(devices, "audiooutput", output);
+          const ctx = context as AudioContext & {
+            setSinkId?: (id: string) => Promise<void>;
+          };
+          if (device && ctx.setSinkId) await ctx.setSinkId(device.deviceId);
+          else
+            console.warn(
+              `Voice conversation: output device "${output}" is not selectable here; using the system default.`,
+            );
+        } catch (cause) {
+          console.warn(
+            "Voice conversation: could not set the output device",
+            cause,
           );
-        await ctx.setSinkId(device.deviceId);
+        }
       }
       const { MicVAD } = await import("@ricky0123/vad-web");
       if (!lifecycle.current.accepts(generation)) {
@@ -373,8 +399,12 @@ export function useVoiceConversation(callbacks: VoiceCallbacks) {
           setError(null);
           interrupt(session);
           refreshPhase(session);
+          // A segment this long is either a monologue or a room the VAD never
+          // hears fall silent (a fan, a TV). Either way it is one bad turn, not
+          // a dead microphone: say so and keep listening. Ending the session
+          // here released the mic mid-call and threw the speech away.
           session.timeout = setTimeout(
-            () => fail({ code: "tooLong" }),
+            () => recover({ code: "tooLong" }, session),
             MAX_UTTERANCE_MS,
           );
         },
@@ -409,12 +439,13 @@ export function useVoiceConversation(callbacks: VoiceCallbacks) {
         detail: String(cause),
       });
     }
-  }, [end, fail, interrupt, refreshPhase, release, submit]);
+  }, [end, fail, interrupt, recover, refreshPhase, release, submit]);
 
   const toggleMute = useCallback(async () => {
     const s = sessionRef.current;
     if (!s?.vad || s.changingMic) return;
     s.changingMic = true;
+    const wasMuted = s.muted;
     s.muted = !s.muted;
     s.hearing = false;
     if (s.timeout) clearTimeout(s.timeout);
@@ -426,16 +457,28 @@ export function useVoiceConversation(callbacks: VoiceCallbacks) {
       if (s.muted) await s.vad.pause();
       else await s.vad.start();
     } catch (cause) {
-      if (sessionRef.current === s)
-        fail({ code: "microphone", detail: String(cause) });
+      // Unmuting reopens the microphone, so it fails whenever another app has
+      // taken it in the meantime. That is a retryable condition: put the mute
+      // state back and keep the call alive so a second tap can succeed.
+      if (sessionRef.current === s) {
+        s.muted = wasMuted;
+        recover({ code: "microphone", detail: String(cause) }, s);
+      }
     } finally {
       s.changingMic = false;
     }
-  }, [fail, interrupt, refreshPhase]);
+  }, [interrupt, recover, refreshPhase]);
 
   useEffect(() => {
     sessionRef.current?.vad?.setOptions({ redemptionMs: TURN_PAUSE_MS[pace] });
   }, [pace]);
+
+  // Both dials reach a running session: the pace above, the volume here. A
+  // setting changed mid-call should apply to that call.
+  const volume = callbacks.volume;
+  useEffect(() => {
+    if (volume !== undefined) sessionRef.current?.audio.setVolume(volume);
+  }, [volume]);
 
   useEffect(() => {
     let disposed = false;
@@ -488,8 +531,12 @@ export function useVoiceConversation(callbacks: VoiceCallbacks) {
               c.charCodeAt(0),
             );
             void s.audio.enqueue(bytes.buffer, payload.epoch).catch((cause) => {
-              if (current(payload.ticket))
-                fail({ code: "playback", detail: String(cause) });
+              // One sentence that would not decode is not a broken speaker.
+              // ConversationAudio already isolates the failure so later chunks
+              // still play; tearing the call down over it lost the session.
+              const session = current(payload.ticket);
+              if (session)
+                recover({ code: "playback", detail: String(cause) }, session);
             });
           },
         ),
@@ -522,8 +569,9 @@ export function useVoiceConversation(callbacks: VoiceCallbacks) {
             void callbacksRef.current
               .beginLocal(payload.epoch)
               .catch((cause) => {
-                if (current(payload.ticket))
-                  fail({ code: "playback", detail: String(cause) });
+                const session = current(payload.ticket);
+                if (session)
+                  recover({ code: "playback", detail: String(cause) }, session);
               });
           } else if (payload.epoch === s.epoch) {
             if (payload.kind === "chunk")
@@ -537,14 +585,27 @@ export function useVoiceConversation(callbacks: VoiceCallbacks) {
           if (sessionRef.current?.id === payload) end();
         }),
       );
-      // Visibility is independent of the session: a hidden or collapsed panel
-      // still owns the microphone until End (or actual webview teardown).
+      // Collapsing to the pill keeps the microphone, because the pill is on
+      // screen and says the call is live. Hiding the panel does not: the backend
+      // ends the session (see `assistant::hide_assistant_panel`) and this
+      // listener tears the local side down with it.
       track(
         await listen<{ code: string; detail: string }>(
           "assistant-error",
           ({ payload }) => {
             const s = sessionRef.current;
-            if (s?.id) recover({ code: "turn", detail: payload.detail }, s);
+            if (!s?.id) return;
+            // `assistant-error` is a global event with background emitters (a
+            // superseded turn's speech synthesis, TTS playback, screen capture).
+            // Only treat it as *this* turn's failure when a turn is actually in
+            // flight — otherwise a late error from work already abandoned marked
+            // the live turn finished and flipped the orb back to "Listening"
+            // while its reply was still being written.
+            if (s.turnDone && s.synthesisDone) {
+              setError({ code: "turn", detail: payload.detail });
+              return;
+            }
+            recover({ code: "turn", detail: payload.detail }, s);
           },
         ),
       );

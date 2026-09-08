@@ -72,6 +72,46 @@ pub fn current_epoch() -> u64 {
     PLAYBACK_EPOCH.load(Ordering::SeqCst)
 }
 
+/// Why the configured voice engine cannot speak, or `None` when it can.
+///
+/// A hands-free call forces spoken replies on regardless of the
+/// `assistant_tts_enabled` switch, which means it also inherits a voice engine
+/// the user configured but never finished setting up — and a remote engine with
+/// no API key fails once per turn, forever, with a generic provider error. This
+/// is the check that turns that into one clear message before the call starts.
+///
+/// Loopback endpoints are exempt: a self-hosted OpenAI-compatible speech server
+/// legitimately needs no key, and refusing it would break a working setup.
+pub fn voice_engine_blocker(settings: &AppSettings) -> Option<String> {
+    let engine = settings.assistant_tts_engine.trim();
+    // The in-webview engine needs nothing configured.
+    if engine.is_empty() || engine == "kokoro" {
+        return None;
+    }
+    if !settings.assistant_tts_api_key.0.trim().is_empty() {
+        return None;
+    }
+    let base_url = settings.assistant_tts_base_url.to_ascii_lowercase();
+    let self_hosted = engine == "openai"
+        && (base_url.contains("127.0.0.1")
+            || base_url.contains("localhost")
+            || base_url.contains("0.0.0.0")
+            || base_url.contains("[::1]"));
+    if self_hosted {
+        return None;
+    }
+    let label = match engine {
+        "openai" => "OpenAI",
+        "openrouter" => "OpenRouter",
+        "elevenlabs" => "ElevenLabs",
+        "azure" => "Azure AI Speech",
+        other => other,
+    };
+    Some(format!(
+        "The assistant's voice is set to {label}, which needs an API key. Add one in Settings → Assistant → Voice, or switch the voice to On-device."
+    ))
+}
+
 /// Cancel any in-flight or queued remote TTS: native playback stops within
 /// ~50ms and any superseded request aborts before it can play.
 pub fn stop_remote() {
@@ -304,7 +344,10 @@ fn run_playback_session(
         }
     };
     let sink = rodio::Sink::connect_new(stream_handle.mixer());
-    sink.set_volume(volume.max(0.1));
+    // No floor: this is the assistant's own voice volume, so 0 means silent.
+    // The old `.max(0.1)` existed because the value came from the feedback-sound
+    // slider, where 0 meant "no beeps" rather than "no spoken replies".
+    sink.set_volume(volume.clamp(0.0, 1.0));
 
     // "Playing" is announced when audio actually starts, not when the device
     // opens, so a session that is superseded before its first chunk never makes
@@ -452,7 +495,7 @@ pub async fn speak_remote_epoch(app: &AppHandle, settings: &AppSettings, text: S
                 return;
             }
             debug!("TTS audio fetched: {} KB", audio_bytes.len() / 1024);
-            let volume = settings.audio_feedback_volume;
+            let volume = settings.assistant_tts_volume;
             let device = settings.selected_output_device.clone();
             // Let the panel know audio is playing so it can show a Stop button
             // even though the turn itself is already idle. Counted, so a
@@ -1510,7 +1553,7 @@ pub async fn test_remote(settings: &AppSettings, text: String) -> Result<(), Str
     )
     .await?
     .bytes;
-    let volume = settings.audio_feedback_volume;
+    let volume = settings.assistant_tts_volume;
     let device = settings.selected_output_device.clone();
     tauri::async_runtime::spawn_blocking(move || {
         play_audio_bytes(audio_bytes, device, volume, epoch).map_err(|e| e.to_string())
@@ -1568,7 +1611,7 @@ pub(crate) fn play_audio_bytes(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let stream_handle = open_output_stream(selected_device)?;
     let sink = rodio::play(stream_handle.mixer(), Cursor::new(bytes))?;
-    sink.set_volume(volume.max(0.1));
+    sink.set_volume(volume.clamp(0.0, 1.0));
 
     // Poll rather than `sink.sleep_until_end()` so cancellation is responsive.
     // The OutputStream/Sink are not Send, so they stay on this thread while the
@@ -1709,6 +1752,64 @@ fn sanitize_speech_inner(input: &str, allow_raw_fallback: bool) -> String {
 #[cfg(test)]
 mod tests {
     use super::sanitize_for_speech;
+    use super::voice_engine_blocker;
+    use crate::settings::{get_default_settings, AppSettings};
+
+    fn with_voice(engine: &str, api_key: &str, base_url: &str) -> AppSettings {
+        let mut settings = get_default_settings();
+        settings.assistant_tts_engine = engine.to_string();
+        settings.assistant_tts_api_key = crate::settings::SecretString(api_key.to_string());
+        settings.assistant_tts_base_url = base_url.to_string();
+        settings
+    }
+
+    /// A call speaks every reply whether or not spoken replies are switched on,
+    /// so it inherits a voice engine the user configured but never finished. A
+    /// remote engine with no key used to fail once per utterance, forever, with a
+    /// generic provider error on a surface the orb view hides.
+    #[test]
+    fn a_remote_voice_with_no_key_blocks_a_call_before_it_starts() {
+        for engine in ["openai", "openrouter", "elevenlabs", "azure"] {
+            let blocker = voice_engine_blocker(&with_voice(engine, "", "https://api.example.com"));
+            assert!(
+                blocker.is_some_and(|m| m.contains("API key")),
+                "{engine} with no key should block a call"
+            );
+        }
+    }
+
+    #[test]
+    fn a_configured_or_on_device_voice_does_not_block_a_call() {
+        assert!(voice_engine_blocker(&with_voice("kokoro", "", "")).is_none());
+        assert!(voice_engine_blocker(&get_default_settings()).is_none());
+        for engine in ["openai", "openrouter", "elevenlabs", "azure"] {
+            assert!(
+                voice_engine_blocker(&with_voice(engine, "sk-test", "https://api.example.com"))
+                    .is_none(),
+                "{engine} with a key should be allowed"
+            );
+        }
+    }
+
+    /// A self-hosted OpenAI-compatible speech server legitimately needs no key;
+    /// refusing it would break a working offline setup.
+    #[test]
+    fn a_loopback_speech_server_needs_no_key() {
+        for base_url in [
+            "http://127.0.0.1:8080/v1",
+            "http://localhost:5002/v1",
+            "http://[::1]:8080/v1",
+        ] {
+            assert!(
+                voice_engine_blocker(&with_voice("openai", "", base_url)).is_none(),
+                "{base_url} should be allowed without a key"
+            );
+        }
+        // A hosted endpoint is not exempt just because another engine is.
+        assert!(
+            voice_engine_blocker(&with_voice("openai", "", "https://api.openai.com/v1")).is_some()
+        );
+    }
 
     #[test]
     fn keeps_plain_prose_unchanged() {

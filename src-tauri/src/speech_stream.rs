@@ -812,7 +812,7 @@ fn spawn_remote_synthesis(
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<String>();
     tauri::async_runtime::spawn(async move {
         let device = settings.selected_output_device.clone();
-        let volume = settings.audio_feedback_volume;
+        let volume = settings.assistant_tts_volume;
         let stitching = settings.assistant_tts_engine == "elevenlabs";
         // Shared with every synthesis task rather than cloned per chunk.
         let settings = std::sync::Arc::new(settings);

@@ -1,4 +1,5 @@
 use std::{
+    collections::VecDeque,
     io::Error,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -25,14 +26,16 @@ enum Cmd {
     Shutdown,
 }
 
-enum AudioChunk {
+// Audio and controls share a queue: Stop/Shutdown must wake a stalled microphone.
+enum RecorderEvent {
+    Command(Cmd),
     Samples(Vec<f32>),
     EndOfStream,
 }
 
 pub struct AudioRecorder {
     device: Option<Device>,
-    cmd_tx: Option<mpsc::Sender<Cmd>>,
+    cmd_tx: Option<mpsc::Sender<RecorderEvent>>,
     worker_handle: Option<std::thread::JoinHandle<()>>,
     vad: Option<Arc<Mutex<Box<dyn vad::VoiceActivityDetector>>>>,
     level_cb: Option<Arc<dyn Fn(Vec<f32>) + Send + Sync + 'static>>,
@@ -97,8 +100,8 @@ impl AudioRecorder {
             return Ok(()); // already open
         }
 
-        let (sample_tx, sample_rx) = mpsc::channel::<AudioChunk>();
-        let (cmd_tx, cmd_rx) = mpsc::channel::<Cmd>();
+        let (sample_tx, sample_rx) = mpsc::channel::<RecorderEvent>();
+        let cmd_tx = sample_tx.clone();
         let (init_tx, init_rx) = mpsc::sync_channel::<Result<(), String>>(1);
 
         let host = crate::audio_toolkit::get_cpal_host();
@@ -228,7 +231,6 @@ impl AudioRecorder {
                         sample_rate,
                         vad,
                         sample_rx,
-                        cmd_rx,
                         level_cb,
                         frame_cb,
                         stop_flag,
@@ -278,7 +280,7 @@ impl AudioRecorder {
             *lock.lock().unwrap() = false;
         }
         if let Some(tx) = &self.cmd_tx {
-            tx.send(Cmd::Start)?;
+            tx.send(RecorderEvent::Command(Cmd::Start))?;
         }
         Ok(())
     }
@@ -292,15 +294,16 @@ impl AudioRecorder {
 
     pub fn stop(&self) -> Result<Vec<f32>, Box<dyn std::error::Error>> {
         let (resp_tx, resp_rx) = mpsc::channel();
-        if let Some(tx) = &self.cmd_tx {
-            tx.send(Cmd::Stop(resp_tx))?;
-        }
+        let tx = self.cmd_tx.as_ref().ok_or_else(|| {
+            Error::new(std::io::ErrorKind::NotConnected, "Microphone is not open")
+        })?;
+        tx.send(RecorderEvent::Command(Cmd::Stop(resp_tx)))?;
         Ok(resp_rx.recv()?) // wait for the samples
     }
 
     pub fn close(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         if let Some(tx) = self.cmd_tx.take() {
-            let _ = tx.send(Cmd::Shutdown);
+            let _ = tx.send(RecorderEvent::Command(Cmd::Shutdown));
         }
         if let Some(h) = self.worker_handle.take() {
             let _ = h.join();
@@ -312,7 +315,7 @@ impl AudioRecorder {
     fn build_stream<T>(
         device: &cpal::Device,
         config: &cpal::SupportedStreamConfig,
-        sample_tx: mpsc::Sender<AudioChunk>,
+        sample_tx: mpsc::Sender<RecorderEvent>,
         channels: usize,
         stop_flag: Arc<AtomicBool>,
     ) -> Result<cpal::Stream, cpal::BuildStreamError>
@@ -326,7 +329,7 @@ impl AudioRecorder {
         let stream_cb = move |data: &[T], _: &cpal::InputCallbackInfo| {
             if stop_flag.load(Ordering::Relaxed) {
                 if !eos_sent {
-                    let _ = sample_tx.send(AudioChunk::EndOfStream);
+                    let _ = sample_tx.send(RecorderEvent::EndOfStream);
                     eos_sent = true;
                 }
                 return;
@@ -352,7 +355,7 @@ impl AudioRecorder {
             }
 
             if sample_tx
-                .send(AudioChunk::Samples(output_buffer.clone()))
+                .send(RecorderEvent::Samples(output_buffer.clone()))
                 .is_err()
             {
                 log::error!("Failed to send samples");
@@ -439,7 +442,136 @@ pub fn is_no_input_device_error(error_message: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{is_microphone_access_denied, is_no_input_device_error};
+    use super::*;
+    use std::sync::atomic::AtomicUsize;
+
+    #[test]
+    fn stop_and_shutdown_work_when_microphone_never_delivers_audio() {
+        let (tx, rx) = mpsc::channel();
+        let (done_tx, done_rx) = mpsc::channel();
+        let worker = std::thread::spawn(move || {
+            run_consumer(
+                16_000,
+                None,
+                rx,
+                None,
+                None,
+                Arc::new(AtomicBool::new(false)),
+                Arc::new((Mutex::new(false), Condvar::new())),
+            );
+            done_tx.send(()).unwrap();
+        });
+        let (reply_tx, reply_rx) = mpsc::channel();
+        tx.send(RecorderEvent::Command(Cmd::Start)).unwrap();
+        tx.send(RecorderEvent::Command(Cmd::Stop(reply_tx)))
+            .unwrap();
+        assert!(reply_rx
+            .recv_timeout(Duration::from_secs(1))
+            .unwrap()
+            .is_empty());
+        tx.send(RecorderEvent::Command(Cmd::Shutdown)).unwrap();
+        // Keep the producer connected: no audio, disconnect, or timer should
+        // be required to wake the consumer and close the microphone.
+        done_rx.recv_timeout(Duration::from_secs(1)).unwrap();
+        worker.join().unwrap();
+    }
+
+    #[test]
+    fn stopping_an_unopened_microphone_returns_an_error() {
+        assert!(AudioRecorder::new().unwrap().stop().is_err());
+    }
+
+    #[test]
+    fn warm_idle_microphone_does_not_publish_levels_or_stream_audio() {
+        let (sample_tx, sample_rx) = mpsc::channel();
+        // One second of audio from a warm 48 kHz microphone, without Start.
+        for _ in 0..100 {
+            sample_tx
+                .send(RecorderEvent::Samples(vec![0.2; 480]))
+                .unwrap();
+        }
+        drop(sample_tx);
+        let levels = Arc::new(AtomicUsize::new(0));
+        let frames = Arc::new(AtomicUsize::new(0));
+        let level_count = levels.clone();
+        let frame_count = frames.clone();
+        let ready = Arc::new((Mutex::new(false), Condvar::new()));
+        run_consumer(
+            48_000,
+            None,
+            sample_rx,
+            Some(Arc::new(move |_| {
+                level_count.fetch_add(1, Ordering::Relaxed);
+            })),
+            Some(Arc::new(move |_| {
+                frame_count.fetch_add(1, Ordering::Relaxed);
+            })),
+            Arc::new(AtomicBool::new(false)),
+            ready.clone(),
+        );
+        assert_eq!(levels.load(Ordering::Relaxed), 0);
+        assert_eq!(frames.load(Ordering::Relaxed), 0);
+        assert!(!*ready.0.lock().unwrap());
+    }
+
+    #[test]
+    fn recording_after_idle_preserves_streaming_and_stop_tail() {
+        let (sample_tx, sample_rx) = mpsc::channel();
+        let cmd_tx = sample_tx.clone();
+        let (reply_tx, reply_rx) = mpsc::channel();
+        let (level_tx, level_rx) = mpsc::channel();
+        let (frame_tx, frame_rx) = mpsc::channel();
+        let stop = Arc::new(AtomicBool::new(false));
+        let ready = Arc::new((Mutex::new(false), Condvar::new()));
+        let worker_stop = stop.clone();
+        let worker_ready = ready.clone();
+        let worker = std::thread::spawn(move || {
+            run_consumer(
+                16_000,
+                None,
+                sample_rx,
+                Some(Arc::new(move |levels| {
+                    let _ = level_tx.send(levels);
+                })),
+                Some(Arc::new(move |frame| {
+                    let _ = frame_tx.send(frame.to_vec());
+                })),
+                worker_stop,
+                worker_ready,
+            )
+        });
+
+        // Queued idle audio precedes Start and must never enter the output.
+        sample_tx
+            .send(RecorderEvent::Samples(vec![0.9; 480]))
+            .unwrap();
+        cmd_tx.send(RecorderEvent::Command(Cmd::Start)).unwrap();
+        sample_tx
+            .send(RecorderEvent::Samples(vec![0.2; 960]))
+            .unwrap();
+        level_rx.recv_timeout(Duration::from_secs(2)).unwrap();
+        assert!(*ready.0.lock().unwrap());
+
+        // Stop consumes this chunk and flushes the partial final frame before
+        // replying. Both the batch transcript and cloud stream need that tail.
+        cmd_tx
+            .send(RecorderEvent::Command(Cmd::Stop(reply_tx)))
+            .unwrap();
+        sample_tx
+            .send(RecorderEvent::Samples(vec![0.3; 240]))
+            .unwrap();
+        sample_tx.send(RecorderEvent::EndOfStream).unwrap();
+        let output = reply_rx.recv_timeout(Duration::from_secs(2)).unwrap();
+        drop(sample_tx);
+        drop(cmd_tx);
+        worker.join().unwrap();
+        let streamed: Vec<f32> = frame_rx.try_iter().flatten().collect();
+        assert_eq!(streamed, output);
+        assert_eq!(&output[..960], &[0.2; 960]);
+        assert_eq!(&output[960..1200], &[0.3; 240]);
+        assert!(output[1200..].iter().all(|s| *s == 0.0));
+        assert!(!stop.load(Ordering::Relaxed));
+    }
 
     #[test]
     fn detects_access_is_denied() {
@@ -483,8 +615,7 @@ mod tests {
 fn run_consumer(
     in_sample_rate: u32,
     vad: Option<Arc<Mutex<Box<dyn vad::VoiceActivityDetector>>>>,
-    sample_rx: mpsc::Receiver<AudioChunk>,
-    cmd_rx: mpsc::Receiver<Cmd>,
+    sample_rx: mpsc::Receiver<RecorderEvent>,
     level_cb: Option<Arc<dyn Fn(Vec<f32>) + Send + Sync + 'static>>,
     frame_cb: Option<Arc<dyn Fn(&[f32]) + Send + Sync + 'static>>,
     stop_flag: Arc<AtomicBool>,
@@ -543,50 +674,54 @@ fn run_consumer(
         }
     }
 
+    let mut pending_commands = VecDeque::new();
     loop {
-        let chunk = match sample_rx.recv() {
-            Ok(c) => c,
-            Err(_) => break, // stream closed
+        let event = match pending_commands.pop_front() {
+            Some(cmd) => RecorderEvent::Command(cmd),
+            None => match sample_rx.recv() {
+                Ok(event) => event,
+                Err(_) => break,
+            },
         };
-
-        let raw = match chunk {
-            AudioChunk::Samples(s) => s,
-            AudioChunk::EndOfStream => continue,
-        };
-
-        // First real audio frame after a Start means the device is genuinely
-        // delivering audio for this session. Signal readiness so the UI/cue can
-        // tell the user it's safe to speak (instead of guessing a fixed delay).
-        if recording && awaiting_first_frame {
-            let (lock, cvar) = &*capture_ready;
-            *lock.lock().unwrap() = true;
-            cvar.notify_all();
-            awaiting_first_frame = false;
-        }
-
-        // ---------- spectrum processing ---------------------------------- //
-        if let Some(buckets) = visualizer.feed(&raw) {
-            if let Some(cb) = &level_cb {
-                cb(buckets);
-            }
-        }
-
-        // ---------- existing pipeline ------------------------------------ //
-        frame_resampler.push(&raw, &mut |frame: &[f32]| {
-            // Feed the raw, pre-VAD 16 kHz mono frame to the streaming
-            // transcription callback (when one is armed) so its own VAD can
-            // detect speech/silence boundaries. Independent of the batch VAD
-            // path below, and only while actively recording.
-            if recording {
-                if let Some(cb) = &frame_cb {
-                    cb(frame);
+        let cmd = match event {
+            RecorderEvent::Command(cmd) => cmd,
+            RecorderEvent::EndOfStream => continue,
+            RecorderEvent::Samples(raw) => {
+                // First real audio frame after a Start means the device is genuinely
+                // delivering audio for this session. Signal readiness so the UI/cue can
+                // tell the user it's safe to speak (instead of guessing a fixed delay).
+                if recording && awaiting_first_frame {
+                    let (lock, cvar) = &*capture_ready;
+                    *lock.lock().unwrap() = true;
+                    cvar.notify_all();
+                    awaiting_first_frame = false;
                 }
-            }
-            handle_frame(frame, recording, &vad, &mut processed_samples)
-        });
 
-        // non-blocking check for a command
-        while let Ok(cmd) = cmd_rx.try_recv() {
+                // A warm microphone still delivers chunks between recordings. Drain
+                // them so Start/Stop commands stay responsive, but don't resample or
+                // calculate/broadcast a waveform nobody can use. Start resets both
+                // processors, so no idle audio is needed for the next recording.
+                if recording {
+                    if let Some(buckets) = visualizer.feed(&raw) {
+                        if let Some(cb) = &level_cb {
+                            cb(buckets);
+                        }
+                    }
+
+                    frame_resampler.push(&raw, &mut |frame: &[f32]| {
+                        // Keep silence in the streaming path: the provider uses it
+                        // to detect speech boundaries independently of the batch VAD.
+                        if let Some(cb) = &frame_cb {
+                            cb(frame);
+                        }
+                        handle_frame(frame, true, &vad, &mut processed_samples)
+                    });
+                }
+
+                continue;
+            }
+        };
+        {
             match cmd {
                 Cmd::Start => {
                     stop_flag.store(false, Ordering::Relaxed);
@@ -624,9 +759,18 @@ fn run_consumer(
                     // push-to-talk (hold) release, where the user stops the instant
                     // they finish the final word. feed() is a cheap no-op when no
                     // live stream is active.
+                    let deadline = std::time::Instant::now() + Duration::from_secs(2);
                     loop {
-                        match sample_rx.recv_timeout(Duration::from_secs(2)) {
-                            Ok(AudioChunk::Samples(remaining)) => {
+                        // If the device never delivered a frame, there is no
+                        // in-flight audio tail to wait for. Drain anything
+                        // already queued, then return empty immediately.
+                        let remaining = if awaiting_first_frame {
+                            Duration::ZERO
+                        } else {
+                            deadline.saturating_duration_since(std::time::Instant::now())
+                        };
+                        match sample_rx.recv_timeout(remaining) {
+                            Ok(RecorderEvent::Samples(remaining)) => {
                                 frame_resampler.push(&remaining, &mut |frame: &[f32]| {
                                     if let Some(cb) = &frame_cb {
                                         cb(frame);
@@ -634,9 +778,14 @@ fn run_consumer(
                                     handle_frame(frame, true, &vad, &mut processed_samples)
                                 });
                             }
-                            Ok(AudioChunk::EndOfStream) => break,
+                            Ok(RecorderEvent::EndOfStream) => break,
+                            Ok(RecorderEvent::Command(cmd)) => pending_commands.push_back(cmd),
                             Err(_) => {
-                                log::warn!("Timed out waiting for EndOfStream from audio callback");
+                                if !awaiting_first_frame {
+                                    log::warn!(
+                                        "Timed out waiting for EndOfStream from audio callback"
+                                    );
+                                }
                                 break;
                             }
                         }

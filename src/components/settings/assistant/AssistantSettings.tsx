@@ -1589,6 +1589,27 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
               </div>
             </SettingContainer>
 
+            {/* Its own control, deliberately. Spoken replies used to be gained
+                by the feedback-sound slider, which is greyed out whenever
+                feedback sounds are off — so turning the beeps down once and
+                then switching them off left the voice quiet with nothing to
+                turn it back up. Unlike Speed it stays enabled with spoken
+                replies off, because a call turns them on regardless. */}
+            <Slider
+              value={settings?.assistant_tts_volume ?? 1}
+              onChange={(value) =>
+                setAndRefresh(commands.setAssistantTtsVolume(value))
+              }
+              min={0}
+              max={1}
+              step={0.05}
+              label={t("settings.assistant.tts.volumeLabel")}
+              info={t("settings.assistant.tts.volumeDescription")}
+              grouped={true}
+              controlClassName="w-[200px]"
+              formatValue={(v) => `${Math.round(v * 100)}%`}
+            />
+
             <SettingContainer
               title={t("settings.assistant.tts.testLabel")}
               layout="horizontal"

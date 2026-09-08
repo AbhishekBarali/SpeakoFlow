@@ -53,6 +53,7 @@ import { VOICE_INTERRUPTED_MARKER } from "./conversationPolicy";
 import { useLocalLlmEngineStatus } from "@/hooks/useLocalLlmEngineStatus";
 import { useSafeWindowDrag } from "@/lib/useSafeWindowDrag";
 import "./AssistantPanel.css";
+import "@/lib/windowActivity.css";
 
 type AssistantState =
   | "idle"
@@ -470,7 +471,16 @@ const AssistantPanel: React.FC = () => {
     endLocal: () => localVoiceRef.current?.endStream(),
     microphone: settings?.selected_microphone,
     outputDevice: settings?.selected_output_device,
-    volume: settings?.audio_feedback_volume,
+    // The assistant's own voice volume, not the feedback-beep slider — see
+    // `assistant_tts_volume` in settings.rs.
+    volume: settings?.assistant_tts_volume,
+    pace: settings?.assistant_conversation_pace,
+    // Persisted, so the value comes back through `assistant-settings-changed`
+    // rather than from local state — one source of truth for a dial that has to
+    // outlive the call it was changed in.
+    onPaceChange: (pace) => {
+      void commands.setAssistantConversationPace(pace);
+    },
   });
 
   // The conversation view has two forms — the orb alone, and the orb strip
@@ -1227,6 +1237,11 @@ const AssistantPanel: React.FC = () => {
       state === "idle" &&
       !ttsActive &&
       !error &&
+      // Never during a call. Hiding now hangs up (see `hide_assistant_panel`),
+      // and the collapsed form here is the conversation pill — a live call the
+      // user can see, not a transient overlay to time out. Without this, a Live
+      // user lost the call 2.5s after every reply with no gesture of their own.
+      !voice.open &&
       history.length > 0;
     if (!shouldAutoHide) return;
 
@@ -1234,7 +1249,15 @@ const AssistantPanel: React.FC = () => {
       void commands.hideAssistantPanel();
     }, 2500);
     return () => window.clearTimeout(timer);
-  }, [collapsed, liveOverlay, state, ttsActive, error, history.length]);
+  }, [
+    collapsed,
+    liveOverlay,
+    state,
+    ttsActive,
+    error,
+    voice.open,
+    history.length,
+  ]);
 
   const dispatchText = useCallback(
     async (text: string) => {
@@ -1331,8 +1354,14 @@ const AssistantPanel: React.FC = () => {
   }, []);
 
   const hidePanel = useCallback(async () => {
+    // Closing the panel hangs up. The backend ends the session too (so the
+    // hotkey and tray paths behave the same, and the call's memory pass runs),
+    // but doing it here first releases the microphone on the click instead of on
+    // the event that comes back — X should never leave a live mic behind an
+    // invisible window.
+    if (voice.open) voice.end();
     await commands.hideAssistantPanel();
-  }, []);
+  }, [voice]);
 
   const toggleTts = useCallback(async () => {
     if (ttsEnabled) {
@@ -1405,9 +1434,15 @@ const AssistantPanel: React.FC = () => {
     [t, errorPrimary],
   );
 
+  // A voice-engine failure during a call, in the wording the panel would have
+  // used for it. The panel's own error banner lives inside the message list,
+  // which is hidden behind the orb, so a voice that could not load or play left
+  // the call silent with the explanation on a surface nobody could see.
+  const voiceFault =
+    voice.open && error?.code?.startsWith("tts") ? errorPrimary(error) : null;
+
   const showTypingDots =
     (state === "thinking" || state === "searching") && stream === "";
-
   // User-controlled screen state is meaningful only in Manual mode.
   const screenActive = manualScreenAccess && (visionActive || attachScreen);
 
@@ -1420,7 +1455,7 @@ const AssistantPanel: React.FC = () => {
 
   const shellClass = `assistant-scope assistant-shell${
     collapsed ? "" : " expanded"
-  }${mounted ? " fade-in" : ""}`;
+  }${mounted ? " fade-in" : ""}${panelVisible ? "" : " native-window-hidden"}`;
 
   const profilePicker = (
     <AssistantProfilePicker
@@ -1438,6 +1473,8 @@ const AssistantPanel: React.FC = () => {
           voice={voice}
           name={activeCharacter?.name ?? t("assistant.title")}
           onExpand={() => void collapse(false)}
+          voiceLoading={tts.status === "loading" ? tts.progress : null}
+          voiceFault={voiceFault}
         />
       </div>
     );
@@ -1998,6 +2035,8 @@ const AssistantPanel: React.FC = () => {
             }
             showTranscript={showVoiceTranscript}
             onToggleTranscript={() => setVoiceTranscript(!showVoiceTranscript)}
+            voiceLoading={tts.status === "loading" ? tts.progress : null}
+            voiceFault={voiceFault}
           />
         )}
         <div
@@ -2068,6 +2107,12 @@ const AssistantPanel: React.FC = () => {
                 {message.role === "assistant" &&
                   i === history.length - 1 &&
                   !busy &&
+                  // Regenerate ends the live call before re-running the turn,
+                  // and it deletes the exchange it is replacing first — so
+                  // during a conversation the small ↻ hung up with no warning
+                  // and, if the cancelled turn still held the busy guard, threw
+                  // the question and answer away without producing a new one.
+                  !voice.open &&
                   stream === "" && (
                     <div className="assistant-last-actions">
                       <button

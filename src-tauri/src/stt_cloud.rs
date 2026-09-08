@@ -279,6 +279,67 @@ fn client_cache() -> &'static Mutex<HashMap<u64, reqwest::Client>> {
     CACHE.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
+/// How long one completed request is assumed to keep the provider's route warm.
+///
+/// Deliberately short, because the two costs are wildly asymmetric: a redundant
+/// warm-up is a quarter-second of audio (fractions of a cent), while a skipped
+/// one that was needed is one to two seconds the user waits. Measured behaviour
+/// bears the asymmetry out — back-to-back requests stayed at ~1.2 s, a 4-minute
+/// gap cost 3.2–3.9 s, and the 60 s sample in between was slow once and fast
+/// once. When in doubt, warm.
+const ROUTE_WARM_FOR: Duration = Duration::from_secs(30);
+
+/// When the last cloud request completed, so a redundant warm-up can be skipped.
+fn last_request_at() -> &'static Mutex<Option<std::time::Instant>> {
+    static AT: OnceLock<Mutex<Option<std::time::Instant>>> = OnceLock::new();
+    AT.get_or_init(|| Mutex::new(None))
+}
+
+/// Record that a request reached the provider and came back.
+fn note_request_completed() {
+    if let Ok(mut at) = last_request_at().lock() {
+        *at = Some(std::time::Instant::now());
+    }
+}
+
+/// Whether a recent request has already warmed the path to the provider.
+fn route_is_warm() -> bool {
+    last_request_at()
+        .lock()
+        .ok()
+        .and_then(|at| *at)
+        .is_some_and(|at| at.elapsed() < ROUTE_WARM_FOR)
+}
+
+/// Forget any recorded request, so the next prewarm treats the route as cold.
+///
+/// Test-only, and it exists for the same reason [`clear_client_cache`] does: the
+/// effect of the warm-up can only be measured from a genuinely cold start, and
+/// every earlier request in the same process leaves the route marked warm.
+#[cfg(test)]
+pub(crate) fn clear_route_warm_marker() {
+    if let Ok(mut at) = last_request_at().lock() {
+        *at = None;
+    }
+}
+
+/// A short, quiet tone: the smallest payload that is still real audio.
+///
+/// The warm-up has to be a genuine transcription to warm what actually costs the
+/// time (see [`prewarm_cloud_stt`]), and a genuine transcription needs something
+/// to transcribe. A tone rather than silence because a provider is free to
+/// short-circuit an empty request, and a short-circuited request warms nothing.
+/// The text that comes back is discarded.
+fn warmup_samples() -> Vec<f32> {
+    let count = WHISPER_SAMPLE_RATE as usize / 4;
+    (0..count)
+        .map(|i| {
+            let t = i as f32 / WHISPER_SAMPLE_RATE as f32;
+            (t * 220.0 * std::f32::consts::TAU).sin() * 0.05
+        })
+        .collect()
+}
+
 /// Drop every pooled client, so the next request pays a full handshake again.
 ///
 /// Test-only, and it exists for one reason: the benefit of the recording-start
@@ -314,15 +375,38 @@ where
         .map_err(|_| "The cloud transcription task was dropped".to_string())?
 }
 
-/// Open a connection to the configured provider so the handshake happens while
-/// the user is still speaking instead of after they stop.
+/// Warm the path to the configured provider while the user is still speaking, so
+/// the dictation does not pay for it after they stop.
 ///
 /// Called at recording start (see `actions.rs`), mirroring how the app already
-/// prewarms the local cleanup model. The request itself is meaningless — a `HEAD`
-/// at the origin, unauthenticated, result discarded — because the connection pool
-/// is keyed by scheme/host/port, so any request to the right origin leaves a warm
-/// TLS session behind for the real one. Fire-and-forget: a failure here costs
-/// nothing, the transcription just pays the handshake as before.
+/// prewarms the local cleanup model — and, like that one, it sends a **real
+/// request**, not a ping. That distinction is the whole point, and it was learned
+/// the expensive way.
+///
+/// This used to be an authenticated `GET` on the provider's models path, on the
+/// theory that the cost worth hiding was DNS + TCP + TLS. It is not. Measured
+/// against OpenRouter / `mai-transcribe-2` with a 4-minute idle gap between
+/// samples (`stt_cloud_bench::does_a_tiny_warmup_request_beat_a_cold_provider_route`):
+///
+/// - cold, connection pooled and prewarmed the old way: **3.85 s and 3.20 s**
+/// - after one 0.25 s *transcription* first: **1.81 s and 1.78 s**
+///
+/// Two arms, no overlap between them, and the cold numbers reproduce what the
+/// app's own log showed for two real dictations 35 minutes apart. So the second
+/// or two was never the handshake — the connection was already being reused, and
+/// the log confirms no new connection was opened before the `POST`. It is the
+/// provider's route to the upstream model going cold, and the only thing that
+/// warms a model route is asking the model to do its job.
+///
+/// The cost is a quarter-second of audio per cold dictation: at
+/// `mai-transcribe-2`'s $1.7 per 1000 minutes, roughly seven millionths of a
+/// dollar, and at the priciest provider here still under three hundredths of a
+/// cent. Fire-and-forget — a failure here costs nothing but the second it was
+/// meant to save.
+///
+/// Skipped when a real request finished within [`ROUTE_WARM_FOR`], and skipped
+/// entirely for realtime streaming, which opens its own socket at recording start
+/// and uploads during speech anyway.
 pub(crate) fn prewarm_cloud_stt(settings: &AppSettings) {
     let Ok(cfg) = resolve_cloud_stt(settings) else {
         return;
@@ -331,37 +415,30 @@ pub(crate) fn prewarm_cloud_stt(settings: &AppSettings) {
     if settings.cloud_stt_streaming && crate::stt_cloud_stream::supports_streaming(&cfg) {
         return;
     }
-    let request = CloudRequest::from_config(&cfg);
+    if route_is_warm() {
+        debug!("Cloud STT prewarm skipped: a request completed within the warm window");
+        return;
+    }
     let Ok(runtime) = runtime() else { return };
-    // Prefer an authenticated GET against the provider's own API path over an
-    // anonymous HEAD at the origin: an edge can serve the two from different
-    // places, and only a connection opened to the path the transcription will use
-    // is certain to be the one it reuses.
-    let warm_url = match cfg.provider.models_endpoint.as_deref() {
-        Some(endpoint) => format!("{}{}", cfg.base_url, endpoint),
-        None => cfg.base_url.clone(),
+    let request = CloudRequest::from_config(&cfg);
+    let Ok(wav) = encode_wav_16k_mono(&warmup_samples()) else {
+        return;
     };
-    let authenticated = cfg.provider.models_endpoint.is_some();
+    let label = cfg.provider.label.clone();
+    let model = cfg.model.clone();
     runtime.spawn(async move {
-        let Ok(client) = request.client() else { return };
         let started = std::time::Instant::now();
-        let builder = if authenticated {
-            client.get(&warm_url).bearer_auth(&request.api_key)
-        } else {
-            client.head(&warm_url)
-        };
-        match builder.timeout(Duration::from_secs(5)).send().await {
-            Ok(response) => {
-                // The body has to be drained for the connection to go back in the
-                // pool; an abandoned response is a closed connection.
-                let status = response.status();
-                let bytes = response.bytes().await.map(|b| b.len()).unwrap_or(0);
+        match request.transcribe(wav).await {
+            Ok(_) => {
+                note_request_completed();
                 debug!(
-                    "Cloud STT connection warmed in {:?} ({status}, {bytes}B, {warm_url})",
+                    "Cloud STT route warmed in {:?} ({label} / {model})",
                     started.elapsed()
                 );
             }
-            Err(e) => debug!("Cloud STT prewarm skipped ({warm_url}): {e}"),
+            // Not an error the user should see: the dictation itself will report
+            // a real failure with the provider's own message.
+            Err(e) => debug!("Cloud STT warm-up skipped ({label} / {model}): {e}"),
         }
     });
 }
@@ -383,7 +460,13 @@ pub(crate) fn transcribe_cloud_blocking(
         wav.len() / 1024
     );
     let request = CloudRequest::from_config(cfg);
-    block_on_request(async move { request.transcribe(wav).await })
+    let result = block_on_request(async move { request.transcribe(wav).await });
+    if result.is_ok() {
+        // Only a completed round trip proves the route is warm, which is what
+        // lets the next recording skip its warm-up.
+        note_request_completed();
+    }
+    result
 }
 
 /// Everything one cloud request needs, owned so it can cross a thread boundary
@@ -1035,6 +1118,34 @@ mod tests {
 
         // Idempotent: a second pass changes nothing.
         assert!(!crate::settings::ensure_cloud_stt_defaults(&mut settings));
+    }
+
+    /// The warm-up has to be real audio, and small. If it ever becomes silence
+    /// the whole mechanism quietly stops working: a provider is free to
+    /// short-circuit an empty request, and a short-circuited request warms
+    /// nothing while still looking like a success in the log.
+    #[test]
+    fn the_warmup_payload_is_short_real_audio() {
+        let samples = warmup_samples();
+        assert_eq!(samples.len(), WHISPER_SAMPLE_RATE as usize / 4);
+        let rms = (samples.iter().map(|s| s * s).sum::<f32>() / samples.len() as f32).sqrt();
+        assert!(rms > 0.01, "warm-up audio must not be silence (rms {rms})");
+        assert!(samples.iter().all(|s| s.abs() <= 1.0));
+        // Small enough that the cost per cold dictation stays negligible.
+        let wav = encode_wav_16k_mono(&samples).expect("should encode");
+        assert!(wav.len() < 16_000, "warm-up payload is {} bytes", wav.len());
+    }
+
+    /// The route-warm marker is what stops a burst of dictations paying for a
+    /// warm-up each time, and it must only ever be set by a completed round trip.
+    #[test]
+    fn only_a_completed_request_marks_the_route_warm() {
+        clear_route_warm_marker();
+        assert!(!route_is_warm());
+        note_request_completed();
+        assert!(route_is_warm());
+        clear_route_warm_marker();
+        assert!(!route_is_warm());
     }
 
     #[test]

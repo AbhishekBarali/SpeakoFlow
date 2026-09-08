@@ -100,6 +100,7 @@ pub fn cancellation_generation() -> u64 {
 /// the incremented generation when they start.
 pub fn cancel_generation() {
     FLOW_CANCEL_GENERATION.fetch_add(1, Ordering::SeqCst);
+    CANCEL_WAKE.notify_waiters();
 }
 
 /// Whether a Flow turn that started at `generation` has since been cancelled.
@@ -107,9 +108,19 @@ pub fn is_generation_cancelled(generation: u64) -> bool {
     cancellation_generation() != generation
 }
 
-async fn wait_for_generation_cancel(generation: u64) {
-    while !is_generation_cancelled(generation) {
-        tokio::time::sleep(Duration::from_millis(25)).await;
+static CANCEL_WAKE: tokio::sync::Notify = tokio::sync::Notify::const_new();
+
+pub(crate) async fn wait_for_generation_cancel(generation: u64) {
+    loop {
+        let wake = CANCEL_WAKE.notified();
+        tokio::pin!(wake);
+        wake.as_mut().enable();
+        // Register before checking the sticky generation so a cancel between
+        // pipeline stages cannot be lost. No timer runs while waiting.
+        if is_generation_cancelled(generation) {
+            return;
+        }
+        wake.await;
     }
 }
 

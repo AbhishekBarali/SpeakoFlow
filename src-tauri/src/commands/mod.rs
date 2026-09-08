@@ -18,6 +18,16 @@ pub fn cancel_operation(app: AppHandle) {
     cancel_current_operation(&app);
 }
 
+/// Copy from the non-activating overlay and acknowledge the actual OS write.
+#[tauri::command]
+#[specta::specta]
+pub fn copy_overlay_transcript(app: AppHandle, text: String) -> Result<(), String> {
+    if text.trim().is_empty() {
+        return Ok(());
+    }
+    crate::clipboard::write_clipboard_text(&app, &text)
+}
+
 /// Finish the current recording right now and run the normal transcribe /
 /// assistant pipeline on it. This is the "done" tick on the recording overlay
 /// and the finish button on the assistant panel — the keyboard-free way to end

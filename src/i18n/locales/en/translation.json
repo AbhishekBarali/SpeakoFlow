@@ -1423,6 +1423,8 @@
         "speedDescription": "1× is normal. ElevenLabs supports 0.7×–1.2× only.",
         "speedValue": "{{value}}×",
         "speedCustomLabel": "Custom playback speed",
+        "volumeLabel": "Voice volume",
+        "volumeDescription": "How loud spoken replies are. Separate from the feedback sounds.",
         "testLabel": "Test voice",
         "testDescription": "Play a short sample with the current settings.",
         "testButton": "Test voice",
@@ -1561,7 +1563,7 @@
     "preparing": "Getting mic ready…",
     "recording": "Recording",
     "transcribing": "Transcribing…",
-    "processing": "Processing…",
+    "processing": "Cleaning up…",
     "generating": "Writing with Flow…",
     "vision": "Looking at your screen…",
     "notices": {
@@ -1574,6 +1576,10 @@
     "listening": "Listening…",
     "locked": "Recording hands-free — press the hotkey again to stop",
     "cancel": "Cancel",
+    "copy": "Copy the transcript",
+    "transcript": "Transcript",
+    "copied": "Copied",
+    "copyFailed": "Could not copy — try again",
     "done": "Done",
     "askAssistant": "Ask the assistant instead of typing this"
   },
@@ -1592,6 +1598,7 @@
       "retry": "Try again",
       "details": "Details",
       "pace": "Time to finish speaking",
+      "preparingVoice": "Preparing the voice… {{progress}}%",
       "paces": {
         "quick": "Quick",
         "natural": "Natural",

@@ -1,0 +1,101 @@
+/* ── Working indicator ──────────────────────────────────────────────────────
+ * Honestly indeterminate. Nothing on this path reports a fraction: the local
+ * engines expose no progress the overlay consumes, and a cleanup or Flow call
+ * returns once or not at all. The earlier version faked a curve anyway —
+ * scaleX 0.06 → 0.62 inside 400ms, 0.90 by 4s, then a 41-second crawl to 0.94
+ * — so it leapt, then sat frozen for the rest of every wait, and its edge
+ * implied a percentage the app never had. A block that is always fully present
+ * with light passing over it claims nothing, so it can neither overshoot nor
+ * stall, and its motion stays at one constant speed for as long as the work
+ * takes. `aria-valuenow` is likewise absent until there is a real result. */
+.overlay-progress {
+  position: relative;
+  width: 100%;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  /* The block itself, not a track: at 14% alpha over the near-black pill the
+     old container read as nothing, leaving the fill unanchored. */
+  background: rgba(229, 201, 155, 0.24);
+  box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.35);
+  direction: ltr;
+  transform-origin: center;
+  transition: background-color 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+/* Twice the track's width, carrying two periods of the same highlight, shifted
+ * by exactly one period over the loop — so the wrap is not a wrap: the pattern
+ * at the end of a cycle is pixel-identical to the pattern at its start. That is
+ * what buys a seam-free sweep from a single transform, with no second element
+ * chasing the first and no dead frame where the block goes plain. Linear on
+ * purpose: an eased sweep decelerates to a halt at each end, which is the
+ * stalling the old bar was disliked for. */
+.progress-sheen {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 200%;
+  border-radius: inherit;
+  /* Feathered, not a hard-edged rectangle: soft ends read as light moving
+     across the block, a crisp edge reads as an object being dragged over it. */
+  background: repeating-linear-gradient(
+    90deg,
+    rgba(250, 238, 214, 0) 0%,
+    rgba(250, 238, 214, 0.32) 8%,
+    rgba(250, 238, 214, 0.95) 17%,
+    rgba(250, 238, 214, 0.32) 26%,
+    rgba(250, 238, 214, 0) 34%,
+    rgba(250, 238, 214, 0) 50%
+  );
+  animation: progress-sweep 1350ms linear infinite;
+  transition: opacity 140ms ease-out;
+}
+@keyframes progress-sweep {
+  from {
+    transform: translateX(-50%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+/* Hidden window: park the compositor rather than animate what nobody sees.
+   There is no position to preserve, so resuming needs no bookkeeping. */
+.overlay-progress.is-paused .progress-sheen {
+  animation-play-state: paused;
+}
+/* A real result is the only thing that resolves this. The block goes solid and
+   takes one short beat of height — a confirmation, not a fill reaching 100%. */
+.overlay-progress.is-complete {
+  background: #e5c99b;
+  animation: progress-settle 280ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.overlay-progress.is-complete .progress-sheen {
+  animation: none;
+  opacity: 0;
+}
+@keyframes progress-settle {
+  0% {
+    transform: scaleY(1);
+  }
+  45% {
+    transform: scaleY(1.4);
+  }
+  100% {
+    transform: scaleY(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  /* No travelling light and no settle beat. The waiting block simply sits at a
+     brighter rest value than the finished one, so the two states are still
+     told apart by tone alone. */
+  .overlay-progress {
+    background: rgba(229, 201, 155, 0.46);
+    transition: none;
+  }
+  .overlay-progress.is-complete {
+    animation: none;
+  }
+  .progress-sheen {
+    display: none;
+  }
+}

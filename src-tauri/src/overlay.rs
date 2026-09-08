@@ -1,12 +1,13 @@
 use crate::input;
+use crate::overlay_lifecycle::OverlayLifecycle;
 use crate::settings;
 use crate::settings::OverlayPosition;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize};
 
 /// Bumped on every overlay state change. The delayed hide behind a brief
 /// notice only fires when nothing newer (e.g. a fresh recording) replaced it.
-static OVERLAY_EPOCH: AtomicU64 = AtomicU64::new(0);
+static OVERLAY_LIFECYCLE: OverlayLifecycle = OverlayLifecycle::new();
 
 #[cfg(not(target_os = "macos"))]
 use log::debug;
@@ -39,15 +40,19 @@ tauri_panel! {
 // The window is intentionally a little larger than the visible pill: the pill
 // hugs its content (auto width) and floats centered inside this transparent
 // frame, so these are the *maximum* bounds across all states rather than the
-// chip's actual size. Keeping them tight makes the overlay read as a small,
-// unobtrusive lozenge.
-const OVERLAY_WIDTH: f64 = 128.0;
-const OVERLAY_HEIGHT: f64 = 40.0;
+// chip's actual size. Keeping them tight is what makes the overlay read as a
+// small, unobtrusive lozenge — the compact pill is only ~86pt wide, and every
+// point of frame beyond that is invisible padding that still swallows clicks.
+const OVERLAY_WIDTH: f64 = 96.0;
+const OVERLAY_HEIGHT: f64 = 44.0;
 
 // Labeled pill states (Flow generating / looking at the screen / a brief
-// notice) carry a short text line, so the transparent frame is widened; the
-// pill itself still hugs its content.
-const OVERLAY_LABEL_WIDTH: f64 = 260.0;
+// notice) carry a written line, so the transparent frame is widened and given
+// room for a second line. Truncating a notice destroys the only thing it exists
+// to say, so the text wraps here rather than ellipsizing; the pill itself still
+// hugs its content, so a short label stays a short pill.
+const OVERLAY_LABEL_WIDTH: f64 = 300.0;
+const OVERLAY_LABEL_HEIGHT: f64 = 60.0;
 
 // The opt-in live-transcription window (see `live_transcription_window_enabled`)
 // reuses this same overlay window, resized into a larger card so the running
@@ -56,6 +61,23 @@ const OVERLAY_LABEL_WIDTH: f64 = 260.0;
 // stays the compact pill above.
 const OVERLAY_STREAM_WIDTH: f64 = 400.0;
 const OVERLAY_STREAM_HEIGHT: f64 = 120.0;
+
+/// Only completed live cards linger. All waiting is event-driven.
+///
+/// The card holds still at full opacity for the whole linger — that is the
+/// window in which the transcript is readable and the copy button is a real
+/// target — and then leaves in one short movement. A long fade is the worst of
+/// both: it is neither readable nor gone, and a card that spends most of a
+/// second dissolving reads as the app being slow rather than as a dismissal.
+/// Hovering during either phase cancels it and restarts the linger, so the exit
+/// being brief costs nothing (see `OverlayLifecycle::wait_for_dismissal`).
+static OVERLAY_STREAMING: AtomicBool = AtomicBool::new(false);
+const OVERLAY_LINGER_MS: u64 = 3000;
+const OVERLAY_FADE_MS: u64 = 220;
+
+pub fn set_overlay_hovered(hovered: bool) {
+    OVERLAY_LIFECYCLE.set_hovered(hovered);
+}
 
 /// Payload of the "show-overlay" event. Carries the visual `state`
 /// (recording / transcribing / processing / generating / vision / notice)
@@ -439,7 +461,7 @@ fn show_overlay_state(app_handle: &AppHandle, state: &str) {
 }
 
 fn show_overlay_state_with_notice(app_handle: &AppHandle, state: &str, notice: Option<String>) {
-    OVERLAY_EPOCH.fetch_add(1, Ordering::SeqCst);
+    OVERLAY_LIFECYCLE.advance();
     // Check if overlay should be shown based on position setting
     let settings = settings::get_settings(app_handle);
 
@@ -457,11 +479,12 @@ fn show_overlay_state_with_notice(app_handle: &AppHandle, state: &str, notice: O
     // while streaming actually produces text, but it degrades gracefully to a
     // waveform + state label for batch models, so it's safe to show on Live.
     let streaming_window = style == settings::OverlayStyle::Live;
+    OVERLAY_STREAMING.store(streaming_window, Ordering::SeqCst);
 
     let (width, height) = if streaming_window {
         (OVERLAY_STREAM_WIDTH, OVERLAY_STREAM_HEIGHT)
     } else if matches!(state, "generating" | "vision" | "notice") {
-        (OVERLAY_LABEL_WIDTH, OVERLAY_HEIGHT)
+        (OVERLAY_LABEL_WIDTH, OVERLAY_LABEL_HEIGHT)
     } else {
         (OVERLAY_WIDTH, OVERLAY_HEIGHT)
     };
@@ -528,12 +551,12 @@ pub fn show_vision_overlay(app_handle: &AppHandle) {
 /// `overlay.notices.*` in the webview.
 pub fn show_overlay_notice(app_handle: &AppHandle, notice_key: &str) {
     show_overlay_state_with_notice(app_handle, "notice", Some(notice_key.to_string()));
-    let epoch = OVERLAY_EPOCH.load(Ordering::SeqCst);
+    let epoch = OVERLAY_LIFECYCLE.current();
     let app = app_handle.clone();
     std::thread::spawn(move || {
         std::thread::sleep(std::time::Duration::from_millis(2600));
         // Only hide if no newer overlay state replaced the notice meanwhile.
-        if OVERLAY_EPOCH.load(Ordering::SeqCst) == epoch {
+        if OVERLAY_LIFECYCLE.current() == epoch {
             hide_recording_overlay(&app);
         }
     });
@@ -566,18 +589,83 @@ fn update_overlay_position_sized(app_handle: &AppHandle, width: f64, height: f64
     }
 }
 
-/// Hides the recording overlay window with fade-out animation
+/// A successful dictation leaves its final (including cleaned-up) text available
+/// to copy. Compact mode keeps its immediate dismissal and original footprint.
+pub fn finish_recording_overlay(app: &AppHandle, text: &str, notice: Option<&str>) {
+    if !OVERLAY_STREAMING.load(Ordering::SeqCst) || text.trim().is_empty() {
+        if let Some(notice) = notice {
+            show_overlay_notice(app, notice);
+        } else {
+            if !text.trim().is_empty() {
+                // Let the compact progress bar finish during the existing hide
+                // transition. Pasting has already happened; no extra wait is
+                // added. An empty/cancelled recording never signals success.
+                if let Some(window) = app.get_webview_window("recording_overlay") {
+                    let _ = window.emit(
+                        "finish-overlay",
+                        serde_json::json!({
+                            "epoch": OVERLAY_LIFECYCLE.current(), "text": ""
+                        }),
+                    );
+                }
+            }
+            hide_recording_overlay(app);
+        }
+        return;
+    }
+    let epoch = OVERLAY_LIFECYCLE.advance();
+    let Some(window) = app.get_webview_window("recording_overlay") else {
+        return;
+    };
+    let _ = window.emit(
+        "finish-overlay",
+        serde_json::json!({ "epoch": epoch, "text": text, "notice": notice }),
+    );
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        let ready = OVERLAY_LIFECYCLE
+            .wait_for_dismissal(
+                epoch,
+                std::time::Duration::from_millis(OVERLAY_LINGER_MS),
+                std::time::Duration::from_millis(OVERLAY_FADE_MS),
+                |fading| {
+                    let _ = window.emit(
+                        if fading {
+                            "fade-overlay"
+                        } else {
+                            "restore-overlay"
+                        },
+                        epoch,
+                    );
+                },
+            )
+            .await;
+        if ready {
+            let _ = app.run_on_main_thread(move || {
+                if OVERLAY_LIFECYCLE.is_current(epoch) {
+                    let _ = window.emit("hide-overlay", ());
+                    let _ = window.hide();
+                    set_overlay_hovered(false);
+                }
+            });
+        }
+    });
+}
+
+/// Cancellation and empty/error outcomes never leave a completed card behind.
 pub fn hide_recording_overlay(app_handle: &AppHandle) {
-    // Always hide the overlay regardless of settings - if setting was changed while recording,
-    // we still want to hide it properly
-    if let Some(overlay_window) = app_handle.get_webview_window("recording_overlay") {
-        // Emit event to trigger fade-out animation
-        let _ = overlay_window.emit("hide-overlay", ());
-        // Hide the window after a short delay to allow animation to complete
-        let window_clone = overlay_window.clone();
-        std::thread::spawn(move || {
-            std::thread::sleep(std::time::Duration::from_millis(300));
-            let _ = window_clone.hide();
+    let epoch = OVERLAY_LIFECYCLE.advance();
+    set_overlay_hovered(false);
+    if let Some(window) = app_handle.get_webview_window("recording_overlay") {
+        let _ = window.emit("hide-overlay", ());
+        let app = app_handle.clone();
+        tauri::async_runtime::spawn(async move {
+            tokio::time::sleep(std::time::Duration::from_millis(240)).await;
+            let _ = app.run_on_main_thread(move || {
+                if OVERLAY_LIFECYCLE.current() == epoch {
+                    let _ = window.hide();
+                }
+            });
         });
     }
 }

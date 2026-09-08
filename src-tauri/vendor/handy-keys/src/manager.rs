@@ -1,7 +1,7 @@
 //! Platform-agnostic hotkey manager built on top of KeyboardListener
 
 use std::collections::{HashMap, HashSet};
-use std::sync::mpsc::{self, Receiver, Sender, TryRecvError};
+use std::sync::mpsc::{self, Receiver, TryRecvError};
 use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 
@@ -91,6 +91,8 @@ pub struct HotkeyManager {
     running: Arc<std::sync::atomic::AtomicBool>,
     /// Shared set of hotkeys to block
     blocking_hotkeys: Option<BlockingHotkeys>,
+    #[cfg(target_os = "windows")]
+    shutdown_event: Arc<std::os::windows::io::OwnedHandle>,
 }
 
 impl HotkeyManager {
@@ -98,26 +100,7 @@ impl HotkeyManager {
     ///
     /// On macOS, this will check for accessibility permissions and fail if not granted.
     pub fn new() -> Result<Self> {
-        let listener = KeyboardListener::new()?;
-
-        let (tx, rx) = mpsc::channel();
-        let state = Arc::new(Mutex::new(ManagerState::new()));
-        let running = Arc::new(std::sync::atomic::AtomicBool::new(true));
-
-        let thread_state = Arc::clone(&state);
-        let thread_running = Arc::clone(&running);
-
-        let handle = thread::spawn(move || {
-            Self::event_loop(listener, thread_state, tx, thread_running);
-        });
-
-        Ok(Self {
-            state,
-            event_receiver: rx,
-            _thread_handle: Some(handle),
-            running,
-            blocking_hotkeys: None,
-        })
+        Self::new_internal(false, None)
     }
 
     /// Create a new HotkeyManager with blocking support
@@ -127,10 +110,34 @@ impl HotkeyManager {
     ///
     /// Note: On Linux/Wayland, blocking may not work due to compositor restrictions.
     pub fn new_with_blocking() -> Result<Self> {
-        let blocking_hotkeys: BlockingHotkeys = Arc::new(Mutex::new(HashSet::new()));
-        let listener = KeyboardListener::new_with_blocking(blocking_hotkeys.clone())?;
+        Self::new_internal(true, None)
+    }
+
+    /// Deliver matching hotkeys directly to a handler instead of the receive
+    /// queue. The handler should only enqueue the event and return promptly;
+    /// returning false stops delivery. This lets an application wait on one
+    /// channel for commands and hotkeys without polling either queue.
+    pub fn new_with_blocking_handler(
+        handler: impl Fn(HotkeyEvent) -> bool + Send + 'static,
+    ) -> Result<Self> {
+        Self::new_internal(true, Some(Box::new(handler)))
+    }
+
+    fn new_internal(
+        blocking: bool,
+        handler: Option<Box<dyn Fn(HotkeyEvent) -> bool + Send>>,
+    ) -> Result<Self> {
+        let blocking_hotkeys: Option<BlockingHotkeys> =
+            blocking.then(|| Arc::new(Mutex::new(HashSet::new())));
+        let listener = match &blocking_hotkeys {
+            Some(hotkeys) => KeyboardListener::new_with_blocking(hotkeys.clone())?,
+            None => KeyboardListener::new()?,
+        };
+        #[cfg(target_os = "windows")]
+        let shutdown_event = listener.shutdown_event();
 
         let (tx, rx) = mpsc::channel();
+        let deliver = handler.unwrap_or_else(|| Box::new(move |event| tx.send(event).is_ok()));
         let state = Arc::new(Mutex::new(ManagerState::new()));
         let running = Arc::new(std::sync::atomic::AtomicBool::new(true));
 
@@ -138,7 +145,23 @@ impl HotkeyManager {
         let thread_running = Arc::clone(&running);
 
         let handle = thread::spawn(move || {
-            Self::event_loop(listener, thread_state, tx, thread_running);
+            Self::event_loop(
+                || {
+                    // Windows shutdown closes the native sender, waking recv
+                    // without a timer. Other platforms retain their stop poll.
+                    #[cfg(target_os = "windows")]
+                    {
+                        listener.recv()
+                    }
+                    #[cfg(not(target_os = "windows"))]
+                    {
+                        listener.recv_timeout(std::time::Duration::from_millis(100))
+                    }
+                },
+                thread_state,
+                deliver,
+                thread_running,
+            );
         });
 
         Ok(Self {
@@ -146,27 +169,26 @@ impl HotkeyManager {
             event_receiver: rx,
             _thread_handle: Some(handle),
             running,
-            blocking_hotkeys: Some(blocking_hotkeys),
+            blocking_hotkeys,
+            #[cfg(target_os = "windows")]
+            shutdown_event,
         })
     }
 
     /// Event processing loop
     fn event_loop(
-        listener: KeyboardListener,
+        next_event: impl Fn() -> Result<KeyEvent>,
         state: Arc<Mutex<ManagerState>>,
-        sender: Sender<HotkeyEvent>,
+        deliver: Box<dyn Fn(HotkeyEvent) -> bool + Send>,
         running: Arc<std::sync::atomic::AtomicBool>,
     ) {
-        const RECV_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(100);
-
         while running.load(std::sync::atomic::Ordering::SeqCst) {
-            // Block until we receive an event or timeout (to check running flag)
-            match listener.recv_timeout(RECV_TIMEOUT) {
+            match next_event() {
                 Ok(key_event) => {
                     if let Ok(mut state) = state.lock() {
                         let hotkey_events = state.process_event(&key_event);
                         for event in hotkey_events {
-                            if sender.send(event).is_err() {
+                            if !deliver(event) {
                                 // Receiver dropped, exit
                                 return;
                             }
@@ -280,6 +302,16 @@ impl Drop for HotkeyManager {
     fn drop(&mut self) {
         self.running
             .store(false, std::sync::atomic::Ordering::SeqCst);
+        #[cfg(target_os = "windows")]
+        {
+            use std::os::windows::io::AsRawHandle;
+            use windows::Win32::{Foundation::HANDLE, System::Threading::SetEvent};
+            // End the native listener first: closing its sender wakes the
+            // processing thread even if no hotkey has ever been pressed.
+            unsafe {
+                let _ = SetEvent(HANDLE(self.shutdown_event.as_raw_handle()));
+            }
+        }
         // Join the thread to ensure clean shutdown
         if let Some(handle) = self._thread_handle.take() {
             let _ = handle.join();
@@ -291,6 +323,73 @@ impl Drop for HotkeyManager {
 mod tests {
     use super::*;
     use crate::types::{Key, Modifiers};
+
+    #[test]
+    fn handler_delivers_press_and_release_in_order_without_polling() {
+        let mut state = ManagerState::new();
+        state
+            .hotkeys
+            .insert(HotkeyId(0), Hotkey::new(Modifiers::CTRL, Key::K).unwrap());
+        let (key_tx, key_rx) = mpsc::channel();
+        let (event_tx, event_rx) = mpsc::channel();
+        for down in [true, true, false] {
+            key_tx
+                .send(make_key_event(Modifiers::CTRL_LEFT, Some(Key::K), down))
+                .unwrap();
+        }
+        drop(key_tx);
+        HotkeyManager::event_loop(
+            || key_rx.recv().map_err(|_| Error::EventLoopNotRunning),
+            Arc::new(Mutex::new(state)),
+            Box::new(move |event| event_tx.send(event).is_ok()),
+            Arc::new(std::sync::atomic::AtomicBool::new(true)),
+        );
+        let events: Vec<_> = event_rx.try_iter().map(|e| (e.id, e.state)).collect();
+        assert_eq!(
+            events,
+            vec![
+                (HotkeyId(0), HotkeyState::Pressed),
+                (HotkeyId(0), HotkeyState::Released),
+            ]
+        );
+    }
+
+    #[test]
+    fn handler_disconnect_stops_event_processing() {
+        let mut state = ManagerState::new();
+        state
+            .hotkeys
+            .insert(HotkeyId(0), Hotkey::new(Modifiers::CTRL, Key::K).unwrap());
+        let reads = std::cell::Cell::new(0);
+        HotkeyManager::event_loop(
+            || {
+                reads.set(reads.get() + 1);
+                assert_eq!(reads.get(), 1, "read again after delivery stopped");
+                Ok(make_key_event(Modifiers::CTRL_LEFT, Some(Key::K), true))
+            },
+            Arc::new(Mutex::new(state)),
+            Box::new(|_| false),
+            Arc::new(std::sync::atomic::AtomicBool::new(true)),
+        );
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn idle_native_manager_shuts_down_without_keyboard_input() {
+        let (done_tx, done_rx) = mpsc::channel();
+        let worker = thread::spawn(move || {
+            // Immediate drops also exercise shutdown before native hook setup
+            // finishes. No hotkeys are registered and no input is synthesized.
+            for _ in 0..8 {
+                drop(HotkeyManager::new_with_blocking_handler(|_| true).unwrap());
+            }
+            done_tx.send(()).unwrap();
+        });
+        done_rx
+            .recv_timeout(std::time::Duration::from_secs(5))
+            .unwrap();
+        worker.join().unwrap();
+    }
 
     fn make_key_event(modifiers: Modifiers, key: Option<Key>, is_key_down: bool) -> KeyEvent {
         KeyEvent {

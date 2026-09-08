@@ -13,6 +13,24 @@ use tauri_plugin_clipboard_manager::ClipboardExt;
 use crate::utils::{is_kde_wayland, is_wayland};
 
 /// Pastes text using the clipboard: saves current content, writes text, sends paste keystroke, restores clipboard.
+/// Put `text` on the system clipboard.
+///
+/// Shared by the paste pipeline and the live-transcription card's copy button.
+/// On Wayland this prefers `wl-copy`, which handles non-ASCII (umlauts and the
+/// like) more reliably than the plugin's own writer.
+pub fn write_clipboard_text(app_handle: &AppHandle, text: &str) -> Result<(), String> {
+    #[cfg(target_os = "linux")]
+    if is_wayland() && is_wl_copy_available() {
+        info!("Using wl-copy for clipboard write on Wayland");
+        return write_clipboard_via_wl_copy(text);
+    }
+
+    app_handle
+        .clipboard()
+        .write_text(text)
+        .map_err(|e| format!("Failed to write to clipboard: {}", e))
+}
+
 fn paste_via_clipboard(
     enigo: &mut Enigo,
     text: &str,
@@ -24,23 +42,7 @@ fn paste_via_clipboard(
     let clipboard_content = clipboard.read_text().unwrap_or_default();
 
     // Write text to clipboard first
-    // On Wayland, prefer wl-copy for better compatibility (especially with umlauts)
-    #[cfg(target_os = "linux")]
-    let write_result = if is_wayland() && is_wl_copy_available() {
-        info!("Using wl-copy for clipboard write on Wayland");
-        write_clipboard_via_wl_copy(text)
-    } else {
-        clipboard
-            .write_text(text)
-            .map_err(|e| format!("Failed to write to clipboard: {}", e))
-    };
-
-    #[cfg(not(target_os = "linux"))]
-    let write_result = clipboard
-        .write_text(text)
-        .map_err(|e| format!("Failed to write to clipboard: {}", e));
-
-    write_result?;
+    write_clipboard_text(app_handle, text)?;
 
     std::thread::sleep(Duration::from_millis(paste_delay_ms));
 

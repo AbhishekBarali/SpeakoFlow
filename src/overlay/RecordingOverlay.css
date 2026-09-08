@@ -1,13 +1,3 @@
-/* Recording / transcribing overlay — a small floating chip that speaks the
- * same editorial language as the main app: warm near-black surface, off-white
- * ink, hairline edge. The window itself is transparent with no native shadow,
- * so depth comes from a 1px hairline plus an inner top highlight rather than a
- * drop shadow (which would clip at the window bounds).
- *
- * The chip hugs its content (auto width) and floats centered inside a small
- * transparent window, so it stays as compact as each state allows: a tight
- * waveform while recording, a terse icon + label while transcribing. */
-
 .overlay-root {
   position: fixed;
   inset: 0;
@@ -15,418 +5,334 @@
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  padding: 3px;
+  box-sizing: border-box;
+  font-family:
+    "Inter Variable",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  color: #f5f5f4;
 }
 
+/* ── Shared surface ─────────────────────────────────────────────────────────
+ * The window itself is transparent and shadowless, so the sense of a small
+ * object floating over the desktop is built here: a hairline edge and an inner
+ * top highlight. Entering scales up from slightly small — that little settle is
+ * most of why the chip feels like it belongs on screen. */
+.overlay-pill,
+.overlay-card {
+  box-sizing: border-box;
+  background: rgba(24, 22, 20, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 0 0 0.5px rgba(0, 0, 0, 0.45);
+  opacity: 1;
+  transform: scale(1) translateY(0);
+  transform-origin: center;
+  transition:
+    opacity 240ms ease-out,
+    transform 260ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+.overlay-root.native-window-hidden > * {
+  opacity: 0;
+  transform: scale(0.9) translateY(2px);
+  pointer-events: none;
+}
+/* ── Compact pill (default) ─────────────────────────────────────────────────
+ * Hugs its content and sits centered in the transparent frame, so the recording
+ * → transcribing → cleanup sequence never changes size: only what moves inside
+ * it changes. The labeled states get a wider frame from the backend. */
 .overlay-pill {
   position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  box-sizing: border-box;
   height: 34px;
   min-width: 46px;
   max-width: 100%;
   padding: 0 10px;
   border-radius: 999px;
-  background: rgba(24, 22, 20, 0.94);
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    inset 0 0 0 0.5px rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(20px) saturate(1.4);
-  -webkit-backdrop-filter: blur(20px) saturate(1.4);
-  /* Reveal: fade + a small settle, driven by the root .fade-in toggle. */
-  opacity: 0;
-  transform: scale(0.9) translateY(2px);
-  transform-origin: center;
-  transition:
-    opacity 240ms ease-out,
-    transform 260ms cubic-bezier(0.22, 0.61, 0.36, 1),
-    height 240ms cubic-bezier(0.22, 0.61, 0.36, 1);
-  font-family:
-    "Inter Variable",
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    Roboto,
-    sans-serif;
 }
-
-.overlay-root.fade-in .overlay-pill {
-  opacity: 1;
-  transform: scale(1) translateY(0);
-}
-
-/* ---- Live recording: the waveform carries the state ---------------------- */
-
 .pill-wave {
   display: flex;
   align-items: center;
-  gap: 6px;
-  min-width: 0;
+  width: 54px;
 }
-
-/* Small text label for the labeled pill states (Flow generating / looking at
- * the screen / a brief notice). One quiet line, ellipsized to the pill. */
-.pill-label {
+.pill-wave.compact {
+  width: 40px;
+}
+.pill-label,
+.card-label {
   font-size: 11.5px;
+  line-height: 16px;
   font-weight: 500;
   letter-spacing: 0.01em;
-  color: rgba(245, 245, 244, 0.92);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 200px;
+}
+.pill-label {
+  color: rgba(245, 245, 244, 0.92);
+}
+/* A written state explains itself or it is noise, so it wraps to a second line
+ * instead of ellipsizing the payload away. The backend gives these states a
+ * taller frame; the pill still hugs a short label. */
+.overlay-pill.labeled {
+  gap: 8px;
+  height: auto;
+  min-height: 34px;
+  padding: 8px 13px;
+  border-radius: 18px;
+}
+.overlay-pill.labeled .pill-label {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
 }
 
-/* A fixed box keeps the bars packed into a dense little spindle instead of
- * stretching thin across the chip. */
-.wave-box {
-  width: 66px;
-  display: flex;
-  align-items: center;
-  /* Eases the chip's resize as it switches between hold and hands-free. */
-  transition: width 220ms cubic-bezier(0.22, 0.61, 0.36, 1);
+/* ── Live transcript, compact pill ──────────────────────────────────────────
+ * A ticker: pinned to the newest words, older ones scrolling out of the far
+ * edge. `text-align: end` cannot do this — alignment stops mattering once a
+ * nowrap line overflows, and the box then shows its *start*, clipping exactly
+ * the words the user just said. Flipping the box's direction moves the clip to
+ * the other edge; the line inside keeps its own reading order. */
+.overlay-pill.has-text {
+  width: 100%;
 }
-
-/* ---- Live transcription: a compact single-line ticker of the latest words -
- * Shown in place of the waveform once streaming text arrives (opt-in). The box
- * pins its content to the trailing edge and clips the overflow, so the most
- * recent words stay visible as the transcript grows — a small live caption
- * that stays within the fixed pill/window bounds. */
 .stream-text-box {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
+  flex: 1 1 0;
+  min-width: 0;
+  direction: rtl;
   overflow: hidden;
-  max-width: 104px;
-  height: 20px;
-}
-
-.stream-text {
-  flex: 0 0 auto;
   white-space: nowrap;
   font-size: 12px;
-  line-height: 1;
-  color: #f5f5f4;
+  line-height: 20px;
+  /* Fade the overflowing head instead of clipping it mid-glyph. */
+  mask-image: linear-gradient(to right, transparent, #000 22px);
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 22px);
 }
-
-/* The volatile, not-yet-committed tail (native streaming). Dimmed so it reads
- * as "still being decided" next to the solid committed prefix, and eased so a
- * word settling from tentative to committed doesn't flicker. */
-.stream-text-tentative {
-  color: #f5f5f4;
-  opacity: 0.45;
-  transition: opacity 160ms ease-out;
+.stream-text-box .transcript-line {
+  direction: ltr;
+  unicode-bidi: embed;
 }
-
-@media (prefers-reduced-motion: reduce) {
-  .stream-text-tentative {
-    transition: none;
-  }
+[dir="rtl"] .stream-text-box {
+  direction: ltr;
+  mask-image: linear-gradient(to left, transparent, #000 22px);
+  -webkit-mask-image: linear-gradient(to left, transparent, #000 22px);
 }
-
-/* Push-to-talk hold: keep the live wave compact and subtle. It grows on lock
- * (see .overlay-pill.locked below). The height eases so the hold -> lock switch
- * reads as one smooth motion. */
-.pill-wave .audio-waveform.sm {
-  height: 20px;
-  transition: height 240ms cubic-bezier(0.22, 0.61, 0.36, 1);
+[dir="rtl"] .stream-text-box .transcript-line {
+  direction: rtl;
 }
-
-/* The "working" spinner tucks alongside the settled waveform, so transcribing
- * reads as the same compact audio chip with a quiet loading cue rather than a
- * word. */
-.load-spinner {
-  flex-shrink: 0;
-  opacity: 0.9;
-  animation: overlay-spin 0.85s linear infinite;
+.transcript-tentative {
+  color: #aaa59b;
 }
-
-@keyframes overlay-spin {
-  to {
-    transform: rotate(360deg);
-  }
+/* Words the decoder just committed arrive instead of appearing. The animation
+ * runs on the newly appended run only, so the settled text never moves — and it
+ * is short enough that a fast speaker's next chunk is not queued behind it. */
+.transcript-arriving {
+  animation: transcript-in 160ms ease-out both;
 }
-
-/* ---- Cancel: hidden until hovered, so the resting chip stays clean -------- */
-
-.pill-cancel {
-  position: absolute;
-  right: 3px;
-  top: 50%;
-  transform: translateY(-50%) scale(0.85);
-  width: 20px;
-  height: 20px;
-  padding: 0;
-  border: none;
-  border-radius: 50%;
-  background: rgba(40, 36, 33, 0.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  opacity: 0;
-  pointer-events: none;
-  transition:
-    opacity 140ms ease-out,
-    background-color 140ms ease-out,
-    transform 120ms ease-out;
-}
-
-[dir="rtl"] .pill-cancel {
-  right: auto;
-  left: 3px;
-}
-
-.overlay-pill:hover .pill-cancel {
-  opacity: 1;
-  pointer-events: auto;
-  transform: translateY(-50%) scale(1);
-}
-
-.pill-cancel:hover {
-  background: rgba(220, 38, 38, 0.32);
-}
-
-.pill-cancel:active {
-  transform: translateY(-50%) scale(0.9);
-}
-
-/* Hands-free (locked) mode: the Cancel control becomes a persistent inline
- * button (rather than the hover-only affordance used during a push-to-talk
- * hold, where you finish by releasing the key). Hands-free itself is ended by
- * pressing the hotkey again — there is no Done button — so the locked pill is
- * just a calmer, slightly larger waveform with Cancel trailing it. */
-.overlay-pill.locked {
-  gap: 4px;
-}
-
-.overlay-pill.locked .pill-cancel {
-  position: static;
-  transform: none;
-  opacity: 1;
-  pointer-events: auto;
-  width: 18px;
-  height: 18px;
-  order: 2;
-}
-
-.overlay-pill.locked .pill-wave {
-  order: 1;
-}
-
-.overlay-pill.locked .wave-box {
-  width: 54px;
-}
-
-/* Hands-free lock (you pressed the shortcut to lock in): the chip grows into a
- * more present state — a taller pill and a bigger wave — so it reads as
- * actively listening rather than the compact push-to-talk hold. The window is
- * 40px tall, so 36px keeps a hairline of breathing room. */
-.overlay-pill.locked {
-  height: 36px;
-}
-
-.overlay-pill.locked .audio-waveform.sm {
-  height: 28px;
-}
-
-/* Ease the Cancel control in, so the hold → lock switch reads as one smooth
- * motion (the button growing in beside the enlarged waveform) rather than a
- * jump. */
-.overlay-pill.locked .pill-cancel {
-  animation: control-in 220ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
-}
-
-@keyframes control-in {
+@keyframes transcript-in {
   from {
     opacity: 0;
-    transform: scale(0.5);
+    filter: blur(2px);
   }
   to {
     opacity: 1;
-    transform: scale(1);
+    filter: blur(0);
   }
 }
 
-/* In locked mode Cancel is a static flex child, so right-to-left layouts mirror
-   it automatically (the waveform leads, Cancel trails) — no explicit order
-   override needed. */
-
-@media (prefers-reduced-motion: reduce) {
-  .overlay-pill,
-  .pill-cancel {
-    transition: none;
-  }
-  .wave-box,
-  .pill-wave .audio-waveform.sm,
-  .overlay-pill.locked .pill-cancel {
-    transition: none;
-    animation: none;
-  }
-  .load-spinner {
-    animation: none;
-  }
-}
-
-/* ---- Live-transcription window: the enlarged card (opt-in) ----------------
- * When the user turns on the live-transcription window, the overlay window is
- * resized to 400×120 (see overlay.rs OVERLAY_STREAM_WIDTH/HEIGHT) and this card
- * replaces the compact pill. It speaks the same editorial language — warm
- * near-black surface, off-white ink, hairline edge — but gives the running
- * transcript room to breathe: a header (live indicator + state label + the same
- * cancel/done controls) over a scrollable transcript that keeps the newest
- * words in view. The committed prefix renders solid; the tentative tail dimmed.
- */
+/* ── Live-transcription card (opt-in, 400×120) ──────────────────────────── */
 .overlay-card {
-  box-sizing: border-box;
-  width: 100%;
-  height: 100%;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 12px 14px;
+  gap: 7px;
+  width: 100%;
+  height: 100%;
+  padding: 10px 10px 12px 14px;
   border-radius: 16px;
-  background: rgba(24, 22, 20, 0.94);
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    inset 0 0 0 0.5px rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(20px) saturate(1.4);
-  -webkit-backdrop-filter: blur(20px) saturate(1.4);
-  /* Reveal: fade + a small settle, driven by the root .fade-in toggle. */
-  opacity: 0;
-  transform: scale(0.96) translateY(4px);
-  transform-origin: center;
-  transition:
-    opacity 240ms ease-out,
-    transform 260ms cubic-bezier(0.22, 0.61, 0.36, 1);
-  font-family:
-    "Inter Variable",
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    Roboto,
-    sans-serif;
 }
-
-.overlay-root.fade-in .overlay-card {
-  opacity: 1;
-  transform: scale(1) translateY(0);
-}
-
 .card-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  flex: 0 0 auto;
+  gap: 12px;
+  flex: 0 0 22px;
 }
-
 .card-status {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 9px;
   min-width: 0;
 }
-
 .card-wave {
-  width: 66px;
+  flex: 0 0 54px;
+  display: flex;
+  align-items: center;
+  height: 24px;
 }
-
 .card-label {
-  font-size: 12px;
-  line-height: 1;
   color: rgba(245, 245, 244, 0.7);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
-
 .card-actions {
   display: flex;
   align-items: center;
-  gap: 6px;
   flex: 0 0 auto;
 }
-
-.card-btn {
-  width: 22px;
-  height: 22px;
-  padding: 0;
-  border: none;
-  border-radius: 50%;
-  background: rgba(40, 36, 33, 0.6);
+.overlay-copy {
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #817d73;
   cursor: pointer;
   transition:
-    background-color 140ms ease-out,
-    transform 120ms ease-out;
+    color 140ms,
+    background-color 140ms;
 }
-
-.card-cancel:hover {
-  background: rgba(220, 38, 38, 0.32);
+.overlay-card:hover .overlay-copy {
+  color: #aaa497;
 }
-
-.card-btn:active {
-  transform: scale(0.9);
+.overlay-card .overlay-copy:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: #e6dfd2;
 }
-
-/* The transcript area: grows to fill the card, scrolls its overflow, and is
- * kept pinned to the newest words by RecordingOverlay's auto-scroll effect. */
+.overlay-copy:active {
+  background: rgba(255, 255, 255, 0.15);
+}
+.overlay-copy:focus-visible {
+  outline: 2px solid #d9c7a8;
+  outline-offset: 1px;
+}
+.overlay-card .overlay-copy.is-done {
+  color: #d9c7a8;
+}
+.overlay-card .overlay-copy.is-error {
+  color: #efb4a7;
+}
+.overlay-card.completed .card-wave:not(.is-progress) {
+  flex-basis: 14px;
+  color: #d9c7a8;
+}
+/* ── Leaving ───────────────────────────────────────────────────────────────
+ * One decisive movement, not a long dissolve. Most of the opacity is gone
+ * inside ~90ms and the slight shrink-and-lift gives the eye a direction to
+ * follow, so the card reads as dismissed rather than as the app being slow.
+ * The card stays clickable for the whole exit — opacity does not block
+ * hit-testing — and a pointer entering it cancels the fade and restarts the
+ * full reading window (`OverlayLifecycle::wait_for_dismissal`), which is what
+ * makes a short exit safe: the copy button is never taken away mid-reach. */
+.overlay-root.is-fading > .overlay-card {
+  opacity: 0;
+  transform: scale(0.965) translateY(-3px);
+  transition:
+    opacity 220ms cubic-bezier(0.3, 0, 0.2, 1),
+    transform 220ms cubic-bezier(0.3, 0, 0.2, 1);
+}
+.overlay-root:not(.is-fading) > .overlay-card {
+  transition:
+    opacity 150ms ease-out,
+    transform 150ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+.overlay-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
 .card-body {
-  flex: 1 1 auto;
+  flex: 1;
   min-height: 0;
+  padding-inline-end: 4px;
   overflow-y: auto;
   overflow-x: hidden;
-  /* Thin, unobtrusive scrollbar to match the dark surface. */
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+  scrollbar-gutter: stable;
+  /* Non-auto standard values override the WebKit rules in Chromium and bring
+     back Windows' native arrow buttons. Keep the custom thumb in control. */
+  scrollbar-width: auto;
+  scrollbar-color: auto;
 }
-
 .card-body::-webkit-scrollbar {
-  width: 6px;
+  width: 3px;
 }
-
+.card-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+.card-body::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
 .card-body::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.18);
   border-radius: 3px;
+  background: transparent;
 }
-
+.overlay-card:hover .card-body::-webkit-scrollbar-thumb,
+.card-body:focus-visible::-webkit-scrollbar-thumb {
+  background: rgba(220, 213, 197, 0.22);
+}
+.card-body::-webkit-scrollbar-thumb:hover {
+  background: rgba(220, 213, 197, 0.4);
+}
+.card-body:focus-visible {
+  outline: 1px solid #777166;
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+@supports not selector(::-webkit-scrollbar) {
+  .card-body {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+  }
+  .overlay-card:hover .card-body,
+  .card-body:focus-visible {
+    scrollbar-color: rgba(220, 213, 197, 0.22) transparent;
+  }
+}
 .card-text {
   margin: 0;
   font-size: 14px;
-  line-height: 1.4;
-  color: #f5f5f4;
+  line-height: 1.5;
   overflow-wrap: anywhere;
-  word-break: break-word;
+}
+.card-hint {
+  color: #a5a199;
 }
 
-.card-placeholder {
-  color: rgba(245, 245, 244, 0.5);
-}
-
-.card-committed {
-  color: #f5f5f4;
-}
-
-/* The volatile, not-yet-committed tail (native streaming). Dimmed so it reads
- * as "still being decided" next to the solid committed prefix. */
-.card-tentative {
-  color: #f5f5f4;
-  opacity: 0.5;
-  transition: opacity 160ms ease-out;
+/* Audio time runs left to right in every locale, like a media scrubber. */
+.audio-waveform {
+  direction: ltr;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .overlay-card {
+  .overlay-pill,
+  .overlay-card,
+  .overlay-copy,
+  .overlay-root.native-window-hidden > .overlay-card,
+  .overlay-root.is-fading > .overlay-card,
+  .overlay-root:not(.is-fading) > .overlay-card {
     transition: none;
   }
-  .card-btn,
-  .card-tentative {
-    transition: none;
+  .overlay-root.native-window-hidden > * {
+    transform: none;
+  }
+  .overlay-root.is-fading > .overlay-card {
+    transform: none;
+  }
+  .transcript-arriving {
+    animation: none;
   }
 }

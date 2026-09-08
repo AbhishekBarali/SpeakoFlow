@@ -75,7 +75,12 @@ const DOWNLOAD_WRITE_BUFFER: usize = 4 * 1024 * 1024;
 /// which is what users far from the origin were seeing. HTTP/2 multiplexing buys
 /// nothing for bulk file transfer, and on 1.1 each parallel range request gets
 /// its own connection with no shared window to throttle it.
-fn download_client() -> reqwest::Result<reqwest::Client> {
+///
+/// `pub(crate)` so every bulk transfer in the app shares it. A default
+/// `reqwest::Client` is not an acceptable substitute here: measured against the
+/// 31.7 MiB llama.cpp engine asset, the default client managed 11.78 MB/s where
+/// this one managed 29.70 MB/s on the same link moments apart.
+pub(crate) fn download_client() -> reqwest::Result<reqwest::Client> {
     reqwest::Client::builder()
         .connect_timeout(Duration::from_secs(30))
         .user_agent(concat!("SpeakoFlow/", env!("CARGO_PKG_VERSION")))
@@ -2956,7 +2961,7 @@ id: "gemma-3-4b".to_string(),
             .unwrap_or("mmproj.gguf");
         let tmp = self.models_dir.join(format!("{}.partial", file_name));
 
-        let client = reqwest::Client::new();
+        let client = download_client()?;
         let response = client.get(url).send().await?;
         if !response.status().is_success() {
             return Err(anyhow::anyhow!(
@@ -3152,6 +3157,12 @@ id: "gemma-3-4b".to_string(),
                     let end = (start + DOWNLOAD_CHUNK_SIZE).min(total_size) - 1;
                     let expected = (end - start + 1) as usize;
 
+                    // Bytes this attempt has already added to the progress
+                    // counter. Declared out here so every exit path — stream
+                    // error, short read, failed write, cancel — can hand them
+                    // back, which is what keeps a counter that is credited
+                    // mid-flight from running ahead of what actually landed.
+                    let mut credited = 0u64;
                     let outcome: Result<()> = async {
                         let response = client
                             .get(&url)
@@ -3168,7 +3179,23 @@ id: "gemma-3-4b".to_string(),
                             if cancel_flag.load(Ordering::Relaxed) {
                                 return Ok(());
                             }
-                            buffer.extend_from_slice(&part?);
+                            let part = part?;
+                            // Credit bytes as they arrive rather than when the
+                            // chunk completes. Crediting whole chunks made the
+                            // counter move in 8 MiB steps, and because eight
+                            // workers start together those steps arrive in
+                            // bursts: measured on the 795 MiB SpeakoFlow Mini
+                            // download, the counter did not move at all for the
+                            // first ~2s and then jumped between 8 and 56 MiB per
+                            // second on a transfer that was steady at 29 MB/s.
+                            // Any speed the UI derives by differencing this
+                            // counter over a sub-second window was therefore
+                            // wrong in both directions — most often reading far
+                            // below the real rate, and capped at one chunk per
+                            // window no matter how fast the link was.
+                            downloaded.fetch_add(part.len() as u64, Ordering::Relaxed);
+                            credited += part.len() as u64;
+                            buffer.extend_from_slice(&part);
                         }
                         if buffer.len() != expected {
                             return Err(anyhow::anyhow!(
@@ -3191,7 +3218,12 @@ id: "gemma-3-4b".to_string(),
                     .await;
 
                     match outcome {
-                        Ok(()) if cancel_flag.load(Ordering::Relaxed) => return,
+                        // Cancelled part-way through this chunk: nothing was
+                        // written, so give its bytes back.
+                        Ok(()) if cancel_flag.load(Ordering::Relaxed) => {
+                            downloaded.fetch_sub(credited, Ordering::Relaxed);
+                            return;
+                        }
                         Ok(()) => {
                             let snapshot = {
                                 let mut done = done.lock().unwrap();
@@ -3199,9 +3231,10 @@ id: "gemma-3-4b".to_string(),
                                 done.iter().map(|d| u8::from(*d)).collect::<Vec<u8>>()
                             };
                             let _ = fs::write(&parts_path, &snapshot);
-                            downloaded.fetch_add(expected as u64, Ordering::Relaxed);
+                            // The chunk's bytes were credited as they arrived.
                         }
                         Err(error) => {
+                            downloaded.fetch_sub(credited, Ordering::Relaxed);
                             *failure.lock().unwrap() = Some(error);
                             return;
                         }

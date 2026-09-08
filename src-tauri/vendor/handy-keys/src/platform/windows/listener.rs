@@ -1,11 +1,13 @@
 //! Windows low-level keyboard hook implementation
 
+use std::os::windows::io::{AsRawHandle, FromRawHandle, OwnedHandle};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 
-use windows::Win32::Foundation::{LPARAM, LRESULT, WPARAM};
+use windows::Win32::Foundation::{HANDLE, LPARAM, LRESULT, WAIT_FAILED, WAIT_OBJECT_0, WPARAM};
+use windows::Win32::System::Threading::{CreateEventW, INFINITE};
 use windows::Win32::UI::WindowsAndMessaging::{
     CallNextHookEx, DispatchMessageW, MsgWaitForMultipleObjects, PeekMessageW, SetWindowsHookExW,
     TranslateMessage, UnhookWindowsHookEx, KBDLLHOOKSTRUCT, LLKHF_EXTENDED, MSG, MSLLHOOKSTRUCT,
@@ -14,13 +16,11 @@ use windows::Win32::UI::WindowsAndMessaging::{
     WM_SYSKEYDOWN, WM_SYSKEYUP, WM_XBUTTONDOWN, WM_XBUTTONUP,
 };
 
-use crate::error::Result;
+use crate::error::{Error, Result};
 use crate::platform::state::BlockingHotkeys;
 use crate::types::{Hotkey, Key, KeyEvent, Modifiers};
 
 use super::keycode::{vk_to_key, vk_to_modifier};
-
-const HOOK_LOOP_TIMEOUT_MS: u32 = 10;
 
 /// Thread-local state for the keyboard hook callback.
 ///
@@ -62,11 +62,19 @@ fn drain_thread_messages(msg: &mut MSG) -> bool {
     false
 }
 
-/// Wait for new input/messages or until timeout expires.
-fn wait_for_message_or_timeout(timeout_ms: u32) {
-    unsafe {
-        let _ = MsgWaitForMultipleObjects(None, false, timeout_ms, QS_ALLINPUT);
-    }
+/// Sleep until Windows delivers input or the listener is explicitly stopped.
+/// A manual-reset event remembers an early stop, including one that arrives
+/// before the message loop starts, so shutdown never depends on polling.
+fn wait_for_message_or_shutdown(shutdown: &OwnedHandle) -> bool {
+    let result = unsafe {
+        MsgWaitForMultipleObjects(
+            Some(&[HANDLE(shutdown.as_raw_handle())]),
+            false,
+            INFINITE,
+            QS_ALLINPUT,
+        )
+    };
+    result != WAIT_OBJECT_0 && result != WAIT_FAILED
 }
 
 /// Internal listener state returned to KeyboardListener
@@ -75,10 +83,16 @@ pub(crate) struct WindowsListenerState {
     pub thread_handle: Option<JoinHandle<()>>,
     pub running: Arc<AtomicBool>,
     pub blocking_hotkeys: Option<BlockingHotkeys>,
+    pub shutdown_event: Arc<OwnedHandle>,
 }
 
 /// Spawn a Windows low-level keyboard hook listener
 pub(crate) fn spawn(blocking_hotkeys: Option<BlockingHotkeys>) -> Result<WindowsListenerState> {
+    let event = unsafe { CreateEventW(None, true, false, None) }
+        .map_err(|e| Error::Platform(format!("Failed to create keyboard shutdown event: {e}")))?;
+    // Transfer ownership once; both threads share it until the listener exits.
+    let shutdown_event = Arc::new(unsafe { OwnedHandle::from_raw_handle(event.0) });
+    let thread_shutdown = shutdown_event.clone();
     let (tx, rx) = mpsc::channel();
     let running = Arc::new(AtomicBool::new(true));
     let thread_running = Arc::clone(&running);
@@ -124,7 +138,7 @@ pub(crate) fn spawn(blocking_hotkeys: Option<BlockingHotkeys>) -> Result<Windows
         };
 
         // Message loop - required for low-level hooks to function.
-        // Keep the short timeout so shutdown polling behavior remains unchanged.
+        // Input and shutdown both wake the loop immediately, with no idle timer.
         let mut msg = MSG::default();
         loop {
             // Check if we should stop
@@ -137,9 +151,9 @@ pub(crate) fn spawn(blocking_hotkeys: Option<BlockingHotkeys>) -> Result<Windows
                 break;
             }
 
-            // Wait for messages or timeout — unlike thread::sleep, this returns
-            // immediately when a message arrives, so hook callbacks are never delayed.
-            wait_for_message_or_timeout(HOOK_LOOP_TIMEOUT_MS);
+            if !wait_for_message_or_shutdown(&thread_shutdown) {
+                break;
+            }
         }
 
         // Clean up the hooks
@@ -159,6 +173,7 @@ pub(crate) fn spawn(blocking_hotkeys: Option<BlockingHotkeys>) -> Result<Windows
         thread_handle: Some(handle),
         running,
         blocking_hotkeys,
+        shutdown_event,
     })
 }
 
@@ -203,11 +218,8 @@ unsafe extern "system" fn keyboard_hook_proc(code: i32, wparam: WPARAM, lparam: 
                     if is_repeat {
                         should_block = ctx.blocked_keys.contains(&vk_code);
                     } else {
-                        should_block = should_block_hotkey(
-                            &ctx.blocking_hotkeys,
-                            ctx.current_modifiers,
-                            None,
-                        );
+                        should_block =
+                            should_block_hotkey(&ctx.blocking_hotkeys, ctx.current_modifiers, None);
                         if should_block {
                             ctx.blocked_keys.insert(vk_code);
                         }
@@ -355,7 +367,8 @@ fn should_block_hotkey(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::{Duration, Instant};
+    use std::time::Duration;
+    use windows::Win32::System::Threading::SetEvent;
     use windows::Win32::UI::WindowsAndMessaging::PostQuitMessage;
 
     fn clear_message_queue() {
@@ -364,16 +377,29 @@ mod tests {
     }
 
     #[test]
-    fn wait_times_out_when_no_messages() {
+    fn wait_stays_asleep_until_shutdown() {
+        let event = unsafe { CreateEventW(None, true, false, None) }.unwrap();
+        let shutdown = Arc::new(unsafe { OwnedHandle::from_raw_handle(event.0) });
+        let worker_shutdown = shutdown.clone();
+        let (tx, rx) = mpsc::channel();
+        let worker = thread::spawn(move || {
+            clear_message_queue();
+            tx.send(wait_for_message_or_shutdown(&worker_shutdown))
+                .unwrap();
+        });
+        let idle_result = rx.recv_timeout(Duration::from_millis(100));
+        unsafe { SetEvent(HANDLE(shutdown.as_raw_handle())) }.unwrap();
+        assert!(matches!(idle_result, Err(mpsc::RecvTimeoutError::Timeout)));
+        assert!(!rx.recv_timeout(Duration::from_secs(2)).unwrap());
+        worker.join().unwrap();
+    }
+
+    #[test]
+    fn shutdown_before_wait_is_not_lost() {
         clear_message_queue();
-        let start = Instant::now();
-        wait_for_message_or_timeout(20);
-        let elapsed = start.elapsed();
-        assert!(
-            elapsed >= Duration::from_millis(8),
-            "expected wait to block close to timeout, elapsed={elapsed:?}"
-        );
-        clear_message_queue();
+        let event = unsafe { CreateEventW(None, true, true, None) }.unwrap();
+        let shutdown = unsafe { OwnedHandle::from_raw_handle(event.0) };
+        assert!(!wait_for_message_or_shutdown(&shutdown));
     }
 
     #[test]
@@ -382,13 +408,9 @@ mod tests {
         unsafe {
             PostQuitMessage(0);
         }
-        let start = Instant::now();
-        wait_for_message_or_timeout(200);
-        let elapsed = start.elapsed();
-        assert!(
-            elapsed < Duration::from_millis(100),
-            "expected pending message to wake wait early, elapsed={elapsed:?}"
-        );
+        let event = unsafe { CreateEventW(None, true, false, None) }.unwrap();
+        let shutdown = unsafe { OwnedHandle::from_raw_handle(event.0) };
+        assert!(wait_for_message_or_shutdown(&shutdown));
         clear_message_queue();
     }
 

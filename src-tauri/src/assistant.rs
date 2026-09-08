@@ -1586,7 +1586,11 @@ fn build_assistant_panel(app: &AppHandle) {
                 match event {
                     tauri::WindowEvent::Moved(_) => save_position(&app_handle),
                     tauri::WindowEvent::CloseRequested { api, .. } => {
-                        // Dismiss the surface without hanging up a voice call.
+                        // Closing the window hangs up: `hide_assistant_panel`
+                        // ends a live call so the microphone never outlives the
+                        // surface that showed it. A call already cancels its own
+                        // turn and silences playback, so the general cancel path
+                        // is only needed when there isn't one.
                         api.prevent_close();
                         if !crate::voice_conversation::is_active(&app_handle) {
                             crate::utils::cancel_current_operation(&app_handle);
@@ -1691,11 +1695,14 @@ pub fn show_assistant_voice_overlay(app: &AppHandle) {
 }
 
 /// Dismiss the transient collapsed voice overlay, if it is actually on screen.
-/// A no-op when the panel is hidden or expanded, so a cancellation never ends
-/// the conversation — `hide_assistant_panel` triggers memory distillation — for
+/// A no-op when the panel is hidden or expanded, so a cancellation never closes
 /// a surface the user cannot even see.
+///
+/// Also a no-op during a call: the collapsed form there is the conversation
+/// pill, not a transient overlay, and `hide_assistant_panel` now hangs up. Esc
+/// mid-reply should stop the reply, not end the conversation.
 pub fn dismiss_voice_overlay(app: &AppHandle) {
-    if !is_panel_collapsed() {
+    if !is_panel_collapsed() || crate::voice_conversation::is_active(app) {
         return;
     }
     // `panel_is_visible` is a blocking round-trip to the event loop, so keep it
@@ -1725,6 +1732,14 @@ pub fn is_panel_collapsed() -> bool {
 }
 
 pub fn hide_assistant_panel(app: &AppHandle) {
+    // A hidden window must not keep the microphone. Closing the panel during a
+    // call used to leave the session running: every utterance was still
+    // transcribed and answered, and replies were still spoken aloud, from a
+    // window that was no longer on screen — while the X read as "hang up".
+    // Collapsing is the gesture that keeps a call alive, because the pill stays
+    // visible and says so. Ending here also runs the call's own teardown, which
+    // is what lets a spoken conversation reach memory.
+    crate::voice_conversation::end(app);
     // Window work on the event loop's own thread: this is reached from the
     // keyboard engine's thread as well as from commands (see
     // `build_assistant_panel` for why that distinction matters).
@@ -1743,21 +1758,33 @@ pub fn hide_assistant_panel(app: &AppHandle) {
     }
     // Learn from the conversation when the panel is closed — the common way to
     // "end" a chat besides Clear (users often just close it when it gets long).
-    // Guarded so it only runs when memory is on, the chat isn't incognito, and
-    // there's genuinely new content since the last pass, so opening/closing the
-    // panel repeatedly never spends a wasted model call.
+    // A call that was live has already been ended above, and `take_distillable`
+    // is dirty-guarded, so this is a no-op when its hang-up just did the pass.
+    distill_conversation_if_ended(app);
+}
+
+/// Learn from a conversation that has just ended.
+///
+/// Guarded so it only runs when memory is on, the chat isn't incognito, and
+/// there's genuinely new content since the last pass, so ending a chat
+/// repeatedly never spends a wasted model call.
+///
+/// Shared by every way a conversation can end — closing the panel, clearing it,
+/// and hanging up a voice call. A spoken conversation is a conversation: it used
+/// to be the one kind that taught the assistant nothing, because closing the
+/// panel skipped the pass while the call was still live and ending the call
+/// never ran it at all.
+pub fn distill_conversation_if_ended(app: &AppHandle) {
     let settings = crate::settings::get_settings(app);
-    if !crate::voice_conversation::is_active(app)
-        && settings.assistant_memory_enabled
-        && !settings.assistant_memory_incognito
-    {
-        if let Some(conversation) = app.try_state::<AssistantConversation>() {
-            if let Some(messages) = conversation.take_distillable() {
-                let app_for_memory = app.clone();
-                tauri::async_runtime::spawn(async move {
-                    crate::memory::distill_and_store(app_for_memory, messages).await;
-                });
-            }
+    if !settings.assistant_memory_enabled || settings.assistant_memory_incognito {
+        return;
+    }
+    if let Some(conversation) = app.try_state::<AssistantConversation>() {
+        if let Some(messages) = conversation.take_distillable() {
+            let app_for_memory = app.clone();
+            tauri::async_runtime::spawn(async move {
+                crate::memory::distill_and_store(app_for_memory, messages).await;
+            });
         }
     }
 }
@@ -2199,6 +2226,16 @@ pub fn finish_region_snip(app: &AppHandle, rect: Option<(f64, f64, f64, f64)>) {
 /// and run the conversation turn. In Agent-decides mode the model may instead
 /// request the screen itself via the `capture_screen` tool inside the turn.
 pub async fn run_voice_turn(app: AppHandle, transcription: String) {
+    // A silent recording is not a question. A local engine answers silence with
+    // `[BLANK_AUDIO]` or a bracketed annotation rather than an empty string, so
+    // without this the assistant spends a whole generation — and, on the built-in
+    // engine, a cold model load first — replying to a marker nobody said.
+    if crate::audio_toolkit::is_speechless_transcription(&transcription) {
+        debug!("Voice turn had no speech ({transcription:?}); nothing to ask");
+        take_immediate_capture();
+        emit_state(&app, "idle");
+        return;
+    }
     let settings = get_settings(&app);
     let character_is_cat = settings.active_character_is_cat();
     let manual_mode = manual_screen_access_allowed(settings.assistant_screen_access_mode);
@@ -2961,7 +2998,13 @@ async fn run_assistant_turn_inner(
     // if it doesn't, the frame is dropped at the end of the turn and never
     // leaves the device. A recording-start frame (Immediate timing) is already
     // parked and is left alone.
-    if agent_screen && !settings.active_character_is_cat() {
+    //
+    // Not for a spoken call, though: every utterance there is a turn, so this
+    // grabbed the screen continuously for the length of the conversation — for
+    // "what time is it" as much as for "what's this error". `capture_screen`
+    // falls back to capturing on demand (`agent_capture_screen`), so the model
+    // can still look; it just pays for the frame when it actually asks.
+    if agent_screen && voice_ticket.is_none() && !settings.active_character_is_cat() {
         ensure_agent_capture_started(crate::screenshot::CaptureProfile::for_base_url(
             &provider.base_url,
         ));

@@ -849,7 +849,8 @@ impl LocalLlmManager {
         use futures_util::StreamExt;
         use std::io::Write;
 
-        let client = reqwest::Client::new();
+        let client = crate::managers::model::download_client()
+            .map_err(|e| format!("Engine download client setup failed: {}", e))?;
         let resp = client
             .get(url)
             .header("User-Agent", "speakoflow")
@@ -1594,6 +1595,19 @@ impl LocalLlmManager {
     /// Never unloads while a request is in flight, or when the timeout is set to
     /// `Never`.
     fn idle_check_and_maybe_stop(&self) {
+        // Most cloud users never start either local engine. Check the cheap
+        // process state before loading the entire settings/history snapshot.
+        {
+            let mut st = self.state.lock().unwrap();
+            let running = match st.child.as_mut() {
+                Some(child) => matches!(child.try_wait(), Ok(None)),
+                None => false,
+            };
+            if !running {
+                return;
+            }
+        }
+
         let settings = crate::settings::get_settings(&self.app_handle);
         // Each role has its own residency policy: the assistant's model is large
         // and rarely used, cleanup's is small and used on every dictation.
@@ -1610,18 +1624,6 @@ impl LocalLlmManager {
         if self.in_flight.load(Ordering::SeqCst) > 0 {
             self.touch_activity();
             return;
-        }
-
-        // Only act if the engine is actually running.
-        {
-            let mut st = self.state.lock().unwrap();
-            let running = match st.child.as_mut() {
-                Some(child) => matches!(child.try_wait(), Ok(None)),
-                None => false,
-            };
-            if !running {
-                return;
-            }
         }
 
         let idle_ms = Self::now_ms().saturating_sub(self.last_activity.load(Ordering::Relaxed));

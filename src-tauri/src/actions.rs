@@ -38,6 +38,10 @@ struct RecordingErrorEvent {
 struct FinishGuard(AppHandle);
 impl Drop for FinishGuard {
     fn drop(&mut self) {
+        if std::thread::panicking() {
+            utils::hide_recording_overlay(&self.0);
+            change_tray_icon(&self.0, TrayIconState::Idle);
+        }
         // The whole pipeline (recording + transcription + any assistant
         // generation) is done, so drop the cancel shortcut here rather than at
         // recording-stop. Keeping it registered through generation is what lets
@@ -78,6 +82,20 @@ struct TranscribeAction {
 
 fn uses_ai_cleanup(post_process: bool) -> bool {
     post_process
+}
+
+/// Return the UI to rest: overlay down, tray idle.
+///
+/// Every exit from the post-recording pipeline has to end here. The paths that
+/// bail out early on a cancel used to just `return`, on the assumption that
+/// `cancel_current_operation` had already hidden the overlay — but a cancel that
+/// lands *before* the pipeline shows its next state loses that race: the pipeline
+/// then shows "Transcribing…" or "Processing…" and returns without hiding it, and
+/// the pill sits on screen with no owner left to take it down. That is the
+/// "processing gets stuck forever" report; the work had already finished.
+fn finish_idle(app: &AppHandle) {
+    utils::hide_recording_overlay(app);
+    change_tray_icon(app, TrayIconState::Idle);
 }
 
 /// Field name for structured output JSON schema
@@ -1078,6 +1096,16 @@ pub(crate) async fn process_transcription_output(
     transcription: &str,
     post_process: bool,
 ) -> ProcessedTranscription {
+    // A silent recording is a completed no-op. Never start an LLM — or spend its
+    // timeout, or a cold engine start — cleaning up a string with no speech in it.
+    if crate::audio_toolkit::is_speechless_transcription(transcription) {
+        return ProcessedTranscription {
+            final_text: String::new(),
+            post_processed_text: None,
+            post_process_prompt: None,
+            post_process_result: None,
+        };
+    }
     let settings = get_settings(app);
     let mut final_text = transcription.to_string();
     let mut post_processed_text: Option<String> = None;
@@ -1492,6 +1520,34 @@ impl ShortcutAction for TranscribeAction {
                                 transcription
                             );
 
+                            if crate::flow::is_generation_cancelled(flow_cancel_generation) {
+                                finish_idle(&ah);
+                                return;
+                            }
+                            if crate::audio_toolkit::is_speechless_transcription(&transcription) {
+                                debug!(
+                                    "Recording produced no speech ({transcription:?}); nothing to \
+                                     paste, clean up, or hand to the assistant"
+                                );
+                                finish_idle(&ah);
+                                crate::assistant::take_transcribe_redirect();
+                                if crate::assistant::take_dictate_to_field() {
+                                    let _ = ah.emit("dictation-transcript", "");
+                                }
+                                if wav_saved {
+                                    if let Err(err) = hm.save_entry(
+                                        file_name,
+                                        String::new(),
+                                        post_process,
+                                        None,
+                                        None,
+                                    ) {
+                                        error!("Failed to save silent recording: {}", err);
+                                    }
+                                }
+                                return;
+                            }
+
                             // Rerouted to the assistant (the overlay's Ask-
                             // Assistant button): hand the transcript to the
                             // assistant instead of pasting it anywhere.
@@ -1698,9 +1754,14 @@ impl ShortcutAction for TranscribeAction {
                             if post_process {
                                 show_processing_overlay(&ah);
                             }
-                            let processed =
-                                process_transcription_output(&ah, &transcription, post_process)
-                                    .await;
+                            let processed = tokio::select! {
+                                biased;
+                                _ = crate::flow::wait_for_generation_cancel(flow_cancel_generation) => {
+                                    finish_idle(&ah);
+                                    return;
+                                }
+                                result = process_transcription_output(&ah, &transcription, post_process) => result,
+                            };
 
                             // A cleanup that fell back used to be completely
                             // silent: the raw transcript was pasted with no
@@ -1731,14 +1792,20 @@ impl ShortcutAction for TranscribeAction {
                             }
 
                             if processed.final_text.is_empty() {
-                                utils::hide_recording_overlay(&ah);
-                                change_tray_icon(&ah, TrayIconState::Idle);
+                                finish_idle(&ah);
                             } else {
                                 let ah_clone = ah.clone();
                                 let paste_time = Instant::now();
                                 let final_text = processed.final_text;
                                 ah.run_on_main_thread(move || {
-                                    match utils::paste(final_text, ah_clone.clone()) {
+                                    // A cancel can arrive after cleanup finished
+                                    // but before this main-thread closure runs.
+                                    if crate::flow::is_generation_cancelled(flow_cancel_generation)
+                                    {
+                                        finish_idle(&ah_clone);
+                                        return;
+                                    }
+                                    match utils::paste(final_text.clone(), ah_clone.clone()) {
                                         Ok(()) => debug!(
                                             "Text pasted successfully in {:?}",
                                             paste_time.elapsed()
@@ -1753,10 +1820,11 @@ impl ShortcutAction for TranscribeAction {
                                     // then briefly explains itself; a cleanup
                                     // that fell back does the same. Otherwise
                                     // the overlay just hides.
-                                    match overlay_notice {
-                                        Some(key) => utils::show_overlay_notice(&ah_clone, key),
-                                        None => utils::hide_recording_overlay(&ah_clone),
-                                    }
+                                    utils::finish_recording_overlay(
+                                        &ah_clone,
+                                        &final_text,
+                                        overlay_notice,
+                                    );
                                     change_tray_icon(&ah_clone, TrayIconState::Idle);
                                 })
                                 .unwrap_or_else(|e| {
@@ -1886,6 +1954,13 @@ impl ShortcutAction for AssistantAction {
 
         let tm = app.state::<Arc<TranscriptionManager>>();
         let rm = app.state::<Arc<AudioRecordingManager>>();
+
+        // A spoken question goes through the same transcription engine a
+        // dictation does, so on a cloud provider it pays the same cold-route
+        // cost — and here it is paid in front of an LLM turn the user is already
+        // waiting on. `initiate_model_load` is a no-op in cloud mode, so without
+        // this nothing overlapped with the recording at all.
+        crate::stt_cloud::prewarm_cloud_stt(&get_settings(app));
 
         tm.initiate_model_load();
         let rm_clone = Arc::clone(&rm);

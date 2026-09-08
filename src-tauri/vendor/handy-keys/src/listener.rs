@@ -30,9 +30,16 @@ pub struct KeyboardListener {
     _thread_handle: Option<JoinHandle<()>>,
     running: Arc<AtomicBool>,
     blocking_hotkeys: Option<BlockingHotkeys>,
+    #[cfg(target_os = "windows")]
+    shutdown_event: Arc<std::os::windows::io::OwnedHandle>,
 }
 
 impl KeyboardListener {
+    #[cfg(target_os = "windows")]
+    pub(crate) fn shutdown_event(&self) -> Arc<std::os::windows::io::OwnedHandle> {
+        self.shutdown_event.clone()
+    }
+
     /// Create a new KeyboardListener (non-blocking mode)
     ///
     /// Events are observed but not blocked. Use this for "record hotkey" UI flows.
@@ -75,6 +82,7 @@ impl KeyboardListener {
                 _thread_handle: state.thread_handle,
                 running: state.running,
                 blocking_hotkeys: state.blocking_hotkeys,
+                shutdown_event: state.shutdown_event,
             })
         }
 
@@ -132,6 +140,17 @@ impl KeyboardListener {
 impl Drop for KeyboardListener {
     fn drop(&mut self) {
         self.running.store(false, Ordering::SeqCst);
+
+        #[cfg(target_os = "windows")]
+        {
+            use std::os::windows::io::AsRawHandle;
+            use windows::Win32::{Foundation::HANDLE, System::Threading::SetEvent};
+            // Wake the native message pump before joining it, even when the
+            // user has not pressed any key since the listener was created.
+            unsafe {
+                let _ = SetEvent(HANDLE(self.shutdown_event.as_raw_handle()));
+            }
+        }
 
         // On macOS and Windows, we can join the thread for clean shutdown.
         // On Linux (rdev), the thread continues running but becomes idle

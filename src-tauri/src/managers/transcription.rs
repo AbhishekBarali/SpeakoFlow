@@ -313,6 +313,13 @@ impl TranscriptionManager {
                         break;
                     }
 
+                    // Cloud-only sessions have no local engine to unload.
+                    // Avoid deserializing/migrating/hydrating the full settings
+                    // snapshot on every idle tick.
+                    if !manager_cloned.is_model_loaded() {
+                        continue;
+                    }
+
                     let settings = get_settings(&app_handle_cloned);
                     let timeout = settings.model_unload_timeout;
 
@@ -705,6 +712,12 @@ impl TranscriptionManager {
 
     /// Kicks off the model loading in a background thread if it's not already loaded
     pub fn initiate_model_load(&self) {
+        // All callers share this policy, including history retries. A complete
+        // cloud configuration needs no local engine; an incomplete one still
+        // preloads the local fallback just as transcribe() expects.
+        if crate::stt_cloud::cloud_stt_active(&get_settings(&self.app_handle)) {
+            return;
+        }
         let mut is_loading = self.is_loading.lock().unwrap();
         if *is_loading || self.is_model_loaded() {
             return;
@@ -714,8 +727,11 @@ impl TranscriptionManager {
         let self_clone = self.clone();
         thread::spawn(move || {
             let settings = get_settings(&self_clone.app_handle);
-            if let Err(e) = self_clone.load_model(&settings.selected_model) {
-                error!("Failed to load model: {}", e);
+            // The provider may have changed between scheduling and running.
+            if !crate::stt_cloud::cloud_stt_active(&settings) {
+                if let Err(e) = self_clone.load_model(&settings.selected_model) {
+                    error!("Failed to load model: {}", e);
+                }
             }
             let mut is_loading = self_clone.is_loading.lock().unwrap();
             *is_loading = false;
@@ -770,6 +786,20 @@ impl TranscriptionManager {
         {
             let settings = get_settings(&self.app_handle);
             if let Ok(cfg) = crate::stt_cloud::resolve_cloud_stt(&settings) {
+                // "Translate to English" is a local-engine feature: it maps onto
+                // Whisper's translate task, and none of the cloud transcription
+                // endpoints wired up here accept an equivalent flag. Silently
+                // returning the spoken language is the wrong kind of surprise —
+                // a user who turned this on and dictated Japanese gets Japanese
+                // back — so say so rather than letting the completion line below
+                // claim a translation that never happened.
+                if settings.translate_to_english {
+                    warn!(
+                        "\"Translate to English\" is not available on cloud transcription \
+                         ({} / {}); the transcript will be in the language spoken",
+                        cfg.provider.label, cfg.model
+                    );
+                }
                 // The provider was already given the custom words as keyterm /
                 // prompt biasing, so a second fuzzy pass over its output would
                 // only risk rewriting words it already got right. With biasing
@@ -785,6 +815,7 @@ impl TranscriptionManager {
                             st,
                             biased_upstream,
                             settings.cloud_stt_no_verbatim,
+                            false,
                         );
                         return Ok(finished);
                     }
@@ -1048,7 +1079,17 @@ impl TranscriptionManager {
 
         // The local engines have always filtered fillers unconditionally; that
         // stays true, so nothing changes for a user on a downloaded model.
-        Ok(self.finish_transcription(&settings, result, st, is_whisper, true))
+        //
+        // Translation is only claimed when the loaded model can actually do it:
+        // the whisper path passes the flag through, but Parakeet and friends
+        // ignore it, so the setting alone never proved anything happened.
+        let translated = settings.translate_to_english
+            && self
+                .model_manager
+                .get_model_info(&settings.selected_model)
+                .map(|info| info.supports_translation)
+                .unwrap_or(false);
+        Ok(self.finish_transcription(&settings, result, st, is_whisper, true, translated))
     }
 
     /// Shared tail of every batch transcription: fuzzy custom-word correction,
@@ -1080,6 +1121,7 @@ impl TranscriptionManager {
         started: std::time::Instant,
         skip_word_correction: bool,
         remove_fillers: bool,
+        translated: bool,
     ) -> String {
         let recognition_hints = recognition_words(settings);
         let corrected_result = if !recognition_hints.is_empty() && !skip_word_correction {
@@ -1100,11 +1142,11 @@ impl TranscriptionManager {
         };
 
         let et = std::time::Instant::now();
-        let translation_note = if settings.translate_to_english {
-            " (translated)"
-        } else {
-            ""
-        };
+        // Only claim a translation the engine actually performed. The setting
+        // being on is not evidence: the cloud path cannot translate at all, and
+        // a local model that does not support the translate task has it dropped
+        // too, so reading the flag here made the log assert something false.
+        let translation_note = if translated { " (translated)" } else { "" };
         info!(
             "Transcription completed in {}ms{}",
             (et - started).as_millis(),

@@ -484,6 +484,33 @@ pub fn set_assistant_tts_voice(app: AppHandle, voice: String) -> Result<(), Stri
     Ok(())
 }
 
+/// Loudness of the assistant's spoken replies (0.0–1.0).
+#[tauri::command]
+#[specta::specta]
+pub fn set_assistant_tts_volume(app: AppHandle, volume: f32) -> Result<(), String> {
+    let mut settings = get_settings(&app);
+    settings.assistant_tts_volume = volume.clamp(0.0, 1.0);
+    write_settings(&app, settings);
+    emit_settings_changed(&app);
+    Ok(())
+}
+
+/// How long a hands-free conversation waits for you to finish speaking before it
+/// answers. Persisted, so it applies to every call rather than only the one it
+/// was changed in.
+#[tauri::command]
+#[specta::specta]
+pub fn set_assistant_conversation_pace(
+    app: AppHandle,
+    pace: crate::settings::ConversationPace,
+) -> Result<(), String> {
+    let mut settings = get_settings(&app);
+    settings.assistant_conversation_pace = pace;
+    write_settings(&app, settings);
+    emit_settings_changed(&app);
+    Ok(())
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn set_assistant_response_length(
@@ -840,7 +867,7 @@ pub async fn assistant_play_local_tts_chunk(
 
     let settings = get_settings(&app);
     let device = settings.selected_output_device.clone();
-    let volume = settings.audio_feedback_volume;
+    let volume = settings.assistant_tts_volume;
     let epoch = chunk.epoch.unwrap_or_else(crate::tts::current_epoch);
 
     let app_play = app.clone();

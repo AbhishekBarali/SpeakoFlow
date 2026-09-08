@@ -12,7 +12,7 @@
 //! │   Main Thread   │ ───────────────▶ │   Manager Thread     │
 //! │                 │   (via channel)   │                      │
 //! │ - register()    │                   │ - owns HotkeyManager │
-//! │ - unregister()  │                   │ - polls for events   │
+//! │ - unregister()  │                   │ - waits for events   │
 //! └─────────────────┘                   │ - dispatches actions │
 //!                                       └──────────────────────┘
 //! ```
@@ -27,7 +27,7 @@
 //! polled from a dedicated recording thread. Events are emitted to the frontend
 //! via Tauri's event system.
 
-use handy_keys::{Hotkey, HotkeyId, HotkeyManager, HotkeyState, KeyboardListener};
+use handy_keys::{Hotkey, HotkeyEvent, HotkeyId, HotkeyManager, HotkeyState, KeyboardListener};
 use log::{debug, error, info};
 use serde::Serialize;
 use specta::Type;
@@ -43,7 +43,7 @@ use crate::settings::{self, get_settings, ShortcutBinding};
 use super::handler::handle_shortcut_event;
 
 /// How long a caller waits for the manager thread to answer a register /
-/// unregister request. The thread answers within its 10 ms poll unless it is
+/// unregister request. The channel wakes the thread immediately unless it is
 /// busy running a shortcut action, so this is generous — its job is to make sure
 /// a wedged engine can never freeze the caller (which may be the UI thread)
 /// forever, as an unbounded `recv()` did.
@@ -51,6 +51,7 @@ const MANAGER_REPLY_TIMEOUT: std::time::Duration = std::time::Duration::from_sec
 
 /// Commands that can be sent to the hotkey manager thread
 enum ManagerCommand {
+    Hotkey(HotkeyEvent),
     Register {
         binding_id: String,
         hotkey_string: String,
@@ -99,8 +100,9 @@ impl HandyKeysState {
 
         // Start the manager thread
         let app_clone = app.clone();
+        let event_tx = cmd_tx.clone();
         let thread_handle = thread::spawn(move || {
-            Self::manager_thread(cmd_rx, app_clone);
+            Self::manager_thread(cmd_rx, event_tx, app_clone);
         });
 
         Ok(Self {
@@ -114,11 +116,17 @@ impl HandyKeysState {
     }
 
     /// The main manager thread - owns the HotkeyManager and processes commands
-    fn manager_thread(cmd_rx: Receiver<ManagerCommand>, app: AppHandle) {
+    fn manager_thread(
+        cmd_rx: Receiver<ManagerCommand>,
+        event_tx: Sender<ManagerCommand>,
+        app: AppHandle,
+    ) {
         info!("handy-keys manager thread started");
 
         // Create the HotkeyManager in this thread
-        let manager = match HotkeyManager::new_with_blocking() {
+        let manager = match HotkeyManager::new_with_blocking_handler(move |event| {
+            event_tx.send(ManagerCommand::Hotkey(event)).is_ok()
+        }) {
             Ok(m) => m,
             Err(e) => {
                 error!("Failed to create HotkeyManager: {}", e);
@@ -130,58 +138,48 @@ impl HandyKeysState {
         let mut binding_to_hotkey: HashMap<String, HotkeyId> = HashMap::new();
         let mut hotkey_to_binding: HashMap<HotkeyId, (String, String)> = HashMap::new(); // (binding_id, hotkey_string)
 
-        loop {
-            // Check for hotkey events (non-blocking)
-            while let Some(event) = manager.try_recv() {
-                if let Some((binding_id, hotkey_string)) = hotkey_to_binding.get(&event.id) {
-                    debug!(
-                        "handy-keys event: binding={}, hotkey={}, state={:?}",
-                        binding_id, hotkey_string, event.state
+        // Hotkeys and configuration commands wake the same blocking receive.
+        // No periodic idle wakeups and no poll delay before a recording starts.
+        while let Ok(cmd) = cmd_rx.recv() {
+            match cmd {
+                ManagerCommand::Hotkey(event) => {
+                    if let Some((binding_id, hotkey_string)) = hotkey_to_binding.get(&event.id) {
+                        debug!(
+                            "handy-keys event: binding={}, hotkey={}, state={:?}",
+                            binding_id, hotkey_string, event.state
+                        );
+                        let is_pressed = event.state == HotkeyState::Pressed;
+                        handle_shortcut_event(&app, binding_id, hotkey_string, is_pressed);
+                    }
+                }
+                ManagerCommand::Register {
+                    binding_id,
+                    hotkey_string,
+                    response,
+                } => {
+                    let result = Self::do_register(
+                        &manager,
+                        &mut binding_to_hotkey,
+                        &mut hotkey_to_binding,
+                        &binding_id,
+                        &hotkey_string,
                     );
-                    let is_pressed = event.state == HotkeyState::Pressed;
-                    handle_shortcut_event(&app, binding_id, hotkey_string, is_pressed);
+                    let _ = response.send(result);
                 }
-            }
-
-            // Check for commands (non-blocking with timeout)
-            match cmd_rx.recv_timeout(std::time::Duration::from_millis(10)) {
-                Ok(cmd) => match cmd {
-                    ManagerCommand::Register {
-                        binding_id,
-                        hotkey_string,
-                        response,
-                    } => {
-                        let result = Self::do_register(
-                            &manager,
-                            &mut binding_to_hotkey,
-                            &mut hotkey_to_binding,
-                            &binding_id,
-                            &hotkey_string,
-                        );
-                        let _ = response.send(result);
-                    }
-                    ManagerCommand::Unregister {
-                        binding_id,
-                        response,
-                    } => {
-                        let result = Self::do_unregister(
-                            &manager,
-                            &mut binding_to_hotkey,
-                            &mut hotkey_to_binding,
-                            &binding_id,
-                        );
-                        let _ = response.send(result);
-                    }
-                    ManagerCommand::Shutdown => {
-                        info!("handy-keys manager thread shutting down");
-                        break;
-                    }
-                },
-                Err(mpsc::RecvTimeoutError::Timeout) => {
-                    // No command, continue
+                ManagerCommand::Unregister {
+                    binding_id,
+                    response,
+                } => {
+                    let result = Self::do_unregister(
+                        &manager,
+                        &mut binding_to_hotkey,
+                        &mut hotkey_to_binding,
+                        &binding_id,
+                    );
+                    let _ = response.send(result);
                 }
-                Err(mpsc::RecvTimeoutError::Disconnected) => {
-                    info!("Command channel disconnected, shutting down");
+                ManagerCommand::Shutdown => {
+                    info!("handy-keys manager thread shutting down");
                     break;
                 }
             }

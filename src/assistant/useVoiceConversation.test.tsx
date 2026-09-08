@@ -33,6 +33,7 @@ mock.module("@tauri-apps/api/core", () => ({
   },
 }));
 mock.module("@tauri-apps/api/event", () => ({
+  emit: async () => {},
   listen: async (
     name: string,
     handler: (event: { payload: unknown }) => void,
@@ -58,8 +59,15 @@ mock.module("@ricky0123/vad-web", () => ({
   },
 }));
 const { useVoiceConversation } = await import("./useVoiceConversation");
+const { TURN_PAUSE_MS } = await import("./conversationPolicy");
 let voice: ReturnType<typeof useVoiceConversation>;
 let renderer: ReactTestRenderer;
+/** The persisted pace the harness feeds the hook, and what it asked to save. */
+let settingsPace: "quick" | "natural" | "patient" | null = null;
+let paceWrites: string[] = [];
+/** The persisted voice volume, and every gain node the session created. */
+let settingsVolume: number | undefined;
+const gains: { gain: { value: number } }[] = [];
 function Harness() {
   voice = useVoiceConversation({
     stopLocal() {},
@@ -68,6 +76,9 @@ function Harness() {
     },
     pushLocal() {},
     endLocal() {},
+    volume: settingsVolume,
+    pace: settingsPace,
+    onPaceChange: (pace) => paceWrites.push(pace),
   });
   return null;
 }
@@ -94,6 +105,10 @@ beforeEach(async () => {
   backendStart = null;
   audioTurn = null;
   microphone = null;
+  settingsPace = null;
+  paceWrites = [];
+  settingsVolume = undefined;
+  gains.length = 0;
   events.clear();
   globalThis.window = {
     addEventListener() {},
@@ -114,7 +129,9 @@ beforeEach(async () => {
     async resume() {}
     async close() {}
     createGain() {
-      return { gain: { value: 1 }, connect() {} };
+      const node = { gain: { value: 1 }, connect() {} };
+      gains.push(node);
+      return node;
     }
     async decodeAudioData() {
       return { duration: 1 };
@@ -150,6 +167,43 @@ const speak = async () => {
 };
 
 describe("hands-free session lifecycle", () => {
+  /**
+   * The pace is a persisted setting, so the hook must read it rather than own
+   * it: it used to live in local state and reset to Natural on every restart
+   * and every panel reload, which meant a user who needed Patient re-set it
+   * every session.
+   */
+  test("the saved pace decides the pause the VAD waits for", async () => {
+    settingsPace = "patient";
+    await act(async () => renderer.update(<Harness />));
+    await act(async () => voice.start());
+    expect(voice.pace).toBe("patient");
+    expect(vadOptions.redemptionMs).toBe(TURN_PAUSE_MS.patient);
+  });
+
+  test("with nothing saved the pace falls back to Natural", async () => {
+    await act(async () => voice.start());
+    expect(voice.pace).toBe("natural");
+    expect(vadOptions.redemptionMs).toBe(TURN_PAUSE_MS.natural);
+  });
+
+  test("changing the pace is handed to the caller to persist", async () => {
+    await act(async () => voice.start());
+    await act(async () => voice.setPace("quick"));
+    expect(paceWrites).toEqual(["quick"]);
+  });
+
+  /** The voice-volume slider should be audible in the call it is moved in. */
+  test("the saved volume applies to a call already in progress", async () => {
+    settingsVolume = 0.5;
+    await act(async () => renderer.update(<Harness />));
+    await act(async () => voice.start());
+    expect(gains.at(-1)?.gain.value).toBeCloseTo(0.5);
+    settingsVolume = 0;
+    await act(async () => renderer.update(<Harness />));
+    expect(gains.at(-1)?.gain.value).toBe(0);
+  });
+
   test("opening starts listening; completed speech submits without a button", async () => {
     await act(async () => voice.start());
     expect(voice.phase).toBe("listening");
@@ -242,7 +296,14 @@ describe("hands-free session lifecycle", () => {
     });
     expect(sourceStarts).toBe(0);
   });
-  test("hidden and collapsed panels keep listening until explicitly ended", async () => {
+  /**
+   * Collapsing is the gesture that keeps a call alive, because the pill stays on
+   * screen and says so. `assistant-panel-hidden` is a webview-lifecycle cue (it
+   * tells the local voice engine it can release its weights) and is deliberately
+   * NOT a hang-up signal here — hiding ends the call from the backend, which
+   * arrives as `assistant-conversation-ended` and is covered separately.
+   */
+  test("a collapsed panel keeps listening until the call is ended", async () => {
     await act(async () => voice.start());
     await emit("assistant-panel-hidden", null);
     await emit("assistant-collapsed", true);

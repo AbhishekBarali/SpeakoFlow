@@ -8,7 +8,10 @@ export const VolumeSlider: React.FC<{ disabled?: boolean }> = ({
 }) => {
   const { t } = useTranslation();
   const { getSetting, updateSetting } = useSettings();
-  const audioFeedbackVolume = getSetting("audio_feedback_volume") ?? 0.5;
+  // Matches `default_audio_feedback_volume()`. The old 0.5 fallback disagreed
+  // with the backend's 1.0, so a store that had not loaded yet showed 50% while
+  // the sounds played at full volume.
+  const audioFeedbackVolume = getSetting("audio_feedback_volume") ?? 1;
 
   return (
     <Slider

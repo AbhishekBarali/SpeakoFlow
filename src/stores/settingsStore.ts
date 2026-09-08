@@ -4,6 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import type {
   AppSettings as Settings,
   AudioDevice,
+  ConversationPace,
   PostProcessReadiness,
   Replacement,
   WhisperAcceleratorSetting,
@@ -130,6 +131,10 @@ const settingUpdaters: {
     commands.changeAudioFeedbackSetting(value as boolean),
   audio_feedback_volume: (value) =>
     commands.changeAudioFeedbackVolumeSetting(value as number),
+  assistant_tts_volume: (value) =>
+    commands.setAssistantTtsVolume(value as number),
+  assistant_conversation_pace: (value) =>
+    commands.setAssistantConversationPace(value as ConversationPace),
   sound_theme: (value) => commands.changeSoundThemeSetting(value as string),
   theme: (value) => commands.changeThemeSetting(value as string),
   ui_text_size: (value) => commands.changeUiTextSizeSetting(value as string),
