@@ -1,4 +1,4 @@
-name: "Build"
+﻿name: "Build"
 
 # Reusable build workflow for SpeakoFlow. Ported from upstream Handy's build.yml
 # and adapted for SpeakoFlow's shape-(b) engine posture (see
@@ -11,14 +11,14 @@ name: "Build"
 #     (no DLLs, no GPU backend).
 #   * transcribe-rs 0.3.11 is KEPT AS-IS with its statically-embedded ONNX
 #     Runtime (+ `ort-directml` on Windows). We deliberately do NOT converge to
-#     Handy's shape-(a) dynamically-linked baseline ORT, so — unlike Handy —
+#     Handy's shape-(a) dynamically-linked baseline ORT, so â€” unlike Handy â€”
 #     there are NO `ORT_LIB_LOCATION` / `ORT_PREFER_DYNAMIC_LINK` steps and no
 #     onnxruntime.dll staging/audit here.
 #
 #     ONE EXCEPTION: Intel macOS (x86_64-apple-darwin), where pykeio's `ort`
 #     dropped prebuilt binaries entirely, so there is no static ORT to embed.
 #     That target links against Homebrew's onnxruntime and ships the dylib inside
-#     the .app — see "Stage ONNX Runtime for Intel macOS" and
+#     the .app â€” see "Stage ONNX Runtime for Intel macOS" and
 #     "Audit Intel macOS bundle" below. Apple Silicon is untouched by this.
 #
 # What this covers (Session 7 requirements):
@@ -30,7 +30,7 @@ name: "Build"
 #   * App-local VC++ runtime staging (build.rs, via SPEAKOFLOW_VC_REDIST_DIRS).
 #   * Signing: bundled DLLs are signed by tauri-bundler via the `signCommand`
 #     in tauri.conf.json (trusted-signing-cli), which runs on every .exe/.dll it
-#     bundles before packaging — so the staged transcribe-cpp/VC++ DLLs get
+#     bundles before packaging â€” so the staged transcribe-cpp/VC++ DLLs get
 #     signed. trusted-signing-cli is installed below when sign-binaries is on.
 #   * Package audit: every staged DLL must be present in BOTH the MSI and NSIS
 #     installers, and the installed speakoflow.exe --list-devices must exit 0.
@@ -139,7 +139,7 @@ jobs:
 
       - name: Rust cache
         # Release builds skip the cache (no-cache: true) so the artifact is
-        # always compiled clean — no risk of a stale cached native lib being
+        # always compiled clean â€” no risk of a stale cached native lib being
         # linked. PR/test builds keep caching for speed.
         if: ${{ !inputs.no-cache }}
         uses: swatinem/rust-cache@v2
@@ -177,7 +177,7 @@ jobs:
           dpkg-query -W -f='${Status}\n' libgtk-layer-shell0 | grep -q "install ok installed"
           ldconfig -p | grep -q "libgtk-layer-shell.so.0"
 
-      # x86_64 only — Windows-on-ARM links transcribe-cpp statically CPU-only
+      # x86_64 only â€” Windows-on-ARM links transcribe-cpp statically CPU-only
       # (no `vulkan` feature; see src-tauri/Cargo.toml), so ggml-vulkan is never
       # built there and no Vulkan SDK, headers, or glslc are needed.
       - name: Install Vulkan SDK (Windows x64)
@@ -294,7 +294,7 @@ jobs:
       # ggml/src/ggml-cpu/CMakeLists.txt: "MSVC is not supported for ARM, use
       # clang"), so the Windows-ARM build must use clang-cl. transcribe-cpp-sys
       # drives CMake via the cmake crate, which resolves the compiler through the
-      # cc crate — i.e. the CC/CXX env vars, NOT CMAKE_C_COMPILER (which is why an
+      # cc crate â€” i.e. the CC/CXX env vars, NOT CMAKE_C_COMPILER (which is why an
       # earlier CMAKE_C_COMPILER-only attempt still configured with MSVC cl.exe).
       # Ninja (honored by the cmake crate) sidesteps the VS generator's toolset.
       - name: Configure cmake for ARM64 (Windows)
@@ -318,12 +318,12 @@ jobs:
           # transcribe-cpp-sys configure via TRANSCRIBE_CMAKE_ARGS (applied AFTER
           # the crate's own -D's, so ours win):
           #
-          #   GGML_NATIVE=OFF  — only the dynamic-backends path force-sets this; a
+          #   GGML_NATIVE=OFF  â€” only the dynamic-backends path force-sets this; a
           #     plain static build inherits ggml's default GGML_NATIVE=ON
-          #     (= -mcpu=native), tuning the binary to THIS runner's CPU — a
+          #     (= -mcpu=native), tuning the binary to THIS runner's CPU â€” a
           #     distribution hazard. Pin OFF for a portable ARM baseline.
           #
-          #   GGML_OPENMP=OFF  — transcribe-cpp-sys force-sets GGML_OPENMP=ON on
+          #   GGML_OPENMP=OFF  â€” transcribe-cpp-sys force-sets GGML_OPENMP=ON on
           #     Windows, assuming MSVC auto-links vcomp via the /openmp pragma. But
           #     ARM builds with clang-cl, whose /openmp emits LLVM-OMP refs
           #     (__kmpc_*/omp_*) with no auto-linked runtime, so the static final
@@ -335,7 +335,7 @@ jobs:
       # Bundle the VC++ runtime app-local so SpeakoFlow starts on machines without
       # a current Microsoft redistributable. build.rs stages DLLs from these dirs
       # into transcribe-libs/, using the same VS install that compiled the code.
-      # (SpeakoFlow keeps GGML_OPENMP off, so vcomp140 is not required — the CRT
+      # (SpeakoFlow keeps GGML_OPENMP off, so vcomp140 is not required â€” the CRT
       # dir alone satisfies build.rs's msvcp140/vcruntime140 requirement.)
       - name: Locate VC++ runtime redist for app-local bundling (Windows)
         if: contains(inputs.platform, 'windows')
@@ -389,7 +389,7 @@ jobs:
       # not expose a findable SPIRV-HeadersConfig.cmake, so the configure fails.
       # Provide the header-only package via vcpkg and put its prefix on
       # CMAKE_PREFIX_PATH (the cmake crate forwards it as -DCMAKE_PREFIX_PATH).
-      # x86_64 only — the Windows ARM64 build is CPU-only, so ggml-vulkan is
+      # x86_64 only â€” the Windows ARM64 build is CPU-only, so ggml-vulkan is
       # never built there.
       - name: Install SPIRV-Headers for transcribe-cpp Vulkan build (Windows x64)
         if: contains(inputs.platform, 'windows') && !contains(inputs.target, 'aarch64')
@@ -440,7 +440,7 @@ jobs:
           # linuxdeploy resolves `speakoflow`'s NEEDED libs via `ldd` and
           # HARD-FAILS on an unresolved one. libtranscribe.so lives only in the
           # cargo build tree, so also publish it (and the ggml libs it pulls in)
-          # to the system linker cache — belt-and-suspenders with LD_LIBRARY_PATH.
+          # to the system linker cache â€” belt-and-suspenders with LD_LIBRARY_PATH.
           sudo cp -vL "$LIBDIR"/libtranscribe.so* "$LIBDIR"/libggml*.so* /usr/local/lib/ 2>/dev/null || true
           sudo ldconfig
 
@@ -474,12 +474,12 @@ jobs:
             console.log("Patched tauri.conf.json: signing disabled for unsigned test build");
           '
 
-      # ── Intel macOS (x86_64-apple-darwin) ─────────────────────────────────
+      # â”€â”€ Intel macOS (x86_64-apple-darwin) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       # Intel macOS is the ONE target where SpeakoFlow links ONNX Runtime
       # dynamically. pykeio's `ort` dropped prebuilt x86_64-apple-darwin binaries
       # ("Support for Intel macOS has been dropped following upstream changes to
       # ONNX Runtime & Rust"), so transcribe-rs's `onnx` feature has no static ORT
-      # to embed there — the shape-(b) posture that holds on every other target.
+      # to embed there â€” the shape-(b) posture that holds on every other target.
       # Homebrew's onnxruntime fills the gap (this is what BUILD.md documents for
       # local Intel builds).
       #
@@ -493,7 +493,7 @@ jobs:
       # on the .app (and the stale-DMG problem that comes with it):
       #   1. copy the dylib into src-tauri/onnx-libs/, dereferenced,
       #   2. rewrite its install name to @rpath/libonnxruntime.dylib,
-      #   3. point ORT_LIB_LOCATION at that staged copy — so the linker records
+      #   3. point ORT_LIB_LOCATION at that staged copy â€” so the linker records
       #      @rpath/libonnxruntime.dylib in `speakoflow`, not /usr/local/...
       # build.rs emits the matching @executable_path/../Frameworks rpath, the
       # config patch below makes tauri-bundler copy the dylib into
@@ -510,8 +510,8 @@ jobs:
       # Comet Lake desktop chips (e.g. the i5-10500 our tester runs) have AVX2
       # but no AVX-512, so a native build on a runner that has it produces an app
       # that transcribes fine in CI and dies with SIGILL / "Illegal instruction"
-      # on a user's Mac. That is the same shape of bug as #19 — works on the
-      # build machine, broken everywhere else — and would have been the next
+      # on a user's Mac. That is the same shape of bug as #19 â€” works on the
+      # build machine, broken everywhere else â€” and would have been the next
       # thing our tester hit after the dylib fix.
       #
       # Two levers, because the two engines expose different knobs:
@@ -520,7 +520,7 @@ jobs:
       #   * whisper-rs-sys 0.15 has NO hook for arbitrary cmake defines and never
       #     sets GGML_NATIVE itself. But ggml's own CMakeLists flips
       #     GGML_NATIVE_DEFAULT to OFF when SOURCE_DATE_EPOCH is present in the
-      #     environment — an upstream affordance for exactly this
+      #     environment â€” an upstream affordance for exactly this
       #     reproducible/distributable case. Setting it covers both engines.
       # Never do this for a local dev build: -march=native is the right default
       # when the binary only has to run on the machine that compiled it.
@@ -595,7 +595,7 @@ jobs:
           echo "Staged ${staged_count} dylib(s) for the bundle:"
           ls -la "$STAGE"
           if [ "$staged_count" -lt 2 ]; then
-            echo "ERROR: only ${staged_count} dylib staged — dylibbundler did not gather the dependency closure" >&2
+            echo "ERROR: only ${staged_count} dylib staged â€” dylibbundler did not gather the dependency closure" >&2
             echo "Homebrew's libonnxruntime has dozens of non-system dependencies; one file is never right." >&2
             exit 1
           fi
@@ -608,7 +608,7 @@ jobs:
 
       # Make tauri-bundler copy the staged dylibs into
       # SpeakoFlow.app/Contents/Frameworks. `bundle.macOS.frameworks` accepts a
-      # path to a .dylib and copies it there verbatim — it deliberately does not
+      # path to a .dylib and copies it there verbatim â€” it deliberately does not
       # touch install names or rpaths, which the two steps above/around it handle.
       # Patched here rather than committed to tauri.conf.json so the path only
       # exists for the Intel job; every other target would fail on a missing file.
@@ -621,13 +621,13 @@ jobs:
       # onnxruntime bottle demands, which is currently macOS 14 (bottles are
       # published per-OS and the Intel one is Sonoma-only). Leaving 10.15 in
       # place ships a .dmg that installs on a Ventura Intel Mac and then refuses
-      # to start — the audit step below asserts these agree.
+      # to start â€” the audit step below asserts these agree.
       - name: Bundle ONNX Runtime into the app (Intel macOS)
         if: inputs.target == 'x86_64-apple-darwin'
         shell: bash
         env:
           # Homebrew publishes the Intel onnxruntime bottle for Sonoma only, and
-          # that dylib reports minos 14.0. Bump this when that changes — the
+          # that dylib reports minos 14.0. Bump this when that changes â€” the
           # audit step fails the build if it disagrees with the binaries.
           INTEL_MIN_MACOS: "14.0"
         run: |
@@ -651,6 +651,43 @@ jobs:
             console.log("Patched tauri.conf.json:", fw.size, "framework entries, minimumSystemVersion =", c.bundle.macOS.minimumSystemVersion);
           '
 
+      # The tag of the release being built into, taken FROM that release rather
+      # than rebuilt from the version. A release's tag is not always
+      # `v${version}`: a prerelease is tagged `v1.5.0-beta.1` on a 1.5.0 build,
+      # and reconstructing the tag made the Linux republish step look up
+      # `v1.5.0`, get "release not found", and fail after it had already spent 32
+      # minutes building. It failed *after* tauri-action had attached the
+      # pre-repack packages, so the release was left holding exactly the
+      # defective .deb and AppImage the repack exists to replace, which is the
+      # worst possible outcome for a step whose whole job is to prevent that.
+      #
+      # Falls back to `v${version}` when there is no release id, which is the
+      # test-build path where nothing is uploaded to a release at all.
+      - name: Resolve the release tag
+        id: release-tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_ID: ${{ inputs.release-id }}
+          VERSION: ${{ steps.get-version.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "${RELEASE_ID}" ]; then
+            TAG="$(gh api "repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}" --jq .tag_name)"
+            NAME="$(gh api "repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}" --jq '.name // .tag_name')"
+            if [ -z "${TAG}" ] || [ "${TAG}" = "null" ]; then
+              echo "ERROR: release ${RELEASE_ID} has no tag_name" >&2
+              exit 1
+            fi
+            echo "Release ${RELEASE_ID} is tagged ${TAG} (${NAME})"
+          else
+            TAG="v${VERSION}"
+            NAME="v${VERSION}"
+            echo "No release id; using ${TAG}"
+          fi
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "name=${NAME}" >> "$GITHUB_OUTPUT"
+
       # Split signed (production) vs unsigned (test). The UNSIGNED path passes NO
       # Apple/Azure/updater env at all: a present-but-EMPTY APPLE_CERTIFICATE makes
       # tauri attempt a keychain `security import` that fails ("SecKeychainItemImport:
@@ -673,8 +710,8 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: ${{ inputs.release-id && format('v{0}', steps.get-version.outputs.version) || '' }}
-          releaseName: ${{ inputs.release-id && format('v{0}', steps.get-version.outputs.version) || '' }}
+          tagName: ${{ inputs.release-id && steps.release-tag.outputs.tag || '' }}
+          releaseName: ${{ inputs.release-id && steps.release-tag.outputs.name || '' }}
           releaseId: ${{ inputs.release-id }}
           assetNamePattern: ${{ steps.patch-release-name.outputs.platform }}
           args: ${{ inputs.build-args }}
@@ -685,15 +722,15 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: ${{ inputs.release-id && format('v{0}', steps.get-version.outputs.version) || '' }}
-          releaseName: ${{ inputs.release-id && format('v{0}', steps.get-version.outputs.version) || '' }}
+          tagName: ${{ inputs.release-id && steps.release-tag.outputs.tag || '' }}
+          releaseName: ${{ inputs.release-id && steps.release-tag.outputs.name || '' }}
           releaseId: ${{ inputs.release-id }}
           assetNamePattern: ${{ steps.patch-release-name.outputs.platform }}
           args: ${{ inputs.build-args }}
 
       # The hard gate for Intel macOS, mirroring the Windows/Linux package audits:
       # a .dmg that installs and then cannot start is the failure mode worth
-      # catching in CI rather than in a user's issue tracker — which is exactly
+      # catching in CI rather than in a user's issue tracker â€” which is exactly
       # what happened in #19, because the first version of this step only ever
       # inspected the app executable's own load commands. Five failing checks now,
       # each covering a different way the ORT bundling can silently half-work,
@@ -775,7 +812,7 @@ jobs:
 
           # 4. The RECURSIVE audit, and the honest minimum-macOS assert. Checks
           #    1-3 above all pass on a bundle that cannot start, because they only
-          #    ever look at $BIN's own load commands — that is precisely how #19
+          #    ever look at $BIN's own load commands â€” that is precisely how #19
           #    shipped. This walks every dylib in Contents/Frameworks too, at
           #    every depth, and fails on any path that points outside the bundle.
           DECLARED_MIN_OS="$(node -e 'console.log(JSON.parse(require("fs").readFileSync("src-tauri/tauri.conf.json","utf8")).bundle.macOS.minimumSystemVersion)')"
@@ -784,7 +821,7 @@ jobs:
           # 5. It actually starts, ON A MACHINE THAT LOOKS LIKE A USER'S. dyld
           #    resolves every linked dylib before main() runs, so `--list-devices`
           #    (which exits before Tauri and any window setup) is a real
-          #    end-to-end proof — but ONLY if the build machine is not quietly
+          #    end-to-end proof â€” but ONLY if the build machine is not quietly
           #    supplying the libraries. The previous version of this step ran the
           #    binary with Homebrew fully installed, so all ~84 of libonnxruntime's
           #    dependencies resolved from /usr/local/opt and the test passed on an
@@ -793,7 +830,7 @@ jobs:
           #    So move the Homebrew opt prefixes aside first. `brew unlink` is the
           #    obvious tool but its exact effect on /usr/local/opt/<formula> is a
           #    Homebrew implementation detail; moving the directories is
-          #    unambiguous. Then ASSERT they are gone — a silently-failed move
+          #    unambiguous. Then ASSERT they are gone â€” a silently-failed move
           #    would restore the old false green, which is the whole bug we are
           #    fixing.
           echo "--- clean-room launch test ---"
@@ -835,7 +872,7 @@ jobs:
 
           # 6. Provenance, for the record. The minimum-macOS numbers are printed
           #    AND asserted by audit-macos-bundle.sh above, so all that is left
-          #    worth logging is where the dylib came from — Homebrew publishes
+          #    worth logging is where the dylib came from â€” Homebrew publishes
           #    bottles per-OS version, and the Intel tag it offers is what moves
           #    this artifact's floor between releases.
           echo "--- Homebrew bottle provenance ---"
@@ -897,7 +934,7 @@ jobs:
             # linuxdeploy bundles the NEEDED libtranscribe.so (resolved at build
             # time via LD_LIBRARY_PATH) but NOT the dlopen'd ggml backend modules
             # that init_backends_default() loads at runtime from libtranscribe's
-            # own directory — stage those (and backfill the core libs) into
+            # own directory â€” stage those (and backfill the core libs) into
             # usr/lib, next to libtranscribe. Fails loudly if libs are missing.
             if [ -n "${TRANSCRIBE_LIBDIR:-}" ]; then
               bash "$GITHUB_WORKSPACE/scripts/ci/stage-transcribe-libs.sh" \
@@ -1166,11 +1203,11 @@ jobs:
             done
           fi
 
-      # ── THE FIX for v1.1.0's unlaunchable .deb ─────────────────────────────
+      # â”€â”€ THE FIX for v1.1.0's unlaunchable .deb â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       # `tauri-action` is given `releaseId`, so it uploads the bundles to the
       # GitHub Release from INSIDE the "Build with Tauri" step. Both Linux
-      # post-processing steps above — the AppImage repack and the .deb
-      # inject/repack that add libtranscribe.so and the ggml backend modules —
+      # post-processing steps above â€” the AppImage repack and the .deb
+      # inject/repack that add libtranscribe.so and the ggml backend modules â€”
       # run AFTER that upload. So the release got the pre-injection files while
       # the fixes landed on local copies nobody downloads, and the audit then
       # inspected those same local (correct) copies and passed.
@@ -1183,7 +1220,7 @@ jobs:
       #
       # Overwrite those assets with the repacked ones. Runs only for release
       # builds (release-id set); test builds are unaffected because their
-      # "Upload artifacts (Linux)" step already runs after the audit — which is
+      # "Upload artifacts (Linux)" step already runs after the audit â€” which is
       # exactly why test builds always looked fine.
       - name: Republish repacked Linux packages to the release
         if: ${{ contains(inputs.platform, 'ubuntu') && inputs.release-id != '' }}
@@ -1193,7 +1230,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          TAG="v${{ steps.get-version.outputs.version }}"
+          # Resolved from the release id, never rebuilt from the version: on a
+          # prerelease the tag is v1.5.0-beta.1 while the version is 1.5.0, and
+          # guessing produced "release not found" here after a 32-minute build.
+          TAG="${{ steps.release-tag.outputs.tag }}"
           BUNDLE_DIR="src-tauri/target/${{ steps.build-profile.outputs.profile }}/bundle"
 
           shopt -s nullglob
@@ -1310,8 +1350,8 @@ jobs:
 
           # x64 ships the dynamic transcribe/ggml DLLs; ARM64 is static CPU-only
           # (only the VC++ runtime is staged). SpeakoFlow keeps ONNX Runtime
-          # statically linked via transcribe-rs (shape-(b)), so — unlike upstream
-          # Handy — onnxruntime.dll is NOT staged or required. GGML_OPENMP is off,
+          # statically linked via transcribe-rs (shape-(b)), so â€” unlike upstream
+          # Handy â€” onnxruntime.dll is NOT staged or required. GGML_OPENMP is off,
           # so vcomp140.dll is not required either.
           $requiredStaged = @("msvcp140.dll", "vcruntime140.dll")
           if ("${{ inputs.target }}" -notlike "aarch64*") {

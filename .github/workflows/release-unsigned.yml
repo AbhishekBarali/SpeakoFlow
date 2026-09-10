@@ -52,13 +52,17 @@ on:
       platforms:
         description: >-
           Which targets to build. "windows-linux" skips both macOS runners, which
-          is the right choice for a beta nobody can test on a Mac.
+          is the right choice for a beta nobody can test on a Mac. "windows" and
+          "linux" build one OS only, for re-running a single failed side without
+          repeating a build that already succeeded.
         required: false
         default: all
         type: choice
         options:
           - all
           - windows-linux
+          - windows
+          - linux
       prerelease:
         description: >-
           Mark the release as a prerelease (beta). GitHub then keeps "Latest
@@ -192,6 +196,12 @@ jobs:
             windows-linux)
               INCLUDE="$(jq -c '[.[] | select(.platform | startswith("macos") | not)]' <<<"$ALL")"
               ;;
+            windows)
+              INCLUDE="$(jq -c '[.[] | select(.platform | startswith("windows"))]' <<<"$ALL")"
+              ;;
+            linux)
+              INCLUDE="$(jq -c '[.[] | select(.platform | startswith("ubuntu"))]' <<<"$ALL")"
+              ;;
             all|"")
               INCLUDE="$(jq -c '.' <<<"$ALL")"
               ;;
@@ -200,6 +210,10 @@ jobs:
               exit 1
               ;;
           esac
+          if [ "$(jq -r 'length' <<<"$INCLUDE")" -eq 0 ]; then
+            echo "ERROR: '${PLATFORMS}' selected no targets" >&2
+            exit 1
+          fi
           echo "Building: $(jq -r '[.[].platform] | join(", ")' <<<"$INCLUDE")"
           echo "matrix={\"include\":${INCLUDE}}" >> "$GITHUB_OUTPUT"
 
