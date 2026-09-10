@@ -1059,7 +1059,26 @@ fn parse_structured_output(
     validate_cleaned_output(transcription, value, true)
 }
 
+/// Reduce a provider error to the kind cleanup acts on.
+///
+/// **It logs before it discards.** Every field that says *why* a provider refused
+/// the request lives on the error and nowhere else: this function is the only
+/// place that sees the status code and the response body, and the value it
+/// returns is a bare enum. Without a log line here, a real outage read as
+/// `Cleanup fell back to the original transcript (ProviderError)` and nothing
+/// more, which is indistinguishable from a dozen unrelated faults. Diagnosing one
+/// Azure endpoint that answered 404 on every path took a manual `curl` sweep
+/// purely because this detail was thrown away.
+///
+/// A 400/415/422 is logged at debug rather than warn: those are the structured
+/// output probe being rejected, which is an expected step in the fallback ladder
+/// (see [`is_schema_compatibility_error`]) rather than a fault worth alarming on.
 fn classify_chat_error(error: &crate::llm_client::ChatCompletionError) -> PostProcessFailureKind {
+    if is_schema_compatibility_error(error) {
+        log::debug!("Cleanup provider rejected the structured request: {error}");
+    } else {
+        log::warn!("Cleanup provider request failed: {error}");
+    }
     match error {
         crate::llm_client::ChatCompletionError::HttpStatus {
             status: 401 | 403, ..
