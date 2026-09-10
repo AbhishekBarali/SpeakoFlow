@@ -301,7 +301,12 @@ static LOWERCASE_AFTER_TERMINAL_PATTERN: Lazy<Regex> =
 /// Only unambiguous repairs are made. Casing is fixed after `?` and `!` but never
 /// after `.`, because a full stop is also an abbreviation mark and
 /// "e.g. foo" must not become "e.g. Foo".
-fn repair_removal_seams(text: &str) -> String {
+///
+/// Shared with AI cleanup (`actions::sanitize_post_process_output`) rather than
+/// kept private to the local filter, because an LLM leaves the same seams when it
+/// deletes a filler and forgets the comma that came with it. One implementation,
+/// one set of tests, both paths.
+pub(crate) fn repair_removal_seams(text: &str) -> String {
     let mut out = DOUBLED_COMMA_PATTERN.replace_all(text, ",").to_string();
     out = ORPHAN_COMMA_PATTERN.replace_all(&out, "$1 ").to_string();
     out = SPACE_BEFORE_PUNCT_PATTERN

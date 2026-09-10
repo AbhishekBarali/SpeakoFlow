@@ -63,6 +63,20 @@ struct ChatCompletionRequest {
     /// which is a deterministic transform.
     #[serde(skip_serializing_if = "Option::is_none")]
     temperature: Option<f32>,
+    /// Hard ceiling on generated tokens. Unset for the assistant, whose answer
+    /// length is the model's business, and set for cleanup, whose output length
+    /// is bounded by its input: a cleaned transcript is never much longer than
+    /// the transcript.
+    ///
+    /// Without it, the classic small-model failure — narrating a plan instead of
+    /// returning the text — is paid for in full before it can be detected.
+    /// Measured on this app's own log against `google.gemma-3-27b-it`: a
+    /// six-character transcript ("Ё-ё-ё.") spent 5.17s inside the structured
+    /// attempt and returned something invalid, then 0.66s on the plain retry and
+    /// succeeded. A cap sized to the input would have ended the first attempt in
+    /// well under a second.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    max_tokens: Option<u32>,
     /// llama.cpp-specific template options. Sent only to the built-in engine.
     #[serde(skip_serializing_if = "Option::is_none")]
     chat_template_kwargs: Option<Value>,
@@ -83,6 +97,7 @@ struct ChatRequestOptions {
     reasoning_effort: Option<String>,
     reasoning: Option<ReasoningConfig>,
     temperature: Option<f32>,
+    max_tokens: Option<u32>,
     stream: Option<bool>,
     tools: Option<Value>,
     tool_choice: Option<Value>,
@@ -130,6 +145,7 @@ fn build_chat_completion_request(
         reasoning_effort: options.reasoning_effort,
         reasoning: options.reasoning,
         temperature: options.temperature,
+        max_tokens: options.max_tokens,
         chat_template_kwargs: builtin_chat_template_kwargs(provider),
         stream: options.stream,
         tools: options.tools,
@@ -575,6 +591,7 @@ pub(crate) async fn send_chat_completion_with_schema_typed(
     reasoning_effort: Option<String>,
     reasoning: Option<ReasoningConfig>,
     temperature: Option<f32>,
+    max_tokens: Option<u32>,
     keep_system_role: bool,
 ) -> Result<Option<String>, ChatCompletionError> {
     let base_url = effective_base_url(provider);
@@ -599,6 +616,7 @@ pub(crate) async fn send_chat_completion_with_schema_typed(
             reasoning_effort,
             reasoning,
             temperature,
+            max_tokens,
             keep_system_role,
             ..Default::default()
         },
@@ -657,6 +675,10 @@ pub async fn send_chat_completion_with_schema(
         reasoning_effort,
         reasoning,
         // Assistant/memory callers keep the provider's default temperature.
+        None,
+        // Assistant/memory callers do not bound their answer length; only
+        // cleanup can, because only cleanup knows its output is the size of its
+        // input.
         None,
         // Assistant/memory callers keep the historical folding behavior.
         false,
