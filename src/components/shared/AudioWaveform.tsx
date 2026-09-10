@@ -82,7 +82,9 @@ const AudioWaveform: React.FC<AudioWaveformProps> = ({
         speaking.current &&
         now - lastAudio.current <= AUDIO_STALE_MS &&
         now - lastSpeech.current <= SPEECH_RELEASE_MS;
-      if (speechActive && !reducedMotion) phase += Math.min(dt, 0.05);
+      // The wave keeps travelling through the release, so speech that resumes
+      // after a syllable gap does not restart from the identical crest.
+      if (!reducedMotion) phase += Math.min(dt, 0.05);
       const target = speechActive ? speechWave(count, phase) : rest;
       if (!speechActive) speaking.current = false;
       let changed = false,

@@ -21,28 +21,60 @@ export function voiceEnergy(levels: readonly number[]): number {
   return Math.pow(Math.max(0, (signal - NOISE_GATE) / (1 - NOISE_GATE)), 0.95);
 }
 
-// Rounded vertical bars with a balanced, fixed profile. The small paired offsets
-// soften the up/down rhythm; there is no phase progression across the row.
-const BAR_PROFILE = [
-  0.64, 0.84, 1, 0.78, 0.9, 0.69, 0.94, 0.94, 0.69, 0.9, 0.78, 1, 0.84, 0.64,
+/** The shape of the speaking wave, as travelling components rather than a fixed
+ * per-bar table. Each one contributes `cycles` crests across the row and moves
+ * along it once per `period`, so a crest is visibly handed from one bar to the
+ * next — that phase gradient is the whole difference between a wave and a row of
+ * bars pulsing in unison, which is what a single shared phase produced before.
+ *
+ * The periods are deliberately incommensurate and the third component travels
+ * the other way. Two same-direction waves alone read as a conveyor belt on a
+ * fixed beat; adding a slow counter-swell means the crests never line up the
+ * same way twice, so the silhouette keeps changing size without anything
+ * jumping. */
+const COMPONENTS = [
+  // Primary crest: ~1.5 crests in view, so a crest is always somewhere on the
+  // row, sweeping across it a little over once per second.
+  { cycles: 1.5, period: 0.9, direction: 1, weight: 0.5, offset: 0 },
+  // Shorter ripple riding along with it, at a slower tempo.
+  { cycles: 2.6, period: 1.37, direction: 1, weight: 0.33, offset: 1.7 },
+  // Long counter-travelling swell; breaks up any repeating march.
+  { cycles: 0.85, period: 1.13, direction: -1, weight: 0.24, offset: 3.1 },
 ];
-const BAR_PHASE = [
-  0.12, -0.08, 0.04, 0.16, -0.12, 0.08, 0, 0, 0.08, -0.12, 0.16, 0.04, -0.08,
-  0.12,
-];
+const TOTAL_WEIGHT = COMPONENTS.reduce((sum, c) => sum + c.weight, 0);
+/** Bar height at a trough, and how much a full crest adds. The floor stays well
+ * clear of REST_HEIGHT so no bar reads as dead while speech is coming in. */
+const WAVE_FLOOR = 0.19;
+const WAVE_SPAN = 0.53;
+/** A slow breath over the whole row, so successive crests are not all the same
+ * height. Shallow on purpose: this is the "varies a little" part, not a pump. */
+const SWELL_PERIOD = 2.9;
+const SWELL_DEPTH = 0.14;
 
-/** Speech-gated vertical activity, with a steady size and tempo. This is an
- * activity indicator rather than a literal spectrum or scrolling waveform. */
+/** Shortens the outermost bars so the row has a rounded silhouette and crests
+ * appear to enter and leave rather than being clipped at the ends. */
+const edgeTaper = (u: number) =>
+  0.68 + 0.32 * Math.pow(Math.sin(Math.PI * u), 0.75);
+
+/** Speech-gated activity, as a wave that travels along the row at a steady
+ * tempo and comfortable size. This is an activity indicator rather than a
+ * literal spectrum: `seconds` drives the motion and the microphone only decides
+ * whether it runs, so leaning into the mic changes nothing about how big it is. */
 export function speechWave(count: number, seconds: number): number[] {
-  const phase = ((Number.isFinite(seconds) ? seconds : 0) * 2 * Math.PI) / 0.82;
+  const time = Number.isFinite(seconds) ? seconds : 0;
+  const swell =
+    1 - (SWELL_DEPTH * (1 - Math.sin((2 * Math.PI * time) / SWELL_PERIOD))) / 2;
   return Array.from({ length: count }, (_, index) => {
-    const position = count === 1 ? 6.5 : (index * 13) / (count - 1);
-    const left = Math.floor(position),
-      fraction = position - left;
-    const sample = (values: number[]) =>
-      values[left] * (1 - fraction) + values[Math.min(13, left + 1)] * fraction;
-    const lift = (1 + Math.sin(phase + sample(BAR_PHASE))) / 2;
-    return 0.24 + sample(BAR_PROFILE) * (0.15 + 0.31 * lift);
+    const u = count === 1 ? 0.5 : index / (count - 1);
+    let sum = 0;
+    for (const { cycles, period, direction, weight, offset } of COMPONENTS)
+      sum +=
+        weight *
+        Math.sin(
+          2 * Math.PI * (cycles * u - (direction * time) / period) + offset,
+        );
+    const crest = 0.5 + sum / (2 * TOTAL_WEIGHT);
+    return edgeTaper(u) * (WAVE_FLOOR + WAVE_SPAN * swell * crest);
   });
 }
 

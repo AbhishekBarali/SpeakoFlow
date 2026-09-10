@@ -74,7 +74,7 @@ test("a microphone that stops publishing cannot leave the last loud frame active
   expect(frames.size).toBe(0);
   expect(heights().every((height) => height === 2)).toBe(true);
 });
-test("steady speech keeps the bars moving vertically in place", () => {
+test("steady speech keeps a travelling wave going, not one repeated shape", () => {
   for (let i = 0; i < 40; i++) {
     show([...levels]);
     tick(2);
@@ -85,7 +85,12 @@ test("steady speech keeps the bars moving vertically in place", () => {
     tick(2);
   }
   expect(heights()).not.toEqual(steady);
-  expect(heights().every((height) => height > 4 && height < 14)).toBe(true);
+  // Bars differ from one another at any instant, none is parked at rest, and
+  // none is clipped by the 24px box.
+  for (const frame of [steady, heights()]) {
+    expect(Math.max(...frame) - Math.min(...frame)).toBeGreaterThan(2);
+    expect(frame.every((height) => height > 2 && height < 16)).toBe(true);
+  }
 });
 
 test("brief syllable gaps hold the wave, but continuing silence parks it", () => {
