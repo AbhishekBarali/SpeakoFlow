@@ -24,6 +24,13 @@ name: "Release (unsigned)"
 # has not had a green Test Build run first — Test Build #8 exposed three targets
 # that release.yml had listed for months without ever building once.
 #
+# The `platforms` input trims that set to Windows + Linux, and `prerelease` marks
+# the release as a beta. Together they are what a beta needs: GitHub keeps
+# "Latest release" on the last stable version, so a prerelease is never handed to
+# someone following a download link, and no CI time is spent on macOS bundles
+# nobody can verify. Both default to the full stable behaviour, so an ordinary
+# release is unchanged.
+#
 # Deliberately absent, with reasons (see test-build.yml for the detail):
 #   * ubuntu-22.04 — cannot compile; xcap's pipewire/libspa needs newer libspa
 #     headers than 22.04 ships. The .deb is built on 24.04 instead, so it wants
@@ -42,6 +49,24 @@ on:
           workflow create the draft itself.
         required: false
         type: string
+      platforms:
+        description: >-
+          Which targets to build. "windows-linux" skips both macOS runners, which
+          is the right choice for a beta nobody can test on a Mac.
+        required: false
+        default: all
+        type: choice
+        options:
+          - all
+          - windows-linux
+      prerelease:
+        description: >-
+          Mark the release as a prerelease (beta). GitHub then keeps "Latest
+          release" pointing at the last stable version, so a beta is never handed
+          to someone who followed a download link.
+        required: false
+        default: false
+        type: boolean
 
 # WHY the release-id input exists: a GitHub Release is authored by whoever
 # created it, and that CANNOT be changed afterwards. When this workflow creates
@@ -65,6 +90,7 @@ jobs:
     outputs:
       release-id: ${{ steps.resolve-release.outputs.id }}
       version: ${{ steps.get-version.outputs.version }}
+      matrix: ${{ steps.matrix.outputs.matrix }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
@@ -89,7 +115,7 @@ jobs:
               tag_name: `v${{ steps.get-version.outputs.version }}`,
               name: `v${{ steps.get-version.outputs.version }}`,
               draft: true,
-              prerelease: false,
+              prerelease: ${{ inputs.prerelease }},
               generate_release_notes: true
             })
             return data.id
@@ -113,8 +139,14 @@ jobs:
             AUTHOR="$(gh api "repos/${GITHUB_REPOSITORY}/releases/${SUPPLIED_ID}" --jq .author.login)"
             DRAFT="$(gh api "repos/${GITHUB_REPOSITORY}/releases/${SUPPLIED_ID}" --jq .draft)"
             echo "Supplied release ${SUPPLIED_ID}: tag=${TAG} author=${AUTHOR} draft=${DRAFT}"
-            if [ "${TAG}" != "v${VERSION}" ]; then
+            # The tag must name the version being built, either exactly
+            # (v1.4.0) or as a prerelease of it (v1.4.0-beta.1). The trailing
+            # hyphen is required rather than a bare prefix match, so v1.4.01 and
+            # v1.4.0.1 are still refused; the point of this guard is that a 1.4.0
+            # build can never be uploaded into the v1.3.1 release.
+            if [ "${TAG}" != "v${VERSION}" ] && [ "${TAG#v${VERSION}-}" = "${TAG}" ]; then
               echo "ERROR: release ${SUPPLIED_ID} is tagged ${TAG} but this build is v${VERSION}" >&2
+              echo "       Acceptable tags: v${VERSION} or v${VERSION}-<prerelease>" >&2
               exit 1
             fi
             if [ "${DRAFT}" != "true" ]; then
@@ -128,35 +160,60 @@ jobs:
             echo "id=${CREATED_ID}" >> "$GITHUB_OUTPUT"
           fi
 
+      # Which targets to build, resolved here because a matrix has to be fully
+      # decided before the job that uses it starts; GitHub offers no way to skip
+      # one combination with `if`.
+      #
+      # macOS Intel is in the full set only because test-build.yml went green
+      # twice AND its Intel audit proved the bundle starts on a real Intel runner
+      # with Homebrew's onnxruntime, onnx, protobuf, re2 and abseil moved out of
+      # /usr/local/opt. That clean-room launch is what #19 needed and never had:
+      # checks on the main binary's own load commands pass on a bundle that
+      # cannot actually start.
+      #
+      # "windows-linux" drops both macOS runners. For a beta that is the honest
+      # choice when no one can test on a Mac, and it also removes the two
+      # slowest, least-verifiable jobs from a build that is already from-scratch.
+      - name: Resolve build matrix
+        id: matrix
+        env:
+          PLATFORMS: ${{ inputs.platforms }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ALL='[
+            {"platform":"macos-26","args":"--target aarch64-apple-darwin","target":"aarch64-apple-darwin"},
+            {"platform":"macos-15-intel","args":"--target x86_64-apple-darwin","target":"x86_64-apple-darwin"},
+            {"platform":"ubuntu-24.04","args":"--bundles appimage,deb","target":"x86_64-unknown-linux-gnu"},
+            {"platform":"ubuntu-24.04-arm","args":"--bundles appimage,deb","target":"aarch64-unknown-linux-gnu"},
+            {"platform":"windows-latest","args":"","target":"x86_64-pc-windows-msvc"}
+          ]'
+          case "${PLATFORMS:-all}" in
+            windows-linux)
+              INCLUDE="$(jq -c '[.[] | select(.platform | startswith("macos") | not)]' <<<"$ALL")"
+              ;;
+            all|"")
+              INCLUDE="$(jq -c '.' <<<"$ALL")"
+              ;;
+            *)
+              echo "ERROR: unknown platforms input '${PLATFORMS}'" >&2
+              exit 1
+              ;;
+          esac
+          echo "Building: $(jq -r '[.[].platform] | join(", ")' <<<"$INCLUDE")"
+          echo "matrix={\"include\":${INCLUDE}}" >> "$GITHUB_OUTPUT"
+
   publish:
     permissions:
       contents: write
     needs: create-release
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - platform: "macos-26" # Apple Silicon (M1+)
-            args: "--target aarch64-apple-darwin"
-            target: "aarch64-apple-darwin"
-          # Intel Macs, CPU only (the GPU backend targets Apple Silicon). Promoted
-          # here after test-build.yml went green twice AND its Intel audit proved
-          # the bundle starts on a real Intel runner with Homebrew's onnxruntime,
-          # onnx, protobuf, re2 and abseil moved out of /usr/local/opt. That
-          # clean-room launch is what #19 needed and never had: checks on the main
-          # binary's own load commands pass on a bundle that cannot start.
-          - platform: "macos-15-intel"
-            args: "--target x86_64-apple-darwin"
-            target: "x86_64-apple-darwin"
-          - platform: "ubuntu-24.04" # AppImage + .deb, x86_64
-            args: "--bundles appimage,deb"
-            target: "x86_64-unknown-linux-gnu"
-          - platform: "ubuntu-24.04-arm" # AppImage + .deb, ARM64
-            args: "--bundles appimage,deb"
-            target: "aarch64-unknown-linux-gnu"
-          - platform: "windows-latest" # .msi + NSIS .exe
-            args: ""
-            target: "x86_64-pc-windows-msvc"
+      # Resolved in create-release, because GitHub cannot skip an individual
+      # matrix combination with `if` — the whole matrix has to be decided before
+      # the job starts. See the "Resolve build matrix" step for what each target
+      # is and why.
+      matrix: ${{ fromJSON(needs.create-release.outputs.matrix) }}
 
     uses: ./.github/workflows/build.yml
     with:
