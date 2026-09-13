@@ -425,6 +425,17 @@ fn register_all_shortcuts_for_implementation(
             .cloned()
             .unwrap_or_else(|| default_binding.clone());
 
+        // An empty binding means "deliberately unbound", not "broken". Without
+        // this, validation rejects it as empty, the reset path "fixes" it to a
+        // default that is also empty, and the result is a spurious settings write
+        // plus a bogus "your shortcut was reset" report to the UI on every single
+        // launch. `cancel` dodged that via the hard-coded skip above; the optional
+        // panel-toggle binding needs the same treatment, so it is now a general
+        // rule rather than a list of exceptions.
+        if binding.current_binding.trim().is_empty() {
+            continue;
+        }
+
         // Validate the shortcut for the target implementation
         if let Err(e) =
             validate_shortcut_for_implementation(&binding.current_binding, implementation)
@@ -434,8 +445,31 @@ fn register_all_shortcuts_for_implementation(
                 id, binding.current_binding, implementation, e
             );
 
-            // Reset to default
-            binding.current_binding = default_binding.current_binding.clone();
+            // Reset to default — but the default itself may be unusable on this
+            // engine, in which case resetting achieves nothing. That is exactly
+            // the case on Windows, where the shipped defaults for dictation
+            // (`ctrl_left+super`) and the assistant (`ctrl_left+alt_left`) are
+            // both modifier-only and so cannot be registered by Tauri's plugin
+            // at all. Derive something registerable instead, and still report it
+            // as reset so the settings UI shows the binding that is really live
+            // rather than one that silently does nothing.
+            let default_combo = default_binding.current_binding.clone();
+            binding.current_binding =
+                match validate_shortcut_for_implementation(&default_combo, implementation) {
+                    Ok(()) => default_combo,
+                    Err(_) => match implementation {
+                        KeyboardImplementation::Tauri => {
+                            let safe = tauri_impl::tauri_safe_binding(&default_combo);
+                            info!(
+                                "Default shortcut '{}' for '{}' is also invalid for {:?}; \
+                                 using '{}' instead",
+                                default_combo, id, implementation, safe
+                            );
+                            safe
+                        }
+                        KeyboardImplementation::HandyKeys => default_combo,
+                    },
+                };
             current_settings
                 .bindings
                 .insert(id.clone(), binding.clone());
@@ -1254,7 +1288,13 @@ pub fn change_post_process_api_key_setting(
 ) -> Result<(), String> {
     let mut settings = settings::get_settings(&app);
     validate_provider_exists(&settings, &provider_id)?;
-    settings.post_process_api_keys.insert(provider_id, api_key);
+    // Trim: a key pasted with a trailing space or newline was stored verbatim
+    // and then rejected with the provider's generic 401, which reads as "my key
+    // is wrong" rather than "my key has whitespace on the end". No provider
+    // has a key where surrounding whitespace is significant.
+    settings
+        .post_process_api_keys
+        .insert(provider_id, api_key.trim().to_string());
     settings::write_settings(&app, settings);
     Ok(())
 }
@@ -1447,7 +1487,7 @@ pub fn delete_post_process_prompt(app: AppHandle, id: String) -> Result<(), Stri
 pub async fn fetch_post_process_models(
     app: AppHandle,
     provider_id: String,
-) -> Result<Vec<String>, String> {
+) -> Result<Vec<crate::llm_client::ModelChoice>, String> {
     let settings = settings::get_settings(&app);
 
     // Find the provider
@@ -1460,7 +1500,10 @@ pub async fn fetch_post_process_models(
     if provider.id == APPLE_INTELLIGENCE_PROVIDER_ID {
         #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
         {
-            return Ok(vec![APPLE_INTELLIGENCE_DEFAULT_MODEL_ID.to_string()]);
+            return Ok(vec![crate::llm_client::ModelChoice {
+                id: APPLE_INTELLIGENCE_DEFAULT_MODEL_ID.to_string(),
+                label: APPLE_INTELLIGENCE_DEFAULT_MODEL_ID.to_string(),
+            }]);
         }
 
         #[cfg(not(all(target_os = "macos", target_arch = "aarch64")))]

@@ -3,6 +3,7 @@ import { useSettingsStore } from "../stores/settingsStore";
 import type {
   AppSettings as Settings,
   AudioDevice,
+  ModelChoice,
   PostProcessReadiness,
 } from "@/bindings";
 
@@ -14,7 +15,7 @@ interface UseSettingsReturn {
   audioDevices: AudioDevice[];
   outputDevices: AudioDevice[];
   audioFeedbackEnabled: boolean;
-  postProcessModelOptions: Record<string, string[]>;
+  postProcessModelOptions: Record<string, ModelChoice[]>;
   postProcessReadiness: PostProcessReadiness | null;
   isPostProcessReadinessLoading: boolean;
   postProcessReadinessError: boolean;
@@ -51,7 +52,7 @@ interface UseSettingsReturn {
     providerId: string,
     model: string,
   ) => Promise<boolean>;
-  fetchPostProcessModels: (providerId: string) => Promise<string[] | null>;
+  fetchPostProcessModels: (providerId: string) => Promise<ModelChoice[] | null>;
 }
 
 export const useSettings = (): UseSettingsReturn => {

@@ -20,6 +20,7 @@ import {
   CameraOff,
   Check,
   Copy,
+  CornerDownLeft,
   Eraser,
   Expand,
   FileText,
@@ -36,8 +37,8 @@ import {
   Shrink,
   Sparkles,
   Square,
+  TextSelect,
   Volume2,
-  VolumeX,
   X,
 } from "lucide-react";
 import { commands, type AppSettings } from "@/bindings";
@@ -85,12 +86,25 @@ interface DisplayMessage {
    *  the screen capture first (if any), then attached images. Present on new
    *  messages; empty on older history (which falls back to the text chips). */
   thumbnails?: string[];
+  /** How many characters of text the user had selected in another application
+   *  when they asked. The block itself is collapsed into a chip rather than
+   *  echoed back at them. */
+  selectionChars?: number;
 }
 
 /** Must match the marker constants in src-tauri/src/assistant.rs */
 const SCREENSHOT_MARKER = "[screenshot attached]";
 const IMAGE_MARKER = "[image attached]";
 const FILE_MARKER_PREFIX = "[file attached:";
+/** Delimiters around text the user had selected elsewhere. Must match
+ *  `SELECTION_OPEN` / `SELECTION_CLOSE` in src-tauri/src/assistant.rs. */
+const SELECTION_OPEN = "<selected_text>";
+const SELECTION_CLOSE = "</selected_text>";
+/** The two fixed phrases `compose_selection_request` writes around the block.
+ *  Stripped for display: the chip already says the answer is about a selection. */
+const SELECTION_LEAD_IN =
+  "The user has this text selected in another application:";
+const SELECTION_REQUEST_PREFIX = "Their request about it: ";
 
 /** A picture waiting to be sent with the next message. */
 interface PendingImage {
@@ -153,8 +167,29 @@ function toDisplay(raw: {
   let images = 0;
   const files: string[] = [];
   const kept: string[] = [];
+  // A selection can be thousands of characters, and re-reading your own
+  // highlighted paragraph above the answer is noise. The block is replaced by a
+  // chip saying how much text was attached — the same treatment the screenshot and
+  // file markers get. Keep these delimiters in sync with assistant.rs.
+  let selectionChars = 0;
+  let inSelection = false;
   for (const line of raw.content.split("\n")) {
     const trimmed = line.trim();
+    if (trimmed === SELECTION_OPEN) {
+      inSelection = true;
+      continue;
+    }
+    if (trimmed === SELECTION_CLOSE) {
+      inSelection = false;
+      continue;
+    }
+    if (inSelection) {
+      selectionChars += line.length;
+      continue;
+    }
+    // The lead-in line the backend writes above the block; it explains the
+    // relationship to the model and is redundant next to the chip.
+    if (trimmed === SELECTION_LEAD_IN) continue;
     if (trimmed === VOICE_INTERRUPTED_MARKER) continue;
     if (trimmed === SCREENSHOT_MARKER) {
       screenshot = true;
@@ -173,10 +208,17 @@ function toDisplay(raw: {
   const thumbnails = raw.images && raw.images.length ? raw.images : undefined;
   return {
     role,
-    content: kept.join("\n").trim(),
+    content: kept
+      .join("\n")
+      .trim()
+      // The question is stored as "Their request about it: <question>"; show just
+      // the question, since the chip already says it was about a selection.
+      .replace(SELECTION_REQUEST_PREFIX, "")
+      .trim(),
     screenshot: screenshot || undefined,
     images: images || undefined,
     files: files.length ? files : undefined,
+    selectionChars: selectionChars || undefined,
     thumbnails,
   };
 }
@@ -196,6 +238,42 @@ const CopyButton: React.FC<{ content: string; title: string }> = ({
   return (
     <button className="bubble-copy" onClick={handleCopy} title={title}>
       {copied ? <Check size={13} /> : <Copy size={13} />}
+    </button>
+  );
+};
+
+/** Writes an answer into the app the question was asked from. When the question
+ *  was about selected text, the paste lands over that selection and replaces it;
+ *  otherwise it goes in at the caret.
+ *
+ *  Always an explicit click, never automatic. Restoring focus does not reliably
+ *  restore a *selection* — some editors and many `contenteditable` fields collapse
+ *  it to a caret on blur — and when that happens a "replace" silently becomes an
+ *  "insert", leaving the user with both the original and the rewrite. That cannot
+ *  be detected beforehand, so the destructive version stays something the user
+ *  chooses while looking at the answer. */
+const InsertButton: React.FC<{ content: string; title: string }> = ({
+  content,
+  title,
+}) => {
+  const [inserted, setInserted] = useState(false);
+
+  const handleInsert = async () => {
+    const result = await commands.assistantInsertText(content);
+    if (result.status === "ok") {
+      setInserted(true);
+      setTimeout(() => setInserted(false), 1200);
+    }
+  };
+
+  return (
+    <button
+      className="bubble-insert"
+      onClick={() => void handleInsert()}
+      title={title}
+      aria-label={title}
+    >
+      {inserted ? <Check size={13} /> : <CornerDownLeft size={13} />}
     </button>
   );
 };
@@ -396,6 +474,15 @@ const AssistantPanel: React.FC = () => {
   // only shown on a hotkey/turn, so anything expensive (the local TTS weights)
   // waits for this rather than loading into a window nobody has opened.
   const [panelVisible, setPanelVisible] = useState(false);
+  // Whether this window is on screen because the user asked for it (shortcut,
+  // tray) rather than as a voice turn's transient overlay. A deliberately opened
+  // window must never fade itself or time out; see the idle-dim and Live
+  // auto-hide effects.
+  const [userOpened, setUserOpened] = useState(false);
+  // How many characters of selected text rode along with the current question,
+  // 0 for none. Drives the "about your selection" chip and makes the Insert
+  // button say "Replace selection" rather than just "Insert".
+  const [selectionChars, setSelectionChars] = useState(0);
   const [locked, setLocked] = useState(false);
   // The collapsed pill dims to a thin, translucent sliver after a spell of
   // inactivity so it doesn't sit in the user's way; hovering it (CSS) or any
@@ -500,9 +587,16 @@ const AssistantPanel: React.FC = () => {
     if (!voice.open) setShowVoiceTranscript(false);
   }, [voice.open]);
 
+  // Speaking belongs to the call and nothing else. A quick text answer is read,
+  // not listened to, and `run_assistant_turn_inner` decides it the same way: the
+  // setting only applies to a turn that carries a voice ticket. Keeping the old
+  // `|| settings.assistant_tts_enabled` here would have loaded Kokoro's ~310 MB of
+  // weights for a user who never starts a call, to synthesize audio the backend no
+  // longer sends.
   const ttsEnabled =
-    (voice.open && voice.phase !== "error") ||
-    (settings?.assistant_tts_enabled ?? false);
+    voice.open &&
+    voice.phase !== "error" &&
+    (settings?.assistant_tts_enabled ?? true);
   const ttsEngine = settings?.assistant_tts_engine ?? "kokoro";
   const ttsVoice = settings?.assistant_tts_voice ?? "af_heart";
   const ttsDtype = settings?.assistant_tts_kokoro_dtype ?? "fp32";
@@ -537,6 +631,12 @@ const AssistantPanel: React.FC = () => {
     voice.open ? voice.browserSink : undefined,
   );
   localVoiceRef.current = tts;
+  // The event listeners are registered once on mount, so anything they call has to
+  // be reached through a ref that always points at the latest value. The spoken
+  // "open live conversation" command arrives on that mount-time listener and needs
+  // the live conversation controls, not the ones from first render.
+  const voiceRef = useRef(voice);
+  voiceRef.current = voice;
   const speakRef = useRef(tts.speak);
   speakRef.current = tts.speak;
   // The event listeners are registered once on mount, so the streaming calls are
@@ -920,17 +1020,43 @@ const AssistantPanel: React.FC = () => {
         }),
       );
 
+      // A turn picked up the text the user had selected in another app. The
+      // payload is the character count, so the panel can say what it is acting on
+      // without echoing the whole selection back at them.
+      track(
+        await listen<number>("assistant-selection-attached", (e) => {
+          setSelectionChars(typeof e.payload === "number" ? e.payload : 0);
+        }),
+      );
+
+      // The user said "open live conversation" (or similar) and nothing else, so
+      // the backend routed it here instead of answering it as a question.
+      track(
+        await listen("assistant-start-conversation", () => {
+          if (voiceRef.current.open) return;
+          setShowVoiceTranscript(false);
+          void voiceRef.current.start();
+        }),
+      );
+
       // Window visibility, from the two places Rust shows/hides the panel. Used
       // to decide when it is worth holding the local TTS model in memory.
+      //
+      // The payload says whether the user asked for this window (shortcut, tray)
+      // or whether it is a voice turn's transient overlay. Only the transient
+      // kind may fade itself or time out — see the idle-dim and auto-hide
+      // effects below.
       track(
-        await listen("assistant-panel-shown", () => {
+        await listen<boolean>("assistant-panel-shown", (e) => {
           setPanelVisible(true);
+          setUserOpened(e.payload === true);
         }),
       );
 
       track(
         await listen("assistant-panel-hidden", () => {
           setPanelVisible(false);
+          setUserOpened(false);
         }),
       );
 
@@ -1213,8 +1339,16 @@ const AssistantPanel: React.FC = () => {
   // no voice playing) fade and thin it to a quiet sliver so it stays out of the
   // way. Any activity flips it back here; a hover restores it via CSS. Only the
   // pill dims — the expanded panel never does.
+  //
+  // The dim only applies to a pill that arrived on its own, as the transient
+  // overlay for a voice turn. A pill the user opened by hand must stay put: the
+  // dimmed state is 54x14 at 0.32 opacity with `visibility: hidden` on every
+  // child, and the window has no taskbar button or alt-tab entry, so fading it
+  // six seconds after an explicit open made the assistant look like it had never
+  // opened at all. Between that and the panel opening collapsed in the first
+  // place, pressing the shortcut appeared to do nothing whatsoever.
   useEffect(() => {
-    if (!collapsed) {
+    if (!collapsed || userOpened) {
       setDimmed(false);
       return;
     }
@@ -1225,7 +1359,7 @@ const AssistantPanel: React.FC = () => {
     }
     const timer = window.setTimeout(() => setDimmed(true), PILL_IDLE_DIM_MS);
     return () => window.clearTimeout(timer);
-  }, [collapsed, state, error, notice, ttsActive]);
+  }, [collapsed, userOpened, state, error, notice, ttsActive]);
 
   // A Live voice overlay is transient: keep it on screen while recording,
   // generating, and speaking, then dismiss it shortly after the completed
@@ -1234,6 +1368,11 @@ const AssistantPanel: React.FC = () => {
     const shouldAutoHide =
       collapsed &&
       liveOverlay &&
+      // Same rule as the idle dim: never time out a surface the user opened
+      // deliberately. Because the panel toggle used to leave the window
+      // collapsed, a Live-style user with any prior conversation pressed their
+      // shortcut and watched it vanish 2.5s later.
+      !userOpened &&
       state === "idle" &&
       !ttsActive &&
       !error &&
@@ -1252,6 +1391,7 @@ const AssistantPanel: React.FC = () => {
   }, [
     collapsed,
     liveOverlay,
+    userOpened,
     state,
     ttsActive,
     error,
@@ -1363,14 +1503,6 @@ const AssistantPanel: React.FC = () => {
     await commands.hideAssistantPanel();
   }, [voice]);
 
-  const toggleTts = useCallback(async () => {
-    if (ttsEnabled) {
-      tts.stop();
-    }
-    await commands.setAssistantTtsEnabled(!ttsEnabled);
-    await refreshSettings();
-  }, [ttsEnabled, tts, refreshSettings]);
-
   const toggleVoice = useCallback(async () => {
     setError(null);
     await commands.assistantToggleVoice();
@@ -1445,13 +1577,6 @@ const AssistantPanel: React.FC = () => {
     (state === "thinking" || state === "searching") && stream === "";
   // User-controlled screen state is meaningful only in Manual mode.
   const screenActive = manualScreenAccess && (visionActive || attachScreen);
-
-  const ttsTitle =
-    tts.status === "loading"
-      ? t("assistant.tts.loadingShort", { progress: tts.progress })
-      : ttsEnabled
-        ? t("assistant.tts.disable")
-        : t("assistant.tts.enable");
 
   const shellClass = `assistant-scope assistant-shell${
     collapsed ? "" : " expanded"
@@ -1553,16 +1678,6 @@ const AssistantPanel: React.FC = () => {
                 <span data-tauri-drag-region>{pillStatus}</span>
               </div>
               <div className="alive-actions" onMouseDown={stopDrag}>
-                <button
-                  type="button"
-                  className={`alive-button${ttsEnabled ? " active" : ""}`}
-                  onClick={toggleTts}
-                  onMouseDown={stopDrag}
-                  title={ttsTitle}
-                  aria-label={ttsTitle}
-                >
-                  {ttsEnabled ? <Volume2 size={14} /> : <VolumeX size={14} />}
-                </button>
                 {locked && isListening && (
                   <button
                     type="button"
@@ -1980,18 +2095,6 @@ const AssistantPanel: React.FC = () => {
                 </button>
                 <button
                   type="button"
-                  className={`assistant-icon-button${ttsEnabled ? " active" : ""}${
-                    tts.status === "loading" ? " pulsing" : ""
-                  }`}
-                  onClick={toggleTts}
-                  disabled={voice.open}
-                  onMouseDown={stopDrag}
-                  title={ttsTitle}
-                >
-                  {ttsEnabled ? <Volume2 size={14} /> : <VolumeX size={14} />}
-                </button>
-                <button
-                  type="button"
                   className="assistant-icon-button"
                   onClick={clearConversation}
                   disabled={voice.open}
@@ -2098,10 +2201,28 @@ const AssistantPanel: React.FC = () => {
                     {name}
                   </span>
                 ))}
+                {(message.selectionChars ?? 0) > 0 && (
+                  <span className="screen-chip">
+                    <TextSelect size={11} />
+                    {t("assistant.selectionAttached", {
+                      count: message.selectionChars,
+                    })}
+                  </span>
+                )}
                 {message.role === "assistant" && (
                   <CopyButton
                     content={message.content}
                     title={t("assistant.copy")}
+                  />
+                )}
+                {message.role === "assistant" && (
+                  <InsertButton
+                    content={message.content}
+                    title={
+                      selectionChars > 0
+                        ? t("assistant.insertReplace")
+                        : t("assistant.insert")
+                    }
                   />
                 )}
                 {message.role === "assistant" &&
@@ -2303,6 +2424,27 @@ const AssistantPanel: React.FC = () => {
           >
             <Paperclip size={15} />
           </button>
+          {/* The route into a live conversation. It used to be an icon-only button
+              third of six in the header, which is why nobody found it — and the
+              collapsed pill had no way in at all. A labelled control sitting next to
+              the input makes "read the answer" and "talk it through" equally
+              visible, which is the whole point of folding the two surfaces into one
+              card. */}
+          {!voice.open && (
+            <button
+              className="assistant-talk-button"
+              onClick={() => {
+                setShowVoiceTranscript(false);
+                void voice.start();
+              }}
+              disabled={busy || !settings}
+              title={t("assistant.conversation.startHint")}
+              aria-label={t("assistant.conversation.start")}
+            >
+              <AudioLines size={14} />
+              <span>{t("assistant.conversation.startShort")}</span>
+            </button>
+          )}
           <input
             className="assistant-input"
             type="text"

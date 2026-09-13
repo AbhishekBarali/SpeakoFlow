@@ -30,7 +30,8 @@ export { PostProcessingSettingsPrompts } from "./PostProcessingSettingsPrompts";
 export { AppDataDirectory } from "./AppDataDirectory";
 export { ModelUnloadTimeoutSetting } from "./ModelUnloadTimeout";
 export { StartHidden } from "./StartHidden";
-export { HistoryLimit } from "./HistoryLimit";
-export { RecordingRetentionPeriodSelector } from "./RecordingRetentionPeriod";
+// The History page owns retention now (`history/RetentionSettings.tsx`): the
+// period, the count, and the day window share a preview/confirm step, so they
+// can no longer be dropped in as three independent rows.
 export { AutostartToggle } from "./AutostartToggle";
 export { UpdateChecksToggle } from "./UpdateChecksToggle";

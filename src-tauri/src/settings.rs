@@ -462,6 +462,22 @@ pub struct CloudSttProvider {
     /// as a single request once the recording stops.
     #[serde(default)]
     pub supports_streaming: bool,
+    /// Whether this provider can return the transcript translated into English.
+    ///
+    /// Nothing in cloud speech-to-text translates into an *arbitrary* language:
+    /// ElevenLabs `language_code`, Deepgram `language` and OpenAI-compatible
+    /// `language` are all hints about the language being *spoken*, and every one
+    /// of those endpoints answers in that language. English is the single
+    /// exception, and only on the OpenAI schema, which has a separate
+    /// `/audio/translations` route whose output language is fixed to English.
+    /// ElevenLabs, Deepgram and OpenRouter have no equivalent route at all.
+    ///
+    /// So this flag is what lets the UI offer "Translate to English" exactly
+    /// where it works and say why it is unavailable everywhere else, instead of a
+    /// toggle that reads as on and quietly does nothing (the local engine's
+    /// Whisper `translate` task is what set that expectation).
+    #[serde(default)]
+    pub supports_translation: bool,
     /// Where the user goes to get a key. Surfaced as a link in Settings so the
     /// first-run path isn't "search the web for it".
     #[serde(default)]
@@ -507,7 +523,18 @@ pub(crate) struct ResolvedCloudStt {
     pub base_url: String,
     pub api_key: String,
     /// ISO language code, or `None` for auto-detect.
+    ///
+    /// This is the language being *spoken*, not a target: every endpoint here
+    /// treats it as a recognition hint and answers in that language.
     pub language: Option<String>,
+    /// Ask for the transcript in English rather than the language spoken.
+    ///
+    /// Only ever true when the user's "Translate to English" switch is on *and*
+    /// the provider actually has a translation route
+    /// ([`CloudSttProvider::supports_translation`]), so the request path can act
+    /// on it without re-checking, and a provider without one falls back to plain
+    /// transcription with a log line rather than a failed dictation.
+    pub translate: bool,
     /// The user's custom vocabulary, forwarded as provider-native biasing
     /// (ElevenLabs `keyterms`, OpenAI `prompt`, Deepgram `keyterm`). The app
     /// already collects these words for the local fuzzy-correction pass, so a
@@ -602,6 +629,31 @@ pub enum OverlayPosition {
     None,
     Top,
     Bottom,
+}
+
+/// Where the assistant's Ask card opens on screen.
+///
+/// The card used to be a free-floating window restored to wherever it was last
+/// dragged, defaulting to the bottom-right corner. That is how it got lost: a
+/// small window with no taskbar button, parked in a corner or on a monitor that
+/// had since been unplugged. An anchor means it appears somewhere predictable
+/// every time.
+///
+/// `Custom` is the escape hatch — once the user drags the card somewhere and it
+/// snaps, that position is remembered and used instead. Set automatically by the
+/// drag, not something the user picks from a list.
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Type)]
+#[serde(rename_all = "lowercase")]
+pub enum AskAnchor {
+    /// Middle of the display the cursor is on. The default: easiest to read, and
+    /// impossible to lose.
+    Center,
+    TopCenter,
+    BottomCenter,
+    Left,
+    Right,
+    /// Wherever the user last dragged it.
+    Custom,
 }
 
 /// How the recording / assistant overlay presents itself while active.
@@ -789,14 +841,33 @@ pub enum AssistantSearchDepth {
     High,
 }
 
+/// How long unstarred dictation/Flow recordings are kept.
+///
+/// **The string on each variant is load-bearing and must stay explicit.** serde's
+/// `rename_all = "snake_case"` and specta's do not agree once a variant contains a
+/// digit: serde writes `days3` to the settings store while specta declared
+/// `days_3` in `bindings.ts`. The generated TypeScript union was therefore a set
+/// of literals the backend never produces or accepts, and the History UI only
+/// worked because it hardcoded untyped strings and cast them to this type — so
+/// any comparison that trusted the generated type was silently always false.
+/// Explicit `rename` attributes are honored verbatim by both, which pins one wire
+/// format and keeps every value already on disk valid.
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Type)]
 #[serde(rename_all = "snake_case")]
 pub enum RecordingRetentionPeriod {
+    /// Keep everything forever. Nothing is ever auto-deleted.
     Never,
+    /// Keep at most `history_limit` unstarred recordings.
     PreserveLimit,
+    #[serde(rename = "days3")]
     Days3,
+    #[serde(rename = "weeks2")]
     Weeks2,
+    #[serde(rename = "months3")]
     Months3,
+    /// Keep for exactly `recording_retention_days` days.
+    #[serde(rename = "custom_days")]
+    CustomDays,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Type)]
@@ -1250,6 +1321,11 @@ pub struct AppSettings {
     pub history_limit: usize,
     #[serde(default = "default_recording_retention_period")]
     pub recording_retention_period: RecordingRetentionPeriod,
+    /// Length of the `CustomDays` retention policy. Ignored by every other
+    /// policy, and paired with `RecordingRetentionPeriod::CustomDays` exactly the
+    /// way `history_limit` is paired with `PreserveLimit`.
+    #[serde(default = "default_recording_retention_days")]
+    pub recording_retention_days: u32,
     #[serde(default)]
     pub paste_method: PasteMethod,
     #[serde(default)]
@@ -1479,6 +1555,12 @@ pub struct AppSettings {
     /// overrides it for the current session.
     #[serde(default = "default_assistant_panel_size")]
     pub assistant_panel_size: String,
+    /// Where the Ask card opens. Centre by default — the card is transient and
+    /// meant to be read, so it appears in front of the user rather than in a
+    /// corner they have to hunt for. Dragging the card to an edge snaps it and
+    /// switches this to `Custom`, which uses the remembered position instead.
+    #[serde(default = "default_ask_anchor")]
+    pub assistant_ask_anchor: AskAnchor,
     /// Whether starting a plain dictation should silence an assistant reply
     /// that is still being read aloud. Off by default — earphone users often
     /// want to keep listening while they dictate. (Asking the assistant a NEW
@@ -1595,6 +1677,12 @@ fn default_overlay_position() -> OverlayPosition {
     return OverlayPosition::Bottom;
 }
 
+/// The Ask card opens centred. Deliberately not a corner: a corner is where the
+/// old panel got lost, and the card exists to be read the moment it appears.
+fn default_ask_anchor() -> AskAnchor {
+    AskAnchor::Center
+}
+
 /// Overlay style defaults to `Auto` (follow the model's live-streaming support)
 /// for both the dictation overlay and the assistant, until the user overrides.
 fn default_overlay_style() -> OverlayStyle {
@@ -1627,6 +1715,22 @@ fn default_history_limit() -> usize {
 
 fn default_recording_retention_period() -> RecordingRetentionPeriod {
     RecordingRetentionPeriod::PreserveLimit
+}
+
+/// Smallest number of recordings the count policy may keep. Zero would delete
+/// every unstarred recording the moment it was typed, which is indistinguishable
+/// from a mistyped keystroke while clearing the field.
+pub const MIN_HISTORY_LIMIT: usize = 1;
+pub const MAX_HISTORY_LIMIT: usize = 1000;
+
+/// Bounds for the custom retention window. One day is the shortest meaningful
+/// window; ten years is effectively "forever" for anyone who wants a number
+/// rather than the `Never` policy.
+pub const MIN_RECORDING_RETENTION_DAYS: u32 = 1;
+pub const MAX_RECORDING_RETENTION_DAYS: u32 = 3650;
+
+fn default_recording_retention_days() -> u32 {
+    30
 }
 
 fn default_audio_feedback_volume() -> f32 {
@@ -1939,6 +2043,10 @@ pub fn default_cloud_stt_providers() -> Vec<CloudSttProvider> {
             models_endpoint: None,
             honors_keyterms: true,
             supports_streaming: true,
+            // `language_code` is a hint about the language being spoken; the
+            // transcript comes back in that language. There is no translation
+            // route on this API.
+            supports_translation: false,
             api_key_url: "https://elevenlabs.io/app/settings/api-keys".to_string(),
         },
         CloudSttProvider {
@@ -1955,6 +2063,12 @@ pub fn default_cloud_stt_providers() -> Vec<CloudSttProvider> {
             models_endpoint: Some("/models".to_string()),
             honors_keyterms: true,
             supports_streaming: false,
+            // Serves the same Whisper weights as the local engine and mirrors
+            // OpenAI's `/audio/translations`, so English translation works here.
+            // Documented for `whisper-large-v3`; the turbo model is transcription
+            // only, which the request path reports as a provider error rather
+            // than pretending to translate.
+            supports_translation: true,
             api_key_url: "https://console.groq.com/keys".to_string(),
         },
         CloudSttProvider {
@@ -1972,6 +2086,9 @@ pub fn default_cloud_stt_providers() -> Vec<CloudSttProvider> {
             models_endpoint: Some("/models".to_string()),
             honors_keyterms: true,
             supports_streaming: false,
+            // The origin of the `/audio/translations` route. Output is fixed to
+            // English; `whisper-1` and the `gpt-4o-transcribe` family accept it.
+            supports_translation: true,
             api_key_url: "https://platform.openai.com/api-keys".to_string(),
         },
         // OpenRouter fronts several transcription vendors behind one key. It
@@ -2003,6 +2120,10 @@ pub fn default_cloud_stt_providers() -> Vec<CloudSttProvider> {
             // Documented as "accepted but ignored" on the multipart route.
             honors_keyterms: false,
             supports_streaming: false,
+            // Only `/audio/transcriptions` is proxied — there is no
+            // `/audio/translations` here, even for the Whisper models that have
+            // one at their upstream vendor.
+            supports_translation: false,
             api_key_url: "https://openrouter.ai/settings/keys".to_string(),
         },
         CloudSttProvider {
@@ -2020,6 +2141,9 @@ pub fn default_cloud_stt_providers() -> Vec<CloudSttProvider> {
             models_endpoint: None,
             honors_keyterms: true,
             supports_streaming: true,
+            // `language` selects the recognition language (`multi` for
+            // code-switching); `/v1/listen` never translates.
+            supports_translation: false,
             api_key_url: "https://console.deepgram.com/".to_string(),
         },
         CloudSttProvider {
@@ -2036,6 +2160,10 @@ pub fn default_cloud_stt_providers() -> Vec<CloudSttProvider> {
             models_endpoint: Some("/models".to_string()),
             honors_keyterms: true,
             supports_streaming: false,
+            // Voxtral's audio API is transcription only; the cross-lingual work
+            // Mistral documents belongs to its speech-to-speech pipeline, not to
+            // this endpoint.
+            supports_translation: false,
             api_key_url: "https://console.mistral.ai/api-keys".to_string(),
         },
         // Custom always comes last, mirroring the post-processing provider list.
@@ -2050,6 +2178,12 @@ pub fn default_cloud_stt_providers() -> Vec<CloudSttProvider> {
             models_endpoint: Some("/models".to_string()),
             honors_keyterms: true,
             supports_streaming: false,
+            // Offered rather than assumed: the self-hosted Whisper servers people
+            // point this at (`speaches`, `faster-whisper-server`, whisper.cpp's
+            // own server) do implement `/audio/translations`, and a gateway that
+            // does not answers with an error the user can see — which is better
+            // than hiding a switch that would have worked.
+            supports_translation: true,
             api_key_url: String::new(),
         },
     ]
@@ -3282,24 +3416,25 @@ pub fn get_default_settings() -> AppSettings {
     // variant. Attach a screenshot from the assistant panel's camera button
     // instead; a dedicated screen shortcut may return later on a free combo.
 
-    #[cfg(target_os = "macos")]
-    let default_panel_toggle_shortcut = "option+ctrl+a";
-    // Windows: must NOT contain the assistant's modifier-only combo
-    // (ctrl_left+alt) as a subset, or opening the panel would also start an
-    // assistant recording. Ctrl+Shift+A stays clear of both recording combos.
-    #[cfg(target_os = "windows")]
-    let default_panel_toggle_shortcut = "ctrl+shift+a";
-    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
-    let default_panel_toggle_shortcut = "ctrl+alt+a";
-
     bindings.insert(
         "assistant_panel_toggle".to_string(),
         ShortcutBinding {
             id: "assistant_panel_toggle".to_string(),
-            name: "Toggle Assistant Panel".to_string(),
-            description: "Shows or hides the floating assistant panel.".to_string(),
-            default_binding: default_panel_toggle_shortcut.to_string(),
-            current_binding: default_panel_toggle_shortcut.to_string(),
+            name: "Open the assistant without recording".to_string(),
+            description:
+                "Optional. The assistant shortcut already opens the Ask card and starts \
+                 listening, and the tray icon opens it without recording, so this is only \
+                 useful if you want a key that opens the card ready to type."
+                    .to_string(),
+            // Unbound by default: two shortcuts for one surface is exactly the
+            // clutter this redesign set out to remove, and the assistant shortcut
+            // plus the tray entry already cover both ways in. Anyone who wants a
+            // type-first key can record one, the same way the cancel binding works.
+            // Deliberately NOT force-cleared for existing installs — silently
+            // unbinding a key somebody uses every day is worse than one spare row
+            // in Settings.
+            default_binding: String::new(),
+            current_binding: String::new(),
         },
     );
 
@@ -3350,6 +3485,7 @@ pub fn get_default_settings() -> AppSettings {
         word_correction_threshold: default_word_correction_threshold(),
         history_limit: default_history_limit(),
         recording_retention_period: default_recording_retention_period(),
+        recording_retention_days: default_recording_retention_days(),
         paste_method: PasteMethod::default(),
         clipboard_handling: ClipboardHandling::default(),
         auto_submit: default_auto_submit(),
@@ -3430,6 +3566,7 @@ pub fn get_default_settings() -> AppSettings {
         assistant_font_size: default_assistant_font_size(),
         assistant_panel_opacity: default_assistant_panel_opacity(),
         assistant_panel_size: default_assistant_panel_size(),
+        assistant_ask_anchor: default_ask_anchor(),
         assistant_tts_stop_on_dictation: false,
         assistant_web_search_enabled: false,
         assistant_web_search_provider: default_assistant_web_search_provider(),
@@ -4382,15 +4519,10 @@ pub fn get_stored_binding(app: &AppHandle, id: &str) -> ShortcutBinding {
     binding
 }
 
-pub fn get_history_limit(app: &AppHandle) -> usize {
-    let settings = get_settings(app);
-    settings.history_limit
-}
-
-pub fn get_recording_retention_period(app: &AppHandle) -> RecordingRetentionPeriod {
-    let settings = get_settings(app);
-    settings.recording_retention_period
-}
+// Retention is read through `HistoryManager::active_plan`, which takes one
+// `get_settings` snapshot rather than three separate getters — each of those was a
+// full store read plus keychain hydration, on a path that runs after every
+// dictation.
 
 #[cfg(test)]
 mod tests {
@@ -4398,6 +4530,100 @@ mod tests {
 
     fn default_settings_json() -> serde_json::Value {
         serde_json::to_value(get_default_settings()).unwrap()
+    }
+
+    /// The exact strings the settings store and the frontend exchange. These are
+    /// the values already written to every existing install's
+    /// `settings_store.json`, so a change here silently resets a user's retention
+    /// choice to the default. `bindings.ts` must declare this same set — it did
+    /// not, because serde and specta disagree on where a digit starts a new word.
+    #[test]
+    fn retention_period_wire_format_is_stable() {
+        for (period, expected) in [
+            (RecordingRetentionPeriod::Never, "\"never\""),
+            (
+                RecordingRetentionPeriod::PreserveLimit,
+                "\"preserve_limit\"",
+            ),
+            (RecordingRetentionPeriod::Days3, "\"days3\""),
+            (RecordingRetentionPeriod::Weeks2, "\"weeks2\""),
+            (RecordingRetentionPeriod::Months3, "\"months3\""),
+            (RecordingRetentionPeriod::CustomDays, "\"custom_days\""),
+        ] {
+            let encoded = serde_json::to_string(&period).expect("serialize retention period");
+            assert_eq!(encoded, expected, "wire format changed for {:?}", period);
+            let decoded: RecordingRetentionPeriod =
+                serde_json::from_str(expected).expect("deserialize retention period");
+            assert_eq!(decoded, period);
+        }
+    }
+
+    /// A stored value from before `CustomDays` existed must keep working, and the
+    /// new field must fall back to its default rather than failing the whole
+    /// struct (which would drag every unrelated setting back to default too).
+    #[test]
+    fn settings_without_retention_days_keep_parsing() {
+        let mut json = default_settings_json();
+        let map = json.as_object_mut().expect("settings are an object");
+        map.remove("recording_retention_days");
+        map.insert(
+            "recording_retention_period".to_string(),
+            serde_json::json!("days3"),
+        );
+
+        let settings: AppSettings =
+            serde_json::from_value(json).expect("legacy settings still parse");
+        assert_eq!(
+            settings.recording_retention_period,
+            RecordingRetentionPeriod::Days3
+        );
+        assert_eq!(
+            settings.recording_retention_days,
+            default_recording_retention_days()
+        );
+    }
+
+    /// The generated TypeScript must offer exactly the strings serde accepts.
+    ///
+    /// `bindings.ts` is only regenerated while the app runs in dev, so nothing
+    /// used to catch a drift between the two generators — and they *did* drift:
+    /// specta renders `rename_all = "snake_case"` through `Inflector`, which
+    /// treats a digit as a new word (`days_3`), while serde only breaks on an
+    /// uppercase letter (`days3`). This asserts the agreement at test time
+    /// instead of leaving it to be discovered as a setting that won't save.
+    #[test]
+    fn generated_typescript_matches_the_serde_wire_format() {
+        let exported = specta_typescript::export::<RecordingRetentionPeriod>(
+            &specta_typescript::Typescript::default(),
+        )
+        .expect("export retention period type");
+
+        for period in [
+            RecordingRetentionPeriod::Never,
+            RecordingRetentionPeriod::PreserveLimit,
+            RecordingRetentionPeriod::Days3,
+            RecordingRetentionPeriod::Weeks2,
+            RecordingRetentionPeriod::Months3,
+            RecordingRetentionPeriod::CustomDays,
+        ] {
+            let serde_literal = serde_json::to_string(&period).expect("serialize period");
+            assert!(
+                exported.contains(&serde_literal),
+                "generated TypeScript {:?} is missing serde's literal {}",
+                exported,
+                serde_literal
+            );
+        }
+
+        // The specific literals the old bindings advertised and the backend never
+        // accepted. Their presence means the two generators have drifted again.
+        for stale in ["\"days_3\"", "\"weeks_2\"", "\"months_3\""] {
+            assert!(
+                !exported.contains(stale),
+                "generated TypeScript still contains {}, which serde rejects",
+                stale
+            );
+        }
     }
 
     #[test]

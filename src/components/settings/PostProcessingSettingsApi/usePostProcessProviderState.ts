@@ -200,16 +200,16 @@ export const usePostProcessProviderState = (): PostProcessProviderState => {
     const seen = new Set<string>();
     const options: ModelOption[] = [];
 
-    const upsert = (value: string | null | undefined) => {
+    const upsert = (value: string | null | undefined, label?: string) => {
       const trimmed = value?.trim();
       if (!trimmed || seen.has(trimmed)) return;
       seen.add(trimmed);
-      options.push({ value: trimmed, label: trimmed });
+      options.push({ value: trimmed, label: label?.trim() || trimmed });
     };
 
     // Add available models from API
     for (const candidate of availableModelsRaw) {
-      upsert(candidate);
+      upsert(candidate.id, candidate.label);
     }
 
     // Ensure current model is in the list

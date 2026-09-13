@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Cloud, ExternalLink, Loader2 } from "lucide-react";
+import { Cloud, ExternalLink, Globe, Languages, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { SettingsGroup } from "@/components/ui/SettingsGroup";
@@ -12,6 +12,8 @@ import { Button } from "@/components/ui/Button";
 import { Alert } from "@/components/ui/Alert";
 import { ModelCombo } from "@/components/ui/ModelCombo";
 import { ProviderModeToggle } from "../PostProcessingSettingsApi/ProviderModeToggle";
+import { LanguageSelector } from "../LanguageSelector";
+import { TranslateToEnglish } from "../TranslateToEnglish";
 import { useSettings } from "@/hooks/useSettings";
 import { commands, type CloudSttProvider } from "@/bindings";
 
@@ -175,6 +177,13 @@ export const CloudTranscriptionGroup: React.FC = () => {
       ? selectedModel.includes("realtime")
       : providerStreams;
 
+  // Whether "Translate to English" has anywhere to go on this provider. Only the
+  // OpenAI schema has a translation route, and its output language is fixed to
+  // English — no cloud transcription endpoint here can translate into an
+  // arbitrary language, so the row says which of the two situations applies
+  // rather than offering a switch that would do nothing.
+  const supportsTranslation = provider?.supports_translation ?? false;
+
   return (
     <SettingsGroup
       title={t("settings.dictation.cloud.groupTitle")}
@@ -334,6 +343,38 @@ export const CloudTranscriptionGroup: React.FC = () => {
               grouped={true}
             />
           )}
+
+          {/* Language rows live here, not in the local model card above, because
+              in cloud mode that model is unloaded and its capabilities describe
+              nothing. Every provider wired up here accepts a spoken-language
+              hint, so the picker is unconditional and offers the full list rather
+              than a local model's subset — a cloud user on an English-only local
+              model previously had no language control at all, because the card
+              that owned it was hidden along with the model. */}
+          <LanguageSelector
+            descriptionMode="inline"
+            grouped={true}
+            icon={Globe}
+            tone="emerald"
+            description={t("settings.dictation.cloud.language.description")}
+          />
+
+          <TranslateToEnglish
+            descriptionMode="inline"
+            grouped={true}
+            icon={Languages}
+            tone="violet"
+            disabled={!supportsTranslation}
+            description={
+              supportsTranslation
+                ? t("settings.dictation.cloud.translate.supported", {
+                    provider: provider?.label ?? "",
+                  })
+                : t("settings.dictation.cloud.translate.unsupported", {
+                    provider: provider?.label ?? "",
+                  })
+            }
+          />
 
           <ToggleSwitch
             checked={getSetting("cloud_stt_send_custom_words") ?? true}

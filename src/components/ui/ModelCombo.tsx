@@ -49,9 +49,38 @@ export const ModelCombo: React.FC<ModelComboProps> = ({
   const [local, setLocal] = React.useState(value);
   React.useEffect(() => setLocal(value), [value]);
 
+  /** Turn what the user typed into something the provider will accept.
+   *
+   *  A provider's display name and its model id are different strings, and only
+   *  the id works: OpenRouter lists `z-ai/glm-5.3-flash` as "Z.ai: GLM 5.3
+   *  Flash" and answers `400 … is not a valid model ID` for the name. Copying
+   *  the name off the provider's own model page is the obvious thing to do and
+   *  it used to break AI cleanup silently on every dictation — the request
+   *  failed before the model ever ran, and the app pasted the raw transcript.
+   *
+   *  So a value that matches a known *label* is swapped for that option's id.
+   *  Anything that matches nothing is passed through untouched, because the list
+   *  is only ever a suggestion: a provider with no `/models` endpoint, a
+   *  self-hosted server, or an Azure deployment name must all still be typeable.
+   */
+  const resolve = (input: string) => {
+    const wanted = input.toLowerCase();
+    if (options.some((option) => option.value.toLowerCase() === wanted)) {
+      return input;
+    }
+    const byLabel = options.find(
+      (option) => option.label.toLowerCase() === wanted,
+    );
+    return byLabel ? byLabel.value : input;
+  };
+
   const commit = (next: string) => {
-    const trimmed = next.trim();
-    if (trimmed && trimmed !== value.trim()) onCommit(trimmed);
+    const trimmed = resolve(next.trim());
+    if (!trimmed) return;
+    // Reflect a resolved id back into the field, so the value on screen is the
+    // one that was stored rather than the name that was typed.
+    setLocal(trimmed);
+    if (trimmed !== value.trim()) onCommit(trimmed);
   };
 
   return (
@@ -65,8 +94,15 @@ export const ModelCombo: React.FC<ModelComboProps> = ({
             const next = e.target.value;
             setLocal(next);
             // Picking a suggestion from the datalist matches an option exactly —
-            // commit immediately so a click doesn't require an extra blur.
-            if (options.some((o) => o.value === next)) commit(next);
+            // commit immediately so a click doesn't require an extra blur. A
+            // label match counts too: some browsers insert the option's label
+            // rather than its value.
+            if (
+              options.some((o) => o.value === next) ||
+              options.some((o) => o.label === next)
+            ) {
+              commit(next);
+            }
           }}
           onBlur={() => commit(local)}
           onKeyDown={(e) => {

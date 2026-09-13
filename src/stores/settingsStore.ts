@@ -5,7 +5,9 @@ import type {
   AppSettings as Settings,
   AudioDevice,
   ConversationPace,
+  ModelChoice,
   PostProcessReadiness,
+  RecordingRetentionPeriod,
   Replacement,
   WhisperAcceleratorSetting,
   OrtAcceleratorSetting,
@@ -59,7 +61,7 @@ interface SettingsStore {
   audioDevices: AudioDevice[];
   outputDevices: AudioDevice[];
   customSounds: { start: boolean; stop: boolean };
-  postProcessModelOptions: Record<string, string[]>;
+  postProcessModelOptions: Record<string, ModelChoice[]>;
   postProcessReadiness: PostProcessReadiness | null;
   isPostProcessReadinessLoading: boolean;
   postProcessReadinessError: boolean;
@@ -100,8 +102,11 @@ interface SettingsStore {
     providerId: string,
     model: string,
   ) => Promise<boolean>;
-  fetchPostProcessModels: (providerId: string) => Promise<string[] | null>;
-  setPostProcessModelOptions: (providerId: string, models: string[]) => void;
+  fetchPostProcessModels: (providerId: string) => Promise<ModelChoice[] | null>;
+  setPostProcessModelOptions: (
+    providerId: string,
+    models: ModelChoice[],
+  ) => void;
 
   // Internal state setters
   setSettings: (settings: Settings | null) => void;
@@ -166,7 +171,9 @@ const settingUpdaters: {
         : (value as string),
     ),
   recording_retention_period: (value) =>
-    commands.updateRecordingRetentionPeriod(value as string),
+    commands.updateRecordingRetentionPeriod(value as RecordingRetentionPeriod),
+  recording_retention_days: (value) =>
+    commands.updateRecordingRetentionDays(value as number),
   translate_to_english: (value) =>
     commands.changeTranslateToEnglishSetting(value as boolean),
   selected_language: (value) =>

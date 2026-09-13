@@ -286,7 +286,17 @@ fn generate_tray_translations() {
     for (lang, tray) in &translations {
         out.push_str(&format!("    m.insert(\"{lang}\", TrayStrings {{\n"));
         for (rust_field, json_key) in &fields {
-            let val = tray.get(json_key).and_then(|v| v.as_str()).unwrap_or("");
+            // Fall back to English for a key this locale has not translated yet.
+            // A missing key used to become an empty string, so adding any new
+            // tray item shipped a blank, unreadable menu entry to every other
+            // language until someone got round to translating it. An English
+            // label is a far better failure than no label.
+            let val = tray
+                .get(json_key)
+                .and_then(|v| v.as_str())
+                .filter(|s| !s.trim().is_empty())
+                .or_else(|| english.get(json_key).and_then(|v| v.as_str()))
+                .unwrap_or("");
             out.push_str(&format!(
                 "        {rust_field}: \"{}\".to_string(),\n",
                 escape_string(val)

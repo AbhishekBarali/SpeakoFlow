@@ -40,10 +40,9 @@ import { AudioPlayer } from "../../ui/AudioPlayer";
 import { Button } from "../../ui/Button";
 import { SettingsGroup } from "../../ui/SettingsGroup";
 import { SectionHeader } from "../../ui/SectionHeader";
-import { useSettings } from "../../../hooks/useSettings";
-// Retention rows live at the bottom of the History page, below the list.
-import { RecordingRetentionPeriodSelector } from "../RecordingRetentionPeriod";
-import { HistoryLimit } from "../HistoryLimit";
+// Retention lives above the feed; with a long history the list scrolls forever,
+// so anything below it is effectively unreachable.
+import { RetentionSettings } from "./RetentionSettings";
 import { VOICE_INTERRUPTED_MARKER } from "@/assistant/conversationPolicy";
 
 /** Must match the marker constants in src-tauri/src/assistant.rs */
@@ -271,7 +270,6 @@ type HistoryFilter = "all" | "recordings" | "flow" | "assistant";
 export const HistorySettings: React.FC = () => {
   const { t } = useTranslation();
   const osType = useOsType();
-  const { getSetting } = useSettings();
   const [entries, setEntries] = useState<HistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<HistoryFilter>("all");
@@ -341,6 +339,18 @@ export const HistorySettings: React.FC = () => {
     loadPage();
     loadAssistantSessions();
   }, [loadPage, loadAssistantSessions]);
+
+  // Re-apply the stored retention policy whenever this panel opens.
+  //
+  // A time-based policy ("after 3 days", "keep for N days") is otherwise only
+  // enforced at launch and right after a new recording is saved, so on a machine
+  // where the app stays open, entries that crossed the cutoff were still listed —
+  // the retention setting looked like it did nothing. Anything it removes arrives
+  // through the `history-retention-applied` listener below, so no extra refetch
+  // is needed here.
+  useEffect(() => {
+    void commands.enforceRecordingRetention();
+  }, []);
 
   // Infinite scroll via IntersectionObserver. Pagination tracks only
   // transcriptions (cursor = last transcription id); assistant sessions are
@@ -662,13 +672,7 @@ export const HistorySettings: React.FC = () => {
         title={t("settings.history.storage.title")}
         description={t("settings.history.storage.description")}
       >
-        <RecordingRetentionPeriodSelector
-          descriptionMode="tooltip"
-          grouped={true}
-        />
-        {getSetting("recording_retention_period") === "preserve_limit" && (
-          <HistoryLimit descriptionMode="tooltip" grouped={true} />
-        )}
+        <RetentionSettings grouped={true} />
       </SettingsGroup>
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-3">

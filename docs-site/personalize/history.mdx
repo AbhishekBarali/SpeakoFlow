@@ -32,12 +32,18 @@ Assistant chats can be copied, continued, and deleted, but not starred or re-tra
 
 The storage controls sit above the feed. Changes apply immediately.
 
-| Setting                    | Default             | Options                                                                                                 |
-| -------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------- |
-| **Auto-delete recordings** | `Keep a set number` | `Never`, `Keep a set number`, `After 3 days`, `After 2 weeks`, `After 3 months`                         |
-| **Recording limit**        | `20`                | The maximum number of unstarred recordings to keep. Only shown when auto-delete is `Keep a set number`. |
+| Setting                    | Default             | Options                                                                                                                 |
+| -------------------------- | ------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| **Auto-delete recordings** | `Keep a set number` | `Never`, `Keep a set number`, `After 3 days`, `After 2 weeks`, `After 3 months`, `After a set number of days`           |
+| **Recording limit**        | `20`                | The maximum number of unstarred recordings to keep, from 1 to 1000. Only shown when auto-delete is `Keep a set number`. |
+| **Delete after**           | `30`                | A window of 1 to 3650 days. Only shown when auto-delete is `After a set number of days`.                                |
 
-Starred recordings are always kept and do not count toward the limit.
+`Never` means never: nothing is deleted, no matter how old it gets or how many
+recordings pile up. Starred recordings are always kept and do not count toward the
+limit.
+
+Any change that would delete something asks first and tells you how many
+recordings it will remove. Nothing is deleted until you confirm it.
 
 <Note>
   These controls affect **dictation and Flow recordings only**. Assistant chats
@@ -55,7 +61,7 @@ Starred recordings are always kept and do not count toward the limit.
   <Accordion title="When the audio file actually gets deleted">
     Deleting an entry removes its audio file too, unless an older entry still points at the same file. In that case the file survives until the last reference to it is gone.
 
-    The auto-delete policy is re-applied every time a new recording is saved, not just at startup, so the list always matches what you asked for.
+    An age-based policy is enforced at four moments: at launch, on a slow background tick while the app runs, whenever a new recording is saved, and when you open the History section. The last two matter because a recording can cross its cutoff while the app sits idle — without them, the entry stayed listed and the setting looked like it did nothing.
 
   </Accordion>
 </AccordionGroup>

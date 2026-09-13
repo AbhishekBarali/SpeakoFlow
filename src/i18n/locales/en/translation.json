@@ -14,6 +14,7 @@
   },
   "tray": {
     "home": "Home",
+    "openAssistant": "Open assistant",
     "checkUpdates": "Check for updates…",
     "copyLastTranscript": "Copy last transcript",
     "unloadModel": "Unload model",
@@ -950,6 +951,13 @@
           "label": "Remove filler words",
           "description": "Drops \"um\", \"uh\", false starts, and repeats. Turn this off to get back exactly what you said, word for word."
         },
+        "language": {
+          "description": "The language you speak. Every provider here answers in that same language — telling it up front improves accuracy, and Auto lets it detect the language itself."
+        },
+        "translate": {
+          "supported": "{{provider}} can return English instead of the language you spoke. Only English — no transcription API translates into another language.",
+          "unsupported": "{{provider}} transcribes in the language you speak and has no translation endpoint, so this cannot run here. It works on the on-device engine, and on OpenAI, Groq, or a self-hosted Whisper server."
+        },
         "test": {
           "title": "Test connection",
           "description": "Sends one second of audio to check the key, endpoint, and model.",
@@ -1076,7 +1084,7 @@
       },
       "historyLimit": {
         "title": "Recording limit",
-        "description": "Maximum unstarred dictation and Flow recordings to keep. Starred recordings are always kept, and assistant chats are not counted.",
+        "description": "Maximum unstarred dictation and Flow recordings to keep. Starred recordings are always kept, and assistant chats are not counted. The lowest allowed value is 1.",
         "entries": "recordings"
       },
       "recordingRetention": {
@@ -1087,9 +1095,21 @@
         "days3": "After 3 days",
         "weeks2": "After 2 weeks",
         "months3": "After 3 months",
+        "customDays": "After a set number of days",
+        "customDaysTitle": "Delete after",
+        "customDaysDescription": "Unstarred recordings are deleted once they are this many days old. Starred recordings are always kept.",
+        "days": "days",
         "placeholder": "Select retention period…",
         "savedToast": "Retention saved.",
-        "appliedToast": "Recording retention applied"
+        "appliedToast": "Recording retention applied",
+        "saveFailed": "Couldn’t save the retention setting.",
+        "confirmTitle_one": "This deletes {{count}} recording",
+        "confirmTitle_other": "This deletes {{count}} recordings",
+        "confirmTitleUnknown": "This may delete recordings",
+        "confirmBody": "The audio and the transcript are removed from this device and cannot be recovered. Starred recordings are kept.",
+        "confirmAction_one": "Delete {{count}} recording",
+        "confirmAction_other": "Delete {{count}} recordings",
+        "confirmActionUnknown": "Apply anyway"
       },
       "alwaysOnMicrophone": {
         "label": "Always-on microphone",
@@ -1176,6 +1196,10 @@
       "brain": {
         "title": "Assistant brain",
         "whereLabel": "Where it runs",
+        "testLabel": "Test connection",
+        "testDescription": "Sends one short question to check the assistant can actually reach this model. On-device models load first, so the first test can take a while.",
+        "testButton": "Test connection",
+        "testing": "Testing…",
         "onDevice": "On my device",
         "cloud": "Cloud provider",
         "downloadModel": "Browse and download models",
@@ -1396,8 +1420,8 @@
       },
       "tts": {
         "title": "Voice output",
-        "enableLabel": "Speak responses aloud",
-        "enableDescription": "Read the assistant's replies out loud.",
+        "enableLabel": "Speak replies during conversations",
+        "enableDescription": "Read replies out loud while you're in a live conversation. Quick text answers are never spoken.",
         "stopOnDictationLabel": "Stop speech when dictation starts",
         "stopOnDictationDescription": "Stop any reply that's still playing when you start dictating.",
         "engineLabel": "Engine",
@@ -1571,7 +1595,8 @@
       "flowFailed": "Flow couldn't generate — nothing was pasted",
       "cloudSttFailed": "Cloud transcription failed — check your key and credit in Settings",
       "flowEmpty": "Say a command after the activation phrase",
-      "cleanupFallback": "AI cleanup didn't run — pasted the raw text"
+      "cleanupFallback": "AI cleanup didn't run — pasted the raw text",
+      "cleanupModelRejected": "Your cleanup provider rejected that model — check the model in Settings"
     },
     "listening": "Listening…",
     "locked": "Recording hands-free — press the hotkey again to stop",
@@ -1587,6 +1612,8 @@
     "conversation": {
       "title": "Conversation",
       "start": "Start voice conversation",
+      "startShort": "Talk",
+      "startHint": "Switch to a back-and-forth voice conversation. Replies are spoken aloud.",
       "transcript": "Show conversation transcript",
       "hint": "Talk naturally with {{name}}. Speak to interrupt.",
       "mutedHint": "Microphone off. Unmute to continue.",
@@ -1652,6 +1679,10 @@
     "hide": "Hide panel",
     "copy": "Copy",
     "copyCode": "Copy code",
+    "insert": "Insert this where you were typing",
+    "insertReplace": "Replace your selected text with this",
+    "selectionAttached": "{{count}} character selected",
+    "selectionAttached_other": "{{count}} characters selected",
     "regenerate": "Regenerate answer (the old one stays in History)",
     "summarizing": "Summarizing earlier messages…",
     "screenAttached": "Screen",

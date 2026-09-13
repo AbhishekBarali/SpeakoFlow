@@ -245,6 +245,20 @@ pub fn update_tray_menu(app: &AppHandle, state: &TrayIconState, locale: Option<&
     // avoids two tray items doing the exact same thing.
     let home_i = MenuItem::with_id(app, "home", &strings.home, true, home_accelerator)
         .expect("failed to create home item");
+    // The assistant panel has no taskbar button and no alt-tab entry
+    // (`skip_taskbar`), so if it ever ends up somewhere the user can't see — off
+    // the edge of a display that got unplugged, say — the hotkey is the only way
+    // back, and a hotkey that fails to register leaves no way back at all. This
+    // is the guaranteed route in. Disabled when the assistant is switched off,
+    // since nothing may summon the panel then.
+    let open_assistant_i = MenuItem::with_id(
+        app,
+        "open_assistant",
+        &strings.open_assistant,
+        settings.assistant_enabled,
+        None::<&str>,
+    )
+    .expect("failed to create open assistant item");
     let check_updates_i = MenuItem::with_id(
         app,
         "check_updates",
@@ -318,6 +332,7 @@ pub fn update_tray_menu(app: &AppHandle, state: &TrayIconState, locale: Option<&
                     &separator(),
                     &copy_last_transcript_i,
                     &separator(),
+                    &open_assistant_i,
                     &home_i,
                     &check_updates_i,
                     &separator(),
@@ -336,6 +351,7 @@ pub fn update_tray_menu(app: &AppHandle, state: &TrayIconState, locale: Option<&
                 &model_submenu,
                 &unload_model_i,
                 &separator(),
+                &open_assistant_i,
                 &home_i,
                 &check_updates_i,
                 &separator(),

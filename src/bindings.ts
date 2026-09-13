@@ -402,7 +402,7 @@ async setPostProcessProvider(providerId: string) : Promise<Result<null, string>>
     else return { status: "error", error: e  as any };
 }
 },
-async fetchPostProcessModels(providerId: string) : Promise<Result<string[], string>> {
+async fetchPostProcessModels(providerId: string) : Promise<Result<ModelChoice[], string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("fetch_post_process_models", { providerId }) };
 } catch (e) {
@@ -1391,7 +1391,7 @@ async retryHistoryEntryTranscription(id: number) : Promise<Result<null, string>>
     else return { status: "error", error: e  as any };
 }
 },
-async updateHistoryLimit(limit: number) : Promise<Result<null, string>> {
+async updateHistoryLimit(limit: number) : Promise<Result<number, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("update_history_limit", { limit }) };
 } catch (e) {
@@ -1399,9 +1399,60 @@ async updateHistoryLimit(limit: number) : Promise<Result<null, string>> {
     else return { status: "error", error: e  as any };
 }
 },
-async updateRecordingRetentionPeriod(period: string) : Promise<Result<null, string>> {
+/**
+ * Takes the enum, not a string.
+ * 
+ * The previous signature was `period: String` with a hand-written match, which
+ * is how the wire-format mismatch stayed invisible: `bindings.ts` advertised
+ * `"days_3"` (specta) while this match only accepted `"days3"` (serde), so the
+ * generated types described a call the backend would have rejected. With the
+ * typed parameter, serde owns the mapping and specta generates the same
+ * literals it accepts.
+ */
+async updateRecordingRetentionPeriod(period: RecordingRetentionPeriod) : Promise<Result<number, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("update_recording_retention_period", { period }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Length of the custom "keep for N days" policy.
+ */
+async updateRecordingRetentionDays(days: number) : Promise<Result<number, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("update_recording_retention_days", { days }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * How many recordings a prospective policy would delete, changing nothing.
+ * 
+ * Retention deletes the audio file along with the row, so the History panel asks
+ * this before applying a stricter policy and makes the user confirm the number.
+ */
+async previewRecordingRetention(period: RecordingRetentionPeriod, limit: number, days: number) : Promise<Result<number, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("preview_recording_retention", { period, limit, days }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Re-apply the stored policy right now.
+ * 
+ * The History panel calls this when it opens. A time-based policy is otherwise
+ * only enforced at launch and after a new recording is saved, so entries that
+ * crossed the boundary while the app sat idle stayed listed — "the history is
+ * visible regardless of the retention period".
+ */
+async enforceRecordingRetention() : Promise<Result<number, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("enforce_recording_retention") };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -1569,6 +1620,34 @@ async toggleAssistantPanel() : Promise<Result<null, string>> {
 async hideAssistantPanel() : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("hide_assistant_panel") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Write an answer into the application the user asked from.
+ * 
+ * This is the Insert button. When the question was about selected text and that
+ * selection is still live, the paste replaces it, because that is simply what a
+ * paste over a selection does. When there was no selection, it lands at the
+ * caret.
+ * 
+ * Deliberately a button rather than something automatic. `SetForegroundWindow`
+ * restores *focus* but not a *selection*: most native edit controls keep their
+ * selection across a focus change, but some collapse it to a caret on blur, and
+ * `contenteditable` in browsers varies. In those cases a "replace" silently
+ * becomes an "insert" and the user ends up with both the original text and the
+ * rewrite. That cannot be detected before pasting, so the destructive version
+ * stays an explicit act the user takes while looking at the answer.
+ * 
+ * Paste behaviour matches Flow's rather than dictation's: no trailing space and
+ * no auto-submit, because this is a finished artifact being placed, not speech
+ * being typed.
+ */
+async assistantInsertText(text: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("assistant_insert_text", { text }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -2067,6 +2146,30 @@ async assistantListTtsModels() : Promise<Result<string[], string>> {
 async assistantStop() : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("assistant_stop") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Ask the configured brain one trivial question, so a broken setup is found
+ * here instead of the first time the user speaks to the assistant.
+ * 
+ * This sends a real chat completion rather than probing `/models`, because a
+ * listing succeeds for a key that is valid but out of credit, and for a model
+ * id this endpoint does not serve — the two failures people actually hit. On
+ * the built-in engine it also covers "the model loads at all", since
+ * [`resolve_assistant_call`] starts it first (which is why the first press can
+ * take a while: it is loading weights, not stalling).
+ * 
+ * A reply with no text is still a pass. Some reasoning models spend their whole
+ * budget on hidden tokens and return empty content; the request being accepted
+ * is the signal, and calling that a failure would send the user chasing a
+ * working configuration. The message says which case it was.
+ */
+async assistantTestConnection() : Promise<Result<string, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("assistant_test_connection") };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -2579,7 +2682,13 @@ local_llm_unload_timeout?: ModelUnloadTimeout;
  * hundred MB of RAM and no CPU at all (an idle engine does no work), and it
  * removes the reload from the dictation path entirely.
  */
-post_process_unload_timeout?: ModelUnloadTimeout; word_correction_threshold?: number; history_limit?: number; recording_retention_period?: RecordingRetentionPeriod; paste_method?: PasteMethod; clipboard_handling?: ClipboardHandling; auto_submit?: boolean; auto_submit_key?: AutoSubmitKey; post_process_enabled?: boolean; post_process_provider_id?: string; post_process_providers?: PostProcessProvider[]; post_process_api_keys?: SecretMap; post_process_models?: Partial<{ [key in string]: string }>; post_process_prompts?: LLMPrompt[]; post_process_selected_prompt_id?: string | null; post_process_tone?: PostProcessTone; 
+post_process_unload_timeout?: ModelUnloadTimeout; word_correction_threshold?: number; history_limit?: number; recording_retention_period?: RecordingRetentionPeriod; 
+/**
+ * Length of the `CustomDays` retention policy. Ignored by every other
+ * policy, and paired with `RecordingRetentionPeriod::CustomDays` exactly the
+ * way `history_limit` is paired with `PreserveLimit`.
+ */
+recording_retention_days?: number; paste_method?: PasteMethod; clipboard_handling?: ClipboardHandling; auto_submit?: boolean; auto_submit_key?: AutoSubmitKey; post_process_enabled?: boolean; post_process_provider_id?: string; post_process_providers?: PostProcessProvider[]; post_process_api_keys?: SecretMap; post_process_models?: Partial<{ [key in string]: string }>; post_process_prompts?: LLMPrompt[]; post_process_selected_prompt_id?: string | null; post_process_tone?: PostProcessTone; 
 /**
  * User-created writing styles. Built-ins remain code-defined/localized and
  * are selected by their stable IDs.
@@ -2744,6 +2853,13 @@ assistant_panel_opacity?: number;
  */
 assistant_panel_size?: string; 
 /**
+ * Where the Ask card opens. Centre by default — the card is transient and
+ * meant to be read, so it appears in front of the user rather than in a
+ * corner they have to hunt for. Dragging the card to an edge snaps it and
+ * switches this to `Custom`, which uses the remembered position instead.
+ */
+assistant_ask_anchor?: AskAnchor; 
+/**
  * Whether starting a plain dictation should silence an assistant reply
  * that is still being read aloud. Off by default — earphone users often
  * want to keep listening while they dictate. (Asking the assistant a NEW
@@ -2813,6 +2929,29 @@ web_search_api_keys?: SecretMap; theme?: Theme; ui_text_size?: UiTextSize;
  * position, so the window can't reopen off-screen after a monitor change.
  */
 main_window_width?: number | null; main_window_height?: number | null }
+/**
+ * Where the assistant's Ask card opens on screen.
+ * 
+ * The card used to be a free-floating window restored to wherever it was last
+ * dragged, defaulting to the bottom-right corner. That is how it got lost: a
+ * small window with no taskbar button, parked in a corner or on a monitor that
+ * had since been unplugged. An anchor means it appears somewhere predictable
+ * every time.
+ * 
+ * `Custom` is the escape hatch — once the user drags the card somewhere and it
+ * snaps, that position is remembered and used instead. Set automatically by the
+ * drag, not something the user picks from a list.
+ */
+export type AskAnchor = 
+/**
+ * Middle of the display the cursor is on. The default: easiest to read, and
+ * impossible to lose.
+ */
+"center" | "topcenter" | "bottomcenter" | "left" | "right" | 
+/**
+ * Wherever the user last dragged it.
+ */
+"custom"
 /**
  * A selectable assistant persona ("character"). The active character's
  * `prompt` overrides the plain `assistant_system_prompt` for LLM turns; its
@@ -3079,6 +3218,23 @@ honors_keyterms?: boolean;
  */
 supports_streaming?: boolean; 
 /**
+ * Whether this provider can return the transcript translated into English.
+ * 
+ * Nothing in cloud speech-to-text translates into an *arbitrary* language:
+ * ElevenLabs `language_code`, Deepgram `language` and OpenAI-compatible
+ * `language` are all hints about the language being *spoken*, and every one
+ * of those endpoints answers in that language. English is the single
+ * exception, and only on the OpenAI schema, which has a separate
+ * `/audio/translations` route whose output language is fixed to English.
+ * ElevenLabs, Deepgram and OpenRouter have no equivalent route at all.
+ * 
+ * So this flag is what lets the UI offer "Translate to English" exactly
+ * where it works and say why it is unavailable everywhere else, instead of a
+ * toggle that reads as on and quietly does nothing (the local engine's
+ * Whisper `translate` task is what set that expectation).
+ */
+supports_translation?: boolean; 
+/**
  * Where the user goes to get a key. Surfaced as a link in Settings so the
  * first-run path isn't "search the web for it".
  */
@@ -3298,6 +3454,27 @@ confidence?: MemoryConfidence;
  * `"auto"` (distilled from a conversation). Purely informational.
  */
 source?: string }
+/**
+ * One entry from a provider's model catalogue: the id chat requests must carry,
+ * plus the human-readable name the provider shows for it.
+ * 
+ * The two are not interchangeable and confusing them silently breaks cleanup.
+ * OpenRouter lists `{"id": "z-ai/glm-5.3-flash", "name": "Z.ai: GLM 5.3
+ * Flash"}`, and its chat endpoint answers `400 … is not a valid model ID` for
+ * anything but the id. This type exists so the picker can display the name a
+ * user recognises from the provider's own website while still storing — and
+ * sending — the id.
+ */
+export type ModelChoice = { 
+/**
+ * The value chat requests carry.
+ */
+id: string; 
+/**
+ * What the provider calls it. Equal to `id` when the provider offers no
+ * separate display name.
+ */
+label: string }
 export type ModelInfo = { id: string; name: string; description: string; filename: string; url: string | null; sha256: string | null; size_mb: number; is_downloaded: boolean; is_downloading: boolean; partial_size: number; is_directory: boolean; engine_type: EngineType; accuracy_score: number; speed_score: number; supports_translation: boolean; supports_streaming: boolean; is_recommended: boolean; 
 /**
  * Overall recommendation rank (1 = top); `None` when unranked. Mirrors the
@@ -3357,7 +3534,32 @@ export type PostProcessReadiness = { state: "ready"; source: PostProcessConfigSo
  */
 export type PostProcessTone = "none" | "formal" | "casual" | "professional" | "friendly" | "concise"
 export type PostProcessUnavailableReason = "no_providers" | "selected_provider_missing" | "no_model_configured" | "no_prompt_selected" | "selected_prompt_missing" | "selected_prompt_empty" | "missing_api_key"
-export type RecordingRetentionPeriod = "never" | "preserve_limit" | "days_3" | "weeks_2" | "months_3"
+/**
+ * How long unstarred dictation/Flow recordings are kept.
+ * 
+ * **The string on each variant is load-bearing and must stay explicit.** serde's
+ * `rename_all = "snake_case"` and specta's do not agree once a variant contains a
+ * digit: serde writes `days3` to the settings store while specta declared
+ * `days_3` in `bindings.ts`. The generated TypeScript union was therefore a set
+ * of literals the backend never produces or accepts, and the History UI only
+ * worked because it hardcoded untyped strings and cast them to this type — so
+ * any comparison that trusted the generated type was silently always false.
+ * Explicit `rename` attributes are honored verbatim by both, which pins one wire
+ * format and keeps every value already on disk valid.
+ */
+export type RecordingRetentionPeriod = 
+/**
+ * Keep everything forever. Nothing is ever auto-deleted.
+ */
+"never" | 
+/**
+ * Keep at most `history_limit` unstarred recordings.
+ */
+"preserve_limit" | "days3" | "weeks2" | "months3" | 
+/**
+ * Keep for exactly `recording_retention_days` days.
+ */
+"custom_days"
 /**
  * A single deterministic find/replace rule applied to the transcript.
  * 

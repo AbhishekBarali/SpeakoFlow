@@ -34,6 +34,12 @@ pub fn cancel_current_operation(app: &AppHandle) {
     // vision timing) so a cancelled capture never rides along with a later turn.
     crate::assistant::clear_immediate_capture();
 
+    // Same reasoning for a captured text selection: a recording the user
+    // abandoned must not donate its selection to the next question they ask. That
+    // failure would be silent and would put text they never offered in front of a
+    // model, so it is cleared on the way out rather than relied on to expire.
+    crate::selection::clear_pending();
+
     // Whether this cancellation belongs to the assistant: either a turn is in
     // flight, or the recording being cancelled was routed to the assistant.
     // Read before `request_cancel()` below, while the turn still reports busy.
@@ -73,6 +79,11 @@ pub fn cancel_current_operation(app: &AppHandle) {
     // Update tray icon and hide overlay
     change_tray_icon(app, crate::tray::TrayIconState::Idle);
     hide_recording_overlay(app);
+
+    // Nothing will be pasted, so the window this recording was aimed at stops
+    // being a restore target. Keeping it would mean a later paste could hand the
+    // foreground to a window the user has since abandoned.
+    crate::input::forget_paste_target();
 
     // Unload model if immediate unload is enabled
     let tm = app.state::<Arc<TranscriptionManager>>();

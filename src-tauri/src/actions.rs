@@ -535,6 +535,10 @@ pub(crate) fn prewarm_assistant_llm(app: &AppHandle, model: String) {
 enum PostProcessFailureKind {
     LocalModelStart,
     Authentication,
+    /// The provider refused the configured model itself: an id it does not
+    /// recognise, or one this key may not use. Distinct from every other failure
+    /// because nothing about the request will ever make it succeed.
+    ModelRejected,
     ProviderRequest,
     StructuredOutputRejected,
     MalformedResponse,
@@ -1074,6 +1078,33 @@ fn parse_structured_output(
 /// output probe being rejected, which is an expected step in the fallback ladder
 /// (see [`is_schema_compatibility_error`]) rather than a fault worth alarming on.
 fn classify_chat_error(error: &crate::llm_client::ChatCompletionError) -> PostProcessFailureKind {
+    if let Some(rejection) = model_rejection_detail(error) {
+        // At warn, and quoting the provider verbatim, because this is the one
+        // cleanup failure the user must act on and the app cannot repair. It used
+        // to land in the debug-only branch below (a rejected model id answers
+        // 400, same as the structured-output probe), so a permanently broken
+        // configuration logged one line at debug and reported the same generic
+        // `ProviderError` as a network blip.
+        //
+        // The advice is split because the two causes need opposite actions and
+        // the wrong one wastes the user's time. Telling someone whose model is
+        // gated behind an approved harness to re-check the spelling of a slug the
+        // provider just echoed back correctly is worse than saying nothing.
+        log::warn!(
+            "Cleanup provider refused the configured model, so no cleanup can run: {}. {}",
+            rejection.detail,
+            match rejection.kind {
+                ModelRejectionKind::UnknownId =>
+                    "The provider does not recognise that model id. It must be the id, not the \
+display name — for OpenRouter that is 'z-ai/glm-5.3-flash' rather than 'Z.ai: GLM 5.3 Flash'. \
+Pick it again from the list in Settings > Dictation cleanup.",
+                ModelRejectionKind::NotPermitted =>
+                    "The id is recognised but this key may not use it, so the model itself has to \
+change. Pick a different one in Settings > Dictation cleanup.",
+            }
+        );
+        return PostProcessFailureKind::ModelRejected;
+    }
     if is_schema_compatibility_error(error) {
         log::debug!("Cleanup provider rejected the structured request: {error}");
     } else {
@@ -1094,7 +1125,113 @@ fn classify_chat_error(error: &crate::llm_client::ChatCompletionError) -> PostPr
     }
 }
 
+/// Why the provider refused the model, when the two causes call for different
+/// actions.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ModelRejectionKind {
+    /// The provider does not know this id at all — a typo, a display name, or a
+    /// model that has been retired.
+    UnknownId,
+    /// The id is real but this key cannot use it: a gated listing, a plan that
+    /// does not include it, or a region that does not serve it. Re-typing the id
+    /// cannot help; only choosing a different model can.
+    NotPermitted,
+}
+
+struct ModelRejection {
+    detail: String,
+    kind: ModelRejectionKind,
+}
+
+/// The provider's own words when it refused the *model*, rather than the request
+/// around it.
+///
+/// This exists because [`is_schema_compatibility_error`] cannot tell the two
+/// apart from the status code alone, and getting it wrong is expensive in both
+/// directions. Measured in this app's log against OpenRouter: the cleanup model
+/// had been saved as the display name `Z.ai: GLM 5.3 Flash` instead of the slug
+/// `z-ai/glm-5.3-flash`, so every request answered
+/// `400 {"error":{"message":"Z.ai: GLM 5.3 Flash is not a valid model ID"}}`.
+/// The app read that 400 as "the provider dislikes my optional parameters",
+/// walked the whole step-down ladder — `none` → `low` → nothing — then fell
+/// through to a plain request, spending four round trips per dictation to learn
+/// something the first response had already stated plainly, and memoising
+/// `REQUEST_TUNING_REJECTED` and `STRUCTURED_OUTPUT_UNUSABLE` against a
+/// provider that had refused neither. The user saw a generic fallback notice and
+/// cleanup that "just doesn't run".
+///
+/// Matching on the body is unavoidable: the status code for this is 400 on
+/// OpenRouter, 404 on OpenAI and Azure, and 403 when a model exists but the key
+/// may not use it (OpenRouter's free tier answers
+/// `403 … is only available on agentic harnesses`, gating the listing behind an
+/// approved client rather than behind the id). The phrases below are deliberately
+/// required to name a model, a deployment, or the access rule, so a schema
+/// rejection (which talks about `response_format` and `json_schema`) and a
+/// billing 403 (which talks about credits) cannot match.
+fn model_rejection_detail(
+    error: &crate::llm_client::ChatCompletionError,
+) -> Option<ModelRejection> {
+    let crate::llm_client::ChatCompletionError::HttpStatus { status, detail } = error else {
+        return None;
+    };
+    if !matches!(status, 400 | 403 | 404) {
+        return None;
+    }
+    let haystack = detail.to_lowercase();
+    /// Phrases that only ever appear when the *model* is the problem.
+    const STANDALONE: [&str; 5] = [
+        "not a valid model",
+        "invalid model",
+        "unknown model",
+        "model_not_found",
+        "no such model",
+    ];
+    /// Phrases that need corroboration, because they also describe a missing
+    /// route, a retired API version, or a deleted resource.
+    const NEEDS_SUBJECT: [&str; 4] = [
+        "does not exist",
+        "not found",
+        "unsupported",
+        "is not available",
+    ];
+    const SUBJECTS: [&str; 3] = ["model", "deployment", "engine"];
+    /// The model is real; the caller is not allowed to use it.
+    const NOT_PERMITTED: [&str; 3] = [
+        "do not have access",
+        "does not have access",
+        "only available on",
+    ];
+
+    // Checked first, but only wins when nothing says the id is unknown: OpenAI
+    // answers "does not exist OR you do not have access to it" in one sentence,
+    // and there the id is by far the likelier cause.
+    let unknown = STANDALONE.iter().any(|phrase| haystack.contains(phrase))
+        || (NEEDS_SUBJECT.iter().any(|phrase| haystack.contains(phrase))
+            && SUBJECTS.iter().any(|subject| haystack.contains(subject)));
+    let not_permitted = NOT_PERMITTED.iter().any(|phrase| haystack.contains(phrase));
+
+    let kind = match (unknown, not_permitted) {
+        (true, _) => ModelRejectionKind::UnknownId,
+        (false, true) => ModelRejectionKind::NotPermitted,
+        (false, false) => return None,
+    };
+    Some(ModelRejection {
+        detail: detail.trim().to_string(),
+        kind,
+    })
+}
+
+/// Whether a failure is the structured-output probe (or another optional tuning
+/// parameter) being refused, and therefore worth retrying without it.
+///
+/// A model the provider will not serve is explicitly **not** one of these, even
+/// though it arrives with the same 400: retrying it differently cannot help, and
+/// treating it as a tuning refusal is what made a mistyped model id look like a
+/// silent feature outage. See [`model_rejection_detail`].
 fn is_schema_compatibility_error(error: &crate::llm_client::ChatCompletionError) -> bool {
+    if model_rejection_detail(error).is_some() {
+        return false;
+    }
     matches!(
         error,
         crate::llm_client::ChatCompletionError::HttpStatus {
@@ -1686,6 +1823,9 @@ fn fallback_reason_for_failure(failure: PostProcessFailureKind) -> PostProcessFa
         PostProcessFailureKind::LocalModelStart | PostProcessFailureKind::UnsupportedProvider => {
             PostProcessFallbackReason::ModelUnavailable
         }
+        // The model, not the credentials: a key that can reach the provider at
+        // all but names a model it will not serve.
+        PostProcessFailureKind::ModelRejected => PostProcessFallbackReason::ModelUnavailable,
         PostProcessFailureKind::Authentication => PostProcessFallbackReason::Authentication,
         PostProcessFailureKind::ProviderRequest => PostProcessFallbackReason::ProviderError,
         PostProcessFailureKind::StructuredOutputRejected
@@ -1724,9 +1864,23 @@ fn finalize_post_process_attempt(
 /// Silence used to be the only outcome here, which is what made a fallback read
 /// as two separate bugs — "cleanup didn't happen" and "it pasted the raw text"
 /// are the same event seen from different angles.
+///
+/// One reason gets its own notice: a model the provider will not serve. Every
+/// other fallback is transient or self-healing, so "cleanup didn't run" is the
+/// whole story and a retry may well succeed. A refused model is neither — it
+/// fails identically on every dictation until the setting changes — and the
+/// generic notice gives the user nothing to act on, which is exactly how a model
+/// saved as `Z.ai: GLM 5.3 Flash` instead of `z-ai/glm-5.3-flash` read as the
+/// feature being broken.
 fn cleanup_fallback_notice(result: Option<&PostProcessRuntimeMetadata>) -> Option<&'static str> {
     let result = result?;
-    (result.requested && !result.applied).then_some("cleanupFallback")
+    if !(result.requested && !result.applied) {
+        return None;
+    }
+    match result.fallback_reason {
+        Some(PostProcessFallbackReason::ModelUnavailable) => Some("cleanupModelRejected"),
+        _ => Some("cleanupFallback"),
+    }
 }
 
 fn emit_post_process_result(
@@ -1921,6 +2075,12 @@ impl ShortcutAction for TranscribeAction {
 
         // A fresh dictation can't be redirected by a stale Ask-Assistant click.
         crate::assistant::clear_transcribe_redirect();
+
+        // Remember where this transcript is meant to go, before any window of
+        // ours is on screen. The paste is minutes of wall-clock away — recording,
+        // transcription, maybe an LLM cleanup pass — and a synthetic Ctrl+V only
+        // ever reaches whatever holds keyboard focus at the moment it is sent.
+        crate::input::remember_paste_target();
 
         // Route the transcript: an in-app dictation (the Create-with-AI persona
         // box uses source "in-app") delivers its text to the webview via an
@@ -2615,6 +2775,23 @@ impl ShortcutAction for AssistantAction {
     fn start(&self, app: &AppHandle, binding_id: &str, _shortcut_str: &str) {
         debug!("AssistantAction::start called for binding: {}", binding_id);
 
+        // Harvest whatever the user has selected, now, while their selection and
+        // focus are still where they were when they pressed the shortcut. By the
+        // time the answer arrives they may well have clicked somewhere else.
+        //
+        // The capture runs on its own thread (see `selection::begin_capture`)
+        // because this method runs on the transcription coordinator's single
+        // thread, which also handles the release event: blocking it here would
+        // delay the microphone opening and swallow the user's first words.
+        let selection_generation = crate::selection::begin_capture(app);
+        crate::assistant::set_selection_generation(selection_generation);
+
+        // The Insert button pastes into whatever had focus when the question was
+        // asked, so the same target-restoring logic dictation uses is needed here.
+        // Only dictation ever called this, which is why an assistant-driven paste
+        // had no idea where it was meant to land.
+        crate::input::remember_paste_target();
+
         // Manual Immediate timing captures at recording start. Beginning every
         // recording advances the epoch even when no capture is allowed, so a
         // worker from an older/cancelled recording cannot populate this turn.
@@ -2891,15 +3068,16 @@ pub static ACTION_MAP: Lazy<HashMap<String, Arc<dyn ShortcutAction>>> = Lazy::ne
 mod tests {
     use super::{
         append_final_output_contract, append_style_layer, build_post_process_request,
-        build_system_prompt, cleanup_fallback_notice, cleanup_reasoning_options,
-        cleanup_token_budget, finalize_post_process_attempt, is_system_role_error,
-        parse_structured_output, remember_token_cap_starves_output,
+        build_system_prompt, classify_chat_error, cleanup_fallback_notice,
+        cleanup_reasoning_options, cleanup_token_budget, fallback_reason_for_failure,
+        finalize_post_process_attempt, is_schema_compatibility_error, is_system_role_error,
+        model_rejection_detail, parse_structured_output, remember_token_cap_starves_output,
         replace_dashes_with_plain_punctuation, run_provider_post_process,
         sanitize_post_process_output, structured_output_unusable, token_cap_starves_output,
         transcription_allows_empty_output, tuning_rejected, uses_ai_cleanup,
-        validate_cleaned_output, PostProcessAttemptOutcome, PostProcessFailureKind,
-        PostProcessFallbackReason, PostProcessResultEvent, PostProcessRuntimeMetadata,
-        APPLE_INTELLIGENCE_PROVIDER_ID,
+        validate_cleaned_output, ModelRejectionKind, PostProcessAttemptOutcome,
+        PostProcessFailureKind, PostProcessFallbackReason, PostProcessResultEvent,
+        PostProcessRuntimeMetadata, APPLE_INTELLIGENCE_PROVIDER_ID,
     };
     use crate::settings::{
         PostProcessConfigSource, PostProcessProvider, PostProcessTone,
@@ -3031,6 +3209,167 @@ mod tests {
         status: u16,
         body: String,
         delay: Duration,
+    }
+
+    /// The provider's own words, verbatim from this app's log, for the failure
+    /// that prompted [`model_rejection_detail`]: the cleanup model had been saved
+    /// as OpenRouter's display name instead of its slug.
+    const OPENROUTER_BAD_MODEL_BODY: &str =
+        r#"{"error":{"message":"Z.ai: GLM 5.3 Flash is not a valid model ID","code":400}}"#;
+
+    fn http_error(status: u16, detail: &str) -> crate::llm_client::ChatCompletionError {
+        crate::llm_client::ChatCompletionError::HttpStatus {
+            status,
+            detail: detail.to_string(),
+        }
+    }
+
+    #[test]
+    fn a_refused_model_id_is_not_mistaken_for_a_schema_rejection() {
+        let rejected = http_error(400, OPENROUTER_BAD_MODEL_BODY);
+        let detail = model_rejection_detail(&rejected).expect("the model was refused");
+        assert_eq!(
+            detail.detail, OPENROUTER_BAD_MODEL_BODY,
+            "the provider's message is what the user needs to see"
+        );
+        assert_eq!(detail.kind, ModelRejectionKind::UnknownId);
+        // The whole point: this 400 must NOT enter the schema/tuning step-down
+        // ladder, which used to spend three more round trips on it and then
+        // memoise two per-model facts the provider never asserted.
+        assert!(!is_schema_compatibility_error(&rejected));
+        assert_eq!(
+            classify_chat_error(&rejected),
+            PostProcessFailureKind::ModelRejected
+        );
+        assert_eq!(
+            fallback_reason_for_failure(PostProcessFailureKind::ModelRejected),
+            PostProcessFallbackReason::ModelUnavailable
+        );
+    }
+
+    #[test]
+    fn model_rejection_is_recognised_across_providers_and_status_codes() {
+        let kind = |status, detail: &str| {
+            model_rejection_detail(&http_error(status, detail))
+                .map(|rejection| rejection.kind)
+                .expect("the model was refused")
+        };
+        // OpenAI / Groq / Together: 404 or 400, "does not exist". The sentence
+        // also mentions access, but an unknown id is the likelier cause and the
+        // only one the user can act on by re-picking the model.
+        for status in [400, 404] {
+            assert_eq!(
+                kind(
+                    status,
+                    "The model `glm-5.3-flash` does not exist or you do not have access to it."
+                ),
+                ModelRejectionKind::UnknownId
+            );
+        }
+        // Azure names the deployment rather than the model.
+        assert_eq!(
+            kind(404, "The API deployment for this resource does not exist."),
+            ModelRejectionKind::UnknownId
+        );
+        // Gemini.
+        assert_eq!(
+            kind(404, "models/gemini-9 is not found for API version v1beta"),
+            ModelRejectionKind::UnknownId
+        );
+        // A model that exists but this key may not use: OpenRouter gates some
+        // free listings behind an approved client. Re-typing the id cannot fix
+        // it, so the advice must differ — measured against
+        // `thinkingmachines/inkling-small:free`, which failed identically on
+        // every dictation while the slug was correct.
+        assert_eq!(
+            kind(
+                403,
+                "thinkingmachines/inkling-small:free is only available on agentic harnesses. \
+Try plugging it into a coding agent or productivity app listed on https://openrouter.ai/apps"
+            ),
+            ModelRejectionKind::NotPermitted
+        );
+    }
+
+    #[test]
+    fn a_schema_or_billing_refusal_is_not_read_as_a_bad_model() {
+        let refused = |status, detail: &str| {
+            model_rejection_detail(&http_error(status, detail)).map(|rejection| rejection.kind)
+        };
+        // The structured-output probe being refused. Must stay in the ladder, or
+        // every model on a gateway without JSON-schema support loses cleanup.
+        let schema = http_error(
+            400,
+            r#"{"error":{"message":"Unsupported parameter: 'response_format.json_schema'"}}"#,
+        );
+        assert_eq!(model_rejection_detail(&schema).map(|r| r.kind), None);
+        assert!(is_schema_compatibility_error(&schema));
+
+        // A reasoning parameter being refused: same ladder.
+        assert_eq!(
+            refused(
+                400,
+                r#"{"error":{"message":"reasoning_effort: 'none' is not one of ['low','medium','high']"}}"#
+            ),
+            None
+        );
+
+        // Out of credit is an account problem, not a model problem.
+        let billing = http_error(
+            403,
+            r#"{"error":{"message":"Insufficient credits. Add more at openrouter.ai/credits"}}"#,
+        );
+        assert_eq!(model_rejection_detail(&billing).map(|r| r.kind), None);
+        assert_eq!(
+            classify_chat_error(&billing),
+            PostProcessFailureKind::Authentication
+        );
+
+        // A plain outage carries no model wording either.
+        assert_eq!(refused(400, "Bad Request"), None);
+    }
+
+    /// A refused model id costs exactly ONE request.
+    ///
+    /// The mock is primed with a single response, so a second attempt would hit a
+    /// closed listener and surface as a transport failure instead — which is what
+    /// makes this a real assertion about the number of round trips and not just
+    /// about the returned enum. Before the fix this path issued four: structured,
+    /// then `none` → `low` → no-tuning on the plain retry ladder.
+    #[tokio::test]
+    async fn a_refused_model_id_costs_one_request_and_reports_the_model() {
+        let (base_url, requests, handle) = spawn_mock_provider(vec![MockResponse {
+            status: 400,
+            body: OPENROUTER_BAD_MODEL_BODY.to_string(),
+            delay: Duration::ZERO,
+        }]);
+        let config = test_config(base_url, true, PostProcessTone::None, "Clean it up.");
+
+        let outcome = run_provider_post_process(
+            &config,
+            "the meeting is at five",
+            TokioInstant::now() + Duration::from_secs(30),
+            None,
+        )
+        .await;
+
+        assert_eq!(
+            outcome,
+            PostProcessAttemptOutcome::Failed(PostProcessFailureKind::ModelRejected)
+        );
+        assert!(requests.recv_timeout(Duration::from_secs(2)).is_ok());
+        assert!(
+            requests.recv_timeout(Duration::from_millis(300)).is_err(),
+            "a model the provider will not serve must not be retried"
+        );
+        // Neither memo may be poisoned: the provider refused the model, not the
+        // schema and not the tuning parameters.
+        assert!(!structured_output_unusable(
+            &config.provider.id,
+            &config.model
+        ));
+        assert!(!tuning_rejected(&config.provider.id, &config.model));
+        handle.join().unwrap();
     }
 
     fn completion_response(content: &str) -> String {
@@ -4601,7 +4940,7 @@ mod tests {
         PostProcessRuntimeMetadata {
             requested,
             applied,
-            fallback_reason: (!applied).then_some(PostProcessFallbackReason::ModelUnavailable),
+            fallback_reason: (!applied).then_some(PostProcessFallbackReason::Timeout),
             source: None,
             provider_id: None,
             model: None,
@@ -4627,6 +4966,16 @@ mod tests {
             cleanup_fallback_notice(None),
             None,
             "plain dictation never requested cleanup, so it cannot have fallen back"
+        );
+        // A refused model is the one fallback the user must act on, so it gets a
+        // notice that says so instead of the generic one a retry might fix.
+        let refused = PostProcessRuntimeMetadata {
+            fallback_reason: Some(PostProcessFallbackReason::ModelUnavailable),
+            ..runtime_metadata(true, false)
+        };
+        assert_eq!(
+            cleanup_fallback_notice(Some(&refused)),
+            Some("cleanupModelRejected")
         );
     }
 

@@ -31,6 +31,69 @@ pub fn write_clipboard_text(app_handle: &AppHandle, text: &str) -> Result<(), St
         .map_err(|e| format!("Failed to write to clipboard: {}", e))
 }
 
+/// A monotonic counter that changes whenever the clipboard's contents change.
+///
+/// This is what makes harvesting a text selection safe. A synthetic Ctrl+C that
+/// the target application ignores — because nothing was selected, or because it
+/// simply doesn't implement copy — leaves the clipboard untouched, and reading it
+/// anyway returns whatever the user copied minutes ago. That could be a password,
+/// and it would then be sent to whichever model provider the user has configured,
+/// possibly a cloud one. Comparing the counter before and after proves something
+/// actually landed.
+///
+/// `None` means the platform gives us no way to prove freshness, and the caller
+/// must treat a harvest as "cannot tell" rather than trusting the read. Only
+/// Windows has a real counter here; X11 doesn't need one because it can read the
+/// PRIMARY selection directly without a keystroke.
+pub fn clipboard_sequence() -> Option<u64> {
+    #[cfg(target_os = "windows")]
+    {
+        use windows::Win32::System::DataExchange::GetClipboardSequenceNumber;
+        Some(unsafe { GetClipboardSequenceNumber() } as u64)
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        None
+    }
+}
+
+/// What the clipboard held before we interfered with it.
+///
+/// Deliberately richer than the `String` the paste path uses. `read_text()`
+/// collapses "empty", "holds an image", "holds files" and "read failed" into the
+/// same empty string, and writing that back is fine for a paste (which has
+/// already overwritten the clipboard regardless). A *harvest* inverts that: a
+/// user who copied an image, then selects some text and asks for a translation,
+/// would silently lose the image. So a non-text clipboard is recorded as
+/// something we must not overwrite at all.
+pub enum ClipboardSnapshot {
+    Text(String),
+    /// Held something that isn't text, or could not be read. Never restored,
+    /// because we cannot reproduce it — the harvest is skipped instead.
+    NotText,
+}
+
+/// Record the clipboard so a harvest can put it back.
+pub fn snapshot_clipboard(app_handle: &AppHandle) -> ClipboardSnapshot {
+    match app_handle.clipboard().read_text() {
+        Ok(text) => ClipboardSnapshot::Text(text),
+        // An image, a file list, or an empty clipboard. `read_text` cannot tell
+        // these apart, and only one of them is safe to clobber, so none are.
+        Err(_) => ClipboardSnapshot::NotText,
+    }
+}
+
+/// Put back what [`snapshot_clipboard`] recorded.
+pub fn restore_clipboard(app_handle: &AppHandle, snapshot: &ClipboardSnapshot) {
+    if let ClipboardSnapshot::Text(text) = snapshot {
+        if let Err(e) = write_clipboard_text(app_handle, text) {
+            // Worth a real warning: the user's clipboard now holds the harvested
+            // selection instead of what they put there.
+            log::warn!("Could not restore the clipboard after a selection capture: {e}");
+        }
+    }
+}
+
 fn paste_via_clipboard(
     enigo: &mut Enigo,
     text: &str,
@@ -641,6 +704,18 @@ pub fn paste_with_behavior(
         .0
         .lock()
         .map_err(|e| format!("Failed to lock Enigo: {}", e))?;
+
+    // Every method below except `None` and `ExternalScript` delivers the text to
+    // whatever holds keyboard focus right now. If one of our own windows took the
+    // foreground since recording started — most often the always-on-top recording
+    // overlay catching a click in its transparent frame — the transcript would go
+    // into that window and vanish. Hand the foreground back first.
+    if !matches!(
+        paste_method,
+        PasteMethod::None | PasteMethod::ExternalScript
+    ) {
+        input::restore_paste_target();
+    }
 
     // Perform the paste operation. Capture the result instead of using `?` so we
     // can always run the modifier-release safety net below, even on failure.

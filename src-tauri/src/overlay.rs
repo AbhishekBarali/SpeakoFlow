@@ -199,6 +199,123 @@ fn force_overlay_topmost(overlay_window: &tauri::webview::WebviewWindow) {
     });
 }
 
+/// Keep the overlay on screen for as long as it is meant to be there.
+///
+/// `force_overlay_topmost` used to run exactly once per show, and that is not
+/// enough on Windows: `WS_EX_TOPMOST` is a property another process can displace
+/// after the fact. A full-screen exclusive app, a shell flyout, or any window
+/// that raises itself into the topmost band takes the position we asked for, and
+/// the pill silently vanishes for the rest of the recording with nothing in the
+/// log to say so — the "the dictation window gets hidden randomly" report.
+///
+/// So the assertion is re-run on a slow tick while the overlay is up, and the
+/// tick *reports*: a lost `WS_EX_TOPMOST` or an unexpectedly invisible window is
+/// logged once per occurrence, which turns an unreproducible complaint into a
+/// line naming which of the two failed.
+///
+/// The generation counter is the whole lifecycle: starting bumps it (retiring
+/// any previous watcher), and hiding bumps it again so nothing is left ticking
+/// against a window that is deliberately down.
+#[cfg(target_os = "windows")]
+static OVERLAY_GUARD: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// Slow enough to be free, fast enough that a displaced overlay is back before
+/// the user finishes the sentence they were speaking when it happened.
+#[cfg(target_os = "windows")]
+const OVERLAY_GUARD_INTERVAL_MS: u64 = 700;
+
+#[cfg(target_os = "windows")]
+fn start_overlay_topmost_guard(app_handle: &AppHandle) {
+    use std::sync::atomic::AtomicU64;
+    let generation = OVERLAY_GUARD.fetch_add(1, Ordering::SeqCst) + 1;
+    let app = app_handle.clone();
+    // Reported once per displacement rather than every tick: the repair is
+    // immediate, so a window that is taken repeatedly would otherwise fill the
+    // log with the same line.
+    static LAST_REPORTED: AtomicU64 = AtomicU64::new(0);
+    std::thread::spawn(move || {
+        while OVERLAY_GUARD.load(Ordering::SeqCst) == generation {
+            std::thread::sleep(std::time::Duration::from_millis(OVERLAY_GUARD_INTERVAL_MS));
+            if OVERLAY_GUARD.load(Ordering::SeqCst) != generation {
+                break;
+            }
+            let Some(window) = app.get_webview_window("recording_overlay") else {
+                break;
+            };
+            let _ = window.clone().run_on_main_thread(move || {
+                // Re-check on the main thread: a hide may have landed while this
+                // closure was queued, and resurrecting the overlay then would be
+                // worse than leaving it displaced.
+                if OVERLAY_GUARD.load(Ordering::SeqCst) != generation {
+                    return;
+                }
+                reassert_overlay_on_top(&window, &LAST_REPORTED, generation);
+            });
+        }
+    });
+}
+
+#[cfg(target_os = "windows")]
+fn stop_overlay_topmost_guard() {
+    OVERLAY_GUARD.fetch_add(1, Ordering::SeqCst);
+}
+
+#[cfg(target_os = "windows")]
+fn reassert_overlay_on_top(
+    window: &tauri::webview::WebviewWindow,
+    last_reported: &std::sync::atomic::AtomicU64,
+    generation: u64,
+) {
+    use windows::Win32::UI::WindowsAndMessaging::{
+        GetWindowLongPtrW, IsWindowVisible, SetWindowPos, GWL_EXSTYLE, HWND_TOPMOST,
+        SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, WS_EX_TOPMOST,
+    };
+
+    let Ok(hwnd) = window.hwnd() else {
+        return;
+    };
+    unsafe {
+        let lost_topmost = GetWindowLongPtrW(hwnd, GWL_EXSTYLE) as u32 & WS_EX_TOPMOST.0 == 0;
+        let hidden = !IsWindowVisible(hwnd).as_bool();
+        if lost_topmost || hidden {
+            if last_reported.swap(generation, Ordering::SeqCst) != generation {
+                log::warn!(
+                    "Recording overlay was displaced (lost topmost: {lost_topmost}, \
+                     hidden: {hidden}); restoring it"
+                );
+            }
+            // Deliberately no SWP_SHOWWINDOW: an unmapped window is put back
+            // through Tauri's own `show()` below, so this call can never reveal a
+            // window the app meant to keep hidden.
+            let _ = SetWindowPos(
+                hwnd,
+                Some(HWND_TOPMOST),
+                0,
+                0,
+                0,
+                0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
+            );
+            if hidden {
+                let _ = window.show();
+            }
+            return;
+        }
+        // Still flagged topmost but possibly no longer *first* among topmost
+        // windows. Re-asking is a no-op when we are already there and costs one
+        // message otherwise, which is cheaper than working out the difference.
+        let _ = SetWindowPos(
+            hwnd,
+            Some(HWND_TOPMOST),
+            0,
+            0,
+            0,
+            0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
+        );
+    }
+}
+
 /// Linux fallback for keeping the recording overlay above other windows when
 /// GTK layer shell is unavailable (e.g. GNOME/Mutter, or an X11 session). Tauri
 /// maps `always_on_top` to GTK's `keep_above`, but that hint can be dropped
@@ -225,26 +342,41 @@ fn force_overlay_keep_above(overlay_window: &tauri::webview::WebviewWindow) {
 pub(crate) fn get_monitor_with_cursor(app_handle: &AppHandle) -> Option<tauri::Monitor> {
     if let Some(mouse_location) = input::get_cursor_position(app_handle) {
         if let Ok(monitors) = app_handle.available_monitors() {
-            for monitor in monitors {
-                // Tauri's monitor position/size are physical pixels, but enigo
-                // may return logical coordinates (confirmed on macOS via
-                // NSEvent::mouseLocation; on Windows, GetCursorPos behavior
-                // depends on the process DPI-awareness context). Dividing by
-                // scale_factor normalizes to logical, which is safe regardless:
-                // if enigo returns logical it matches directly, and if it returns
-                // physical on a scale=1 monitor the division is a no-op.
-                let scale = monitor.scale_factor();
+            // Tauri reports monitor bounds in physical pixels; enigo's cursor is
+            // physical on Windows and X11 (`GetCursorPos` / `XQueryPointer` under
+            // a DPI-aware process) but logical points on macOS
+            // (`NSEvent::mouseLocation`). So the hit test runs twice, in each
+            // space, instead of guessing which one this platform is in.
+            //
+            // Physical first, because it is the only reading that is correct on a
+            // scaled multi-monitor Windows desktop: pre-scaling the monitor
+            // bounds down to logical while the cursor stays physical made every
+            // monitor look smaller than it is, so a cursor in the right half of a
+            // 150% display matched nothing and placement silently fell back to
+            // the primary monitor.
+            if let Some(monitor) = monitors
+                .iter()
+                .find(|m| is_mouse_within_monitor(mouse_location, m.position(), m.size()))
+            {
+                return Some(monitor.clone());
+            }
+
+            // Logical fallback (macOS, and any platform whose cursor turns out
+            // not to be physical). A no-op on an unscaled display, where the two
+            // spaces are identical.
+            if let Some(monitor) = monitors.iter().find(|m| {
+                let scale = m.scale_factor();
                 let pos = PhysicalPosition::new(
-                    (monitor.position().x as f64 / scale) as i32,
-                    (monitor.position().y as f64 / scale) as i32,
+                    (m.position().x as f64 / scale) as i32,
+                    (m.position().y as f64 / scale) as i32,
                 );
                 let size = PhysicalSize::new(
-                    (monitor.size().width as f64 / scale) as u32,
-                    (monitor.size().height as f64 / scale) as u32,
+                    (m.size().width as f64 / scale) as u32,
+                    (m.size().height as f64 / scale) as u32,
                 );
-                if is_mouse_within_monitor(mouse_location, &pos, &size) {
-                    return Some(monitor);
-                }
+                is_mouse_within_monitor(mouse_location, &pos, &size)
+            }) {
+                return Some(monitor.clone());
             }
         }
     }
@@ -377,6 +509,27 @@ pub fn create_recording_overlay(app_handle: &AppHandle) {
     #[allow(unused_variables)]
     match builder.build() {
         Ok(window) => {
+            // The visible pill is much smaller than this window (see
+            // OVERLAY_WIDTH), so most of the overlay is transparent padding that
+            // still sat in front of the user's app and swallowed every click that
+            // landed on it. Worse, a click that reached the overlay *activated*
+            // it, which moved keyboard focus off the field being dictated into —
+            // and the synthetic Ctrl+V then pasted the transcript into the
+            // overlay's own webview, where it went nowhere. Recording is
+            // click-through by default; `finish_recording_overlay` re-enables
+            // input only for the completed card, which is the one state with
+            // something to click (the copy button).
+            let _ = window.set_ignore_cursor_events(true);
+
+            // Belt and braces on Windows: WS_EX_NOACTIVATE means even a click
+            // that does reach the overlay cannot take the foreground, so the
+            // paste target survives regardless of where the pointer is. Safe to
+            // set here because the window is built hidden and unfocused — the
+            // documented "cannot unfocus after set_focusable(false)" trap only
+            // applies to a window that already holds focus.
+            #[cfg(target_os = "windows")]
+            let _ = window.set_focusable(false);
+
             #[cfg(target_os = "linux")]
             {
                 // Try to initialize GTK layer shell, ignore errors if compositor doesn't support it
@@ -498,11 +651,21 @@ fn show_overlay_state_with_notice(app_handle: &AppHandle, state: &str, notice: O
     update_overlay_position_sized(app_handle, width, height);
 
     if let Some(overlay_window) = app_handle.get_webview_window("recording_overlay") {
+        // Every state reached through here is a state the user cannot interact
+        // with, so the overlay must not intercept the pointer. Only the completed
+        // card takes input back (see `finish_recording_overlay`).
+        let _ = overlay_window.set_ignore_cursor_events(true);
         let _ = overlay_window.show();
 
         // On Windows, aggressively re-assert "topmost" in the native Z-order after showing
         #[cfg(target_os = "windows")]
         force_overlay_topmost(&overlay_window);
+
+        // …and keep asserting it for as long as the overlay is up, because
+        // another process can take the position back at any point during a
+        // recording.
+        #[cfg(target_os = "windows")]
+        start_overlay_topmost_guard(app_handle);
 
         // On Linux, re-assert the keep-above hint after showing (for the
         // non-layer-shell fallback on X11/Xorg). No-op under layer shell and
@@ -617,6 +780,10 @@ pub fn finish_recording_overlay(app: &AppHandle, text: &str, notice: Option<&str
     let Some(window) = app.get_webview_window("recording_overlay") else {
         return;
     };
+    // The completed card is the one overlay state with a target in it — the copy
+    // button — and its hover also holds the linger open, so this is where the
+    // pointer is handed back after a click-through recording.
+    let _ = window.set_ignore_cursor_events(false);
     let _ = window.emit(
         "finish-overlay",
         serde_json::json!({ "epoch": epoch, "text": text, "notice": notice }),
@@ -643,7 +810,10 @@ pub fn finish_recording_overlay(app: &AppHandle, text: &str, notice: Option<&str
         if ready {
             let _ = app.run_on_main_thread(move || {
                 if OVERLAY_LIFECYCLE.is_current(epoch) {
+                    #[cfg(target_os = "windows")]
+                    stop_overlay_topmost_guard();
                     let _ = window.emit("hide-overlay", ());
+                    let _ = window.set_ignore_cursor_events(true);
                     let _ = window.hide();
                     set_overlay_hovered(false);
                 }
@@ -656,6 +826,10 @@ pub fn finish_recording_overlay(app: &AppHandle, text: &str, notice: Option<&str
 pub fn hide_recording_overlay(app_handle: &AppHandle) {
     let epoch = OVERLAY_LIFECYCLE.advance();
     set_overlay_hovered(false);
+    // Retire the watcher before the window goes down, so a tick already queued on
+    // the main thread cannot put a deliberately hidden overlay back on screen.
+    #[cfg(target_os = "windows")]
+    stop_overlay_topmost_guard();
     if let Some(window) = app_handle.get_webview_window("recording_overlay") {
         let _ = window.emit("hide-overlay", ());
         let app = app_handle.clone();
@@ -663,6 +837,7 @@ pub fn hide_recording_overlay(app_handle: &AppHandle) {
             tokio::time::sleep(std::time::Duration::from_millis(240)).await;
             let _ = app.run_on_main_thread(move || {
                 if OVERLAY_LIFECYCLE.current() == epoch {
+                    let _ = window.set_ignore_cursor_events(true);
                     let _ = window.hide();
                 }
             });

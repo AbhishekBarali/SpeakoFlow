@@ -281,11 +281,71 @@ pub fn toggle_assistant_panel(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+/// Choose where the Ask card opens.
+///
+/// Picking any anchor other than `Custom` also discards the remembered dragged
+/// position, so the choice takes effect on the very next open instead of being
+/// quietly overridden by wherever the card was last dropped.
+#[tauri::command]
+#[specta::specta]
+pub fn set_assistant_ask_anchor(
+    app: AppHandle,
+    anchor: crate::settings::AskAnchor,
+) -> Result<(), String> {
+    let mut settings = get_settings(&app);
+    settings.assistant_ask_anchor = anchor;
+    write_settings(&app, settings);
+    if anchor != crate::settings::AskAnchor::Custom {
+        assistant::forget_dragged_position(&app);
+    }
+    Ok(())
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn hide_assistant_panel(app: AppHandle) -> Result<(), String> {
     assistant::hide_assistant_panel(&app);
     Ok(())
+}
+
+/// Write an answer into the application the user asked from.
+///
+/// This is the Insert button. When the question was about selected text and that
+/// selection is still live, the paste replaces it, because that is simply what a
+/// paste over a selection does. When there was no selection, it lands at the
+/// caret.
+///
+/// Deliberately a button rather than something automatic. `SetForegroundWindow`
+/// restores *focus* but not a *selection*: most native edit controls keep their
+/// selection across a focus change, but some collapse it to a caret on blur, and
+/// `contenteditable` in browsers varies. In those cases a "replace" silently
+/// becomes an "insert" and the user ends up with both the original text and the
+/// rewrite. That cannot be detected before pasting, so the destructive version
+/// stays an explicit act the user takes while looking at the answer.
+///
+/// Paste behaviour matches Flow's rather than dictation's: no trailing space and
+/// no auto-submit, because this is a finished artifact being placed, not speech
+/// being typed.
+#[tauri::command]
+#[specta::specta]
+pub fn assistant_insert_text(app: AppHandle, text: String) -> Result<(), String> {
+    let text = text.trim().to_string();
+    if text.is_empty() {
+        return Err("There is nothing to insert".to_string());
+    }
+    // The panel is focusable when expanded, so clicking Insert put our own window
+    // in front. Hide first, then paste: the paste path's `restore_paste_target`
+    // only repairs a foreground that one of our own windows took, and it needs the
+    // real target to be next in line.
+    assistant::hide_assistant_panel(&app);
+    crate::clipboard::paste_with_behavior(
+        text,
+        app,
+        crate::clipboard::PasteBehavior {
+            allow_trailing_space: false,
+            allow_auto_submit: false,
+        },
+    )
 }
 
 #[tauri::command]
@@ -1136,6 +1196,113 @@ pub fn set_assistant_web_search_api_key(
     Ok(())
 }
 
+// ---------------------------------------------------------------------------
+// Brain connection test
+// ---------------------------------------------------------------------------
+
+/// Everything one assistant LLM call needs, resolved from settings.
+struct ResolvedAssistantCall {
+    provider: crate::settings::PostProcessProvider,
+    model: String,
+    api_key: String,
+}
+
+/// Resolve the configured assistant brain into a callable provider/model/key,
+/// starting the built-in engine if that is what is selected.
+///
+/// Shared by the connection test and character generation so the "you haven't
+/// finished setting this up" messages are written once. The three failures are
+/// separated on purpose: no provider, no model, and an engine that won't start
+/// need three different actions from the user, and collapsing them into one
+/// "not configured" is what sends people to the wrong setting.
+async fn resolve_assistant_call(app: &AppHandle) -> Result<ResolvedAssistantCall, String> {
+    let settings = get_settings(app);
+    let provider = settings
+        .active_assistant_provider()
+        .cloned()
+        .ok_or_else(|| {
+            "No assistant provider configured. Pick one in Settings → Assistant.".to_string()
+        })?;
+    let model = settings
+        .assistant_models
+        .get(&provider.id)
+        .cloned()
+        .unwrap_or_default();
+    if model.trim().is_empty() {
+        return Err(format!(
+            "No model configured for provider '{}'. Set one in Settings → Assistant.",
+            provider.label
+        ));
+    }
+    let api_key = settings
+        .post_process_api_keys
+        .get(&provider.id)
+        .cloned()
+        .unwrap_or_default();
+
+    // The built-in local engine must be running before we can call it.
+    if provider.id == crate::settings::BUILTIN_POST_PROCESS_PROVIDER_ID {
+        let manager = app.state::<Arc<LocalLlmManager>>();
+        manager
+            .ensure_running(&model)
+            .await
+            .map_err(|e| e.to_string())?;
+    }
+
+    Ok(ResolvedAssistantCall {
+        provider,
+        model,
+        api_key,
+    })
+}
+
+/// Ask the configured brain one trivial question, so a broken setup is found
+/// here instead of the first time the user speaks to the assistant.
+///
+/// This sends a real chat completion rather than probing `/models`, because a
+/// listing succeeds for a key that is valid but out of credit, and for a model
+/// id this endpoint does not serve — the two failures people actually hit. On
+/// the built-in engine it also covers "the model loads at all", since
+/// [`resolve_assistant_call`] starts it first (which is why the first press can
+/// take a while: it is loading weights, not stalling).
+///
+/// A reply with no text is still a pass. Some reasoning models spend their whole
+/// budget on hidden tokens and return empty content; the request being accepted
+/// is the signal, and calling that a failure would send the user chasing a
+/// working configuration. The message says which case it was.
+#[tauri::command]
+#[specta::specta]
+pub async fn assistant_test_connection(app: AppHandle) -> Result<String, String> {
+    let call = resolve_assistant_call(&app).await?;
+    let started = std::time::Instant::now();
+    let reply = crate::llm_client::send_chat_completion(
+        &call.provider,
+        call.api_key,
+        &call.model,
+        "Reply with just the word: ok".to_string(),
+        None,
+        None,
+    )
+    .await?;
+    let millis = started.elapsed().as_millis();
+
+    let answered = reply
+        .as_deref()
+        .map(|text| !text.trim().is_empty())
+        .unwrap_or(false);
+    if answered {
+        Ok(format!(
+            "{} replied — {} is reachable ({} ms).",
+            call.provider.label, call.model, millis
+        ))
+    } else {
+        Ok(format!(
+            "{} accepted the request for {} ({} ms), but returned no text.",
+            call.provider.label, call.model, millis
+        ))
+    }
+}
+
 /// Run a one-off web search with the current settings and return the results,
 /// so the settings UI can offer a "Test search" button and surface any error
 /// (missing key, rate limit) inline.
@@ -1352,42 +1519,11 @@ pub async fn assistant_generate_character(
         return Err("Describe the character you want first.".to_string());
     }
 
-    let settings = get_settings(&app);
-    let provider = settings
-        .active_assistant_provider()
-        .cloned()
-        .ok_or_else(|| {
-            "No assistant provider configured. Pick one in Settings → Assistant.".to_string()
-        })?;
-    let model = settings
-        .assistant_models
-        .get(&provider.id)
-        .cloned()
-        .unwrap_or_default();
-    if model.trim().is_empty() {
-        return Err(format!(
-            "No model configured for provider '{}'. Set one in Settings → Assistant.",
-            provider.label
-        ));
-    }
-    let api_key = settings
-        .post_process_api_keys
-        .get(&provider.id)
-        .cloned()
-        .unwrap_or_default();
-
-    // The built-in local engine must be running before we can call it.
-    if provider.id == "builtin" {
-        let manager = app.state::<std::sync::Arc<crate::managers::local_llm::LocalLlmManager>>();
-        manager
-            .ensure_running(&model)
-            .await
-            .map_err(|e| e.to_string())?;
-    }
+    let call = resolve_assistant_call(&app).await?;
 
     let system = "You design personas for a voice assistant. Given the user's description, invent a single character and respond with ONLY a JSON object (no prose, no markdown fences) with exactly these keys: \"name\" (a short display name, 2-24 characters), \"prompt\" (the system prompt for the persona, written in the second person — define its personality, tone, speaking style, and any quirks or constraints; it must stay genuinely helpful and must never be hateful, harassing, or target real people or protected groups), and \"greeting\" (a short in-character opening line, one sentence). Keep it tasteful and PG.".to_string();
 
-    let schema = if provider.supports_structured_output {
+    let schema = if call.provider.supports_structured_output {
         Some(serde_json::json!({
             "type": "object",
             "properties": {
@@ -1403,9 +1539,9 @@ pub async fn assistant_generate_character(
     };
 
     let raw = crate::llm_client::send_chat_completion_with_schema(
-        &provider,
-        api_key,
-        &model,
+        &call.provider,
+        call.api_key,
+        &call.model,
         description,
         Some(system),
         schema,

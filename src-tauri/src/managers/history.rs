@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Result};
-use chrono::{DateTime, Local, Utc};
+use chrono::{DateTime, Local, Months, Utc};
 use log::{debug, error, info};
 use rusqlite::{params, Connection, OptionalExtension};
 use rusqlite_migration::{Migrations, M};
@@ -11,6 +11,7 @@ use tauri::{AppHandle, Emitter};
 use tauri_specta::Event;
 
 use crate::llm_client::ChatMessage;
+use crate::settings::RecordingRetentionPeriod;
 
 /// Database migrations for transcription history.
 /// Each migration is applied in order. The library tracks which migrations
@@ -106,6 +107,61 @@ pub struct HistoryManager {
     app_handle: AppHandle,
     recordings_dir: PathBuf,
     db_path: PathBuf,
+}
+
+/// What the retention settings mean, resolved away from both the database and the
+/// clock. Keeping this separate is what makes the policy testable: every bug this
+/// feature had was in the decision, not in the SQL.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RetentionPlan {
+    /// Delete nothing, ever. "Forever" must stay forever.
+    KeepAll,
+    /// Keep at most this many unstarred recordings, newest first.
+    ByCount(usize),
+    /// Delete unstarred recordings older than this epoch second.
+    OlderThan(i64),
+}
+
+/// Turn the persisted settings into a plan.
+///
+/// `now` is a parameter rather than a call to `Utc::now()` so the time-based
+/// branches can be asserted against a fixed clock.
+pub fn resolve_retention_plan(
+    period: RecordingRetentionPeriod,
+    limit: usize,
+    custom_days: u32,
+    now: DateTime<Utc>,
+) -> RetentionPlan {
+    match period {
+        RecordingRetentionPeriod::Never => RetentionPlan::KeepAll,
+        // A limit of 0 would delete every unstarred recording. The settings
+        // command rejects it, but clamping here too means a store hand-edited or
+        // carried over from an older build cannot wipe a history either.
+        RecordingRetentionPeriod::PreserveLimit => {
+            RetentionPlan::ByCount(limit.max(crate::settings::MIN_HISTORY_LIMIT))
+        }
+        RecordingRetentionPeriod::Days3 => RetentionPlan::OlderThan(cutoff_days(now, 3)),
+        RecordingRetentionPeriod::Weeks2 => RetentionPlan::OlderThan(cutoff_days(now, 14)),
+        // Calendar months, not 90 days. The old code subtracted 3 * 30 days and
+        // said "approximate" in a comment, which silently deleted up to two days
+        // early depending on the month.
+        RecordingRetentionPeriod::Months3 => RetentionPlan::OlderThan(
+            now.checked_sub_months(Months::new(3))
+                .unwrap_or(now)
+                .timestamp(),
+        ),
+        RecordingRetentionPeriod::CustomDays => {
+            let days = custom_days.clamp(
+                crate::settings::MIN_RECORDING_RETENTION_DAYS,
+                crate::settings::MAX_RECORDING_RETENTION_DAYS,
+            );
+            RetentionPlan::OlderThan(cutoff_days(now, days.into()))
+        }
+    }
+}
+
+fn cutoff_days(now: DateTime<Utc>, days: i64) -> i64 {
+    now.timestamp() - days * 24 * 60 * 60
 }
 
 impl HistoryManager {
@@ -382,84 +438,143 @@ impl HistoryManager {
     /// Apply the active recording-retention policy and return the number of
     /// database rows removed. Starred rows are never included.
     pub fn cleanup_old_entries(&self) -> Result<usize> {
-        let retention_period = crate::settings::get_recording_retention_period(&self.app_handle);
-
-        match retention_period {
-            crate::settings::RecordingRetentionPeriod::Never => Ok(0),
-            crate::settings::RecordingRetentionPeriod::PreserveLimit => {
-                let limit = crate::settings::get_history_limit(&self.app_handle);
-                self.cleanup_by_count(limit)
-            }
-            _ => self.cleanup_by_time(retention_period),
-        }
+        self.apply_plan(self.active_plan())
     }
 
-    fn delete_entries_and_files(&self, entries: &[(i64, String)]) -> Result<usize> {
-        if entries.is_empty() {
+    /// Resolve the retention settings into a database-independent plan.
+    ///
+    /// One `get_settings` call, not three. Each one is a full store read plus a
+    /// deserialize, the `ensure_*_defaults` migrations, a keychain hydration, and
+    /// possibly a write-back — and this runs after every dictation.
+    pub fn active_plan(&self) -> RetentionPlan {
+        let settings = crate::settings::get_settings(&self.app_handle);
+        resolve_retention_plan(
+            settings.recording_retention_period,
+            settings.history_limit,
+            settings.recording_retention_days,
+            Utc::now(),
+        )
+    }
+
+    /// How many recordings a plan *would* delete, without deleting anything.
+    ///
+    /// This exists so the History UI can tell the user "this will delete 410
+    /// recordings" before it happens. Retention is irreversible and deletes the
+    /// WAV file along with the row, so an unannounced switch to a stricter policy
+    /// is the most destructive thing this panel can do.
+    pub fn count_pending_deletions(&self, plan: RetentionPlan) -> Result<usize> {
+        let conn = self.get_connection()?;
+        Ok(Self::pending_deletions(&conn, plan)?.len())
+    }
+
+    /// Delete everything the plan selects, in one transaction, then remove the
+    /// WAV files whose last referencing row is gone.
+    pub fn apply_plan(&self, plan: RetentionPlan) -> Result<usize> {
+        if matches!(plan, RetentionPlan::KeepAll) {
             return Ok(0);
         }
 
-        let conn = self.get_connection()?;
-        let mut deleted_count = 0;
+        let mut conn = self.get_connection()?;
+        let doomed = Self::pending_deletions(&conn, plan)?;
+        if doomed.is_empty() {
+            return Ok(0);
+        }
 
-        for (id, file_name) in entries {
-            let rows_deleted = conn.execute(
-                "DELETE FROM transcription_history WHERE id = ?1",
-                params![id],
-            )?;
-            if rows_deleted == 0 {
-                continue;
+        // One transaction for the whole prune. Previously each row was its own
+        // transaction on a *second* connection opened while the selecting
+        // connection was still alive, which meant N commits and N fsyncs for a
+        // prune of N rows and left the delete racing the insert in `save_entry`.
+        // A `SQLITE_BUSY` there failed the command *after* the new setting had
+        // already been persisted, so the UI rolled its value back while disk kept
+        // the new one.
+        let deleted_count;
+        let orphaned_files;
+        {
+            let tx = conn.transaction()?;
+            let mut removed = 0usize;
+            for (id, _) in &doomed {
+                // `saved = 0` is re-checked here, not just in the select above.
+                // The rows were chosen before the transaction opened, and
+                // `toggle_saved_status` stars a row on its own connection, so a
+                // star landing in that window would otherwise be deleted anyway —
+                // permanently, WAV included. Starring must always win.
+                removed += tx.execute(
+                    "DELETE FROM transcription_history WHERE id = ?1 AND saved = 0",
+                    params![id],
+                )?;
             }
-            deleted_count += rows_deleted;
 
-            // Older builds named WAVs with second-level timestamps, so two
-            // rows could reference the same file. Remove it only after the last
-            // referencing row is gone; otherwise pruning one row breaks audio
-            // playback for another row that is still visible.
-            let remaining_references: i64 = conn.query_row(
-                "SELECT COUNT(*) FROM transcription_history WHERE file_name = ?1",
-                params![file_name],
-                |row| row.get(0),
-            )?;
-            if remaining_references == 0 {
-                let file_path = self.recordings_dir.join(file_name);
-                if file_path.exists() {
-                    if let Err(e) = fs::remove_file(&file_path) {
-                        error!("Failed to delete WAV file {}: {}", file_name, e);
-                    } else {
-                        debug!("Deleted old WAV file: {}", file_name);
-                    }
+            // Older builds named WAVs with second-level timestamps, so two rows
+            // could reference the same file. Only delete a file once no surviving
+            // row points at it; otherwise pruning one row breaks playback for a
+            // row that is still visible. Deduped because two doomed rows sharing a
+            // name would both see zero references.
+            let mut still_referenced =
+                tx.prepare("SELECT COUNT(*) FROM transcription_history WHERE file_name = ?1")?;
+            let mut files: Vec<String> = Vec::new();
+            for (_, file_name) in &doomed {
+                if files.iter().any(|seen| seen == file_name) {
+                    continue;
+                }
+                let refs: i64 = still_referenced.query_row(params![file_name], |row| row.get(0))?;
+                if refs == 0 {
+                    files.push(file_name.clone());
+                }
+            }
+            drop(still_referenced);
+
+            deleted_count = removed;
+            orphaned_files = files;
+            tx.commit()?;
+        }
+
+        // Files are removed only after the rows are committed. A failed unlink
+        // leaves a stray WAV, which is recoverable; unlinking first would leave a
+        // visible row whose audio is gone.
+        for file_name in orphaned_files {
+            let file_path = self.recordings_dir.join(&file_name);
+            if file_path.exists() {
+                if let Err(e) = fs::remove_file(&file_path) {
+                    error!("Failed to delete WAV file {}: {}", file_name, e);
+                } else {
+                    debug!("Deleted old WAV file: {}", file_name);
                 }
             }
         }
 
+        info!(
+            "History retention removed {} recording(s) ({:?})",
+            deleted_count, plan
+        );
+
         Ok(deleted_count)
     }
 
+    /// Rows the plan selects for deletion, newest-first ordering preserved.
+    fn pending_deletions(conn: &Connection, plan: RetentionPlan) -> Result<Vec<(i64, String)>> {
+        match plan {
+            RetentionPlan::KeepAll => Ok(Vec::new()),
+            RetentionPlan::ByCount(limit) => Self::entries_beyond_unsaved_limit(conn, limit),
+            RetentionPlan::OlderThan(cutoff) => Self::unsaved_entries_before(conn, cutoff),
+        }
+    }
+
     fn entries_beyond_unsaved_limit(conn: &Connection, limit: usize) -> Result<Vec<(i64, String)>> {
+        // `LIMIT -1 OFFSET ?` is SQLite's "skip the newest N, return the rest".
+        // Doing the skip in SQL matters because this runs after every dictation
+        // and on every preview; the previous version pulled every unstarred row
+        // into a Vec just to drop the first N.
         let mut stmt = conn.prepare(
             "SELECT id, file_name
              FROM transcription_history
              WHERE saved = 0
-             ORDER BY timestamp DESC, id DESC",
+             ORDER BY timestamp DESC, id DESC
+             LIMIT -1 OFFSET ?1",
         )?;
-        let rows = stmt.query_map([], |row| {
+        let rows = stmt.query_map(params![limit as i64], |row| {
             Ok((row.get::<_, i64>("id")?, row.get::<_, String>("file_name")?))
         })?;
-        let entries = rows.collect::<std::result::Result<Vec<_>, _>>()?;
-        Ok(entries.into_iter().skip(limit).collect())
-    }
-
-    fn cleanup_by_count(&self, limit: usize) -> Result<usize> {
-        let conn = self.get_connection()?;
-        let entries_to_delete = Self::entries_beyond_unsaved_limit(&conn, limit)?;
-        let deleted_count = self.delete_entries_and_files(&entries_to_delete)?;
-
-        if deleted_count > 0 {
-            debug!("Cleaned up {} old history entries by count", deleted_count);
-        }
-
-        Ok(deleted_count)
+        Ok(rows.collect::<std::result::Result<Vec<_>, _>>()?)
     }
 
     fn unsaved_entries_before(
@@ -475,34 +590,6 @@ impl HistoryManager {
             Ok((row.get::<_, i64>("id")?, row.get::<_, String>("file_name")?))
         })?;
         Ok(rows.collect::<std::result::Result<Vec<_>, _>>()?)
-    }
-
-    fn cleanup_by_time(
-        &self,
-        retention_period: crate::settings::RecordingRetentionPeriod,
-    ) -> Result<usize> {
-        let conn = self.get_connection()?;
-
-        // Calculate cutoff timestamp (current time minus retention period)
-        let now = Utc::now().timestamp();
-        let cutoff_timestamp = match retention_period {
-            crate::settings::RecordingRetentionPeriod::Days3 => now - (3 * 24 * 60 * 60), // 3 days in seconds
-            crate::settings::RecordingRetentionPeriod::Weeks2 => now - (2 * 7 * 24 * 60 * 60), // 2 weeks in seconds
-            crate::settings::RecordingRetentionPeriod::Months3 => now - (3 * 30 * 24 * 60 * 60), // 3 months in seconds (approximate)
-            _ => unreachable!("Should not reach here"),
-        };
-
-        let entries_to_delete = Self::unsaved_entries_before(&conn, cutoff_timestamp)?;
-        let deleted_count = self.delete_entries_and_files(&entries_to_delete)?;
-
-        if deleted_count > 0 {
-            debug!(
-                "Cleaned up {} old history entries based on retention period",
-                deleted_count
-            );
-        }
-
-        Ok(deleted_count)
     }
 
     pub async fn get_history_entries(
@@ -1103,5 +1190,183 @@ mod tests {
 
         assert_eq!(selected_files, vec!["speakoflow-100.wav"]);
         assert!(!selected_files.contains(&"speakoflow-50.wav"));
+    }
+
+    // ---------------------------------------------------------------------
+    // Retention policy resolution
+    // ---------------------------------------------------------------------
+
+    fn at(iso: &str) -> DateTime<Utc> {
+        DateTime::parse_from_rfc3339(iso)
+            .expect("valid timestamp")
+            .with_timezone(&Utc)
+    }
+
+    /// "Forever" has to mean forever. This is the setting a user picks precisely
+    /// because their history matters, so it gets its own test.
+    #[test]
+    fn never_deletes_nothing_regardless_of_other_settings() {
+        assert_eq!(
+            resolve_retention_plan(
+                RecordingRetentionPeriod::Never,
+                1,
+                1,
+                at("2026-09-12T00:00:00Z")
+            ),
+            RetentionPlan::KeepAll
+        );
+    }
+
+    #[test]
+    fn custom_days_uses_exactly_the_days_asked_for() {
+        let now = at("2026-09-12T00:00:00Z");
+        let plan = resolve_retention_plan(RecordingRetentionPeriod::CustomDays, 20, 20, now);
+        assert_eq!(
+            plan,
+            RetentionPlan::OlderThan(at("2026-08-23T00:00:00Z").timestamp()),
+            "20 days must mean 20 days"
+        );
+    }
+
+    #[test]
+    fn custom_days_is_clamped_into_range() {
+        let now = at("2026-09-12T00:00:00Z");
+        // Zero days would delete a recording the instant it was saved.
+        assert_eq!(
+            resolve_retention_plan(RecordingRetentionPeriod::CustomDays, 20, 0, now),
+            RetentionPlan::OlderThan(at("2026-09-11T00:00:00Z").timestamp())
+        );
+        assert_eq!(
+            resolve_retention_plan(RecordingRetentionPeriod::CustomDays, 20, u32::MAX, now),
+            RetentionPlan::OlderThan(
+                now.timestamp() - i64::from(crate::settings::MAX_RECORDING_RETENTION_DAYS) * 86_400
+            )
+        );
+    }
+
+    #[test]
+    fn fixed_periods_resolve_to_their_documented_windows() {
+        let now = at("2026-09-12T00:00:00Z");
+        assert_eq!(
+            resolve_retention_plan(RecordingRetentionPeriod::Days3, 20, 30, now),
+            RetentionPlan::OlderThan(at("2026-09-09T00:00:00Z").timestamp())
+        );
+        assert_eq!(
+            resolve_retention_plan(RecordingRetentionPeriod::Weeks2, 20, 30, now),
+            RetentionPlan::OlderThan(at("2026-08-29T00:00:00Z").timestamp())
+        );
+    }
+
+    /// Three months is three calendar months. The old code used 3 * 30 days,
+    /// which deleted up to two days' worth of recordings early.
+    #[test]
+    fn three_months_is_calendar_months_not_ninety_days() {
+        let now = at("2026-05-31T12:00:00Z");
+        let plan = resolve_retention_plan(RecordingRetentionPeriod::Months3, 20, 30, now);
+        assert_eq!(
+            plan,
+            RetentionPlan::OlderThan(at("2026-02-28T12:00:00Z").timestamp()),
+            "must clamp onto a real date, not drift by 90 fixed days"
+        );
+        assert_ne!(
+            plan,
+            RetentionPlan::OlderThan(now.timestamp() - 90 * 86_400),
+            "the 90-day approximation is the bug being fixed"
+        );
+    }
+
+    #[test]
+    fn zero_limit_cannot_wipe_history() {
+        let plan = resolve_retention_plan(
+            RecordingRetentionPeriod::PreserveLimit,
+            0,
+            30,
+            at("2026-09-12T00:00:00Z"),
+        );
+        assert_eq!(
+            plan,
+            RetentionPlan::ByCount(crate::settings::MIN_HISTORY_LIMIT)
+        );
+    }
+
+    #[test]
+    fn preserve_limit_passes_the_configured_count_through() {
+        assert_eq!(
+            resolve_retention_plan(
+                RecordingRetentionPeriod::PreserveLimit,
+                20,
+                30,
+                at("2026-09-12T00:00:00Z")
+            ),
+            RetentionPlan::ByCount(20)
+        );
+    }
+
+    #[test]
+    fn keep_all_selects_no_rows_even_with_old_entries() {
+        let conn = setup_conn();
+        insert_entry(&conn, 1, "ancient", None);
+        insert_entry(&conn, 2, "also ancient", None);
+
+        let selected = HistoryManager::pending_deletions(&conn, RetentionPlan::KeepAll)
+            .expect("resolve deletions");
+        assert!(selected.is_empty());
+    }
+
+    /// The delete re-checks `saved = 0`, so a recording starred between the
+    /// selection and the delete survives. Without the guard the row was already
+    /// on the doomed list and would have been destroyed along with its audio.
+    #[test]
+    fn starring_a_row_after_selection_survives_the_delete() {
+        let conn = setup_conn();
+        insert_entry(&conn, 100, "about to be starred", None);
+        insert_entry(&conn, 300, "newest", None);
+
+        let doomed = HistoryManager::pending_deletions(&conn, RetentionPlan::ByCount(1))
+            .expect("select doomed rows");
+        assert_eq!(doomed.len(), 1);
+
+        // The user stars it in the window between selection and deletion.
+        conn.execute(
+            "UPDATE transcription_history SET saved = 1 WHERE timestamp = 100",
+            [],
+        )
+        .expect("star recording");
+
+        let removed = conn
+            .execute(
+                "DELETE FROM transcription_history WHERE id = ?1 AND saved = 0",
+                params![doomed[0].0],
+            )
+            .expect("run guarded delete");
+
+        assert_eq!(removed, 0, "a starred recording must not be deleted");
+        let survivors: i64 = conn
+            .query_row("SELECT COUNT(*) FROM transcription_history", [], |row| {
+                row.get(0)
+            })
+            .expect("count survivors");
+        assert_eq!(survivors, 2);
+    }
+
+    #[test]
+    fn pending_deletions_dispatches_on_the_plan() {
+        let conn = setup_conn();
+        insert_entry(&conn, 100, "old", None);
+        insert_entry(&conn, 300, "new", None);
+
+        let by_count = HistoryManager::pending_deletions(&conn, RetentionPlan::ByCount(1))
+            .expect("count plan");
+        assert_eq!(
+            by_count.iter().map(|(_, f)| f.as_str()).collect::<Vec<_>>(),
+            vec!["speakoflow-100.wav"]
+        );
+
+        let by_time = HistoryManager::pending_deletions(&conn, RetentionPlan::OlderThan(200))
+            .expect("time plan");
+        assert_eq!(
+            by_time.iter().map(|(_, f)| f.as_str()).collect::<Vec<_>>(),
+            vec!["speakoflow-100.wav"]
+        );
     }
 }

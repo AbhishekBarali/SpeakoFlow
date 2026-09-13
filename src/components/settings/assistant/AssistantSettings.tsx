@@ -14,6 +14,7 @@ import {
   Download,
   ChevronRight,
   Power,
+  PlugZap,
 } from "lucide-react";
 import {
   commands,
@@ -23,6 +24,7 @@ import {
   type AssistantResponseLength,
   type AssistantScreenAccessMode,
   type AssistantSearchDepth,
+  type ModelChoice,
   type ModelUnloadTimeout,
   type VisionCaptureTiming,
 } from "@/bindings";
@@ -225,6 +227,10 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
   const [contextSize, setContextSize] = useState("8192");
   const [apiKey, setApiKey] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
+  // Which credential field currently has focus, so the settings→state resync
+  // effect can leave an in-progress edit alone. A ref, not state: it must be
+  // readable by that effect without itself triggering a render.
+  const editingCredentialField = useRef<"apiKey" | "baseUrl" | null>(null);
   const [ttsBaseUrl, setTtsBaseUrl] = useState("");
   const [ttsApiKey, setTtsApiKey] = useState("");
   const [ttsModel, setTtsModel] = useState("");
@@ -244,6 +250,13 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
   const providerSwitchQueue = useRef<Promise<void>>(Promise.resolve());
   const [isProviderSwitching, setIsProviderSwitching] = useState(false);
 
+  // Brain connection test state. Kept separate from the TTS and web-search test
+  // states so one failing test can't blank another's message.
+  const [brainTest, setBrainTest] = useState<
+    "idle" | "testing" | "ok" | "error"
+  >("idle");
+  const [brainTestMsg, setBrainTestMsg] = useState<string | null>(null);
+
   // Web search section state.
   const [webSearchApiKey, setWebSearchApiKey] = useState("");
   const [webSearchTest, setWebSearchTest] = useState<
@@ -260,9 +273,9 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
   // Assistant model list, fetched per-provider from its /models endpoint via
   // the same command post-processing uses (providers + keys are shared). Kept
   // local to this component so it doesn't couple to the post-processing tab.
-  const [loadedModels, setLoadedModels] = useState<Record<string, string[]>>(
-    {},
-  );
+  const [loadedModels, setLoadedModels] = useState<
+    Record<string, ModelChoice[]>
+  >({});
   const [modelsLoading, setModelsLoading] = useState(false);
   const [modelsError, setModelsError] = useState<string | null>(null);
 
@@ -537,8 +550,22 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
 
   useEffect(() => {
     setModel(settings?.assistant_models?.[selectedProviderId] ?? "");
-    setApiKey(settings?.post_process_api_keys?.[selectedProviderId] ?? "");
-    setBaseUrl(selectedProvider?.base_url ?? "");
+    // Never overwrite a credential field while the user is typing in it. This
+    // effect depends on the WHOLE `settings` object, so any settings write
+    // anywhere in the app re-runs it — a finished dictation, the 30-minute
+    // retention sweep, or a neighbouring control calling `refreshSettings`.
+    // Because the key is persisted on blur, clobbering a half-entered value
+    // also wrote the OLD key straight back on the way out: a freshly pasted key
+    // silently reverted, but only when an unrelated event happened to land in
+    // the gap between the paste and the blur, which is what made it look
+    // random. A provider switch blurs the input first, so the resync a switch
+    // needs still happens.
+    if (editingCredentialField.current !== "apiKey") {
+      setApiKey(settings?.post_process_api_keys?.[selectedProviderId] ?? "");
+    }
+    if (editingCredentialField.current !== "baseUrl") {
+      setBaseUrl(selectedProvider?.base_url ?? "");
+    }
   }, [settings, selectedProviderId, selectedProvider]);
 
   useEffect(() => {
@@ -668,13 +695,13 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
   const assistantModelOptions = useMemo(() => {
     const seen = new Set<string>();
     const opts: { value: string; label: string }[] = [];
-    const add = (v?: string | null) => {
+    const add = (v?: string | null, label?: string) => {
       const trimmed = v?.trim();
       if (!trimmed || seen.has(trimmed)) return;
       seen.add(trimmed);
-      opts.push({ value: trimmed, label: trimmed });
+      opts.push({ value: trimmed, label: label?.trim() || trimmed });
     };
-    for (const m of loadedModels[selectedProviderId] || []) add(m);
+    for (const m of loadedModels[selectedProviderId] || []) add(m.id, m.label);
     add(model);
     return opts;
   }, [loadedModels, selectedProviderId, model]);
@@ -774,11 +801,32 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
     if (target) handleProviderSelect(target);
   };
 
+  /** Persist a pending API-key edit. Trims (a trailing space from a paste was
+   *  stored verbatim and 401'd with no hint) and no-ops when nothing changed,
+   *  so it is safe to call from both blur and the test button. */
+  const persistApiKeyDraft = async () => {
+    const trimmed = apiKey.trim();
+    const stored = settings?.post_process_api_keys?.[selectedProviderId] ?? "";
+    if (trimmed !== apiKey) setApiKey(trimmed);
+    if (trimmed === stored) return;
+    await updatePostProcessApiKey(selectedProviderId, trimmed);
+  };
+
+  const handleApiKeyFocus = () => {
+    editingCredentialField.current = "apiKey";
+  };
+
   const handleApiKeyBlur = async () => {
-    await updatePostProcessApiKey(selectedProviderId, apiKey);
+    editingCredentialField.current = null;
+    await persistApiKeyDraft();
+  };
+
+  const handleBaseUrlFocus = () => {
+    editingCredentialField.current = "baseUrl";
   };
 
   const handleBaseUrlBlur = async () => {
+    editingCredentialField.current = null;
     // Base URLs are shared with AI cleanup, so use the hardened store action:
     // it checks Result.status, clears the now-invalid model, refreshes
     // readiness, and reports failures — instead of a silent bypass write.
@@ -833,6 +881,41 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
       webSearchApiKey,
     );
     await refreshSettings();
+  };
+
+  // A "reachable" result belongs to the provider and model it was measured
+  // against. Changing either invalidates it, so clear it rather than leave a
+  // green line vouching for a configuration nobody tested.
+  useEffect(() => {
+    setBrainTest("idle");
+    setBrainTestMsg(null);
+  }, [selectedProviderId, model]);
+
+  /** Send one throwaway question to the configured brain and report back.
+   *  On the built-in engine this includes loading the model, so it can take
+   *  tens of seconds the first time — the button stays in its "testing" state
+   *  rather than pretending to have finished. */
+  const handleTestBrain = async () => {
+    setBrainTest("testing");
+    setBrainTestMsg(null);
+    try {
+      // The test reads the key from the backend, and the field persists on
+      // blur — so pasting a key and going straight for this button could test
+      // the previous one. Flush the draft first; it no-ops when unchanged.
+      // Mirrors what the TTS test already does with `persistRemoteTtsDraft`.
+      await persistApiKeyDraft();
+      const res = await commands.assistantTestConnection();
+      if (res.status === "error") {
+        setBrainTest("error");
+        setBrainTestMsg(res.error);
+        return;
+      }
+      setBrainTest("ok");
+      setBrainTestMsg(res.data);
+    } catch (e) {
+      setBrainTest("error");
+      setBrainTestMsg(String(e));
+    }
   };
 
   const handleTestWebSearch = async () => {
@@ -894,6 +977,7 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
             type="text"
             value={baseUrl}
             onChange={(e) => setBaseUrl(e.target.value)}
+            onFocus={handleBaseUrlFocus}
             onBlur={handleBaseUrlBlur}
             placeholder="https://my-resource.openai.azure.com/openai/v1"
             className="w-[340px]"
@@ -911,6 +995,7 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
           type="password"
           value={apiKey}
           onChange={(e) => setApiKey(e.target.value)}
+          onFocus={handleApiKeyFocus}
           onBlur={handleApiKeyBlur}
           placeholder={t("settings.assistant.provider.apiKeyPlaceholder")}
           className="w-[340px]"
@@ -1118,6 +1203,44 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
         />
       </SettingContainer>
       {brainMode === "device" ? deviceProviderForm : cloudProviderForm}
+
+      {/* Last row of the group on purpose: it tests whatever the rows above
+          resolved to, in either mode. A wrong key, an empty balance, or a model
+          id this endpoint doesn't serve all fail identically the first time the
+          user talks to the assistant — and that failure arrives as silence. */}
+      <SettingContainer
+        title={t("settings.assistant.brain.testLabel")}
+        info={t("settings.assistant.brain.testDescription")}
+        layout="horizontal"
+        grouped={true}
+      >
+        <div className="flex flex-col items-end gap-1">
+          <button
+            type="button"
+            onClick={handleTestBrain}
+            disabled={brainTest === "testing" || isProviderSwitching}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-hairline-strong bg-surface hover:bg-surface-strong disabled:opacity-50 disabled:cursor-not-allowed text-[13px] font-medium cursor-pointer transition-colors"
+          >
+            {brainTest === "testing" ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <PlugZap size={14} />
+            )}
+            {brainTest === "testing"
+              ? t("settings.assistant.brain.testing")
+              : t("settings.assistant.brain.testButton")}
+          </button>
+          {brainTestMsg && (
+            <span
+              className={`text-xs max-w-[360px] text-right break-words ${
+                brainTest === "error" ? "text-error" : "text-muted-soft"
+              }`}
+            >
+              {brainTestMsg}
+            </span>
+          )}
+        </div>
+      </SettingContainer>
     </SettingsGroup>
   );
 

@@ -138,6 +138,14 @@ windows = { version = "0.61.3", features = [
   # is killed on crash/force-kill (orphan-process cleanup, see local_llm.rs).
   "Win32_System_JobObjects",
   "Win32_Security",
+  # Selection capture (see selection.rs): `GetClipboardSequenceNumber` proves a
+  # synthetic copy actually landed, so a copy the target app ignored can never be
+  # mistaken for the user's stale clipboard contents.
+  "Win32_System_DataExchange",
+  # `GetAsyncKeyState`, to see which modifiers the user is physically holding.
+  # The assistant hotkey itself contains Ctrl, so a synthetic Ctrl+C fired while
+  # it is held would be read as a different combo entirely.
+  "Win32_UI_Input_KeyboardAndMouse",
 ] }
 winreg = "0.55"
 

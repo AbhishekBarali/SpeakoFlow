@@ -12,6 +12,12 @@ interface LanguageSelectorProps {
   supportedLanguages?: string[];
   icon?: SettingIcon;
   tone?: SettingTone;
+  /**
+   * Overrides the generic help text. The cloud group uses it to say that this is
+   * the language being *spoken* rather than a target, because every cloud
+   * endpoint treats it as a recognition hint and answers in that same language.
+   */
+  description?: string;
 }
 
 export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
@@ -20,6 +26,7 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
   supportedLanguages,
   icon,
   tone,
+  description,
 }) => {
   const { t } = useTranslation();
   const { getSetting, updateSetting, resetSetting, isUpdating } = useSettings();
@@ -107,6 +114,7 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
     <SettingContainer
       title={t("settings.general.language.title")}
       info={t("settings.general.language.description")}
+      description={description}
       icon={icon}
       tone={tone}
       descriptionMode={descriptionMode}

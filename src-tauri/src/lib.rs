@@ -20,6 +20,7 @@ mod overlay_lifecycle;
 pub mod portable;
 mod screenshot;
 mod secret_store;
+mod selection;
 mod settings;
 mod shortcut;
 mod signal_handle;
@@ -266,16 +267,37 @@ fn initialize_core_logic(app_handle: &AppHandle) {
     app_handle.manage(local_llm_manager.clone());
     app_handle.manage(managers::local_llm::CleanupLlm(cleanup_llm_manager.clone()));
 
-    // Apply history retention once, at startup. This is the ONLY place old
-    // recordings are pruned: changing the history limit / retention period
-    // just persists the value (see commands::history), so nothing is ever
-    // deleted mid-session — a changed limit takes effect on the next launch.
+    // Enforce history retention at startup and then on a slow tick for as long
+    // as the app runs.
+    //
+    // The tick is the fix for a real hole: retention used to be applied only at
+    // launch and immediately after a new recording was saved. A time-based policy
+    // ("after 3 days") therefore never fired on a machine where the app stays
+    // open and no new dictation happens to land — entries crossed the cutoff and
+    // stayed listed indefinitely, which reads as the retention setting doing
+    // nothing at all. `Never` and the count policy make this a no-op, so the tick
+    // costs one settings read per interval for anyone not using an age policy.
     // Runs off-thread so DB/file IO can't delay window creation.
     {
         let history_manager = history_manager.clone();
+        let sweep_handle = app_handle.clone();
         std::thread::spawn(move || {
-            if let Err(e) = history_manager.cleanup_old_entries() {
-                log::error!("Startup history cleanup failed: {}", e);
+            /// Long enough to be invisible, short enough that a recording never
+            /// outlives its retention window by a meaningful margin.
+            const SWEEP_INTERVAL: std::time::Duration = std::time::Duration::from_secs(30 * 60);
+
+            loop {
+                match history_manager.cleanup_old_entries() {
+                    Ok(0) => {}
+                    Ok(deleted) => {
+                        log::info!("History retention sweep removed {} recording(s)", deleted);
+                        if let Err(e) = sweep_handle.emit("history-retention-applied", ()) {
+                            log::error!("Failed to emit history-retention-applied: {}", e);
+                        }
+                    }
+                    Err(e) => log::error!("History retention sweep failed: {}", e),
+                }
+                std::thread::sleep(SWEEP_INTERVAL);
             }
         });
     }
@@ -327,6 +349,13 @@ fn initialize_core_logic(app_handle: &AppHandle) {
         .on_menu_event(|app, event| match event.id.as_ref() {
             "home" => {
                 show_main_window(app);
+            }
+            "open_assistant" => {
+                // Always opens (never toggles): this is the recovery path for a
+                // panel the user cannot find, and a toggle would hide it again
+                // for anyone who reached for the tray because the window was
+                // already on screen but off in a corner.
+                assistant::open_assistant_panel(app);
             }
             "check_updates" => {
                 let settings = settings::get_settings(app);
@@ -718,6 +747,9 @@ pub fn run(cli_args: CliArgs) {
             commands::history::retry_history_entry_transcription,
             commands::history::update_history_limit,
             commands::history::update_recording_retention_period,
+            commands::history::update_recording_retention_days,
+            commands::history::preview_recording_retention,
+            commands::history::enforce_recording_retention,
             commands::history::get_assistant_history_entries,
             commands::history::delete_assistant_history_entry,
             commands::assistant::assistant_send_text,
@@ -733,6 +765,8 @@ pub fn run(cli_args: CliArgs) {
             commands::assistant::assistant_clear_conversation,
             commands::assistant::toggle_assistant_panel,
             commands::assistant::hide_assistant_panel,
+            commands::assistant::set_assistant_ask_anchor,
+            commands::assistant::assistant_insert_text,
             commands::assistant::set_assistant_provider,
             commands::assistant::change_assistant_model_setting,
             commands::assistant::change_assistant_system_prompt_setting,
@@ -779,6 +813,7 @@ pub fn run(cli_args: CliArgs) {
             commands::assistant::assistant_list_tts_voices,
             commands::assistant::assistant_list_tts_models,
             commands::assistant::assistant_stop,
+            commands::assistant::assistant_test_connection,
             voice_conversation::assistant_conversation_start,
             voice_conversation::assistant_conversation_end,
             voice_conversation::assistant_conversation_set_expanded,

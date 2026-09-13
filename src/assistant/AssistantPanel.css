@@ -1445,11 +1445,46 @@
     background 0.15s ease;
 }
 
-.assistant-message:hover .bubble-copy {
+/* Insert sits directly beneath Copy in the same gutter. Both are hover-revealed:
+   they're per-answer actions, so showing them permanently on every message in a
+   long thread is just visual noise. */
+.bubble-insert {
+  position: absolute;
+  top: 28px;
+  inset-inline-end: -30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--as-hairline);
+  border-radius: 7px;
+  background: var(--as-panel-surface);
+  color: var(--as-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity 0.15s ease,
+    color 0.15s ease,
+    background 0.15s ease;
+}
+
+.assistant-message:hover .bubble-copy,
+.assistant-message:hover .bubble-insert {
   opacity: 1;
 }
 
-.bubble-copy:hover {
+/* Keyboard users never hover, so the actions have to surface on focus too or
+   they are unreachable without a mouse. */
+.bubble-copy:focus-visible,
+.bubble-insert:focus-visible {
+  opacity: 1;
+  outline: 2px solid var(--as-accent, currentColor);
+  outline-offset: 1px;
+}
+
+.bubble-copy:hover,
+.bubble-insert:hover {
   color: var(--as-ink);
   background: var(--as-raise);
 }
@@ -1672,6 +1707,59 @@
   background: var(--as-ink);
   border-color: transparent;
   color: var(--as-panel-surface);
+}
+
+/* The Talk button carries a label, unlike its icon-only neighbours, because it
+   switches the card into a different mode rather than toggling an attachment.
+   Being the one worded control in the row is what makes the live conversation
+   discoverable at all — as an icon in the header it went unnoticed. */
+.assistant-talk-button {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 30px;
+  padding: 0 10px;
+  flex-shrink: 0;
+  border: 1px solid var(--as-hairline);
+  border-radius: 9px;
+  background: transparent;
+  color: var(--as-muted);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.assistant-talk-button:hover:not(:disabled) {
+  color: var(--as-ink);
+  background: var(--as-raise);
+  border-color: var(--as-ink);
+}
+
+.assistant-talk-button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* On a narrow card the label is the first thing to go: the icon still says
+   "voice", and the tooltip carries the rest. Losing the whole button would put
+   the conversation back out of reach, which is the problem being fixed.
+
+   A media query rather than a container query: this webview's viewport *is* the
+   panel window, so the window's own width is exactly what needs measuring, and
+   nothing on this element's ancestor chain declares `container-type` (only
+   ConversationView.css does, for its own subtree). */
+@media (max-width: 420px) {
+  .assistant-talk-button span {
+    display: none;
+  }
+  .assistant-talk-button {
+    padding: 0 8px;
+  }
 }
 
 .assistant-input {

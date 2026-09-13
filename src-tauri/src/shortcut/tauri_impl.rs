@@ -52,6 +52,67 @@ pub fn init_shortcuts(app: &AppHandle) {
     }
 }
 
+/// Modifier names accepted in a binding string, in the generic form Tauri
+/// understands.
+const MODIFIERS: &[&str] = &[
+    "ctrl", "control", "shift", "alt", "option", "meta", "command", "cmd", "super", "win",
+    "windows",
+];
+
+/// Flatten a binding string into the form Tauri's global-shortcut plugin can
+/// parse: side-specific modifiers lose their handedness.
+///
+/// `handy-keys` distinguishes `ctrl_left` from `ctrl_right`, which is why the
+/// Windows defaults are written that way (AltGr on international layouts reports
+/// as Left Ctrl + Right Alt, and must not trigger the assistant). Tauri's plugin
+/// has no way to express handedness at all — worse, `global-hotkey` parses
+/// `ctrl_left` as a *key name* and fails with `UnsupportedKey`, so a combo that
+/// looked valid was rejected at registration with only an `error!` line.
+///
+/// The suffix is only stripped when what remains is actually a modifier, so a
+/// hypothetical `arrow_left` is left alone.
+pub fn normalize_for_tauri(raw: &str) -> String {
+    raw.split('+')
+        .map(|part| {
+            let part = part.trim().to_lowercase();
+            let base = part
+                .strip_suffix("_left")
+                .or_else(|| part.strip_suffix("_right"));
+            match base {
+                Some(base) if MODIFIERS.contains(&base) => base.to_string(),
+                _ => part,
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("+")
+}
+
+/// Derive a combo this engine can actually register from one it cannot.
+///
+/// Tauri's plugin requires a non-modifier key, so a modifier-only combo has no
+/// valid form — `Space` is appended, keeping whichever modifiers the user chose.
+/// This is not cosmetic: on Windows the shipped defaults for **both** dictation
+/// (`ctrl_left+super`) and the assistant (`ctrl_left+alt_left`) are
+/// modifier-only. A Windows install that fell back to this engine — which
+/// happens on any handy-keys init failure, and is then persisted, so it never
+/// retries — therefore had no working dictation hotkey and no working assistant
+/// hotkey. Resetting to the default could not help, because the default is the
+/// offending value.
+pub fn tauri_safe_binding(raw: &str) -> String {
+    let normalized = normalize_for_tauri(raw);
+    if normalized.trim().is_empty() {
+        return normalized;
+    }
+    let has_main_key = normalized
+        .split('+')
+        .any(|part| !MODIFIERS.contains(&part.trim()));
+    if has_main_key {
+        normalized
+    } else {
+        format!("{normalized}+space")
+    }
+}
+
 /// Validate a shortcut string for the Tauri global-shortcut implementation.
 /// Tauri requires at least one non-modifier key and doesn't support the fn key.
 pub fn validate_shortcut(raw: &str) -> Result<(), String> {
@@ -59,13 +120,16 @@ pub fn validate_shortcut(raw: &str) -> Result<(), String> {
         return Err("Shortcut cannot be empty".into());
     }
 
-    let modifiers = [
-        "ctrl", "control", "shift", "alt", "option", "meta", "command", "cmd", "super", "win",
-        "windows",
-    ];
+    // Compare against the flattened form, so a side-specific modifier is
+    // recognised as the modifier it is. Without this, `ctrl_left+alt_left` was
+    // read as "one modifier plus a main key called ctrl_left" and passed
+    // validation, only to fail unparseable a moment later.
+    let parts: Vec<String> = normalize_for_tauri(raw)
+        .split('+')
+        .map(|p| p.trim().to_string())
+        .collect();
 
     // Check for fn key which Tauri doesn't support
-    let parts: Vec<String> = raw.split('+').map(|p| p.trim().to_lowercase()).collect();
     for part in &parts {
         if part == "fn" || part == "function" {
             return Err("The 'fn' key is not supported by Tauri global shortcuts".into());
@@ -73,7 +137,7 @@ pub fn validate_shortcut(raw: &str) -> Result<(), String> {
     }
 
     // Check for at least one non-modifier key
-    let has_non_modifier = parts.iter().any(|part| !modifiers.contains(&part.as_str()));
+    let has_non_modifier = parts.iter().any(|part| !MODIFIERS.contains(&part.as_str()));
 
     if has_non_modifier {
         Ok(())
@@ -102,8 +166,11 @@ fn register_one(app: &AppHandle, binding_id: &str, hotkey: &str) -> Result<(), S
         return Err(e);
     }
 
-    // Parse shortcut and return error if it fails
-    let shortcut = match hotkey.parse::<Shortcut>() {
+    // Parse the flattened combo: Tauri cannot express handedness, so
+    // `ctrl_left+alt_left+space` has to reach the parser as `ctrl+alt+space`.
+    // Parsing the raw string made `ctrl_left` an unknown key and failed.
+    let normalized = normalize_for_tauri(hotkey);
+    let shortcut = match normalized.parse::<Shortcut>() {
         Ok(s) => s,
         Err(e) => {
             let error_msg = format!("Failed to parse shortcut '{}': {}", hotkey, e);
@@ -218,5 +285,85 @@ pub fn unregister_cancel_shortcut(app: &AppHandle) {
                 let _ = unregister_shortcut(&app_clone, cancel_binding);
             }
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The shipped Windows defaults for dictation and the assistant are
+    /// modifier-only and side-specific. Both properties are invisible to
+    /// `global-hotkey`, so this engine could register neither — and the failure
+    /// was an `error!` line, leaving a Windows user who fell back to this engine
+    /// with no dictation hotkey and no assistant hotkey at all.
+    #[test]
+    fn the_windows_modifier_only_defaults_are_rejected_with_an_accurate_reason() {
+        for combo in ["ctrl_left+super", "ctrl_left+alt_left"] {
+            let err = validate_shortcut(combo)
+                .expect_err("a modifier-only combo cannot be registered by Tauri");
+            assert!(
+                err.contains("main key"),
+                "expected a 'needs a main key' error for {combo}, got: {err}"
+            );
+        }
+    }
+
+    /// Validation used to pass these, because `ctrl_left` was not in the
+    /// modifier list and so counted as the main key. Registration then failed on
+    /// parse, one layer further down and far less visibly.
+    #[test]
+    fn handedness_is_recognised_as_a_modifier_not_as_a_main_key() {
+        assert_eq!(normalize_for_tauri("ctrl_left+alt_left"), "ctrl+alt");
+        assert_eq!(normalize_for_tauri("CTRL_Left+Shift"), "ctrl+shift");
+        assert_eq!(
+            normalize_for_tauri("ctrl_left+alt_left+space"),
+            "ctrl+alt+space"
+        );
+    }
+
+    /// Only a modifier loses its handedness. Anything else keeps its name, so a
+    /// key that merely ends in `_left` is not mangled into something else.
+    #[test]
+    fn a_non_modifier_ending_in_left_is_left_alone() {
+        assert_eq!(normalize_for_tauri("ctrl+arrow_left"), "ctrl+arrow_left");
+    }
+
+    /// A combo with a real key already in it must survive untouched apart from
+    /// the handedness flattening — appending Space to it would silently change a
+    /// working shortcut.
+    #[test]
+    fn a_combo_that_already_has_a_main_key_is_not_given_another() {
+        assert_eq!(tauri_safe_binding("ctrl+shift+a"), "ctrl+shift+a");
+        assert_eq!(tauri_safe_binding("ctrl+shift+space"), "ctrl+shift+space");
+        assert_eq!(
+            tauri_safe_binding("ctrl_left+alt_left+space"),
+            "ctrl+alt+space"
+        );
+    }
+
+    /// The point of the fallback: a modifier-only default becomes something this
+    /// engine can actually register, keeping the modifiers the user chose. The
+    /// results must themselves validate, or the fallback just moves the failure.
+    #[test]
+    fn a_modifier_only_combo_gains_a_main_key_and_then_validates() {
+        assert_eq!(tauri_safe_binding("ctrl_left+alt_left"), "ctrl+alt+space");
+        assert_eq!(tauri_safe_binding("ctrl_left+super"), "ctrl+super+space");
+        for combo in ["ctrl_left+super", "ctrl_left+alt_left"] {
+            let safe = tauri_safe_binding(combo);
+            assert!(
+                validate_shortcut(&safe).is_ok(),
+                "the fallback for {combo} ({safe}) must itself be registerable"
+            );
+        }
+    }
+
+    /// An empty binding means "disabled" and must stay empty — handing it a
+    /// Space would arm a shortcut the user deliberately switched off. This is the
+    /// shipped default for the cancel binding.
+    #[test]
+    fn an_empty_binding_stays_empty() {
+        assert_eq!(tauri_safe_binding(""), "");
+        assert!(validate_shortcut("").is_err());
     }
 }

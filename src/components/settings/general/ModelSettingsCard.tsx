@@ -5,11 +5,13 @@ import { SettingsGroup } from "../../ui/SettingsGroup";
 import { LanguageSelector } from "../LanguageSelector";
 import { TranslateToEnglish } from "../TranslateToEnglish";
 import { useModelStore } from "../../../stores/modelStore";
+import { useSettings } from "../../../hooks/useSettings";
 import type { ModelInfo } from "@/bindings";
 
 export const ModelSettingsCard: React.FC = () => {
   const { t } = useTranslation();
   const { currentModel, models } = useModelStore();
+  const { getSetting } = useSettings();
 
   const currentModelInfo = models.find((m: ModelInfo) => m.id === currentModel);
 
@@ -17,6 +19,14 @@ export const ModelSettingsCard: React.FC = () => {
     currentModelInfo?.supports_language_selection ?? false;
   const supportsTranslation = currentModelInfo?.supports_translation ?? false;
   const hasAnySettings = supportsLanguageSelection || supportsTranslation;
+
+  // In cloud mode this model is not the one listening, so its language options
+  // describe nothing. The equivalent rows live in the cloud group, where they can
+  // be gated on what the *provider* supports — and where a user who just switched
+  // engines will look for them.
+  if (getSetting("stt_engine_mode") === "cloud") {
+    return null;
+  }
 
   // Don't render anything if no model is selected or no settings available
   if (!currentModel || !currentModelInfo || !hasAnySettings) {

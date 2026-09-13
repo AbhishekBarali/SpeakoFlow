@@ -119,11 +119,22 @@ pub(crate) fn resolve_cloud_stt(
         .filter(|u| !u.is_empty() && provider.allow_base_url_edit)
         .unwrap_or_else(|| provider.base_url.trim_end_matches('/').to_string());
 
-    let language = if settings.selected_language == "auto" {
-        None
-    } else {
-        Some(settings.selected_language.clone())
-    };
+    let language = cloud_language_code(&settings.selected_language);
+
+    // "Translate to English" is one switch shared with the local engine, where it
+    // maps onto Whisper's translate task. On the cloud side only the OpenAI
+    // schema has an equivalent, so the flag is resolved against the provider here
+    // rather than at the request, and the mismatch is said out loud: a user who
+    // turned this on and got their own language back had no way to know the
+    // endpoint never offered it.
+    let translate = settings.translate_to_english && provider.supports_translation;
+    if settings.translate_to_english && !translate {
+        warn!(
+            "Translate to English is on, but {} transcribes in the language spoken \
+             and has no translation endpoint; the transcript will not be translated",
+            provider.label
+        );
+    }
 
     let keyterms = if settings.cloud_stt_send_custom_words && provider.honors_keyterms {
         crate::managers::transcription::recognition_words(settings)
@@ -145,10 +156,36 @@ pub(crate) fn resolve_cloud_stt(
         base_url,
         api_key,
         language,
+        translate,
         keyterms,
         no_verbatim: settings.cloud_stt_no_verbatim,
         timeout_secs: settings.cloud_stt_timeout_secs.max(5),
     })
+}
+
+/// Turn the app's dictation-language setting into a code a cloud endpoint accepts.
+///
+/// `None` means auto-detect, which is what every provider here does with no
+/// language field at all.
+///
+/// The app's own list carries script subtags for Chinese (`zh-Hans` / `zh-Hant`)
+/// because the local Whisper path uses them to pick a variant conversion. No
+/// cloud endpoint here understands that: ElevenLabs wants ISO-639-1/3, the OpenAI
+/// schema documents "ISO-639-1", and Deepgram takes BCP-47 tags it publishes
+/// itself. Sending `zh-Hans` therefore either errored or was ignored, so the
+/// primary subtag is what goes on the wire; the Simplified/Traditional conversion
+/// still happens locally afterwards (`maybe_convert_chinese_variant`).
+fn cloud_language_code(selected: &str) -> Option<String> {
+    let trimmed = selected.trim();
+    if trimmed.is_empty() || trimmed == "auto" {
+        return None;
+    }
+    let primary = trimmed.split(['-', '_']).next().unwrap_or(trimmed);
+    if primary.is_empty() {
+        None
+    } else {
+        Some(primary.to_ascii_lowercase())
+    }
 }
 
 /// Whether this provider is usable without an API key. Only the user-editable
@@ -451,15 +488,23 @@ pub(crate) fn transcribe_cloud_blocking(
     samples: &[f32],
 ) -> Result<String, String> {
     let wav = encode_wav_16k_mono(samples)?;
+    let request = CloudRequest::from_config(cfg);
     let seconds = samples.len() as f32 / WHISPER_SAMPLE_RATE as f32;
     info!(
-        "Cloud transcription: {} / {} ({:.1}s, {} kB)",
+        "Cloud transcription: {} / {} ({:.1}s, {} kB){}",
         cfg.provider.label,
         cfg.model,
         seconds,
-        wav.len() / 1024
+        wav.len() / 1024,
+        // Only claimed when the request really is going to the translation route,
+        // so this line can be trusted the way the local engine's cannot when the
+        // setting is on and the model cannot honour it.
+        if request.translate {
+            " → English"
+        } else {
+            ""
+        }
     );
-    let request = CloudRequest::from_config(cfg);
     let result = block_on_request(async move { request.transcribe(wav).await });
     if result.is_ok() {
         // Only a completed round trip proves the route is warm, which is what
@@ -479,6 +524,7 @@ struct CloudRequest {
     api_key: String,
     model: String,
     language: Option<String>,
+    translate: bool,
     keyterms: Vec<String>,
     no_verbatim: bool,
     timeout: Duration,
@@ -493,6 +539,7 @@ impl CloudRequest {
             api_key: cfg.api_key.clone(),
             model: cfg.model.clone(),
             language: cfg.language.clone(),
+            translate: cfg.translate,
             keyterms: cfg.keyterms.clone(),
             no_verbatim: cfg.no_verbatim,
             timeout: Duration::from_secs(cfg.timeout_secs),
@@ -612,8 +659,20 @@ impl CloudRequest {
 
     /// `POST /audio/transcriptions` — the OpenAI schema, shared by Groq,
     /// Mistral, and self-hosted servers.
+    ///
+    /// With translation asked for, the same multipart body goes to
+    /// `/audio/translations` instead. That route is the only translation this
+    /// family offers and its output language is fixed to English, so it takes no
+    /// `language` field — sending one would be describing a target it does not
+    /// have. The spoken-language hint is dropped for exactly that reason:
+    /// Whisper's translate task detects the source itself.
     async fn transcribe_openai(&self, wav: Vec<u8>) -> Result<String, String> {
-        let url = format!("{}/audio/transcriptions", self.base_url);
+        let path = if self.translate {
+            "/audio/translations"
+        } else {
+            "/audio/transcriptions"
+        };
+        let url = format!("{}{}", self.base_url, path);
         let part = reqwest::multipart::Part::bytes(wav)
             .file_name("audio.wav")
             .mime_str("audio/wav")
@@ -623,8 +682,15 @@ impl CloudRequest {
             .text("response_format", "json")
             .part("file", part);
         if let Some(language) = &self.language {
-            // This schema wants a bare ISO-639-1 code.
-            form = form.text("language", language.clone());
+            if self.translate {
+                debug!(
+                    "Cloud transcription: translating to English, so the {language} \
+                     source hint is not sent"
+                );
+            } else {
+                // This schema wants a bare ISO-639-1 code.
+                form = form.text("language", language.clone());
+            }
         }
         if !self.keyterms.is_empty() {
             // No keyterm field here; the documented way to bias this family is
@@ -966,6 +1032,78 @@ mod tests {
         assert_eq!(cfg.base_url, "https://api.elevenlabs.io");
         // "auto" means let the provider detect it.
         assert!(cfg.language.is_none());
+    }
+
+    #[test]
+    fn auto_and_blank_languages_mean_provider_detection() {
+        assert_eq!(cloud_language_code("auto"), None);
+        assert_eq!(cloud_language_code("   "), None);
+    }
+
+    #[test]
+    fn a_chosen_language_reaches_the_provider_as_a_bare_iso_code() {
+        let mut settings = cloud_settings();
+        settings.selected_language = "ne".to_string();
+        let cfg = resolve_cloud_stt(&settings).expect("should resolve");
+        assert_eq!(cfg.language.as_deref(), Some("ne"));
+    }
+
+    #[test]
+    fn script_subtags_are_dropped_because_no_endpoint_here_takes_them() {
+        // The local path needs `zh-Hans` to pick a variant conversion; every
+        // cloud endpoint wants the primary subtag and rejects or ignores the rest.
+        assert_eq!(cloud_language_code("zh-Hans"), Some("zh".to_string()));
+        assert_eq!(cloud_language_code("zh-Hant"), Some("zh".to_string()));
+        assert_eq!(cloud_language_code("pt_BR"), Some("pt".to_string()));
+        assert_eq!(cloud_language_code("EN"), Some("en".to_string()));
+    }
+
+    #[test]
+    fn translation_is_refused_where_the_provider_has_no_route_for_it() {
+        // ElevenLabs takes a source-language hint and answers in that language.
+        let mut settings = cloud_settings();
+        settings.translate_to_english = true;
+        let cfg = resolve_cloud_stt(&settings).expect("should resolve");
+        assert!(!cfg.provider.supports_translation);
+        assert!(!cfg.translate);
+    }
+
+    #[test]
+    fn translation_is_honoured_on_the_openai_schema() {
+        let mut settings = cloud_settings();
+        settings.translate_to_english = true;
+        settings.cloud_stt_provider_id = "openai".to_string();
+        settings
+            .cloud_stt_api_keys
+            .insert("openai".to_string(), "test-key".to_string());
+        let cfg = resolve_cloud_stt(&settings).expect("should resolve");
+        assert!(cfg.translate);
+    }
+
+    #[test]
+    fn translation_stays_off_until_the_user_asks_for_it() {
+        let mut settings = cloud_settings();
+        settings.cloud_stt_provider_id = "openai".to_string();
+        settings
+            .cloud_stt_api_keys
+            .insert("openai".to_string(), "test-key".to_string());
+        let cfg = resolve_cloud_stt(&settings).expect("should resolve");
+        assert!(!cfg.translate);
+    }
+
+    /// Guards the claim the UI makes for each shipped provider. A wrong entry
+    /// here is a switch that reads as working and silently does nothing, which is
+    /// the exact failure this flag exists to prevent.
+    #[test]
+    fn only_the_openai_schema_providers_claim_translation() {
+        for provider in crate::settings::default_cloud_stt_providers() {
+            let expected = matches!(provider.id.as_str(), "openai" | "groq" | "custom");
+            assert_eq!(
+                provider.supports_translation, expected,
+                "{} claims the wrong translation capability",
+                provider.id
+            );
+        }
     }
 
     #[test]

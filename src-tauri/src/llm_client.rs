@@ -1177,12 +1177,39 @@ fn assemble_tool_calls(acc: Vec<ToolCallParts>) -> Vec<ToolCall> {
         .collect()
 }
 
-/// Fetch available models from an OpenAI-compatible API
-/// Returns a list of model IDs
+/// One entry from a provider's model catalogue: the id chat requests must carry,
+/// plus the human-readable name the provider shows for it.
+///
+/// The two are not interchangeable and confusing them silently breaks cleanup.
+/// OpenRouter lists `{"id": "z-ai/glm-5.3-flash", "name": "Z.ai: GLM 5.3
+/// Flash"}`, and its chat endpoint answers `400 … is not a valid model ID` for
+/// anything but the id. This type exists so the picker can display the name a
+/// user recognises from the provider's own website while still storing — and
+/// sending — the id.
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, specta::Type)]
+pub struct ModelChoice {
+    /// The value chat requests carry.
+    pub id: String,
+    /// What the provider calls it. Equal to `id` when the provider offers no
+    /// separate display name.
+    pub label: String,
+}
+
+impl ModelChoice {
+    fn bare(id: impl Into<String>) -> Self {
+        let id = id.into();
+        Self {
+            label: id.clone(),
+            id,
+        }
+    }
+}
+
+/// Fetch available models from an OpenAI-compatible API.
 pub async fn fetch_models(
     provider: &PostProcessProvider,
     api_key: String,
-) -> Result<Vec<String>, String> {
+) -> Result<Vec<ModelChoice>, String> {
     let base_url = effective_base_url(provider);
     let url = format!("{}/models", base_url);
 
@@ -1215,13 +1242,23 @@ pub async fn fetch_models(
 
     let mut models = Vec::new();
 
-    // Handle OpenAI format: { data: [ { id: "..." }, ... ] }
+    // Handle OpenAI format: { data: [ { id: "...", name: "..." }, ... ] }
     if let Some(data) = parsed.get("data").and_then(|d| d.as_array()) {
         for entry in data {
+            let label = entry
+                .get("name")
+                .and_then(|name| name.as_str())
+                .map(str::trim)
+                .filter(|name| !name.is_empty());
             if let Some(id) = entry.get("id").and_then(|i| i.as_str()) {
-                models.push(id.to_string());
-            } else if let Some(name) = entry.get("name").and_then(|n| n.as_str()) {
-                models.push(name.to_string());
+                models.push(ModelChoice {
+                    id: id.to_string(),
+                    label: label.unwrap_or(id).to_string(),
+                });
+            } else if let Some(name) = label {
+                // No id at all: the name is the only handle this provider gives
+                // out, so it has to serve as both.
+                models.push(ModelChoice::bare(name));
             }
         }
     }
@@ -1229,7 +1266,7 @@ pub async fn fetch_models(
     else if let Some(array) = parsed.as_array() {
         for entry in array {
             if let Some(model) = entry.as_str() {
-                models.push(model.to_string());
+                models.push(ModelChoice::bare(model));
             }
         }
     }
@@ -1239,7 +1276,10 @@ pub async fn fetch_models(
     // gets stored are the ones chat actually accepts. No-op elsewhere.
     let models = models
         .into_iter()
-        .map(|model| normalize_model_name(provider, &model))
+        .map(|model| ModelChoice {
+            id: normalize_model_name(provider, &model.id),
+            label: model.label,
+        })
         .collect();
 
     Ok(models)
