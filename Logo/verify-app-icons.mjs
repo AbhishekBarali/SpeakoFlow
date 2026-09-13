@@ -1,9 +1,9 @@
 // Verify the icon rollout: that every app asset carries the new brand, and that
 // each one carries the RIGHT TIER for the size it is drawn at.
 //
-// Fingerprints, so this needs no eyeballing:
-//   small tier -> contains pure white (#ffffff) pixels; the redrawn pills are
-//                 pure white, and nothing in the hero art is
+// Small assets and decoded ICO entries must match the generated artwork pixel
+// for pixel. Colour fingerprints alone cannot distinguish old and new icons.
+// Legacy hero fingerprint:
 //   hero art   -> no pure white, but a deep-teal region (the gradient's dark
 //                 corner) plus a wide colour count
 //   old logo   -> a flat #14b8a6 field over a large share of the tile
@@ -13,6 +13,25 @@
 import fs from "node:fs";
 import path from "node:path";
 import sharp from "sharp";
+import { renderSmall } from "./small-icon.mjs";
+
+async function matchesSmall(data, size) {
+  const expected = await sharp(await renderSmall(size))
+    .ensureAlpha()
+    .raw()
+    .toBuffer();
+  if (data.length !== expected.length) return false;
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i + 3] !== expected[i + 3]) return false;
+    // Encoders may discard RGB under fully transparent pixels.
+    if (
+      expected[i + 3] &&
+      !data.subarray(i, i + 3).equals(expected.subarray(i, i + 3))
+    )
+      return false;
+  }
+  return true;
+}
 
 const OLD_TEAL = { r: 0x14, g: 0xb8, b: 0xa6 };
 const near = (a, b, tol) =>
@@ -25,7 +44,7 @@ async function classify(input) {
     .ensureAlpha()
     .raw()
     .toBuffer({ resolveWithObject: true });
-  return classifyRaw(data, info.width, info.height, info.channels);
+  return { ...classifyRaw(data, info.width, info.height, info.channels), data };
 }
 
 /**
@@ -58,7 +77,7 @@ function classifyIcoEntry(buf) {
       src += 4;
     }
   }
-  return { png: false, ...classifyRaw(rgba, W, H, 4) };
+  return { png: false, ...classifyRaw(rgba, W, H, 4), data: rgba };
 }
 
 function classifyRaw(data, W, H, C) {
@@ -99,11 +118,12 @@ function classifyRaw(data, W, H, C) {
 let bad = 0;
 async function expect(file, want, label = file) {
   const r = await classify(file);
-  const ok = r.tier === want;
+  const ok =
+    want === "small" ? await matchesSmall(r.data, r.W) : r.tier === want;
   if (!ok) bad++;
   console.log(
     `${ok ? "OK  " : "FAIL"} ${label.padEnd(50)} ${`${r.W}x${r.H}`.padEnd(10)}` +
-      ` tier=${r.tier.padEnd(5)} want=${want.padEnd(5)}` +
+      ` match=${ok ? want : "MISMATCH"}` +
       ` white=${(r.white * 100).toFixed(0)}% deep=${(r.deep * 100).toFixed(0)}% colors=${r.colors}`,
   );
 }
@@ -122,6 +142,27 @@ for (const f of [
   "src-tauri/icons/StoreLogo.png",
 ])
   await expect(f, "small");
+
+console.log("\n== approved artwork is preserved exactly ==");
+const originalMaster = await sharp(
+  "Logo/final-v2/preview/before-optical-fix.png",
+)
+  .ensureAlpha()
+  .raw()
+  .toBuffer();
+const currentMaster = await sharp(
+  "Logo/final-v2/small/small-reference-1024.png",
+)
+  .ensureAlpha()
+  .raw()
+  .toBuffer();
+const unchanged = originalMaster.equals(currentMaster);
+if (!unchanged) bad++;
+console.log(
+  unchanged
+    ? "OK   Full-size artwork matches the approved first version pixel for pixel"
+    : "FAIL Artwork has changed",
+);
 
 console.log("\n== hero art: large sizes only ==");
 for (const f of [
@@ -166,6 +207,11 @@ for (let i = 0; i < count; i++) {
 entries.sort((a, b) => a.w - b.w);
 console.log(`${count} entries: ${entries.map((e) => e.w).join(", ")}`);
 const tmp = path.join("Logo", ".ico-entry.png");
+const expectedSizes = [16, 20, 24, 32, 40, 48, 64, 128, 256];
+if (entries.map((e) => e.w).join() !== expectedSizes.join()) {
+  console.log("FAIL missing or duplicate Windows icon sizes");
+  bad++;
+}
 for (const e of entries) {
   const payload = ico.subarray(e.at, e.at + e.size);
   const want = e.w <= 64 ? "small" : "hero";
@@ -176,11 +222,12 @@ for (const e of entries) {
     r = await classify(tmp);
     fs.rmSync(tmp);
   }
-  const ok = r.tier === want;
+  const ok =
+    want === "small" ? await matchesSmall(r.data, e.w) : r.tier === want;
   if (!ok) bad++;
   console.log(
     `${ok ? "OK  " : "FAIL"}   icon.ico @${String(e.w).padStart(3)}px ${kind}` +
-      ` tier=${r.tier.padEnd(5)} want=${want.padEnd(5)}` +
+      ` match=${ok ? want : "MISMATCH"}` +
       ` white=${(r.white * 100).toFixed(0)}% deep=${(r.deep * 100).toFixed(0)}% colors=${r.colors}`,
   );
 }
@@ -228,12 +275,18 @@ if (
   }
 }
 
-console.log("\n== favicon is vector now ==");
+console.log("\n== favicon embeds the generated small artwork ==");
 const fav = fs.readFileSync("public/favicon.svg", "utf8");
-const vector = !fav.includes("base64") && fav.includes("<rect");
-if (!vector) bad++;
+const embedded = fav.match(/data:image\/png;base64,([A-Za-z0-9+/=]+)/)?.[1];
+const faviconMatches =
+  embedded &&
+  (await matchesSmall(
+    await sharp(Buffer.from(embedded, "base64")).ensureAlpha().raw().toBuffer(),
+    64,
+  ));
+if (!faviconMatches) bad++;
 console.log(
-  `${vector ? "OK  " : "FAIL"} public/favicon.svg ${fs.statSync("public/favicon.svg").size}b,` +
+  `${faviconMatches ? "OK  " : "FAIL"} public/favicon.svg ${fs.statSync("public/favicon.svg").size}b,` +
     ` base64=${fav.includes("base64")}`,
 );
 

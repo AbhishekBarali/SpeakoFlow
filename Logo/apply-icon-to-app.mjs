@@ -11,9 +11,7 @@
 // to downscale nine pale-mint elements into four pixels. Sizes above the
 // crossover keep the hero art, where its gradient and swirl are the whole point.
 //
-// This is deliberately asset-side rather than per-platform code: handing every
-// shell a legible bitmap fixes Windows, macOS and Linux at once, and needs no
-// Win32 icon plumbing.
+// Preserve the existing runtime icon selection; refine the artwork exports.
 //
 // src-tauri/icons/* comes from the Tauri CLI first:
 //     bun run tauri icon Logo/final-v2/png/icon-1024.png
@@ -29,14 +27,13 @@ import fs from "node:fs";
 import path from "node:path";
 import sharp from "sharp";
 import pngToIco from "png-to-ico";
-import { smallIconSvg } from "./small-icon.mjs";
+import { renderSmall as small, smallIconSvg } from "./small-icon.mjs";
 
 const HERO_MASTER = path.join("final-v2", "icon-master-2048.png");
 const REPO = "..";
 const SMALL_MAX = 64; // crossover: at or below this, use the simplified mark
 
-// Hero downscales get a light unsharp below 96px; the small tier never needs it
-// because it is rendered from vector at the target size.
+// Hero artwork is kept for the large icon slots.
 function hero(size) {
   let pipe = sharp(HERO_MASTER).resize(size, size, { kernel: "lanczos3" });
   if (size < 96) {
@@ -44,14 +41,6 @@ function hero(size) {
   }
   return pipe.png({ compressionLevel: 9 }).toBuffer();
 }
-
-// Rendered at the requested size, not scaled from a larger raster: the small tier
-// snaps its geometry to the pixel grid of whatever size it is asked for.
-const small = (size) =>
-  sharp(Buffer.from(smallIconSvg(size)), { density: 384 })
-    .resize(size, size)
-    .png({ compressionLevel: 9 })
-    .toBuffer();
 
 const render = (size) => (size <= SMALL_MAX ? small(size) : hero(size));
 
@@ -62,11 +51,12 @@ const TARGETS = [
   ["src-tauri/resources/tray_idle.png", 64, "tray idle (dark themes)"],
   ["src-tauri/resources/tray_idle_dark.png", 64, "tray idle (light themes)"],
   ["src-tauri/resources/speakoflow.png", 64, "tray idle (Linux)"],
-  // Taskbar / alt-tab / dock, set at runtime by tray.rs. Was 256px of hero art,
-  // which the shell then crushed to 24px; 64px of the small tier is what the
-  // shell can actually use.
-  ["src-tauri/resources/window_icon_light.png", 64, "taskbar + alt-tab"],
-  ["src-tauri/resources/window_icon_dark.png", 64, "taskbar + alt-tab"],
+  // Runtime window icons are single bitmaps, independent of the multi-size ICO.
+  // Native DrawIconEx comparisons showed uneven stroke widths from 64 -> 24.
+  // 48 -> 24 preserves the original mark more evenly, and also covers the
+  // common 48px display size without upscaling. See preview-windows-icons.ps1.
+  ["src-tauri/resources/window_icon_light.png", 48, "taskbar + alt-tab"],
+  ["src-tauri/resources/window_icon_dark.png", 48, "taskbar + alt-tab"],
   // Linux hicolor theme + Tauri bundles (install-arch.sh installs 32 and 128).
   ["src-tauri/icons/32x32.png", 32, "Linux hicolor 32"],
   ["src-tauri/icons/64x64.png", 64, "Linux hicolor 64"],
@@ -90,7 +80,7 @@ for (const [rel, size, why] of TARGETS) {
 // Mixed tiers in one container so Windows picks an exact entry at every size it
 // asks for, instead of scaling a single large bitmap.
 // ---------------------------------------------------------------------------
-const ICO_SIZES = [16, 20, 24, 32, 48, 64, 128, 256];
+const ICO_SIZES = [16, 20, 24, 32, 40, 48, 64, 128, 256];
 const icoPath = path.join(REPO, "src-tauri/icons/icon.ico");
 fs.writeFileSync(
   icoPath,
@@ -113,14 +103,12 @@ console.log(
 
 // ---------------------------------------------------------------------------
 // favicon: the window entry points draw it at 16-32px, so it takes the small
-// tier -- and since that tier is vector, the favicon is now real SVG rather than
-// an embedded raster (92 KB -> ~1 KB, crisp at any size). Snapped on a 32px grid:
-// a browser asking for 16 gets a clean 2:1 reduction of exact geometry.
+// tier. SVG is a wrapper around a 64px PNG of the actual generated artwork.
 // ---------------------------------------------------------------------------
 const favicon = path.join(REPO, "public/favicon.svg");
-fs.writeFileSync(favicon, smallIconSvg(32));
+fs.writeFileSync(favicon, await smallIconSvg(64));
 console.log(
-  `${"public/favicon.svg".padEnd(46)}   vector small   ${fs.statSync(favicon).size}b  (window favicons)`,
+  `${"public/favicon.svg".padEnd(46)}   raster small   ${fs.statSync(favicon).size}b  (window favicons)`,
 );
 
 // docs-site favicon stays hero: it is shown at 32px+ in a browser tab strip and

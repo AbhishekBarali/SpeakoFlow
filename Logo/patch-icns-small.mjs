@@ -16,16 +16,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import sharp from "sharp";
-import { smallIconSvg } from "./small-icon.mjs";
+import { renderSmall } from "./small-icon.mjs";
 
 const ICNS = path.join("..", "src-tauri", "icons", "icon.icns");
-
-// Rendered at the target size so the small tier's pixel snapping applies.
-const renderSmall = (size) =>
-  sharp(Buffer.from(smallIconSvg(size)), { density: 384 })
-    .resize(size, size)
-    .png({ compressionLevel: 9 })
-    .toBuffer();
 
 /** ICNS RLE24: per channel, 0x00-0x7F = literal run of n+1, 0x80-0xFF = repeat n-125. */
 function encodeRle24(planes) {

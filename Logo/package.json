@@ -12,6 +12,8 @@
     "build:small": "node build-small-icon.mjs",
     "apply:app": "node apply-icon-to-app.mjs",
     "apply:icns": "node patch-icns-small.mjs",
+    "preview:small": "node preview-small-icon.mjs",
+    "verify:app": "cd .. && node Logo/verify-app-icons.mjs",
     "verify:icon-v2": "node verify-new-icon.mjs"
   },
   "dependencies": {
