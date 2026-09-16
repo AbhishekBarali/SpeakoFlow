@@ -739,6 +739,46 @@ impl TranscriptionManager {
         });
     }
 
+    /// Load the configured local model so a failed cloud request has somewhere
+    /// to go, returning the model id that is now resident.
+    ///
+    /// Cloud mode never preloads a local engine (`initiate_model_load` returns
+    /// early), so this is the one place that pays that cost — deliberately, and
+    /// only after a cloud request has already failed. It is a plain synchronous
+    /// load rather than a spawn because the caller is mid-`transcribe()` and has
+    /// audio in hand: the point is to finish *this* recording, and the model
+    /// stays resident afterwards so a second failure costs nothing.
+    ///
+    /// Mirrors `initiate_model_load`'s handling of `is_loading` so a concurrent
+    /// load is awaited rather than duplicated.
+    fn load_fallback_engine(&self, settings: &crate::settings::AppSettings) -> Result<String> {
+        {
+            // Wait out a load already in flight before deciding anything.
+            let mut is_loading = self.is_loading.lock().unwrap();
+            while *is_loading {
+                is_loading = self.loading_condvar.wait(is_loading).unwrap();
+            }
+            if self.is_model_loaded() {
+                return self
+                    .get_current_model()
+                    .ok_or_else(|| anyhow::anyhow!("a model is loaded but unnamed"));
+            }
+            *is_loading = true;
+        }
+
+        let model_id = settings.selected_model.clone();
+        let outcome = if model_id.is_empty() {
+            Err(anyhow::anyhow!("no local model is selected"))
+        } else {
+            self.load_model(&model_id).map(|()| model_id)
+        };
+
+        let mut is_loading = self.is_loading.lock().unwrap();
+        *is_loading = false;
+        self.loading_condvar.notify_all();
+        outcome
+    }
+
     pub fn get_current_model(&self) -> Option<String> {
         let current_model = self.current_model_id.lock().unwrap();
         current_model.clone()
@@ -782,7 +822,10 @@ impl TranscriptionManager {
         //
         // An incomplete cloud configuration (no key, unknown provider) resolves
         // to `None` here and falls through to the local engine rather than
-        // failing the dictation.
+        // failing the dictation. A *complete* configuration that then fails on
+        // the wire falls through too, loading the local engine on demand — a
+        // dead key is a configuration problem wearing a network error's clothes,
+        // and it would otherwise fail every recording forever.
         {
             let settings = get_settings(&self.app_handle);
             if let Ok(cfg) = crate::stt_cloud::resolve_cloud_stt(&settings) {
@@ -820,12 +863,39 @@ impl TranscriptionManager {
                         return Ok(finished);
                     }
                     Err(e) => {
-                        // Nothing local is loaded in cloud mode, so there is no
-                        // second engine to fall back to: surface the provider's
-                        // own message, which is the only thing that explains a
-                        // bad key or an exhausted quota.
                         error!("Cloud transcription failed: {}", e);
-                        return Err(anyhow::anyhow!(e));
+                        // A revoked, expired, or mistyped key fails identically on
+                        // every single recording, so returning here does not report
+                        // a problem so much as break dictation until the user
+                        // happens to read the error. The local engine is
+                        // deliberately not loaded in cloud mode (see
+                        // `initiate_model_load`), which is why this used to be a
+                        // dead end — so pay for the one-time load and finish the
+                        // recording locally instead of throwing the audio away.
+                        //
+                        // The cloud error is still the one that surfaces if the
+                        // fallback cannot run: for a cloud-only user with nothing
+                        // downloaded, "invalid API key" explains the failure and
+                        // "no model loaded" only describes a consequence of it.
+                        match self.load_fallback_engine(&settings) {
+                            Ok(model_id) => {
+                                warn!(
+                                    "Falling back to the local model '{}' for this \
+                                     recording — {} rejected the request. Fix the key \
+                                     in Settings → Models → Cloud transcription, or \
+                                     switch transcription back to On my device.",
+                                    model_id, cfg.provider.label
+                                );
+                            }
+                            Err(load_err) => {
+                                warn!(
+                                    "No local engine to fall back to ({}), so the \
+                                     cloud failure stands",
+                                    load_err
+                                );
+                                return Err(anyhow::anyhow!(e));
+                            }
+                        }
                     }
                 }
             }
