@@ -15,11 +15,33 @@ custom-protocol = ["tauri/custom-protocol"]
 
 [profile.dev]
 incremental = true # Compile your binary in smaller steps.
+# Our own crate at a light optimisation level. The audio pipeline in
+# `audio_toolkit` — sample-format conversion, ring buffers, resampling, the VAD
+# feed — is numeric loops in *this* crate, so optimising only dependencies leaves
+# the hottest per-frame code unoptimised. Level 1 recovers most of the speed while
+# keeping incremental rebuilds quick; level 3 here would make every edit slow to
+# compile for little further gain.
+opt-level = 1
 
-# Screenshot resize/encode is pure pixel math, and unoptimized it costs SECONDS
-# per capture on a 1440p+ display — enough to make a dev build feel broken in a
-# way the shipped release build never is. Optimizing just this one dependency
-# keeps `tauri dev` representative of what users actually experience.
+# Build every DEPENDENCY optimised, even in a dev build. Our own crate stays at
+# opt-level 0, so incremental rebuilds and debugging are unaffected.
+#
+# This is not a nicety. At opt-level 0 the whole speech pipeline — whisper.cpp /
+# transcribe-rs inference, Silero VAD, `rubato` resampling, `image` encode — runs
+# roughly an order of magnitude slower than the shipped release build. A `tauri dev`
+# session then feels catastrophically broken: dictation that takes well under a
+# second in the real app sits there for many seconds, and it looks exactly like a
+# regression in the app rather than an artefact of the build profile. Anyone testing
+# a change reasonably concludes the change made things slow.
+#
+# Dependencies are compiled once and cached, so the cost is a slower first build and
+# nothing after that.
+[profile.dev.package."*"]
+opt-level = 3
+
+# Kept explicitly as well as the blanket rule above, because the reason is specific:
+# screenshot resize/encode is pure pixel math, and unoptimized it costs SECONDS per
+# capture on a 1440p+ display.
 [profile.dev.package.image]
 opt-level = 3
 
@@ -258,12 +280,20 @@ keyring = { version = "3", features = [
 tauri-runtime = { git = "https://github.com/cjpais/tauri.git", branch = "handy-2.10.2" }
 tauri-runtime-wry = { git = "https://github.com/cjpais/tauri.git", branch = "handy-2.10.2" }
 tauri-utils = { git = "https://github.com/cjpais/tauri.git", branch = "handy-2.10.2" }
-# Vendored handy-keys with a fix for OS-level stuck keys on Windows: the
-# low-level hook now blocks a key's UP (and auto-repeats) if-and-only-if it
-# blocked that key's DOWN, instead of re-evaluating the hotkey match per event.
-# Re-evaluating desyncs down/up whenever modifiers change mid-press (sloppy
-# press order, tap-to-lock Shift taps, hotkeys registered mid-hold) and left
-# keys "pressed forever" system-wide. See vendor/handy-keys/src/platform/windows/listener.rs.
+# Vendored handy-keys with two Windows fixes.
+#
+# 1. OS-level stuck keys: the low-level hook now blocks a key's UP (and
+#    auto-repeats) if-and-only-if it blocked that key's DOWN, instead of
+#    re-evaluating the hotkey match per event. Re-evaluating desyncs down/up
+#    whenever modifiers change mid-press (sloppy press order, tap-to-lock Shift
+#    taps, hotkeys registered mid-hold) and left keys "pressed forever"
+#    system-wide. See vendor/handy-keys/src/platform/windows/listener.rs.
+# 2. The app's own synthetic keystrokes are no longer matched against hotkeys
+#    while it is injecting them (`ignore_injected_input`). The assistant harvests
+#    the focused app's selection with a synthetic Ctrl+C at recording start, and
+#    that injected Ctrl key-up came back through our own hook and read as the user
+#    releasing the modifier-only `Ctrl+Alt` hotkey — ending a hold-to-talk
+#    recording ~30 ms after it began. See vendor/handy-keys/src/injected.rs.
 handy-keys = { path = "vendor/handy-keys" }
 
 [dev-dependencies]
