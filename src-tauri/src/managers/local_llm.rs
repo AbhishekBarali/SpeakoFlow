@@ -1220,9 +1220,8 @@ impl LocalLlmManager {
         // Passed via the env var rather than `--reasoning-budget` so that an
         // older cached engine build (which predates the flag) ignores it instead
         // of refusing to start, exactly like `LLAMA_ARG_FLASH_ATTN` below.
-        if self.role == LlmRole::Cleanup {
-            cmd.env("LLAMA_ARG_THINK_BUDGET", "0");
-        }
+        // Interactive answers need the same immediate output as cleanup.
+        cmd.env("LLAMA_ARG_THINK_BUDGET", "0");
 
         // Keep local chat on the same dedicated-first GPU policy used by the
         // rest of the app — but with the flag that actually enforces it.
