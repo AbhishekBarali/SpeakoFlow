@@ -1,0 +1,92 @@
+/* The reminder popup.
+ *
+ * There is deliberately almost nothing here. The card, its header, its actions
+ * and its body copy are the assistant panel's own classes from its own
+ * stylesheet (`.ask-card`, `.ask-head`, `.ask-action`, `.ask-answer-body`), so a
+ * reminder looks like the assistant because it *is* the assistant's card — not a
+ * second implementation of the same look that drifts a shade at a time.
+ *
+ * What is left is the handful of differences between a panel and a notification:
+ * this window is sized to its content rather than filling a frame, and several
+ * reminders stack in it.
+ *
+ * Two things the first version got wrong, both visible at a glance and worth
+ * naming so they do not come back:
+ *
+ *   • An amber accent (a 2px bar down the leading edge, an amber-filled Done
+ *     button, amber label text). Everything else in the app is monochrome, so a
+ *     lone spot of colour did not read as "this is a reminder", it read as a
+ *     rendering artifact — a stray line where a border had gone wrong.
+ *   • Snooze as an absolutely-positioned popover. The window is sized from the
+ *     measured content, and an absolutely-positioned element contributes no
+ *     height, so the menu opened straight through the bottom edge and was
+ *     clipped to a sliver. The choices are in normal flow now, which makes that
+ *     class of bug unreachable rather than merely fixed.
+ */
+
+.reminder-scope {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  /* The height reported to the window is this element's box, so it has to be
+     exactly the content: no stretch, no padding, no stray margin. */
+  padding: 0;
+  margin: 0;
+}
+
+/* In the panel the card fills the window and scrolls its own body. Here the
+   window follows the card, so both have to size to their content instead —
+   otherwise a flex child with `min-height: 0` collapses to nothing. */
+.reminder-scope .ask-card {
+  flex: 0 0 auto;
+  animation: reminder-arrive 300ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+.reminder-scope .ask-answer-body {
+  flex: 0 0 auto;
+  overflow: visible;
+  /* A notification is short by nature and there is no scrollbar to reserve
+     space for. */
+  scrollbar-gutter: auto;
+}
+
+/* Arrives from the corner it lives in, so the motion says where it came from.
+   Brief, and it settles rather than bouncing: this interrupts someone. */
+@keyframes reminder-arrive {
+  from {
+    opacity: 0;
+    transform: translateX(16px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+/* Supporting detail the assistant worked out rather than was told — the URL it
+   read off the screen, a file name. One step quieter than the reminder itself. */
+.reminder-note {
+  font-size: 0.82em;
+  color: var(--as-muted);
+}
+
+/* One step brighter than the panel's own header glyph. In the ask card the mic is
+   decoration next to a label you are already reading; here the bell is what
+   identifies the window as a reminder before you read anything, often in
+   peripheral vision, and `--as-faint` was too close to invisible for that. Still
+   monochrome: an accent colour is what made the first version look broken. */
+.reminder-scope .ask-head-icon {
+  color: var(--as-muted);
+}
+
+.reminder-snooze-row {
+  display: flex;
+  gap: 6px;
+  padding: 0 16px 12px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reminder-scope .ask-card {
+    animation: none;
+  }
+}

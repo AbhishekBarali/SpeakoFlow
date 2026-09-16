@@ -422,10 +422,6 @@
           "assistant_vision": {
             "name": "Demander avec l'écran",
             "description": "Posez votre question à la voix en joignant votre écran, pour qu'il voie ce que vous regardez."
-          },
-          "assistant_panel_toggle": {
-            "name": "Afficher ou masquer le panneau",
-            "description": "Affiche ou masque le panneau flottant de l'assistant."
           }
         },
         "errors": {

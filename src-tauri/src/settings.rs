@@ -1561,6 +1561,25 @@ pub struct AppSettings {
     /// switches this to `Custom`, which uses the remembered position instead.
     #[serde(default = "default_ask_anchor")]
     pub assistant_ask_anchor: AskAnchor,
+    /// Which display the Ask surface opens on.
+    ///
+    /// A free-form string rather than an enum, because the interesting values are
+    /// the names of monitors that only exist at runtime:
+    ///
+    /// * `"last_used"` (default) — the display it was last dragged to.
+    /// * `"cursor"` — whichever display the mouse is on. This used to be the only
+    ///   behaviour and was not a choice: on a landscape-plus-portrait desk it made
+    ///   the panel change both its place and its shape depending on where the
+    ///   pointer happened to be resting, which reads as the panel wandering.
+    /// * `"primary"` — always the primary display.
+    /// * anything else — a monitor name (`\\.\DISPLAY2` on Windows), matched by
+    ///   name first so the choice follows the physical screen if the desktop is
+    ///   rearranged, with the stored origin as a fallback.
+    ///
+    /// An unresolvable value degrades to `last_used` rather than failing, so
+    /// unplugging the chosen screen leaves the panel reachable.
+    #[serde(default = "default_ask_display")]
+    pub assistant_ask_display: String,
     /// Whether starting a plain dictation should silence an assistant reply
     /// that is still being read aloud. Off by default — earphone users often
     /// want to keep listening while they dictate. (Asking the assistant a NEW
@@ -1681,6 +1700,13 @@ fn default_overlay_position() -> OverlayPosition {
 /// old panel got lost, and the card exists to be read the moment it appears.
 fn default_ask_anchor() -> AskAnchor {
     AskAnchor::Center
+}
+
+/// The display the panel was last put on, which on a single-monitor machine is the
+/// only display and on a multi-monitor one is the answer that needs no setting.
+/// Naming a screen is for people who want it somewhere specific regardless.
+pub fn default_ask_display() -> String {
+    "last_used".to_string()
 }
 
 /// Overlay style defaults to `Auto` (follow the model's live-streaming support)
@@ -3076,7 +3102,7 @@ fn ensure_assistant_defaults(settings: &mut AppSettings) -> bool {
     }
     if !matches!(
         settings.assistant_font_size.as_str(),
-        "small" | "medium" | "large"
+        "small" | "medium" | "large" | "extra_large"
     ) {
         settings.assistant_font_size = default_assistant_font_size();
         changed = true;
@@ -3398,6 +3424,18 @@ pub fn get_default_settings() -> AppSettings {
     #[cfg(not(any(target_os = "windows", target_os = "macos")))]
     let default_assistant_shortcut = "ctrl+alt+space";
 
+    // The call's own key. `c` for call, and a letter rather than a modifier-only
+    // combo because this one is a deliberate tap, not a hold — nothing about it
+    // needs to be reachable without looking.
+    #[cfg(target_os = "macos")]
+    let default_assistant_call_shortcut = "option+ctrl+c";
+    // Ctrl+Alt+C first presses the modifier-only Assistant shortcut on Windows,
+    // so starting a call also started a recording and failed its setup check.
+    #[cfg(target_os = "windows")]
+    let default_assistant_call_shortcut = "ctrl+shift+c";
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    let default_assistant_call_shortcut = "ctrl+alt+c";
+
     bindings.insert(
         "assistant".to_string(),
         ShortcutBinding {
@@ -3417,24 +3455,19 @@ pub fn get_default_settings() -> AppSettings {
     // instead; a dedicated screen shortcut may return later on a free combo.
 
     bindings.insert(
-        "assistant_panel_toggle".to_string(),
+        "assistant_call".to_string(),
         ShortcutBinding {
-            id: "assistant_panel_toggle".to_string(),
-            name: "Open the assistant without recording".to_string(),
-            description:
-                "Optional. The assistant shortcut already opens the Ask card and starts \
-                 listening, and the tray icon opens it without recording, so this is only \
-                 useful if you want a key that opens the card ready to type."
-                    .to_string(),
-            // Unbound by default: two shortcuts for one surface is exactly the
-            // clutter this redesign set out to remove, and the assistant shortcut
-            // plus the tray entry already cover both ways in. Anyone who wants a
-            // type-first key can record one, the same way the cancel binding works.
-            // Deliberately NOT force-cleared for existing installs — silently
-            // unbinding a key somebody uses every day is worse than one spare row
-            // in Settings.
-            default_binding: String::new(),
-            current_binding: String::new(),
+            id: "assistant_call".to_string(),
+            name: "Start or end a call".to_string(),
+            description: "Open a hands-free conversation and talk to the assistant, replies \
+                 spoken aloud. Press again to hang up. This is the separate, longer-form \
+                 feature — the assistant shortcut above is for one quick question."
+                .to_string(),
+            // Bound by default, unlike the panel toggle. A call with no key of its
+            // own was reachable only by saying "open live conversation" out loud,
+            // which is not a discoverable way to find a feature.
+            default_binding: default_assistant_call_shortcut.to_string(),
+            current_binding: default_assistant_call_shortcut.to_string(),
         },
     );
 
@@ -3567,6 +3600,7 @@ pub fn get_default_settings() -> AppSettings {
         assistant_panel_opacity: default_assistant_panel_opacity(),
         assistant_panel_size: default_assistant_panel_size(),
         assistant_ask_anchor: default_ask_anchor(),
+        assistant_ask_display: default_ask_display(),
         assistant_tts_stop_on_dictation: false,
         assistant_web_search_enabled: false,
         assistant_web_search_provider: default_assistant_web_search_provider(),
@@ -4352,7 +4386,16 @@ pub fn load_or_create_app_settings(app: &AppHandle) -> AppSettings {
         //  - assistant_vision: Ctrl/Cmd+Alt+Shift+Space is now the
         //    assistant's hands-free variant; screenshots come from the
         //    panel's camera button instead.
-        for obsolete in ["transcribe_toggle", "assistant_vision"] {
+        //  - assistant_panel_toggle: show/hide-the-panel described a window
+        //    that no longer works that way. The panel is a quick-ask card the
+        //    ask key opens and closing ends, or a call the call key opens and
+        //    hangs up; a key that only reveals an empty one had nothing left
+        //    to do. The tray entry still opens it.
+        for obsolete in [
+            "transcribe_toggle",
+            "assistant_vision",
+            "assistant_panel_toggle",
+        ] {
             if settings.bindings.remove(obsolete).is_some() {
                 debug!("Removing obsolete '{}' binding", obsolete);
                 updated = true;

@@ -245,7 +245,7 @@
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 4;
   overflow: hidden;
-  font-size: var(--as-msg-font, 15px);
+  font-size: var(--as-msg-font, 16px);
   line-height: 1.7;
   overflow-wrap: anywhere;
 }
@@ -379,6 +379,7 @@
 .conversation-error {
   overflow-y: auto;
   flex: 1;
+  min-height: 0;
   width: min(100%, 40ch);
   font-size: 12px;
   line-height: 1.6;
@@ -410,7 +411,7 @@
   cursor: pointer;
 }
 .assistant-conversation.has-error .conversation-stage {
-  flex: 0;
+  flex: 0 0 auto;
   gap: 12px;
   padding: 18px 0 8px;
 }
@@ -468,6 +469,13 @@
   }
   .conversation-footnote {
     margin-top: 12px;
+  }
+  .assistant-conversation.has-error .conversation-stage {
+    gap: 8px;
+    padding: 12px 0 8px;
+  }
+  .assistant-conversation.has-error .voice-orb {
+    --orb-size: 40px;
   }
   .assistant-conversation.compact .voice-orb {
     --orb-size: 24px;

@@ -3,11 +3,21 @@
  * panel window AND the settings preview, so the two can never drift.
  */
 
-/** Message text size (user setting "small" | "medium" | "large"). */
+/** Message text size (user setting "small" | "medium" | "large" | "extra_large").
+ *
+ * The scale used to run 12.5 / 13.5 / 15 px, which had two problems. The step
+ * from small to medium was 1 px — not a choice anyone can see — and the top of
+ * the scale was roughly what the rest of the app calls default, so a reader who
+ * wanted bigger text had nothing left to pick. The panel deliberately does not
+ * follow the main window's `ui_text_size` (it is sized for a small floating
+ * surface, not a settings page), which means this list is the only lever there
+ * is, and it has to actually reach a comfortable reading size.
+ */
 export const FONT_SIZES: Record<string, string> = {
-  small: "12.5px",
-  medium: "13.5px",
-  large: "15px",
+  small: "13px",
+  medium: "14.5px",
+  large: "16px",
+  extra_large: "18px",
 };
 
 /** Structured error codes emitted by the backend (`assistant-error`).

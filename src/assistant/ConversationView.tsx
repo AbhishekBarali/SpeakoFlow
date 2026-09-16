@@ -18,7 +18,17 @@ import { VoiceOrb } from "./VoiceOrb";
 
 type Voice = ReturnType<typeof useVoiceConversation>;
 
-export function ConversationCallButtons({ voice }: { voice: Voice }) {
+export function ConversationCallButtons({
+  voice,
+  onEnd,
+}: {
+  voice: Voice;
+  /** Hang up. Deliberately not `voice.end` on its own: ending the session left
+   *  the window on screen, which re-rendered as the quick-ask card — so End
+   *  looked like it had opened a second, different assistant. Hanging up sends
+   *  the surface away with the call, exactly as the X does. */
+  onEnd: () => void;
+}) {
   const { t } = useTranslation();
   const muted = voice.phase === "muted";
   const muteLabel = t(`assistant.conversation.${muted ? "unmute" : "mute"}`);
@@ -38,7 +48,7 @@ export function ConversationCallButtons({ voice }: { voice: Voice }) {
       <button
         type="button"
         className="conversation-control end"
-        onClick={voice.end}
+        onClick={onEnd}
         aria-label={t("assistant.conversation.end")}
         title={t("assistant.conversation.end")}
       >
@@ -52,12 +62,15 @@ export function ConversationPill({
   voice,
   name,
   onExpand,
+  onEnd,
   voiceLoading = null,
   voiceFault = null,
 }: {
   voice: Voice;
   name: string;
   onExpand: () => void;
+  /** See `ConversationCallButtons.onEnd`. */
+  onEnd: () => void;
   /** See `Props.voiceLoading`. The pill is the default collapsed form during a
    *  call, so the first-call wait has to read the same here. */
   voiceLoading?: number | null;
@@ -91,7 +104,7 @@ export function ConversationPill({
         </span>
         <Maximize2 size={12} />
       </button>
-      <ConversationCallButtons voice={voice} />
+      <ConversationCallButtons voice={voice} onEnd={onEnd} />
     </div>
   );
 }
@@ -102,6 +115,8 @@ interface Props {
   answer: string;
   showTranscript: boolean;
   onToggleTranscript: () => void;
+  /** See `ConversationCallButtons.onEnd`. */
+  onEnd: () => void;
   /**
    * Percentage complete while the on-device voice loads, or `null` when it is
    * not loading.
@@ -127,6 +142,7 @@ export function ConversationView({
   answer,
   showTranscript,
   onToggleTranscript,
+  onEnd,
   voiceLoading = null,
   voiceFault = null,
 }: Props) {
@@ -225,7 +241,7 @@ export function ConversationView({
           >
             <MessageSquare size={18} />
           </button>
-          <ConversationCallButtons voice={voice} />
+          <ConversationCallButtons voice={voice} onEnd={onEnd} />
           <div
             className="conversation-options"
             ref={options}

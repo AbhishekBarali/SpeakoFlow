@@ -422,10 +422,6 @@
           "assistant_vision": {
             "name": "Mit Bildschirm fragen",
             "description": "Frage per Stimme mit angehängtem Bildschirm, damit der Assistent sieht, was du gerade ansiehst."
-          },
-          "assistant_panel_toggle": {
-            "name": "Panel ein- oder ausblenden",
-            "description": "Blendet das schwebende Assistenten-Panel ein oder aus."
           }
         },
         "errors": {

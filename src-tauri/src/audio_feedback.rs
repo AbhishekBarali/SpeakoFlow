@@ -13,9 +13,14 @@ use tauri::{AppHandle, Manager};
 pub enum SoundType {
     Start,
     Stop,
-    /// The tap-to-lock cue played when a push-to-talk hold is converted to
-    /// hands-free. Theme-independent — always `popo_lock.wav`.
-    Lock,
+    /// The reminder chime. Theme-independent — always `popo_lock.wav`.
+    ///
+    /// The file name is historical: this cue was added for the mid-recording
+    /// tap-to-lock gesture, which was removed, leaving it unreachable. A reminder
+    /// coming due is the one other event in the app that is a *notification*
+    /// rather than feedback for something the user just did, so it inherits the
+    /// one bundled sound that was already theme-independent for the same reason.
+    Reminder,
 }
 
 fn resolve_sound_path(
@@ -35,8 +40,8 @@ fn resolve_sound_path(
 
 fn get_sound_path(settings: &AppSettings, sound_type: SoundType) -> String {
     match (settings.sound_theme, sound_type) {
-        // The lock cue is theme-independent and always ships in resources.
-        (_, SoundType::Lock) => "resources/popo_lock.wav".to_string(),
+        // The reminder cue is theme-independent and always ships in resources.
+        (_, SoundType::Reminder) => "resources/popo_lock.wav".to_string(),
         (SoundTheme::Custom, SoundType::Start) => "custom_start.wav".to_string(),
         (SoundTheme::Custom, SoundType::Stop) => "custom_stop.wav".to_string(),
         (_, SoundType::Start) => settings.sound_theme.to_start_path(),
@@ -47,11 +52,28 @@ fn get_sound_path(settings: &AppSettings, sound_type: SoundType) -> String {
 fn get_sound_base_dir(settings: &AppSettings, sound_type: SoundType) -> tauri::path::BaseDirectory {
     match (settings.sound_theme, sound_type) {
         // Custom start/stop live in the user's app-data dir; everything else
-        // (built-in themes and the shared lock cue) is a bundled resource.
+        // (built-in themes and the shared reminder cue) is a bundled resource.
         (SoundTheme::Custom, SoundType::Start) | (SoundTheme::Custom, SoundType::Stop) => {
             tauri::path::BaseDirectory::AppData
         }
         _ => tauri::path::BaseDirectory::Resource,
+    }
+}
+
+/// Play the reminder chime.
+///
+/// Deliberately **not** gated on `audio_feedback`, unlike every other cue here.
+/// That switch means "don't beep at me when I start and stop dictating" — it is
+/// about feedback for an action the user just performed, and they are looking at
+/// the screen when they perform it. A reminder is the opposite: its whole purpose
+/// is to reach someone whose attention is elsewhere, and a silent one has failed
+/// even though the popup is technically on screen. (The same reasoning already
+/// separated `assistant_tts_volume` from `audio_feedback_volume`, after turning
+/// the beeps off left spoken replies quiet with no way to fix it.)
+pub fn play_reminder_sound(app: &AppHandle) {
+    let settings = settings::get_settings(app);
+    if let Some(path) = resolve_sound_path(app, &settings, SoundType::Reminder) {
+        play_sound_async(app, path);
     }
 }
 

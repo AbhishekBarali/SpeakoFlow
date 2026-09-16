@@ -21,9 +21,9 @@ use tokio::sync::Notify;
 pub const PANEL_LABEL: &str = "assistant_panel";
 
 /// The shortcut bindings that belong to the assistant, and so are switched off
-/// with it: the voice turn and the panel toggle. (Their auto-derived Shift
-/// `.lock` variants resolve to these ids, so checking the base id covers both.)
-pub const ASSISTANT_BINDINGS: [&str; 2] = ["assistant", "assistant_panel_toggle"];
+/// with it: the quick ask and the call. (Their auto-derived Shift `.lock`
+/// variants resolve to these ids, so checking the base id covers both.)
+pub const ASSISTANT_BINDINGS: [&str; 2] = ["assistant", "assistant_call"];
 
 /// Does this shortcut belong to the assistant?
 pub fn is_assistant_binding(binding_id: &str) -> bool {
@@ -35,6 +35,35 @@ const PANEL_POSITION_KEY: &str = "assistant_panel_position";
 /// Where the EXPANDED panel last sat. Each form remembers its own place, so
 /// expanding never dumps the panel wherever the pill happened to be dragged.
 const PANEL_POSITION_EXPANDED_KEY: &str = "assistant_panel_position_expanded";
+
+/// Which display the panel belongs to, stored as that display's logical origin.
+///
+/// The panel used to be placed on **whichever display the mouse cursor was on**
+/// at the moment it opened, and its size derived from that display too. On one
+/// screen that is invisible. On two it is the whole bug: measured on a 2560x1440
+/// landscape primary at (0,0) beside a 1440x2560 portrait secondary at
+/// (-1440,-510), the same `Center` anchor produced a 669x583 card near (946,404)
+/// or a 380x634 card near (-910,445) depending on nothing but where the pointer
+/// happened to be resting. Two shapes, two places, no gesture from the user — and
+/// the more different the two displays are, the further apart the two answers.
+///
+/// So the display is a remembered property of the panel, not a function of the
+/// cursor. It is stored as an origin rather than a monitor name because names are
+/// reassigned across reconnects and driver updates while the desktop origin is
+/// stable, and because matching an origin lets us return the display's *current*
+/// bounds — so changing a resolution re-shapes the card instead of stranding it.
+const PANEL_DISPLAY_KEY: &str = "assistant_panel_display";
+
+/// Where the user DRAGGED the quick-ask surface to, if they ever did.
+///
+/// Deliberately not [`PANEL_POSITION_EXPANDED_KEY`], which `save_position` writes
+/// from every hide, resize and programmatic placement and therefore cannot answer
+/// "did the user choose this?". This key is written in exactly one place
+/// ([`snap_and_remember`], after a settled drag) and cleared in exactly one place
+/// (`forget_dragged_position`, when an anchor is picked in Settings). That is what
+/// makes a drag durable without making every window operation look like a
+/// preference.
+const PANEL_DRAGGED_KEY: &str = "assistant_panel_dragged";
 
 /// Collapsed "pill" mode: a small transparent window in which the chip floats
 /// and hugs its content, like the STT recording overlay (128×40 there).
@@ -64,18 +93,18 @@ fn collapsed_size(app: &AppHandle) -> (f64, f64) {
 const PANEL_WIDTH: f64 = 390.0;
 const PANEL_HEIGHT: f64 = 500.0;
 
-/// Resize floor for the EXPANDED chat panel. This used to be the pill's 240x44,
-/// which is not a floor at all for a window that has to hold a message list and
-/// an input row: dragging the panel down to 241x45 was allowed, that size was
-/// then filed as the remembered expanded size, and every later expand produced a
-/// transparent sliver showing nothing but a sliced header. The pill floor
-/// belongs to the pill (see [`panel_min_size`]).
+/// Resize floor for the EXPANDED quick-ask surface's WIDTH. This used to be the
+/// pill's 240px, which is not a floor at all for a window an answer has to wrap
+/// inside: dragging the panel down to 241px was allowed, that width was then
+/// filed as the remembered expanded width, and every later expand produced a
+/// transparent sliver. The pill floor belongs to the pill (see
+/// [`panel_min_size`]).
 ///
-/// Kept at or below the smallest shipped preset (`mini`, 300x380) so every
+/// Kept at or below the smallest shipped preset (`mini`, 300px wide) so every
 /// preset remains applicable, while still leaving room to drag a little tighter
-/// than `mini` for anyone who wants it.
+/// than `mini` for anyone who wants it. There is no matching height floor: the
+/// height is the content's (see [`ASK_PILL_HEIGHT`] and [`ask_card_height`]).
 const PANEL_MIN_WIDTH: f64 = 300.0;
-const PANEL_MIN_HEIGHT: f64 = 360.0;
 
 /// How much of a window's top-left corner must land inside a monitor for the
 /// window to count as reachable. A few pixels are not enough: the user has to be
@@ -100,19 +129,105 @@ fn panel_preset_size(size: &str) -> (f64, f64) {
     }
 }
 
-/// How much of the display's width and height the Ask card takes at the standard
-/// size preset.
+/// How much of the display's width the Ask card takes at the standard size
+/// preset, and how tall it is allowed to grow.
 ///
 /// Fixed pixel presets gave a 4K monitor and a 13" laptop the same 390x500 card:
 /// postage-stamp on one, cramped on the other. The card is a fraction of the
 /// display instead, clamped at both ends so it can neither shrink to a strip nor
 /// sprawl across a huge screen, and the size preset became a multiplier on top.
-const ASK_WIDTH_FRACTION: f64 = 0.34;
-const ASK_HEIGHT_FRACTION: f64 = 0.46;
+/// The fractions themselves come from the dock zone — see
+/// [`ask_shape_for_anchor`].
+///
+/// The height is a **ceiling**, not a size: the card is sized to its answer (see
+/// [`fit_ask_card`]) and only reaches this when the answer is long enough to
+/// scroll.
 const ASK_MIN_WIDTH: f64 = 380.0;
 const ASK_MAX_WIDTH: f64 = 760.0;
 const ASK_MIN_HEIGHT: f64 = 340.0;
 const ASK_MAX_HEIGHT: f64 = 720.0;
+
+/// How the answer card is shaped for the edge it is docked to, as fractions of
+/// the display.
+///
+/// A card docked left or right has the whole height of the screen available and
+/// only wants a slice of its width: a reply read in a narrow column beside your
+/// work is easier to follow than one stretched across it, and it leaves the
+/// middle of the screen — where the work is — alone. Docked to the top or bottom
+/// the trade runs the other way, so it becomes a wide, shallow banner. Centred,
+/// with nothing to sit beside, it is balanced. This is what it means for the dock
+/// zones to be "optimised for that direction": the zone picks the proportions,
+/// not just the coordinates.
+///
+/// Pure, so each zone's proportions can be checked against real screen sizes.
+fn ask_shape_for_anchor(anchor: crate::settings::AskAnchor) -> (f64, f64) {
+    use crate::settings::AskAnchor;
+    match anchor {
+        // Tall rail down one side.
+        AskAnchor::Left | AskAnchor::Right => (0.25, 0.70),
+        // Wide banner along one edge.
+        AskAnchor::TopCenter | AskAnchor::BottomCenter => (0.42, 0.34),
+        // Balanced, and the default.
+        AskAnchor::Center | AskAnchor::Custom => (0.30, 0.46),
+    }
+}
+
+/// The talking pill's transparent frame: the shape every quick ask opens in.
+///
+/// This was the full width of the answer card, on the theory that a bar sharing
+/// the card's width and top-left corner turns the transition into a single
+/// downward `set_size` with no reposition to tear. It worked, and it was the
+/// wrong trade: it put a 650px slab on screen to hold the word "Listening",
+/// which is the opposite of the small, quiet thing a voice prompt should be.
+///
+/// The morph is a cross-fade now (see [`AskStage`]), and a cross-fade does not
+/// care whether the window moved underneath it — so the pill is free to be pill
+/// sized. It is deliberately the dictation overlay's pill, because to the user it
+/// is the same gesture: press, speak, release.
+///
+/// These are the **frame**, not the pill. The pill itself hugs its content and
+/// floats centred inside this transparent rectangle, exactly as the recording
+/// overlay's does, which is what lets "Listening", "Thinking" and "Searching the
+/// web" be different widths with no window resize between them. So the frame is
+/// sized for the longest of those states and the surplus simply never draws.
+///
+/// Keep in sync with `--ask-pill-h` in `AssistantPanel.css`, and with
+/// `.overlay-pill` in `RecordingOverlay.css`, which this mirrors.
+const ASK_PILL_WIDTH: f64 = 340.0;
+const ASK_PILL_HEIGHT: f64 = 56.0;
+
+/// The shortest the answer card may be. A one-line answer still needs its
+/// question line, a readable body and the follow-up row underneath it.
+const ASK_CARD_MIN_HEIGHT: f64 = 168.0;
+
+/// The height the card opens at before the webview has measured its own content
+/// — only ever seen if a fit report is lost.
+const ASK_CARD_FALLBACK_HEIGHT: f64 = 320.0;
+
+/// How long the webview's height morph runs, after which the window can be
+/// trimmed back to the surface it is actually drawing.
+///
+/// The window is transparent, so it is free to be *larger* than the card for the
+/// length of the animation and clips nothing; it must never be smaller, which is
+/// the only reason this is a shared constant rather than a CSS detail. Keep in
+/// sync with the `--ask-morph` duration in `AssistantPanel.css`, with a little
+/// slack so the trim always lands after the last frame.
+const ASK_MORPH_SETTLE_MS: u64 = 460;
+
+/// How long the pill is given to fade out before the window is resized and moved
+/// under it.
+///
+/// This delay is the whole reason the pill can be small. Resizing and moving a
+/// window while it still has something drawn in it is what reads as a glitch, so
+/// the order is: tell the webview to fade the pill out, wait for it to finish,
+/// *then* change the geometry — against an empty transparent window, where there
+/// is nothing left to jump — and only then let the card fade in. Geometry moves
+/// while nothing is visible, so no dock zone and no answer length can produce a
+/// tear.
+///
+/// Keep in sync with `--ask-pill-exit` in `AssistantPanel.css`, with slack, so the
+/// window never changes shape before the last frame of the fade.
+const ASK_PILL_EXIT_MS: u64 = 150;
 
 /// The size preset as a multiplier on the display-derived size, so the user's
 /// choice still means something without reintroducing a table of magic numbers.
@@ -125,25 +240,46 @@ fn ask_preset_scale(size: &str) -> f64 {
     }
 }
 
-/// The Ask card's size on a display of the given logical dimensions.
+/// The Ask card's width and maximum height on a display of the given logical
+/// dimensions, for the zone it is docked to.
 ///
 /// Pure, so the rule that decides whether the card is readable can be tested
-/// against real screen sizes without a monitor attached. Order matters: scale to
-/// the display, clamp to the comfortable band, then make sure it still physically
-/// fits — a small screen wins over the minimum, because a card larger than the
-/// display cannot be dragged back into view.
-fn ask_size_for_display(mon_w: f64, mon_h: f64, preset: &str) -> (f64, f64) {
+/// against real screen sizes without a monitor attached. Order matters: shape to
+/// the zone, scale to the display, clamp to the comfortable band, then make sure
+/// it still physically fits — a small screen wins over the minimum, because a card
+/// larger than the display cannot be dragged back into view.
+fn ask_size_for_display(
+    mon_w: f64,
+    mon_h: f64,
+    preset: &str,
+    anchor: crate::settings::AskAnchor,
+) -> (f64, f64) {
     let scale = ask_preset_scale(preset);
+    let (width_fraction, height_fraction) = ask_shape_for_anchor(anchor);
     // The cap scales with the preset too. With a fixed cap, every preset above
     // "mini" saturated it on a 1440p or 4K display — so "large" and "compact"
     // produced an identical card and the setting silently stopped meaning
     // anything on exactly the screens where it matters most.
-    let w = (mon_w * ASK_WIDTH_FRACTION * scale).clamp(ASK_MIN_WIDTH, ASK_MAX_WIDTH * scale);
-    let h = (mon_h * ASK_HEIGHT_FRACTION * scale).clamp(ASK_MIN_HEIGHT, ASK_MAX_HEIGHT * scale);
+    let w = (mon_w * width_fraction * scale).clamp(ASK_MIN_WIDTH, ASK_MAX_WIDTH * scale);
+    let h = (mon_h * height_fraction * scale).clamp(ASK_MIN_HEIGHT, ASK_MAX_HEIGHT * scale);
     // Leave a margin either side, and clearance for a taskbar at the bottom.
-    let max_w = (mon_w - 2.0 * PANEL_MARGIN).max(PILL_WIDTH);
-    let max_h = (mon_h - 2.0 * PANEL_MARGIN - TASKBAR_CLEARANCE).max(PILL_HEIGHT);
+    let max_w = (mon_w - 2.0 * PANEL_MARGIN).max(ASK_PILL_WIDTH);
+    let max_h = (mon_h - 2.0 * PANEL_MARGIN - TASKBAR_CLEARANCE).max(ASK_PILL_HEIGHT);
     (w.min(max_w), h.min(max_h))
+}
+
+/// Resolve a height the webview asked for into one the window may actually take.
+///
+/// Pure and separate from the window call for the reason every other geometry
+/// helper here is: a fit report arrives from the webview on every answer, and
+/// "does a two-line reply get a two-line card, and does a 4000-word one stop at
+/// the screen" is a question worth answering in a test rather than by talking to
+/// the assistant repeatedly.
+fn clamp_ask_fit(requested: f64, max_height: f64) -> f64 {
+    // A cap below the floor is possible on a very small display, and there the
+    // screen has to win — a card taller than the display cannot be read.
+    let floor = ASK_CARD_MIN_HEIGHT.min(max_height);
+    requested.clamp(floor, max_height.max(floor))
 }
 
 /// Clamp a desired logical panel size so it never exceeds the monitor it's on.
@@ -167,13 +303,19 @@ fn clamp_to_monitor(app: &AppHandle, w: f64, h: f64) -> (f64, f64) {
     (w, h)
 }
 
-/// How close to a screen edge a dragged card has to land before it snaps there.
+/// A display's logical bounds.
 ///
-/// Snapping exists because free positioning is what lost the old panel. Dragging
-/// stays available — the user asked for it — but the card lands on a sensible edge
-/// or corner instead of three pixels off one, and that position is what gets
-/// remembered.
-const SNAP_DISTANCE: f64 = 64.0;
+/// Grouped rather than passed as four loose `f64`s. The geometry helpers below took
+/// eight positional arguments between them, and nothing stopped a caller
+/// transposing width and height — a mistake that places the card plausibly but
+/// wrongly, which is the hardest kind to spot.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct DisplayBounds {
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+}
 
 /// Place a window of the given size at an anchor within a display.
 ///
@@ -181,13 +323,16 @@ const SNAP_DISTANCE: f64 = 64.0;
 /// a monitor. Returns the window's top-left in logical points.
 fn anchor_position(
     anchor: crate::settings::AskAnchor,
-    mon_x: f64,
-    mon_y: f64,
-    mon_w: f64,
-    mon_h: f64,
+    display: DisplayBounds,
     w: f64,
     h: f64,
 ) -> (f64, f64) {
+    let DisplayBounds {
+        x: mon_x,
+        y: mon_y,
+        width: mon_w,
+        height: mon_h,
+    } = display;
     use crate::settings::AskAnchor;
     let centre_x = mon_x + (mon_w - w) / 2.0;
     // Vertical centre sits slightly above true centre: the card grows downward as
@@ -219,95 +364,333 @@ fn anchor_position(
     )
 }
 
-/// Snap a dragged position to the nearest edge or corner when it lands close
-/// enough, leaving it untouched otherwise.
-///
-/// Each axis snaps independently, which is what makes corners work without a
-/// separate corner case: a drop near the top-right snaps on both axes at once.
-fn snap_to_edges(
-    x: f64,
-    y: f64,
-    mon_x: f64,
-    mon_y: f64,
-    mon_w: f64,
-    mon_h: f64,
-    w: f64,
-    h: f64,
-) -> (f64, f64) {
-    let left = mon_x + PANEL_MARGIN;
-    let right = mon_x + mon_w - w - PANEL_MARGIN;
-    let top = mon_y + PANEL_MARGIN;
-    let bottom = mon_y + mon_h - h - PANEL_MARGIN - TASKBAR_CLEARANCE;
-    let centre_x = mon_x + (mon_w - w) / 2.0;
-
-    let snapped_x = if (x - left).abs() <= SNAP_DISTANCE {
-        left
-    } else if (x - right).abs() <= SNAP_DISTANCE {
-        right
-    } else if (x - centre_x).abs() <= SNAP_DISTANCE {
-        // Horizontal centre is a snap target too, so "roughly middle" becomes
-        // exactly middle — the position most people actually want.
-        centre_x
-    } else {
-        x
-    };
-    let snapped_y = if (y - top).abs() <= SNAP_DISTANCE {
-        top
-    } else if (y - bottom).abs() <= SNAP_DISTANCE {
-        bottom
-    } else {
-        y
-    };
-    (snapped_x, snapped_y)
-}
-
-/// Session memory of the last expanded size (logical px), so collapsing to the
+/// Session memory of the last expanded WIDTH (logical px), so collapsing to the
 /// pill and expanding again restores a manual resize. 0 = never resized this
 /// session — fall back to the user's size preset. Not persisted: a fresh app
 /// start uses the preset from settings.
-static EXPANDED_W: AtomicU32 = AtomicU32::new(0);
-static EXPANDED_H: AtomicU32 = AtomicU32::new(0);
-
-/// The logical bounds of the display the Ask card should use: the one the mouse
-/// cursor is on, falling back to the window's current monitor and then the
-/// primary. Returns `(x, y, width, height)` in logical points.
 ///
-/// Cursor-based rather than "wherever the window happens to be", because the card
-/// is opened by a hotkey while the user is working somewhere specific — and on a
-/// multi-monitor desk, that is the screen they are looking at.
-fn active_display_bounds(app: &AppHandle) -> Option<(f64, f64, f64, f64)> {
-    let monitor = app
-        .cursor_position()
-        .ok()
-        .and_then(|pos| app.monitor_from_point(pos.x, pos.y).ok().flatten())
-        .or_else(|| {
-            app.get_webview_window(PANEL_LABEL)
-                .and_then(|w| w.current_monitor().ok().flatten())
-        })
-        .or_else(|| app.primary_monitor().ok().flatten())?;
+/// Width only. The quick ask's height belongs to its content now (see
+/// [`ask_stage_height`]), so there is nothing for a remembered height to mean:
+/// the next answer would overrule it on arrival, which reads as the app ignoring
+/// a resize the user just made. Dragging the card taller is instead a request the
+/// *next* fit report answers properly.
+static EXPANDED_W: AtomicU32 = AtomicU32::new(0);
+
+/// Whether the quick ask is showing its answer card (`true`) or the small
+/// talking pill it opens in (`false`).
+///
+/// The two are one window in two shapes, not two windows. They no longer share a
+/// footprint: the pill is pill sized and the card is card sized, each placed by
+/// the same dock zone, and the transition between them is a cross-fade rather
+/// than a geometric unfold. The earlier arrangement made the pill as wide as the
+/// card so growth was one downward `set_size` with nothing to reposition — the
+/// motion was clean and the resting shape was a 650px slab holding one word,
+/// which is not a trade worth making. A cross-fade is indifferent to whether the
+/// window moved, so the shapes are free to be the right shapes (see
+/// [`ASK_PILL_EXIT_MS`] for the ordering that makes the geometry change
+/// invisible).
+static ASK_STAGE_CARD: AtomicBool = AtomicBool::new(false);
+
+/// The card height the webview last measured for its own content, in logical px.
+/// 0 = nothing measured yet.
+static ASK_CARD_HEIGHT: AtomicU32 = AtomicU32::new(0);
+
+/// Rising counter identifying the most recent pill-to-card transition.
+///
+/// The card arrives on a delay (the pill's fade-out), and in that gap the user
+/// can cancel, close, or start speaking again. Each transition takes a ticket and
+/// the delayed half refuses to run unless its ticket is still the current one, so
+/// a superseded morph cannot resize a window that has moved on.
+static ASK_MORPH_TICKET: AtomicU32 = AtomicU32::new(0);
+
+/// A monitor's bounds in logical points.
+fn display_bounds_of(monitor: &tauri::Monitor) -> DisplayBounds {
     let scale = monitor.scale_factor();
-    Some((
-        monitor.position().x as f64 / scale,
-        monitor.position().y as f64 / scale,
-        monitor.size().width as f64 / scale,
-        monitor.size().height as f64 / scale,
-    ))
+    DisplayBounds {
+        x: monitor.position().x as f64 / scale,
+        y: monitor.position().y as f64 / scale,
+        width: monitor.size().width as f64 / scale,
+        height: monitor.size().height as f64 / scale,
+    }
 }
 
-fn expanded_size(app: &AppHandle) -> (f64, f64) {
-    let w = EXPANDED_W.load(Ordering::SeqCst);
-    let h = EXPANDED_H.load(Ordering::SeqCst);
-    if w != 0 && h != 0 {
-        // A deliberate manual resize this session wins over the computed size.
-        return clamp_to_monitor(app, w as f64, h as f64);
+/// How far two logical origins may differ and still count as the same display.
+///
+/// Not zero: an origin makes a round trip through the store as an `f64` and back
+/// through a scale-factor division, and a display whose resolution changed keeps
+/// its origin but not necessarily to the pixel.
+const DISPLAY_MATCH_TOLERANCE: f64 = 2.0;
+
+/// Read back the display the panel was pinned to, if it is still connected.
+///
+/// Returns the monitor's bounds **as they are now** rather than the ones that were
+/// stored, so a resolution or orientation change re-shapes the card instead of
+/// placing it against a screen that no longer exists at that size.
+fn pinned_display_bounds(app: &AppHandle) -> Option<DisplayBounds> {
+    let store = app
+        .store(crate::portable::store_path(
+            crate::settings::SETTINGS_STORE_PATH,
+        ))
+        .ok()?;
+    let value = store.get(PANEL_DISPLAY_KEY)?;
+    let x = value.get("x")?.as_f64()?;
+    let y = value.get("y")?.as_f64()?;
+    let monitors = app.available_monitors().ok()?;
+    monitors
+        .iter()
+        .map(display_bounds_of)
+        .find(|bounds| {
+            (bounds.x - x).abs() <= DISPLAY_MATCH_TOLERANCE
+                && (bounds.y - y).abs() <= DISPLAY_MATCH_TOLERANCE
+        })
+        .or_else(|| {
+            // Debug rather than warn: this is consulted on every fit report and every
+            // stage change, so a genuinely unplugged display would otherwise fill the
+            // log with the same line hundreds of times per answer.
+            debug!(
+                "The assistant panel's display at ({:.0}, {:.0}) is not connected; \
+                 falling back to the display it is currently on.",
+                x, y
+            );
+            None
+        })
+}
+
+/// Pin the panel to the display it is currently sitting on.
+///
+/// Called after a drag settles, which is the only gesture that means "I want it over
+/// here". Everything else — a show, a resize, a stage change — must leave the choice
+/// alone, or the panel is back to picking its own screen.
+///
+/// When the user has **named** a display in Settings and then drags the panel to a
+/// different one, the setting is updated to match. This is deliberately unlike the
+/// dock zone, which a drag must never rewrite: a zone has to be guessed from a
+/// coordinate and guessed wrong constantly, whereas the display a window's corner
+/// sits on is a fact. Leaving the setting behind would mean the panel snapped back
+/// on the next open with the dropdown still naming the screen it refused to stay on.
+fn remember_panel_display(app: &AppHandle) {
+    let Some(window) = app.get_webview_window(PANEL_LABEL) else {
+        return;
+    };
+    let Ok(Some(monitor)) = window.current_monitor() else {
+        return;
+    };
+    let bounds = display_bounds_of(&monitor);
+    if let Ok(store) = app.store(crate::portable::store_path(
+        crate::settings::SETTINGS_STORE_PATH,
+    )) {
+        store.set(
+            PANEL_DISPLAY_KEY,
+            serde_json::json!({ "x": bounds.x, "y": bounds.y }),
+        );
     }
-    let preset = get_settings(app).assistant_panel_size;
-    match active_display_bounds(app) {
-        Some((_, _, mon_w, mon_h)) => ask_size_for_display(mon_w, mon_h, &preset),
+    let mut settings = get_settings(app);
+    let named = display_choice_is_named(&settings.assistant_ask_display);
+    let landed_on = display_id(&monitor);
+    if named && settings.assistant_ask_display != landed_on {
+        debug!(
+            "The assistant panel was dragged to '{landed_on}'; updating the chosen display \
+             from '{}'.",
+            settings.assistant_ask_display
+        );
+        settings.assistant_ask_display = landed_on;
+        crate::settings::write_settings(app, settings);
+    }
+}
+
+/// Is this `assistant_ask_display` value the name of a specific screen, rather than
+/// one of the policies?
+///
+/// Pure, because it is what decides whether dragging the panel to another monitor
+/// rewrites the setting. Getting it wrong in the permissive direction would rewrite
+/// "follow my mouse" into a fixed screen the first time the panel was nudged, which
+/// is the same class of mistake the dock zone used to make.
+fn display_choice_is_named(choice: &str) -> bool {
+    !matches!(choice, "last_used" | "cursor" | "primary")
+}
+
+/// A connected display, as the settings dropdown needs to describe it.
+#[derive(Clone, serde::Serialize, serde::Deserialize, specta::Type)]
+pub struct DisplayChoice {
+    /// The value stored in `assistant_ask_display`: the monitor's own name where it
+    /// has one, and its origin otherwise.
+    pub id: String,
+    /// The monitor's name as the OS reports it, for building a readable label.
+    pub name: String,
+    pub width: u32,
+    pub height: u32,
+    pub is_primary: bool,
+    /// True for the display the panel would open on right now, so the UI can say
+    /// which screen "last used" currently resolves to.
+    pub is_current: bool,
+}
+
+/// The stable id for a monitor: its name, or its origin when it has none.
+///
+/// Falling back to the origin rather than to an index matters — an index is
+/// re-assigned when a display is unplugged, which would silently move the panel to
+/// a different screen than the one the user picked.
+fn display_id(monitor: &tauri::Monitor) -> String {
+    match monitor.name() {
+        Some(name) if !name.is_empty() => name.clone(),
+        _ => {
+            let bounds = display_bounds_of(monitor);
+            format!("at:{:.0},{:.0}", bounds.x, bounds.y)
+        }
+    }
+}
+
+/// Every connected display, for the "Which screen" dropdown.
+pub fn list_displays(app: &AppHandle) -> Vec<DisplayChoice> {
+    let current = active_display_bounds(app);
+    let primary = app
+        .primary_monitor()
+        .ok()
+        .flatten()
+        .map(|m| display_id(&m))
+        .unwrap_or_default();
+    app.available_monitors()
+        .map(|monitors| {
+            monitors
+                .iter()
+                .map(|monitor| {
+                    let bounds = display_bounds_of(monitor);
+                    let id = display_id(monitor);
+                    DisplayChoice {
+                        is_primary: id == primary,
+                        is_current: current.is_some_and(|c| {
+                            (c.x - bounds.x).abs() <= DISPLAY_MATCH_TOLERANCE
+                                && (c.y - bounds.y).abs() <= DISPLAY_MATCH_TOLERANCE
+                        }),
+                        id,
+                        name: monitor.name().cloned().unwrap_or_default(),
+                        width: monitor.size().width,
+                        height: monitor.size().height,
+                    }
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// The display the user explicitly named, if it is still connected.
+fn chosen_display_bounds(app: &AppHandle, choice: &str) -> Option<DisplayBounds> {
+    let monitors = app.available_monitors().ok()?;
+    // By name first, then by the origin encoded in a nameless id. Name first so the
+    // choice follows the physical screen when the desktop is rearranged, which is
+    // what "the screen on my left" means to the person who picked it.
+    monitors
+        .iter()
+        .find(|monitor| display_id(monitor) == choice)
+        .map(display_bounds_of)
+}
+
+/// The display the cursor is on.
+fn cursor_display_bounds(app: &AppHandle) -> Option<DisplayBounds> {
+    let pos = app.cursor_position().ok()?;
+    let monitor = app.monitor_from_point(pos.x, pos.y).ok().flatten()?;
+    Some(display_bounds_of(&monitor))
+}
+
+/// The logical bounds of the display the Ask surface belongs to.
+///
+/// The `assistant_ask_display` setting decides, and its default (`last_used`) is
+/// the display the panel was last dragged to. The cursor is only consulted when the
+/// user asked for it or when nothing else is known — see [`PANEL_DISPLAY_KEY`] for
+/// what consulting it unconditionally cost. A hotkey press is not a statement about
+/// which screen the panel lives on; dragging it there, or naming it in Settings, is.
+///
+/// Every branch falls through rather than failing, so a chosen display that has been
+/// unplugged leaves the panel reachable instead of parked in dead space.
+fn active_display_bounds(app: &AppHandle) -> Option<DisplayBounds> {
+    let choice = get_settings(app).assistant_ask_display;
+    match choice.as_str() {
+        "cursor" => {
+            if let Some(display) = cursor_display_bounds(app) {
+                return Some(display);
+            }
+        }
+        "primary" => {
+            if let Ok(Some(monitor)) = app.primary_monitor() {
+                return Some(display_bounds_of(&monitor));
+            }
+        }
+        "last_used" => {
+            if let Some(display) = pinned_display_bounds(app) {
+                return Some(display);
+            }
+        }
+        named => {
+            if let Some(display) = chosen_display_bounds(app, named) {
+                return Some(display);
+            }
+            debug!(
+                "The assistant panel's chosen display '{named}' is not connected; \
+                 falling back to the display it is currently on."
+            );
+        }
+    }
+    let monitor = app
+        .get_webview_window(PANEL_LABEL)
+        .and_then(|w| w.current_monitor().ok().flatten())
+        .or_else(|| {
+            app.cursor_position()
+                .ok()
+                .and_then(|pos| app.monitor_from_point(pos.x, pos.y).ok().flatten())
+        })
+        .or_else(|| app.primary_monitor().ok().flatten())?;
+    Some(display_bounds_of(&monitor))
+}
+
+/// The Ask card's width and its height ceiling for the current dock zone.
+fn ask_bounds(app: &AppHandle) -> (f64, f64) {
+    let settings = get_settings(app);
+    let preset = settings.assistant_panel_size;
+    let anchor = settings.assistant_ask_anchor;
+    let (mut width, max_height) = match active_display_bounds(app) {
+        Some(display) => ask_size_for_display(display.width, display.height, &preset, anchor),
         // No readable display: fall back to the old fixed preset rather than
         // guessing a fraction of an unknown screen.
         None => panel_preset_size(&preset),
+    };
+    // A deliberate manual resize this session wins over the computed width.
+    let remembered = EXPANDED_W.load(Ordering::SeqCst);
+    if remembered != 0 {
+        width = clamp_to_monitor(app, remembered as f64, max_height).0;
     }
+    (width, max_height)
+}
+
+/// The height the card takes for the content the webview measured.
+fn ask_card_height(max_height: f64) -> f64 {
+    let measured = ASK_CARD_HEIGHT.load(Ordering::SeqCst);
+    let requested = if measured == 0 {
+        ASK_CARD_FALLBACK_HEIGHT
+    } else {
+        measured as f64
+    };
+    clamp_ask_fit(requested, max_height)
+}
+
+/// The size the window takes for the current ask stage: the pill, or the card
+/// sized to its measured content.
+fn expanded_size(app: &AppHandle) -> (f64, f64) {
+    if !ASK_STAGE_CARD.load(Ordering::SeqCst) {
+        return (ASK_PILL_WIDTH, ASK_PILL_HEIGHT);
+    }
+    let (width, max_height) = ask_bounds(app);
+    (width, ask_card_height(max_height))
+}
+
+/// The footprint the dock zone should place: whichever stage is on screen.
+///
+/// This used to always report the card's, so the pill was positioned as if it
+/// were the card — deliberately, because the two shared a footprint and the pill
+/// occupied the card's top-left corner. Now that each stage is its own size, each
+/// is placed on its own: a pill centred in its zone, and a card centred in the
+/// same zone, with the move happening while the pill has already faded out.
+fn ask_anchor_size(app: &AppHandle) -> (f64, f64) {
+    expanded_size(app)
 }
 
 /// Voice conversation is a different shape of window from the chat panel: an
@@ -347,7 +730,7 @@ const CONVERSATION_MIN_HEIGHT: f64 = 340.0;
 
 /// Session memory of a manual resize made during a conversation, always stored
 /// as the ORB-view base even when the resize happened in the larger transcript
-/// form. Kept apart from `EXPANDED_W`/`EXPANDED_H` so neither mode can silently
+/// form. Kept apart from `EXPANDED_W` so neither mode can silently
 /// rewrite the other's size.
 static CONVERSATION_W: AtomicU32 = AtomicU32::new(0);
 static CONVERSATION_H: AtomicU32 = AtomicU32::new(0);
@@ -414,14 +797,18 @@ fn remember_size_in_lane(app: &AppHandle, lane: SizeLane) {
     // used to be the pill's 240x44, so a 241x45 drag of the expanded panel was
     // filed happily and then reproduced on every later expand for the rest of
     // the session. Each lane is held to its own floor instead.
-    let (min_w, min_h) = panel_min_size(false, lane == SizeLane::Conversation);
+    // Against the card's floor, not the pill's: the pill is a fixed shape the
+    // user cannot usefully drag, so any resize worth remembering was made on the
+    // card.
+    let (min_w, min_h) = panel_min_size(false, lane == SizeLane::Conversation, true);
     if w < min_w || h < min_h {
         return;
     }
     match lane {
         SizeLane::Panel => {
+            // Width only: the quick ask's height is its answer's (see
+            // `ask_stage_height`).
             EXPANDED_W.store(w.round() as u32, Ordering::SeqCst);
-            EXPANDED_H.store(h.round() as u32, Ordering::SeqCst);
         }
         SizeLane::Conversation => {
             // The stored value is the orb-view base; undo the growth factor so
@@ -439,16 +826,27 @@ fn remember_size_in_lane(app: &AppHandle, lane: SizeLane) {
 
 /// The resize floor for one form of the window. Split out of
 /// [`apply_panel_min_size`] so the invariants that matter — a live call keeps
-/// its controls reachable, and collapsing to the pill is never refused — are
-/// testable without a window.
-fn panel_min_size(collapsed: bool, conversation: bool) -> (f64, f64) {
+/// its controls reachable, and neither the collapsed pill nor the talking pill is
+/// ever refused — are testable without a window.
+///
+/// `card` distinguishes the quick ask's two stages. It matters for the width as
+/// well as the height: the talking pill is narrower than the card's width floor,
+/// so a single floor for both stages would quietly stretch the pill to 300px and
+/// undo the whole point of it.
+fn panel_min_size(collapsed: bool, conversation: bool, card: bool) -> (f64, f64) {
     if collapsed {
         // Collapsing must never be refused, so the pill's own size is the floor.
         (PILL_WIDTH, PILL_HEIGHT)
     } else if conversation {
         (CONVERSATION_MIN_WIDTH, CONVERSATION_MIN_HEIGHT)
+    } else if card {
+        // `PANEL_MIN_HEIGHT` was the floor for a window that always held a message
+        // list and an input row; a 360px floor would refuse a card sized to a
+        // one-line answer. Width still has a real floor, because the width is the
+        // one dimension the user drags and the one the answer wraps to.
+        (PANEL_MIN_WIDTH, ASK_CARD_MIN_HEIGHT)
     } else {
-        (PANEL_MIN_WIDTH, PANEL_MIN_HEIGHT)
+        (ASK_PILL_WIDTH, ASK_PILL_HEIGHT)
     }
 }
 
@@ -456,7 +854,11 @@ fn panel_min_size(collapsed: bool, conversation: bool) -> (f64, f64) {
 /// to move with the form: the pill is 240x44, so a conversation-sized floor
 /// left in place would refuse the collapse outright.
 fn apply_panel_min_size(app: &AppHandle, window: &tauri::WebviewWindow, collapsed: bool) {
-    let (w, h) = panel_min_size(collapsed, crate::voice_conversation::is_active(app));
+    let (w, h) = panel_min_size(
+        collapsed,
+        crate::voice_conversation::is_active(app),
+        ASK_STAGE_CARD.load(Ordering::SeqCst),
+    );
     let _ = window.set_min_size(Some(tauri::LogicalSize::new(w, h)));
 }
 
@@ -471,7 +873,7 @@ fn keep_panel_on_monitor(window: &tauri::WebviewWindow, w: f64, h: f64) {
         let mh = monitor.size().height as f64 / scale;
         let x = (pos.x as f64 / scale).clamp(mx + 8.0, (mx + mw - w - 8.0).max(mx + 8.0));
         let y = (pos.y as f64 / scale).clamp(my + 8.0, (my + mh - h - 8.0).max(my + 8.0));
-        let _ = window.set_position(tauri::LogicalPosition::new(x, y));
+        place_panel(window, x, y);
     }
 }
 
@@ -493,6 +895,225 @@ fn apply_panel_form_size(app: &AppHandle) {
     let _ = window.set_size(tauri::LogicalSize::new(w, h));
     keep_panel_on_monitor(&window, w, h);
     save_position(app);
+}
+
+/* =============================================================================
+ * The quick ask's two stages
+ *
+ * A question opens the talking pill; the answer replaces it with the card. Both
+ * are the same window in two shapes, each placed by the dock zone the user chose.
+ *
+ * Ordering is the entire design here, and it runs in three beats:
+ *
+ *   1. the webview fades the pill out          (`stage: "leaving"`)
+ *   2. the window is resized and moved         — nothing is drawn, so nothing can
+ *                                                visibly jump
+ *   3. the webview fades the card in           (`stage: "card"`)
+ *
+ * Beat 2 is the one that used to be impossible. While the pill and the card
+ * shared a footprint the geometry never changed and no sequencing was needed, at
+ * the cost of a pill as wide as the card. Fading out first buys the same
+ * seamlessness without that cost: a window may change size, change place, and
+ * change dock zone between beats 1 and 3, and none of it is visible because there
+ * is nothing on screen at the time.
+ *
+ * The rule that survives from the old arrangement: never let the animation
+ * outrun the frame. The card must not begin drawing into a window that is still
+ * pill sized, or the answer is clipped to 52px.
+ * ============================================================================= */
+
+/// Which shape the webview should be drawing, and in which direction it is
+/// moving.
+#[derive(Clone, Copy, PartialEq)]
+enum AskStage {
+    /// The talking pill: listening, transcribing, thinking.
+    Pill,
+    /// The pill, on its way out. The window changes shape once this has finished.
+    Leaving,
+    /// The answer card.
+    Card,
+}
+
+impl AskStage {
+    /// The wire name. Kept explicit rather than derived so renaming the variant
+    /// cannot silently break the webview, which matches on these strings.
+    fn as_str(self) -> &'static str {
+        match self {
+            AskStage::Pill => "pill",
+            AskStage::Leaving => "leaving",
+            AskStage::Card => "card",
+        }
+    }
+}
+
+/// Tell the webview which stage it is in, and how much room it has to draw.
+///
+/// Re-sent on every show as well as on every change, which is what lets a
+/// reloaded webview — whose React state comes back believing it is a pill — draw
+/// the right shape without a command to ask with.
+fn emit_ask_frame(app: &AppHandle, stage: AskStage, height: f64) {
+    let _ = app.emit(
+        "assistant-ask-frame",
+        AskFramePayload {
+            stage: stage.as_str(),
+            height,
+        },
+    );
+}
+
+#[derive(Clone, Serialize)]
+struct AskFramePayload {
+    /// `"pill"`, `"leaving"`, or `"card"`.
+    stage: &'static str,
+    /// The height the window has just been given, in logical px. The webview
+    /// morphs its surface to exactly this, so it is the clamped value rather than
+    /// whatever was asked for.
+    height: f64,
+}
+
+/// Put the surface back to the talking pill.
+///
+/// Only ever called while the card is off screen — a fresh ask, or a close — so
+/// there is nothing to animate and no reason to make the user watch a card
+/// collapse before they can speak.
+fn reset_ask_stage_now(app: &AppHandle) {
+    // Any morph still waiting on its fade-out belongs to the surface being
+    // replaced, so retire its ticket before it can resize the pill into a card.
+    ASK_MORPH_TICKET.fetch_add(1, Ordering::SeqCst);
+    if !ASK_STAGE_CARD.swap(false, Ordering::SeqCst) && ASK_CARD_HEIGHT.load(Ordering::SeqCst) == 0
+    {
+        return;
+    }
+    ASK_CARD_HEIGHT.store(0, Ordering::SeqCst);
+    if PILL_MODE.load(Ordering::SeqCst) || crate::voice_conversation::is_active(app) {
+        return;
+    }
+    if app.get_webview_window(PANEL_LABEL).is_some() {
+        apply_panel_form_size(app);
+        emit_ask_frame(app, AskStage::Pill, ASK_PILL_HEIGHT);
+    }
+}
+
+/// Give the answer the room it measured, and let the webview swap the pill for
+/// the card.
+///
+/// `requested` is the height the webview needs for the whole card. It is clamped
+/// here rather than there because the ceiling belongs to the display, which the
+/// webview cannot see (its own `100vh` is only ever the window it is already in).
+///
+/// Two quite different transitions arrive through this one door, and conflating
+/// them is what made the old version need a card-width pill:
+///
+/// * **The first answer.** The pill is on screen and the card is not, so the
+///   window has to change size *and* place. The pill fades out first and the
+///   geometry changes against an empty window (see [`ASK_PILL_EXIT_MS`]).
+/// * **A follow-up answer.** The card is already in front of the user, so only its
+///   height changes and it keeps its top-left corner. Re-centring it on the dock
+///   zone would slide a card somebody is reading, which is worse than letting it
+///   grow downward.
+pub fn fit_ask_card(app: &AppHandle, requested: f64) {
+    if requested <= 0.0 {
+        return;
+    }
+    let app_main = app.clone();
+    if let Err(e) = app.run_on_main_thread(move || {
+        // The pill and the card are the quick ask's shapes. A call owns the window
+        // while it runs, and the collapsed pill is a form the user chose.
+        if PILL_MODE.load(Ordering::SeqCst) || crate::voice_conversation::is_active(&app_main) {
+            return;
+        }
+        if app_main.get_webview_window(PANEL_LABEL).is_none() {
+            return;
+        }
+        let (width, max_height) = ask_bounds(&app_main);
+        let target = clamp_ask_fit(requested, max_height);
+        let previous = ASK_CARD_HEIGHT.swap(target.round() as u32, Ordering::SeqCst) as f64;
+
+        if ASK_STAGE_CARD.swap(true, Ordering::SeqCst) {
+            resize_ask_card_in_place(&app_main, width, target, previous);
+            return;
+        }
+
+        // Beat 1: the pill leaves. Nothing about the window changes yet.
+        let ticket = ASK_MORPH_TICKET.fetch_add(1, Ordering::SeqCst) + 1;
+        emit_ask_frame(&app_main, AskStage::Leaving, ASK_PILL_HEIGHT);
+
+        let app_late = app_main.clone();
+        tauri::async_runtime::spawn(async move {
+            tokio::time::sleep(std::time::Duration::from_millis(ASK_PILL_EXIT_MS)).await;
+            let app_final = app_late.clone();
+            let _ = app_late.run_on_main_thread(move || {
+                // Anything that touched the stage during the fade owns the window
+                // now: a cancel, a close, or a second question already speaking.
+                if ASK_MORPH_TICKET.load(Ordering::SeqCst) != ticket
+                    || PILL_MODE.load(Ordering::SeqCst)
+                    || crate::voice_conversation::is_active(&app_final)
+                    || !ASK_STAGE_CARD.load(Ordering::SeqCst)
+                {
+                    return;
+                }
+                let Some(window) = app_final.get_webview_window(PANEL_LABEL) else {
+                    return;
+                };
+                // Re-read rather than reuse: the answer can have grown between the
+                // two beats, and the measurement that arrived last is the right one.
+                let (width, max_height) = ask_bounds(&app_final);
+                let height = ask_card_height(max_height);
+
+                // Beat 2: change shape and place while the window is empty.
+                apply_panel_min_size(&app_final, &window, false);
+                let _ = window.set_size(tauri::LogicalSize::new(width, height));
+                let (x, y) = default_position_for(&app_final, width, height);
+                place_panel(&window, x, y);
+                keep_panel_on_monitor(&window, width, height);
+
+                // Beat 3: the card arrives, into a frame that already fits it.
+                emit_ask_frame(&app_final, AskStage::Card, height);
+            });
+        });
+    }) {
+        error!("Could not queue ask-card fit: {}", e);
+    }
+}
+
+/// Resize a card that is already on screen, holding the taller of the two heights
+/// for the length of the morph.
+///
+/// The window is transparent, so one that is briefly too tall shows nothing at
+/// all; one that is too short clips the answer mid-animation. So the hold is only
+/// ever downward, and the trim only happens once the morph has finished — at which
+/// point the window stops intercepting clicks in the empty strip below the card.
+fn resize_ask_card_in_place(app: &AppHandle, width: f64, target: f64, previous: f64) {
+    let Some(window) = app.get_webview_window(PANEL_LABEL) else {
+        return;
+    };
+    apply_panel_min_size(app, &window, false);
+    let hold = target.max(previous);
+    let _ = window.set_size(tauri::LogicalSize::new(width, hold));
+    keep_panel_on_monitor(&window, width, hold);
+    emit_ask_frame(app, AskStage::Card, target);
+
+    if hold <= target {
+        return;
+    }
+    let app_trim = app.clone();
+    tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(std::time::Duration::from_millis(ASK_MORPH_SETTLE_MS)).await;
+        let app_final = app_trim.clone();
+        let _ = app_trim.run_on_main_thread(move || {
+            // Anything that changed the stage meanwhile owns the window now.
+            if PILL_MODE.load(Ordering::SeqCst)
+                || crate::voice_conversation::is_active(&app_final)
+                || !ASK_STAGE_CARD.load(Ordering::SeqCst)
+                || (ASK_CARD_HEIGHT.load(Ordering::SeqCst) as f64 - target).abs() > 0.5
+            {
+                return;
+            }
+            if let Some(window) = app_final.get_webview_window(PANEL_LABEL) {
+                let _ = window.set_size(tauri::LogicalSize::new(width, target));
+            }
+        });
+    });
 }
 
 /// A voice conversation is starting: park the chat panel's current size in its
@@ -1473,6 +2094,24 @@ impl AssistantConversation {
         self.reset_rolling_summary();
     }
 
+    /// Load a conversation as a NEW branch: the messages are adopted but no
+    /// session id is kept, so the next turn writes a fresh History row.
+    ///
+    /// That missing id is the entire safety property. Branching is meant to be
+    /// non-destructive — the user liked an old conversation and wants to try a
+    /// different direction from the middle of it — so the row it came from must be
+    /// left exactly as it was. Reusing `load_session` here would point future
+    /// persists at the original and quietly overwrite the thing being forked.
+    pub fn load_branch(&self, messages: Vec<ChatMessage>) {
+        if let Ok(mut history) = self.messages.lock() {
+            *history = messages;
+        }
+        if let Ok(mut session) = self.session_id.lock() {
+            *session = None;
+        }
+        self.reset_rolling_summary();
+    }
+
     /// Drop the session pointer only if it matches `id` — used when a
     /// conversation is deleted from the History view while still active, so
     /// the next turn re-saves instead of updating a now-deleted row.
@@ -1504,6 +2143,7 @@ struct AssistantErrorPayload {
 /// `screenshot_too_large`, `screen_capture`, `transcription`, `tts`,
 /// `mic_denied`, `mic_unavailable`.
 pub fn emit_error(app: &AppHandle, code: &str, detail: String) {
+    warn!("Assistant error ({code}): {detail}");
     let _ = app.emit(
         "assistant-error",
         AssistantErrorPayload {
@@ -1822,29 +2462,61 @@ fn save_position(app: &AppHandle) {
     }
 }
 
-/// Where the Ask card should open, for a window of the given size.
+/// Hold a window of this size inside a display, keeping its top-left as close to
+/// the requested point as the display allows.
 ///
-/// Honours the anchor setting on the display the cursor is on. `Custom` means the
-/// user dragged the card somewhere, so the remembered position is used — and if
-/// that position is no longer reachable (the display was unplugged), it falls back
-/// to centre rather than opening into dead space.
+/// Pure, and shared by the anchor path and the dragged-position path so a remembered
+/// drop and a dock zone cannot disagree about where the edge of the screen is.
+fn clamp_position_into_display(
+    x: f64,
+    y: f64,
+    display: DisplayBounds,
+    w: f64,
+    h: f64,
+) -> (f64, f64) {
+    let min_x = display.x + PANEL_MARGIN;
+    let min_y = display.y + PANEL_MARGIN;
+    let max_x = (display.x + display.width - w - PANEL_MARGIN).max(min_x);
+    let max_y = (display.y + display.height - h - PANEL_MARGIN - TASKBAR_CLEARANCE).max(min_y);
+    (x.clamp(min_x, max_x), y.clamp(min_y, max_y))
+}
+
+/// The position the user dragged the quick-ask surface to, if they ever did and it
+/// is still reachable.
+fn dragged_position(app: &AppHandle) -> Option<(f64, f64)> {
+    saved_position_for(app, PANEL_DRAGGED_KEY)
+}
+
+/// Where the Ask surface should open, for a window of the given size.
 ///
-/// This replaces a bottom-right corner computed from the *panel's* 390x500 while
-/// the window was actually being built at the pill's 240x44, which put a fresh
-/// install's card floating in the middle-right of the screen — nowhere near the
-/// corner it was aiming for, and nowhere the user would look.
+/// Two inputs, in priority order: a position the user **dragged** it to, and
+/// otherwise the dock zone they chose in Settings. Both are resolved against the
+/// display the panel is pinned to (see [`active_display_bounds`]), so the answer is
+/// the same on every open rather than a function of where the pointer was resting.
+///
+/// A drag winning here is what makes dragging mean anything. The previous version
+/// ignored every stored coordinate, because the only coordinate available was the
+/// one `save_position` wrote after every hide and every programmatic placement —
+/// which could not distinguish a choice from an echo, so honouring it defeated the
+/// anchor setting and ignoring it defeated the drag. `PANEL_DRAGGED_KEY` is written
+/// by one gesture and cleared by one gesture, so it can be honoured safely.
 fn default_position_for(app: &AppHandle, w: f64, h: f64) -> (f64, f64) {
     use crate::settings::AskAnchor;
-    let anchor = get_settings(app).assistant_ask_anchor;
-    let Some((mon_x, mon_y, mon_w, mon_h)) = active_display_bounds(app) else {
+    let Some(display) = active_display_bounds(app) else {
         return (100.0, 100.0);
     };
-    if anchor == AskAnchor::Custom {
-        if let Some((x, y)) = saved_position_for(app, PANEL_POSITION_EXPANDED_KEY) {
-            return (x, y);
-        }
+    if let Some((x, y)) = dragged_position(app) {
+        return clamp_position_into_display(x, y, display, w, h);
     }
-    anchor_position(anchor, mon_x, mon_y, mon_w, mon_h, w, h)
+    // `Custom` is the legacy value written by the old drag handler, which used to
+    // flip the setting behind the user's back. There is nothing to place it by, so
+    // it reads as the default; a real drag now lands in `PANEL_DRAGGED_KEY` above
+    // and never touches the anchor.
+    let anchor = match get_settings(app).assistant_ask_anchor {
+        AskAnchor::Custom => AskAnchor::Center,
+        anchor => anchor,
+    };
+    anchor_position(anchor, display, w, h)
 }
 
 /// Move the panel back onto a visible monitor if it is currently parked off
@@ -1870,36 +2542,185 @@ fn ensure_panel_on_screen(app: &AppHandle, window: &tauri::WebviewWindow, w: f64
         "Assistant panel was off screen at ({:.0}, {:.0}); moving it to ({:.0}, {:.0})",
         x, y, nx, ny
     );
-    let _ = window.set_position(tauri::LogicalPosition::new(nx, ny));
+    place_panel(window, nx, ny);
 }
 
-/// Discard the remembered dragged position for the Ask card.
+/// Discard the remembered dragged position for the Ask surface.
 ///
-/// Called when the user picks an anchor: without this, the stored position from an
-/// earlier drag would keep winning and the new anchor would appear to do nothing.
+/// Called when the user picks an anchor in Settings: picking a dock zone is a
+/// statement that overrides an earlier drag, and without this the drag would keep
+/// winning and the new zone would appear to do nothing.
+///
+/// The display pin is deliberately **kept**. "Bottom" means the bottom of the
+/// screen the panel lives on, and clearing the pin here would send it back to
+/// hunting for the cursor's screen the moment the user adjusted the zone.
 pub fn forget_dragged_position(app: &AppHandle) {
     if let Ok(store) = app.store(crate::portable::store_path(
         crate::settings::SETTINGS_STORE_PATH,
     )) {
+        store.delete(PANEL_DRAGGED_KEY);
         store.delete(PANEL_POSITION_EXPANDED_KEY);
     }
 }
 
-/// Snap the card to the nearest edge after the user finishes dragging it, and
-/// remember where it ended up.
+/// Discard the remembered display, so `last_used` starts from nothing.
 ///
-/// Called on the window's `Moved` event. Snapping on every intermediate move event
-/// would fight the drag, so the position is only adjusted once it is close enough
-/// to a target to be unambiguous — the pointer is still down, but the correction is
-/// small enough to read as magnetism rather than the window escaping.
+/// Called when the user picks a display in Settings. Keeping the old pin would let it
+/// win over a fresh `last_used` choice, which is the same trap the dragged position
+/// used to set.
+pub fn forget_panel_display(app: &AppHandle) {
+    if let Ok(store) = app.store(crate::portable::store_path(
+        crate::settings::SETTINGS_STORE_PATH,
+    )) {
+        store.delete(PANEL_DISPLAY_KEY);
+    }
+}
+
+/// The position the app itself last placed the window at.
+///
+/// Every programmatic move fires a `Moved` event exactly like a drag does, so
+/// without this, simply opening the card at the Centre anchor would look like the
+/// user had dragged it there — flipping the anchor setting to `Custom` on the first
+/// open and permanently defeating the setting it was meant to honour.
+static PLACED_AT: std::sync::Mutex<Option<(f64, f64)>> = std::sync::Mutex::new(None);
+
+/// Move the window and remember that *we* did it, not the user.
+fn place_panel(window: &tauri::WebviewWindow, x: f64, y: f64) {
+    if let Ok(mut placed) = PLACED_AT.lock() {
+        *placed = Some((x, y));
+    }
+    let _ = window.set_position(tauri::LogicalPosition::new(x, y));
+}
+
+/// Is the window sitting exactly where the app last put it? Then the `Moved` event
+/// being handled is our own placement echoing back, not a drag.
+fn is_our_own_placement(x: f64, y: f64) -> bool {
+    match PLACED_AT.lock() {
+        Ok(placed) => placed
+            .map(|(px, py)| (px - x).abs() < 2.0 && (py - y).abs() < 2.0)
+            .unwrap_or(false),
+        Err(_) => false,
+    }
+}
+
+/// Generation counter for debouncing the end of a drag. Every `Moved` event bumps
+/// it, and a deferred snap only acts if it is still the newest.
+static MOVE_GENERATION: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// How long the window has to sit still before the drag counts as finished.
+///
+/// `Moved` fires continuously while the pointer is down, and calling
+/// `set_position` on each one fights the drag: the window sticks to an edge the
+/// user is trying to pull away from, which reads as the app grabbing the mouse.
+/// Waiting for the movement to stop turns the same code into magnetism applied
+/// once, on release.
+const SNAP_SETTLE: std::time::Duration = std::time::Duration::from_millis(180);
+
+/// Handle a panel move: remember the position, and snap to an edge once the drag
+/// has actually finished.
+fn on_panel_moved(app: &AppHandle) {
+    let generation = MOVE_GENERATION.fetch_add(1, Ordering::SeqCst) + 1;
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(SNAP_SETTLE).await;
+        // A newer move arrived, so the pointer is still down. Let that one settle.
+        if MOVE_GENERATION.load(Ordering::SeqCst) != generation {
+            return;
+        }
+        let app_main = app.clone();
+        if let Err(e) = app.run_on_main_thread(move || snap_and_remember(&app_main)) {
+            debug!("Could not queue the panel snap: {e}");
+        }
+    });
+}
+
+/// Which dock zone a window dropped at this position belongs to.
+///
+/// Decided by asking each zone where it *would* have put a window of this size and
+/// taking the closest answer, rather than by carving the screen into regions. The
+/// zones already know their own geometry (margins, taskbar clearance, the slight
+/// lift above true centre), so reimplementing that as a set of thresholds is how
+/// the two would drift apart — and a zone you cannot reach by dragging to the
+/// obvious place is worse than no dragging at all.
+///
+/// `Custom` is deliberately not a candidate: it is not somewhere you can drop
+/// something, it is the absence of a zone.
+fn nearest_anchor(
+    x: f64,
+    y: f64,
+    display: DisplayBounds,
+    w: f64,
+    h: f64,
+) -> crate::settings::AskAnchor {
+    use crate::settings::AskAnchor;
+    [
+        AskAnchor::Center,
+        AskAnchor::TopCenter,
+        AskAnchor::BottomCenter,
+        AskAnchor::Left,
+        AskAnchor::Right,
+    ]
+    .into_iter()
+    .map(|anchor| {
+        let (ax, ay) = anchor_position(anchor, display, w, h);
+        let (dx, dy) = (ax - x, ay - y);
+        (anchor, dx * dx + dy * dy)
+    })
+    .min_by(|a, b| a.1.total_cmp(&b.1))
+    .map(|(anchor, _)| anchor)
+    .unwrap_or(AskAnchor::Center)
+}
+
+/// How close to a dock zone a drop has to land before the surface snaps into it.
+///
+/// A radius rather than a nearest-zone vote, because "nearest" always has an
+/// answer. On a 1440-wide portrait display the Left, Center and Right zones sit a
+/// few hundred points apart, so every drop was inside somebody's territory and a
+/// small nudge teleported the window across the screen — which is what made the
+/// gesture feel like it was fighting the pointer. Outside this radius the drop is
+/// simply where the user let go.
+const SNAP_RADIUS: f64 = 96.0;
+
+/// Resolve where a drop actually lands: the dock zone it was aimed at, or the free
+/// position if it was not aimed at one.
+///
+/// Pure, so "does dropping near the bottom edge snap to Bottom, and does dropping
+/// in the middle of nowhere stay put" is answerable without a monitor.
+fn snapped_drop(x: f64, y: f64, display: DisplayBounds, w: f64, h: f64) -> (f64, f64) {
+    let anchor = nearest_anchor(x, y, display, w, h);
+    let (ax, ay) = anchor_position(anchor, display, w, h);
+    if (ax - x).hypot(ay - y) <= SNAP_RADIUS {
+        (ax, ay)
+    } else {
+        clamp_position_into_display(x, y, display, w, h)
+    }
+}
+
+/// Settle the quick-ask surface after the user finishes dragging it, and remember
+/// where it ended up.
+///
+/// Called on the window's `Moved` event. Acting on every intermediate move would
+/// fight the drag, so this runs once the movement has stopped (see `SNAP_SETTLE`).
+///
+/// A drop remembers a **position and a display**, and nothing else. It used to
+/// remember a dock *zone* by writing `assistant_ask_anchor`, on the reasoning that a
+/// zone knows which proportions suit it. The reasoning was fine and the consequence
+/// was not: the one gesture available on this window silently rewrote a setting the
+/// user had chosen in Settings, so the dock zone was a moving target and moving the
+/// window was indistinguishable from reconfiguring it. Dragging now moves the
+/// window. Choosing a zone is done where zones are chosen.
+///
+/// The zones are still magnetic, so dropping near one lands cleanly on it — that is
+/// [`snapped_drop`], and it changes only the coordinate.
 fn snap_and_remember(app: &AppHandle) {
     let Some(window) = app.get_webview_window(PANEL_LABEL) else {
         return;
     };
-    // The pill has its own small footprint and its own slot; snapping it to a
-    // card-sized grid would fling it across the screen.
+    // The collapsed pill has its own small footprint and its own remembered slot;
+    // snapping it to a card-sized grid would fling it across the screen.
     if PILL_MODE.load(Ordering::SeqCst) {
         save_position(app);
+        remember_panel_display(app);
         return;
     }
     let (Ok(pos), Ok(size), Ok(Some(monitor))) = (
@@ -1913,23 +2734,256 @@ fn snap_and_remember(app: &AppHandle) {
     let scale = monitor.scale_factor();
     let (x, y) = (pos.x as f64 / scale, pos.y as f64 / scale);
     let (w, h) = (size.width as f64 / scale, size.height as f64 / scale);
-    let (mon_x, mon_y, mon_w, mon_h) = (
-        monitor.position().x as f64 / scale,
-        monitor.position().y as f64 / scale,
-        monitor.size().width as f64 / scale,
-        monitor.size().height as f64 / scale,
-    );
-    let (sx, sy) = snap_to_edges(x, y, mon_x, mon_y, mon_w, mon_h, w, h);
-    if (sx - x).abs() > 0.5 || (sy - y).abs() > 0.5 {
-        let _ = window.set_position(tauri::LogicalPosition::new(sx, sy));
+    let display = display_bounds_of(&monitor);
+    // Our own placement echoing back through `Moved`. Save nothing and move
+    // nothing: this is the app opening the panel where it already belongs, not the
+    // user asking for it somewhere new.
+    if is_our_own_placement(x, y) {
+        return;
+    }
+
+    let (dx, dy) = snapped_drop(x, y, display, w, h);
+    if (dx - x).abs() > 0.5 || (dy - y).abs() > 0.5 {
+        place_panel(&window, dx, dy);
     }
     save_position(app);
-    // The user has chosen a place for the card, so stop overriding it with the
-    // anchor on the next open.
-    let mut settings = get_settings(app);
-    if settings.assistant_ask_anchor != crate::settings::AskAnchor::Custom {
-        settings.assistant_ask_anchor = crate::settings::AskAnchor::Custom;
-        crate::settings::write_settings(app, settings);
+    store_dragged_position(app, dx, dy);
+    remember_panel_display(app);
+}
+
+/// File the position a drag ended at, so every later open uses it.
+fn store_dragged_position(app: &AppHandle, x: f64, y: f64) {
+    if let Ok(store) = app.store(crate::portable::store_path(
+        crate::settings::SETTINGS_STORE_PATH,
+    )) {
+        store.set(PANEL_DRAGGED_KEY, serde_json::json!({ "x": x, "y": y }));
+    }
+}
+
+/* =============================================================================
+ * Cursor pass-through
+ *
+ * The panel window is always larger than the thing it is drawing. That is
+ * deliberate — the pill hugs its own content and floats centred in a transparent
+ * frame, so "Listening", "Thinking" and "Searching the web" can be different
+ * widths with no window resize between them (`ASK_PILL_WIDTH` is 340x56 for a pill
+ * that renders at roughly 155x34). The frame is invisible. It was not
+ * intangible: the window carried no `WS_EX_TRANSPARENT`, so every pixel of that
+ * surplus sat in front of the user's desktop and ate their clicks, and because
+ * WebView2 draws its own context menu, a right-click there answered with Copy /
+ * Print / Inspect. From the outside the whole screen is simply dead while the
+ * assistant is on it.
+ *
+ * `overlay.rs` solved the same problem by never taking the pointer at all
+ * (`set_ignore_cursor_events(true)` for every state the user cannot act on). That
+ * is not available here: the pill has a cancel button, a screen-vision badge and a
+ * hover reveal, and the card has a text input. So the window has to take the
+ * pointer *sometimes*, and the question is where.
+ *
+ * The webview is the only thing that knows. It reports the rectangle it is actually
+ * drawing (`assistant-hit-rect`, in physical pixels relative to the window origin
+ * so no scale factor has to be agreed on across the boundary) and a short tick
+ * compares the cursor against it, flipping pass-through on and off. Two properties
+ * make this safe rather than clever:
+ *
+ *   * **Unknown means tangible.** No report, no cursor, or a report that has not
+ *     arrived yet resolves to "take the pointer" — the behaviour that shipped. A
+ *     webview that fails to measure makes the panel no worse than it was; the
+ *     opposite default would make a visible panel unclickable.
+ *   * **A held pointer is never taken away.** Dragging the pill hands the move to
+ *     the OS, which keeps the pointer captured while it travels well outside the
+ *     drawn rect. Flipping pass-through on mid-drag would drop the window on the
+ *     spot, so the webview holds the guard open between `pointerdown` and
+ *     `pointerup`.
+ * ========================================================================== */
+
+/// The part of the panel window that is drawn and can be clicked, in PHYSICAL
+/// pixels relative to the window's top-left corner.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct HitRect {
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+}
+
+/// Slack around the drawn rect, in physical pixels. A border radius, a focus ring
+/// and a sub-pixel layout all put a click a hair outside the measured box, and
+/// losing that click is more annoying than passing one extra pixel through.
+///
+/// Deliberately small: this is leaked area, and anything larger starts eating the
+/// desktop again. An element that genuinely overflows its parent is handled by
+/// listing it as its own surface instead of by widening this (see `HIT_SURFACES`).
+const HIT_TOLERANCE: f64 = 4.0;
+
+impl HitRect {
+    /// Is this window-relative point inside the drawn surface?
+    ///
+    /// A rect with no area is treated as "nothing drawn" rather than as a point, so
+    /// a faded-out layer cannot leave a one-pixel island of live window behind.
+    fn contains(&self, x: f64, y: f64) -> bool {
+        if self.width <= 0.0 || self.height <= 0.0 {
+            return false;
+        }
+        x >= self.x - HIT_TOLERANCE
+            && x <= self.x + self.width + HIT_TOLERANCE
+            && y >= self.y - HIT_TOLERANCE
+            && y <= self.y + self.height + HIT_TOLERANCE
+    }
+}
+
+/// Should the panel window take the pointer right now?
+///
+/// Pure, because this is the decision that makes the difference between "the app
+/// is unusable while the assistant is open" and not, and it needs to be answerable
+/// in a test rather than by clicking around a desktop.
+fn panel_should_take_pointer(
+    hit: Option<HitRect>,
+    cursor_in_window: Option<(f64, f64)>,
+    pointer_held: bool,
+) -> bool {
+    if pointer_held {
+        return true;
+    }
+    match (hit, cursor_in_window) {
+        (Some(hit), Some((x, y))) => hit.contains(x, y),
+        // Nothing measured, or no readable cursor: behave exactly as the window did
+        // before this existed.
+        _ => true,
+    }
+}
+
+/// How often the cursor is checked against the drawn rect while the panel is up.
+///
+/// Fast enough that a hover does not feel laggy, slow enough to be free. The tick
+/// body runs on the main thread, where the window and cursor queries are local
+/// calls rather than round trips through the event loop.
+const PANEL_INPUT_TICK: std::time::Duration = std::time::Duration::from_millis(90);
+
+/// Retires a running guard. Bumped by every start and every stop, so a guard whose
+/// panel has been hidden or destroyed cannot outlive it — the same discipline
+/// `overlay.rs` uses for its topmost guard, and for the same reason: a tick already
+/// queued on the main thread must not act on a window that has moved on.
+static PANEL_INPUT_GENERATION: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// The rectangle the webview last reported drawing. `None` = nothing measured yet.
+static PANEL_HIT_RECT: Mutex<Option<HitRect>> = Mutex::new(None);
+
+/// Whether a pointer is currently held down inside the panel.
+static PANEL_POINTER_HELD: AtomicBool = AtomicBool::new(false);
+
+/// The pass-through state the window is believed to be in, so the setter is only
+/// called when it actually changes.
+static PANEL_PASSTHROUGH: AtomicBool = AtomicBool::new(false);
+
+/// Record the rectangle the panel is drawing, in physical pixels relative to the
+/// window origin. Reported by the webview; see the section comment above.
+pub fn set_panel_hit_rect(app: &AppHandle, x: f64, y: f64, width: f64, height: f64) {
+    store_panel_hit_rect(
+        app,
+        Some(HitRect {
+            x,
+            y,
+            width,
+            height,
+        }),
+    );
+}
+
+/// Forget the drawn rectangle, which makes the whole window tangible again.
+///
+/// Sent by a form that has no measurable surface in it — the voice conversation
+/// view, the full chat panel. Clearing rather than leaving the last rect in place is
+/// the point: a call that inherited the ask pill's little rectangle would have no
+/// reachable Mute or End button.
+pub fn clear_panel_hit_rect(app: &AppHandle) {
+    store_panel_hit_rect(app, None);
+}
+
+fn store_panel_hit_rect(app: &AppHandle, rect: Option<HitRect>) {
+    if let Ok(mut current) = PANEL_HIT_RECT.lock() {
+        *current = rect;
+    }
+    // Apply it now rather than up to one tick later: this arrives on a stage change,
+    // which is exactly when the drawn area jumps and the user is most likely to be
+    // reaching for it.
+    let app_main = app.clone();
+    let _ = app.run_on_main_thread(move || tick_panel_input(&app_main));
+}
+
+/// Hold the guard open for the length of a drag or a resize.
+pub fn set_panel_pointer_held(held: bool) {
+    PANEL_POINTER_HELD.store(held, Ordering::SeqCst);
+}
+
+/// One pass of the pass-through decision. Main thread only.
+fn tick_panel_input(app: &AppHandle) {
+    let Some(window) = app.get_webview_window(PANEL_LABEL) else {
+        return;
+    };
+    let cursor_in_window = match (app.cursor_position(), window.outer_position()) {
+        (Ok(cursor), Ok(origin)) => Some((cursor.x - origin.x as f64, cursor.y - origin.y as f64)),
+        _ => None,
+    };
+    let hit = PANEL_HIT_RECT.lock().ok().and_then(|rect| *rect);
+    let take = panel_should_take_pointer(
+        hit,
+        cursor_in_window,
+        PANEL_POINTER_HELD.load(Ordering::SeqCst),
+    );
+    apply_panel_passthrough(&window, !take);
+}
+
+/// Flip the window's cursor pass-through, but only on a real change.
+fn apply_panel_passthrough(window: &tauri::WebviewWindow, ignore: bool) {
+    if PANEL_PASSTHROUGH.swap(ignore, Ordering::SeqCst) == ignore {
+        return;
+    }
+    if let Err(e) = window.set_ignore_cursor_events(ignore) {
+        debug!("Could not set assistant panel cursor pass-through: {e}");
+        // Leave the cached state matching reality so the next tick retries.
+        PANEL_PASSTHROUGH.store(!ignore, Ordering::SeqCst);
+    }
+}
+
+/// Start watching the cursor while the panel is on screen.
+fn start_panel_input_guard(app: &AppHandle) {
+    let generation = PANEL_INPUT_GENERATION
+        .fetch_add(1, Ordering::SeqCst)
+        .wrapping_add(1);
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        loop {
+            if PANEL_INPUT_GENERATION.load(Ordering::SeqCst) != generation
+                || !PANEL_VISIBLE.load(Ordering::SeqCst)
+            {
+                return;
+            }
+            let app_main = app.clone();
+            if app
+                .run_on_main_thread(move || tick_panel_input(&app_main))
+                .is_err()
+            {
+                return;
+            }
+            tokio::time::sleep(PANEL_INPUT_TICK).await;
+        }
+    });
+}
+
+/// Retire the guard and hand the pointer back, so a window that is hidden or
+/// rebuilt never comes back in pass-through with nothing to switch it off.
+///
+/// Must run before the window goes down, for the same reason
+/// `hide_recording_overlay` retires its topmost guard first.
+fn stop_panel_input_guard(app: &AppHandle) {
+    PANEL_INPUT_GENERATION.fetch_add(1, Ordering::SeqCst);
+    PANEL_POINTER_HELD.store(false, Ordering::SeqCst);
+    if let Ok(mut rect) = PANEL_HIT_RECT.lock() {
+        *rect = None;
+    }
+    if let Some(window) = app.get_webview_window(PANEL_LABEL) {
+        apply_panel_passthrough(&window, false);
     }
 }
 
@@ -1958,11 +3012,22 @@ fn build_assistant_panel(app: &AppHandle) {
     } else {
         expanded_size(app)
     };
-    // Read the slot belonging to the form actually being built, and fall back to
-    // a corner computed for that form's real size. This used to read the pill's
-    // slot unconditionally and default to a corner computed for the panel.
-    let (x, y) = saved_position_for(app, position_key())
-        .unwrap_or_else(|| default_position_for(app, init_w, init_h));
+    // Where to put it. The pill keeps its own remembered slot — it is a small HUD
+    // the user parks somewhere deliberately. The card goes wherever the anchor says,
+    // and only falls back to a remembered position when the anchor *is* "Custom".
+    //
+    // The saved position used to be consulted first, unconditionally. That quietly
+    // defeated the whole anchor setting: anyone who had ever opened the old panel
+    // had a stored coordinate, so the card kept reappearing in the old corner and
+    // "opens in the middle" simply never happened for an existing install.
+    let (x, y) = if initially_collapsed {
+        saved_position_for(app, PANEL_POSITION_KEY)
+            .unwrap_or_else(|| default_position_for(app, init_w, init_h))
+    } else {
+        // By the card's footprint, not the bar's: see `ask_anchor_size`.
+        let (anchor_w, anchor_h) = ask_anchor_size(app);
+        default_position_for(app, anchor_w, anchor_h)
+    };
 
     let mut builder = WebviewWindowBuilder::new(
         app,
@@ -2001,11 +3066,16 @@ fn build_assistant_panel(app: &AppHandle) {
 
     match builder.build() {
         Ok(window) => {
+            // The builder's own `.position()` can surface as a `Moved` event once the
+            // window exists, so record it as ours before any handler can see it.
+            if let Ok(mut placed) = PLACED_AT.lock() {
+                *placed = Some((x, y));
+            }
             // Persist position while the user drags the panel around.
             let app_handle = app.clone();
             window.on_window_event(move |event| {
                 match event {
-                    tauri::WindowEvent::Moved(_) => snap_and_remember(&app_handle),
+                    tauri::WindowEvent::Moved(_) => on_panel_moved(&app_handle),
                     tauri::WindowEvent::CloseRequested { api, .. } => {
                         // Closing the window hangs up: `hide_assistant_panel`
                         // ends a live call so the microphone never outlives the
@@ -2094,13 +3164,45 @@ fn present_assistant_panel(app: &AppHandle, reason: PresentReason) {
         };
         apply_panel_min_size(app, &window, collapsed);
         let _ = window.set_size(tauri::LogicalSize::new(width, height));
+        // Put the card back at its anchor on every show.
+        //
+        // The window is created once at launch and thereafter only hidden and shown,
+        // so without this it stays wherever it happened to be last — which meant the
+        // anchor setting only ever applied on the very first run after an install and
+        // "it opens in the middle" was not true of any subsequent open.
+        //
+        // The pill is left where the user parked it, and a live call keeps its place
+        // too: both are surfaces you position once and work alongside, not transient
+        // cards that should reappear front and centre.
+        if !collapsed && !crate::voice_conversation::is_active(app) {
+            // Placed by the CARD's footprint even when the bar is what is being
+            // shown, so the answer unfolds downward into the anchor's space
+            // instead of the window having to move once it arrives.
+            let (anchor_w, anchor_h) = ask_anchor_size(app);
+            let (x, y) = default_position_for(app, anchor_w, anchor_h);
+            place_panel(&window, x, y);
+        }
         // A monitor can be unplugged while the app runs, which leaves the window
         // parked in dead space with no taskbar button and no alt-tab entry to
         // find it by. Check every time we show rather than only at creation.
         ensure_panel_on_screen(app, &window, width, height);
         let _ = app.emit("assistant-collapsed", collapsed);
+        // A reloaded webview comes back believing it is a card, so the stage has
+        // to be re-asserted with the size, not just at the moment it changes.
+        if !collapsed && !crate::voice_conversation::is_active(app) {
+            let stage = if ASK_STAGE_CARD.load(Ordering::SeqCst) {
+                AskStage::Card
+            } else {
+                AskStage::Pill
+            };
+            emit_ask_frame(app, stage, height);
+        }
 
         let _ = window.show();
+        PANEL_VISIBLE.store(true, Ordering::SeqCst);
+        // Only take the pointer where something is drawn, from now until it is
+        // hidden again (see the cursor pass-through section).
+        start_panel_input_guard(app);
         #[cfg(any(target_os = "windows", target_os = "linux"))]
         force_panel_topmost(&window);
         let _ = app.emit("assistant-panel-shown", reason == PresentReason::UserOpened);
@@ -2109,10 +3211,92 @@ fn present_assistant_panel(app: &AppHandle, reason: PresentReason) {
     }
 }
 
-/// Show the non-focus-stealing surface for a voice-assistant turn. Unlike the
-/// manual panel toggle, a hotkey turn always starts in the configured overlay
-/// form: hidden for None, the compact pill for Minimal/Auto, or the readable
-/// question-and-answer HUD for Live.
+/// Whether the panel window is on screen, tracked rather than asked.
+///
+/// `window.is_visible()` is a blocking round-trip to the event loop, and the
+/// decision below is reached from the transcription coordinator's single thread —
+/// the same thread that handles the shortcut release. Blocking it there delays the
+/// microphone opening and swallows the first words of the question, and the very
+/// next statement queues a WebView show on the main thread, so it is one press
+/// away from waiting on a loop that is busy building this window. Two other call
+/// sites in this file already push `is_visible` onto the main thread for exactly
+/// this reason; a flag costs nothing and is readable from anywhere.
+static PANEL_VISIBLE: AtomicBool = AtomicBool::new(false);
+
+/// Whether a quick ask should start from an empty conversation.
+///
+/// The quick ask and the call are two features that happened to share one
+/// `AssistantConversation`, and that single fact produced the worst bug either of
+/// them had: finish a hands-free call, press the assistant shortcut, and the
+/// entire call transcript is sitting in the quick-ask card, because the call
+/// wrote into the same message list the card reads from. Nothing about the layout
+/// caused that and no amount of restyling could fix it.
+///
+/// So they get separate lifetimes. A call is a conversation and keeps everything
+/// said in it. A quick ask is one job — translate this, rewrite that — and starts
+/// from nothing.
+///
+/// Two exceptions, and they are the whole rule:
+///
+/// * **Never during a call.** The conversation belongs to the call while it is
+///   running; wiping it would erase what the user is in the middle of saying.
+/// * **Not when the card is already on screen.** Then the ask is a follow-up to
+///   the answer in front of you — "make it shorter", "in Nepali instead" — and
+///   that needs the previous turn. One *topic*, discarded when the card closes,
+///   is what "quick" means here; one *message* would make the single most useful
+///   thing about the feature impossible.
+pub fn should_reset_quick_ask(call_active: bool, card_on_screen: bool) -> bool {
+    !call_active && !card_on_screen
+}
+
+/// Start a quick ask from a clean slate unless it is a follow-up to the card
+/// already in front of the user. Call before the overlay is presented, while
+/// panel visibility still describes the previous state.
+pub fn begin_quick_ask_exchange(app: &AppHandle) {
+    let call_active = crate::voice_conversation::is_active(app);
+    if !should_reset_quick_ask(call_active, PANEL_VISIBLE.load(Ordering::SeqCst)) {
+        return;
+    }
+    reset_conversation_for_new_exchange(app);
+}
+
+/// Empty the conversation and detach it from its history row, so what follows is
+/// a new exchange rather than a continuation.
+///
+/// Deliberately not `commands::assistant_clear_conversation`: that one also hangs
+/// up a live call, which is right for the Clear button and catastrophic on the
+/// path that runs at the start of every ask. Everything else is the same,
+/// including handing the finished conversation to memory on the way out — a quick
+/// ask that taught the assistant something should not lose it just because the
+/// next ask starts clean.
+pub fn reset_conversation_for_new_exchange(app: &AppHandle) {
+    let conversation = app.state::<AssistantConversation>();
+    let snapshot = conversation.take_distillable();
+    match conversation.messages.lock() {
+        Ok(mut messages) => {
+            if messages.is_empty() && snapshot.is_none() {
+                return;
+            }
+            messages.clear();
+        }
+        Err(e) => {
+            error!("Conversation lock poisoned; cannot reset: {e}");
+            return;
+        }
+    }
+    conversation.reset_session();
+    conversation.reset_distilled_marker();
+    emit_conversation(app);
+    if let Some(messages) = snapshot {
+        let app_for_memory = app.clone();
+        tauri::async_runtime::spawn(async move {
+            crate::memory::distill_and_store(app_for_memory, messages).await;
+        });
+    }
+    debug!("Quick ask starting from an empty conversation");
+}
+
+/// Put the quick-ask card on screen for a voice turn, already listening.
 ///
 /// Runs entirely on the main thread for the reason spelled out on
 /// `build_assistant_panel`: this is called from the keyboard engine's thread, and
@@ -2129,12 +3313,26 @@ pub fn show_assistant_voice_overlay(app: &AppHandle) {
 
     let app_main = app.clone();
     if let Err(e) = app.run_on_main_thread(move || {
-        // Don't fight a panel the user opened deliberately: when the full chat is
-        // already on screen, leave it expanded and let the turn stream into it.
-        // Only an absent or already-collapsed panel is forced into the compact
-        // overlay form.
-        if is_panel_collapsed() || !panel_is_visible(&app_main) {
-            set_panel_collapsed(&app_main, true);
+        // A call owns the collapsed form — that pill is the conversation, and the
+        // user parks it somewhere on purpose — so a call is left in whatever shape
+        // it is in. Everything else opens as the talking bar, already listening,
+        // and unfolds into the card when there is an answer to read.
+        //
+        // An earlier version of this grew a 240x44 pill into a panel at a
+        // different place on screen, which read as a glitch; the version after it
+        // over-corrected and opened the finished card the instant the microphone
+        // did, so every question began by throwing a near-empty 650x570 panel over
+        // the user's work. The bar is the same window at the same width and the
+        // same top-left corner as the card, so the unfold moves one edge and
+        // nothing else.
+        if !crate::voice_conversation::is_active(&app_main) {
+            set_panel_collapsed(&app_main, false);
+            // A question asked while the card is already up is a follow-up to the
+            // answer in front of the user, so that card stays. Only a fresh ask —
+            // nothing on screen — starts from the bar.
+            if !PANEL_VISIBLE.load(Ordering::SeqCst) {
+                reset_ask_stage_now(&app_main);
+            }
         }
         build_assistant_panel(&app_main);
         present_assistant_panel(&app_main, PresentReason::VoiceTurn);
@@ -2143,15 +3341,17 @@ pub fn show_assistant_voice_overlay(app: &AppHandle) {
     }
 }
 
-/// Dismiss the transient collapsed voice overlay, if it is actually on screen.
-/// A no-op when the panel is hidden or expanded, so a cancellation never closes
-/// a surface the user cannot even see.
+/// Send the quick-ask surface away, if it is on screen.
 ///
-/// Also a no-op during a call: the collapsed form there is the conversation
-/// pill, not a transient overlay, and `hide_assistant_panel` now hangs up. Esc
-/// mid-reply should stop the reply, not end the conversation.
+/// A no-op when the panel is already hidden, and a no-op during a call: there the
+/// window is the conversation and hiding hangs up, so Esc mid-reply should stop
+/// the reply instead.
 pub fn dismiss_voice_overlay(app: &AppHandle) {
-    if !is_panel_collapsed() || crate::voice_conversation::is_active(app) {
+    // The panel *is* the quick-ask card now, and a quick ask is a transient thing
+    // by definition, so Esc may always send it away. A call is the one exception:
+    // there the collapsed form is the conversation pill and hiding hangs up, so
+    // Esc mid-reply stops the reply instead.
+    if crate::voice_conversation::is_active(app) {
         return;
     }
     // `panel_is_visible` is a blocking round-trip to the event loop, so keep it
@@ -2165,6 +3365,23 @@ pub fn dismiss_voice_overlay(app: &AppHandle) {
     }) {
         error!("Could not queue voice overlay dismissal: {}", e);
     }
+}
+
+/// The messages a branch starts from: everything up to and including
+/// `message_index`.
+///
+/// Pure, so the off-by-one that would either duplicate the chosen message or drop
+/// it is settled by a test rather than by trying it in the app. An index past the
+/// end keeps the whole conversation, which is what "continue from the last thing
+/// said" means and is also the safe answer if the panel's list and the stored row
+/// have drifted apart.
+///
+/// A branch taken from the user's own message leaves two consecutive user turns
+/// once they type again; `llm_client::enforce_alternating_roles` merges those at
+/// send time, so it needs no special case here.
+pub fn branch_messages(messages: Vec<ChatMessage>, message_index: usize) -> Vec<ChatMessage> {
+    let keep = message_index.saturating_add(1).min(messages.len());
+    messages.into_iter().take(keep).collect()
 }
 
 /// Whether the assistant panel window exists and is currently on screen.
@@ -2189,15 +3406,26 @@ pub fn hide_assistant_panel(app: &AppHandle) {
     // visible and says so. Ending here also runs the call's own teardown, which
     // is what lets a spoken conversation reach memory.
     crate::voice_conversation::end(app);
+    // No longer on screen, so it is no longer a card Esc should be able to close.
     // Window work on the event loop's own thread: this is reached from the
     // keyboard engine's thread as well as from commands (see
     // `build_assistant_panel` for why that distinction matters).
     let app_main = app.clone();
     if let Err(e) = app.run_on_main_thread(move || {
         save_position(&app_main);
+        // Before the window goes down, so a tick already queued cannot flip
+        // pass-through on a window that is on its way out.
+        stop_panel_input_guard(&app_main);
         if let Some(window) = app_main.get_webview_window(PANEL_LABEL) {
             let _ = window.hide();
+            PANEL_VISIBLE.store(false, Ordering::SeqCst);
         }
+        // The next question starts from the talking bar. Done here rather than on
+        // the way back in so the window is already the right shape before it is
+        // shown — a card that folds up in front of the user on its way out is
+        // motion nobody asked for.
+        ASK_STAGE_CARD.store(false, Ordering::SeqCst);
+        ASK_CARD_HEIGHT.store(0, Ordering::SeqCst);
         // Tell the webview it is off screen. The window stays alive for the app's
         // lifetime, so this is its cue to give back anything it only needs while
         // visible — notably the local TTS model's ONNX session and GPU buffers.
@@ -2240,12 +3468,13 @@ pub fn distill_conversation_if_ended(app: &AppHandle) {
 
 /// Open the assistant as the full panel, creating the window if needed.
 ///
-/// This is what an explicit "open the assistant" gesture means — the toggle
-/// shortcut, the tray entry. It exists because [`PILL_MODE`] starts `true` and
-/// nothing on the toggle path ever cleared it, so the very first press of the
-/// panel shortcut produced a 240x44 pill instead of the panel, and kept doing so
-/// for the rest of the process lifetime. Combined with the pill's idle fade,
-/// that is what "the assistant never opens" looked like from the outside.
+/// This is what an explicit "open the assistant" gesture means — the tray entry,
+/// and the call key on its way to starting a conversation. It exists because
+/// [`PILL_MODE`] starts `true` and nothing that opened the window ever cleared
+/// it, so the first open of a process produced a 240x44 pill instead of the
+/// panel, and kept doing so for the rest of the process lifetime. Combined with
+/// the pill's idle fade, that is what "the assistant never opens" looked like
+/// from the outside.
 ///
 /// A live call is deliberately left in whatever form it is in: there, the
 /// collapsed form is the conversation pill, which the user may have parked in a
@@ -2256,8 +3485,16 @@ pub fn open_assistant_panel(app: &AppHandle) {
     }
     let app_main = app.clone();
     if let Err(e) = app.run_on_main_thread(move || {
+        // This is the user asking for the window, so it opens as the quick-ask
+        // surface rather than whatever form it was last left in.
         if !crate::voice_conversation::is_active(&app_main) {
             PILL_MODE.store(false, Ordering::SeqCst);
+            // Opened cold, with no answer on screen, it is a prompt — so it opens
+            // as the bar. An open card is left alone: the user asked for the window
+            // they can already see, not for it to fold up.
+            if !PANEL_VISIBLE.load(Ordering::SeqCst) {
+                reset_ask_stage_now(&app_main);
+            }
         }
         build_assistant_panel(&app_main);
         present_assistant_panel(&app_main, PresentReason::UserOpened);
@@ -2270,28 +3507,6 @@ pub fn open_assistant_panel(app: &AppHandle) {
         }
     }) {
         error!("Could not queue assistant panel open: {}", e);
-    }
-}
-
-pub fn toggle_assistant_panel(app: &AppHandle) {
-    // `is_visible` is a blocking round-trip to the event loop; the panel-toggle
-    // shortcut calls this from the keyboard engine's thread, so decide on the
-    // main thread instead of making that thread wait.
-    let app_main = app.clone();
-    if let Err(e) = app.run_on_main_thread(move || {
-        let visible = app_main
-            .get_webview_window(PANEL_LABEL)
-            .and_then(|window| window.is_visible().ok())
-            .unwrap_or(false);
-        if visible {
-            hide_assistant_panel(&app_main);
-        } else {
-            // Also the "no window yet" case, right after the assistant was
-            // switched back on: opening creates it.
-            open_assistant_panel(&app_main);
-        }
-    }) {
-        error!("Could not queue assistant panel toggle: {}", e);
     }
 }
 
@@ -2310,7 +3525,9 @@ pub fn destroy_assistant_panel(app: &AppHandle) {
         if let Some(window) = app_main.get_webview_window(PANEL_LABEL) {
             // Remember where it sat, so re-enabling puts it back in the same place.
             save_position(&app_main);
+            stop_panel_input_guard(&app_main);
             let _ = window.destroy();
+            PANEL_VISIBLE.store(false, Ordering::SeqCst);
             debug!("Assistant panel window destroyed (assistant disabled)");
         }
     }) {
@@ -2381,7 +3598,7 @@ pub fn set_panel_collapsed(app: &AppHandle, collapsed: bool) {
             new_x = new_x.clamp(mx + 8.0, (mx + mw - new_w - 8.0).max(mx + 8.0));
             new_y = new_y.clamp(my + 8.0, (my + mh - new_h - 8.0).max(my + 8.0));
         }
-        let _ = window.set_position(tauri::LogicalPosition::new(new_x, new_y));
+        place_panel(&window, new_x, new_y);
 
         // The pill is deliberately non-activatable so typing keeps going to the
         // app underneath. On Windows that flag has to be paired with giving the
@@ -2407,7 +3624,6 @@ pub fn apply_panel_size(app: &AppHandle) {
     // 0 means "no manual resize this session", which sends each lane back to
     // its own preset — read from the setting that was just written.
     EXPANDED_W.store(0, Ordering::SeqCst);
-    EXPANDED_H.store(0, Ordering::SeqCst);
     CONVERSATION_W.store(0, Ordering::SeqCst);
     CONVERSATION_H.store(0, Ordering::SeqCst);
 
@@ -2445,6 +3661,7 @@ fn snip_epoch_is_current(epoch: u64) -> bool {
 fn destroy_snip_overlay(app: &AppHandle) {
     if let Some(window) = app.get_webview_window(SNIP_LABEL) {
         let _ = window.destroy();
+        PANEL_VISIBLE.store(false, Ordering::SeqCst);
     }
 }
 
@@ -2610,6 +3827,7 @@ pub fn open_snip_overlay(
     };
     if !shown {
         let _ = window.destroy();
+        PANEL_VISIBLE.store(false, Ordering::SeqCst);
         clear_pending_snip_for_epoch(epoch);
         return Ok(());
     }
@@ -2705,53 +3923,6 @@ pub fn finish_region_snip(app: &AppHandle, rect: Option<(f64, f64, f64, f64)>) {
 // Assistant pipeline
 // ---------------------------------------------------------------------------
 
-/// Phrases that mean "switch me into a live conversation" when spoken on their own.
-///
-/// Matched against the *entire* utterance, never as a substring. That restriction
-/// is the whole design: "how do I open a live conversation in Zoom?" is a question
-/// to be answered, not an instruction to hang up on the user and dial. A command
-/// that occasionally fires when you meant to ask something is worse than no command
-/// at all, because it makes the assistant feel unpredictable — so the bar is that
-/// the user said nothing else.
-const CONVERSATION_COMMANDS: &[&str] = &[
-    "open live conversation",
-    "open the live conversation",
-    "open a live conversation",
-    "start live conversation",
-    "start the live conversation",
-    "start a live conversation",
-    "open live chat",
-    "start live chat",
-    "open conversation mode",
-    "start conversation mode",
-    "let's talk",
-    "lets talk",
-    "start a conversation",
-    "start the conversation",
-    "start conversation",
-];
-
-/// Does this transcription consist of nothing but a "start a conversation" command?
-///
-/// Punctuation and case are stripped first because a speech engine decides those
-/// for you: the same words arrive as "Open live conversation." from one model and
-/// "open live conversation" from another, and a command that works on only one
-/// engine would look broken.
-fn is_conversation_command(transcription: &str) -> bool {
-    let normalized: String = transcription
-        .chars()
-        .filter(|c| c.is_alphanumeric() || c.is_whitespace() || *c == '\'')
-        .collect::<String>()
-        .to_lowercase()
-        .split_whitespace()
-        .collect::<Vec<_>>()
-        .join(" ");
-    if normalized.is_empty() {
-        return false;
-    }
-    CONVERSATION_COMMANDS.contains(&normalized.as_str())
-}
-
 /// Run a voice-initiated assistant turn on a finished transcription: attach the
 /// screen only for an explicitly armed Manual turn, pick up staged attachments,
 /// and run the conversation turn. In Agent-decides mode the model may instead
@@ -2768,20 +3939,6 @@ pub async fn run_voice_turn(app: AppHandle, transcription: String) {
         return;
     }
 
-    // "Open live conversation" and friends switch surfaces instead of asking a
-    // question. Handled before anything else so the phrase never reaches the model
-    // and never costs a generation.
-    if is_conversation_command(&transcription) {
-        debug!("Spoken command recognised: starting a live conversation");
-        // The selection and screen frame captured for this recording belong to a
-        // question that is not going to be asked; dropping them keeps them from
-        // riding along with the first utterance of the conversation.
-        take_immediate_capture();
-        crate::selection::clear_pending();
-        emit_state(&app, "idle");
-        let _ = app.emit("assistant-start-conversation", ());
-        return;
-    }
     let settings = get_settings(&app);
     let character_is_cat = settings.active_character_is_cat();
     let manual_mode = manual_screen_access_allowed(settings.assistant_screen_access_mode);
@@ -2908,7 +4065,33 @@ fn is_vision_unsupported_error(error: &str) -> bool {
         || e.contains("support image input")
         || e.contains("image_url")
         || e.contains("multimodal")
+        // Groq's text-only models reject the entire multimodal content array,
+        // without naming the image inside it. This check is only used after
+        // an image was actually dispatched.
+        || (e.contains("messages[") && e.contains(".content must be a string"))
         || (e.contains("vision") && (e.contains("not") || e.contains("unsupported")))
+}
+
+/// Detect provider errors that mean "this endpoint or model does not do function
+/// calling", so the turn can be retried without tools.
+///
+/// Kept deliberately narrow. `is_vision_unsupported_error` above can afford broad
+/// keyword matching because it is only consulted after an image was actually
+/// sent; this one is consulted on *every* failed turn, so a loose match would
+/// turn an unrelated provider error into a silent second request. Each pattern
+/// below is a phrase a real endpoint returns when it rejects the `tools` field —
+/// llama.cpp and Ollama on an older model, OpenAI-compatible gateways fronting a
+/// base or completion-only model, and vLLM started without a tool parser.
+fn is_tools_unsupported_error(error: &str) -> bool {
+    let e = error.to_lowercase();
+    (e.contains("tool") || e.contains("function call"))
+        && (e.contains("not supported")
+            || e.contains("unsupported")
+            || e.contains("does not support")
+            || e.contains("not enabled")
+            || e.contains("unrecognized")
+            || e.contains("unknown field")
+            || e.contains("unexpected keyword"))
 }
 
 /// A clear, actionable message for when a screenshot was sent to a model that
@@ -2955,8 +4138,8 @@ fn strip_visuals_for_retry(messages: &[Value], user_content: &str) -> Vec<Value>
 
 /// The "Tools" section of the system prompt, included whenever the turn
 /// exposes at least one tool. Describes only the tools actually available this
-/// turn — `web_search` + `get_current_datetime` when web search is on, and
-/// `capture_screen` when the screen-access mode is Agent decides — explains
+/// turn — the clock and reminders always, `web_search` when web search is on,
+/// and `capture_screen` when the screen-access mode is Agent decides — explains
 /// when to reach for each, and (reusing the shared, TTS-aware directive) how
 /// to present web findings. Fixed text per flag combination → cache-safe.
 fn tools_system_section(web: bool, screen: bool, tts_enabled: bool) -> String {
@@ -2966,10 +4149,14 @@ fn tools_system_section(web: bool, screen: bool, tts_enabled: bool) -> String {
     );
     if web {
         s.push_str(
-            "• web_search(query, freshness, news): live web results (titles + short snippets). Call it BEFORE answering any question about current, recent, or changeable facts — news, prices, sports scores, schedules, software versions, who currently holds a role or title, or recent events — because your training data has a fixed cutoff and may be out of date. For timeless things (definitions, concepts, math, coding, writing, translation, general how-to), answer directly without searching. Never claim you cannot access the internet.\n\
-             • get_current_datetime(): the user's current local date and time. Call it whenever you need the present moment — to say what day or time it is, or to turn a relative reference (today, yesterday, this week, how long until X) into a concrete date, including before building a web_search query.\n",
+            "• web_search(query, freshness, news): live web results (titles + short snippets). Call it BEFORE answering any question about current, recent, or changeable facts — news, prices, sports scores, schedules, software versions, who currently holds a role or title, or recent events — because your training data has a fixed cutoff and may be out of date. For timeless things (definitions, concepts, math, coding, writing, translation, general how-to), answer directly without searching. Never claim you cannot access the internet.\n",
         );
     }
+    s.push_str(
+        "• get_current_datetime(): the user's current local date and time. Call it whenever you need the present moment — to say what day or time it is, to turn a relative reference (today, yesterday, this week, how long until X) into a concrete date, or before setting a reminder for a named clock time.\n\
+         • set_reminder(text, in_minutes, at, note): schedule a popup on the user's screen. Call it for any request to be reminded, nudged, told later, or timed. Use in_minutes for a duration and at (\"YYYY-MM-DD HH:MM\", local, future) for a named time — check the clock first for the latter. Write text so it stands alone: it is the entire popup, so \"Reply to Sam's email about the quote\", never \"do that thing\". If the request is about something on screen, look first and put what you saw into text or note. After it is set, confirm in one short sentence including when it will arrive.\n\
+         • list_reminders() and cancel_reminder(id): what is set, and removing one. Look the id up before cancelling, and never cancel something the user did not clearly name.\n",
+    );
     if screen {
         s.push_str(
             "• capture_screen(): take one screenshot of the user's current screen. The user allowed you to decide when seeing their screen helps. Call it ONLY when the message clearly refers to something on screen ('this page', 'this error', 'look at this', 'reply to this') or genuinely cannot be answered blind. Never capture for self-contained questions. At most once per message; the screenshot is shown to the user.\n",
@@ -3150,15 +4337,18 @@ async fn agent_capture_screen(
     Ok(data_url)
 }
 
-/// Build the current local tool capability matrix. `web` exposes `web_search`
-/// followed by `get_current_datetime`; `screen` (Agent-decides screen access)
-/// appends `capture_screen`. Turns with no capability expose no tools. The
-/// order is stable because it is part of the model-facing request baseline.
+/// Build the current local tool capability matrix. `web` exposes `web_search`;
+/// `screen` (Agent-decides screen access) appends `capture_screen`. The clock and
+/// the reminder tools are unconditional, so the list is never empty.
+///
+/// `get_current_datetime` used to sit behind the `web` flag, which was wrong on
+/// its own terms — a clock has nothing to do with search — and became a bug once
+/// reminders existed, because "remind me at nine tomorrow" cannot be resolved
+/// without knowing what today is. It is now always offered, next to the tools
+/// that need it.
+///
+/// The order is stable because it is part of the model-facing request baseline.
 fn build_assistant_tool_capabilities(web: bool, screen: bool) -> Option<Value> {
-    if !web && !screen {
-        return None;
-    }
-
     let mut tools: Vec<Value> = Vec::new();
     if web {
         tools.push(json!(
@@ -3188,19 +4378,76 @@ fn build_assistant_tool_capabilities(web: bool, screen: bool) -> Option<Value> {
                 }
             }
         }));
-        tools.push(json!(
-        {
-            "type": "function",
-            "function": {
-                "name": "get_current_datetime",
-                "description": "Get the user's current local date and time. Call this when you need the present moment — to answer what day or time it is, or to resolve a relative reference (today, yesterday, tonight, this week, this month, this year, how long until X) into a concrete date, including before building a web_search query. Takes no arguments.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {}
-                }
-            }
-        }));
     }
+    tools.push(json!(
+    {
+        "type": "function",
+        "function": {
+            "name": "get_current_datetime",
+            "description": "Get the user's current local date and time. Call this when you need the present moment — to answer what day or time it is, to resolve a relative reference (today, yesterday, tonight, this week, this month, this year, how long until X) into a concrete date, or before setting a reminder for a named time like 'tomorrow at 9'. Takes no arguments.",
+            "parameters": {
+                "type": "object",
+                "properties": {}
+            }
+        }
+    }));
+    tools.push(json!(
+    {
+        "type": "function",
+        "function": {
+            "name": "set_reminder",
+            "description": "Schedule a reminder that pops up on the user's screen at a chosen time. Call it whenever the user asks to be reminded, nudged, told later, or wants a timer — 'remind me to call the bank in 20 minutes', 'nudge me about this at 6', 'set a timer for 10 minutes'. It also covers a reminder about something on screen: look first if you need to, then put what you saw in the text so the popup makes sense on its own. Confirm briefly afterwards, saying when it will arrive.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "text": {
+                        "type": "string",
+                        "description": "What to do, addressed to the user and readable on its own with no other context, e.g. 'Call the bank about the transfer'. This is the whole popup, so never write 'the thing we discussed'."
+                    },
+                    "in_minutes": {
+                        "type": "number",
+                        "description": "Minutes from now. Use this for any relative request ('in 20 minutes', 'in an hour and a half' = 90, 'in 30 seconds' = 0.5). Preferred over 'at' when the user gave a duration."
+                    },
+                    "at": {
+                        "type": "string",
+                        "description": "An absolute local time as 'YYYY-MM-DD HH:MM' (24-hour). Use this only for a named clock time or date, and call get_current_datetime first so the date is right. Must be in the future."
+                    },
+                    "note": {
+                        "type": "string",
+                        "description": "Optional supporting detail you worked out rather than were told — a URL or page title you read off the screen, a file name, a phone number. Shown under the main text."
+                    }
+                },
+                "required": ["text"]
+            }
+        }
+    }));
+    tools.push(json!(
+    {
+        "type": "function",
+        "function": {
+            "name": "list_reminders",
+            "description": "List the user's reminders with their due times and ids. Call it when they ask what they have set, or before cancelling one so you know its id. Takes no arguments.",
+            "parameters": { "type": "object", "properties": {} }
+        }
+    }));
+    tools.push(json!(
+    {
+        "type": "function",
+        "function": {
+            "name": "cancel_reminder",
+            "description": "Delete one reminder by id. Call list_reminders first to find the id, and only cancel the one the user clearly meant.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "description": "The reminder id from list_reminders."
+                    }
+                },
+                "required": ["id"]
+            }
+        }
+    }));
     if screen {
         tools.push(json!(
         {
@@ -3303,7 +4550,13 @@ impl TurnTimer {
 ///
 /// Split out of the dispatch loop so several independent calls in one round can
 /// run concurrently instead of one after another.
+///
+/// Every failure comes back as a *sentence*, not an error: a tool result is read
+/// by the model, and "That time is in the past" lets it ask the user for a better
+/// one, where a swallowed error leaves it confidently confirming a reminder that
+/// does not exist.
 async fn run_text_tool(
+    app: &AppHandle,
     settings: &crate::settings::AppSettings,
     name: &str,
     arguments: &str,
@@ -3323,7 +4576,83 @@ async fn run_text_tool(
             web_search::format_results_for_prompt(&results, budget)
         }
         "get_current_datetime" => current_datetime_line(),
+        "set_reminder" => {
+            let args = parse_set_reminder_args(arguments);
+            match crate::reminders::schedule(
+                app,
+                &args.text,
+                args.in_minutes,
+                args.at.as_deref(),
+                args.note,
+            ) {
+                Ok(reminder) => {
+                    let when = reminder
+                        .due_at
+                        .parse::<chrono::DateTime<chrono::Utc>>()
+                        .map(|due| crate::reminders::describe_due(chrono::Utc::now(), due))
+                        .unwrap_or_else(|_| reminder.due_at.clone());
+                    format!(
+                        "Reminder set for {}: \"{}\". Tell the user it is set and when it will \
+                         arrive.",
+                        when, reminder.text
+                    )
+                }
+                Err(e) => format!("The reminder was NOT set: {e}"),
+            }
+        }
+        "list_reminders" => crate::reminders::describe_all(app),
+        "cancel_reminder" => {
+            let id = serde_json::from_str::<Value>(arguments)
+                .ok()
+                .and_then(|v| {
+                    v.get("id")
+                        .and_then(|i| i.as_str())
+                        .map(|s| s.trim().to_string())
+                })
+                .unwrap_or_default();
+            if id.is_empty() {
+                return "No reminder id was provided. Call list_reminders first.".to_string();
+            }
+            match crate::reminders::remove(app, &id) {
+                Ok(()) => format!("Reminder {id} was cancelled."),
+                Err(e) => format!("Nothing was cancelled: {e}"),
+            }
+        }
         other => format!("Unknown tool '{}'.", other),
+    }
+}
+
+/// The parsed arguments of a `set_reminder` call.
+struct SetReminderArgs {
+    text: String,
+    in_minutes: Option<f64>,
+    at: Option<String>,
+    note: Option<String>,
+}
+
+/// Parse `set_reminder` arguments, tolerating the shapes models actually send.
+///
+/// `in_minutes` is accepted as a number *or* a numeric string, because a model
+/// asked for a number frequently sends `"20"`. Rejecting that would turn a
+/// correct request into a failed one over a pair of quotes.
+fn parse_set_reminder_args(raw: &str) -> SetReminderArgs {
+    let v: Value = serde_json::from_str(raw).unwrap_or(Value::Null);
+    let string_field = |key: &str| {
+        v.get(key)
+            .and_then(|value| value.as_str())
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+    };
+    let in_minutes = v.get("in_minutes").and_then(|value| {
+        value
+            .as_f64()
+            .or_else(|| value.as_str().and_then(|s| s.trim().parse::<f64>().ok()))
+    });
+    SetReminderArgs {
+        text: string_field("text").unwrap_or_default(),
+        in_minutes,
+        at: string_field("at"),
+        note: string_field("note"),
     }
 }
 
@@ -3709,19 +5038,23 @@ async fn run_assistant_turn_inner(
             sections.push(block);
         }
 
-        // 4. Tools — included whenever this turn exposes at least one tool
-        //    (web search and/or agent-decided screen capture). One labeled
-        //    section that explains exactly the tools the model can call this
-        //    turn and when to use each. On the OpenRouter `:online` path the
-        //    model has no local tools (search runs server-side), so it gets a
-        //    short capability note instead.
-        if tool_capabilities.is_some() {
-            sections.push(tools_system_section(
-                web_via_tools,
-                agent_screen,
-                settings.assistant_tts_enabled,
-            ));
-        } else if web_via_online {
+        // 4. Tools — one labeled section explaining exactly the tools the model
+        //    can call this turn and when to use each. Always present now: the
+        //    clock and the reminder tools are unconditional, so only the
+        //    *contents* vary with the web-search and screen-access flags.
+        //
+        //    The OpenRouter `:online` note is a separate `if`, not an `else`. It
+        //    describes search running server-side, which is orthogonal to the
+        //    local tool list — and while the two were exclusive, making it an
+        //    `else` was harmless. It stopped being harmless the moment the tool
+        //    list became unconditional, at which point an `else` would have
+        //    silently dropped the note for every `:online` user.
+        sections.push(tools_system_section(
+            web_via_tools,
+            agent_screen,
+            settings.assistant_tts_enabled,
+        ));
+        if web_via_online {
             sections.push(web_search::WEB_SEARCH_CAPABILITY_NOTE.to_string());
         }
 
@@ -3842,6 +5175,12 @@ async fn run_assistant_turn_inner(
     } else {
         None
     };
+
+    // And the same turn with the tool list removed, for a provider that refuses
+    // function calling outright (see the retry further down). One clone of the
+    // message list per turn, which is the same cost `vision_fallback` above
+    // already pays and negligible beside the request it is insuring.
+    let mut tools_fallback = tool_capabilities.as_ref().map(|_| messages.clone());
 
     emit_state(&app, "thinking");
 
@@ -4080,7 +5419,7 @@ async fn run_assistant_turn_inner(
                 let mut text_results: Vec<Option<String>> = vec![None; round_out.tool_calls.len()];
                 let completed = futures_util::future::join_all(text_indexes.iter().map(|&index| {
                     let call = &round_out.tool_calls[index];
-                    run_text_tool(&settings_c, &call.name, &call.arguments)
+                    run_text_tool(&app_state, &settings_c, &call.name, &call.arguments)
                 }))
                 .await;
                 for (&index, content) in text_indexes.iter().zip(completed) {
@@ -4222,7 +5561,6 @@ async fn run_assistant_turn_inner(
     // Retried once, never in a loop: the second request carries no image, so it
     // cannot fail the same way, and any other failure it hits falls through to
     // the normal error handling below.
-    let mut vision_notified = false;
     let outcome = match outcome {
         Some(Err(e))
             if image_dispatched.load(Ordering::SeqCst)
@@ -4239,7 +5577,6 @@ async fn run_assistant_turn_inner(
                 "vision_unsupported",
                 vision_unsupported_message(&provider.id, &model),
             );
-            vision_notified = true;
             // Manual screen arming is sticky, so without this the next message
             // would attach a fresh capture and take the same detour again. The
             // panel's screen toggle follows the state, so the user sees vision
@@ -4286,6 +5623,62 @@ async fn run_assistant_turn_inner(
         other => other,
     };
 
+    // The provider or model does not do function calling at all.
+    //
+    // This needs a fallback because the tool list stopped being optional: the
+    // clock and the reminder tools go out on every turn now, so an endpoint that
+    // rejects a `tools` array outright would fail *every* message rather than
+    // only the ones from users who had switched web search on. That is a bricked
+    // assistant, and the user's only clue would be a provider error they cannot
+    // act on — there is no setting for "stop sending tools".
+    //
+    // Retried once, and only when nothing has streamed yet, so a mid-reply
+    // failure can never restart a turn the user is already reading. The retry
+    // carries no tools, so it cannot fail the same way; anything else it hits
+    // falls through to the ordinary error handling below.
+    let outcome = match outcome {
+        Some(Err(e))
+            if is_tools_unsupported_error(&e)
+                && tools_fallback.is_some()
+                && timer.first_token_ms().is_none()
+                && !app.state::<AssistantConversation>().is_cancelled() =>
+        {
+            warn!(
+                "Provider '{}' rejected tool calling ({}); retrying without tools. \
+                 Reminders and web search will not work on this model.",
+                provider.id, e
+            );
+            if let Some((pipeline, _)) = &speech {
+                if let Ok(mut pipeline) = pipeline.lock() {
+                    pipeline.reset();
+                }
+            }
+            if let Ok(mut buffer) = partial.lock() {
+                buffer.clear();
+            }
+            emit_state(&app, "thinking");
+            let retry_fut = llm_client::send_chat_stream(
+                &provider,
+                api_key.clone(),
+                &request_model,
+                tools_fallback.take().unwrap_or_default(),
+                None,
+                None,
+                assistant_token_sink(
+                    app.clone(),
+                    partial.clone(),
+                    speech_sink.clone(),
+                    timer.clone(),
+                ),
+            );
+            tokio::pin!(retry_fut);
+            tokio::select! {
+                result = &mut retry_fut => Some(result),
+                _ = wait_for_assistant_cancel(&app, &cancel) => None,
+            }
+        }
+        other => other,
+    };
     // Whether a spoken reply is starting. When it is, the turn ends in a
     // "speaking" UI state rather than idle, so the panel/pill doesn't flash its
     // idle "Assistant" affordance in the gap before audio begins.
@@ -4386,12 +5779,9 @@ async fn run_assistant_turn_inner(
         Some(Err(e)) => {
             close_speech();
             error!("Assistant request failed: {}", e);
-            if vision_notified {
-                // The vision error is already on screen and names the setting
-                // that fixes it; a second, vaguer provider error would only
-                // replace it with less useful advice.
-                debug!("Image-free retry also failed: {}", e);
-            } else if e.contains("Unterminated string") && has_visual {
+            // Retrying clears the earlier error when it resumes the thinking
+            // state. A failed retry must therefore surface its own failure.
+            if e.contains("Unterminated string") && has_visual {
                 emit_error(&app, "screenshot_too_large", e);
             } else if has_visual && is_vision_unsupported_error(&e) {
                 emit_error(
@@ -4835,6 +6225,314 @@ mod tests {
     use super::*;
     use crate::llm_client::{ChatRound, ToolCall, ToolStreamOutcome};
 
+    /// The user's real desk, and the layout that made the panel unusable: a
+    /// landscape primary beside a taller-than-it-is-wide portrait secondary at
+    /// negative coordinates.
+    const LANDSCAPE: DisplayBounds = DisplayBounds {
+        x: 0.0,
+        y: 0.0,
+        width: 2560.0,
+        height: 1440.0,
+    };
+    const PORTRAIT: DisplayBounds = DisplayBounds {
+        x: -1440.0,
+        y: -510.0,
+        width: 1440.0,
+        height: 2560.0,
+    };
+
+    /// Only a named screen is rewritten by a drag. The three policies are choices
+    /// about *how* to pick a screen, so moving the window is not a contradiction of
+    /// them and must not overwrite them — "follow my mouse" turning itself into a
+    /// fixed monitor the first time the panel was nudged is the same mistake the dock
+    /// zone used to make.
+    #[test]
+    fn only_a_named_screen_is_rewritten_by_a_drag() {
+        for policy in ["last_used", "cursor", "primary"] {
+            assert!(
+                !display_choice_is_named(policy),
+                "'{policy}' is a policy, not a screen"
+            );
+        }
+        for name in [r"\\.\DISPLAY1", r"\\.\DISPLAY2", "at:-1440,-510", "HDMI-1"] {
+            assert!(
+                display_choice_is_named(name),
+                "'{name}' names a specific screen"
+            );
+        }
+    }
+
+    /// A drop nowhere near a zone stays where it was let go. "Nearest zone" always
+    /// has an answer, and on a 1440-wide portrait screen every drop was inside
+    /// somebody's territory — so the window teleported away from the pointer, which
+    /// is what made dragging feel broken rather than magnetic.
+    #[test]
+    fn a_drop_away_from_every_zone_stays_put() {
+        let (w, h) = (400.0, 500.0);
+        // Deliberately off-centre and off-edge on the portrait display.
+        let (x, y) = (-1100.0, 900.0);
+        let (dx, dy) = snapped_drop(x, y, PORTRAIT, w, h);
+        assert_eq!((dx, dy), (x, y), "a free drop must not be pulled to a zone");
+    }
+
+    /// Dropped close to a zone, it still snaps cleanly onto it — the magnetism is
+    /// the good half of the old behaviour and is kept.
+    #[test]
+    fn a_drop_near_a_zone_snaps_onto_it() {
+        let (w, h) = (669.0, 583.0);
+        let (zx, zy) = anchor_position(crate::settings::AskAnchor::BottomCenter, LANDSCAPE, w, h);
+        let (dx, dy) = snapped_drop(zx + 30.0, zy - 20.0, LANDSCAPE, w, h);
+        assert_eq!(
+            (dx, dy),
+            (zx, zy),
+            "a drop inside SNAP_RADIUS should land on the zone"
+        );
+    }
+
+    /// A drop is never allowed off its own display, however far the pointer went.
+    #[test]
+    fn a_free_drop_is_still_held_on_screen() {
+        let (w, h) = (400.0, 500.0);
+        let (dx, dy) = snapped_drop(9_999.0, 9_999.0, PORTRAIT, w, h);
+        assert!(
+            dx >= PORTRAIT.x && dx + w <= PORTRAIT.x + PORTRAIT.width,
+            "x {dx} escaped the portrait display"
+        );
+        assert!(
+            dy >= PORTRAIT.y && dy + h <= PORTRAIT.y + PORTRAIT.height,
+            "y {dy} escaped the portrait display"
+        );
+    }
+
+    /// A remembered drop made when the card was short must not hang off the bottom
+    /// once a long answer makes it tall.
+    #[test]
+    fn a_remembered_drop_is_reclamped_for_a_taller_card() {
+        let low = LANDSCAPE.y + LANDSCAPE.height - 200.0;
+        let (_, y) = clamp_position_into_display(400.0, low, LANDSCAPE, 669.0, 700.0);
+        assert!(
+            y + 700.0 <= LANDSCAPE.y + LANDSCAPE.height - TASKBAR_CLEARANCE,
+            "a tall card at a remembered low position should be lifted clear of the taskbar"
+        );
+    }
+
+    /// The two displays disagree about everything, which is exactly why the panel
+    /// must not pick one from the cursor. This pins the disagreement so nobody
+    /// re-introduces cursor-based selection thinking it is harmless.
+    #[test]
+    fn the_same_anchor_means_very_different_places_on_two_displays() {
+        let anchor = crate::settings::AskAnchor::Center;
+        let (lw, lh) = ask_size_for_display(LANDSCAPE.width, LANDSCAPE.height, "compact", anchor);
+        let (pw, ph) = ask_size_for_display(PORTRAIT.width, PORTRAIT.height, "compact", anchor);
+        assert!(
+            (lw - pw).abs() > 200.0,
+            "landscape {lw} vs portrait {pw}: the card is a very different shape per display"
+        );
+        let (lx, _) = anchor_position(anchor, LANDSCAPE, lw, lh);
+        let (px, _) = anchor_position(anchor, PORTRAIT, pw, ph);
+        assert!(
+            (lx - px).abs() > 1_000.0,
+            "landscape x {lx} vs portrait x {px}: and a very different place"
+        );
+    }
+
+    /// Outside the drawn rect the window hands the pointer to whatever is behind
+    /// it. This is the whole fix for "nothing is clickable".
+    #[test]
+    fn the_transparent_frame_passes_the_pointer_through() {
+        // The ask pill: a 340x56 window drawing a ~155x34 chip centred in it.
+        let pill = HitRect {
+            x: 92.0,
+            y: 11.0,
+            width: 155.0,
+            height: 34.0,
+        };
+        assert!(
+            panel_should_take_pointer(Some(pill), Some((170.0, 28.0)), false),
+            "a click on the chip belongs to the panel"
+        );
+        for outside in [(10.0, 28.0), (330.0, 28.0), (170.0, 2.0), (170.0, 54.0)] {
+            assert!(
+                !panel_should_take_pointer(Some(pill), Some(outside), false),
+                "a click at {outside:?} is on the user's desktop, not on the panel"
+            );
+        }
+    }
+
+    /// Every unknown resolves to "tangible". A webview that fails to measure, or
+    /// one that has not reported yet, must leave the panel exactly as clickable as
+    /// it was before pass-through existed — the opposite default would make a
+    /// visible panel impossible to use.
+    #[test]
+    fn an_unmeasured_panel_keeps_the_pointer() {
+        assert!(panel_should_take_pointer(None, Some((0.0, 0.0)), false));
+        assert!(panel_should_take_pointer(
+            Some(HitRect {
+                x: 0.0,
+                y: 0.0,
+                width: 10.0,
+                height: 10.0
+            }),
+            None,
+            false
+        ));
+        assert!(panel_should_take_pointer(None, None, false));
+    }
+
+    /// A held pointer is never taken away. The OS runs a window drag well outside
+    /// the drawn rect, so going pass-through mid-drag would drop the panel on the
+    /// spot.
+    #[test]
+    fn a_drag_keeps_the_pointer_wherever_it_travels() {
+        let pill = HitRect {
+            x: 92.0,
+            y: 11.0,
+            width: 155.0,
+            height: 34.0,
+        };
+        assert!(
+            panel_should_take_pointer(Some(pill), Some((-4_000.0, 3_000.0)), true),
+            "a drag in progress must survive the pointer leaving the chip"
+        );
+    }
+
+    /// A faded-out layer reports an empty rect rather than no rect, and an empty
+    /// rect must not leave a live pixel behind.
+    #[test]
+    fn a_faded_out_surface_is_fully_pass_through() {
+        let empty = HitRect {
+            x: 0.0,
+            y: 0.0,
+            width: 0.0,
+            height: 0.0,
+        };
+        assert!(!panel_should_take_pointer(
+            Some(empty),
+            Some((0.0, 0.0)),
+            false
+        ));
+    }
+
+    /// The tool list is no longer optional, so a provider that refuses `tools`
+    /// would fail every single turn. Recognising its wording is what turns that
+    /// into a working (if tool-less) assistant.
+    #[test]
+    fn tool_calling_rejections_are_recognized() {
+        for error in [
+            "Tools are not supported by this model",
+            "this model does not support tools",
+            "function calling is not supported for this deployment",
+            "tool_choice is unsupported",
+            "tools: unknown field",
+            "Tool use is not enabled for this endpoint",
+        ] {
+            assert!(
+                is_tools_unsupported_error(error),
+                "should trigger the no-tools retry: {error}"
+            );
+        }
+    }
+
+    /// The detector runs on *every* failed turn, so a false positive silently
+    /// costs a second request and strips the tools off a turn that needed them.
+    /// These must all be left alone.
+    #[test]
+    fn ordinary_failures_do_not_trigger_the_no_tools_retry() {
+        for error in [
+            "401 Unauthorized: invalid api key",
+            "429 rate limit exceeded",
+            "The model produced no output",
+            "connection closed before a response was received",
+            "This model does not support image input",
+            // Names a tool, but the complaint is about the arguments, not about
+            // tool calling being unavailable. Retrying without tools would
+            // discard the search this turn depends on.
+            "tool call arguments were invalid json",
+        ] {
+            assert!(
+                !is_tools_unsupported_error(error),
+                "must not be treated as a tool-calling failure: {error}"
+            );
+        }
+    }
+
+    /// The clock and the reminder tools ride on every turn, including one with
+    /// no web search and no screen access — which used to produce no tools at
+    /// all. Reminders cannot work without that.
+    #[test]
+    fn the_clock_and_reminder_tools_are_offered_with_no_other_capability() {
+        let tools = build_assistant_tool_capabilities(false, false).expect("tools are never empty");
+        let names: Vec<&str> = tools
+            .as_array()
+            .expect("an array")
+            .iter()
+            .filter_map(|t| t.get("function")?.get("name")?.as_str())
+            .collect();
+        assert_eq!(
+            names,
+            vec![
+                "get_current_datetime",
+                "set_reminder",
+                "list_reminders",
+                "cancel_reminder"
+            ]
+        );
+        // And the optional two still appear when their capability is on.
+        let tools = build_assistant_tool_capabilities(true, true).expect("tools");
+        let names: Vec<&str> = tools
+            .as_array()
+            .expect("an array")
+            .iter()
+            .filter_map(|t| t.get("function")?.get("name")?.as_str())
+            .collect();
+        assert_eq!(names.first(), Some(&"web_search"));
+        assert_eq!(names.last(), Some(&"capture_screen"));
+    }
+
+    /// A model asked for a number frequently sends a string. Refusing that would
+    /// fail a correct request over a pair of quotes.
+    #[test]
+    fn a_delay_sent_as_a_string_is_still_read_as_a_number() {
+        let args = parse_set_reminder_args(r#"{"text":"Call the bank","in_minutes":"20"}"#);
+        assert_eq!(args.text, "Call the bank");
+        assert_eq!(args.in_minutes, Some(20.0));
+        let args = parse_set_reminder_args(r#"{"text":"x","in_minutes":0.5}"#);
+        assert_eq!(args.in_minutes, Some(0.5));
+    }
+
+    /// Blank and missing fields must arrive as `None`, not as empty strings that
+    /// would look like a caller-supplied value further down.
+    #[test]
+    fn empty_reminder_fields_are_absent_rather_than_blank() {
+        let args =
+            parse_set_reminder_args(r#"{"text":"  Water the plants  ","at":"   ","note":""}"#);
+        assert_eq!(args.text, "Water the plants");
+        assert!(args.at.is_none());
+        assert!(args.note.is_none());
+        assert!(args.in_minutes.is_none());
+        // Malformed JSON is a missing everything, not a panic.
+        let args = parse_set_reminder_args("not json at all");
+        assert!(args.text.is_empty());
+        assert!(args.in_minutes.is_none());
+    }
+
+    /// The system prompt has to describe the tools that are actually attached, or
+    /// the model is told about a capability it cannot reach (or not told about one
+    /// it has). Reminders are in every combination.
+    #[test]
+    fn the_tools_prompt_section_always_documents_reminders() {
+        for (web, screen) in [(false, false), (true, false), (false, true), (true, true)] {
+            let section = tools_system_section(web, screen, false);
+            assert!(
+                section.contains("set_reminder"),
+                "web={web} screen={screen}"
+            );
+            assert!(section.contains("get_current_datetime"));
+            assert_eq!(section.contains("web_search"), web);
+            assert_eq!(section.contains("capture_screen"), screen);
+        }
+    }
+
     /// The rejections this has to recognise, in the wording each provider
     /// actually uses. Getting this wrong is expensive in both directions: a
     /// miss leaves the turn dead, and a false positive would silently strip a
@@ -4850,6 +6548,8 @@ mod tests {
             "Invalid content type. image_url is only supported by certain models.",
             "This model does not support image input",
             "The model is not multimodal",
+            // Groq GPT-OSS rejects the array used to carry a screenshot.
+            r#"{"error":{"message":"messages[4].content must be a string","type":"invalid_request_error","param":"messages[4].content"}}"#,
         ] {
             assert!(
                 is_vision_unsupported_error(error),
@@ -4863,12 +6563,176 @@ mod tests {
             "429 Too Many Requests",
             "context window exceeded",
             "connection closed before message completed",
+            "messages[4].content must not be empty",
+            "messages[4].role must be a string",
         ] {
             assert!(
                 !is_vision_unsupported_error(error),
                 "should not be treated as a vision failure: {error}"
             );
         }
+    }
+
+    /// The pill is what a question opens, and it has to be smaller than the card
+    /// it hands over to on every screen and in every dock zone. If it were ever
+    /// taller or wider than the card, the transition would be a shrink dressed up
+    /// as a bloom — and on a small display the pill could end up the larger of the
+    /// two surfaces, which is the "why is this thing so big" this whole shape
+    /// exists to answer.
+    #[test]
+    fn the_talking_pill_is_smaller_than_every_card_it_hands_over_to() {
+        use crate::settings::AskAnchor;
+        for (mon_w, mon_h) in [
+            (1024.0, 600.0),
+            (1366.0, 768.0),
+            (1920.0, 1080.0),
+            (2560.0, 1440.0),
+            (3840.0, 2160.0),
+        ] {
+            for preset in ["mini", "compact", "standard", "large", "unknown-legacy"] {
+                for anchor in [
+                    AskAnchor::Center,
+                    AskAnchor::TopCenter,
+                    AskAnchor::BottomCenter,
+                    AskAnchor::Left,
+                    AskAnchor::Right,
+                    AskAnchor::Custom,
+                ] {
+                    let (width, max_height) = ask_size_for_display(mon_w, mon_h, preset, anchor);
+                    assert!(
+                        ASK_PILL_HEIGHT < max_height,
+                        "the pill must be shorter than the card's ceiling on \
+                         {mon_w}x{mon_h} ({preset}, {anchor:?}): {ASK_PILL_HEIGHT} vs \
+                         {max_height}"
+                    );
+                    assert!(
+                        ASK_PILL_WIDTH < width,
+                        "the pill must be narrower than the card on {mon_w}x{mon_h} \
+                         ({preset}, {anchor:?}): {ASK_PILL_WIDTH} vs {width}"
+                    );
+                }
+            }
+        }
+    }
+
+    /// A dock zone picks proportions, not just coordinates: a card down one side
+    /// of the screen should be a tall rail and one along an edge a wide banner. If
+    /// every zone resolved to the same shape, "optimised for that direction" would
+    /// be a claim the code does not keep.
+    #[test]
+    fn side_docks_are_taller_than_edge_docks() {
+        use crate::settings::AskAnchor;
+        let (side_w, side_h) = ask_size_for_display(1920.0, 1080.0, "standard", AskAnchor::Left);
+        let (edge_w, edge_h) =
+            ask_size_for_display(1920.0, 1080.0, "standard", AskAnchor::TopCenter);
+        assert!(
+            side_h > edge_h,
+            "a side rail should be the taller shape: {side_h} vs {edge_h}"
+        );
+        assert!(
+            edge_w > side_w,
+            "an edge banner should be the wider shape: {edge_w} vs {side_w}"
+        );
+    }
+
+    /// The resize floor has to admit both of the quick ask's shapes. It is stage
+    /// aware because the card's width floor is wider than the whole pill: one
+    /// floor for both would quietly stretch the pill back out, which is exactly
+    /// the regression this surface was redesigned to undo.
+    #[test]
+    fn the_resize_floor_admits_both_ask_shapes() {
+        let (pill_w, pill_h) = panel_min_size(false, false, false);
+        assert!(
+            pill_w <= ASK_PILL_WIDTH && pill_h <= ASK_PILL_HEIGHT,
+            "a floor of {pill_w}x{pill_h} would refuse the \
+             {ASK_PILL_WIDTH}x{ASK_PILL_HEIGHT} pill"
+        );
+        let (_, card_h) = panel_min_size(false, false, true);
+        assert!(
+            card_h <= ASK_CARD_MIN_HEIGHT,
+            "a floor of {card_h} would refuse a card sized to a one-line answer"
+        );
+    }
+
+    /// Dropping the surface near an edge has to choose *that* zone. This is the
+    /// only way the dock zones can be reached by hand, and it is decided by
+    /// re-asking each zone where it would place the window — so if a zone's own
+    /// geometry ever changes, this follows it instead of drifting away from it.
+    #[test]
+    fn a_drop_lands_in_the_zone_it_was_aimed_at() {
+        use crate::settings::AskAnchor;
+        let display = DisplayBounds {
+            x: 0.0,
+            y: 0.0,
+            width: 1920.0,
+            height: 1080.0,
+        };
+        let (w, h) = (520.0, 420.0);
+        for anchor in [
+            AskAnchor::Center,
+            AskAnchor::TopCenter,
+            AskAnchor::BottomCenter,
+            AskAnchor::Left,
+            AskAnchor::Right,
+        ] {
+            // Dropped exactly on a zone, and dropped roughly at it, both resolve
+            // to that zone.
+            let (ax, ay) = anchor_position(anchor, display, w, h);
+            assert_eq!(nearest_anchor(ax, ay, display, w, h), anchor);
+            assert_eq!(nearest_anchor(ax + 18.0, ay - 14.0, display, w, h), anchor);
+        }
+        // And a drop is never answered with `Custom`, which is the absence of a
+        // zone rather than a place to land.
+        assert_ne!(
+            nearest_anchor(700.0, 400.0, display, w, h),
+            AskAnchor::Custom
+        );
+    }
+
+    /// A two-line reply gets a two-line card; a very long one stops at the
+    /// screen. Both directions matter: without the floor a one-word answer would
+    /// arrive in a sliver with no room for the follow-up row, and without the
+    /// ceiling a long answer would grow past the display and take its own close
+    /// button with it.
+    #[test]
+    fn a_measured_answer_is_clamped_to_something_readable() {
+        let (_, ceiling) = ask_size_for_display(
+            1920.0,
+            1080.0,
+            "standard",
+            crate::settings::AskAnchor::Center,
+        );
+
+        // Short answers are floored, not honoured literally.
+        assert_eq!(clamp_ask_fit(40.0, ceiling), ASK_CARD_MIN_HEIGHT);
+        assert_eq!(clamp_ask_fit(0.5, ceiling), ASK_CARD_MIN_HEIGHT);
+        // A comfortable middle is taken as asked.
+        let middle = (ASK_CARD_MIN_HEIGHT + ceiling) / 2.0;
+        assert_eq!(clamp_ask_fit(middle, ceiling), middle);
+        // And an essay stops at the ceiling.
+        assert_eq!(clamp_ask_fit(9000.0, ceiling), ceiling);
+        // The default the card opens at, before anything has been measured, has
+        // to be inside the band on every display — otherwise the very first
+        // answer arrives at a height the next fit report contradicts.
+        for (mon_w, mon_h) in [(1024.0, 600.0), (1920.0, 1080.0), (3840.0, 2160.0)] {
+            let (_, ceiling) =
+                ask_size_for_display(mon_w, mon_h, "standard", crate::settings::AskAnchor::Center);
+            let opened = clamp_ask_fit(ASK_CARD_FALLBACK_HEIGHT, ceiling);
+            assert!(
+                opened <= ceiling.max(ASK_CARD_MIN_HEIGHT.min(ceiling)),
+                "the opening height escaped the band on {mon_w}x{mon_h}: {opened} / {ceiling}"
+            );
+        }
+    }
+
+    /// A display too small to hold even the minimum card is the one case where
+    /// the clamp has to invert its own floor: a card taller than the screen
+    /// cannot be read, and cannot be dragged anywhere better.
+    #[test]
+    fn a_tiny_display_wins_over_the_minimum_card_height() {
+        let tiny = 120.0;
+        assert_eq!(clamp_ask_fit(400.0, tiny), tiny);
+        assert_eq!(clamp_ask_fit(10.0, tiny), tiny);
     }
 
     #[test]
@@ -4924,7 +6788,14 @@ mod tests {
     #[test]
     fn assistant_bindings_cover_both_assistant_shortcuts() {
         assert!(is_assistant_binding("assistant"));
-        assert!(is_assistant_binding("assistant_panel_toggle"));
+        // The call is the assistant's other half, so the master switch governs it
+        // too — otherwise turning the assistant off would leave a key that starts a
+        // conversation with a feature that is supposed to be gone.
+        assert!(is_assistant_binding("assistant_call"));
+        // The retired show/hide-panel key. Kept as an assertion rather than
+        // deleted so a reintroduction has to be deliberate: the quick-ask
+        // shortcut and the tray entry are the two ways in.
+        assert!(!is_assistant_binding("assistant_panel_toggle"));
         // Dictation must keep working with the assistant switched off.
         assert!(!is_assistant_binding("transcribe"));
         assert!(!is_assistant_binding("transcribe_with_post_process"));
@@ -4985,10 +6856,13 @@ mod tests {
     /// drop back to the pill's floor on collapse, or the collapse is refused.
     #[test]
     fn the_conversation_resize_floor_sits_between_the_pill_and_every_preset() {
-        let (call_w, call_h) = panel_min_size(false, true);
-        let (pill_w, pill_h) = panel_min_size(true, true);
+        let (call_w, call_h) = panel_min_size(false, true, true);
+        let (pill_w, pill_h) = panel_min_size(true, true, true);
         assert!(call_w > pill_w && call_h > pill_h);
-        assert_eq!(panel_min_size(true, true), panel_min_size(true, false));
+        assert_eq!(
+            panel_min_size(true, true, true),
+            panel_min_size(true, false, true)
+        );
         for preset in ["mini", "compact", "standard", "large", "unknown-legacy"] {
             let (w, h) = conversation_preset_size(preset);
             assert!(
@@ -4998,27 +6872,30 @@ mod tests {
         }
     }
 
-    /// The expanded chat panel needs a floor of its own, for exactly the reason
-    /// the call does. It used to share the pill's 240x44 — which is no floor for
-    /// a window holding a message list and an input row. A single small drag was
-    /// accepted, filed as the remembered expanded size by
-    /// `remember_size_in_lane`, and then reproduced on every later expand, so the
-    /// panel came back as a transparent sliver until the app was restarted. The
-    /// old version of the test above asserted that shared floor as if it were
-    /// intended.
+    /// The quick-ask surface needs a floor of its own, for exactly the reason the
+    /// call does. It used to share the pill's 240x44 — which is no floor for a
+    /// window an answer has to wrap inside. A single small drag was accepted,
+    /// filed as the remembered expanded size by `remember_size_in_lane`, and then
+    /// reproduced on every later expand, so the panel came back as a transparent
+    /// sliver until the app was restarted. The old version of the test above
+    /// asserted that shared floor as if it were intended.
+    ///
+    /// The height half of the floor is now the talking bar rather than a full
+    /// panel's worth (see `the_resize_floor_admits_the_talking_bar`), because the
+    /// surface deliberately takes that shape while a question is being asked.
     #[test]
     fn the_chat_panel_resize_floor_sits_between_the_pill_and_every_preset() {
-        let (panel_w, panel_h) = panel_min_size(false, false);
-        let (pill_w, pill_h) = panel_min_size(true, false);
+        let (panel_w, panel_h) = panel_min_size(false, false, true);
+        let (pill_w, pill_h) = panel_min_size(true, false, true);
         assert!(
             panel_w > pill_w && panel_h > pill_h,
-            "the expanded panel's floor must sit above the pill's, not equal it"
+            "the expanded surface's floor must sit above the pill's, not equal it"
         );
         for preset in ["mini", "compact", "standard", "large", "unknown-legacy"] {
             let (w, h) = panel_preset_size(preset);
             assert!(
                 w >= panel_w && h >= panel_h,
-                "{preset} is below the chat panel resize floor"
+                "{preset} is below the quick-ask resize floor"
             );
         }
     }
@@ -5147,9 +7024,24 @@ mod tests {
     /// visibly bigger card, and a small one should still fit.
     #[test]
     fn the_card_grows_with_the_display() {
-        let (laptop_w, _) = ask_size_for_display(1366.0, 768.0, "standard");
-        let (fhd_w, _) = ask_size_for_display(1920.0, 1080.0, "standard");
-        let (uhd_w, _) = ask_size_for_display(3840.0, 2160.0, "standard");
+        let (laptop_w, _) = ask_size_for_display(
+            1366.0,
+            768.0,
+            "standard",
+            crate::settings::AskAnchor::Center,
+        );
+        let (fhd_w, _) = ask_size_for_display(
+            1920.0,
+            1080.0,
+            "standard",
+            crate::settings::AskAnchor::Center,
+        );
+        let (uhd_w, _) = ask_size_for_display(
+            3840.0,
+            2160.0,
+            "standard",
+            crate::settings::AskAnchor::Center,
+        );
         assert!(
             laptop_w < fhd_w && fhd_w < uhd_w,
             "a larger display must produce a larger card: {laptop_w} / {fhd_w} / {uhd_w}"
@@ -5168,7 +7060,8 @@ mod tests {
             (5120.0, 2880.0),
         ] {
             for preset in ["mini", "compact", "standard", "large", "unknown-legacy"] {
-                let (cw, ch) = ask_size_for_display(w, h, preset);
+                let (cw, ch) =
+                    ask_size_for_display(w, h, preset, crate::settings::AskAnchor::Center);
                 let scale = ask_preset_scale(preset);
                 assert!(
                     cw <= ASK_MAX_WIDTH * scale && ch <= ASK_MAX_HEIGHT * scale,
@@ -5198,7 +7091,9 @@ mod tests {
         ] {
             let sizes: Vec<f64> = ["mini", "compact", "standard", "large"]
                 .iter()
-                .map(|p| ask_size_for_display(mon_w, mon_h, p).0)
+                .map(|p| {
+                    ask_size_for_display(mon_w, mon_h, p, crate::settings::AskAnchor::Center).0
+                })
                 .collect();
             assert!(
                 sizes.windows(2).all(|pair| pair[0] <= pair[1]),
@@ -5208,7 +7103,7 @@ mod tests {
         // A display with room to show the difference must actually show it.
         let sizes: Vec<f64> = ["mini", "compact", "standard", "large"]
             .iter()
-            .map(|p| ask_size_for_display(2560.0, 1440.0, p).0)
+            .map(|p| ask_size_for_display(2560.0, 1440.0, p, crate::settings::AskAnchor::Center).0)
             .collect();
         assert!(
             sizes.windows(2).all(|pair| pair[0] < pair[1]),
@@ -5216,13 +7111,48 @@ mod tests {
         );
     }
 
+    /// A display at the desktop origin, for the geometry tests.
+    fn screen(width: f64, height: f64) -> DisplayBounds {
+        DisplayBounds {
+            x: 0.0,
+            y: 0.0,
+            width,
+            height,
+        }
+    }
+
     /// Centre is the default because a corner is where the old panel got lost.
     #[test]
     fn the_centre_anchor_actually_centres_horizontally() {
         use crate::settings::AskAnchor;
         let (w, h) = (600.0, 500.0);
-        let (x, _) = anchor_position(AskAnchor::Center, 0.0, 0.0, 1920.0, 1080.0, w, h);
+        let (x, _) = anchor_position(AskAnchor::Center, screen(1920.0, 1080.0), w, h);
         assert_eq!(x, (1920.0 - w) / 2.0);
+    }
+
+    /// The bug the whole separation exists for: hang up a call, press the assistant
+    /// shortcut, and the entire call transcript was sitting in the quick-ask card,
+    /// because both features wrote into one `AssistantConversation`.
+    #[test]
+    fn a_quick_ask_after_a_call_starts_empty() {
+        assert!(should_reset_quick_ask(false, false));
+    }
+
+    /// A follow-up to the answer in front of you keeps its context. "Make it
+    /// shorter" is the single most useful thing about a quick ask and it is
+    /// impossible without the previous turn, so "quick" means one *topic*, not one
+    /// message.
+    #[test]
+    fn a_follow_up_to_the_open_card_keeps_its_context() {
+        assert!(!should_reset_quick_ask(false, true));
+    }
+
+    /// The conversation belongs to the call while it is running. Wiping it here
+    /// would erase what the user is in the middle of saying.
+    #[test]
+    fn nothing_is_reset_during_a_call() {
+        assert!(!should_reset_quick_ask(true, false));
+        assert!(!should_reset_quick_ask(true, true));
     }
 
     /// Every anchor must land the card fully on screen, on any display size —
@@ -5239,8 +7169,9 @@ mod tests {
             AskAnchor::Custom,
         ] {
             for (mon_w, mon_h) in [(1024.0, 600.0), (1920.0, 1080.0), (3840.0, 2160.0)] {
-                let (w, h) = ask_size_for_display(mon_w, mon_h, "large");
-                let (x, y) = anchor_position(anchor, 0.0, 0.0, mon_w, mon_h, w, h);
+                let (w, h) =
+                    ask_size_for_display(mon_w, mon_h, "large", crate::settings::AskAnchor::Center);
+                let (x, y) = anchor_position(anchor, screen(mon_w, mon_h), w, h);
                 assert!(
                     x >= 0.0 && y >= 0.0,
                     "{anchor:?} on {mon_w}x{mon_h} → ({x}, {y})"
@@ -5259,15 +7190,13 @@ mod tests {
     #[test]
     fn anchors_respect_a_display_with_a_negative_origin() {
         use crate::settings::AskAnchor;
-        let (x, y) = anchor_position(
-            AskAnchor::Center,
-            -1920.0,
-            0.0,
-            1920.0,
-            1080.0,
-            600.0,
-            500.0,
-        );
+        let left_monitor = DisplayBounds {
+            x: -1920.0,
+            y: 0.0,
+            width: 1920.0,
+            height: 1080.0,
+        };
+        let (x, y) = anchor_position(AskAnchor::Center, left_monitor, 600.0, 500.0);
         assert!(
             x < 0.0,
             "the card belongs on the left-hand monitor, got x={x}"
@@ -5276,100 +7205,93 @@ mod tests {
         assert!(y >= 0.0);
     }
 
-    /// Snapping is what makes dragging safe: a drop near an edge lands *on* it.
+    /// `nearest_anchor` always names a zone, from anywhere on the display. That is
+    /// a property of the candidate search, not a decision: [`snapped_drop`] is what
+    /// decides, and it only accepts the answer within `SNAP_RADIUS` — otherwise the
+    /// drop is left where the user let go. The distinction matters because "nearest"
+    /// having an answer everywhere is exactly what used to teleport the window away
+    /// from the pointer on a narrow display.
+    ///
+    /// What is asserted here is that the search is self-consistent: the zone it
+    /// names for a point is the zone that point's placement then belongs to, so a
+    /// snap can never land somewhere that would snap again.
     #[test]
-    fn a_drop_near_an_edge_snaps_to_it() {
-        let (w, h) = (600.0, 500.0);
-        // Near the left edge.
-        let (x, _) = snap_to_edges(10.0, 300.0, 0.0, 0.0, 1920.0, 1080.0, w, h);
-        assert_eq!(x, PANEL_MARGIN);
-        // Near the top edge.
-        let (_, y) = snap_to_edges(700.0, 8.0, 0.0, 0.0, 1920.0, 1080.0, w, h);
-        assert_eq!(y, PANEL_MARGIN);
-    }
-
-    /// Both axes snap independently, which is how corners work without a separate
-    /// corner case. The drop position is the window's top-left, so a right-edge
-    /// drop is near `screen - width - margin`, not near the screen's own edge.
-    #[test]
-    fn a_drop_near_a_corner_snaps_on_both_axes() {
-        let (w, h) = (600.0, 500.0);
-        let right_target = 1920.0 - w - PANEL_MARGIN;
-        let (x, y) = snap_to_edges(right_target - 16.0, 4.0, 0.0, 0.0, 1920.0, 1080.0, w, h);
-        assert_eq!(x, right_target, "should snap to the right edge");
-        assert_eq!(y, PANEL_MARGIN, "should snap to the top edge");
-    }
-
-    /// A drop in open space is left exactly where the user put it. Snapping
-    /// everything would take the control away rather than assist it. Chosen to sit
-    /// clear of the centre target as well as the edges.
-    #[test]
-    fn a_drop_in_open_space_is_left_alone() {
+    fn a_drop_in_open_space_still_resolves_to_a_zone() {
+        use crate::settings::AskAnchor;
+        let display = screen(1920.0, 1080.0);
         let (w, h) = (400.0, 300.0);
-        let centre_x = (1920.0 - w) / 2.0;
-        let x = centre_x + SNAP_DISTANCE * 3.0;
-        let (sx, sy) = snap_to_edges(x, 400.0, 0.0, 0.0, 1920.0, 1080.0, w, h);
-        assert_eq!((sx, sy), (x, 400.0));
-    }
-
-    /// "Roughly the middle" should become exactly the middle — it is the position
-    /// most people are aiming for when they drag a card back toward the centre.
-    #[test]
-    fn a_drop_near_the_horizontal_centre_snaps_to_centre() {
-        let w = 600.0;
-        let centre = (1920.0 - w) / 2.0;
-        let (x, _) = snap_to_edges(centre + 20.0, 400.0, 0.0, 0.0, 1920.0, 1080.0, w, 500.0);
-        assert_eq!(x, centre);
-    }
-
-    /// The command works on its own, in any casing, with whatever punctuation the
-    /// speech engine decided to add.
-    #[test]
-    fn a_bare_conversation_command_is_recognised() {
-        for said in [
-            "open live conversation",
-            "Open live conversation.",
-            "OPEN LIVE CONVERSATION!",
-            "  start a conversation  ",
-            "Let's talk",
-            "lets talk",
-            "Start conversation mode.",
-            "open the live conversation",
-        ] {
-            assert!(
-                is_conversation_command(said),
-                "{said:?} should start a conversation"
-            );
+        for (x, y) in [(700.0, 400.0), (30.0, 30.0), (1500.0, 900.0), (960.0, 20.0)] {
+            let anchor = nearest_anchor(x, y, display, w, h);
+            assert_ne!(anchor, AskAnchor::Custom);
+            // And the zone it names is one the placement agrees with, so a drop is
+            // never answered with a zone the window is then not put in.
+            let (ax, ay) = anchor_position(anchor, display, w, h);
+            assert_eq!(nearest_anchor(ax, ay, display, w, h), anchor);
         }
     }
 
-    /// The property the whole feature rests on. A question that merely mentions a
-    /// conversation must be answered, not acted on — otherwise the assistant hangs
-    /// up on the user mid-thought and feels unpredictable, which is worse than not
-    /// having the command.
-    #[test]
-    fn a_question_that_merely_mentions_a_conversation_is_not_a_command() {
-        for said in [
-            "how do I open a live conversation in Zoom?",
-            "what does start a conversation mean",
-            "can you open live conversation for me later",
-            "remind me to start a conversation with Sam tomorrow",
-            "write an email asking to start a conversation about pricing",
-            "open live conversation is the phrase I keep saying",
-            "translate let's talk into Japanese",
-        ] {
-            assert!(
-                !is_conversation_command(said),
-                "{said:?} is a question and must be answered, not treated as a command"
-            );
+    fn msg(role: &str, content: &str) -> ChatMessage {
+        ChatMessage {
+            role: role.to_string(),
+            content: content.to_string(),
+            images: Vec::new(),
         }
     }
 
-    /// Silence and punctuation-only transcriptions are not commands.
+    fn sample_thread() -> Vec<ChatMessage> {
+        vec![
+            msg("user", "first question"),
+            msg("assistant", "first answer"),
+            msg("user", "second question"),
+            msg("assistant", "second answer"),
+        ]
+    }
+
+    /// "Continue from here" includes the message you pointed at. Dropping it would
+    /// lose the answer the user branched *because of*.
     #[test]
-    fn empty_or_punctuation_only_speech_is_not_a_command() {
-        for said in ["", "   ", ".", "...", "?!"] {
-            assert!(!is_conversation_command(said));
+    fn a_branch_keeps_the_message_it_was_taken_from() {
+        let branched = branch_messages(sample_thread(), 1);
+        assert_eq!(branched.len(), 2);
+        assert_eq!(branched[1].content, "first answer");
+    }
+
+    /// Branching from the very first message leaves exactly that message.
+    #[test]
+    fn a_branch_from_the_first_message_keeps_only_it() {
+        let branched = branch_messages(sample_thread(), 0);
+        assert_eq!(branched.len(), 1);
+        assert_eq!(branched[0].content, "first question");
+    }
+
+    /// An index past the end keeps the whole thread rather than panicking or
+    /// returning nothing — which is also the right answer if the panel's list and
+    /// the stored row have drifted apart.
+    #[test]
+    fn a_branch_index_past_the_end_keeps_everything() {
+        let branched = branch_messages(sample_thread(), 999);
+        assert_eq!(branched.len(), 4);
+    }
+
+    /// Branching an empty conversation yields nothing, which the command turns into
+    /// a readable error instead of an empty panel.
+    #[test]
+    fn a_branch_from_an_empty_conversation_is_empty() {
+        assert!(branch_messages(Vec::new(), 0).is_empty());
+    }
+
+    /// The branch is a prefix of the original, in order — never reordered and never
+    /// missing a message from the middle.
+    #[test]
+    fn a_branch_is_an_ordered_prefix_of_the_original() {
+        let original = sample_thread();
+        for index in 0..original.len() {
+            let branched = branch_messages(original.clone(), index);
+            assert_eq!(branched.len(), index + 1);
+            for (i, message) in branched.iter().enumerate() {
+                assert_eq!(message.content, original[i].content);
+                assert_eq!(message.role, original[i].role);
+            }
         }
     }
 
@@ -5556,51 +7478,64 @@ mod tests {
 
     #[test]
     fn assistant_tool_capability_matrix_and_order_are_stable() {
-        assert!(build_assistant_tool_capabilities(false, false).is_none());
+        // The clock and the three reminder tools are unconditional, so the list
+        // is never empty — a turn with no web search and no screen access used to
+        // expose no tools at all, which is precisely what reminders could not
+        // live with.
+        const ALWAYS: [&str; 4] = [
+            "get_current_datetime",
+            "set_reminder",
+            "list_reminders",
+            "cancel_reminder",
+        ];
+        let names_for = |web: bool, screen: bool| -> Vec<String> {
+            build_assistant_tool_capabilities(web, screen)
+                .expect("the tool list is never empty")
+                .as_array()
+                .expect("tool definitions should be an array")
+                .iter()
+                .map(|tool| {
+                    tool["function"]["name"]
+                        .as_str()
+                        .expect("tool name should be a string")
+                        .to_string()
+                })
+                .collect()
+        };
+
+        assert_eq!(names_for(false, false), ALWAYS.to_vec());
 
         let tools =
             build_assistant_tool_capabilities(true, false).expect("tools should be enabled");
         let tools = tools
             .as_array()
             .expect("tool definitions should be an array");
-        let names: Vec<&str> = tools
-            .iter()
-            .map(|tool| {
-                tool["function"]["name"]
-                    .as_str()
-                    .expect("tool name should be a string")
-            })
-            .collect();
-        assert_eq!(names, vec!["web_search", "get_current_datetime"]);
+        assert_eq!(
+            names_for(true, false),
+            [&["web_search"][..], &ALWAYS[..]].concat()
+        );
         assert_eq!(
             tools[0]["function"]["parameters"]["required"],
             json!(["query"])
         );
         assert_eq!(tools[1]["function"]["parameters"]["properties"], json!({}));
-
-        // Agent-decides screen access appends capture_screen after the web
-        // tools; screen-only turns expose just capture_screen.
-        let tools = build_assistant_tool_capabilities(true, true).expect("tools should be enabled");
-        let names: Vec<&str> = tools
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|tool| tool["function"]["name"].as_str().unwrap())
-            .collect();
+        // A reminder must always say what to do; the time is optional because a
+        // delay and an absolute time are alternatives.
         assert_eq!(
-            names,
-            vec!["web_search", "get_current_datetime", "capture_screen"]
+            tools[2]["function"]["parameters"]["required"],
+            json!(["text"])
         );
 
-        let tools =
-            build_assistant_tool_capabilities(false, true).expect("tools should be enabled");
-        let names: Vec<&str> = tools
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|tool| tool["function"]["name"].as_str().unwrap())
-            .collect();
-        assert_eq!(names, vec!["capture_screen"]);
+        // Agent-decides screen access appends capture_screen last, after
+        // everything else, so the request baseline stays byte-stable.
+        assert_eq!(
+            names_for(true, true),
+            [&["web_search"][..], &ALWAYS[..], &["capture_screen"][..]].concat()
+        );
+        assert_eq!(
+            names_for(false, true),
+            [&ALWAYS[..], &["capture_screen"][..]].concat()
+        );
     }
 
     #[test]

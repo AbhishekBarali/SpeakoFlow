@@ -422,10 +422,6 @@
           "assistant_vision": {
             "name": "Preguntar con la pantalla",
             "description": "Pregunta por voz adjuntando tu pantalla para que pueda ver lo que estás mirando."
-          },
-          "assistant_panel_toggle": {
-            "name": "Mostrar u ocultar el panel",
-            "description": "Muestra u oculta el panel flotante del asistente."
           }
         },
         "errors": {

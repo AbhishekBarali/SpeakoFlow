@@ -4,10 +4,14 @@ import { toast } from "sonner";
 import {
   Check,
   Loader2,
+  AudioLines,
   Volume2,
   ArrowUp,
+  Copy,
+  CornerDownLeft,
   Globe,
   Keyboard,
+  Mic,
   Sparkles,
   Monitor,
   PanelTop,
@@ -15,6 +19,7 @@ import {
   ChevronRight,
   Power,
   PlugZap,
+  Square,
 } from "lucide-react";
 import {
   commands,
@@ -24,6 +29,8 @@ import {
   type AssistantResponseLength,
   type AssistantScreenAccessMode,
   type AssistantSearchDepth,
+  type AskAnchor,
+  type DisplayChoice,
   type ModelChoice,
   type ModelUnloadTimeout,
   type VisionCaptureTiming,
@@ -42,6 +49,7 @@ import { TONE_TILE } from "../../ui/tones";
 import { ProviderModeToggle } from "../PostProcessingSettingsApi/ProviderModeToggle";
 import { ShortcutInput } from "../ShortcutInput";
 import { PushToTalk } from "../PushToTalk";
+import { RemindersSettings } from "./RemindersSettings";
 import { useSettings } from "../../../hooks/useSettings";
 import { useKokoroTts } from "../../../assistant/useKokoroTts";
 import { localTtsActive } from "../../../assistant/localTts";
@@ -122,44 +130,59 @@ const PanelPreview: React.FC<{
         } as React.CSSProperties
       }
     >
-      <div className="assistant-panel">
-        <div className="assistant-header">
-          <div className="assistant-title">
-            <span className="assistant-status-dot" />
-            {t("assistant.title")}
-          </div>
-          <div className="assistant-header-actions">
-            <span className="assistant-icon-button">
-              <Volume2 size={14} />
+      <div className="assistant-preview-stack">
+        {/* The two shapes the surface actually takes, in the order they happen:
+            the small pill a question opens, and the card the answer fades in as.
+            A preview that shows chrome the panel does not have is worse than no
+            preview, which is why the old title bar and message list are gone from
+            here too. */}
+        <div className="assistant-preview-surface pill">
+          <div className="ask-pill labeled">
+            <span className="ask-pill-mark">
+              <Sparkles size={13} strokeWidth={1.9} />
+            </span>
+            <span className="ask-pill-label">
+              {t("assistant.status.thinking")}
             </span>
           </div>
         </div>
-        <div className="assistant-messages">
-          <div className="assistant-message user">
-            <div className="assistant-message-content">
-              {t("settings.assistant.appearance.previewUser")}
+
+        <div className="assistant-preview-surface">
+          <div className="ask-card">
+            <div className="ask-head">
+              <Mic className="ask-head-icon" size={12} />
+              <p className="ask-question-text">
+                {t("settings.assistant.appearance.previewUser")}
+              </p>
+              <div className="ask-head-actions">
+                <span className="ask-action">
+                  <Copy size={13} />
+                </span>
+                <span className="ask-action labelled">
+                  <CornerDownLeft size={13} />
+                  <span>{t("assistant.insertShort")}</span>
+                </span>
+              </div>
             </div>
-          </div>
-          <div className="assistant-message assistant">
-            <div className="assistant-message-content">
+            <div className="ask-answer-body">
               {t("settings.assistant.appearance.previewAssistant")}
             </div>
+            <div className="assistant-input-row">
+              <div
+                className="assistant-input"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  color: "var(--as-faint)",
+                }}
+              >
+                {t("assistant.followUpPlaceholder")}
+              </div>
+              <span className="assistant-send-button">
+                <ArrowUp size={15} strokeWidth={2.5} />
+              </span>
+            </div>
           </div>
-        </div>
-        <div className="assistant-input-row">
-          <div
-            className="assistant-input"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              color: "var(--as-faint)",
-            }}
-          >
-            {t("assistant.inputPlaceholder")}
-          </div>
-          <span className="assistant-send-button">
-            <ArrowUp size={15} strokeWidth={2.5} />
-          </span>
         </div>
       </div>
     </div>
@@ -225,6 +248,40 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
   const [model, setModel] = useState("");
   const [historyLimit, setHistoryLimit] = useState("12");
   const [contextSize, setContextSize] = useState("8192");
+
+  /**
+   * The displays currently attached, for the "Which screen" row.
+   *
+   * Fetched rather than derived: only the backend can enumerate monitors, and the
+   * list changes while the app runs. Re-read whenever the window regains focus,
+   * because plugging a screen in is exactly the kind of thing someone does and then
+   * comes straight back to this panel to point the assistant at it.
+   */
+  const [displays, setDisplays] = useState<DisplayChoice[]>([]);
+  /**
+   * Which screen the panel would open on right now, 1-based, or 0 when the backend
+   * could not tell. Used to label the "where I last used it" option with the screen
+   * it currently means.
+   */
+  const currentDisplayNumber = useMemo(
+    () => displays.findIndex((display) => display.is_current) + 1,
+    [displays],
+  );
+  useEffect(() => {
+    let active = true;
+    const load = () => {
+      void commands.listAssistantDisplays().then((res) => {
+        if (active && res.status === "ok") setDisplays(res.data);
+      });
+    };
+    load();
+    window.addEventListener("focus", load);
+    return () => {
+      active = false;
+      window.removeEventListener("focus", load);
+    };
+  }, []);
+
   const [apiKey, setApiKey] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
   // Which credential field currently has focus, so the settings→state resync
@@ -1270,11 +1327,15 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
           icon={Sparkles}
           tone="teal"
         />
+        {/* The call's own key, listed next to the quick ask so the split between
+            the two features is visible in the one place people go looking for
+            it. They are separate features with separate lifetimes: one answers a
+            question and closes, the other holds a conversation. */}
         <ShortcutInput
-          shortcutId="assistant_panel_toggle"
+          shortcutId="assistant_call"
           grouped={true}
-          icon={PanelTop}
-          tone="violet"
+          icon={AudioLines}
+          tone="indigo"
         />
         <PushToTalk grouped={true} />
       </SettingsGroup>
@@ -2043,6 +2104,11 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
         )}
       </SettingsGroup>
 
+      {/* Reminders ---------------------------------------------------------
+          Directly after search, because both are things the assistant does on
+          your behalf rather than settings that change how it talks. */}
+      <RemindersSettings />
+
       {/* Panel appearance -------------------------------------------------- */}
       <SettingsGroup
         title={t("settings.assistant.appearance.title")}
@@ -2076,6 +2142,10 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
               {
                 value: "large",
                 label: t("settings.assistant.appearance.fontSizes.large"),
+              },
+              {
+                value: "extra_large",
+                label: t("settings.assistant.appearance.fontSizes.extraLarge"),
               },
             ]}
             selectedValue={settings?.assistant_font_size ?? "medium"}
@@ -2112,6 +2182,109 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
             selectedValue={settings?.assistant_panel_size ?? "standard"}
             onSelect={(size) =>
               setAndRefresh(commands.setAssistantPanelSize(size))
+            }
+          />
+        </SettingContainer>
+        {/* Only worth showing when there is a choice to make. On one monitor the
+            row would be a dropdown with a single meaningful entry. */}
+        {displays.length > 1 && (
+          <SettingContainer
+            title={t("settings.assistant.appearance.askDisplayLabel")}
+            info={t("settings.assistant.appearance.askDisplayDescription")}
+            layout="horizontal"
+            grouped={true}
+          >
+            <Dropdown
+              options={[
+                {
+                  value: "last_used",
+                  // Naming the screen it currently resolves to is what makes this
+                  // option usable. On its own it is a policy with no visible
+                  // consequence, and working out which physical monitor is which is
+                  // the hardest part of any display picker.
+                  label: currentDisplayNumber
+                    ? t(
+                        "settings.assistant.appearance.askDisplays.lastUsedOn",
+                        {
+                          number: currentDisplayNumber,
+                        },
+                      )
+                    : t("settings.assistant.appearance.askDisplays.lastUsed"),
+                },
+                {
+                  value: "cursor",
+                  label: t("settings.assistant.appearance.askDisplays.cursor"),
+                },
+                ...displays.map((display, index) => ({
+                  value: display.id,
+                  // Numbered by position in the list, because a raw device name
+                  // ("\\.\DISPLAY2") means nothing to anyone. The resolution is what
+                  // people actually recognise their screens by, so it carries the
+                  // label rather than sitting in a tooltip.
+                  label: t(
+                    "settings.assistant.appearance.askDisplays.numbered",
+                    {
+                      number: index + 1,
+                      width: display.width,
+                      height: display.height,
+                      suffix: display.is_primary
+                        ? t(
+                            "settings.assistant.appearance.askDisplays.mainSuffix",
+                          )
+                        : "",
+                    },
+                  ),
+                })),
+              ]}
+              selectedValue={settings?.assistant_ask_display ?? "last_used"}
+              onSelect={(display) =>
+                setAndRefresh(commands.setAssistantAskDisplay(display))
+              }
+            />
+          </SettingContainer>
+        )}
+        <SettingContainer
+          title={t("settings.assistant.appearance.askAnchorLabel")}
+          info={t("settings.assistant.appearance.askAnchorDescription")}
+          layout="horizontal"
+          grouped={true}
+        >
+          <Dropdown
+            options={[
+              {
+                value: "center",
+                label: t("settings.assistant.appearance.askAnchors.center"),
+              },
+              {
+                value: "topcenter",
+                label: t("settings.assistant.appearance.askAnchors.top"),
+              },
+              {
+                value: "bottomcenter",
+                label: t("settings.assistant.appearance.askAnchors.bottom"),
+              },
+              {
+                value: "left",
+                label: t("settings.assistant.appearance.askAnchors.left"),
+              },
+              {
+                value: "right",
+                label: t("settings.assistant.appearance.askAnchors.right"),
+              },
+              // "Where I left it" is deliberately absent. Dragging used to set it,
+              // which meant the one gesture available on the surface permanently
+              // switched off the zone that shapes it — and left a stale coordinate
+              // behind that every later open obeyed, so the panel opened off-centre
+              // for no visible reason. A drop now picks a zone instead, and a stored
+              // `custom` from before reads as Centre (see `default_position_for`).
+            ]}
+            selectedValue={
+              settings?.assistant_ask_anchor === "custom"
+                ? "center"
+                : (settings?.assistant_ask_anchor ?? "center")
+            }
+            onSelect={(anchor) =>
+              setAndRefresh(commands.setAssistantAskAnchor(anchor as AskAnchor))
             }
           />
         </SettingContainer>

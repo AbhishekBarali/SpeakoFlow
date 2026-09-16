@@ -244,6 +244,48 @@ pub fn assistant_resume_session(app: AppHandle, id: i64) -> Result<(), String> {
     Ok(())
 }
 
+/// Continue a past conversation from one chosen message, as a new branch.
+///
+/// The thread up to and including `message_index` is adopted and everything after
+/// it is left behind, so the user can take a conversation they liked and try a
+/// different direction from the middle of it.
+///
+/// **The original is never modified.** The branch is loaded with no session id, so
+/// the next turn writes a fresh History row and the conversation being forked stays
+/// exactly as it was. That is what makes this safe to reach for — there is no
+/// version of this that loses the thread you branched from, and so no need for a
+/// history tree to protect it.
+#[tauri::command]
+#[specta::specta]
+pub fn assistant_branch_session(
+    app: AppHandle,
+    id: i64,
+    message_index: usize,
+) -> Result<(), String> {
+    crate::voice_conversation::end(&app);
+    let conversation = app.state::<AssistantConversation>();
+    if conversation.is_busy() {
+        return Err("The assistant is answering right now — stop it first.".to_string());
+    }
+    let hm = app
+        .try_state::<std::sync::Arc<crate::managers::history::HistoryManager>>()
+        .ok_or_else(|| "History unavailable".to_string())?;
+    let entry = hm
+        .get_assistant_session(id)
+        .map_err(|e| format!("Couldn't load the conversation: {}", e))?
+        .ok_or_else(|| "That conversation no longer exists.".to_string())?;
+
+    let branched = assistant::branch_messages(entry.messages, message_index);
+    if branched.is_empty() {
+        return Err("There's nothing to continue from there.".to_string());
+    }
+    conversation.load_branch(branched);
+    assistant::emit_conversation(&app);
+    assistant::set_panel_collapsed(&app, false);
+    assistant::show_assistant_panel(&app);
+    Ok(())
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn assistant_clear_conversation(app: AppHandle) -> Result<(), String> {
@@ -274,13 +316,6 @@ pub fn assistant_clear_conversation(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-#[tauri::command]
-#[specta::specta]
-pub fn toggle_assistant_panel(app: AppHandle) -> Result<(), String> {
-    assistant::toggle_assistant_panel(&app);
-    Ok(())
-}
-
 /// Choose where the Ask card opens.
 ///
 /// Picking any anchor other than `Custom` also discards the remembered dragged
@@ -299,6 +334,31 @@ pub fn set_assistant_ask_anchor(
         assistant::forget_dragged_position(&app);
     }
     Ok(())
+}
+
+/// Choose which display the Ask surface opens on.
+///
+/// Like the anchor, this discards the remembered dragged position: a coordinate on
+/// the screen you just moved away from is meaningless, and keeping it would make the
+/// new choice appear to do nothing on the very next open. The stored display pin goes
+/// too, so `last_used` starts from a clean slate rather than from the screen the user
+/// is trying to get away from.
+#[tauri::command]
+#[specta::specta]
+pub fn set_assistant_ask_display(app: AppHandle, display: String) -> Result<(), String> {
+    let mut settings = get_settings(&app);
+    settings.assistant_ask_display = display;
+    write_settings(&app, settings);
+    assistant::forget_dragged_position(&app);
+    assistant::forget_panel_display(&app);
+    Ok(())
+}
+
+/// The displays currently connected, for the "Which screen" dropdown.
+#[tauri::command]
+#[specta::specta]
+pub fn list_assistant_displays(app: AppHandle) -> Result<Vec<assistant::DisplayChoice>, String> {
+    Ok(assistant::list_displays(&app))
 }
 
 #[tauri::command]
@@ -587,7 +647,7 @@ pub fn set_assistant_response_length(
 #[tauri::command]
 #[specta::specta]
 pub fn set_assistant_font_size(app: AppHandle, size: String) -> Result<(), String> {
-    if !matches!(size.as_str(), "small" | "medium" | "large") {
+    if !matches!(size.as_str(), "small" | "medium" | "large" | "extra_large") {
         return Err(format!("Unknown font size: {}", size));
     }
     let mut settings = get_settings(&app);

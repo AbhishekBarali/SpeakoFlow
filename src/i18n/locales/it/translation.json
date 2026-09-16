@@ -422,10 +422,6 @@
           "assistant_vision": {
             "name": "Chiedi con lo schermo",
             "description": "Chiedi a voce allegando il tuo schermo, così può vedere ciò che stai guardando."
-          },
-          "assistant_panel_toggle": {
-            "name": "Mostra o nascondi il pannello",
-            "description": "Mostra o nasconde il pannello flottante dell'assistente."
           }
         },
         "errors": {

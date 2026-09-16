@@ -1047,11 +1047,165 @@ async fn read_sse_round(
     Ok(round)
 }
 
+/// Interactive requests should answer immediately when the model supports it.
+/// Reasoning-only models get their lowest effort; unsupported controls are
+/// negotiated by `send_stream_request` without sacrificing the answer.
+fn fast_reasoning_options(
+    provider_id: &str,
+    model: &str,
+) -> (Option<String>, Option<ReasoningConfig>) {
+    let effort = if crate::actions::wants_low_rather_than_no_reasoning(model) {
+        "low"
+    } else {
+        "none"
+    };
+    match provider_id {
+        "builtin" | "anthropic" | "apple_intelligence" => (None, None),
+        "openrouter" => (
+            None,
+            Some(ReasoningConfig {
+                effort: Some(effort.into()),
+                exclude: Some(true),
+            }),
+        ),
+        _ => (Some(effort.into()), None),
+    }
+}
+
+#[derive(Clone, Copy, Default)]
+enum StreamReasoningSupport {
+    #[default]
+    Requested,
+    Low,
+    Unsupported,
+}
+
+static STREAM_REASONING_SUPPORT: Lazy<Mutex<HashMap<String, StreamReasoningSupport>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
+
+fn apply_stream_reasoning_support(
+    body: &mut ChatCompletionRequest,
+    support: StreamReasoningSupport,
+) {
+    match support {
+        StreamReasoningSupport::Requested => {}
+        StreamReasoningSupport::Low => {
+            if let Some(effort) = &mut body.reasoning_effort {
+                *effort = "low".into();
+            }
+            if let Some(reasoning) = &mut body.reasoning {
+                reasoning.effort = Some("low".into());
+            }
+        }
+        StreamReasoningSupport::Unsupported => {
+            body.reasoning_effort = None;
+            body.reasoning = None;
+        }
+    }
+}
+
+fn reasoning_rejection(error: &str) -> bool {
+    let error = error.to_ascii_lowercase();
+    // Only negotiate an explicitly rejected reasoning parameter. Auth, network,
+    // tool, context and model errors must reach the user unchanged.
+    (error.contains("reasoning") || error.contains("thinking"))
+        && [
+            "unsupported",
+            "not support",
+            "not allowed",
+            "not permitted",
+            "invalid",
+            "not one of",
+            "must be",
+            "unknown",
+            "unrecognized",
+            "extra inputs",
+        ]
+        .iter()
+        .any(|word| error.contains(word))
+}
+
+async fn send_stream_request(
+    client: &reqwest::Client,
+    url: &str,
+    mut body: ChatCompletionRequest,
+    mut on_token: impl FnMut(&str),
+) -> Result<ChatRound, String> {
+    let key = format!("{url}|{}", body.model);
+    let tuned = body.reasoning_effort.is_some() || body.reasoning.is_some();
+    if tuned {
+        let support = STREAM_REASONING_SUPPORT
+            .lock()
+            .ok()
+            .and_then(|cache| cache.get(&key).copied())
+            .unwrap_or_default();
+        apply_stream_reasoning_support(&mut body, support);
+    }
+    loop {
+        let response = client
+            .post(url)
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| format!("HTTP request failed: {e}"))?;
+        let status = response.status();
+        let mut emitted = false;
+        let (result, can_negotiate) = if status.is_success() {
+            (
+                read_sse_round(response, |token| {
+                    emitted = true;
+                    on_token(token);
+                })
+                .await,
+                true,
+            )
+        } else {
+            let error_text = response.text().await.unwrap_or_default();
+            (
+                Err(format!(
+                    "API request failed with status {status}: {error_text}"
+                )),
+                matches!(status.as_u16(), 400 | 422),
+            )
+        };
+        let Err(error) = &result else {
+            return result;
+        };
+        let effort = body
+            .reasoning_effort
+            .as_deref()
+            .or_else(|| body.reasoning.as_ref().and_then(|r| r.effort.as_deref()));
+        if emitted || !can_negotiate || effort.is_none() || !reasoning_rejection(error) {
+            return result;
+        }
+        // At most two retries: none -> low -> provider default. Retain tools,
+        // images and history, and remember the supported level for later turns.
+        let support = if effort == Some("low") {
+            StreamReasoningSupport::Unsupported
+        } else {
+            StreamReasoningSupport::Low
+        };
+        warn!(
+            "Model '{}' rejected interactive reasoning control; retrying with {}",
+            body.model,
+            if matches!(support, StreamReasoningSupport::Low) {
+                "low effort"
+            } else {
+                "provider defaults"
+            }
+        );
+        apply_stream_reasoning_support(&mut body, support);
+        if let Ok(mut cache) = STREAM_REASONING_SUPPORT.lock() {
+            cache.insert(key.clone(), support);
+        }
+    }
+}
+
 /// Send a streaming chat completion request to an OpenAI-compatible API.
 /// Parses the SSE response (`data: {...}` lines, `data: [DONE]` sentinel) and
 /// invokes `on_token` for every content delta. Returns the full accumulated
 /// response text on success. `reasoning_effort` / `reasoning` suppress or tune
-/// reasoning-model thinking (pass `None` for provider defaults).
+/// reasoning-model thinking. With neither set, use the fastest supported mode.
 pub async fn send_chat_stream(
     provider: &PostProcessProvider,
     api_key: String,
@@ -1061,6 +1215,11 @@ pub async fn send_chat_stream(
     reasoning: Option<ReasoningConfig>,
     on_token: impl FnMut(&str),
 ) -> Result<String, String> {
+    let (reasoning_effort, reasoning) = if reasoning_effort.is_none() && reasoning.is_none() {
+        fast_reasoning_options(&provider.id, model)
+    } else {
+        (reasoning_effort, reasoning)
+    };
     let base_url = effective_base_url(provider);
     let url = format!("{}/chat/completions", base_url);
 
@@ -1079,26 +1238,9 @@ pub async fn send_chat_stream(
         },
     );
 
-    let response = client
-        .post(&url)
-        .json(&request_body)
-        .send()
-        .await
-        .map_err(|e| format!("HTTP request failed: {}", e))?;
-
-    let status = response.status();
-    if !status.is_success() {
-        let error_text = response
-            .text()
-            .await
-            .unwrap_or_else(|_| "Failed to read error response".to_string());
-        return Err(format!(
-            "API request failed with status {}: {}",
-            status, error_text
-        ));
-    }
-
-    Ok(read_sse_round(response, on_token).await?.text)
+    Ok(send_stream_request(&client, &url, request_body, on_token)
+        .await?
+        .text)
 }
 
 /// Streaming chat completion WITH tool support (the web-search tool-calling
@@ -1119,6 +1261,11 @@ pub async fn send_chat_stream_with_tools(
     reasoning: Option<ReasoningConfig>,
     on_token: impl FnMut(&str),
 ) -> Result<ToolStreamOutcome, String> {
+    let (reasoning_effort, reasoning) = if reasoning_effort.is_none() && reasoning.is_none() {
+        fast_reasoning_options(&provider.id, model)
+    } else {
+        (reasoning_effort, reasoning)
+    };
     let base_url = effective_base_url(provider);
     let url = format!("{}/chat/completions", base_url);
     let client = create_client(provider, &api_key)?;
@@ -1136,26 +1283,9 @@ pub async fn send_chat_stream_with_tools(
         },
     );
 
-    let response = client
-        .post(&url)
-        .json(&request_body)
-        .send()
-        .await
-        .map_err(|e| format!("HTTP request failed: {}", e))?;
-
-    let status = response.status();
-    if !status.is_success() {
-        let error_text = response
-            .text()
-            .await
-            .unwrap_or_else(|_| "Failed to read error response".to_string());
-        return Err(format!(
-            "API request failed with status {}: {}",
-            status, error_text
-        ));
-    }
-
-    Ok(read_sse_round(response, on_token).await?.into())
+    Ok(send_stream_request(&client, &url, request_body, on_token)
+        .await?
+        .into())
 }
 
 /// Turn accumulated tool-call fragments into ToolCalls, dropping any entry
@@ -1300,6 +1430,171 @@ mod tests {
             models_endpoint: Some("/models".to_string()),
             supports_structured_output: true,
         }
+    }
+
+    use std::io::{Read, Write};
+
+    fn read_request_body(stream: &mut std::net::TcpStream) -> String {
+        stream
+            .set_read_timeout(Some(std::time::Duration::from_secs(2)))
+            .unwrap();
+        let mut bytes = Vec::new();
+        let mut buffer = [0_u8; 4096];
+        let mut expected_len = None;
+        let mut header_end = None;
+
+        loop {
+            let read = stream.read(&mut buffer).unwrap();
+            if read == 0 {
+                break;
+            }
+            bytes.extend_from_slice(&buffer[..read]);
+            if header_end.is_none() {
+                header_end = bytes.windows(4).position(|window| window == b"\r\n\r\n");
+                if let Some(position) = header_end {
+                    let headers = String::from_utf8_lossy(&bytes[..position]);
+                    expected_len = headers.lines().find_map(|line| {
+                        let (name, value) = line.split_once(':')?;
+                        name.eq_ignore_ascii_case("content-length")
+                            .then(|| value.trim().parse::<usize>().ok())
+                            .flatten()
+                    });
+                    header_end = Some(position + 4);
+                }
+            }
+            if let (Some(start), Some(length)) = (header_end, expected_len) {
+                if bytes.len() >= start + length {
+                    return String::from_utf8(bytes[start..start + length].to_vec()).unwrap();
+                }
+            }
+        }
+
+        let start = header_end.unwrap_or(bytes.len());
+        String::from_utf8(bytes[start..].to_vec()).unwrap()
+    }
+
+    async fn verify_reasoning_fallback(id: &str, rejection_status: u16, rejections: &[&str]) {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let base = format!("http://{}/v1", listener.local_addr().unwrap());
+        let (tx, rx) = std::sync::mpsc::channel();
+        let mut replies: Vec<(u16, String)> = rejections
+            .iter()
+            .map(|error| {
+                (
+                    rejection_status,
+                    if rejection_status == 200 {
+                        format!("data: {}\n\n", json!({"error":{"message":error}}))
+                    } else {
+                        json!({"error":{"message":error}}).to_string()
+                    },
+                )
+            })
+            .collect();
+        let answer =
+            "data: {\"choices\":[{\"delta\":{\"content\":\"Hello\"}}]}\n\ndata: [DONE]\n\n";
+        replies.extend([(200, answer.into()), (200, answer.into())]);
+        let server = std::thread::spawn(move || {
+            for (status, body) in replies {
+                let (mut stream, _) = listener.accept().unwrap();
+                let request = read_request_body(&mut stream);
+                tx.send(serde_json::from_str::<Value>(&request).unwrap())
+                    .unwrap();
+                write!(stream, "HTTP/1.1 {status} Response\r\nContent-Type: text/event-stream\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len()).unwrap();
+            }
+        });
+        let provider = provider(id, &base);
+        let messages = vec![json!({"role":"user", "content":"Hi"})];
+        let mut tokens = String::new();
+        let tools = json!([{ "type":"function", "function":{"name":"get_current_datetime", "parameters":{"type":"object"}}}]);
+        let reply = send_chat_stream_with_tools(
+            &provider,
+            String::new(),
+            "test-model",
+            messages.clone(),
+            tools.clone(),
+            json!("auto"),
+            None,
+            None,
+            |t| tokens.push_str(t),
+        )
+        .await
+        .unwrap();
+        assert_eq!(reply.text, "Hello");
+        assert_eq!(tokens, "Hello");
+        let reply = send_chat_stream(
+            &provider,
+            String::new(),
+            "test-model",
+            messages.clone(),
+            None,
+            None,
+            |_| {},
+        )
+        .await
+        .unwrap();
+        assert_eq!(reply, "Hello");
+        server.join().unwrap();
+        let requests: Vec<Value> = rx.into_iter().collect();
+        assert_eq!(requests.len(), rejections.len() + 2);
+        let effort = |body: &Value| {
+            body.get("reasoning_effort")
+                .or_else(|| body.get("reasoning").and_then(|r| r.get("effort")))
+                .cloned()
+        };
+        assert_eq!(effort(&requests[0]), Some(json!("none")));
+        assert_eq!(effort(&requests[1]), Some(json!("low")));
+        let last_effort = if rejections.len() == 1 {
+            Some(json!("low"))
+        } else {
+            None
+        };
+        assert_eq!(effort(requests.last().unwrap()), last_effort);
+        for request in &requests[..requests.len() - 1] {
+            assert_eq!(request["tools"], tools);
+            assert_eq!(request["messages"], json!(messages));
+        }
+    }
+
+    #[tokio::test]
+    async fn stream_reasoning_retries_low_and_remembers_it() {
+        verify_reasoning_fallback(
+            "bedrock_mantle",
+            400,
+            &["reasoning_effort 'none' is not one of low, medium, high"],
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn stream_reasoning_negotiates_in_stream_rejections_for_openrouter() {
+        verify_reasoning_fallback(
+            "openrouter",
+            200,
+            &[
+                "invalid reasoning effort none",
+                "reasoning is not supported",
+            ],
+        )
+        .await;
+    }
+
+    #[test]
+    fn fast_reasoning_uses_low_only_when_thinking_is_required() {
+        assert_eq!(
+            fast_reasoning_options("bedrock_mantle", "openai.gpt-oss-20b")
+                .0
+                .as_deref(),
+            Some("low")
+        );
+        assert_eq!(
+            fast_reasoning_options("bedrock_mantle", "xai.grok-4.3")
+                .0
+                .as_deref(),
+            Some("none")
+        );
+        assert!(fast_reasoning_options("builtin", "qwen3").0.is_none());
+        assert!(!reasoning_rejection("Invalid API key"));
+        assert!(!reasoning_rejection("model not found"));
     }
 
     /// A voice barge-in cancels a turn before the first token, so history keeps

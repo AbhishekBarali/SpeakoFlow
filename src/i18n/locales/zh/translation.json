@@ -422,10 +422,6 @@
           "assistant_vision": {
             "name": "带屏幕提问",
             "description": "用语音提问并附上您的屏幕，让它看到您正在看的内容。"
-          },
-          "assistant_panel_toggle": {
-            "name": "显示或隐藏面板",
-            "description": "显示或隐藏悬浮的助手面板。"
           }
         },
         "errors": {

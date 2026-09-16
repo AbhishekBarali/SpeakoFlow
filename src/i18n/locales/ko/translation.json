@@ -422,10 +422,6 @@
           "assistant_vision": {
             "name": "화면과 함께 묻기",
             "description": "화면을 함께 첨부해 음성으로 물어보면, 지금 보고 있는 내용을 어시스턴트가 볼 수 있습니다."
-          },
-          "assistant_panel_toggle": {
-            "name": "패널 표시 또는 숨기기",
-            "description": "플로팅 어시스턴트 패널을 표시하거나 숨깁니다."
           }
         },
         "errors": {

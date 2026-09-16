@@ -422,10 +422,6 @@
           "assistant_vision": {
             "name": "اسأل مع الشاشة",
             "description": "اسأل بصوتك مع إرفاق شاشتك ليرى ما تنظر إليه."
-          },
-          "assistant_panel_toggle": {
-            "name": "إظهار اللوحة أو إخفاؤها",
-            "description": "يُظهر لوحة المساعد العائمة أو يخفيها."
           }
         },
         "errors": {

@@ -422,10 +422,6 @@
           "assistant_vision": {
             "name": "Perguntar com a tela",
             "description": "Pergunte por voz com sua tela anexada, para que ele veja o que você está olhando."
-          },
-          "assistant_panel_toggle": {
-            "name": "Mostrar ou ocultar o painel",
-            "description": "Mostra ou oculta o painel flutuante do assistente."
           }
         },
         "errors": {

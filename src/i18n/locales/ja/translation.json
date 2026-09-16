@@ -422,10 +422,6 @@
           "assistant_vision": {
             "name": "画面付きで聞く",
             "description": "画面を添えて音声で質問し、見ている内容をアシスタントに把握させます。"
-          },
-          "assistant_panel_toggle": {
-            "name": "パネルの表示・非表示",
-            "description": "フローティングのアシスタントパネルを表示または非表示にします。"
           }
         },
         "errors": {

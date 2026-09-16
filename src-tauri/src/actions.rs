@@ -788,7 +788,7 @@ fn build_post_process_request(
 /// reasoning models ship weekly under names that say nothing — so it covers only
 /// families whose naming is unambiguous, and the behavioural signal is what
 /// generalises.
-fn wants_low_rather_than_no_reasoning(model: &str) -> bool {
+pub(crate) fn wants_low_rather_than_no_reasoning(model: &str) -> bool {
     let model = model.to_ascii_lowercase();
     // gpt-oss ships reasoning as a first-class, non-optional mode.
     model.contains("gpt-oss")
@@ -2428,6 +2428,13 @@ impl ShortcutAction for TranscribeAction {
                             if crate::assistant::take_transcribe_redirect() {
                                 utils::hide_recording_overlay(&ah);
                                 change_tray_icon(&ah, TrayIconState::Idle);
+                                // Same rule as the assistant shortcut: this is a
+                                // quick ask, so it starts clean unless the card is
+                                // already in front of the user. Missing it here
+                                // meant "Ask Assistant" on the dictation overlay
+                                // was the one route that still inherited whatever
+                                // the last exchange left behind.
+                                crate::assistant::begin_quick_ask_exchange(&ah);
                                 crate::assistant::show_assistant_voice_overlay(&ah);
                                 crate::assistant::run_voice_turn(ah.clone(), transcription).await;
                                 return;
@@ -2775,6 +2782,11 @@ impl ShortcutAction for AssistantAction {
     fn start(&self, app: &AppHandle, binding_id: &str, _shortcut_str: &str) {
         debug!("AssistantAction::start called for binding: {}", binding_id);
 
+        // A quick ask always owns this surface, including after a call failed
+        // before obtaining a backend session ticket.
+        crate::voice_conversation::end(app);
+        let _ = app.emit("assistant-quick-ask", ());
+
         // Harvest whatever the user has selected, now, while their selection and
         // focus are still where they were when they pressed the shortcut. By the
         // time the answer arrives they may well have clicked somewhere else.
@@ -2878,6 +2890,11 @@ impl ShortcutAction for AssistantAction {
             }
         }
 
+        // A quick ask is one job, not a continuation. Reset before the overlay is
+        // presented, while panel visibility still describes the *previous* state —
+        // that is what tells a fresh ask apart from a follow-up to the card the
+        // user is looking at.
+        crate::assistant::begin_quick_ask_exchange(app);
         // Show the configured non-focus-stealing overlay right away so the user
         // sees the listening state without opening the full assistant window.
         crate::assistant::show_assistant_voice_overlay(app);
@@ -2996,16 +3013,40 @@ impl ShortcutAction for AssistantAction {
     }
 }
 
-// Assistant Panel Toggle Action: show/hide the floating panel.
-struct AssistantPanelToggleAction;
+/// Start or hang up a hands-free call.
+///
+/// The call earns its own key because it is its own feature. It used to be
+/// reachable only from a button on the quick-ask card, which is precisely what
+/// made the two feel like one confusing thing — you went to the surface for
+/// "translate this" in order to start a phone call, and the call's transcript came
+/// back through the same door. With that button gone, this is the shortcut that
+/// replaces it.
+///
+/// Not a recording binding: the microphone during a call belongs to the frontend's
+/// VAD loop, not to the transcription coordinator, so this only opens the surface
+/// and asks the webview to begin. Tapping it again hangs up, which means one key
+/// covers the whole call rather than needing a second one to end it.
+struct AssistantCallAction;
 
-impl ShortcutAction for AssistantPanelToggleAction {
+impl ShortcutAction for AssistantCallAction {
     fn start(&self, app: &AppHandle, _binding_id: &str, _shortcut_str: &str) {
-        crate::assistant::toggle_assistant_panel(app);
+        if crate::voice_conversation::is_active(app) {
+            // The window *is* the call, so hanging up takes it with it —
+            // `hide_assistant_panel` ends the session on the way down. Ending
+            // the session on its own left the window up, and the panel then
+            // re-rendered as the quick-ask card: pressing the call key to hang
+            // up looked like it had opened a second, different assistant.
+            crate::assistant::hide_assistant_panel(app);
+            return;
+        }
+        // The panel has to be on screen before the webview can act on this: the
+        // session is driven from `useVoiceConversation`, which only runs there.
+        crate::assistant::open_assistant_panel(app);
+        let _ = app.emit("assistant-start-conversation", ());
     }
 
     fn stop(&self, _app: &AppHandle, _binding_id: &str, _shortcut_str: &str) {
-        // Nothing to do on stop for panel toggle
+        // Tap to start, tap to hang up — nothing happens on release.
     }
 }
 
@@ -3054,8 +3095,8 @@ pub static ACTION_MAP: Lazy<HashMap<String, Arc<dyn ShortcutAction>>> = Lazy::ne
         Arc::new(AssistantAction) as Arc<dyn ShortcutAction>,
     );
     map.insert(
-        "assistant_panel_toggle".to_string(),
-        Arc::new(AssistantPanelToggleAction) as Arc<dyn ShortcutAction>,
+        "assistant_call".to_string(),
+        Arc::new(AssistantCallAction) as Arc<dyn ShortcutAction>,
     );
     map.insert(
         "test".to_string(),

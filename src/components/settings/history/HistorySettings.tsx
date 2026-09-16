@@ -16,6 +16,7 @@ import {
   FolderOpen,
   Camera,
   FileText,
+  GitBranch,
   MessageCircle,
   MessageSquarePlus,
   Mic,
@@ -550,6 +551,19 @@ export const HistorySettings: React.FC = () => {
     }
   }, []);
 
+  // Continue a past conversation from one message onwards. The original row is
+  // never touched — the branch is saved as a new conversation — so this is safe to
+  // try on something the user wants to keep.
+  const branchAssistantSession = useCallback(
+    async (id: number, messageIndex: number) => {
+      const result = await commands.assistantBranchSession(id, messageIndex);
+      if (result.status !== "ok") {
+        toast.error(String(result.error));
+      }
+    },
+    [],
+  );
+
   const openRecordingsFolder = async () => {
     try {
       const result = await commands.openRecordingsFolder();
@@ -650,6 +664,9 @@ export const HistorySettings: React.FC = () => {
                 onCopyConversation={() => copyConversation(item.session)}
                 onDelete={() => deleteAssistantSession(item.session.id)}
                 onResume={() => void resumeAssistantSession(item.session.id)}
+                onBranch={(messageIndex) =>
+                  void branchAssistantSession(item.session.id, messageIndex)
+                }
               />
             ),
           )}
@@ -965,6 +982,8 @@ interface AssistantHistoryEntryProps {
   onCopyConversation: () => void;
   onDelete: () => Promise<void>;
   onResume: () => void;
+  /** Continue from one message as a new conversation, leaving this one intact. */
+  onBranch: (messageIndex: number) => void;
 }
 
 /**
@@ -980,6 +999,7 @@ const AssistantHistoryEntryComponent: React.FC<AssistantHistoryEntryProps> = ({
   onCopyConversation,
   onDelete,
   onResume,
+  onBranch,
 }) => {
   const { t, i18n } = useTranslation();
   const [showCopied, setShowCopied] = useState(false);
@@ -1089,8 +1109,23 @@ const AssistantHistoryEntryComponent: React.FC<AssistantHistoryEntryProps> = ({
             return (
               <div
                 key={index}
-                className={`flex ${isUser ? "justify-end" : "justify-start"}`}
+                className={`group/msg flex items-center gap-1.5 ${isUser ? "justify-end" : "justify-start"}`}
               >
+                {/* Branch from here. Placed on the message rather than the
+                    conversation because the point is to pick the moment to diverge
+                    from. Reveals on hover so a long thread stays readable.
+                    Non-destructive: this copies the thread up to this message into a
+                    new conversation and leaves this one exactly as it is. */}
+                {isUser && (
+                  <button
+                    onClick={() => onBranch(index)}
+                    title={t("settings.history.branchConversation")}
+                    aria-label={t("settings.history.branchConversation")}
+                    className="shrink-0 rounded-md p-1 text-muted-soft opacity-0 transition-opacity duration-150 hover:bg-surface-strong hover:text-ink focus-visible:opacity-100 group-hover/msg:opacity-100"
+                  >
+                    <GitBranch width={13} height={13} />
+                  </button>
+                )}
                 <div
                   className={
                     isUser

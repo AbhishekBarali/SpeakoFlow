@@ -1609,17 +1609,73 @@ async assistantClearConversation() : Promise<Result<null, string>> {
     else return { status: "error", error: e  as any };
 }
 },
-async toggleAssistantPanel() : Promise<Result<null, string>> {
+async hideAssistantPanel() : Promise<Result<null, string>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("toggle_assistant_panel") };
+    return { status: "ok", data: await TAURI_INVOKE("hide_assistant_panel") };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
 },
-async hideAssistantPanel() : Promise<Result<null, string>> {
+/**
+ * Continue a past conversation from one chosen message, as a new branch.
+ * 
+ * The thread up to and including `message_index` is adopted and everything after
+ * it is left behind, so the user can take a conversation they liked and try a
+ * different direction from the middle of it.
+ * 
+ * **The original is never modified.** The branch is loaded with no session id, so
+ * the next turn writes a fresh History row and the conversation being forked stays
+ * exactly as it was. That is what makes this safe to reach for — there is no
+ * version of this that loses the thread you branched from, and so no need for a
+ * history tree to protect it.
+ */
+async assistantBranchSession(id: number, messageIndex: number) : Promise<Result<null, string>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("hide_assistant_panel") };
+    return { status: "ok", data: await TAURI_INVOKE("assistant_branch_session", { id, messageIndex }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Choose where the Ask card opens.
+ * 
+ * Picking any anchor other than `Custom` also discards the remembered dragged
+ * position, so the choice takes effect on the very next open instead of being
+ * quietly overridden by wherever the card was last dropped.
+ */
+async setAssistantAskAnchor(anchor: AskAnchor) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_assistant_ask_anchor", { anchor }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Choose which display the Ask surface opens on.
+ * 
+ * Like the anchor, this discards the remembered dragged position: a coordinate on
+ * the screen you just moved away from is meaningless, and keeping it would make the
+ * new choice appear to do nothing on the very next open. The stored display pin goes
+ * too, so `last_used` starts from a clean slate rather than from the screen the user
+ * is trying to get away from.
+ */
+async setAssistantAskDisplay(display: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_assistant_ask_display", { display }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * The displays currently connected, for the "Which screen" dropdown.
+ */
+async listAssistantDisplays() : Promise<Result<DisplayChoice[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("list_assistant_displays") };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -2174,6 +2230,62 @@ async assistantTestConnection() : Promise<Result<string, string>> {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+/**
+ * Every reminder, scheduled and waiting, earliest first.
+ */
+async listReminders() : Promise<Reminder[]> {
+    return await TAURI_INVOKE("list_reminders");
+},
+/**
+ * Only the ones that have fired and are waiting to be acknowledged — what the
+ * popup renders.
+ */
+async listWaitingReminders() : Promise<Reminder[]> {
+    return await TAURI_INVOKE("list_waiting_reminders");
+},
+/**
+ * Create one by hand (Settings), rather than by asking the assistant.
+ */
+async createReminder(text: string, inMinutes: number | null, at: string | null) : Promise<Result<Reminder, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("create_reminder", { text, inMinutes, at }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * "Done" in the popup, and the delete button in Settings.
+ */
+async completeReminder(id: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("complete_reminder", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async snoozeReminder(id: string, minutes: number) : Promise<Result<Reminder, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("snooze_reminder", { id, minutes }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Hide the popup without resolving anything: the reminders stay owed and come
+ * back on the next fire or restart.
+ */
+async dismissReminderPopup() : Promise<void> {
+    await TAURI_INVOKE("dismiss_reminder_popup");
+},
+/**
+ * The popup measured its content; take that height.
+ */
+async fitReminderPopup(height: number) : Promise<void> {
+    await TAURI_INVOKE("fit_reminder_popup", { height });
 },
 async assistantConversationStart() : Promise<Result<VoiceTicket, string>> {
     try {
@@ -2860,6 +2972,12 @@ assistant_panel_size?: string;
  */
 assistant_ask_anchor?: AskAnchor; 
 /**
+ * Which display the Ask surface opens on.
+ * 
+ * `"last_used"` (default), `"cursor"`, `"primary"`, or a monitor name.
+ */
+assistant_ask_display?: string; 
+/**
  * Whether starting a plain dictation should silence an assistant reply
  * that is still being read aloud. Off by default — earphone users often
  * want to keep listening while they dictate. (Asking the assistant a NEW
@@ -2942,6 +3060,24 @@ main_window_width?: number | null; main_window_height?: number | null }
  * snaps, that position is remembered and used instead. Set automatically by the
  * drag, not something the user picks from a list.
  */
+/**
+ * A connected display, as the settings dropdown needs to describe it.
+ */
+export type DisplayChoice = { 
+/**
+ * The value stored in `assistant_ask_display`: the monitor's own name where it
+ * has one, and its origin otherwise.
+ */
+id: string; 
+/**
+ * The monitor's name as the OS reports it, for building a readable label.
+ */
+name: string; width: number; height: number; is_primary: boolean; 
+/**
+ * True for the display the panel would open on right now, so the UI can say
+ * which screen "last used" currently resolves to.
+ */
+is_current: boolean }
 export type AskAnchor = 
 /**
  * Middle of the display the cursor is on. The default: easiest to read, and
@@ -3560,6 +3696,45 @@ export type RecordingRetentionPeriod =
  * Keep for exactly `recording_retention_days` days.
  */
 "custom_days"
+/**
+ * One future obligation.
+ * 
+ * Timestamps are RFC 3339 UTC strings rather than `DateTime` values: they cross
+ * into the webview and into `reminders.json`, and a string that is already the
+ * serialized form cannot drift between the three representations.
+ */
+export type Reminder = { id: string; 
+/**
+ * What to do, phrased as the user would read it back ("Send Priya the
+ * invoice"). This is the whole content of the popup, so it carries the
+ * meaning on its own.
+ */
+text: string; 
+/**
+ * Optional detail the assistant derived rather than was told — the URL it
+ * read off the screen, the name of the file that was open. Shown smaller,
+ * under the text.
+ */
+note?: string | null; 
+/**
+ * When it fires, RFC 3339 in UTC.
+ */
+due_at: string; 
+/**
+ * When it was asked for, RFC 3339 in UTC.
+ */
+created_at: string; 
+/**
+ * How many times it has been pushed back. Shown in the popup, because
+ * "you have snoozed this four times" is information.
+ */
+snoozes?: number; 
+/**
+ * True once it has come due and is waiting for the user. Persisted, so a
+ * reminder that fired and was never acknowledged is still waiting after a
+ * restart rather than quietly resolved.
+ */
+fired?: boolean }
 /**
  * A single deterministic find/replace rule applied to the transcript.
  * 

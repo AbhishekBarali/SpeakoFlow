@@ -423,10 +423,6 @@
           "assistant_vision": {
             "name": "Ask with screen",
             "description": "Ask by voice with your screen attached so it can see what you're looking at."
-          },
-          "assistant_panel_toggle": {
-            "name": "Show or hide panel",
-            "description": "Shows or hides the floating assistant panel."
           }
         },
         "errors": {
@@ -1051,6 +1047,7 @@
       "assistantLabel": "Assistant chat",
       "copyConversation": "Copy conversation",
       "resumeConversation": "Continue this conversation in the assistant",
+      "branchConversation": "Continue from here as a new conversation. This one is kept unchanged.",
       "showConversation": "Show conversation",
       "hideConversation": "Hide conversation",
       "roleUser": "You",
@@ -1495,15 +1492,35 @@
         "fontSizes": {
           "small": "Small",
           "medium": "Medium",
-          "large": "Large"
+          "large": "Large",
+          "extraLarge": "Extra large"
         },
         "panelSizeLabel": "Panel size",
-        "panelSizeDescription": "Overall size of the floating assistant panel. You can also drag its edges to resize.",
+        "panelSizeDescription": "How large the assistant card is, relative to your screen. A bigger display gets a bigger card. You can also drag its edges to resize.",
         "panelSizes": {
           "mini": "Small",
           "compact": "Compact",
           "standard": "Standard",
           "large": "Large"
+        },
+        "askDisplayLabel": "Which screen",
+        "askDisplayDescription": "The screen the assistant opens on. It stays there until you move it, so it can't wander between monitors.",
+        "askDisplays": {
+          "lastUsed": "Where I last used it",
+          "lastUsedOn": "Where I last used it (screen {{number}})",
+          "cursor": "Screen my mouse is on",
+          "numbered": "Screen {{number}} ({{width}}×{{height}}){{suffix}}",
+          "mainSuffix": " · main"
+        },
+        "askAnchorLabel": "Where it opens",
+        "askAnchorDescription": "Where on that screen the assistant appears. This also picks the shape it opens in: a tall column down one side, a wide strip along an edge. Dragging it near one of these places snaps it there; drop it anywhere else and it stays exactly where you put it.",
+        "askAnchors": {
+          "center": "Middle of the screen",
+          "top": "Top",
+          "bottom": "Bottom",
+          "left": "Left side",
+          "right": "Right side",
+          "custom": "Where I left it"
         },
         "opacityLabel": "Panel opacity",
         "opacityDescription": "How opaque the floating panel is. 100% is fully solid; lower values let the desktop blur through."
@@ -1608,12 +1625,32 @@
     "done": "Done",
     "askAssistant": "Ask the assistant instead of typing this"
   },
+  "reminders": {
+    "title": "Reminder",
+    "due": {
+      "now": "just now",
+      "minutesAgo": "{{count}} min ago",
+      "hoursAgo": "{{count}} h ago"
+    },
+    "done": "Done",
+    "snooze": "Snooze",
+    "snoozeFor_one": "{{count}} minute",
+    "snoozeFor_other": "{{count}} minutes",
+    "snoozedTimes_one": "Snoozed once",
+    "snoozedTimes_other": "Snoozed {{count}}×",
+    "later": "Hide for now — the reminder stays set",
+    "settings": {
+      "label": "Reminders",
+      "description": "Ask the assistant to remind you about something and it appears here until it is due. Say \"remind me to call the bank in twenty minutes\", or ask it to look at your screen first.",
+      "empty": "Nothing scheduled. Ask the assistant to remind you about something.",
+      "waiting": "Waiting for you",
+      "cancel": "Cancel this reminder",
+      "dueAt": "Due {{when}}"
+    }
+  },
   "assistant": {
     "conversation": {
       "title": "Conversation",
-      "start": "Start voice conversation",
-      "startShort": "Talk",
-      "startHint": "Switch to a back-and-forth voice conversation. Replies are spoken aloud.",
       "transcript": "Show conversation transcript",
       "hint": "Talk naturally with {{name}}. Speak to interrupt.",
       "mutedHint": "Microphone off. Unmute to continue.",
@@ -1669,18 +1706,23 @@
     },
     "empty": "Ask by voice with your assistant shortcut,\nor type below.",
     "inputPlaceholder": "Message…",
+    "followUpPlaceholder": "Ask a follow-up…",
     "inputPlaceholderScreen": "Ask about your screen…",
-    "queuedUntilReady": "Queued — sending as soon as this reply finishes.",
+    "bar": {
+      "placeholder": "Ask anything…"
+    },
     "send": "Send",
     "stop": "Stop",
     "cancel": "Cancel",
     "finish": "Finish & send",
-    "clear": "Clear conversation",
     "hide": "Hide panel",
     "copy": "Copy",
     "copyCode": "Copy code",
+    "askHint": "Ask by voice with your shortcut, or type below.",
     "insert": "Insert this where you were typing",
+    "insertShort": "Insert",
     "insertReplace": "Replace your selected text with this",
+    "insertReplaceShort": "Replace",
     "selectionAttached": "{{count}} character selected",
     "selectionAttached_other": "{{count}} characters selected",
     "regenerate": "Regenerate answer (the old one stays in History)",
@@ -1777,7 +1819,9 @@
     },
     "notices": {
       "web_search_failed": "Web search didn't return results — answering without them.",
-      "web_search_failedShort": "No web results"
+      "web_search_failedShort": "No web results",
+      "queued": "Queued — sending as soon as this reply finishes.",
+      "queuedShort": "Queued"
     },
     "engineSetup": {
       "downloading": "Setting up the local engine (first run)… {{percent}}%",

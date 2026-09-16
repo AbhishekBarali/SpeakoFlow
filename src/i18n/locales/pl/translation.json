@@ -422,10 +422,6 @@
           "assistant_vision": {
             "name": "Zapytaj z ekranem",
             "description": "Zapytaj głosem z dołączonym ekranem, aby asystent widział to, na co patrzysz."
-          },
-          "assistant_panel_toggle": {
-            "name": "Pokaż lub ukryj panel",
-            "description": "Pokazuje lub ukrywa pływający panel asystenta."
           }
         },
         "errors": {

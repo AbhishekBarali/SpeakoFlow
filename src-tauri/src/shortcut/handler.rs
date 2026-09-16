@@ -53,25 +53,10 @@ pub fn handle_shortcut_event(
     // shortcut uses the default mode (push-to-talk hold by default); tapping the
     // lock key on top converts a hold to hands-free mid-recording.
     if is_transcribe_binding(base_id) {
-        // A live voice conversation already owns the microphone, and the
-        // assistant shortcut's whole job — open the assistant and record a turn
-        // — is what the conversation is doing continuously. Pressing it used to
-        // hang up the call and start a one-shot recording instead, so a stray
-        // press of the shortcut that opened the conversation destroyed it. Now
-        // it just brings the conversation's own window back to the front.
-        //
-        // Dictation still ends the conversation: it needs the same microphone,
-        // and it types into another app rather than talking back.
-        if crate::voice_conversation::is_active(app) {
-            if crate::assistant::is_assistant_binding(base_id) {
-                if is_pressed {
-                    crate::assistant::show_assistant_panel(app);
-                }
-                return;
-            }
-            if is_pressed {
-                crate::voice_conversation::end(app);
-            }
+        // Every recording shortcut explicitly takes the microphone back from
+        // a call. In particular, Assistant must remain a quick ask during a call.
+        if is_pressed && crate::voice_conversation::is_active(app) {
+            crate::voice_conversation::end(app);
         }
         if let Some(coordinator) = app.try_state::<TranscriptionCoordinator>() {
             // Every recording shortcut — dictation, dictation + post-processing,
@@ -100,16 +85,28 @@ pub fn handle_shortcut_event(
     // an answer, OR while Flow is starting/generating, so Esc can stop every
     // long-running voice operation after recording ends. Only on key-press.
     if base_id == "cancel" {
-        if is_pressed {
-            crate::voice_conversation::end(app);
-        }
         let audio_manager = app.state::<Arc<AudioRecordingManager>>();
         let assistant_busy = app
             .try_state::<crate::assistant::AssistantConversation>()
             .map_or(false, |c| c.is_busy());
         let flow_busy = crate::flow::is_generation_active();
-        if is_pressed && (audio_manager.is_recording() || assistant_busy || flow_busy) {
-            action.start(app, base_id, hotkey_string);
+        if is_pressed {
+            // Esc during a call: stop the reply if there is one, hang up if
+            // there isn't.
+            //
+            // It used to hang up unconditionally, which is the worst of both.
+            // Mid-answer it threw away the thing the user was listening to, and
+            // either way it ended the session while leaving the window on
+            // screen — so the panel re-rendered as the quick-ask card and the
+            // call had silently died behind it. A hang-up now goes through
+            // `hide_assistant_panel` (which ends the session itself), so the
+            // surface always leaves with the call.
+            if crate::voice_conversation::is_active(app) && !assistant_busy {
+                crate::assistant::hide_assistant_panel(app);
+            }
+            if audio_manager.is_recording() || assistant_busy || flow_busy {
+                action.start(app, base_id, hotkey_string);
+            }
         }
         return;
     }

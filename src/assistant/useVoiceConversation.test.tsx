@@ -296,16 +296,8 @@ describe("hands-free session lifecycle", () => {
     });
     expect(sourceStarts).toBe(0);
   });
-  /**
-   * Collapsing is the gesture that keeps a call alive, because the pill stays on
-   * screen and says so. `assistant-panel-hidden` is a webview-lifecycle cue (it
-   * tells the local voice engine it can release its weights) and is deliberately
-   * NOT a hang-up signal here — hiding ends the call from the backend, which
-   * arrives as `assistant-conversation-ended` and is covered separately.
-   */
   test("a collapsed panel keeps listening until the call is ended", async () => {
     await act(async () => voice.start());
-    await emit("assistant-panel-hidden", null);
     await emit("assistant-collapsed", true);
     expect(tracks.every((track) => !track.stopped)).toBe(true);
     expect(voice.open).toBe(true);
@@ -331,6 +323,77 @@ describe("hands-free session lifecycle", () => {
       calls.filter((call) => call.command === "assistant_conversation_audio")
         .length,
     ).toBe(1);
+  });
+  test("hiding a failed call clears the error before the next quick ask", async () => {
+    microphone = Promise.reject(
+      new DOMException("Permission denied", "NotAllowedError"),
+    );
+    await act(async () => voice.start());
+    expect(voice.phase).toBe("error");
+    expect(voice.open).toBe(true);
+    await emit("assistant-panel-hidden", null);
+    expect(voice.open).toBe(false);
+    expect(voice.error).toBe(null);
+  });
+  test("a quick ask cancels pending call setup and releases the late microphone", async () => {
+    const mic = deferred<MediaStream>();
+    microphone = mic.promise;
+    let opening!: Promise<void>;
+    await act(async () => {
+      opening = voice.start();
+    });
+    await emit("assistant-quick-ask", null);
+    await act(async () => {
+      mic.resolve(stream());
+      await opening;
+    });
+    expect(voice.open).toBe(false);
+    expect(tracks.every((track) => track.stopped)).toBe(true);
+    expect(
+      calls.some((call) => call.command === "assistant_conversation_start"),
+    ).toBe(false);
+  });
+  test("hiding a live call releases its microphone", async () => {
+    await act(async () => voice.start());
+    await emit("assistant-panel-hidden", null);
+    expect(voice.open).toBe(false);
+    expect(tracks.every((track) => track.stopped)).toBe(true);
+  });
+  test("a restart waits for a late backend start to be closed", async () => {
+    const pending = deferred<unknown>();
+    backendStart = pending.promise;
+    let first!: Promise<void>;
+    let second!: Promise<void>;
+    await act(async () => {
+      first = voice.start();
+    });
+    await act(async () => {
+      second = voice.start();
+    });
+    expect(
+      calls.filter((call) => call.command === "assistant_conversation_start"),
+    ).toHaveLength(1);
+    backendStart = null;
+    await act(async () => {
+      pending.resolve({ session: 42, turn: 0 });
+      await first;
+      await second;
+    });
+    expect(
+      calls
+        .filter((call) =>
+          [
+            "assistant_conversation_start",
+            "assistant_conversation_end",
+          ].includes(call.command),
+        )
+        .map((call) => call.command),
+    ).toEqual([
+      "assistant_conversation_start",
+      "assistant_conversation_end",
+      "assistant_conversation_start",
+    ]);
+    expect(voice.phase).toBe("listening");
   });
   test("a failed turn reports the error but keeps the microphone open", async () => {
     await act(async () => voice.start());
@@ -364,6 +427,35 @@ describe("hands-free session lifecycle", () => {
     expect(voice.phase).toBe("listening");
     await emit("assistant-conversation-ended", 2);
     expect(voice.open).toBe(false);
+  });
+  test("an ended event releases a session whose ticket has not arrived yet", async () => {
+    // Rust treats a call as active from the moment it issues the ticket, which is
+    // before the id reaches this hook. Something that hangs up in that window —
+    // the call hotkey, a recording shortcut taking the microphone back — emits
+    // `ended` for a session this side cannot name yet. Ignoring it left the VAD
+    // holding the microphone for a call that no longer existed.
+    const pending = deferred<unknown>();
+    backendStart = pending.promise;
+    let opening!: Promise<void>;
+    await act(async () => {
+      opening = voice.start();
+    });
+    await emit("assistant-conversation-ended", 7);
+    expect(voice.open).toBe(false);
+    expect(voice.phase).toBe("off");
+    // And the ticket that lands afterwards is closed rather than left running.
+    await act(async () => {
+      pending.resolve({ session: 7, turn: 0 });
+      await opening;
+    });
+    expect(tracks.every((track) => track.stopped)).toBe(true);
+    expect(
+      calls.some(
+        (call) =>
+          call.command === "assistant_conversation_end" &&
+          (call.args as { session: number }).session === 7,
+      ),
+    ).toBe(true);
   });
   test("remote synthesis remains Thinking after text generation ends", async () => {
     const pending = deferred<unknown>();

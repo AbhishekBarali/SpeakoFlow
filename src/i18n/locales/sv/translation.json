@@ -422,10 +422,6 @@
           "assistant_vision": {
             "name": "Fråga med skärmen",
             "description": "Fråga med röst och bifoga skärmen så att den ser vad du tittar på."
-          },
-          "assistant_panel_toggle": {
-            "name": "Visa eller dölj panelen",
-            "description": "Visar eller döljer den flytande assistentpanelen."
           }
         },
         "errors": {

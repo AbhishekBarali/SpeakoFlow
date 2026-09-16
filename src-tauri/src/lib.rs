@@ -18,6 +18,7 @@ mod memory;
 mod overlay;
 mod overlay_lifecycle;
 pub mod portable;
+mod reminders;
 mod screenshot;
 mod secret_store;
 mod selection;
@@ -432,6 +433,74 @@ fn initialize_core_logic(app_handle: &AppHandle) {
         overlay::set_overlay_hovered(event.payload().trim() == "true");
     });
 
+    // The quick-ask card is sized to the answer it is showing, and only the
+    // webview can measure that. An event rather than a command on purpose: the
+    // panel reports a height, it does not ask for a window operation, and the
+    // clamp against the display belongs on this side either way (see
+    // `assistant::fit_ask_card`).
+    let app_handle_for_ask_fit = app_handle.clone();
+    app_handle.listen("assistant-ask-fit", move |event| {
+        let payload = event.payload();
+        let height = serde_json::from_str::<serde_json::Value>(payload)
+            .ok()
+            .and_then(|value| value.get("height").and_then(|h| h.as_f64()))
+            // A bare number is accepted too, so a caller that forgets the
+            // envelope still resizes instead of silently doing nothing.
+            .or_else(|| payload.trim().parse::<f64>().ok());
+        if let Some(height) = height {
+            assistant::fit_ask_card(&app_handle_for_ask_fit, height);
+        } else {
+            log::debug!("Ignoring assistant-ask-fit with no usable height: {payload}");
+        }
+    });
+
+    // Which part of the panel window is actually drawn, so the rest of it can pass
+    // clicks through to whatever is underneath. Physical pixels relative to the
+    // window origin — the webview knows its own `devicePixelRatio`, so converting
+    // there means no scale factor has to be agreed on across the boundary. An event
+    // rather than a command, exactly like the fit report above: the panel states a
+    // measurement, it does not ask for a window operation.
+    //
+    // `{"tangible":true}` is the third case and not a rect at all: a form with no
+    // measurable surface in it (the voice conversation view, the full chat panel)
+    // has to stay fully clickable, and it also has to *clear* whatever the previous
+    // form measured, or a call would inherit the ask pill's little rectangle and be
+    // left with no reachable Mute or End button.
+    let app_handle_for_hit_rect = app_handle.clone();
+    app_handle.listen("assistant-hit-rect", move |event| {
+        let payload = event.payload();
+        let Ok(value) = serde_json::from_str::<serde_json::Value>(payload) else {
+            log::debug!("Ignoring unparseable assistant-hit-rect: {payload}");
+            return;
+        };
+        if value
+            .get("tangible")
+            .and_then(|t| t.as_bool())
+            .unwrap_or(false)
+        {
+            assistant::clear_panel_hit_rect(&app_handle_for_hit_rect);
+            return;
+        }
+        let number = |key: &str| value.get(key).and_then(|v| v.as_f64());
+        match (number("x"), number("y"), number("width"), number("height")) {
+            (Some(x), Some(y), Some(width), Some(height)) => {
+                assistant::set_panel_hit_rect(&app_handle_for_hit_rect, x, y, width, height)
+            }
+            _ => log::debug!("Ignoring assistant-hit-rect with no usable rect: {payload}"),
+        }
+    });
+
+    // A pointer held down inside the panel keeps it tangible for the length of a
+    // drag or a resize, which the OS runs well outside the drawn rect.
+    app_handle.listen("assistant-panel-hold", move |event| {
+        let payload = event.payload();
+        let held = serde_json::from_str::<serde_json::Value>(payload)
+            .ok()
+            .and_then(|value| value.get("held").and_then(|h| h.as_bool()))
+            .unwrap_or_else(|| payload.trim() == "true");
+        assistant::set_panel_pointer_held(held);
+    });
+
     // Get the autostart manager and configure based on user setting
     let autostart_manager = app_handle.autolaunch();
     let settings = settings::get_settings(&app_handle);
@@ -763,9 +832,11 @@ pub fn run(cli_args: CliArgs) {
             commands::assistant::assistant_summarize,
             commands::assistant::assistant_resume_session,
             commands::assistant::assistant_clear_conversation,
-            commands::assistant::toggle_assistant_panel,
             commands::assistant::hide_assistant_panel,
+            commands::assistant::assistant_branch_session,
             commands::assistant::set_assistant_ask_anchor,
+            commands::assistant::set_assistant_ask_display,
+            commands::assistant::list_assistant_displays,
             commands::assistant::assistant_insert_text,
             commands::assistant::set_assistant_provider,
             commands::assistant::change_assistant_model_setting,
@@ -814,6 +885,13 @@ pub fn run(cli_args: CliArgs) {
             commands::assistant::assistant_list_tts_models,
             commands::assistant::assistant_stop,
             commands::assistant::assistant_test_connection,
+            reminders::list_reminders,
+            reminders::list_waiting_reminders,
+            reminders::create_reminder,
+            reminders::complete_reminder,
+            reminders::snooze_reminder,
+            reminders::dismiss_reminder_popup,
+            reminders::fit_reminder_popup,
             voice_conversation::assistant_conversation_start,
             voice_conversation::assistant_conversation_end,
             voice_conversation::assistant_conversation_set_expanded,
@@ -1087,6 +1165,13 @@ pub fn run(cli_args: CliArgs) {
             if settings::get_settings(&app_handle).assistant_enabled {
                 assistant::create_assistant_panel(&app_handle);
             }
+
+            // Load saved reminders and start their scheduler. Deliberately not
+            // behind `assistant_enabled`: the assistant is how a reminder gets
+            // *created*, but one already on the books is owed regardless, and
+            // switching the assistant off to stop the panel loading must not
+            // silently swallow an alarm the user is relying on.
+            reminders::init(&app_handle);
 
             // Pre-warm GPU/accelerator enumeration on a background thread.
             // The first call into transcribe_rs::whisper_cpp::gpu::list_gpu_devices

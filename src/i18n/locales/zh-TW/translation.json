@@ -422,10 +422,6 @@
           "assistant_vision": {
             "name": "連同螢幕提問",
             "description": "用語音提問並附上您的螢幕畫面，讓它看見您正在看的內容。"
-          },
-          "assistant_panel_toggle": {
-            "name": "顯示或隱藏面板",
-            "description": "顯示或隱藏助理浮動面板。"
           }
         },
         "errors": {

@@ -1,10 +1,9 @@
-import { listen } from "@tauri-apps/api/event";
-import { getCurrentWebview } from "@tauri-apps/api/webview";
+import { emit, listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { open as openFileDialog } from "@tauri-apps/plugin-dialog";
 import React, {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -14,14 +13,12 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
   AlertCircle,
-  AudioLines,
   ArrowUp,
   Camera,
   CameraOff,
   Check,
   Copy,
   CornerDownLeft,
-  Eraser,
   Expand,
   FileText,
   Globe,
@@ -31,7 +28,6 @@ import {
   Maximize2,
   Mic,
   Minimize2,
-  Paperclip,
   RotateCcw,
   Scissors,
   Shrink,
@@ -47,9 +43,12 @@ import { AudioWaveform } from "@/components/shared";
 import { FONT_SIZES, errorKind, type AssistantError } from "./appearance";
 import { useKokoroTts } from "./useKokoroTts";
 import { localTtsActive } from "./localTts";
+import { usePanelHitRegion, useSuppressContextMenu } from "./hitRegion";
 import { useVoiceConversation } from "./useVoiceConversation";
 import { ConversationView, ConversationPill } from "./ConversationView";
 import { AssistantProfilePicker } from "./AssistantProfilePicker";
+import AskBar, { type AskBarPhase } from "./AskBar";
+import AskCard from "./AskCard";
 import { VOICE_INTERRUPTED_MARKER } from "./conversationPolicy";
 import { useLocalLlmEngineStatus } from "@/hooks/useLocalLlmEngineStatus";
 import { useSafeWindowDrag } from "@/lib/useSafeWindowDrag";
@@ -106,46 +105,20 @@ const SELECTION_LEAD_IN =
   "The user has this text selected in another application:";
 const SELECTION_REQUEST_PREFIX = "Their request about it: ";
 
-/** A picture waiting to be sent with the next message. */
+/** A picture waiting to be sent with the next message. Only ever a screen-region
+ *  snip — the panel has no route from disk (see the attachment sync effect). */
 interface PendingImage {
   id: string;
   dataUrl: string;
 }
 
-/** A text-like file waiting to be sent as context with the next message. */
-interface PendingFile {
-  id: string;
-  name: string;
-  content: string;
-}
-
 const MAX_PENDING_IMAGES = 4;
-const MAX_PENDING_FILES = 4;
 
 let attachmentSeq = 0;
 const nextAttachmentId = (): string => `att-${++attachmentSeq}`;
 
-const IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "gif", "webp", "bmp"];
-
-/** Downscale a pasted image blob to a provider-friendly JPEG data URL (same
- *  1568px budget the backend uses for files picked from disk). */
-async function downscaleToDataUrl(blob: Blob): Promise<string> {
-  const bitmap = await createImageBitmap(blob);
-  const maxDim = 1568;
-  const scale = Math.min(1, maxDim / Math.max(bitmap.width, bitmap.height));
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
-  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("canvas 2d context unavailable");
-  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  bitmap.close();
-  return canvas.toDataURL("image/jpeg", 0.8);
-}
-
 /** How long a transient error / notice lingers on the pill before self-clearing. */
 const TRANSIENT_MS = 5000;
-
 /** How long a blocking error (needs a settings/permission fix) lingers before
  *  self-clearing. Longer than a transient hiccup so there's time to read the
  *  fix, but it STILL clears — an always-on-top pill must never get permanently
@@ -347,14 +320,19 @@ const MessageThumbnails: React.FC<{
     });
   };
 
-  // Dismiss the popped preview on Escape.
+  // Dismiss the popped preview on Escape, and let nothing else act on that press.
+  // The panel has its own Escape ladder (clear input, close thread, close panel),
+  // and both listeners sit on `window`, so without this one keystroke closed the
+  // enlarged image *and* the thread it was opened from.
   useEffect(() => {
     if (!preview) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setPreview(null);
+      if (e.key !== "Escape") return;
+      e.stopImmediatePropagation();
+      setPreview(null);
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
   }, [preview]);
 
   return (
@@ -402,6 +380,38 @@ const MessageThumbnails: React.FC<{
 /** Shared react-markdown renderers (module scope — stable identity). */
 const MD_COMPONENTS = { pre: CodeBlock };
 
+/**
+ * Which shape the quick-ask surface is in.
+ *
+ * `"leaving"` is the pill on its way out: the beat during which Rust resizes and
+ * moves the window. It is a state of its own rather than a flag on `"pill"`
+ * because it is the one moment when what the webview draws and what size the
+ * window is are deliberately allowed to disagree — the pill has faded to nothing,
+ * so the geometry underneath it can change without anything visible jumping.
+ */
+type AskStage = "pill" | "leaving" | "card";
+
+/**
+ * Height of the talking pill's transparent frame, in logical px.
+ *
+ * The frame, not the pill: the pill is 34px and hugs its content, floating centred
+ * inside this, exactly as the dictation overlay's does. Keep in sync with
+ * `ASK_PILL_HEIGHT` in `assistant.rs` and `--ask-pill-h` in `AssistantPanel.css`.
+ * Rust owns the window and sends this back on every show, so this constant only
+ * covers the frames before the first event arrives.
+ */
+const ASK_PILL_HEIGHT = 56;
+
+/**
+ * Slack added to a measured card height.
+ *
+ * Sub-pixel layout rounding and a scrollbar gutter that appears only once the
+ * body actually scrolls can each cost a pixel or two, and coming up short is not
+ * symmetric with coming up long: two spare pixels of transparent window are
+ * invisible, while two missing ones clip the last line of the answer.
+ */
+const ASK_FIT_SLACK = 2;
+
 /** Invisible edge/corner grips that drive Tauri's native window resize. The
  *  panel window is borderless (no OS resize border — most noticeably on
  *  Windows), so these provide reliable, easy resizing. Only rendered on the
@@ -429,7 +439,9 @@ const RESIZE_HANDLES: { cls: string; dir: ResizeDir }[] = [
   { cls: "sw", dir: "SouthWest" },
 ];
 
-const ResizeHandles: React.FC = () => {
+const ResizeHandles: React.FC<{ axis?: "both" | "horizontal" }> = ({
+  axis = "both",
+}) => {
   const onDown = (e: React.MouseEvent, dir: ResizeDir) => {
     // Primary button only; don't let the grip start a header drag or a text
     // selection while the native resize loop runs.
@@ -438,9 +450,16 @@ const ResizeHandles: React.FC = () => {
     e.stopPropagation();
     void getCurrentWindow().startResizeDragging(dir);
   };
+  // The quick-ask surface is sized to its answer, so only its width is the
+  // user's to set: a vertical grip there would be a control the next reply
+  // silently overrules, which is worse than not offering it.
+  const handles =
+    axis === "horizontal"
+      ? RESIZE_HANDLES.filter(({ cls }) => cls === "e" || cls === "w")
+      : RESIZE_HANDLES;
   return (
     <>
-      {RESIZE_HANDLES.map(({ cls, dir }) => (
+      {handles.map(({ cls, dir }) => (
         <div
           key={cls}
           className={`assistant-resize ${cls}`}
@@ -499,8 +518,14 @@ const AssistantPanel: React.FC = () => {
   const [toolElapsed, setToolElapsed] = useState(0);
   const [mounted, setMounted] = useState(false);
   const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
-  const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
-  const [dropActive, setDropActive] = useState(false);
+
+  // Which of the quick ask's shapes is on screen: the small talking pill it opens
+  // in, or the answer card that replaces it. Rust owns this — it has to resize
+  // and move the window before the webview may draw into the new room — and sends
+  // it back with the height the card is allowed to draw (see
+  // `assistant-ask-frame`).
+  const [askStage, setAskStage] = useState<AskStage>("pill");
+  const [askFrameHeight, setAskFrameHeight] = useState(ASK_PILL_HEIGHT);
 
   // Built-in (llama.cpp) engine setup progress. Lets the panel show "Setting up
   // the local engine…" during the one-time first-run download instead of a
@@ -515,6 +540,12 @@ const AssistantPanel: React.FC = () => {
         : t("assistant.engineSetup.preparing")
     : "";
   const listRef = useRef<HTMLDivElement>(null);
+  // The answer card, measured so Rust can size the window to it rather than to a
+  // guess. Only the webview can know how tall a rendered answer is.
+  const askCardRef = useRef<HTMLDivElement>(null);
+  // The last height reported, so the same answer is not reported twice — every
+  // report resizes a window, and a loop of them would fight the morph.
+  const fittedHeightRef = useRef(0);
   const sendingRef = useRef(false);
   /// Text typed while a reply was still streaming, sent when the turn ends.
   const queuedTextRef = useRef<string | null>(null);
@@ -549,6 +580,10 @@ const AssistantPanel: React.FC = () => {
   const kokoroErrorRef = useRef(false);
   const localVoiceRef = useRef<ReturnType<typeof useKokoroTts> | null>(null);
   const [showVoiceTranscript, setShowVoiceTranscript] = useState(false);
+  // Hanging up needs `hidePanel`, which is declared below because it needs
+  // `voice`. The indirection breaks that cycle; the ref is pointed at the real
+  // thing further down, on every render.
+  const hangUpRef = useRef<() => void>(() => {});
   const voice = useVoiceConversation({
     stopLocal: () => localVoiceRef.current?.stop(),
     beginLocal: async (epoch) => {
@@ -568,6 +603,7 @@ const AssistantPanel: React.FC = () => {
     onPaceChange: (pace) => {
       void commands.setAssistantConversationPace(pace);
     },
+    onHangUp: () => hangUpRef.current(),
   });
 
   // The conversation view has two forms — the orb alone, and the orb strip
@@ -612,7 +648,6 @@ const AssistantPanel: React.FC = () => {
   const liveOverlay = settings?.assistant_overlay_style === "live";
   const screenAccessMode = settings?.assistant_screen_access_mode ?? "manual";
   const manualScreenAccess = screenAccessMode === "manual";
-  const webSearchEnabled = settings?.assistant_web_search_enabled ?? false;
   const characters = settings?.assistant_characters ?? [];
   const activeCharacterId =
     settings?.assistant_active_character_id ?? "default";
@@ -1020,6 +1055,24 @@ const AssistantPanel: React.FC = () => {
         }),
       );
 
+      // The stage Rust says we are in. Order is strict and it owns it: the card
+      // may only start drawing once the window is already the card's size, or the
+      // answer is animated inside a 52px pill and clipped. `"leaving"` is the
+      // beat before that, when the pill is fading out and the window is about to
+      // change shape underneath it.
+      track(
+        await listen<{ stage: AskStage; height: number }>(
+          "assistant-ask-frame",
+          (e) => {
+            setAskStage(e.payload.stage);
+            setAskFrameHeight(e.payload.height);
+            // A reset back to the pill starts the next answer's measurement from
+            // scratch, so an identical reply still gets a fit report.
+            if (e.payload.stage === "pill") fittedHeightRef.current = 0;
+          },
+        ),
+      );
+
       // A turn picked up the text the user had selected in another app. The
       // payload is the character count, so the panel can say what it is acting on
       // without echoing the whole selection back at them.
@@ -1029,11 +1082,11 @@ const AssistantPanel: React.FC = () => {
         }),
       );
 
-      // The user said "open live conversation" (or similar) and nothing else, so
-      // the backend routed it here instead of answering it as a question.
+      // Only the dedicated call action starts hands-free conversation.
       track(
         await listen("assistant-start-conversation", () => {
-          if (voiceRef.current.open) return;
+          if (voiceRef.current.open && voiceRef.current.phase !== "error")
+            return;
           setShowVoiceTranscript(false);
           void voiceRef.current.start();
         }),
@@ -1081,7 +1134,6 @@ const AssistantPanel: React.FC = () => {
       track(
         await listen("assistant-attachments-consumed", () => {
           setPendingImages([]);
-          setPendingFiles([]);
         }),
       );
     };
@@ -1178,122 +1230,26 @@ const AssistantPanel: React.FC = () => {
     return tool.detail ? `${action} · ${tool.detail}` : action;
   }, [tool, t]);
 
-  /** Route a dropped/picked path to the right reader by extension. */
-  const addPath = useCallback(async (path: string) => {
-    const ext = path.split(".").pop()?.toLowerCase() ?? "";
-    try {
-      if (IMAGE_EXTENSIONS.includes(ext)) {
-        const result = await commands.assistantReadImage(path);
-        if (result.status === "ok") {
-          setPendingImages((prev) =>
-            prev.length >= MAX_PENDING_IMAGES
-              ? prev
-              : [...prev, { id: nextAttachmentId(), dataUrl: result.data }],
-          );
-        } else {
-          setError({ code: "file_read", detail: result.error });
-        }
-      } else {
-        const result = await commands.assistantReadFile(path);
-        if (result.status === "ok") {
-          const { name, content } = result.data;
-          setPendingFiles((prev) =>
-            prev.length >= MAX_PENDING_FILES
-              ? prev
-              : [...prev, { id: nextAttachmentId(), name, content }],
-          );
-        } else {
-          setError({ code: "file_read", detail: result.error });
-        }
-      }
-    } catch (err) {
-      setError({ code: "file_read", detail: String(err) });
-    }
-  }, []);
-
-  // Mirror the staged chips into the backend so VOICE turns (pill mic or
-  // hotkey — they run entirely in Rust) send the attachments too.
+  // Mirror the staged screen captures into the backend so VOICE turns (pill mic
+  // or hotkey — they run entirely in Rust) send them too.
+  //
+  // Images here only ever come from a region snip, which is screen vision. The
+  // panel deliberately has no way to attach a file or an image from disk: it is
+  // the surface you reach for mid-sentence to ask about the thing in front of
+  // you, and a file picker is a errand you go and run. Anything that needs
+  // documents belongs in a chat app with a sidebar, not in a card that opens
+  // over your work. The `files` half of the call stays wired so the backend
+  // keeps one shape of message regardless of where a turn came from.
   useEffect(() => {
     void commands
       .assistantSetPendingAttachments(
         pendingImages.map((image) => image.dataUrl),
-        pendingFiles.map(({ name, content }) => ({ name, content })),
+        [],
       )
       .catch(() => {
         // bindings not ready — the next change re-syncs
       });
-  }, [pendingImages, pendingFiles]);
-
-  // Paste an image (screenshot in the clipboard etc.) anywhere in the panel.
-  useEffect(() => {
-    const onPaste = (e: ClipboardEvent) => {
-      const items = e.clipboardData?.items;
-      if (!items) return;
-      for (const item of items) {
-        if (item.type.startsWith("image/")) {
-          const blob = item.getAsFile();
-          if (blob) {
-            e.preventDefault();
-            void downscaleToDataUrl(blob)
-              .then((dataUrl) =>
-                setPendingImages((prev) =>
-                  prev.length >= MAX_PENDING_IMAGES
-                    ? prev
-                    : [...prev, { id: nextAttachmentId(), dataUrl }],
-                ),
-              )
-              .catch((err) =>
-                setError({ code: "file_read", detail: String(err) }),
-              );
-          }
-          return;
-        }
-      }
-    };
-    document.addEventListener("paste", onPaste);
-    return () => document.removeEventListener("paste", onPaste);
-  }, []);
-
-  // Drag & drop files onto the panel (Tauri surfaces native drops as events).
-  useEffect(() => {
-    let unlisten: (() => void) | undefined;
-    let disposed = false;
-    void getCurrentWebview()
-      .onDragDropEvent((event) => {
-        if (event.payload.type === "enter" || event.payload.type === "over") {
-          setDropActive(true);
-        } else if (event.payload.type === "drop") {
-          setDropActive(false);
-          for (const path of event.payload.paths) {
-            void addPath(path);
-          }
-        } else {
-          setDropActive(false);
-        }
-      })
-      .then((fn) => {
-        if (disposed) fn();
-        else unlisten = fn;
-      });
-    return () => {
-      disposed = true;
-      unlisten?.();
-    };
-  }, [addPath]);
-
-  // File picker (paperclip button).
-  const pickFiles = useCallback(async () => {
-    try {
-      const picked = await openFileDialog({ multiple: true });
-      if (!picked) return;
-      const paths = Array.isArray(picked) ? picked : [picked];
-      for (const path of paths) {
-        await addPath(path);
-      }
-    } catch (err) {
-      setError({ code: "file_read", detail: String(err) });
-    }
-  }, [addPath]);
+  }, [pendingImages]);
 
   const beginSnip = useCallback(async () => {
     try {
@@ -1415,17 +1371,12 @@ const AssistantPanel: React.FC = () => {
       }
       const withScreen = attachScreen && manualScreenAccess;
       const images = pendingImages.map((image) => image.dataUrl);
-      const files = pendingFiles.map(({ name, content }) => ({
-        name,
-        content,
-      }));
       try {
-        if (images.length > 0 || files.length > 0 || withScreen) {
+        if (images.length > 0 || withScreen) {
           // Screen vision is sticky: it stays armed for the following turns
           // until the user switches it off (camera toggle or pill badge).
-          await commands.assistantSendComposed(text, images, files, withScreen);
+          await commands.assistantSendComposed(text, images, [], withScreen);
           setPendingImages([]);
-          setPendingFiles([]);
         } else {
           await commands.assistantSendText(text);
         }
@@ -1435,7 +1386,7 @@ const AssistantPanel: React.FC = () => {
         sendingRef.current = false;
       }
     },
-    [attachScreen, manualScreenAccess, pendingImages, pendingFiles],
+    [attachScreen, manualScreenAccess, pendingImages],
   );
 
   const sendText = useCallback(async () => {
@@ -1448,11 +1399,16 @@ const AssistantPanel: React.FC = () => {
     // answer has finished. Hold it and send it as soon as the turn ends.
     if (busy) {
       queuedTextRef.current = text;
-      setNotice(t("assistant.queuedUntilReady"));
+      // A code, not a sentence. The notice surfaces go through
+      // `assistant.notices.<code>`, so storing translated prose here meant the
+      // lookup missed and every surface fell back to its default — which is the
+      // web-search wording. Typing while a reply streamed announced "Web search
+      // didn't return results".
+      setNotice("queued");
       return;
     }
     await dispatchText(text);
-  }, [input, busy, dispatchText, t]);
+  }, [input, busy, dispatchText]);
 
   // Flush whatever was typed mid-reply, once the turn is over.
   useEffect(() => {
@@ -1462,14 +1418,6 @@ const AssistantPanel: React.FC = () => {
     queuedTextRef.current = null;
     void dispatchText(queued);
   }, [busy, dispatchText]);
-
-  const clearConversation = useCallback(async () => {
-    tts.stop();
-    setError(null);
-    setNotice(null);
-    resetStream();
-    await commands.assistantClearConversation();
-  }, [tts, resetStream]);
 
   const stopTurn = useCallback(async () => {
     // Block any reply that was just emitted, then stop local + remote TTS.
@@ -1503,6 +1451,17 @@ const AssistantPanel: React.FC = () => {
     await commands.hideAssistantPanel();
   }, [voice]);
 
+  // Hang up. The same thing as closing the panel, and deliberately so: the
+  // window *is* the call, so ending the call has to take the window with it.
+  // Ending only the session left the window up and the panel re-rendered as the
+  // quick-ask card, so End looked like it had opened a second, different
+  // assistant — and the next quick ask counted as a follow-up to a call that was
+  // already over.
+  const endCall = useCallback(() => {
+    void hidePanel();
+  }, [hidePanel]);
+  hangUpRef.current = endCall;
+
   const toggleVoice = useCallback(async () => {
     setError(null);
     await commands.assistantToggleVoice();
@@ -1523,15 +1482,39 @@ const AssistantPanel: React.FC = () => {
     e.stopPropagation();
   }, []);
 
-  const toggleWebSearch = useCallback(async () => {
-    await commands.setAssistantWebSearchEnabled(!webSearchEnabled);
-    await refreshSettings();
-  }, [webSearchEnabled, refreshSettings]);
-
   const collapse = useCallback(async (value: boolean) => {
     await commands.setAssistantPanelCollapsed(value);
     setCollapsed(value);
   }, []);
+
+  /**
+   * Escape dismisses the card.
+   *
+   * The global cancel binding only exists while a turn is in flight, so once the
+   * answer has landed there is nothing listening system-wide — and a card you
+   * asked for with a keystroke should not need the mouse to go away.
+   *
+   * Not during a call, where the panel is the conversation and closing it hangs
+   * up, and not while a reply is streaming — the global cancel owns that moment
+   * and stopping the reply is what Esc should do there.
+   *
+   * It clears a half-typed follow-up first, so one stray press does not throw
+   * away what you were in the middle of writing.
+   */
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.repeat) return;
+      if (voice.open || busy || collapsed) return;
+      e.preventDefault();
+      if (input.trim()) {
+        setInput("");
+        return;
+      }
+      void hidePanel();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [voice.open, busy, collapsed, input, hidePanel]);
 
   // Toggle screen-vision straight from the collapsed pill's hover controls, so
   // it can be armed AND disarmed without opening the panel — one control, shown
@@ -1566,6 +1549,27 @@ const AssistantPanel: React.FC = () => {
     [t, errorPrimary],
   );
 
+  /**
+   * A notice code as words.
+   *
+   * Every surface used to inline this lookup with `web_search_failed` as the
+   * fallback, so any code without a translation — or, worse, a notice that was
+   * already a sentence — silently claimed a failed web search. One resolver, and
+   * an unknown code degrades to itself rather than to the wrong explanation.
+   */
+  const noticeText = useCallback(
+    (code: string): string =>
+      t(`assistant.notices.${code}`, { defaultValue: code }),
+    [t],
+  );
+
+  /** Pill-sized variant, which falls back to the full wording. */
+  const noticeShort = useCallback(
+    (code: string): string =>
+      t(`assistant.notices.${code}Short`, { defaultValue: noticeText(code) }),
+    [t, noticeText],
+  );
+
   // A voice-engine failure during a call, in the wording the panel would have
   // used for it. The panel's own error banner lives inside the message list,
   // which is hidden behind the orb, so a voice that could not load or play left
@@ -1577,6 +1581,134 @@ const AssistantPanel: React.FC = () => {
     (state === "thinking" || state === "searching") && stream === "";
   // User-controlled screen state is meaningful only in Manual mode.
   const screenActive = manualScreenAccess && (visionActive || attachScreen);
+
+  // The single exchange the Ask card shows. Derived from the same history the
+  // thread renders, so a follow-up ("now make it shorter") still has the whole
+  // conversation behind it — the card only narrows what is *displayed*.
+  //
+  // The answer is paired by POSITION, not just by role. Taking "the last assistant
+  // message" outright meant a new question that was still transcribing appeared
+  // above the *previous* answer, which reads as though it had already been
+  // answered — the one thing a single-exchange card must never do.
+  let lastUserIndex = -1;
+  let lastAssistantIndex = -1;
+  history.forEach((message, index) => {
+    if (message.role === "user") lastUserIndex = index;
+    else if (message.role === "assistant") lastAssistantIndex = index;
+  });
+  const lastUserMessage =
+    lastUserIndex >= 0 ? history[lastUserIndex] : undefined;
+  const lastQuestion = lastUserMessage?.content ?? "";
+  const lastAnswer =
+    lastAssistantIndex > lastUserIndex
+      ? (history[lastAssistantIndex]?.content ?? "")
+      : "";
+  // Prefer the count stored on the message itself: the event-driven value survives
+  // past its own turn, so it would keep labelling later answers as being about a
+  // selection long after that selection was used.
+  const askSelectionChars = lastUserMessage?.selectionChars ?? 0;
+  // Status line for the card while it is working. Mirrors the pill's wording so the
+  // two surfaces never disagree about what the assistant is doing.
+  const askStatus = engineSetupActive
+    ? engineSetupLabel || t("assistant.engineSetup.short")
+    : state !== "idle"
+      ? t(`assistant.status.${state}`)
+      : t("assistant.status.thinking");
+
+  // A new question is being spoken or transcribed, so nothing in `history` belongs
+  // to it yet. Same rule the Live overlay already uses — the card just had no way
+  // to know, which is why a follow-up ask looked like nothing was happening.
+  const askCapturing = state === "listening" || state === "transcribing";
+
+  // The answer is finished when the backend's authoritative snapshot has replaced
+  // the streamed text. Deliberately not `!busy`: a spoken reply keeps the pipeline
+  // busy for as long as it takes to read the answer aloud, and the card should not
+  // wait for that. Deliberately not "an error arrived" either — a failure is one
+  // line, the pill says it perfectly well, and opening a card to deliver bad news
+  // is exactly the sort of motion that makes an app feel unreliable.
+  const askAnswerDone =
+    !voice.open &&
+    !askCapturing &&
+    stream === "" &&
+    lastAnswer.trim().length > 0;
+
+  /**
+   * Whether the card should be on screen.
+   *
+   * An answer opens the card by itself, always. There was briefly a style in which
+   * the finished reply stayed in the pill behind an expand button, and it was a
+   * mistake in two ways at once: it crammed a paragraph into a 34px lozenge, and
+   * it made the user press something to see the thing they had just asked for. The
+   * card *is* the answer, so arriving at one is what opens it.
+   *
+   * The overlay style now decides only *when*, which is the only part of this a
+   * preference can sensibly own:
+   *
+   *   • live — on the first token, so the reply is read as it is written.
+   *   • otherwise — when the reply is complete. For the two sentences a quick ask
+   *     usually gets, watching them stream is motion with no information in it.
+   */
+  const overlayStyle = settings?.assistant_overlay_style ?? "auto";
+  const askAnswerReady =
+    overlayStyle === "live"
+      ? !voice.open && !askCapturing && (stream !== "" || askAnswerDone)
+      : askAnswerDone;
+
+  /** Which shape the pill should be showing what it has. */
+  const askBarPhase: AskBarPhase = askCapturing
+    ? state === "listening"
+      ? "listening"
+      : "transcribing"
+    : busy
+      ? "working"
+      : "prompt";
+
+  /**
+   * Measure the finished card and tell Rust how much window it needs.
+   *
+   * The height cannot be decided on the Rust side: it depends on how the answer
+   * wraps, which only the webview knows. It cannot be decided here either — the
+   * ceiling belongs to the display. So the webview measures, Rust clamps and
+   * resizes, and the morph starts when the frame that answer needs already exists
+   * (`assistant-ask-frame`).
+   *
+   * `useLayoutEffect` because the measurement has to happen after the answer is in
+   * the DOM and before the browser paints it: measuring a frame later would let a
+   * card at the wrong height reach the screen first.
+   */
+  useLayoutEffect(() => {
+    if (collapsed || voice.open || !panelVisible || !askAnswerReady) return;
+    const node = askCardRef.current;
+    if (!node) return;
+    // The card is normally pinned to the height Rust gave it, so it has to be let
+    // go for the length of one measurement to find out what it actually wants.
+    node.classList.add("measuring");
+    const natural = Math.ceil(node.scrollHeight) + ASK_FIT_SLACK;
+    node.classList.remove("measuring");
+    // Report only a real change: every report resizes a window, and a report
+    // triggered by its own resize is a loop.
+    if (natural <= 0 || Math.abs(natural - fittedHeightRef.current) < 3) return;
+    fittedHeightRef.current = natural;
+    void emit("assistant-ask-fit", { height: natural });
+  }, [
+    askAnswerReady,
+    lastAnswer,
+    lastQuestion,
+    notice,
+    askSelectionChars,
+    collapsed,
+    panelVisible,
+    voice.open,
+  ]);
+
+  /**
+   * Tell Rust which part of the window is drawn, so the transparent rest of it
+   * passes clicks through to the app underneath (see `hitRegion.ts`). Reported
+   * only while the panel is on screen: a hidden window needs no pass-through, and
+   * the guard on the Rust side is retired with the hide anyway.
+   */
+  usePanelHitRegion(panelVisible);
+  useSuppressContextMenu();
 
   const shellClass = `assistant-scope assistant-shell${
     collapsed ? "" : " expanded"
@@ -1598,6 +1730,7 @@ const AssistantPanel: React.FC = () => {
           voice={voice}
           name={activeCharacter?.name ?? t("assistant.title")}
           onExpand={() => void collapse(false)}
+          onEnd={endCall}
           voiceLoading={tts.status === "loading" ? tts.progress : null}
           voiceFault={voiceFault}
         />
@@ -1926,9 +2059,7 @@ const AssistantPanel: React.FC = () => {
                   className="apill-notice"
                   role="status"
                   data-tauri-drag-region
-                  title={t(`assistant.notices.${notice}`, {
-                    defaultValue: t("assistant.notices.web_search_failed"),
-                  })}
+                  title={noticeText(notice)}
                 >
                   <Globe
                     size={11}
@@ -1936,9 +2067,7 @@ const AssistantPanel: React.FC = () => {
                     className="apill-notice-icon"
                   />
                   <span className="apill-notice-text">
-                    {t("assistant.notices.web_search_failedShort", {
-                      defaultValue: t("assistant.notices.web_search_failed"),
-                    })}
+                    {noticeShort(notice)}
                   </span>
                 </span>
               ) : (
@@ -2007,104 +2136,241 @@ const AssistantPanel: React.FC = () => {
     );
   }
 
+  // ---- The quick ask: one surface, two shapes ---------------------------
+  //
+  // The bar and the card are drawn as two layers of the same morphing surface
+  // rather than swapped for each other, for two reasons. The surface's rounded
+  // edge has to travel from a lozenge to a card in one continuous motion, which a
+  // swap cannot do. And the card has to be in the DOM, laid out at its real
+  // width, *before* it is shown — that is what the measurement in
+  // `useLayoutEffect` above reads, and the height it reports is what buys the
+  // window the room to unfold into.
+  if (!voice.open) {
+    const followUpBusy = busy || ttsActive;
+    return (
+      <div className={shellClass}>
+        <div
+          className={`ask-stage ${askStage}`}
+          style={{ "--ask-h": `${askFrameHeight}px` } as React.CSSProperties}
+        >
+          <div className="ask-surface">
+            {/* Width only. Height belongs to the answer, so a vertical grip
+                would be a control the next reply silently overrules. */}
+            <ResizeHandles axis="horizontal" />
+
+            <div className="ask-layer pill" aria-hidden={askStage !== "pill"}>
+              <AskBar
+                phase={askBarPhase}
+                active={askStage === "pill" && !askAnswerReady}
+                state={state}
+                status={askStatus}
+                levels={isListening ? micLevels : undefined}
+                error={error && !busy ? errorShort(error) : null}
+                input={input}
+                onInputChange={(value) => {
+                  setInput(value);
+                  if (error) setError(null);
+                }}
+                onSubmit={() => void sendText()}
+                onClose={hidePanel}
+                stopDrag={stopDrag}
+              />
+            </div>
+
+            <div
+              className="ask-layer card"
+              ref={askCardRef}
+              aria-hidden={askStage !== "card"}
+            >
+              <AskCard
+                question={lastQuestion}
+                answer={stream || lastAnswer}
+                busy={busy}
+                status={askStatus}
+                capturing={askCapturing}
+                levels={isListening ? micLevels : undefined}
+                error={error ? errorPrimary(error) : null}
+                notice={notice ? noticeText(notice) : null}
+                selectionChars={askSelectionChars}
+                markdown={MD_COMPONENTS}
+                onClose={hidePanel}
+                stopDrag={stopDrag}
+              />
+
+              {pendingImages.length > 0 && (
+                <div className="assistant-attachments">
+                  {pendingImages.map((image) => (
+                    <span className="attachment-chip" key={image.id}>
+                      <img src={image.dataUrl} alt="" />
+                      <span className="chip-name">
+                        {t("assistant.attach.image")}
+                      </span>
+                      <button
+                        className="chip-remove"
+                        onClick={() =>
+                          setPendingImages((prev) =>
+                            prev.filter((i) => i.id !== image.id),
+                          )
+                        }
+                        title={t("assistant.attach.remove")}
+                      >
+                        <X size={11} strokeWidth={2.5} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {/* Ask again, about the answer above. Whether the assistant may
+                  search the web is a preference, not a per-question decision, so
+                  its switch lives in Settings → Assistant with the rest of the
+                  search configuration — the model decides when to actually use
+                  it. */}
+              <div className="assistant-input-row">
+                {manualScreenAccess && (
+                  <button
+                    className={`assistant-attach-button${attachScreen ? " armed" : ""}`}
+                    onClick={() => void toggleScreen()}
+                    onMouseDown={stopDrag}
+                    disabled={askStage !== "card"}
+                    title={
+                      attachScreen
+                        ? t("assistant.detachScreen")
+                        : t("assistant.attachScreen")
+                    }
+                  >
+                    <Camera size={15} />
+                  </button>
+                )}
+                {manualScreenAccess && (
+                  <button
+                    className="assistant-attach-button"
+                    onClick={beginSnip}
+                    onMouseDown={stopDrag}
+                    disabled={askStage !== "card"}
+                    title={t("assistant.attach.snip")}
+                  >
+                    <Scissors size={15} />
+                  </button>
+                )}
+                <input
+                  className="assistant-input"
+                  type="text"
+                  value={input}
+                  // The bar carries the same field while it is on screen; two
+                  // live inputs over one value would fight for the caret.
+                  disabled={askStage !== "card"}
+                  placeholder={
+                    attachScreen
+                      ? t("assistant.inputPlaceholderScreen")
+                      : t("assistant.followUpPlaceholder")
+                  }
+                  onChange={(e) => {
+                    setInput(e.target.value);
+                    // Typing a new message clears any lingering error so the user
+                    // isn't blocked by (or waiting out) a stale failure notice.
+                    if (error) setError(null);
+                  }}
+                  onMouseDown={stopDrag}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.repeat) {
+                      void sendText();
+                    }
+                  }}
+                />
+                {(isListening || state === "transcribing") && (
+                  <button
+                    className="assistant-send-button ghost"
+                    onClick={cancelVoice}
+                    onMouseDown={stopDrag}
+                    title={t("assistant.cancel")}
+                    aria-label={t("assistant.cancel")}
+                  >
+                    <X size={16} strokeWidth={2.75} />
+                  </button>
+                )}
+                {state !== "transcribing" && (
+                  <button
+                    className="assistant-send-button"
+                    onClick={
+                      isListening
+                        ? finishVoice
+                        : followUpBusy
+                          ? stopTurn
+                          : sendText
+                    }
+                    onMouseDown={stopDrag}
+                    disabled={
+                      askStage !== "card" ||
+                      (!isListening && !followUpBusy && !input.trim())
+                    }
+                    title={
+                      isListening
+                        ? t("assistant.finish")
+                        : followUpBusy
+                          ? t("assistant.stop")
+                          : t("assistant.send")
+                    }
+                  >
+                    {isListening ? (
+                      <Check size={16} strokeWidth={2.75} />
+                    ) : followUpBusy ? (
+                      <Square size={15} strokeWidth={2.5} />
+                    ) : (
+                      <ArrowUp size={16} strokeWidth={2.5} />
+                    )}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={shellClass}>
       <div className="assistant-panel">
         <ResizeHandles />
-        {dropActive && (
-          <div className="assistant-drop-hint">
-            <Paperclip size={14} />
-            {t("assistant.attach.dropHint")}
-          </div>
-        )}
-        <div
-          className={`assistant-header${voice.open ? " conversation-header" : ""}`}
-        >
-          {voice.open ? (
-            <span className="conversation-header-title" data-tauri-drag-region>
-              {t("assistant.conversation.title")}
-            </span>
-          ) : (
-            <div className="assistant-title">
-              <span
-                className={`assistant-status-dot${busy ? " busy" : ""}`}
-                data-tauri-drag-region
-                title={busy ? t(`assistant.status.${state}`) : undefined}
-              />
-              {profilePicker}
-            </div>
-          )}
+        <div className="assistant-header conversation-header">
+          <span className="conversation-header-title" data-tauri-drag-region>
+            {t("assistant.conversation.title")}
+          </span>
           <div
             className="assistant-header-drag"
             data-tauri-drag-region
             aria-hidden="true"
           />
           <div className="assistant-header-actions">
-            {voice.open ? (
-              <button
-                type="button"
-                className="assistant-icon-button"
-                onMouseDown={stopDrag}
-                disabled={voice.phase === "error"}
-                aria-pressed={showVoiceTranscript}
-                aria-label={t(
-                  showVoiceTranscript
-                    ? "assistant.conversation.shrink"
-                    : "assistant.conversation.expand",
-                )}
-                title={t(
-                  showVoiceTranscript
-                    ? "assistant.conversation.shrink"
-                    : "assistant.conversation.expand",
-                )}
-                onClick={() => setVoiceTranscript(!showVoiceTranscript)}
-              >
-                {showVoiceTranscript ? (
-                  <Shrink size={14} />
-                ) : (
-                  <Expand size={14} />
-                )}
-              </button>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  className={`assistant-icon-button${voice.open ? " active" : ""}`}
-                  onClick={() => {
-                    if (voice.open) voice.end();
-                    else {
-                      setShowVoiceTranscript(false);
-                      void voice.start();
-                    }
-                  }}
-                  onMouseDown={stopDrag}
-                  disabled={!voice.open && (busy || !settings)}
-                  aria-pressed={voice.open}
-                  aria-label={t(
-                    voice.open
-                      ? "assistant.conversation.end"
-                      : "assistant.conversation.start",
-                  )}
-                  title={t(
-                    voice.open
-                      ? "assistant.conversation.end"
-                      : "assistant.conversation.start",
-                  )}
-                >
-                  <AudioLines size={16} />
-                </button>
-                <button
-                  type="button"
-                  className="assistant-icon-button"
-                  onClick={clearConversation}
-                  disabled={voice.open}
-                  onMouseDown={stopDrag}
-                  title={t("assistant.clear")}
-                >
-                  <Eraser size={14} />
-                </button>
-              </>
-            )}
+            {/* A running conversation needs its own two controls — read the
+                transcript, and park it as a pill — because it is a surface you
+                keep around. The quick ask has neither: it is one job with one
+                answer, and it draws its own close button on the card. */}
+            <button
+              type="button"
+              className="assistant-icon-button"
+              onMouseDown={stopDrag}
+              disabled={voice.phase === "error"}
+              aria-pressed={showVoiceTranscript}
+              aria-label={t(
+                showVoiceTranscript
+                  ? "assistant.conversation.shrink"
+                  : "assistant.conversation.expand",
+              )}
+              title={t(
+                showVoiceTranscript
+                  ? "assistant.conversation.shrink"
+                  : "assistant.conversation.expand",
+              )}
+              onClick={() => setVoiceTranscript(!showVoiceTranscript)}
+            >
+              {showVoiceTranscript ? (
+                <Shrink size={14} />
+              ) : (
+                <Expand size={14} />
+              )}
+            </button>
             <button
               type="button"
               className="assistant-icon-button"
@@ -2138,12 +2404,17 @@ const AssistantPanel: React.FC = () => {
             }
             showTranscript={showVoiceTranscript}
             onToggleTranscript={() => setVoiceTranscript(!showVoiceTranscript)}
+            onEnd={endCall}
             voiceLoading={tts.status === "loading" ? tts.progress : null}
             voiceFault={voiceFault}
           />
         )}
+        {/* The call's transcript, and only that. The quick ask has its own
+            surface above and never reaches this branch. */}
         <div
-          className={`assistant-messages${voice.open && !showVoiceTranscript ? " conversation-hidden" : ""}`}
+          className={`assistant-messages${
+            voice.open && showVoiceTranscript ? "" : " conversation-hidden"
+          }`}
           ref={listRef}
           onScroll={handleMessagesScroll}
         >
@@ -2156,7 +2427,8 @@ const AssistantPanel: React.FC = () => {
               </p>
             </div>
           )}
-          {(!voice.open || showVoiceTranscript) &&
+          {voice.open &&
+            showVoiceTranscript &&
             history.map((message, i) => (
               <div key={i} className={`assistant-message ${message.role}`}>
                 <div className="assistant-message-content">
@@ -2250,9 +2522,7 @@ const AssistantPanel: React.FC = () => {
           {notice && (
             <div className="assistant-notice" role="status">
               <Globe size={12} strokeWidth={2} />
-              {t(`assistant.notices.${notice}`, {
-                defaultValue: t("assistant.notices.web_search_failed"),
-              })}
+              {noticeText(notice)}
             </div>
           )}
           {summarizing && (
@@ -2267,7 +2537,7 @@ const AssistantPanel: React.FC = () => {
               {engineSetupLabel}
             </div>
           )}
-          {(!voice.open || showVoiceTranscript) && stream !== "" && (
+          {voice.open && showVoiceTranscript && stream !== "" && (
             <div className="assistant-message assistant">
               <div className="assistant-message-content">
                 <ReactMarkdown
@@ -2336,169 +2606,6 @@ const AssistantPanel: React.FC = () => {
                 <X size={13} strokeWidth={2.5} />
               </button>
             </div>
-          )}
-        </div>
-
-        {!voice.open &&
-          (pendingImages.length > 0 || pendingFiles.length > 0) && (
-            <div className="assistant-attachments">
-              {pendingImages.map((image) => (
-                <span className="attachment-chip" key={image.id}>
-                  <img src={image.dataUrl} alt="" />
-                  <span className="chip-name">
-                    {t("assistant.attach.image")}
-                  </span>
-                  <button
-                    className="chip-remove"
-                    onClick={() =>
-                      setPendingImages((prev) =>
-                        prev.filter((i) => i.id !== image.id),
-                      )
-                    }
-                    title={t("assistant.attach.remove")}
-                  >
-                    <X size={11} strokeWidth={2.5} />
-                  </button>
-                </span>
-              ))}
-              {pendingFiles.map((file) => (
-                <span className="attachment-chip" key={file.id}>
-                  <FileText size={13} />
-                  <span className="chip-name">{file.name}</span>
-                  <button
-                    className="chip-remove"
-                    onClick={() =>
-                      setPendingFiles((prev) =>
-                        prev.filter((f) => f.id !== file.id),
-                      )
-                    }
-                    title={t("assistant.attach.remove")}
-                  >
-                    <X size={11} strokeWidth={2.5} />
-                  </button>
-                </span>
-              ))}
-            </div>
-          )}
-
-        <div
-          className={`assistant-input-row${voice.open ? " conversation-hidden" : ""}`}
-        >
-          <button
-            className={`assistant-attach-button${webSearchEnabled ? " armed" : ""}`}
-            onClick={toggleWebSearch}
-            title={
-              webSearchEnabled
-                ? t("assistant.webSearch.disable")
-                : t("assistant.webSearch.enable")
-            }
-          >
-            <Globe size={15} />
-          </button>
-          {manualScreenAccess && (
-            <button
-              className={`assistant-attach-button${attachScreen ? " armed" : ""}`}
-              onClick={() => void toggleScreen()}
-              title={
-                attachScreen
-                  ? t("assistant.detachScreen")
-                  : t("assistant.attachScreen")
-              }
-            >
-              <Camera size={15} />
-            </button>
-          )}
-          {manualScreenAccess && (
-            <button
-              className="assistant-attach-button"
-              onClick={beginSnip}
-              title={t("assistant.attach.snip")}
-            >
-              <Scissors size={15} />
-            </button>
-          )}
-          <button
-            className="assistant-attach-button"
-            onClick={pickFiles}
-            title={t("assistant.attach.file")}
-          >
-            <Paperclip size={15} />
-          </button>
-          {/* The route into a live conversation. It used to be an icon-only button
-              third of six in the header, which is why nobody found it — and the
-              collapsed pill had no way in at all. A labelled control sitting next to
-              the input makes "read the answer" and "talk it through" equally
-              visible, which is the whole point of folding the two surfaces into one
-              card. */}
-          {!voice.open && (
-            <button
-              className="assistant-talk-button"
-              onClick={() => {
-                setShowVoiceTranscript(false);
-                void voice.start();
-              }}
-              disabled={busy || !settings}
-              title={t("assistant.conversation.startHint")}
-              aria-label={t("assistant.conversation.start")}
-            >
-              <AudioLines size={14} />
-              <span>{t("assistant.conversation.startShort")}</span>
-            </button>
-          )}
-          <input
-            className="assistant-input"
-            type="text"
-            value={input}
-            placeholder={
-              attachScreen
-                ? t("assistant.inputPlaceholderScreen")
-                : t("assistant.inputPlaceholder")
-            }
-            onChange={(e) => {
-              setInput(e.target.value);
-              // Typing a new message clears any lingering error so the user
-              // isn't blocked by (or waiting out) a stale failure notice.
-              if (error) setError(null);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.repeat) {
-                void sendText();
-              }
-            }}
-          />
-          {(isListening || state === "transcribing") && (
-            <button
-              className="assistant-send-button"
-              onClick={cancelVoice}
-              title={t("assistant.cancel")}
-              aria-label={t("assistant.cancel")}
-            >
-              <X size={16} strokeWidth={2.75} />
-            </button>
-          )}
-          {state !== "transcribing" && (
-            <button
-              className="assistant-send-button"
-              onClick={
-                isListening ? finishVoice : showStop ? stopTurn : sendText
-              }
-              disabled={!isListening && !showStop && !input.trim()}
-              title={
-                isListening
-                  ? t("assistant.finish")
-                  : showStop
-                    ? t("assistant.stop")
-                    : t("assistant.send")
-              }
-            >
-              {isListening ? (
-                <Check size={16} strokeWidth={2.75} />
-              ) : showStop ? (
-                <Square size={15} strokeWidth={2.5} />
-              ) : (
-                <ArrowUp size={16} strokeWidth={2.5} />
-              )}
-            </button>
           )}
         </div>
       </div>

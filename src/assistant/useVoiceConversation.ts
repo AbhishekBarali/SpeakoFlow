@@ -43,6 +43,15 @@ interface VoiceCallbacks {
    */
   pace?: ConversationPace | null;
   onPaceChange: (pace: ConversationPace) => void;
+  /**
+   * Hang up: end the session *and* send the surface away.
+   *
+   * The hook can only do the first half, and on its own that is the bug — the
+   * window stays up and re-renders as the quick-ask card, so ending a call looks
+   * like a second, different assistant opening itself. Whoever owns the window
+   * supplies this; without it, Escape falls back to a local-only end.
+   */
+  onHangUp?: () => void;
 }
 interface Session {
   id: number;
@@ -67,6 +76,8 @@ export function useVoiceConversation(callbacks: VoiceCallbacks) {
   const callbacksRef = useRef(callbacks);
   callbacksRef.current = callbacks;
   const [open, setOpen] = useState(false);
+  const openRef = useRef(open);
+  openRef.current = open;
   const [phase, setPhase] = useState<ConversationPhase>("off");
   const [error, setError] = useState<VoiceError | null>(null);
   const [level, setLevel] = useState(0);
@@ -78,6 +89,17 @@ export function useVoiceConversation(callbacks: VoiceCallbacks) {
   const lifecycle = useRef(new VoiceTurnGate());
   const turns = useRef(new VoiceTurnGate());
   const ready = useRef<Promise<unknown>>(Promise.resolve());
+  const backendLifecycle = useRef<Promise<unknown>>(Promise.resolve());
+  /**
+   * Backend session ids this hook has already closed.
+   *
+   * `assistant-conversation-ended` has to be honoured by a session that does not
+   * yet know its own id — see the listener — and that alone would let a *previous*
+   * session's late event tear down a call that had just started. Remembering what
+   * we have already released settles which of the two an event belongs to without
+   * guessing from timing.
+   */
+  const closedSessions = useRef(new Set<number>());
   const lastLevelAt = useRef(0);
 
   const refreshPhase = useCallback((s: Session) => {
@@ -102,10 +124,12 @@ export function useVoiceConversation(callbacks: VoiceCallbacks) {
     s.audio.stop();
     void s.vad?.destroy().catch(() => {});
     void s.context.close().catch(() => {});
-    if (s.id)
-      void invoke("assistant_conversation_end", { session: s.id }).catch(
-        () => {},
-      );
+    if (s.id) {
+      closedSessions.current.add(s.id);
+      backendLifecycle.current = backendLifecycle.current
+        .then(() => invoke("assistant_conversation_end", { session: s.id }))
+        .catch(() => {});
+    }
   }, []);
 
   const end = useCallback(() => {
@@ -119,6 +143,7 @@ export function useVoiceConversation(callbacks: VoiceCallbacks) {
     }
     setOpen(false);
     setPhase("off");
+    setError(null);
     setLevel(0);
   }, [release]);
 
@@ -352,9 +377,26 @@ export function useVoiceConversation(callbacks: VoiceCallbacks) {
         return;
       }
       await ready.current;
-      const ticket = await invoke<VoiceTicket>("assistant_conversation_start");
-      session.id = ticket.session;
-      if (!lifecycle.current.accepts(generation)) {
+      // End must reach Rust before a retry starts. Also close a late start
+      // before a newer start can run, even if permission/VAD setup was cancelled.
+      const starting = backendLifecycle.current.then(async () => {
+        if (!lifecycle.current.accepts(generation)) return null;
+        const ticket = await invoke<VoiceTicket>(
+          "assistant_conversation_start",
+        );
+        if (!lifecycle.current.accepts(generation)) {
+          closedSessions.current.add(ticket.session);
+          await invoke("assistant_conversation_end", {
+            session: ticket.session,
+          });
+          return null;
+        }
+        session.id = ticket.session;
+        return ticket;
+      });
+      backendLifecycle.current = starting.catch(() => {});
+      const ticket = await starting;
+      if (!ticket || !lifecycle.current.accepts(generation)) {
         release(session);
         return;
       }
@@ -582,9 +624,26 @@ export function useVoiceConversation(callbacks: VoiceCallbacks) {
       );
       track(
         await listen<number>("assistant-conversation-ended", ({ payload }) => {
-          if (sessionRef.current?.id === payload) end();
+          // A session this hook already tore down cannot end anything: its late
+          // event must not reach the call that replaced it.
+          if (closedSessions.current.has(payload)) return;
+          const s = sessionRef.current;
+          if (!s) return;
+          // `id === 0` is a live session still waiting for its backend ticket.
+          // Rust considers a call active from the moment it issues that ticket,
+          // so an "ended" event can legitimately arrive before the id lands
+          // here — and requiring the ids to match left the VAD holding the
+          // microphone for a call the backend had already torn down, which is
+          // what "the panel is using the mic and nothing works" looked like. The
+          // in-flight start closes its own late ticket via the lifecycle
+          // generation, so ending early is safe.
+          if (s.id === payload || s.id === 0) end();
         }),
       );
+      // A failed/pending start has no backend ticket to end. These explicit
+      // surface changes must dismiss it too, or the call UI masks quick asks.
+      track(await listen("assistant-panel-hidden", end));
+      track(await listen("assistant-quick-ask", end));
       // Collapsing to the pill keeps the microphone, because the pill is on
       // screen and says the call is live. Hiding the panel does not: the backend
       // ends the session (see `assistant::hide_assistant_panel`) and this
@@ -614,10 +673,15 @@ export function useVoiceConversation(callbacks: VoiceCallbacks) {
       if (
         event.key === "Escape" &&
         !event.defaultPrevented &&
-        sessionRef.current
+        openRef.current
       ) {
         event.preventDefault();
-        end();
+        // Escape on a call is a hang-up, so it has to take the window with it.
+        // Ending only the session left the panel on screen as the quick-ask
+        // card, which is the same glitch the End button had.
+        const hangUp = callbacksRef.current.onHangUp;
+        if (hangUp) hangUp();
+        else end();
       }
     };
     window.addEventListener("keydown", onKey);

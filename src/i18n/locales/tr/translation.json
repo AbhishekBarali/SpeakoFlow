@@ -422,10 +422,6 @@
           "assistant_vision": {
             "name": "Ekranla sor",
             "description": "Ekranınız ekli olarak sesle sorun; böylece neye baktığınızı görebilir."
-          },
-          "assistant_panel_toggle": {
-            "name": "Paneli göster veya gizle",
-            "description": "Yüzen asistan panelini gösterir veya gizler."
           }
         },
         "errors": {

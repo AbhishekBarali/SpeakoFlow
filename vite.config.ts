@@ -18,7 +18,7 @@ export default defineConfig(async () => ({
     },
   },
 
-  // Multiple entry points for main app, overlay, and assistant panel
+  // Multiple entry points for main app, overlay, assistant panel and reminders
   build: {
     rollupOptions: {
       input: {
@@ -26,6 +26,7 @@ export default defineConfig(async () => ({
         overlay: resolve(__dirname, "src/overlay/index.html"),
         assistant: resolve(__dirname, "src/assistant/index.html"),
         snip: resolve(__dirname, "src/assistant/snip.html"),
+        reminder: resolve(__dirname, "src/reminder/index.html"),
       },
     },
   },

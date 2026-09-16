@@ -583,8 +583,8 @@
 .alive-answer {
   min-width: 0;
   color: var(--as-body);
-  font-size: var(--as-msg-font, 13px);
-  line-height: 1.38;
+  font-size: var(--as-msg-font, 14.5px);
+  line-height: 1.45;
   overflow: hidden;
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -737,12 +737,16 @@
 
 /* ---------- Header ---------- */
 
+/* Deliberately without a bottom rule. A full-width divider under a row of icons
+   is the single strongest "this is a window" signal there is, and this surface
+   opens over the work you were already doing — it should read as a card that
+   arrived, not as another window to manage. Identity on the left, three controls
+   on the right, and the card below simply continues. */
 .assistant-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 9px 8px 9px 14px;
-  border-bottom: 1px solid var(--as-hairline);
+  padding: 8px 8px 2px 13px;
   user-select: none;
   cursor: grab;
   flex-shrink: 0;
@@ -766,32 +770,6 @@
   flex: 1;
   min-width: 12px;
   cursor: grab;
-}
-
-.assistant-status-dot {
-  width: 6px;
-  height: 6px;
-  flex-shrink: 0;
-  border-radius: 50%;
-  background: var(--as-faint);
-  transition: background 0.2s ease;
-}
-
-.assistant-status-dot.busy {
-  background: var(--as-ink);
-  animation: as-dot-pulse 1.2s ease-in-out infinite;
-}
-
-@keyframes as-dot-pulse {
-  0%,
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-  50% {
-    transform: scale(1.35);
-    opacity: 0.55;
-  }
 }
 
 .assistant-state-chip {
@@ -862,10 +840,6 @@
 .assistant-icon-button.active {
   color: var(--as-ink);
   background: var(--as-raise);
-}
-
-.assistant-icon-button.pulsing {
-  animation: as-dot-pulse 1.2s ease-in-out infinite;
 }
 
 /* ---------- Character switcher ---------- */
@@ -1012,8 +986,8 @@
   /* Let the bubble shrink below the intrinsic width of a long token so wrapping
    * (below) can kick in instead of the bubble blowing past its max-width. */
   min-width: 0;
-  font-size: var(--as-msg-font, 13.5px);
-  line-height: 1.55;
+  font-size: var(--as-msg-font, 14.5px);
+  line-height: 1.62;
   animation: as-bubble-in 0.18s ease-out;
 }
 
@@ -1139,24 +1113,41 @@
   margin-bottom: 0;
 }
 
-.assistant-message-content p {
+/* Markdown typography, shared by the thread bubbles and the ask card.
+ *
+ * The ask card used to have none of this. It renders `react-markdown` straight
+ * into `.ask-answer-body` with no wrapper class, so its answers fell back to the
+ * user-agent stylesheet: 1em paragraph margins, a 40px list indent, unstyled
+ * code and links. That is the surface the hotkey actually opens — the one people
+ * read most — and it was the less legible of the two. Adding it here rather than
+ * duplicating the rules is deliberate: one place to change, and the two surfaces
+ * cannot drift. */
+.assistant-message-content p,
+.ask-answer-body p {
   margin: 0 0 8px;
 }
 
 .assistant-message-content ul,
-.assistant-message-content ol {
+.assistant-message-content ol,
+.ask-answer-body ul,
+.ask-answer-body ol {
   margin: 4px 0 8px;
   padding-inline-start: 20px;
 }
 
-.assistant-message-content li {
+.assistant-message-content li,
+.ask-answer-body li {
   margin: 3px 0;
 }
 
 .assistant-message-content h1,
 .assistant-message-content h2,
 .assistant-message-content h3,
-.assistant-message-content h4 {
+.assistant-message-content h4,
+.ask-answer-body h1,
+.ask-answer-body h2,
+.ask-answer-body h3,
+.ask-answer-body h4 {
   font-size: 1.1em;
   font-weight: 600;
   letter-spacing: -0.005em;
@@ -1164,7 +1155,16 @@
   margin: 11px 0 6px;
 }
 
-.assistant-message-content code {
+/* Emphasis steps up to the brightest ink instead of the paragraph doing it, so
+   a bolded label still pops off body copy that is deliberately one step down. */
+.assistant-message-content strong,
+.ask-answer-body strong {
+  font-weight: 600;
+  color: var(--as-ink);
+}
+
+.assistant-message-content code,
+.ask-answer-body code {
   font-family: "Cascadia Code", "JetBrains Mono", Consolas, monospace;
   font-size: 0.9em;
   background: var(--as-inset-bg);
@@ -1177,7 +1177,8 @@
   overflow-wrap: anywhere;
 }
 
-.assistant-message-content pre {
+.assistant-message-content pre,
+.ask-answer-body pre {
   background: var(--as-inset-bg);
   border: 1px solid var(--as-hairline);
   border-radius: 10px;
@@ -1188,27 +1189,31 @@
   overscroll-behavior-x: contain;
 }
 
-.assistant-message-content pre code {
+.assistant-message-content pre code,
+.ask-answer-body pre code {
   background: none;
   border: none;
   padding: 0;
 }
 
-.assistant-message-content blockquote {
+.assistant-message-content blockquote,
+.ask-answer-body blockquote {
   margin: 6px 0 8px;
   padding: 2px 0 2px 11px;
   border-inline-start: 2px solid var(--as-hairline-strong);
   color: var(--as-muted);
 }
 
-.assistant-message-content a {
+.assistant-message-content a,
+.ask-answer-body a {
   color: var(--as-ink);
   text-decoration: underline;
   text-underline-offset: 2px;
   text-decoration-color: var(--as-hairline-strong);
 }
 
-.assistant-message-content table {
+.assistant-message-content table,
+.ask-answer-body table {
   border-collapse: collapse;
   display: block;
   overflow-x: auto;
@@ -1218,13 +1223,16 @@
 }
 
 .assistant-message-content th,
-.assistant-message-content td {
+.assistant-message-content td,
+.ask-answer-body th,
+.ask-answer-body td {
   border: 1px solid var(--as-hairline);
   padding: 4px 8px;
   text-align: left;
 }
 
-.assistant-message-content th {
+.assistant-message-content th,
+.ask-answer-body th {
   background: var(--as-inset-bg);
   font-weight: 600;
 }
@@ -1489,6 +1497,580 @@
   background: var(--as-raise);
 }
 
+/* =========================================================================
+ * The quick ask — one surface in two shapes
+ *
+ * A question opens the talking bar; the finished answer unfolds it into the
+ * card. The window is transparent and already the right size by the time any of
+ * this runs (Rust resizes first, then emits `assistant-ask-frame`), so every
+ * pixel of the motion below is drawn by the compositor and none of it is a
+ * native resize the user can see.
+ *
+ * The surface is one element whose height and corner radius travel; the bar and
+ * the card are two layers inside it that cross-fade. That is what keeps the
+ * rounded edge continuous — swapping one element for another cannot morph an
+ * edge — and it is also what lets the card be measured before it is ever shown,
+ * since it is in the DOM, at full width, the whole time.
+ * ========================================================================= */
+
+/* Keep `--ask-pill-w` / `--ask-pill-h` in sync with `ASK_PILL_WIDTH` /
+ * `ASK_PILL_HEIGHT` in `assistant.rs`, and `--ask-pill-exit` with
+ * `ASK_PILL_EXIT_MS` (Rust deliberately waits slightly longer than the fade, so
+ * the window never changes shape before the last frame of it). `--ask-h` is set
+ * inline from the height Rust reports.
+ *
+ * The transition here is a CROSS-FADE, and that is the whole reason the pill is
+ * allowed to be pill sized. The previous version morphed one surface's height,
+ * which is only seamless while the two shapes share a footprint — so the "pill"
+ * had to be as wide as the card and as tall as a toolbar. Fading one shape out
+ * and the other in has no such requirement: the window is free to change size,
+ * position and dock zone in the gap, because at that moment there is nothing on
+ * screen to be seen changing. */
+.ask-stage {
+  --ask-pill-h: 56px;
+  --ask-h: var(--ask-pill-h);
+  --ask-pill-exit: 140ms;
+  --ask-card-in: 320ms;
+  /* Fast off the mark, then an unhurried settle. Nothing overshoots — a bounce
+     reads as sloppy at this size, where the eye is on the text arriving rather
+     than on the frame. */
+  --ask-ease: cubic-bezier(0.16, 0.84, 0.24, 1);
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+}
+
+/* A bare container. Each layer carries its own background, border and radius,
+   which is what makes the cross-fade complete: if the frame were drawn out here
+   it would survive the fade and the lozenge would visibly pop into a rectangle
+   with nothing inside it. */
+.ask-surface {
+  position: absolute;
+  inset: 0;
+}
+
+.ask-layer {
+  position: absolute;
+  top: 0;
+}
+
+/* A centring frame, not a shape. The pill inside hugs its own content — exactly
+   as `.overlay-root` does for the dictation pill — so listening, transcribing and
+   searching can be different widths without the window resizing between them. The
+   frame is generous and transparent; only the pill is visible. */
+.ask-layer.pill {
+  inset-inline: 0;
+  height: var(--ask-pill-h);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 6px;
+  box-sizing: border-box;
+  opacity: 1;
+  transition:
+    opacity var(--ask-pill-exit) ease-in,
+    transform var(--ask-pill-exit) ease-in;
+}
+
+/* Shrinking very slightly as it goes reads as the pill handing over rather than
+   simply being switched off. */
+.ask-stage.leaving .ask-layer.pill,
+.ask-stage.card .ask-layer.pill {
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0.96);
+}
+
+.ask-layer.card {
+  inset-inline: 0;
+  height: var(--ask-h);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  opacity: 0;
+  pointer-events: none;
+  /* Zooms open from noticeably small, about its own middle, so the card reads as
+     the pill opening out rather than a new window appearing. This is the only
+     motion in the whole transition, so it is allowed to be the thing the user
+     actually sees — an earlier 0.96 was so slight that the card looked like it had
+     simply cut in, which is what made the arrival feel abrupt rather than
+     satisfying. It stops exactly at 1: nothing overshoots, because a bounce on a
+     surface carrying text to read is motion competing with the reading. */
+  transform: scale(0.9);
+  transform-origin: 50% 45%;
+  transition:
+    opacity 120ms ease-in,
+    transform 120ms ease-in;
+}
+
+.ask-stage.card .ask-layer.card {
+  opacity: 1;
+  pointer-events: auto;
+  transform: none;
+  transition:
+    opacity calc(var(--ask-card-in) * 0.65) ease-out,
+    transform var(--ask-card-in) var(--ask-ease);
+}
+
+/* One measurement, and only in a layout pass: the card is let go of its pinned
+   height so it can report what it actually wants (see the `useLayoutEffect` in
+   `AssistantPanel.tsx`). `overflow-y: scroll` keeps the body's gutter reserved
+   during the measurement, so the width the answer wraps to is the same one it
+   will wrap to afterwards. */
+.ask-layer.card.measuring {
+  height: auto;
+}
+
+.ask-layer.card.measuring .ask-card,
+.ask-layer.card.measuring .ask-answer-body {
+  flex: 0 0 auto;
+}
+
+.ask-layer.card.measuring .ask-answer-body {
+  overflow-y: scroll;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ask-layer.pill,
+  .ask-layer.card,
+  .ask-stage.leaving .ask-layer.pill,
+  .ask-stage.card .ask-layer.pill,
+  .ask-stage.card .ask-layer.card {
+    transition-duration: 1ms;
+    transition-delay: 0s;
+  }
+
+  .ask-layer.pill {
+    transform: none;
+  }
+
+  .ask-layer.card {
+    transform: none;
+  }
+}
+
+/* ---------- The talking pill ---------- */
+
+/*
+ * Deliberately a mirror of `.overlay-pill` in `RecordingOverlay.css`: the same
+ * height, radius, fill, hairline and inner highlight. It is the same gesture as
+ * dictation, so it is the same object — and two visual languages for one gesture
+ * is a cost paid on every use. If either side of this pair changes, change both.
+ *
+ * The pill hugs its content and floats centred in a transparent frame, which is
+ * what lets listening, transcribing and searching be different widths with no
+ * window resize between them.
+ */
+.ask-pill {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  max-width: 100%;
+  padding: 0 11px;
+  box-sizing: border-box;
+  border-radius: 999px;
+  background: rgba(24, 22, 20, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 0 0 0.5px rgba(0, 0, 0, 0.45);
+  color: #f5f5f4;
+  /* The pill moves the window. A nudge is harmless because a drop re-settles into
+     a dock zone, so this needs no long-press guard. */
+  cursor: grab;
+}
+
+/* A written state explains itself or it is noise, so it gets the wider, softer
+   frame — the same trade `.overlay-pill.labeled` makes. */
+.ask-pill.labeled {
+  height: auto;
+  min-height: 34px;
+  padding: 7px 8px 7px 11px;
+  border-radius: 18px;
+}
+
+/* The halo: the quietest available way to say "assistant, not dictation" without
+   a second shape or a second colour. Sits behind the pill, cannot be clicked, and
+   is a single soft bloom rather than a glow on the edge — an edge glow at this
+   size reads as a focus ring.
+   `z-index: -1` puts it behind the pill's own opaque fill, so only the part that
+   spills past the lozenge is ever visible. The inset stays inside the frame's
+   clearance (34px pill in a 56px frame leaves 11px), because `.ask-stage` clips
+   its overflow and a hard cut through a glow is worse than no glow. */
+.ask-pill::before {
+  content: "";
+  position: absolute;
+  inset: -9px;
+  border-radius: inherit;
+  background: radial-gradient(
+    62% 130% at 16% 50%,
+    rgba(255, 214, 148, 0.2),
+    rgba(255, 214, 148, 0) 72%
+  );
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* The mark says both "this is the assistant" and "this is what it is doing".
+   It changes with the state, which is the whole reason it earns its place. */
+.ask-pill-mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  color: rgba(255, 214, 148, 0.92);
+}
+
+.ask-pill.labeled .ask-pill-mark {
+  align-self: flex-start;
+}
+
+/* One width for the waveform *and* the progress sweep, because they replace each
+   other mid-action: 54px each, as `.pill-wave` is next door. Two different widths
+   here is exactly how the pill used to change size while it worked. */
+.ask-pill-indicator {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  width: 54px;
+}
+
+/* Matches `.pill-label`. Only a failure reaches this now — every working state is
+   a glyph and a sweep, with the words carried by `aria-label` for anyone who needs
+   them read out. */
+.ask-pill-label {
+  min-width: 0;
+  font-size: 11.5px;
+  line-height: 16px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: rgba(245, 245, 244, 0.92);
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+
+.ask-pill-label.error {
+  font-weight: 400;
+  color: var(--as-error);
+}
+
+.ask-pill-input {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  height: 20px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-family: inherit;
+  font-size: 12.5px;
+  letter-spacing: 0.01em;
+  color: #f5f5f4;
+}
+
+.ask-pill-input::placeholder {
+  color: rgba(245, 245, 244, 0.45);
+}
+
+.ask-pill-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(245, 245, 244, 0.85);
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    background 0.15s ease;
+}
+
+.ask-pill-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.18);
+  color: #f5f5f4;
+}
+
+.ask-pill-btn.primary {
+  background: #f5f5f4;
+  color: #18160f;
+}
+
+.ask-pill-btn.quiet {
+  background: transparent;
+  color: rgba(245, 245, 244, 0.55);
+}
+
+.ask-pill-btn.quiet:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  color: #f5f5f4;
+}
+
+.ask-pill-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.ask-pill-btn:focus-visible {
+  outline: 2px solid rgba(255, 214, 148, 0.8);
+  outline-offset: 2px;
+}
+
+/* ---------- The answer card ---------- */
+/*
+   No title bar, no caption over the answer, no box around it. The card used to
+   be a sparkle glyph and the word "Answer" above a bordered panel, inside
+   another bordered panel, inside the window's own border — three nested frames
+   labelling the one thing on screen that could not be anything else. What is
+   left is the question you asked, the answer, and what you can do with it.
+*/
+
+.ask-card {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  /* Its own frame, for the same reason the pill has one: the cross-fade has to
+     take the frame with it, so neither shape may inherit one from the container
+     they share. */
+  border-radius: 18px;
+  background: var(--as-panel-surface);
+  backdrop-filter: blur(22px) saturate(1.4);
+  -webkit-backdrop-filter: blur(22px) saturate(1.4);
+  border: 1px solid var(--as-hairline);
+  box-shadow: var(--as-inner);
+}
+
+.ask-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-shrink: 0;
+  min-height: 40px;
+  padding: 10px 10px 4px 16px;
+  cursor: grab;
+}
+
+.ask-head-icon {
+  flex-shrink: 0;
+  color: var(--as-faint);
+}
+
+.ask-head-spacer {
+  flex: 1;
+}
+
+/* Capped at one line. The question is context for the answer, not the content —
+   the user said it a second ago, so it does not need to be re-read in full, and
+   giving it two lines pushed the answer down the card. */
+.ask-question-text {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.005em;
+  color: var(--as-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ask-selection-chip {
+  flex-shrink: 0;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--as-raise);
+  color: var(--as-muted);
+  font-size: 10px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.ask-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  margin-inline-start: auto;
+}
+
+/* The actions stay visible rather than appearing on hover. Copy and Insert are
+   the whole point of the card — hiding them behind a hover made them
+   undiscoverable, and a keyboard user could not reach them at all. */
+.ask-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--as-muted);
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    background 0.15s ease;
+}
+
+.ask-action:hover {
+  color: var(--as-ink);
+  background: var(--as-raise);
+}
+
+.ask-action.close:hover {
+  color: var(--as-error);
+}
+
+/* Insert carries its word. It is the one action that does something outside this
+   window — it writes the answer back where you were typing — and as a bare
+   corner-arrow glyph next to a copy glyph, nobody could tell which was which
+   without hovering both. Copy stays iconic: everyone already knows that one. */
+.ask-action.labelled {
+  width: auto;
+  gap: 5px;
+  padding: 0 10px 0 8px;
+  height: 26px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--as-body);
+  background: var(--as-raise);
+}
+
+.ask-action.labelled:hover {
+  background: var(--as-ink);
+  color: var(--as-panel-surface);
+}
+
+.ask-action:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 1px;
+}
+
+.ask-answer-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 2px 16px 12px;
+  font-size: var(--as-msg-font, 14.5px);
+  line-height: 1.7;
+  /* Body copy sits one step below the panel's brightest ink, and both of the
+     reasons are about reading rather than taste. Near-white on near-black is
+     about 15:1, far past what any guideline asks for, and at that ratio light
+     glyphs bloom into the background on an LCD — the text looks slightly soft
+     and tiring without looking obviously wrong, which is exactly how it gets
+     reported ("hard to read, I don't know why"). Dropping to --as-body keeps
+     ~13:1, comfortably above AAA, and matches the thread view, which was
+     already the more readable of the two surfaces. Emphasis and headings still
+     step up to --as-ink below, so the hierarchy gets brighter rather than the
+     paragraph. */
+  color: var(--as-body);
+  /* `anywhere` also feeds min-content sizing, so it will split an ordinary word
+     mid-glyph even when the line had somewhere to wrap. `break-word` only breaks
+     a token that genuinely cannot fit, which is all a URL or a hash needs. */
+  overflow-wrap: break-word;
+  /* A reserved gutter, so an answer that grows past the card does not re-wrap
+     the moment its scrollbar appears — and so the height measured for it is the
+     height it keeps. */
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: var(--as-hairline-strong) transparent;
+  /* Cap the measure. The card is as wide as the panel, so at a standard size a
+     line of answer ran past 100 characters — roughly a third more than the eye
+     tracks comfortably, and the single biggest reason a well-contrasted answer
+     still felt like work to read. `ch` rather than px so the cap follows the
+     user's text size instead of fighting it, plus the horizontal padding so the
+     cap describes the text and not the box. The auto margins centre it, so a
+     wide window reads as a column instead of a lopsided block; a narrow one is
+     unaffected. Capping the container rather than each child keeps the markdown
+     margin rules below in charge of vertical rhythm. */
+  width: 100%;
+  max-width: calc(68ch + 32px);
+  margin-inline: auto;
+}
+
+.ask-answer-body::-webkit-scrollbar {
+  width: 3px;
+}
+
+.ask-answer-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.ask-answer-body::-webkit-scrollbar-thumb {
+  border-radius: 3px;
+  background: var(--as-hairline-strong);
+}
+
+.ask-answer-body > :first-child {
+  margin-block-start: 0;
+}
+
+.ask-answer-body > :last-child {
+  margin-block-end: 0;
+}
+
+.ask-waiting,
+.ask-empty,
+.ask-error {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--as-muted);
+}
+
+.ask-error {
+  color: var(--as-error);
+}
+
+/* Listening / transcribing inside an open card — only reachable on a follow-up,
+   since a first ask is still the bar at this point. */
+.ask-capture {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 72px;
+  padding: 12px 0 6px;
+  color: var(--as-muted);
+  font-size: 12.5px;
+}
+
+/* Sits under the answer, because it is about that answer. */
+.ask-notice {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0 16px 8px;
+  color: var(--as-faint);
+  font-size: 11px;
+}
+
+.ask-spin {
+  animation: apill-rotate 1s linear infinite;
+}
+
 /* ---------- Listening / transcribing (inline, panel expanded) ---------- */
 
 .assistant-listening {
@@ -1650,33 +2232,16 @@
   background: var(--as-error-bg);
 }
 
-/* Drag-a-file-over-the-panel highlight. */
-.assistant-drop-hint {
-  position: absolute;
-  inset: 6px;
-  z-index: 5;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  border: 1.5px dashed var(--as-hairline-strong);
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--as-panel-surface) 82%, transparent);
-  color: var(--as-muted);
-  font-size: 12.5px;
-  font-weight: 500;
-  pointer-events: none;
-  animation: as-bubble-in 0.15s ease-out;
-}
-
 /* ---------- Input row ---------- */
 
+/* No top rule either, for the same reason the header has none: two horizontal
+   dividers turn a card into a window with a title bar and a status bar. The row
+   is short enough that the controls read as a group on their own. */
 .assistant-input-row {
   display: flex;
   align-items: center;
   gap: 5px;
-  padding: 9px 10px 11px;
-  border-top: 1px solid var(--as-hairline);
+  padding: 6px 10px 10px;
   flex-shrink: 0;
 }
 
@@ -1707,59 +2272,6 @@
   background: var(--as-ink);
   border-color: transparent;
   color: var(--as-panel-surface);
-}
-
-/* The Talk button carries a label, unlike its icon-only neighbours, because it
-   switches the card into a different mode rather than toggling an attachment.
-   Being the one worded control in the row is what makes the live conversation
-   discoverable at all — as an icon in the header it went unnoticed. */
-.assistant-talk-button {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  height: 30px;
-  padding: 0 10px;
-  flex-shrink: 0;
-  border: 1px solid var(--as-hairline);
-  border-radius: 9px;
-  background: transparent;
-  color: var(--as-muted);
-  font-size: 12px;
-  font-weight: 500;
-  white-space: nowrap;
-  cursor: pointer;
-  transition:
-    color 0.15s ease,
-    border-color 0.15s ease,
-    background 0.15s ease;
-}
-
-.assistant-talk-button:hover:not(:disabled) {
-  color: var(--as-ink);
-  background: var(--as-raise);
-  border-color: var(--as-ink);
-}
-
-.assistant-talk-button:disabled {
-  opacity: 0.45;
-  cursor: default;
-}
-
-/* On a narrow card the label is the first thing to go: the icon still says
-   "voice", and the tooltip carries the rest. Losing the whole button would put
-   the conversation back out of reach, which is the problem being fixed.
-
-   A media query rather than a container query: this webview's viewport *is* the
-   panel window, so the window's own width is exactly what needs measuring, and
-   nothing on this element's ancestor chain declares `container-type` (only
-   ConversationView.css does, for its own subtree). */
-@media (max-width: 420px) {
-  .assistant-talk-button span {
-    display: none;
-  }
-  .assistant-talk-button {
-    padding: 0 8px;
-  }
 }
 
 .assistant-input {
@@ -1815,6 +2327,32 @@
   cursor: default;
 }
 
+/* The cancel that sits next to the send button while a follow-up is being
+   spoken. Two filled circles side by side read as two equally-weighted choices;
+   only one of them is what the user came here to press. */
+.assistant-send-button.ghost {
+  background: transparent;
+  border: 1px solid var(--as-hairline);
+  color: var(--as-muted);
+}
+
+.assistant-send-button.ghost:hover:not(:disabled) {
+  color: var(--as-ink);
+  background: var(--as-raise);
+}
+
+/* Inside the answer card the row is a follow-up, not the main event: a hairline
+   above it separates it from the answer without boxing it in, and it sits flush
+   with the card's own padding. */
+.ask-layer.card .assistant-input-row {
+  padding: 8px 12px 12px;
+  border-top: 1px solid var(--as-hairline);
+}
+
+.ask-layer.card .assistant-attachments {
+  padding-inline: 12px;
+}
+
 /* ---------- Settings preview ----------
  * Renders real panel classes at a reduced footprint. Only layout is scoped
  * here; every colour/token comes from the shared scope above. */
@@ -1849,6 +2387,56 @@
   overflow-y: hidden;
 }
 
+/* The two shapes the real surface takes, drawn statically side by side. They
+ * borrow the panel's own classes so colour, opacity and text size can only ever
+ * be the live ones; only the positioning is preview-specific, because the real
+ * surface is absolutely placed inside a window this has no equivalent of. */
+.assistant-preview-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.assistant-preview-surface {
+  background: var(--as-panel-surface);
+  border: 1px solid var(--as-hairline);
+  border-radius: 18px;
+  box-shadow: var(--as-inner);
+  overflow: hidden;
+}
+
+.assistant-preview-surface.pill {
+  /* The pill draws its own lozenge and hugs its content, so the wrapper stands
+     back rather than framing it twice or stretching it. */
+  display: flex;
+  justify-content: center;
+  border: none;
+  background: none;
+  box-shadow: none;
+  border-radius: 999px;
+}
+
+.assistant-preview-surface .ask-pill {
+  cursor: default;
+}
+
+.assistant-preview-surface .ask-card {
+  /* Already framed by the wrapper here, unlike in the panel where the card is
+     the outermost shape. */
+  border: none;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.assistant-preview-surface .ask-head {
+  cursor: default;
+}
+
+.assistant-preview-surface .ask-answer-body {
+  overflow-y: hidden;
+}
+
 /* ---------- Reduced motion ---------- */
 
 @media (prefers-reduced-motion: reduce) {
@@ -1865,8 +2453,7 @@
   }
 
   .apill-spin,
-  .assistant-status-dot.busy,
-  .assistant-icon-button.pulsing,
+  .ask-spin,
   .typing-dot {
     animation: none;
   }

@@ -216,6 +216,18 @@ fn end_session(app: &AppHandle, expected_session: Option<u32>) {
         // call deliberately defers to here, so this is the only place a spoken
         // conversation can reach memory.
         assistant::distill_conversation_if_ended(app);
+        // And then the call takes its transcript with it.
+        //
+        // Without this, pressing End was the shortest route back to the bug this
+        // separation exists to kill. `end_session` cleared the ticket and left the
+        // window up, so the panel re-rendered as the quick-ask card fed from the
+        // same message list — the last thing said on the call appeared in the card
+        // the instant you hung up, and because the window was still visible the
+        // next quick ask counted as a follow-up and carried the whole call with
+        // it. Only the X escaped, because that hides the window.
+        //
+        // Distillation runs first, so memory still learns from the call.
+        assistant::reset_conversation_for_new_exchange(app);
     }
 }
 
@@ -301,6 +313,20 @@ pub async fn assistant_conversation_start(app: AppHandle) -> Result<VoiceTicket,
         s.carried_at = None;
         ticket
     };
+    // A call is its own conversation, so it starts from nothing.
+    //
+    // This is the other half of the quick-ask separation (see
+    // `assistant::should_reset_quick_ask`): the two features shared one message
+    // list, so a call opened after a few quick asks began with those asks as its
+    // history and answered its first utterance as though it were mid-thread. Same
+    // single cause, opposite direction.
+    //
+    // Deliberately *after* the ticket is claimed, which is the last point this
+    // function can still fail. Run any earlier and the "a conversation is already
+    // active" rejection would wipe the live call's history on its way out — and
+    // the frontend fires an unawaited `end()` immediately before `start()`, so
+    // that race is reachable rather than hypothetical.
+    assistant::reset_conversation_for_new_exchange(&app);
     // Voice has its own window size (see `assistant::enter_conversation_size`).
     // Do this with the ticket in hand so the orb view is never laid out inside
     // a window still sized for the message list.

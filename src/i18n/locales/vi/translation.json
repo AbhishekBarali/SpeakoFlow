@@ -422,10 +422,6 @@
           "assistant_vision": {
             "name": "Hỏi kèm màn hình",
             "description": "Hỏi bằng giọng nói kèm màn hình của bạn để trợ lý thấy được thứ bạn đang xem."
-          },
-          "assistant_panel_toggle": {
-            "name": "Hiện hoặc ẩn bảng",
-            "description": "Hiện hoặc ẩn bảng trợ lý nổi."
           }
         },
         "errors": {

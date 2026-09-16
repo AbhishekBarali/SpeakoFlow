@@ -422,10 +422,6 @@
           "assistant_vision": {
             "name": "Zeptat se s obrazovkou",
             "description": "Zeptejte se hlasem a přiložte svou obrazovku, aby asistent viděl, na co se díváte."
-          },
-          "assistant_panel_toggle": {
-            "name": "Zobrazit nebo skrýt panel",
-            "description": "Zobrazí nebo skryje plovoucí panel asistenta."
           }
         },
         "errors": {
