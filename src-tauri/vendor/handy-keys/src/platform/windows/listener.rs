@@ -10,10 +10,10 @@ use windows::Win32::Foundation::{HANDLE, LPARAM, LRESULT, WAIT_FAILED, WAIT_OBJE
 use windows::Win32::System::Threading::{CreateEventW, INFINITE};
 use windows::Win32::UI::WindowsAndMessaging::{
     CallNextHookEx, DispatchMessageW, MsgWaitForMultipleObjects, PeekMessageW, SetWindowsHookExW,
-    TranslateMessage, UnhookWindowsHookEx, KBDLLHOOKSTRUCT, LLKHF_EXTENDED, MSG, MSLLHOOKSTRUCT,
-    PM_REMOVE, QS_ALLINPUT, WH_KEYBOARD_LL, WH_MOUSE_LL, WM_KEYDOWN, WM_KEYUP, WM_LBUTTONDOWN,
-    WM_LBUTTONUP, WM_MBUTTONDOWN, WM_MBUTTONUP, WM_QUIT, WM_RBUTTONDOWN, WM_RBUTTONUP,
-    WM_SYSKEYDOWN, WM_SYSKEYUP, WM_XBUTTONDOWN, WM_XBUTTONUP,
+    TranslateMessage, UnhookWindowsHookEx, KBDLLHOOKSTRUCT, LLKHF_EXTENDED, LLKHF_INJECTED, MSG,
+    MSLLHOOKSTRUCT, PM_REMOVE, QS_ALLINPUT, WH_KEYBOARD_LL, WH_MOUSE_LL, WM_KEYDOWN, WM_KEYUP,
+    WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MBUTTONDOWN, WM_MBUTTONUP, WM_QUIT, WM_RBUTTONDOWN,
+    WM_RBUTTONUP, WM_SYSKEYDOWN, WM_SYSKEYUP, WM_XBUTTONDOWN, WM_XBUTTONUP,
 };
 
 use crate::error::{Error, Result};
@@ -197,6 +197,17 @@ unsafe extern "system" fn keyboard_hook_proc(code: i32, wparam: WPARAM, lparam: 
             let kb_struct = &*(lparam.0 as *const KBDLLHOOKSTRUCT);
             let vk_code = kb_struct.vkCode as u16;
             let is_extended = (kb_struct.flags.0 & LLKHF_EXTENDED.0) != 0;
+            let is_injected = (kb_struct.flags.0 & LLKHF_INJECTED.0) != 0;
+
+            // The host is synthesizing keystrokes right now, so this event is its
+            // own and must not be mistaken for the user's. Returning here leaves
+            // `should_block` false, so the injected key still reaches the target
+            // application — it is only withheld from hotkey matching. Modifier
+            // tracking is skipped too: our injected Ctrl release says nothing
+            // about whether the user is still holding Ctrl. See `injected.rs`.
+            if crate::injected::should_ignore_event(is_injected) {
+                return;
+            }
 
             let is_key_down = matches!(wparam.0 as u32, WM_KEYDOWN | WM_SYSKEYDOWN);
 

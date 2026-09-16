@@ -22,6 +22,28 @@ pub fn get_cursor_position(app_handle: &AppHandle) -> Option<(i32, i32)> {
     enigo.location().ok()
 }
 
+/// Withhold the keystrokes we are about to synthesize from global-hotkey
+/// matching, until the returned guard is dropped.
+///
+/// Every synthetic sequence in this module and in `clipboard.rs` opens one, and
+/// the reason is a bug that made hold-to-talk record nothing at all. The
+/// assistant harvests the focused app's selection with a synthetic Ctrl+C at
+/// recording start (see `selection.rs`). On Windows our own low-level keyboard
+/// hook sees that injected Ctrl key-up, and for a modifier-only hotkey like the
+/// default `Left Ctrl + Left Alt` it is indistinguishable from the user letting
+/// go — so the recording stopped roughly 30 ms after it started, every time.
+///
+/// [`conflicting_modifier_held`] was supposed to prevent exactly this and could
+/// not: it asks Windows whether Alt is down, and the hotkey engine had *blocked*
+/// that Alt key-down from ever reaching Windows.
+///
+/// The guard is a window rather than a blanket rule, so an external macro
+/// keyboard or accessibility tool that fires a registered hotkey still works.
+/// The keystrokes themselves are unaffected and still reach the target app.
+fn synthesizing() -> handy_keys::InjectedInputGuard {
+    handy_keys::ignore_injected_input()
+}
+
 /// Sends a Ctrl+V or Cmd+V paste command using platform-specific virtual key codes.
 /// This ensures the paste works regardless of keyboard layout (e.g., Russian, AZERTY, DVORAK).
 /// Note: On Wayland, this may not work - callers should check for Wayland and use alternative methods.
@@ -38,6 +60,7 @@ pub fn send_paste_ctrl_v(enigo: &mut Enigo) -> Result<(), String> {
     // must guarantee a matching release — even if clicking V fails — otherwise
     // the modifier (Ctrl/Cmd) is left "pressed" at the OS level, which shows up
     // as a key stuck down continuously.
+    let _injected = synthesizing();
     enigo
         .key(modifier_key, enigo::Direction::Press)
         .map_err(|e| format!("Failed to press modifier key: {}", e))?;
@@ -73,6 +96,7 @@ pub fn send_paste_ctrl_shift_v(enigo: &mut Enigo) -> Result<(), String> {
     // Hold modifier + Shift, click V, then release both. Any failure after a key
     // goes down must still release everything, or Ctrl/Shift can be left stuck
     // "pressed" at the OS level.
+    let _injected = synthesizing();
     enigo
         .key(modifier_key, enigo::Direction::Press)
         .map_err(|e| format!("Failed to press modifier key: {}", e))?;
@@ -113,6 +137,7 @@ pub fn send_paste_shift_insert(enigo: &mut Enigo) -> Result<(), String> {
 
     // Hold Shift, click Insert, then release Shift. Release even if the Insert
     // click fails, so Shift is never left stuck "pressed".
+    let _injected = synthesizing();
     enigo
         .key(Key::Shift, enigo::Direction::Press)
         .map_err(|e| format!("Failed to press Shift key: {}", e))?;
@@ -135,6 +160,7 @@ pub fn send_paste_shift_insert(enigo: &mut Enigo) -> Result<(), String> {
 /// Pastes text directly using the enigo text method.
 /// This tries to use system input methods if possible, otherwise simulates keystrokes one by one.
 pub fn paste_text_direct(enigo: &mut Enigo, text: &str) -> Result<(), String> {
+    let _injected = synthesizing();
     enigo
         .text(text)
         .map_err(|e| format!("Failed to send text directly: {}", e))?;
@@ -163,9 +189,22 @@ pub fn send_copy_combo(enigo: &mut Enigo) -> Result<(), String> {
     #[cfg(target_os = "linux")]
     let (modifier_key, c_key_code) = (Key::Control, Key::Unicode('c'));
 
-    enigo
-        .key(modifier_key, enigo::Direction::Press)
-        .map_err(|e| format!("Failed to press modifier key: {}", e))?;
+    let _injected = synthesizing();
+
+    // The user is very often already holding this exact modifier, because it is
+    // in both shipped Windows hotkeys (dictation is Left Ctrl + Left Super, the
+    // assistant is Left Ctrl + Left Alt) and this runs at recording start. Press
+    // and release it anyway and two things go wrong: the release desynchronises
+    // the OS from the key they are still physically holding, so the rest of their
+    // hold behaves as though Ctrl were up; and the keystroke is redundant, since
+    // their own Ctrl already supplies the modifier. So borrow theirs instead, and
+    // only release what we actually pressed.
+    let modifier_already_held = copy_modifier_held();
+    if !modifier_already_held {
+        enigo
+            .key(modifier_key, enigo::Direction::Press)
+            .map_err(|e| format!("Failed to press modifier key: {}", e))?;
+    }
 
     let click = enigo
         .key(c_key_code, enigo::Direction::Click)
@@ -175,11 +214,38 @@ pub fn send_copy_combo(enigo: &mut Enigo) -> Result<(), String> {
         std::thread::sleep(std::time::Duration::from_millis(30));
     }
 
+    if modifier_already_held {
+        return click;
+    }
+
     let release = enigo
         .key(modifier_key, enigo::Direction::Release)
         .map_err(|e| format!("Failed to release modifier key: {}", e));
 
     click.and(release)
+}
+
+/// Whether the user is already physically holding the modifier
+/// [`send_copy_combo`] would otherwise press for them.
+///
+/// Unlike the Alt/Super half of a hotkey, this modifier is reliably visible to
+/// the OS: a modifier-only combo is only matched (and therefore only blocked by
+/// the keyboard hook) once its *last* key goes down, so the first one — Ctrl in
+/// both shipped Windows defaults — was passed straight through.
+#[cfg(target_os = "windows")]
+fn copy_modifier_held() -> bool {
+    use windows::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_LCONTROL, VK_RCONTROL};
+    [VK_LCONTROL, VK_RCONTROL]
+        .iter()
+        .any(|key| unsafe { GetAsyncKeyState(key.0 as i32) as u16 & 0x8000 != 0 })
+}
+
+#[cfg(not(target_os = "windows"))]
+fn copy_modifier_held() -> bool {
+    // macOS copies with Cmd while its hotkeys use Option/Ctrl, and the Linux path
+    // prefers the X11 PRIMARY selection, which sends no keystroke at all. Neither
+    // has the collision this exists to avoid.
+    false
 }
 
 /// Whether the user is physically holding a modifier that would corrupt a
@@ -194,7 +260,17 @@ pub fn send_copy_combo(enigo: &mut Enigo) -> Result<(), String> {
 /// potentially eating the release that ends the recording.
 ///
 /// Ctrl is deliberately excluded: it is part of the combo being sent anyway, so
-/// the user holding it changes nothing.
+/// the user holding it changes nothing. [`send_copy_combo`] handles that case by
+/// borrowing the modifier they are already holding instead of cycling its own.
+///
+/// One blind spot, worth knowing before trusting this function: it asks the OS,
+/// and the OS does not know about a key the hotkey engine blocked. A modifier-only
+/// combo is matched and blocked on its *last* key, so with the assistant's
+/// `Left Ctrl + Left Alt` held, `GetAsyncKeyState(VK_LMENU)` answers "not down"
+/// and this returns false. That is why the synthetic copy still ran during a
+/// hold-to-talk recording, and why the injected keystrokes are now withheld from
+/// hotkey matching at the source (see [`synthesizing`]) rather than relying on
+/// this check alone.
 #[cfg(target_os = "windows")]
 pub fn conflicting_modifier_held() -> bool {
     use windows::Win32::UI::Input::KeyboardAndMouse::{
@@ -224,6 +300,7 @@ pub fn conflicting_modifier_held() -> bool {
 /// a key that isn't currently down is harmless, so it's always safe to clear
 /// them all after we're done synthesizing keystrokes.
 pub fn release_all_modifiers(enigo: &mut Enigo) {
+    let _injected = synthesizing();
     for key in [Key::Control, Key::Shift, Key::Alt, Key::Meta] {
         // Ignore errors: this is best-effort cleanup, and there's nothing useful
         // to do if a release fails.

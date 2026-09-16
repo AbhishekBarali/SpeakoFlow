@@ -607,6 +607,10 @@ fn paste_direct(
 }
 
 fn send_return_key(enigo: &mut Enigo, key_type: AutoSubmitKey) -> Result<(), String> {
+    // Same reason as every other synthetic sequence: our own keystrokes must not
+    // be matched against a global hotkey the user may be holding. See
+    // `input::synthesizing`.
+    let _injected = handy_keys::ignore_injected_input();
     match key_type {
         AutoSubmitKey::Enter => {
             enigo

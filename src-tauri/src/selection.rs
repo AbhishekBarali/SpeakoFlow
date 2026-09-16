@@ -45,10 +45,16 @@ use tauri::{AppHandle, Manager};
 /// This has to be a poll rather than the fixed sleeps the paste path uses. Those
 /// run in the outbound direction (we write, the app reads) and 60 ms is plenty.
 /// A harvest is inbound: the target has to pump its message loop, run its copy
-/// handler and publish to the clipboard. Electron, Java, and anything over
-/// RDP/Citrix sit in the tail. A single fixed sleep is either too short for them
-/// or too slow for everyone else.
-const CAPTURE_BUDGET: Duration = Duration::from_millis(400);
+/// handler and publish to the clipboard.
+///
+/// Kept deliberately short. This runs on every assistant press, and when nothing
+/// is selected — the common case — the full budget is always spent, because "no
+/// selection" and "the app is being slow" look identical from here. A generous
+/// budget therefore buys a rare success at the cost of holding a background thread
+/// and the synthetic-input lock on every single invocation. 250 ms covers ordinary
+/// native and Electron apps; something slower than that loses its selection this
+/// time and the user can ask again.
+const CAPTURE_BUDGET: Duration = Duration::from_millis(250);
 
 /// Gap between clipboard checks while waiting for the copy to land.
 const POLL_INTERVAL: Duration = Duration::from_millis(15);
