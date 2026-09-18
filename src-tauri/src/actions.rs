@@ -2082,6 +2082,11 @@ impl ShortcutAction for TranscribeAction {
         // ever reaches whatever holds keyboard focus at the moment it is sent.
         crate::input::remember_paste_target();
 
+        // Abandon any correction watch still running from the previous dictation. The
+        // field it was reading is no longer the one that matters, and watching two at
+        // once would attribute one field's edit to the other's transcript.
+        crate::autolearn::learner::cancel(app);
+
         // Route the transcript: an in-app dictation (the Create-with-AI persona
         // box uses source "in-app") delivers its text to the webview via an
         // event; every other dictation pastes into the focused OS window as
@@ -2687,10 +2692,23 @@ impl ShortcutAction for TranscribeAction {
                                         return;
                                     }
                                     match utils::paste(final_text.clone(), ah_clone.clone()) {
-                                        Ok(()) => debug!(
-                                            "Text pasted successfully in {:?}",
-                                            paste_time.elapsed()
-                                        ),
+                                        Ok(()) => {
+                                            debug!(
+                                                "Text pasted successfully in {:?}",
+                                                paste_time.elapsed()
+                                            );
+                                            // Watch the field for a correction, so a
+                                            // word the user fixes by hand is learned.
+                                            // Only on the success path, and only here:
+                                            // the target still has keyboard focus at
+                                            // this moment, which is what makes the
+                                            // right control findable. A no-op unless
+                                            // the user turned the setting on.
+                                            crate::autolearn::learner::watch_after_paste(
+                                                &ah_clone,
+                                                &final_text,
+                                            );
+                                        }
                                         Err(e) => {
                                             error!("Failed to paste transcription: {}", e);
                                             let _ = ah_clone.emit("paste-error", ());

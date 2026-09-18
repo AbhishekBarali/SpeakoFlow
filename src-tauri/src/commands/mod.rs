@@ -1,7 +1,9 @@
 pub mod assistant;
 pub mod audio;
+pub mod autolearn;
 pub mod history;
 pub mod local_llm;
+pub mod meetings;
 pub mod memory;
 pub mod models;
 pub mod stt_cloud;

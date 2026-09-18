@@ -26,6 +26,7 @@
     "general": "General",
     "dictation": "Dictation",
     "assistant": "Assistant",
+    "meetings": "Meetings",
     "history": "History",
     "about": "About",
     "debug": "Debug",
@@ -44,6 +45,7 @@
     "general": "Shortcuts, your microphone, and how the app looks.",
     "dictation": "The model that turns your voice into text, and how it's cleaned up.",
     "assistant": "Set up the assistant, then tune its voice, screen vision, and web search.",
+    "meetings": "Record a call, read it back split by speaker, and turn it into notes.",
     "history": "Your recent dictations, Flow generations, and assistant chats, stored on this device.",
     "about": "Version, app language, data locations, and credits.",
     "debug": "Diagnostics and developer tools."
@@ -726,6 +728,18 @@
         "empty": "No custom words yet.",
         "remove": "Remove {{word}}",
         "duplicate": "\"{{word}}\" already exists"
+      },
+      "autoLearn": {
+        "label": "Learn words I correct",
+        "description": "When you fix a word SpeakoFlow got wrong, it remembers your spelling for next time. To do that it reads the text field you just dictated into, for about a minute afterwards.",
+        "info": "Only the field SpeakoFlow just typed into, and only for a minute. Nothing is uploaded — the text is compared with the transcript on your machine and discarded. Every word it picks up is listed below so you can check it.",
+        "unsupported": "Learning from corrections is only available on Windows so far. You can still add words by hand above.",
+        "learnedTitle": "Learned from your corrections",
+        "learnedEmpty": "Nothing learned yet. Fix a misheard word in the app you dictated into and it appears here.",
+        "keep": "Keep {{word}} in my custom words",
+        "remove": "Forget {{word}}",
+        "clearAll": "Forget all",
+        "reviewHint": "These are guesses. Tick one to move it into your own custom words, or remove it. The oldest are dropped past {{max}}."
       },
       "textReplacements": {
         "title": "Text replacements",
@@ -1546,6 +1560,167 @@
     "portableUpdateTitle": "Manual update required",
     "portableUpdateMessage": "Portable installs cannot be updated automatically. To update: download the latest NSIS installer from GitHub Releases, install it to the same folder, then copy your Data/ folder (settings, models, recordings) from the old version to the new one.",
     "portableUpdateButton": "Open GitHub Releases"
+  },
+  "meetings": {
+    "newTitle": "Meeting {{when}}",
+    "speakers": {
+      "me": "You",
+      "others": "Others",
+      "numbered": "Speaker {{number}}"
+    },
+    "recorder": {
+      "idleTitle": "Record a meeting",
+      "idleCaption": "Captures your microphone and the other participants as two separate streams.",
+      "recording": "Recording",
+      "paused": "Paused",
+      "liveCaption": "Transcribing as people speak.",
+      "start": "Start recording",
+      "starting": "Starting…",
+      "stop": "Stop",
+      "stopping": "Stopping…",
+      "stoppingHint": "Finishing the transcript. This can take a moment on a long meeting.",
+      "pause": "Pause",
+      "resume": "Resume",
+      "transcriptEmpty": "Nothing transcribed yet. It appears here as people speak."
+    },
+    "offer": {
+      "detected": "You seem to be on a call. Record it?",
+      "detectedApp": "{{app}} seems to be in a call. Record it?",
+      "record": "Record this call",
+      "dismiss": "Not this time"
+    },
+    "autoDetect": {
+      "title": "Offer to record calls",
+      "description": "Notices when another app is using your microphone and asks whether to record. It never starts on its own, and a call it guesses wrong about costs one dismissed card.",
+      "unsupported": "Call detection is only available on Windows so far. On this system, start a meeting yourself."
+    },
+    "pill": {
+      "expand": "Show the live transcript",
+      "collapse": "Collapse",
+      "listening": "Listening. What people say appears here.",
+      "micOnly": "Only your microphone is being captured — nothing the other participants say will be in this transcript."
+    },
+    "ask": {
+      "placeholder": "Ask anything about this meeting…",
+      "send": "Ask",
+      "stop": "Stop",
+      "thinking": "Reading the transcript…",
+      "title": "Ask about this meeting",
+      "empty": "Ask what was decided, who owns what, or anything else that came up.",
+      "clear": "Clear these questions",
+      "youAsked": "You asked"
+    },
+    "systemAudio": {
+      "liveTitle": "Only your voice is being recorded",
+      "liveBody": "System audio could not be captured, so this meeting will contain your side of the conversation and nothing the other participants said.",
+      "unavailableTitle": "The other participants cannot be recorded on this machine",
+      "unavailableBody": "System audio capture is unavailable, so a meeting recorded now would contain only your own voice.",
+      "help": "Setup help"
+    },
+    "list": {
+      "title": "Recorded meetings",
+      "emptyTitle": "No meetings yet",
+      "emptyHint": "Start recording before a call and SpeakoFlow keeps the transcript, split by who was speaking.",
+      "loadMore": "Load more",
+      "speakers_one": "{{count}} speaker",
+      "speakers_other": "{{count}} speakers",
+      "hasNotes": "Notes generated"
+    },
+    "status": {
+      "recording": "Recording",
+      "processing": "Processing",
+      "complete": "Complete",
+      "interrupted": "Interrupted"
+    },
+    "delete": {
+      "action": "Delete meeting",
+      "whileRecording": "Stop the recording before deleting this meeting."
+    },
+    "detail": {
+      "title": "Meeting",
+      "rename": "Rename meeting",
+      "gone": "This meeting has been deleted.",
+      "tabsLabel": "Meeting views"
+    },
+    "tabs": {
+      "myNotes": "My thoughts",
+      "transcript": "Transcript",
+      "summary": "Summary",
+      "ask": "Ask"
+    },
+    "myNotes": {
+      "description": "Type what matters to you. It is merged with the transcript when notes are generated.",
+      "placeholder": "What you want to remember from this meeting…",
+      "saving": "Saving…",
+      "saved": "Saved"
+    },
+    "transcript": {
+      "empty": "This meeting has no transcript.",
+      "loadingMore": "Loading more of the transcript…",
+      "renameSpeaker": "Rename this speaker",
+      "lowConfidence": "Uncertain",
+      "lowConfidenceHelp": "This speaker label is a guess. The words are transcribed as spoken; only who said them is uncertain."
+    },
+    "diarize": {
+      "title": "Tell the speakers apart",
+      "ready": "Group the other participants into Speaker 1, Speaker 2, and so on.",
+      "needsModel": "Needs a one-time {{size}} MB download. It then runs on your machine, and every later meeting is labelled automatically.",
+      "install": "Download and identify",
+      "downloading": "Downloading…",
+      "identify": "Identify speakers",
+      "running": "Listening…",
+      "progress": "Comparing voices, {{done}} of {{total}} passages.",
+      "oneSpeaker": "Only one other voice was on this call, so there is nobody to tell apart.",
+      "skipped": {
+        "modelNotInstalled": "The speaker model is not installed yet.",
+        "noSystemAudio": "This meeting has no recording of the other participants.",
+        "audioUnreadable": "The recording of the other participants could not be read. This happens when the app was closed mid-meeting.",
+        "tooFewSegments": "There is not enough speech from the other participants to compare.",
+        "alreadyDone": "The speakers in this meeting have already been identified.",
+        "modelUnusable": "The speaker model could not be loaded, so it has been removed. Download it again."
+      }
+    },
+    "summary": {
+      "template": "Template",
+      "templates": {
+        "general": "General",
+        "standup": "Standup",
+        "one_on_one": "One-on-one",
+        "interview": "Interview",
+        "action_items": "Action items"
+      },
+      "templateHints": {
+        "general": "Summary, decisions, action items and open questions. The default.",
+        "standup": "Grouped by person: what they finished, what is next, what is blocking them.",
+        "one_on_one": "Topics, feedback, and what each person committed to.",
+        "interview": "Evidence about the candidate, with no verdict.",
+        "action_items": "Nothing but the tasks, split into yours and everyone else's."
+      },
+      "generate": "Generate notes",
+      "regenerate": "Generate again",
+      "rewrite": "Rewrite with a different template",
+      "generating": "Writing notes…",
+      "writing": "Writing the notes for this meeting. This takes a moment on a long call.",
+      "autoCaption": "These notes were written automatically when the call ended.",
+      "retryCaption": "The notes for this meeting have not been written yet.",
+      "failed": "The notes could not be written: {{error}}",
+      "empty": "No notes for this meeting yet.",
+      "needsTranscript": "There is no transcript to summarize.",
+      "skipped_one": "One part of the transcript could not be summarized, so these notes have a gap in them.",
+      "skipped_other": "{{count}} parts of the transcript could not be summarized, so these notes have gaps in them."
+    },
+    "errors": {
+      "startFailed": "Couldn't start the meeting: {{error}}",
+      "stopFailed": "Couldn't stop the meeting: {{error}}",
+      "pauseFailed": "Couldn't change the recording: {{error}}",
+      "loadFailed": "Couldn't load meetings: {{error}}",
+      "transcriptFailed": "Couldn't load the transcript: {{error}}",
+      "deleteFailed": "Couldn't delete the meeting: {{error}}",
+      "renameFailed": "Couldn't rename the meeting: {{error}}",
+      "renameSpeakerFailed": "Couldn't rename the speaker: {{error}}",
+      "notesSaveFailed": "Couldn't save your notes: {{error}}",
+      "generateFailed": "Couldn't generate notes: {{error}}"
+    }
   },
   "common": {
     "loading": "Loading…",

@@ -1276,6 +1276,39 @@ pub struct AppSettings {
     pub log_level: LogLevel,
     #[serde(default)]
     pub custom_words: Vec<String>,
+    /// Offer to record when a call appears to be in progress.
+    ///
+    /// On by default. It is safe to default on because the detector's entire output
+    /// is a *question*: it has no route by which it could start recording, and
+    /// software that began recording a private conversation because it inferred one
+    /// was happening is software nobody should leave installed. If the inference is
+    /// wrong the cost is one dismissed card.
+    #[serde(default = "default_true")]
+    pub meeting_auto_detect: bool,
+    /// Learn a spelling when the user corrects a dictated word.
+    ///
+    /// **Off by default, and it must stay that way.** Unlike every other setting
+    /// here, turning this on means the app reads the contents of a text field in
+    /// another application — the one just dictated into — in order to notice that
+    /// "brali" became "Barali". That is worth doing, because a correction the user
+    /// already made is the highest-quality vocabulary signal available and it costs
+    /// them no extra interaction. But it is not something to enable on anyone's
+    /// behalf.
+    ///
+    /// Scope is deliberately narrow: only the field that was just pasted into, only
+    /// for a short window afterwards, and only single-word substitutions of words
+    /// that were in our own transcript. See `autolearn`.
+    #[serde(default)]
+    pub auto_learn_corrections: bool,
+    /// Words learned from corrections, newest last.
+    ///
+    /// Kept apart from [`Self::custom_words`] rather than merged into it, for two
+    /// reasons. The user's own list is theirs and an automatic process must not
+    /// silently grow it. And a learned word needs to be reviewable *as* a guess —
+    /// shown separately, removable individually, and clearable in one action — which
+    /// is impossible once it is indistinguishable from a word they typed in.
+    #[serde(default)]
+    pub learned_words: Vec<String>,
     /// Folders the user keeps their own models in. Each is scanned recursively
     /// and every `.gguf` / Whisper `.bin` found is registered as a catalog entry
     /// pointing at its real location — nothing is copied into the app's models
@@ -3508,6 +3541,9 @@ pub fn get_default_settings() -> AppSettings {
         debug_mode: false,
         log_level: default_log_level(),
         custom_words: Vec::new(),
+        meeting_auto_detect: true,
+        auto_learn_corrections: false,
+        learned_words: Vec::new(),
         model_folders: Vec::new(),
         spoken_emojis_enabled: false,
         replacements_enabled: false,
@@ -3837,6 +3873,65 @@ fn resolve_post_process_tone(settings: &AppSettings) -> (String, Option<String>)
     (DEFAULT_POST_PROCESS_TONE_ID.to_string(), None)
 }
 
+/// Resolve only the *brain*: which provider serves the request, under which
+/// model id, with which credential, and which of the two selections supplied it.
+///
+/// Extracted from [`resolve_post_process_config`] because meeting notes need the
+/// same answer and none of the rest of it. A cleanup prompt and a writing style
+/// describe how to rewrite one dictated sentence; meeting notes bring their own
+/// template. What must **not** diverge is this part — the "dedicated cleanup
+/// selection, else the assistant's" preference. Duplicating that rule is how a
+/// user ends up configuring a fourth brain and having a feature quietly use a
+/// different one than the readiness indicator claims.
+pub(crate) fn resolve_post_process_brain(
+    settings: &AppSettings,
+) -> Result<
+    (PostProcessProvider, String, String, PostProcessConfigSource),
+    PostProcessResolutionError,
+> {
+    if settings.post_process_providers.is_empty() {
+        return Err(PostProcessResolutionError {
+            reason: PostProcessUnavailableReason::NoProviders,
+            source: None,
+            provider_id: None,
+            provider_label: None,
+        });
+    }
+
+    let dedicated = resolve_post_process_candidate(
+        settings,
+        &settings.post_process_provider_id,
+        &settings.post_process_models,
+        PostProcessConfigSource::DedicatedCleanupSelection,
+    );
+
+    match dedicated {
+        Ok((provider, model, api_key)) => Ok((
+            provider,
+            model,
+            api_key,
+            PostProcessConfigSource::DedicatedCleanupSelection,
+        )),
+        Err(dedicated_error) => match resolve_post_process_candidate(
+            settings,
+            &settings.assistant_provider_id,
+            &settings.assistant_models,
+            PostProcessConfigSource::AssistantFallback,
+        ) {
+            Ok((provider, model, api_key)) => Ok((
+                provider,
+                model,
+                api_key,
+                PostProcessConfigSource::AssistantFallback,
+            )),
+            // The dedicated error is the one reported: it names the selection the
+            // user actually made, so the message points at the setting they need
+            // to fix rather than at a fallback they never chose.
+            Err(_) => Err(dedicated_error),
+        },
+    }
+}
+
 /// Resolve the exact provider, model, prompt, writing style, source, and
 /// credential for one cleanup attempt. Both runtime and settings readiness call
 /// this function; there is intentionally no equivalent ruleset in TypeScript.
@@ -3890,37 +3985,10 @@ pub(crate) fn resolve_post_process_config(
         (prompt.id.clone(), prompt.prompt.clone())
     };
 
-    let dedicated = resolve_post_process_candidate(
-        settings,
-        &settings.post_process_provider_id,
-        &settings.post_process_models,
-        PostProcessConfigSource::DedicatedCleanupSelection,
-    );
-
-    let (provider, model, api_key, source) = match dedicated {
-        Ok((provider, model, api_key)) => (
-            provider,
-            model,
-            api_key,
-            PostProcessConfigSource::DedicatedCleanupSelection,
-        ),
-        Err(dedicated_error) => match resolve_post_process_candidate(
-            settings,
-            &settings.assistant_provider_id,
-            &settings.assistant_models,
-            PostProcessConfigSource::AssistantFallback,
-        ) {
-            Ok((provider, model, api_key)) => (
-                provider,
-                model,
-                api_key,
-                PostProcessConfigSource::AssistantFallback,
-            ),
-            Err(_) => return Err(dedicated_error),
-        },
-    };
+    let (provider, model, api_key, source) = resolve_post_process_brain(settings)?;
 
     let (tone_id, tone_instruction) = resolve_post_process_tone(settings);
+
     // Derived from the model, never asked of the user: a cleanup fine-tune needs
     // less prompting than a general chat model, and which of the two you are
     // holding is a fact about the model.

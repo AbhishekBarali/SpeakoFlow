@@ -4,6 +4,7 @@ mod apple_intelligence;
 mod assistant;
 mod audio_feedback;
 pub mod audio_toolkit;
+mod autolearn;
 mod catalog;
 pub mod cli;
 mod clipboard;
@@ -14,6 +15,7 @@ mod huggingface;
 mod input;
 mod llm_client;
 mod managers;
+mod meetings;
 mod memory;
 mod overlay;
 mod overlay_lifecycle;
@@ -267,6 +269,93 @@ fn initialize_core_logic(app_handle: &AppHandle) {
     app_handle.manage(history_manager.clone());
     app_handle.manage(local_llm_manager.clone());
     app_handle.manage(managers::local_llm::CleanupLlm(cleanup_llm_manager.clone()));
+
+    // Meetings: its own SQLite store (never joined with dictation history) plus
+    // the recorder that owns the dual-stream capture lifecycle.
+    //
+    // Unlike the managers above this does NOT `expect`. Meetings are an additive
+    // feature; a store that fails to open must cost the user the meetings panel,
+    // not the app. When it fails, the state is simply never managed and every
+    // meetings command answers with Tauri's "state not managed" error while the
+    // real cause sits in the log right here.
+    match meetings::store::MeetingStore::new(app_handle) {
+        Ok(store) => {
+            let meeting_store = Arc::new(store);
+
+            // Exactly once, before anything reads the list. A row left in
+            // `recording` cannot be recording — this process just started — and
+            // showing it as live tells the user audio is being captured when it
+            // is not.
+            match meeting_store.reconcile_interrupted() {
+                Ok(0) => {}
+                Ok(count) => log::info!("Reconciled {} interrupted meeting(s)", count),
+                Err(e) => log::error!("Could not reconcile interrupted meetings: {}", e),
+            }
+
+            let meeting_recorder = Arc::new(meetings::session::MeetingRecorder::new(
+                app_handle.clone(),
+                meeting_store.clone(),
+            ));
+            app_handle.manage(meeting_store);
+            app_handle.manage(meeting_recorder);
+            // The question-and-answer thread for whichever meeting is open. Its
+            // own instance rather than the assistant's conversation: sharing one
+            // message list between two features is what put a whole call
+            // transcript into the assistant's quick-ask card.
+            app_handle.manage(Arc::new(meetings::chat::MeetingChat::new()));
+
+            // Notice when a call starts, and *offer* to record it.
+            //
+            // The watcher has no handle to the recorder and no route by which it
+            // could start a recording — that is a hard rule, documented at length
+            // in `call_detect`. Its whole output is a card the user accepts or
+            // dismisses, so defaulting it on is safe: a wrong guess costs one
+            // dismissal, while software that silently began recording a private
+            // conversation would be unacceptable however accurate it was.
+            //
+            // `is_recording` is read through the recorder's own state rather than
+            // captured as a bool, because the answer changes constantly and a
+            // stale one would offer to record a meeting already being recorded.
+            if meetings::call_detect::detection_supported() {
+                let watcher_app = app_handle.clone();
+                let recording_probe = app_handle.clone();
+                if let Some(watcher) = meetings::call_detect::CallWatcher::start(
+                    move || {
+                        recording_probe
+                            .try_state::<Arc<meetings::session::MeetingRecorder>>()
+                            .map(|recorder| recorder.is_recording())
+                            .unwrap_or(false)
+                    },
+                    move |observation| {
+                        // Checked here rather than inside the watcher so turning the
+                        // setting off takes effect immediately, without restarting a
+                        // thread or losing its debounce state.
+                        if !settings::get_settings(&watcher_app).meeting_auto_detect {
+                            return;
+                        }
+                        meetings::pill::show_call_offer(
+                            &watcher_app,
+                            observation.app_label().map(str::to_string),
+                        );
+                    },
+                ) {
+                    app_handle.manage(Arc::new(watcher));
+                }
+            }
+        }
+        Err(e) => log::error!(
+            "Meetings unavailable — could not open the meetings store: {}",
+            e
+        ),
+    }
+
+    // Auto-learn from corrections. Started unconditionally so the thread exists and a
+    // dictation can begin a watch the moment the user turns the setting on — the switch
+    // is read per dictation, not here. Answers `None` where a text field cannot be
+    // read, in which case nothing else in that module ever runs and the UI says so.
+    if let Some(watcher) = autolearn::learner::start(app_handle) {
+        app_handle.manage(watcher);
+    }
 
     // Enforce history retention at startup and then on a slow tick for as long
     // as the app runs.
@@ -919,6 +1008,38 @@ pub fn run(cli_args: CliArgs) {
             commands::memory::export_assistant_memory,
             commands::memory::import_assistant_memory,
             commands::memory::assistant_distill_memory_now,
+            commands::meetings::start_meeting,
+            commands::meetings::stop_meeting,
+            commands::meetings::set_meeting_paused,
+            commands::meetings::get_meeting_state,
+            commands::meetings::get_system_audio_status,
+            commands::meetings::list_meetings,
+            commands::meetings::get_meeting,
+            commands::meetings::get_meeting_segments,
+            commands::meetings::get_meeting_speakers,
+            commands::meetings::rename_meeting,
+            commands::meetings::rename_meeting_speaker,
+            commands::meetings::set_meeting_my_notes,
+            commands::meetings::generate_meeting_notes,
+            commands::meetings::delete_meeting,
+            commands::meetings::fit_meeting_pill,
+            commands::meetings::set_meeting_pill_expanded,
+            commands::meetings::get_meeting_pill_expanded,
+            commands::meetings::ask_about_meeting,
+            commands::meetings::get_meeting_chat,
+            commands::meetings::clear_meeting_chat,
+            commands::meetings::cancel_meeting_chat,
+            commands::meetings::get_diarization_status,
+            commands::meetings::download_diarization_model,
+            commands::meetings::diarize_meeting,
+            commands::meetings::dismiss_call_offer,
+            commands::meetings::accept_call_offer,
+            commands::meetings::get_call_detection_status,
+            commands::meetings::set_meeting_auto_detect,
+            commands::autolearn::get_auto_learn_status,
+            commands::autolearn::set_auto_learn_corrections,
+            commands::autolearn::set_learned_words,
+            commands::autolearn::keep_learned_word,
             helpers::clamshell::is_laptop,
         ])
         .events(collect_events![managers::history::HistoryUpdatePayload,]);

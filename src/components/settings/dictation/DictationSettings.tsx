@@ -19,6 +19,7 @@ import { AppendTrailingSpace } from "../AppendTrailingSpace";
 import { AutoSubmit } from "../AutoSubmit";
 import { AlwaysOnMicrophone } from "../AlwaysOnMicrophone";
 import { CustomWords } from "../CustomWords";
+import { AutoLearnCorrections } from "../AutoLearnCorrections";
 import { TextReplacements } from "../TextReplacements";
 
 /**
@@ -100,6 +101,7 @@ export const DictationSettings: React.FC = () => {
         <AutoSubmit grouped={true} />
         <AlwaysOnMicrophone grouped={true} />
         <CustomWords grouped={true} />
+        <AutoLearnCorrections grouped={true} />
         <TextReplacements grouped={true} />
       </SettingsGroup>
     </div>

@@ -2599,6 +2599,334 @@ async assistantDistillMemoryNow() : Promise<Result<null, string>> {
 }
 },
 /**
+ * Start recording a meeting and return its id.
+ * 
+ * `title` is supplied by the frontend so the default is localised (invariant 7
+ * of the meetings plan — an English default written here would escape
+ * i18next). A blank title falls back to the local start time, which carries no
+ * language at all, rather than to an English word.
+ * 
+ * `language` defaults to the app's configured transcription language, so the
+ * stored hint matches what the engine was actually asked to do instead of
+ * being null for every meeting.
+ * 
+ * Runs on the blocking pool: this opens the microphone and the loopback
+ * device, and device enumeration is not fast on any platform.
+ */
+async startMeeting(title: string | null, language: string | null) : Promise<Result<number, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("start_meeting", { title, language }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Stop the active recording and return the meeting id.
+ * 
+ * Marks the meeting complete once `stop()` returns. That is correct rather than
+ * premature: `stop()` flushes both chunkers and *joins* the transcription
+ * worker, so by the time it answers, every captured chunk has been transcribed
+ * and written. Leaving the row in `processing` would instead mean the next
+ * launch reconciled it to `interrupted` — telling the user a meeting they
+ * finished cleanly had crashed, purely because they never asked for notes.
+ * 
+ * Runs on the blocking pool because that worker join can take minutes on a long
+ * meeting with a queue behind it.
+ */
+async stopMeeting() : Promise<Result<number, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("stop_meeting") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Pause or resume the active recording.
+ * 
+ * Paused frames are dropped, not buffered, so this genuinely stops capturing
+ * rather than deferring it — which is what a user pausing a meeting means.
+ */
+async setMeetingPaused(paused: boolean) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_meeting_paused", { paused }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Current recording state, for a panel that just mounted.
+ * 
+ * The live path is the `meeting-state` event; this is how a window opened
+ * mid-meeting learns where things stand without waiting for the next change.
+ */
+async getMeetingState() : Promise<Result<MeetingState, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_meeting_state") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Whether the other participants can be captured on this machine.
+ * 
+ * Asked before recording starts, so the UI can warn that a meeting would
+ * capture only the user's own side — which is worth knowing *before* the call,
+ * not after it.
+ */
+async getSystemAudioStatus() : Promise<Result<SystemAudioStatus, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_system_audio_status") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Page through meetings, newest first.
+ */
+async listMeetings(limit: number | null, offset: number | null) : Promise<Result<PaginatedMeetings, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("list_meetings", { limit, offset }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * One meeting by id. `None` means it was deleted, which is not an error — a
+ * detail view opened from a stale list should show "gone", not a failure.
+ */
+async getMeeting(meetingId: number) : Promise<Result<Meeting | null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_meeting", { meetingId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * A page of transcript segments, oldest first.
+ * 
+ * Paginated because an hour of speech is on the order of a thousand segments:
+ * the response carries `total` so a virtualised list can size its scrollbar
+ * without having fetched the rest.
+ */
+async getMeetingSegments(meetingId: number, limit: number | null, offset: number | null) : Promise<Result<PaginatedSegments, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_meeting_segments", { meetingId, limit, offset }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Speakers known for a meeting, local user first.
+ * 
+ * Always non-empty for a meeting that started: the two channel-derived
+ * speakers are seeded at creation, so the UI has something to render and
+ * rename even for a meeting that produced no transcript.
+ */
+async getMeetingSpeakers(meetingId: number) : Promise<Result<MeetingSpeaker[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_meeting_speakers", { meetingId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Rename a meeting.
+ */
+async renameMeeting(meetingId: number, title: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("rename_meeting", { meetingId, title }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Give a speaker a display name for this meeting only.
+ * 
+ * Per-meeting on purpose: recognising the same voice across meetings needs a
+ * stored voice fingerprint, which is a privacy decision that deserves its own
+ * opt-in rather than arriving as a side effect of labelling one transcript.
+ */
+async renameMeetingSpeaker(meetingId: number, speakerKey: string, displayName: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("rename_meeting_speaker", { meetingId, speakerKey, displayName }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Save the user's own notes.
+ * 
+ * Blank is legitimate here — clearing your notes is an edit, not a mistake —
+ * so unlike a title this is stored as given after trimming.
+ */
+async setMeetingMyNotes(meetingId: number, notes: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_meeting_my_notes", { meetingId, notes }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Generate notes for a meeting and store them.
+ * 
+ * The template is the typed enum rather than a string, for the reason
+ * `update_recording_retention_period` documents: with a hand-written string
+ * match, specta advertised one spelling in `bindings.ts` while serde accepted
+ * another, and the mismatch was invisible until a call failed. `None` means the
+ * default template.
+ * 
+ * Deliberately awaited rather than fired off in the background. This is a
+ * sequence of LLM calls, all `.await`, so it never occupies a worker thread —
+ * and the frontend gets one promise that either resolves with notes or rejects
+ * with the reason, instead of having to correlate a completion event with the
+ * request that caused it. Progress, if the UI wants it, belongs in a later
+ * event rather than in a changed return shape.
+ * 
+ * `skipped_windows` in the result is not decoration: a two-hour meeting is nine
+ * calls and one provider hiccup must not discard the eight that worked, so the
+ * job continues and reports the hole rather than hiding it.
+ */
+async generateMeetingNotes(meetingId: number, template: NotesTemplate | null) : Promise<Result<GeneratedNotes, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("generate_meeting_notes", { meetingId, template }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Delete a meeting, its transcript, and its recorded audio.
+ * 
+ * The store commits the row deletion and returns the audio paths *without*
+ * touching them; unlinking is this command's job and happens strictly after
+ * the commit. Doing it the other way round is how a user ends up with a
+ * meeting that lists fine and opens to nothing.
+ * 
+ * A failed unlink is logged and does not fail the command. The record of truth
+ * is already gone: reporting failure would tell the user the meeting still
+ * exists when it does not, and there is nothing they could do differently. The
+ * residue is an orphaned WAV, which is a disk-space problem, not a data one.
+ */
+async deleteMeeting(meetingId: number) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("delete_meeting", { meetingId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Report the height the pill's content needs, so the window can take it.
+ * 
+ * An event would do as well, but a command keeps this beside the other meeting
+ * calls the pill makes and costs nothing extra — the pill already `invoke`s.
+ * Idempotent on the Rust side: the webview reports on every `ResizeObserver`
+ * callback, and a resize that triggers another measurement would oscillate.
+ */
+async fitMeetingPill(height: number) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("fit_meeting_pill", { height }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Expand the pill into the transcript card, or collapse it back.
+ * 
+ * The webview must blur its ask input *before* calling this with `false`:
+ * `set_focusable(false)` is not honoured for a window that currently holds
+ * focus, and a pill left focusable steals the caret from whatever the user
+ * types into next.
+ */
+async setMeetingPillExpanded(expanded: boolean) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_meeting_pill_expanded", { expanded }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Whether the pill is currently showing its expanded card.
+ * 
+ * Read from an atomic rather than from the window, so this is safe to call from
+ * the recording path — `window.is_visible()` is a blocking round-trip to the
+ * event loop.
+ */
+async getMeetingPillExpanded() : Promise<Result<boolean, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_meeting_pill_expanded") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Ask a question about one meeting and stream the answer.
+ * 
+ * Awaited rather than fired into the background, so the caller gets one promise
+ * that either resolves with the finished answer or rejects with a sentence to
+ * show. The streaming half arrives out of band on `meeting-chat-token`, with an
+ * authoritative full-thread snapshot on `meeting-chat-messages` at the end — the
+ * same contract the assistant panel renders from, and what makes duplicate
+ * listeners unable to duplicate a message.
+ */
+async askAboutMeeting(meetingId: number, question: string) : Promise<Result<string, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("ask_about_meeting", { meetingId, question }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * The question-and-answer thread for a meeting.
+ * 
+ * Switching meetings clears it, so opening a different meeting's detail view
+ * cannot show answers derived from another transcript.
+ */
+async getMeetingChat(meetingId: number) : Promise<Result<ChatMessage[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_meeting_chat", { meetingId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async clearMeetingChat() : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("clear_meeting_chat") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Stop a reply that is still streaming. Whatever already arrived is kept —
+ * dropping it would blank text the user is reading.
+ */
+async cancelMeetingChat() : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("cancel_meeting_chat") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * Stub implementation for non-macOS platforms
  * Always returns false since laptop detection is macOS-specific
  */
@@ -2974,7 +3302,21 @@ assistant_ask_anchor?: AskAnchor;
 /**
  * Which display the Ask surface opens on.
  * 
- * `"last_used"` (default), `"cursor"`, `"primary"`, or a monitor name.
+ * A free-form string rather than an enum, because the interesting values are
+ * the names of monitors that only exist at runtime:
+ * 
+ * * `"last_used"` (default) — the display it was last dragged to.
+ * * `"cursor"` — whichever display the mouse is on. This used to be the only
+ * behaviour and was not a choice: on a landscape-plus-portrait desk it made
+ * the panel change both its place and its shape depending on where the
+ * pointer happened to be resting, which reads as the panel wandering.
+ * * `"primary"` — always the primary display.
+ * * anything else — a monitor name (`\\.\DISPLAY2` on Windows), matched by
+ * name first so the choice follows the physical screen if the desktop is
+ * rearranged, with the stored origin as a fallback.
+ * 
+ * An unresolvable value degrades to `last_used` rather than failing, so
+ * unplugging the chosen screen leaves the panel reachable.
  */
 assistant_ask_display?: string; 
 /**
@@ -3060,24 +3402,6 @@ main_window_width?: number | null; main_window_height?: number | null }
  * snaps, that position is remembered and used instead. Set automatically by the
  * drag, not something the user picks from a list.
  */
-/**
- * A connected display, as the settings dropdown needs to describe it.
- */
-export type DisplayChoice = { 
-/**
- * The value stored in `assistant_ask_display`: the monitor's own name where it
- * has one, and its origin otherwise.
- */
-id: string; 
-/**
- * The monitor's name as the OS reports it, for building a readable label.
- */
-name: string; width: number; height: number; is_primary: boolean; 
-/**
- * True for the display the panel would open on right now, so the UI can say
- * which screen "last used" currently resolves to.
- */
-is_current: boolean }
 export type AskAnchor = 
 /**
  * Middle of the display the cursor is on. The default: easiest to read, and
@@ -3416,6 +3740,24 @@ export type ConversationPace =
  */
 export type CustomPostProcessTone = { id: string; name: string; instruction: string }
 export type CustomSounds = { start: boolean; stop: boolean }
+/**
+ * A connected display, as the settings dropdown needs to describe it.
+ */
+export type DisplayChoice = { 
+/**
+ * The value stored in `assistant_ask_display`: the monitor's own name where it
+ * has one, and its origin otherwise.
+ */
+id: string; 
+/**
+ * The monitor's name as the OS reports it, for building a readable label.
+ */
+name: string; width: number; height: number; is_primary: boolean; 
+/**
+ * True for the display the panel would open on right now, so the UI can say
+ * which screen "last used" currently resolves to.
+ */
+is_current: boolean }
 export type EngineType = "Whisper" | "Parakeet" | "Moonshine" | "MoonshineStreaming" | "SenseVoice" | "GigaAM" | "Canary" | "Cohere" | 
 /**
  * Native transcribe.cpp (ggml/GGUF) engine, added side-by-side with
@@ -3444,6 +3786,25 @@ export type FileAttachment = { name: string; content: string }
  * `set_assistant_characters`.
  */
 export type GeneratedCharacter = { name: string; prompt: string; greeting: string }
+/**
+ * The result of a notes job, including what went wrong but did not stop it.
+ */
+export type GeneratedNotes = { notes: string; 
+/**
+ * Id of the template that produced them, for `meetings.notes_template`.
+ */
+template_id: string; 
+/**
+ * Windows the transcript was split into.
+ */
+windows: number; 
+/**
+ * Windows whose summary call failed and were skipped.
+ * 
+ * Surfaced rather than swallowed: notes built from 6 of 9 windows are still
+ * worth having, and the user is entitled to know they have a hole in them.
+ */
+skipped_windows: number }
 /**
  * One compute device. `Deserialize` is needed by the Linux out-of-process
  * probe, which parses this back out of the child's JSON.
@@ -3551,6 +3912,134 @@ message: string }
 export type LocalModelImport = { added: ModelInfo[]; failed: LocalModelFailure[] }
 export type LogLevel = "trace" | "debug" | "info" | "warn" | "error"
 /**
+ * A meeting record without its transcript.
+ * 
+ * The transcript is deliberately absent: an hour-long meeting is thousands of
+ * segments, and the list view needs none of them. Segments are fetched per
+ * meeting, in pages, via [`store::MeetingStore::segments`].
+ */
+export type Meeting = { id: number; title: string; 
+/**
+ * Epoch seconds when recording started.
+ */
+started_at: number; 
+/**
+ * Epoch seconds when recording stopped; `None` while still recording.
+ */
+ended_at: number | null; status: MeetingStatus; 
+/**
+ * Recorded microphone audio, relative to the meetings audio directory.
+ */
+mic_file: string | null; 
+/**
+ * Recorded system audio, relative to the meetings audio directory.
+ */
+system_file: string | null; 
+/**
+ * The user's own notes, typed during or after the meeting. Merged with the
+ * transcript when generating notes — the thing that makes the output about
+ * what the user cared about rather than a flat summary.
+ */
+my_notes: string; 
+/**
+ * Generated notes (markdown). `None` until notes are produced.
+ */
+notes: string | null; 
+/**
+ * Which template produced [`Self::notes`].
+ */
+notes_template: string | null; 
+/**
+ * Language hint used for transcription.
+ */
+language: string | null; 
+/**
+ * Whether a diarization pass has completed for this meeting.
+ */
+diarized: boolean; 
+/**
+ * Number of transcript segments, so the list view can show length without
+ * loading the transcript.
+ */
+segment_count: number }
+/**
+ * One utterance in a meeting transcript.
+ */
+export type MeetingSegment = { id: number; meeting_id: number; 
+/**
+ * Which stream this came from. Never inferred.
+ */
+source: SpeakerSource; 
+/**
+ * Speaker key: `"me"`, `"them"`, or a diarization cluster such as
+ * `"spk_1"`. Never `NULL` in practice — the source always supplies a
+ * default — but nullable in the schema so a future pass can clear it.
+ */
+speaker_key: string | null; 
+/**
+ * Milliseconds from the start of the meeting.
+ */
+start_ms: number; end_ms: number; text: string; 
+/**
+ * Diarization confidence in `[-1, 1]`, when available. Low values should be
+ * shown de-emphasised rather than asserted: a confidently wrong speaker
+ * label is worse than a visibly uncertain one.
+ */
+confidence: number | null }
+/**
+ * A named speaker within one meeting.
+ * 
+ * Speaker names are per-meeting, not global. Recognising the same voice across
+ * meetings requires storing a voice fingerprint, which is a privacy decision
+ * that deserves its own opt-in rather than arriving as a side effect of
+ * labelling one transcript.
+ */
+export type MeetingSpeaker = { speaker_key: string; display_name: string; 
+/**
+ * True for the key representing the local user.
+ */
+is_me: boolean }
+/**
+ * Live recording state, mirrored to the UI.
+ */
+export type MeetingState = { meeting_id: number | null; status: MeetingStatus; paused: boolean; 
+/**
+ * Whether system audio is actually being captured. False means the
+ * transcript will contain only the user's side — worth surfacing loudly.
+ */
+system_audio: boolean; 
+/**
+ * Why system audio is unavailable, if it is.
+ */
+system_audio_error: string | null; elapsed_ms: number }
+/**
+ * How far along a meeting is.
+ * 
+ * [`MeetingStatus::Interrupted`] exists because the app can be killed
+ * mid-meeting. A meeting left in [`MeetingStatus::Recording`] when the process
+ * dies is not recording any more, and presenting it as though it were is how a
+ * user loses an hour of audio they believe is still being captured. Startup
+ * reconciles this (see [`store::MeetingStore::reconcile_interrupted`]).
+ */
+export type MeetingStatus = 
+/**
+ * Audio is being captured right now.
+ */
+"recording" | 
+/**
+ * Capture finished; transcription, diarization or notes still running.
+ */
+"processing" | 
+/**
+ * Everything finished.
+ */
+"complete" | 
+/**
+ * The app stopped while this meeting was recording. Whatever was already
+ * transcribed is intact and readable.
+ */
+"interrupted"
+/**
  * How sure we are about a remembered fact. Facts the user stated explicitly
  * are `High`; facts the model inferred from a conversation are `Low`. Feeds
  * pruning (low-confidence notes fade first) and injection ordering.
@@ -3643,6 +4132,41 @@ local_path: string | null;
 local_folder: string | null }
 export type ModelLoadStatus = { is_loaded: boolean; current_model: string | null }
 export type ModelUnloadTimeout = "never" | "immediately" | "min_2" | "min_5" | "min_10" | "min_15" | "hour_1" | "sec_15"
+/**
+ * A built-in note template.
+ * 
+ * Modelled on [`crate::settings::PostProcessTone`]: a stable string id for
+ * persistence, a `from_id` that answers `None` for anything unknown, and one
+ * instruction string per variant. Same reasons — the id is what lands in
+ * `meetings.notes_template` and in a settings JSON, so it must survive a rename
+ * of the Rust variant, and a template the app no longer ships must degrade to
+ * the default rather than fail the read.
+ * 
+ * No `label()`: user-facing names are localised on the frontend, keyed by id
+ * (i18next, per the meetings plan's invariant 7). An English label here would
+ * be a string that escapes translation.
+ */
+export type NotesTemplate = 
+/**
+ * What most meetings want: summary, decisions, actions, open questions.
+ */
+"general" | 
+/**
+ * Grouped per person, because that is what a standup is.
+ */
+"standup" | 
+/**
+ * Two people, private, commitments to each other.
+ */
+"one_on_one" | 
+/**
+ * Evidence about a candidate, deliberately without a verdict.
+ */
+"interview" | 
+/**
+ * Nothing but the tasks. The most-used shape after `General`.
+ */
+"action_items"
 export type OrtAcceleratorSetting = "auto" | "cpu" | "cuda" | "directml" | "rocm"
 export type OverlayPosition = "none" | "top" | "bottom"
 /**
@@ -3656,6 +4180,23 @@ export type OverlayPosition = "none" | "top" | "bottom"
 export type OverlayStyle = "auto" | "none" | "minimal" | "live"
 export type PaginatedAssistantHistory = { entries: AssistantHistoryEntry[]; has_more: boolean }
 export type PaginatedHistory = { entries: HistoryEntry[]; has_more: boolean }
+/**
+ * A page of meetings.
+ */
+export type PaginatedMeetings = { meetings: Meeting[]; has_more: boolean }
+/**
+ * A page of transcript segments.
+ * 
+ * Pagination is not premature optimisation here. Meetily shipped without it and
+ * had to retrofit both SQL paging and list virtualisation; an hour of speech is
+ * on the order of a thousand segments and loading them all costs both the query
+ * and the DOM.
+ */
+export type PaginatedSegments = { segments: MeetingSegment[]; has_more: boolean; 
+/**
+ * Total segments for this meeting, so a virtualised list can size itself.
+ */
+total: number }
 export type PasteMethod = "ctrl_v" | "direct" | "none" | "shift_insert" | "ctrl_shift_v" | "external_script"
 export type PermissionAccess = "allowed" | "denied" | "unknown"
 export type PostProcessConfigSource = "dedicated_cleanup_selection" | "assistant_fallback"
@@ -3797,6 +4338,29 @@ export type SoundTheme =
  */
 "dictation" | "marimba" | "pop" | "click" | "custom"
 /**
+ * Which audio stream a transcript segment came from.
+ * 
+ * This is the load-bearing type of the whole feature. It records a **fact about
+ * the hardware**, not a guess: microphone samples are the user, loopback
+ * samples are the remote side of the call. Speaker diarization is statistical
+ * and can be wrong; this cannot. It is why the capture layer refuses to mix the
+ * two streams (see `audio_toolkit::audio::loopback`).
+ * 
+ * The practical consequence: even with diarization disabled, unavailable, or
+ * performing badly, a meeting transcript is still correctly split into "you"
+ * and "them", which is the distinction that matters most when the notes assign
+ * action items.
+ */
+export type SpeakerSource = 
+/**
+ * The user's microphone.
+ */
+"mic" | 
+/**
+ * System audio — the other participants.
+ */
+"system"
+/**
  * Where speech-to-text runs. `Local` is the app's original behaviour and the
  * default: a Whisper/Parakeet/GGUF model on the user's own machine. `Cloud`
  * sends the audio to a hosted transcription API instead.
@@ -3810,6 +4374,25 @@ export type SoundTheme =
  * multi-gigabyte Whisper model would sit in VRAM being paid for twice.
  */
 export type SttEngineMode = "local" | "cloud"
+/**
+ * Whether this machine can capture the other participants at all.
+ * 
+ * Two fields rather than one bool because "no" has a cause the user can act on
+ * exactly once: on macOS the missing piece is a permission that is *separate*
+ * from screen recording, and without it the OS records silence and never
+ * prompts. Surfacing the reason is the difference between a fixable setup step
+ * and a feature that appears broken.
+ */
+export type SystemAudioStatus = { 
+/**
+ * True when a loopback source exists on this platform and build.
+ */
+supported: boolean; 
+/**
+ * Platform-specific guidance when capture needs the user to grant
+ * something. `None` when there is nothing for them to do.
+ */
+help: string | null }
 /**
  * UI appearance preference. `System` follows the OS; `Light` / `Dark` pin the
  * theme regardless of the OS setting. Serialized lowercase ("light", "dark",

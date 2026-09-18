@@ -1995,8 +1995,23 @@ fn transcribe_cpp_backend_options(
 /// transcript, so including "Hey Flow" could rewrite ordinary mid-sentence
 /// speech such as "hey flaw". Flow's leading-phrase matcher handles recognition
 /// near-misses independently.
+///
+/// Words learned from the user's own corrections (`autolearn`) are folded in here
+/// too, and this is the single point at which they take effect — biasing the
+/// recogniser, seeding the cloud providers' keyterm lists, and driving the fuzzy
+/// correction pass, all from one list. They are stored separately from
+/// `custom_words` because a learned word is a *guess* the user must be able to
+/// review and remove, but by the time recognition happens the distinction no longer
+/// matters and keeping two paths would mean one of them eventually forgot them.
 pub fn recognition_words(settings: &crate::settings::AppSettings) -> Vec<String> {
     let mut words = settings.custom_words.clone();
+    for learned in &settings.learned_words {
+        // The user's own list wins: if they have typed the word in themselves, the
+        // learned duplicate contributes nothing and would only be sent twice.
+        if !words.iter().any(|word| word.eq_ignore_ascii_case(learned)) {
+            words.push(learned.clone());
+        }
+    }
     if settings.flow_enabled
         && !words
             .iter()

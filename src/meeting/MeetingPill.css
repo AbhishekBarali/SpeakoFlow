@@ -1,0 +1,437 @@
+/* The floating meeting pill.
+ *
+ * Self-contained rather than importing `AssistantPanel.css`: the reminder popup
+ * imports it because a reminder *is* the assistant's card and must not drift from
+ * it, whereas the pill is a different object — a status indicator that expands —
+ * and inheriting a stylesheet built around `.ask-card` would mean fighting its
+ * layout on every rule. The design tokens below are copied deliberately so the
+ * two windows read as the same application.
+ *
+ * Two rules here are load-bearing rather than cosmetic:
+ *
+ *  - No outer drop shadow. Semi-transparent shadow pixels render as a milky grey
+ *    band on Windows transparent windows, so depth comes from a hairline plus an
+ *    inner highlight, exactly as the recording overlay does.
+ *  - Only `.pill-transcript` scrolls. The window's height is whatever this
+ *    content measures, so a scroll container anywhere above it would feed the
+ *    measurement back into itself and grow the window until it filled the screen.
+ */
+
+:root {
+  --mp-surface: rgba(21, 19, 17, 0.96);
+  --mp-surface-raised: rgba(255, 255, 255, 0.075);
+  --mp-surface-raised-strong: rgba(255, 255, 255, 0.13);
+  --mp-inset: rgba(0, 0, 0, 0.3);
+  --mp-ink: #f7f6f4;
+  --mp-body: #d9d6d2;
+  --mp-muted: #a9a39c;
+  --mp-faint: #7b756d;
+  --mp-hairline: rgba(255, 255, 255, 0.09);
+  --mp-hairline-strong: rgba(255, 255, 255, 0.16);
+  --mp-inner:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 0 0 0.5px rgba(0, 0, 0, 0.45);
+  --mp-live: #e5484d;
+  --mp-accent: #2dd4bf;
+  --mp-warn: #fbbf24;
+  --mp-font:
+    "Inter Variable", -apple-system, BlinkMacSystemFont,
+    "Segoe UI Variable Text", "Segoe UI", Roboto, sans-serif;
+
+  color: var(--mp-ink);
+  font-family: var(--mp-font);
+  color-scheme: dark;
+  font-synthesis-weight: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.pill-shell {
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  overflow: hidden;
+}
+
+/* ---------- collapsed ---------- */
+
+.pill-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 999px;
+  background: var(--mp-surface);
+  border: 1px solid var(--mp-hairline);
+  box-shadow: var(--mp-inner);
+  /* The whole bar is the expand affordance, so it must read as pressable — but
+   * text inside it must not be selectable, or a click that lands on the clock
+   * starts a drag-select instead of opening the card. */
+  cursor: pointer;
+  user-select: none;
+}
+
+.pill-bar:hover {
+  border-color: var(--mp-hairline-strong);
+}
+
+.pill-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-inline-start: 4px;
+  border-radius: 50%;
+  background: var(--mp-live);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .pill-dot[data-live="true"] {
+    animation: pill-breathe 2s ease-in-out infinite;
+  }
+}
+
+@keyframes pill-breathe {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.pill-dot[data-live="false"] {
+  background: var(--mp-warn);
+  animation: none;
+}
+
+.pill-clock {
+  flex: none;
+  font-size: 12.5px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+  color: var(--mp-ink);
+}
+
+/* ---------- the two-stream meter ---------- */
+
+/* Two rows of bars, mic above and system below, because which of the two is
+ * moving is the actual diagnostic: a flat bottom row means the other
+ * participants are not being captured, which is this feature's most common and
+ * most silent failure. One combined meter would hide exactly that. */
+.pill-meter {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-inline: 2px;
+}
+
+.pill-meter-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 9px;
+}
+
+.pill-meter-bar {
+  flex: 1 1 0;
+  min-width: 0;
+  border-radius: 1px;
+  background: currentColor;
+  /* Scaled rather than height-animated: transform does not trigger layout, and
+   * this runs 15 times a second for hours. */
+  transform-origin: center;
+  transition:
+    transform 90ms linear,
+    opacity 90ms linear;
+}
+
+.pill-meter-row[data-stream="mic"] {
+  color: var(--mp-accent);
+}
+
+.pill-meter-row[data-stream="system"] {
+  color: #a78bfa;
+}
+
+.pill-meter-row[data-silent="true"] {
+  color: var(--mp-faint);
+}
+
+/* ---------- buttons ---------- */
+
+.pill-action {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: var(--mp-surface-raised);
+  color: var(--mp-body);
+  cursor: pointer;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
+}
+
+.pill-action:hover {
+  background: var(--mp-surface-raised-strong);
+  color: var(--mp-ink);
+}
+
+.pill-action:focus-visible {
+  outline: 2px solid var(--mp-accent);
+  outline-offset: 1px;
+}
+
+.pill-action[data-variant="stop"] {
+  background: rgba(229, 72, 77, 0.16);
+  color: #fda4af;
+}
+
+.pill-action[data-variant="stop"]:hover {
+  background: rgba(229, 72, 77, 0.28);
+  color: #fff;
+}
+
+.pill-action:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* The call offer reuses `.pill-bar`, but it is a card to read rather than a
+ * control to click through, so it takes the pointer normally and does not
+ * advertise itself as pressable. */
+.pill-bar[data-offer="true"] {
+  cursor: default;
+  padding-inline-start: 12px;
+}
+
+.pill-offer-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 12.5px;
+  line-height: 1.35;
+  color: var(--mp-ink);
+}
+
+.pill-action[data-variant="accept"] {
+  background: rgba(45, 212, 191, 0.18);
+  color: var(--mp-accent);
+}
+
+.pill-action[data-variant="accept"]:hover {
+  background: rgba(45, 212, 191, 0.3);
+  color: #fff;
+}
+
+/* ---------- expanded card ---------- */
+
+.pill-card {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-height: 100%;
+  min-height: 0;
+  border-radius: 16px;
+  background: var(--mp-surface);
+  border: 1px solid var(--mp-hairline);
+  box-shadow: var(--mp-inner);
+  overflow: hidden;
+}
+
+.pill-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--mp-hairline);
+}
+
+.pill-head-meta {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.pill-head-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--mp-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pill-notice {
+  flex: none;
+  padding: 6px 10px;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: #fcd34d;
+  background: rgba(251, 191, 36, 0.1);
+  border-bottom: 1px solid var(--mp-hairline);
+}
+
+/* The one scroll container in the window. */
+.pill-transcript {
+  flex: 1 1 auto;
+  min-height: 96px;
+  max-height: 260px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--mp-hairline-strong) transparent;
+}
+
+.pill-transcript::-webkit-scrollbar {
+  width: 6px;
+}
+
+.pill-transcript::-webkit-scrollbar-thumb {
+  border-radius: 3px;
+  background: var(--mp-hairline-strong);
+}
+
+.pill-empty {
+  margin: 0;
+  padding: 22px 6px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--mp-faint);
+}
+
+.pill-turn {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pill-turn-who {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.pill-turn-swatch {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.pill-turn-text {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--mp-body);
+  overflow-wrap: break-word;
+}
+
+/* A diarization label the pass was not confident about. De-emphasised rather
+ * than hidden: a confidently wrong speaker name is worse than a visibly
+ * uncertain one. */
+.pill-turn[data-uncertain="true"] .pill-turn-who {
+  opacity: 0.55;
+}
+
+/* The latest answer, above the input.
+ *
+ * A second bounded scroll region rather than part of `.pill-transcript`: the
+ * answer must stay put while the transcript keeps growing underneath the live
+ * call, and sharing one scroller would drag the answer off screen every time
+ * someone said something. Both are bounded so the measured window height stays
+ * finite. */
+.pill-answer {
+  flex: none;
+  max-height: 132px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 8px 10px;
+  border-top: 1px solid var(--mp-hairline);
+  background: rgba(45, 212, 191, 0.05);
+  scrollbar-width: thin;
+  scrollbar-color: var(--mp-hairline-strong) transparent;
+}
+
+.pill-answer::-webkit-scrollbar {
+  width: 6px;
+}
+
+.pill-answer::-webkit-scrollbar-thumb {
+  border-radius: 3px;
+  background: var(--mp-hairline-strong);
+}
+
+.pill-answer-text {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--mp-ink);
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+
+.pill-answer-text[data-thinking="true"] {
+  color: var(--mp-faint);
+  font-style: italic;
+}
+
+.pill-ask {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-top: 1px solid var(--mp-hairline);
+}
+
+.pill-ask-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 7px 10px;
+  font-family: inherit;
+  font-size: 12.5px;
+  color: var(--mp-ink);
+  background: var(--mp-inset);
+  border: 1px solid var(--mp-hairline);
+  border-radius: 10px;
+}
+
+.pill-ask-input::placeholder {
+  color: var(--mp-faint);
+}
+
+.pill-ask-input:focus {
+  outline: none;
+  border-color: var(--mp-hairline-strong);
+}
+
+.pill-ask-input:disabled {
+  opacity: 0.5;
+}

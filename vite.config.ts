@@ -18,7 +18,8 @@ export default defineConfig(async () => ({
     },
   },
 
-  // Multiple entry points for main app, overlay, assistant panel and reminders
+  // Multiple entry points for main app, overlay, assistant panel, reminders and
+  // the floating meeting pill
   build: {
     rollupOptions: {
       input: {
@@ -27,6 +28,7 @@ export default defineConfig(async () => ({
         assistant: resolve(__dirname, "src/assistant/index.html"),
         snip: resolve(__dirname, "src/assistant/snip.html"),
         reminder: resolve(__dirname, "src/reminder/index.html"),
+        meeting: resolve(__dirname, "src/meeting/index.html"),
       },
     },
   },

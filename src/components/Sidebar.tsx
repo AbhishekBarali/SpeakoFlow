@@ -7,6 +7,7 @@ import {
   History,
   Info,
   MessageCircle,
+  Users,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
@@ -15,6 +16,7 @@ import {
   GeneralSettings,
   DictationSettings,
   HistorySettings,
+  MeetingsSection,
   DebugSettings,
   AboutSettings,
   AssistantSection,
@@ -60,6 +62,12 @@ export const SECTIONS_CONFIG = {
     labelKey: "sidebar.assistant",
     icon: MessageCircle,
     component: AssistantSection,
+    enabled: () => true,
+  },
+  meetings: {
+    labelKey: "sidebar.meetings",
+    icon: Users,
+    component: MeetingsSection,
     enabled: () => true,
   },
   history: {
