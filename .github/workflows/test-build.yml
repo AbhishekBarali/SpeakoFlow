@@ -49,12 +49,17 @@ name: "Test Build"
 
 on: workflow_dispatch
 
-# BRANCH-LOCAL MATRIX (test/vision-fallback-build only — do NOT merge to main).
-# Trimmed to the two targets the tester can actually run right now: Windows
-# x86_64 and Linux x86_64. macOS (both architectures) and Linux ARM64 are cut
-# because nothing here can verify them, and each one costs a full from-scratch
-# Rust + whisper.cpp build. main keeps the complete five-target matrix; restore
-# it from there before this branch is merged anywhere.
+# BRANCH-LOCAL MATRIX (codex/idle-battery-optimization only — do NOT merge to
+# main). Trimmed to the ONE target being tested right now: Windows x86_64, which
+# is what the tester's other machine runs. macOS (both architectures), Linux
+# ARM64 and Linux x86_64 are cut because nothing here can verify them and each
+# costs a full from-scratch Rust + whisper.cpp build (~30-40 min). main keeps the
+# complete five-target matrix; restore it from there before this branch is merged
+# anywhere.
+#
+# Output: one artifact, `speakoflow-test-x86_64-pc-windows-msvc`, containing the
+# NSIS installer (.exe) and the .msi. Unsigned, so SmartScreen will warn on first
+# run — "More info" → "Run anyway". Artifacts expire after 30 days.
 jobs:
   test-build:
     permissions:
@@ -63,9 +68,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: "ubuntu-24.04" # AppImage + .deb, x86_64
-            args: "--bundles appimage,deb"
-            target: "x86_64-unknown-linux-gnu"
           - platform: "windows-latest" # .msi + NSIS .exe
             args: ""
             target: "x86_64-pc-windows-msvc"

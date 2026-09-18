@@ -253,14 +253,64 @@ describe("hands-free session lifecycle", () => {
     ).toBe(true);
     expect(voice.open).toBe(false);
   });
-  test("mute stops capture and rejects an in-flight utterance and late speech", async () => {
+  /**
+   * The bug this pair of tests exists for: mute used to mean both directions at
+   * once, so muting your microphone to stop the assistant hearing the room also
+   * cut off the answer it was already reading out. Mute is now the input side
+   * alone, and the headphones switch is the one that silences everything.
+   */
+  test("mute stops capture but the reply is still spoken", async () => {
     const pending = deferred<unknown>();
     audioTurn = pending.promise;
     await act(async () => voice.start());
     await speak();
     await act(async () => voice.toggleMute());
     expect(tracks.every((track) => track.stopped)).toBe(true);
-    expect(voice.phase).toBe("muted");
+    expect(voice.muted).toBe(true);
+    expect(voice.deafened).toBe(false);
+    // The turn in flight is untouched, so the phase still reports what the
+    // assistant is doing rather than masking it with "muted".
+    expect(voice.phase).toBe("responding");
+    expect(
+      calls.filter(
+        (call) => call.command === "assistant_conversation_interrupt",
+      ).length,
+    ).toBe(1);
+    await emit("assistant-conversation-local", {
+      ticket: { session: 1, turn: 1 },
+      epoch: 7,
+      kind: "begin",
+    });
+    await emit("assistant-conversation-audio", {
+      ticket: { session: 1, turn: 1 },
+      epoch: 7,
+      audio: "AAAAAA==",
+    });
+    await act(async () => pending.resolve(undefined));
+    expect(callbackBegins).toBe(1);
+    expect(sourceStarts).toBe(1);
+    // Speech that slips through while muted is still rejected.
+    await speak();
+    expect(
+      calls.filter((call) => call.command === "assistant_conversation_audio")
+        .length,
+    ).toBe(1);
+  });
+  test("the headphones switch silences both directions and cancels the reply", async () => {
+    const pending = deferred<unknown>();
+    audioTurn = pending.promise;
+    await act(async () => voice.start());
+    await speak();
+    await act(async () => voice.toggleDeafen());
+    expect(tracks.every((track) => track.stopped)).toBe(true);
+    expect(voice.deafened).toBe(true);
+    expect(voice.phase).toBe("deafened");
+    // Nothing can be heard, so the reply in flight is cancelled like a barge-in.
+    expect(
+      calls.filter(
+        (call) => call.command === "assistant_conversation_interrupt",
+      ).length,
+    ).toBe(2);
     await emit("assistant-conversation-local", {
       ticket: { session: 1, turn: 1 },
       epoch: 7,
@@ -274,7 +324,33 @@ describe("hands-free session lifecycle", () => {
     await act(async () => pending.resolve(undefined));
     expect(callbackBegins).toBe(0);
     expect(sourceStarts).toBe(0);
+    expect(voice.phase).toBe("deafened");
+  });
+  /**
+   * Deafening holds the microphone shut on its own, so turning it off must hand
+   * the microphone back to whatever the mute switch says — not unmute for you.
+   */
+  test("un-deafening restores the microphone switch rather than overriding it", async () => {
+    await act(async () => voice.start());
+    await act(async () => voice.toggleMute());
+    await act(async () => voice.toggleDeafen());
+    await act(async () => voice.toggleDeafen());
+    expect(voice.deafened).toBe(false);
+    expect(voice.muted).toBe(true);
     expect(voice.phase).toBe("muted");
+    await speak();
+    expect(
+      calls.filter((call) => call.command === "assistant_conversation_audio")
+        .length,
+    ).toBe(0);
+    // Only the mute switch reopens it.
+    await act(async () => voice.toggleMute());
+    expect(voice.phase).toBe("listening");
+    await speak();
+    expect(
+      calls.filter((call) => call.command === "assistant_conversation_audio")
+        .length,
+    ).toBe(1);
   });
   test("speech onset interrupts a reply and old completion cannot reset the new turn", async () => {
     const pending = deferred<unknown>();

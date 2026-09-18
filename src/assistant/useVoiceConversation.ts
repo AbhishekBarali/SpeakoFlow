@@ -23,6 +23,7 @@ export type ConversationPhase =
   | "responding"
   | "speaking"
   | "muted"
+  | "deafened"
   | "error";
 type VoiceError = {
   code: "microphone" | "device" | "setup" | "turn" | "playback" | "tooLong";
@@ -60,8 +61,19 @@ interface Session {
   stream: MediaStream | null;
   context: AudioContext;
   audio: ConversationAudio;
+  /**
+   * Microphone off. Input only: a muted call still speaks.
+   *
+   * This used to mean both directions at once, which is what made the button
+   * confusing — muting to stop the assistant hearing a conversation in the room
+   * also cut off the answer being read out, and there was no way to ask for one
+   * without the other. `deafened` is now the switch for the output side.
+   */
   muted: boolean;
-  changingMic: boolean;
+  /** Both directions off: nothing is heard and nothing is spoken. */
+  deafened: boolean;
+  /** A VAD pause/start is in flight; the two switches share it. */
+  changingAudio: boolean;
   hearing: boolean;
   turnDone: boolean;
   synthesisDone: boolean;
@@ -72,6 +84,18 @@ interface Session {
   releaseBackgroundLock?: () => void;
 }
 
+/**
+ * The microphone is live only when neither switch is down.
+ *
+ * Deafening closes it too, because "you won't hear it and it won't take your
+ * input" is one gesture: leaving capture running behind a silenced call would
+ * keep answering questions whose replies nobody can hear.
+ */
+const micLive = (s: Session) => !s.muted && !s.deafened;
+
+/** Only deafening silences the assistant. Mute is the input side alone. */
+const canHear = (s: Session) => !s.deafened;
+
 export function useVoiceConversation(callbacks: VoiceCallbacks) {
   const callbacksRef = useRef(callbacks);
   callbacksRef.current = callbacks;
@@ -81,6 +105,16 @@ export function useVoiceConversation(callbacks: VoiceCallbacks) {
   const [phase, setPhase] = useState<ConversationPhase>("off");
   const [error, setError] = useState<VoiceError | null>(null);
   const [level, setLevel] = useState(0);
+  /**
+   * The two switches, exposed as state rather than read back off `phase`.
+   *
+   * `phase` says what the call is *doing*, and a muted call still does things —
+   * it thinks and it speaks. Deriving the button's pressed state from a "muted"
+   * phase forced the phase to mask "Thinking"/"Speaking" for the whole time the
+   * microphone was off, which is the half of the old mute that read as a bug.
+   */
+  const [muted, setMuted] = useState(false);
+  const [deafened, setDeafened] = useState(false);
   const pace = callbacks.pace ?? DEFAULT_CONVERSATION_PACE;
   const setPace = callbacks.onPaceChange;
   const paceRef = useRef(pace);
@@ -105,15 +139,17 @@ export function useVoiceConversation(callbacks: VoiceCallbacks) {
   const refreshPhase = useCallback((s: Session) => {
     if (sessionRef.current !== s) return;
     setPhase(
-      s.muted
-        ? "muted"
+      s.deafened
+        ? "deafened"
         : s.hearing
           ? "hearing"
           : s.playing
             ? "speaking"
             : !s.turnDone || !s.synthesisDone
               ? "responding"
-              : "listening",
+              : s.muted
+                ? "muted"
+                : "listening",
     );
   }, []);
 
@@ -145,6 +181,8 @@ export function useVoiceConversation(callbacks: VoiceCallbacks) {
     setPhase("off");
     setError(null);
     setLevel(0);
+    setMuted(false);
+    setDeafened(false);
   }, [release]);
 
   const fail = useCallback(
@@ -196,7 +234,7 @@ export function useVoiceConversation(callbacks: VoiceCallbacks) {
 
   const submit = useCallback(
     async (s: Session, audio: Float32Array) => {
-      if (sessionRef.current !== s || s.muted) return;
+      if (sessionRef.current !== s || !micLive(s)) return;
       if (s.timeout) clearTimeout(s.timeout);
       s.timeout = null;
       s.hearing = false;
@@ -212,7 +250,7 @@ export function useVoiceConversation(callbacks: VoiceCallbacks) {
         if (
           sessionRef.current !== s ||
           !turns.current.accepts(generation) ||
-          s.muted
+          !micLive(s)
         )
           return;
         s.ticket = ticket;
@@ -270,7 +308,8 @@ export function useVoiceConversation(callbacks: VoiceCallbacks) {
           callbacksRef.current.volume,
         ),
         muted: false,
-        changingMic: false,
+        deafened: false,
+        changingAudio: false,
         hearing: false,
         turnDone: true,
         synthesisDone: true,
@@ -339,7 +378,7 @@ export function useVoiceConversation(callbacks: VoiceCallbacks) {
         session.stream = stream;
         stream.getAudioTracks().forEach((track) => {
           track.onended = () => {
-            if (sessionRef.current === session && !session.muted)
+            if (sessionRef.current === session && micLive(session))
               fail({ code: "device" });
           };
         });
@@ -424,7 +463,7 @@ export function useVoiceConversation(callbacks: VoiceCallbacks) {
         },
         resumeStream: acquire,
         onFrameProcessed: (_probability, frame) => {
-          if (sessionRef.current !== session || session.muted) return;
+          if (sessionRef.current !== session || !micLive(session)) return;
           // An open mic can run for hours. Keep room noise from re-rendering
           // the whole transcript on every 32 ms inference frame.
           if (!session.hearing) return;
@@ -436,7 +475,7 @@ export function useVoiceConversation(callbacks: VoiceCallbacks) {
           setLevel(Math.min(1, Math.sqrt(sum / frame.length) * 8));
         },
         onSpeechRealStart: () => {
-          if (sessionRef.current !== session || session.muted) return;
+          if (sessionRef.current !== session || !micLive(session)) return;
           session.hearing = true;
           setError(null);
           interrupt(session);
@@ -483,33 +522,84 @@ export function useVoiceConversation(callbacks: VoiceCallbacks) {
     }
   }, [end, fail, interrupt, recover, refreshPhase, release, submit]);
 
-  const toggleMute = useCallback(async () => {
-    const s = sessionRef.current;
-    if (!s?.vad || s.changingMic) return;
-    s.changingMic = true;
-    const wasMuted = s.muted;
-    s.muted = !s.muted;
-    s.hearing = false;
-    if (s.timeout) clearTimeout(s.timeout);
-    s.timeout = null;
-    interrupt(s);
-    refreshPhase(s);
-    setLevel(0);
-    try {
-      if (s.muted) await s.vad.pause();
-      else await s.vad.start();
-    } catch (cause) {
-      // Unmuting reopens the microphone, so it fails whenever another app has
-      // taken it in the meantime. That is a retryable condition: put the mute
-      // state back and keep the call alive so a second tap can succeed.
-      if (sessionRef.current === s) {
-        s.muted = wasMuted;
-        recover({ code: "microphone", detail: String(cause) }, s);
+  /**
+   * Apply a change to the two audio switches and reconcile the session with it.
+   *
+   * One function for both buttons because the microphone is a function of both
+   * (see `micLive`) and because only one VAD pause/start may be in flight at a
+   * time. The asymmetry between them lives here and nowhere else: deafening
+   * cancels the reply, muting deliberately leaves it running.
+   */
+  const setAudioState = useCallback(
+    async (mutate: (s: Session) => void) => {
+      const s = sessionRef.current;
+      if (!s?.vad || s.changingAudio) return;
+      const wasMuted = s.muted;
+      const wasDeafened = s.deafened;
+      const wasLive = micLive(s);
+      mutate(s);
+      if (s.muted === wasMuted && s.deafened === wasDeafened) return;
+      setMuted(s.muted);
+      setDeafened(s.deafened);
+      if (!micLive(s) && wasLive) {
+        // The microphone is closing, so an utterance in progress is abandoned.
+        // Nothing to cancel on the backend: `submit` drops it before it is sent.
+        s.hearing = false;
+        if (s.timeout) clearTimeout(s.timeout);
+        s.timeout = null;
       }
-    } finally {
-      s.changingMic = false;
-    }
-  }, [interrupt, recover, refreshPhase]);
+      // Deafening stops the answer as a barge-in does — there is no point
+      // generating and synthesizing speech nobody can hear. Muting must not,
+      // which is the whole reason the two are separate controls: the assistant
+      // keeps talking while your microphone is off.
+      if (s.deafened && !wasDeafened) interrupt(s);
+      refreshPhase(s);
+      setLevel(0);
+      if (micLive(s) === wasLive) return;
+      s.changingAudio = true;
+      try {
+        if (micLive(s)) await s.vad.start();
+        else await s.vad.pause();
+      } catch (cause) {
+        // Reopening the microphone fails whenever another app has taken it in
+        // the meantime. That is retryable: put the switches back and keep the
+        // call alive so a second tap can succeed.
+        if (sessionRef.current === s) {
+          s.muted = wasMuted;
+          s.deafened = wasDeafened;
+          setMuted(wasMuted);
+          setDeafened(wasDeafened);
+          recover({ code: "microphone", detail: String(cause) }, s);
+        }
+      } finally {
+        s.changingAudio = false;
+      }
+    },
+    [interrupt, recover, refreshPhase],
+  );
+
+  /** Microphone off, speaker untouched: the assistant can still answer aloud. */
+  const toggleMute = useCallback(
+    () =>
+      setAudioState((s) => {
+        s.muted = !s.muted;
+      }),
+    [setAudioState],
+  );
+
+  /**
+   * Both directions off — the headphones-down gesture. Turning it on also cuts
+   * the reply in flight; turning it off restores whatever the microphone switch
+   * was set to on its own, so deafening during a muted call does not silently
+   * unmute you on the way back.
+   */
+  const toggleDeafen = useCallback(
+    () =>
+      setAudioState((s) => {
+        s.deafened = !s.deafened;
+      }),
+    [setAudioState],
+  );
 
   useEffect(() => {
     sessionRef.current?.vad?.setOptions({ redemptionMs: TURN_PAUSE_MS[pace] });
@@ -531,7 +621,7 @@ export function useVoiceConversation(callbacks: VoiceCallbacks) {
     };
     const current = (ticket: VoiceTicket) => {
       const s = sessionRef.current;
-      return s && !s.muted && !s.hearing && sameVoiceTicket(s.ticket, ticket)
+      return s && canHear(s) && !s.hearing && sameVoiceTicket(s.ticket, ticket)
         ? s
         : null;
     };
@@ -698,7 +788,7 @@ export function useVoiceConversation(callbacks: VoiceCallbacks) {
   const browserSink = useRef({
     enqueue: async (blob: Blob, epoch: number | null) => {
       const s = sessionRef.current;
-      if (!s || epoch === null || s.epoch !== epoch || s.hearing || s.muted)
+      if (!s || epoch === null || s.epoch !== epoch || s.hearing || !canHear(s))
         return;
       await s.audio.enqueue(await blob.arrayBuffer(), epoch);
     },
@@ -718,9 +808,12 @@ export function useVoiceConversation(callbacks: VoiceCallbacks) {
     level,
     pace,
     setPace,
+    muted,
+    deafened,
     start,
     end,
     toggleMute,
+    toggleDeafen,
     browserSink,
   };
 }

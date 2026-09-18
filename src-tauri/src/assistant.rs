@@ -70,6 +70,14 @@ const PANEL_DRAGGED_KEY: &str = "assistant_panel_dragged";
 const PILL_WIDTH: f64 = 240.0;
 const PILL_HEIGHT: f64 = 44.0;
 
+/// The collapsed form of a live CALL, which is a different chip: it carries the
+/// orb, the phase line and three controls — microphone, sound, hang up — where
+/// the quick-ask pill carries text and an expand affordance. Adding the sound
+/// switch pushed `.conversation-pill` (272px in `ConversationView.css`) past the
+/// 240px window it used to float in, and a chip wider than its window is a chip
+/// with its hang-up button clipped off.
+const CONVERSATION_PILL_WIDTH: f64 = 288.0;
+
 /// Readable voice HUD used by the assistant's `Live` overlay style. It stays
 /// much smaller than the full chat panel while leaving enough room for the
 /// recognized question and streamed answer.
@@ -78,7 +86,7 @@ const LIVE_HEIGHT: f64 = 188.0;
 
 fn collapsed_size(app: &AppHandle) -> (f64, f64) {
     if crate::voice_conversation::is_active(app) {
-        return (PILL_WIDTH, PILL_HEIGHT);
+        return (CONVERSATION_PILL_WIDTH, PILL_HEIGHT);
     }
     match get_settings(app).assistant_overlay_style {
         OverlayStyle::Live => (LIVE_WIDTH, LIVE_HEIGHT),
@@ -6651,6 +6659,29 @@ mod tests {
         assert!(
             card_h <= ASK_CARD_MIN_HEIGHT,
             "a floor of {card_h} would refuse a card sized to a one-line answer"
+        );
+    }
+
+    /// A collapsed call carries one control more than the quick-ask pill (the
+    /// microphone, the sound switch and hang up), so its chip is wider and its
+    /// window has to be wider still. The collapse floor has to admit it too, or
+    /// collapsing mid-call is refused outright.
+    #[test]
+    fn the_collapsed_call_chip_fits_its_window() {
+        /// `.conversation-pill` in `ConversationView.css`.
+        const CHIP_WIDTH: f64 = 272.0;
+        assert!(
+            CONVERSATION_PILL_WIDTH >= CHIP_WIDTH,
+            "a {CONVERSATION_PILL_WIDTH}px window clips a {CHIP_WIDTH}px chip"
+        );
+        assert!(
+            CONVERSATION_PILL_WIDTH > PILL_WIDTH,
+            "the call chip carries more controls than the quick-ask pill"
+        );
+        let (floor_w, floor_h) = panel_min_size(true, true, false);
+        assert!(
+            floor_w <= CONVERSATION_PILL_WIDTH && floor_h <= PILL_HEIGHT,
+            "a floor of {floor_w}x{floor_h} would refuse the collapsed call chip"
         );
     }
 

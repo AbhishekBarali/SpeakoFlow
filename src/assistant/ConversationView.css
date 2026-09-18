@@ -198,12 +198,14 @@
   animation: voice-breathe 2s ease-in-out infinite;
 }
 .voice-orb.muted .voice-orb-body,
+.voice-orb.deafened .voice-orb-body,
 .voice-orb.error .voice-orb-body,
 .voice-orb.off .voice-orb-body {
   filter: grayscale(0.95);
   opacity: 0.5;
 }
 .voice-orb.muted .voice-orb-flow,
+.voice-orb.deafened .voice-orb-flow,
 .voice-orb.error .voice-orb-flow,
 .voice-orb.off .voice-orb-flow {
   animation-play-state: paused;
@@ -456,6 +458,37 @@
     --orb-size: 24px;
   }
 }
+/* Five controls fit the default widths (360–520px) with room to spare, but the
+   call bar is also the reason the resize floor is 300px — so the row has to give
+   up gap and diameter before it can overflow its own padding and push Hang up
+   off the edge. Two steps rather than one: the first keeps the buttons a
+   comfortable size, the second is the floor's worst case. */
+@container (max-width: 380px) {
+  .conversation-controls {
+    gap: 10px;
+  }
+  .conversation-control {
+    width: 44px;
+    height: 44px;
+  }
+  .conversation-secondary {
+    width: 32px;
+    height: 32px;
+  }
+}
+@container (max-width: 330px) {
+  .conversation-controls {
+    gap: 7px;
+  }
+  .conversation-control {
+    width: 40px;
+    height: 40px;
+  }
+  .conversation-secondary {
+    width: 28px;
+    height: 28px;
+  }
+}
 @container (max-height: 440px) {
   .assistant-conversation {
     padding: 0 16px 14px;
@@ -508,7 +541,10 @@
   padding: 4px 6px 4px 10px;
   box-sizing: border-box;
   height: 40px;
-  width: 236px;
+  /* Three controls now (microphone, sound, hang up), so the chip is wider than
+     it was. `CONVERSATION_PILL_WIDTH` in assistant.rs is the window it floats
+     in and has to stay ahead of this. */
+  width: 272px;
   border-radius: 24px;
   border: 1px solid var(--as-hairline-strong);
   background: var(--as-chip-surface);

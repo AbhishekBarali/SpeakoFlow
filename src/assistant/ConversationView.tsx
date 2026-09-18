@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
+  HeadphoneOff,
+  Headphones,
   Maximize2,
   MessageSquare,
   Mic,
@@ -30,20 +32,43 @@ export function ConversationCallButtons({
   onEnd: () => void;
 }) {
   const { t } = useTranslation();
-  const muted = voice.phase === "muted";
-  const muteLabel = t(`assistant.conversation.${muted ? "unmute" : "mute"}`);
+  // The two switches are independent, and their labels have to say which is
+  // which — a single "Mute" that did both is what made the control ambiguous.
+  // Mute is the microphone; the headphones are the whole call.
+  const { muted, deafened } = voice;
+  const unavailable = ["off", "error", "starting"].includes(voice.phase);
+  const muteLabel = t(
+    `assistant.conversation.${muted || deafened ? "unmute" : "mute"}`,
+  );
+  const deafenLabel = t(
+    `assistant.conversation.${deafened ? "undeafen" : "deafen"}`,
+  );
   return (
     <>
       <button
         type="button"
-        className={`conversation-control${muted ? " muted" : ""}`}
-        disabled={["off", "error", "starting"].includes(voice.phase)}
+        className={`conversation-control${muted || deafened ? " muted" : ""}`}
+        // Deafening already holds the microphone shut, so the mic switch has
+        // nothing to say while it is down — offering it would let the user
+        // "unmute" into a call that still cannot hear them.
+        disabled={unavailable || deafened}
         onClick={() => void voice.toggleMute()}
-        aria-pressed={muted}
+        aria-pressed={muted || deafened}
         aria-label={muteLabel}
         title={muteLabel}
       >
-        {muted ? <MicOff size={20} /> : <Mic size={20} />}
+        {muted || deafened ? <MicOff size={20} /> : <Mic size={20} />}
+      </button>
+      <button
+        type="button"
+        className={`conversation-control${deafened ? " muted" : ""}`}
+        disabled={unavailable}
+        onClick={() => void voice.toggleDeafen()}
+        aria-pressed={deafened}
+        aria-label={deafenLabel}
+        title={deafenLabel}
+      >
+        {deafened ? <HeadphoneOff size={20} /> : <Headphones size={20} />}
       </button>
       <button
         type="button"
@@ -294,11 +319,13 @@ export function ConversationView({
         </div>
         <p className="conversation-footnote">
           {t(
-            voice.phase === "muted"
-              ? "assistant.conversation.mutedHint"
-              : voice.phase === "error"
-                ? "assistant.conversation.errorHint"
-                : "assistant.conversation.interruptHint",
+            voice.deafened
+              ? "assistant.conversation.deafenedHint"
+              : voice.muted
+                ? "assistant.conversation.mutedHint"
+                : voice.phase === "error"
+                  ? "assistant.conversation.errorHint"
+                  : "assistant.conversation.interruptHint",
           )}
         </p>
       </div>
