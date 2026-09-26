@@ -19,23 +19,29 @@ import {
 import { getTranslatedModelName } from "@/lib/utils/modelTranslation";
 import { ProviderTile } from "@/components/icons/ProviderLogos";
 import { LogoSelect, type LogoSelectOption } from "@/components/ui/LogoSelect";
+import { Button } from "@/components/ui/Button";
 import { ModelMark } from "./SlotVisuals";
 import { useNavigation, type ModelSlot } from "./navigation";
 import { useModelSlots } from "./useModelSlots";
 import { useSlotDataStore } from "./slotData";
+import {
+  LLM_REQUIRES_KEY,
+  LlmProviderSetup,
+  VoiceEngineSetup,
+  ttsNeedsSetup,
+} from "./ProviderSetup";
 
 /**
  * "Which model does this job" as one control, usable on any page.
  *
- * The old pages showed the model as a read-only card with a Change link that
- * sent you to a different page to pick one — and the Back button from there
- * went somewhere else again. Every job now has a real picker in place: every
- * model on this computer that can do the job, every cloud provider already set
- * up for it, and a link to the Models page for anything else (downloading,
- * API keys, fine print).
+ * Every model on this computer that can do the job, every cloud provider set
+ * up for it, and — under "Not set up yet" — every other provider, marked with
+ * what it still needs. Choosing one of those opens its setup right here (key,
+ * model) instead of sending you to the Models page to find the right form.
+ * The footer still leads to Models, for downloads and the fine print.
  *
- * Options are encoded `local:<model id>` / `cloud:<provider id>` so one list can
- * hold both.
+ * Options are encoded `local:<model id>` / `cloud:<provider id>` /
+ * `setup:<provider id>` so one list can hold them all.
  */
 
 const KEYLESS_LLM = new Set([
@@ -45,6 +51,7 @@ const KEYLESS_LLM = new Set([
   "apple_intelligence",
 ]);
 const BUILTIN = "builtin";
+const APPLE = "apple_intelligence";
 
 /** A catalog model's label and its quant tag, for a picker option. */
 const localLabel = (
@@ -94,6 +101,7 @@ export const LlmModelPicker: React.FC<{
     ? { ...defaultBrowse, label: t("pickers.download"), onClick: onBrowse }
     : defaultBrowse;
   const [busy, setBusy] = useState(false);
+  const [setupId, setSetupId] = useState<string | null>(null);
 
   const isCleanup = role === "cleanup";
   const providerId =
@@ -136,29 +144,53 @@ export const LlmModelPicker: React.FC<{
         };
       });
 
-    const cloud = (settings?.post_process_providers ?? [])
-      .filter((provider) => provider.id !== BUILTIN)
-      .filter((provider) => {
-        const model = modelMap[provider.id]?.trim();
-        return !!model && hasLlmKey(settings, provider.id);
-      })
+    // Apple Intelligence runs on the Mac and needs nothing; the assistant
+    // cannot use it at all.
+    const providers = (settings?.post_process_providers ?? []).filter(
+      (provider) =>
+        provider.id !== BUILTIN && (isCleanup || provider.id !== APPLE),
+    );
+    const isReady = (providerId: string) =>
+      providerId === APPLE ||
+      (!!modelMap[providerId]?.trim() && hasLlmKey(settings, providerId));
+
+    const cloud = providers
+      .filter((provider) => isReady(provider.id))
       .map<LogoSelectOption>((provider) => {
         const model = modelMap[provider.id]?.trim() ?? "";
         return {
           value: `cloud:${provider.id}`,
           label: prettyModelName(model) || provider.label,
-          hint: provider.label,
+          // Under a model name, say who runs it; a provider shown by its own
+          // name (Apple Intelligence has no model) needs no second line.
+          hint: model ? provider.label : undefined,
           // The trigger shows name + logo; the exact id and provider are one
           // hover away, as on Home.
-          title: `${model} · ${provider.label}`,
+          title: model ? `${model} · ${provider.label}` : provider.label,
           icon: <ProviderTile id={provider.id} kind="llm" size="sm" />,
           group: cloudGroup,
         };
       });
 
+    // Everything else, with what it still needs. Choosing one sets it up.
+    const setup = providers
+      .filter((provider) => !isReady(provider.id))
+      .map<LogoSelectOption>((provider) => ({
+        value: `setup:${provider.id}`,
+        label: provider.label,
+        hint:
+          LLM_REQUIRES_KEY.has(provider.id) &&
+          !settings?.post_process_api_keys?.[provider.id]?.trim()
+            ? t("pickers.needsKey")
+            : t("pickers.needsSetup"),
+        icon: <ProviderTile id={provider.id} kind="llm" size="sm" />,
+        group: t("pickers.groups.setup"),
+      }));
+
     return [
       ...(scope === "cloud" ? [] : local),
       ...(scope === "device" ? [] : cloud),
+      ...(scope === "device" ? [] : setup),
     ];
   }, [models, settings, modelMap, isCleanup, scope, t]);
 
@@ -175,6 +207,10 @@ export const LlmModelPicker: React.FC<{
     const split = next.indexOf(":");
     const kind = next.slice(0, split);
     const id = next.slice(split + 1);
+    if (kind === "setup") {
+      setSetupId(id);
+      return;
+    }
     setBusy(true);
     try {
       if (isCleanup) {
@@ -212,16 +248,23 @@ export const LlmModelPicker: React.FC<{
       : t("pickers.choose");
 
   return (
-    <LogoSelect
-      options={options}
-      value={value}
-      onChange={(next) => void choose(next)}
-      placeholder={placeholder}
-      disabled={busy}
-      className={className}
-      ariaLabel={t(`pickers.label.${role}`)}
-      footerAction={browse}
-    />
+    <>
+      <LogoSelect
+        options={options}
+        value={value}
+        onChange={(next) => void choose(next)}
+        placeholder={placeholder}
+        disabled={busy}
+        className={className}
+        ariaLabel={t(`pickers.label.${role}`)}
+        footerAction={browse}
+      />
+      <LlmProviderSetup
+        role={role}
+        providerId={setupId}
+        onClose={() => setSetupId(null)}
+      />
+    </>
   );
 };
 
@@ -325,6 +368,12 @@ export const SttModelPicker: React.FC<{ className?: string }> = ({
 
 const TTS_ENGINES = ["kokoro", "openai", "openrouter", "elevenlabs", "azure"];
 
+/**
+ * Which voice engine reads replies aloud. An engine that still needs a key or
+ * a voice is marked, and choosing it opens its setup in place; cancelling
+ * puts back the engine that was in use. When the engine in use is the one
+ * missing something, a "Finish setup" button sits beside the picker.
+ */
 export const VoicePicker: React.FC<{ className?: string }> = ({
   className = "w-[20rem]",
 }) => {
@@ -332,25 +381,29 @@ export const VoicePicker: React.FC<{ className?: string }> = ({
   const { settings, refreshSettings } = useSettings();
   const browse = useBrowseAction("voice");
   const [busy, setBusy] = useState(false);
+  const [setup, setSetup] = useState<{
+    engine: string;
+    previous: string;
+  } | null>(null);
+  const current = settings?.assistant_tts_engine ?? "kokoro";
 
-  const options = TTS_ENGINES.map<LogoSelectOption>((engine) => {
-    const needsKey =
-      engine !== "kokoro" &&
-      !settings?.assistant_tts_api_keys?.[engine]?.trim();
-    return {
-      value: engine,
-      label: t(`settings.assistant.tts.engines.${engine}`),
-      hint:
-        engine === "kokoro"
-          ? t("modelsHub.where.device")
-          : needsKey
-            ? t("pickers.needsKey")
-            : undefined,
-      icon: <ProviderTile id={engine} kind="tts" size="sm" />,
-    };
-  });
+  const options = TTS_ENGINES.map<LogoSelectOption>((engine) => ({
+    value: engine,
+    label: t(`settings.assistant.tts.engines.${engine}`),
+    hint:
+      engine === "kokoro"
+        ? t("modelsHub.where.device")
+        : ttsNeedsSetup(settings, engine)
+          ? t("pickers.needsSetup")
+          : undefined,
+    icon: <ProviderTile id={engine} kind="tts" size="sm" />,
+  }));
 
   const choose = async (engine: string) => {
+    if (ttsNeedsSetup(settings, engine)) {
+      setSetup({ engine, previous: current });
+      return;
+    }
     setBusy(true);
     try {
       await ok(commands.setAssistantTtsEngine(engine));
@@ -363,15 +416,45 @@ export const VoicePicker: React.FC<{ className?: string }> = ({
     }
   };
 
+  // Setting up switches to the engine early (its voice list comes from the
+  // engine in use), so backing out has to switch back.
+  const cancelSetup = async () => {
+    const opened = setup;
+    setSetup(null);
+    if (!opened || current === opened.previous) return;
+    try {
+      await ok(commands.setAssistantTtsEngine(opened.previous));
+    } catch (error) {
+      console.error("Failed to restore the voice engine:", error);
+    }
+    await refreshSettings();
+  };
+
   return (
-    <LogoSelect
-      options={options}
-      value={settings?.assistant_tts_engine ?? "kokoro"}
-      onChange={(engine) => void choose(engine)}
-      disabled={busy}
-      className={className}
-      ariaLabel={t("pickers.label.voice")}
-      footerAction={browse}
-    />
+    <>
+      <LogoSelect
+        options={options}
+        value={current}
+        onChange={(engine) => void choose(engine)}
+        disabled={busy}
+        className={className}
+        ariaLabel={t("pickers.label.voice")}
+        footerAction={browse}
+      />
+      {ttsNeedsSetup(settings, current) && (
+        <Button
+          variant="secondary"
+          className="h-10"
+          onClick={() => setSetup({ engine: current, previous: current })}
+        >
+          {t("pickers.finishSetup")}
+        </Button>
+      )}
+      <VoiceEngineSetup
+        engine={setup?.engine ?? null}
+        onSaved={() => setSetup(null)}
+        onCancel={() => void cancelSetup()}
+      />
+    </>
   );
 };

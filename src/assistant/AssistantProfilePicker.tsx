@@ -4,13 +4,13 @@ import { useTranslation } from "react-i18next";
 import type { AssistantCharacter } from "@/bindings";
 
 function Avatar({ profile }: { profile: AssistantCharacter | null }) {
+  // Every profile gets its initial (or its own picture), the same as in
+  // Settings; no emoji stand-ins.
   return profile?.avatar ? (
     <img className="assistant-character-avatar" src={profile.avatar} alt="" />
   ) : (
     <span className="assistant-character-avatar" aria-hidden="true">
-      {profile?.kind === "cat"
-        ? "🐱"
-        : (profile?.name.trim()[0] ?? "?").toUpperCase()}
+      {(profile?.name.trim()[0] ?? "?").toUpperCase()}
     </span>
   );
 }

@@ -52,6 +52,8 @@ export const HomePage: React.FC = () => {
     <Page>
       {!slots.stt.ready && <NeedsSpeechModel />}
 
+      {/* No line art here: Home is read at a glance (and the art is off by
+          default — only Dictionary draws it). */}
       <Hero
         title={greeting}
         subtitle={holdToTalk ? t("home.hero.hold") : t("home.hero.tap")}

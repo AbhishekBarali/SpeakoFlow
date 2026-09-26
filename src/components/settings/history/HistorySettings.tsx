@@ -11,9 +11,9 @@ import { convertFileSrc } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { readFile } from "@tauri-apps/plugin-fs";
 import {
+  ArrowUpRight,
   Check,
   ChevronDown,
-  ChevronRight,
   Copy,
   FolderOpen,
   Camera,
@@ -21,7 +21,6 @@ import {
   GitBranch,
   HardDrive,
   MessageCircle,
-  MessageSquarePlus,
   Mic,
   Pause,
   Play,
@@ -42,6 +41,7 @@ import {
   type HistoryUpdatePayload,
 } from "@/bindings";
 import { useOsType } from "@/hooks/useOsType";
+import { useSettings } from "@/hooks/useSettings";
 import { AudioPlayer } from "../../ui/AudioPlayer";
 import { Button } from "../../ui/Button";
 import { PageHeader } from "../../ui/Page";
@@ -327,7 +327,9 @@ const groupFeedByDay = (
 
 export const HistorySettings: React.FC = () => {
   const { t, i18n } = useTranslation();
-  const { openSettings } = useNavigation();
+  const { openSettings, navigate } = useNavigation();
+  const { getSetting } = useSettings();
+  const assistantEnabled = getSetting("assistant_enabled") ?? true;
   const osType = useOsType();
   const [entries, setEntries] = useState<HistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -602,12 +604,26 @@ export const HistorySettings: React.FC = () => {
   );
 
   /** Load a past conversation back into the assistant panel and open it. */
-  const resumeAssistantSession = useCallback(async (id: number) => {
-    const result = await commands.assistantResumeSession(id);
-    if (result.status !== "ok") {
-      toast.error(String(result.error));
-    }
-  }, []);
+  const resumeAssistantSession = useCallback(
+    async (id: number) => {
+      // With the assistant off the panel cannot open, and the click would
+      // otherwise do nothing at all.
+      if (!assistantEnabled) {
+        toast(t("historyPage.chat.assistantOff"), {
+          action: {
+            label: t("nav.assistant"),
+            onClick: () => navigate("assistant"),
+          },
+        });
+        return;
+      }
+      const result = await commands.assistantResumeSession(id);
+      if (result.status !== "ok") {
+        toast.error(String(result.error));
+      }
+    },
+    [assistantEnabled, navigate, t],
+  );
 
   // Continue a past conversation from one message onwards. The original row is
   // never touched — the branch is saved as a new conversation — so this is safe to
@@ -1167,36 +1183,39 @@ const AssistantHistoryEntryComponent: React.FC<AssistantHistoryEntryProps> = ({
   };
 
   return (
-    <div className="group px-4 py-3.5 flex flex-col gap-1.5">
-      {/* Title first — the conversation is the content. */}
-      <button
-        onClick={onToggleExpand}
-        className="text-left cursor-pointer flex items-start gap-1.5 min-w-0"
-        title={
-          expanded
-            ? t("settings.history.hideConversation")
-            : t("settings.history.showConversation")
-        }
-      >
-        <span
-          className={`mt-[3px] shrink-0 text-muted-soft transition-transform duration-150 ${
-            expanded ? "rotate-90" : ""
-          }`}
+    <div className="group flex flex-col gap-1.5 px-4 py-3.5">
+      {/* The question, and the way back into the chat. Clicking the question
+          opens it too: a past conversation is something you pick up again,
+          not a transcript to copy. */}
+      <div className="flex items-start gap-3">
+        <button
+          type="button"
+          onClick={onResume}
+          title={t("historyPage.chat.continueTitle")}
+          className="min-w-0 flex-1 cursor-pointer rounded-md text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
         >
-          <ChevronRight width={13} height={13} />
-        </span>
-        <span
-          className={`text-sm leading-relaxed text-ink break-words ${
-            expanded ? "" : "line-clamp-2"
-          }`}
+          <span
+            className={`block break-words text-sm leading-relaxed text-ink transition-colors group-hover:text-accent ${
+              expanded ? "" : "line-clamp-2"
+            }`}
+          >
+            {session.title}
+          </span>
+        </button>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={onResume}
+          title={t("historyPage.chat.continueTitle")}
         >
-          {session.title}
-        </span>
-      </button>
+          {t("historyPage.chat.continue")}
+          <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
+        </Button>
+      </div>
 
       {/* Meta row — quiet caption on the left, actions on the right. */}
-      <div className="flex items-center justify-between gap-3 ps-[19px]">
-        <span className="inline-flex shrink-0 items-center gap-1.5 text-xs text-muted">
+      <div className="flex items-center justify-between gap-3">
+        <span className="inline-flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-muted">
           <span className="tabular-nums">{formattedDate}</span>
           <span aria-hidden="true" className="text-muted-soft">
             ·
@@ -1208,19 +1227,24 @@ const AssistantHistoryEntryComponent: React.FC<AssistantHistoryEntryProps> = ({
           <span aria-hidden="true" className="text-muted-soft">
             ·
           </span>
-          <span className="inline-flex items-center gap-1">
-            {t("settings.history.messageCount", {
-              count: session.messages.length,
-            })}
-          </span>
-        </span>
-        <div className="flex items-center gap-0.5 opacity-60 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-150">
-          <IconButton
-            onClick={onResume}
-            title={t("settings.history.resumeConversation")}
+          <button
+            type="button"
+            onClick={onToggleExpand}
+            aria-expanded={expanded}
+            className="inline-flex cursor-pointer items-center gap-0.5 rounded font-medium text-muted transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
           >
-            <MessageSquarePlus width={14} height={14} />
-          </IconButton>
+            {expanded
+              ? t("historyPage.chat.hideMessages")
+              : t("settings.history.messageCount", {
+                  count: session.messages.length,
+                })}
+            <ChevronDown
+              className={`h-3 w-3 transition-transform duration-150 ${expanded ? "rotate-180" : ""}`}
+              aria-hidden="true"
+            />
+          </button>
+        </span>
+        <div className="flex items-center gap-0.5 opacity-60 transition-opacity duration-150 focus-within:opacity-100 group-hover:opacity-100">
           <IconButton
             onClick={handleCopy}
             title={t("settings.history.copyConversation")}
@@ -1241,7 +1265,7 @@ const AssistantHistoryEntryComponent: React.FC<AssistantHistoryEntryProps> = ({
       </div>
 
       {expanded && (
-        <div className="flex flex-col gap-2 pt-1.5 ps-[19px]">
+        <div className="flex flex-col gap-2 pt-1.5">
           {session.messages.map((message, index) => {
             const { text, screenshot, files } = cleanMessageContent(
               message.content,

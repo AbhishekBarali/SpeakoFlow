@@ -2505,8 +2505,11 @@ async setAssistantMemoryDetail(detail: MemoryDetail) : Promise<Result<null, stri
 }
 },
 /**
- * Toggle incognito: when on, this conversation is neither remembered nor
- * personalized from memory.
+ * Toggle incognito: when on, memory is neither used nor learned from.
+ * 
+ * No longer offered in the app (it duplicated turning memory off; see
+ * `settings::retire_memory_incognito`). Kept so the command surface and the
+ * generated bindings stay stable for anything still calling it.
  */
 async setAssistantMemoryIncognito(incognito: boolean) : Promise<Result<null, string>> {
     try {
@@ -3461,9 +3464,10 @@ assistant_memory?: UserMemory;
  */
 assistant_memory_detail?: MemoryDetail; 
 /**
- * When true, this conversation is "incognito": memory is neither injected
- * into replies nor learned from the conversation. A quick switch so a
- * private chat leaves no trace in memory.
+ * Retired: the old "Incognito chat" switch, which meant the same as memory
+ * off. Kept so older stores still deserialize; `retire_memory_incognito`
+ * folds a stored `true` into memory off at load, so a running app always
+ * sees `false` here.
  */
 assistant_memory_incognito?: boolean; assistant_font_size?: string; 
 /**

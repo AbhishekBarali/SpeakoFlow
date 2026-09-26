@@ -38,8 +38,11 @@ pub fn set_assistant_memory_detail(app: AppHandle, detail: MemoryDetail) -> Resu
     Ok(())
 }
 
-/// Toggle incognito: when on, this conversation is neither remembered nor
-/// personalized from memory.
+/// Toggle incognito: when on, memory is neither used nor learned from.
+///
+/// No longer offered in the app (it duplicated turning memory off; see
+/// `settings::retire_memory_incognito`). Kept so the command surface and the
+/// generated bindings stay stable for anything still calling it.
 #[tauri::command]
 #[specta::specta]
 pub fn set_assistant_memory_incognito(app: AppHandle, incognito: bool) -> Result<(), String> {

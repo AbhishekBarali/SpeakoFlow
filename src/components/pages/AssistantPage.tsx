@@ -14,7 +14,6 @@ import {
   Avatar,
   CharactersSettings,
 } from "@/components/settings/assistant/CharactersSettings";
-import { MemorySettings } from "@/components/settings/assistant/MemorySettings";
 import { LlmModelPicker, VoicePicker } from "@/components/shell/ModelPicker";
 import {
   MemoryRow,
@@ -26,20 +25,19 @@ import {
 } from "./assistant/AssistantRows";
 import { PanelCard } from "./assistant/PanelCard";
 
-type Editor = "memory" | "profiles" | null;
-
 /**
  * The assistant as a feature rather than a settings page: how to call it up
  * (the hero, where the keys are also the way to change them), what it thinks
  * and speaks with, then plain rows — a name, a short (i), and the control.
- * Extra detail appears under a row only while its feature is on. Two things
- * open a window, because they are long-form editing: memory and profiles.
+ * Extra detail appears under a row only while its feature is on (memory shows
+ * what it remembers right there). Profiles open a window of their own, because
+ * editing a persona is long-form work.
  */
 export const AssistantPage: React.FC = () => {
   const { t } = useTranslation();
   const { settings, getSetting } = useSettings();
   const run = useSettingCommand();
-  const [editor, setEditor] = useState<Editor>(null);
+  const [profilesOpen, setProfilesOpen] = useState(false);
   const [switching, setSwitching] = useState(false);
   const enabled = settings?.assistant_enabled ?? true;
   const ttsEnabled = settings?.assistant_tts_enabled ?? false;
@@ -147,9 +145,9 @@ export const AssistantPage: React.FC = () => {
               <RemindersRow />
             </SettingsGroup>
             <SettingsGroup title={t("assistantPage.groups.personal")}>
-              <MemoryRow onManage={() => setEditor("memory")} />
+              <MemoryRow />
               <ProfilesRow
-                onEdit={() => setEditor("profiles")}
+                onManage={() => setProfilesOpen(true)}
                 avatar={(character, size) => (
                   <Avatar character={character} size={size} />
                 )}
@@ -158,31 +156,18 @@ export const AssistantPage: React.FC = () => {
             <SettingsGroup title={t("assistantPage.groups.replies")}>
               <RepliesRows />
             </SettingsGroup>
-            <section className="space-y-2.5">
-              <h2 className="px-1 text-[0.8125rem] font-semibold text-muted">
-                {t("assistantPage.cards.panel.title")}
-              </h2>
-              <PanelCard />
-            </section>
+            <PanelCard />
           </section>
         </>
       )}
 
       <Dialog
-        open={editor === "memory"}
-        onClose={() => setEditor(null)}
-        size="xl"
-        title={t("assistantPage.features.memory.title")}
-        description={t("assistantPage.features.memory.description")}
-      >
-        <MemorySettings />
-      </Dialog>
-      <Dialog
-        open={editor === "profiles"}
-        onClose={() => setEditor(null)}
-        size="xl"
+        open={profilesOpen}
+        onClose={() => setProfilesOpen(false)}
+        size="settings"
         title={t("assistantPage.features.profiles.title")}
         description={t("assistantPage.features.profiles.description")}
+        bodyClassName="border-t border-hairline"
       >
         <CharactersSettings />
       </Dialog>

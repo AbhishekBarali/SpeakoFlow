@@ -1,104 +1,254 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useTranslation } from "react-i18next";
+import { ArrowUp, Copy, CornerDownLeft, Mic } from "lucide-react";
 import { commands, type AskAnchor, type DisplayChoice } from "@/bindings";
 import { useSettings } from "@/hooks/useSettings";
 import { useSettingCommand } from "@/hooks/useSettingCommand";
+import { SettingsGroup } from "@/components/ui/SettingsGroup";
+import { SettingContainer } from "@/components/ui/SettingContainer";
 import { Segmented } from "@/components/ui/Segmented";
 import { Dropdown } from "@/components/ui/Dropdown";
-import { InfoTip } from "@/components/ui/InfoTip";
-import { PanelPreview } from "@/components/settings/assistant/AssistantSettings";
-
-/** Where each anchor puts the panel on the miniature screen, in percent. */
-const ZONES: Array<{
-  value: Exclude<AskAnchor, "custom">;
-  key: string;
-  box: { left: number; top: number; width: number; height: number };
-}> = [
-  {
-    value: "left",
-    key: "left",
-    box: { left: 5, top: 12, width: 22, height: 76 },
-  },
-  {
-    value: "topcenter",
-    key: "top",
-    box: { left: 33, top: 9, width: 34, height: 18 },
-  },
-  {
-    value: "center",
-    key: "center",
-    box: { left: 37, top: 36, width: 26, height: 28 },
-  },
-  {
-    value: "bottomcenter",
-    key: "bottom",
-    box: { left: 33, top: 73, width: 34, height: 18 },
-  },
-  {
-    value: "right",
-    key: "right",
-    box: { left: 73, top: 12, width: 22, height: 76 },
-  },
-];
+import { FONT_SIZES } from "@/assistant/appearance";
+import "@/assistant/AssistantPanel.css";
+import {
+  anchorPosition,
+  askSizeForDisplay,
+  type PanelAnchor,
+} from "./panelGeometry";
 
 /**
- * "Where it opens" as a picture of a screen: click the spot. Each spot is the
- * shape the panel takes there — a column down a side, a strip along an edge.
+ * The floating panel's settings, around a picture of your screen.
+ *
+ * The preview is a miniature desktop with the real panel card drawn on it —
+ * where it opens and as big as it opens, from the same geometry the backend
+ * uses (see `panelGeometry.ts`) — and it is also the control: the dashed
+ * outlines are the other places it can open, and clicking one moves it there.
+ * Text size, size and opacity redraw the card as you change them.
  */
-const PositionPicker: React.FC<{
-  value: AskAnchor;
-  onChange: (anchor: AskAnchor) => void;
-}> = ({ value, onChange }) => {
-  const { t } = useTranslation();
-  // "Where I left it" is no longer offered; a stored value from before reads
-  // as the middle, as the backend treats it.
-  const current = value === "custom" ? "center" : value;
-  const selected = ZONES.find((zone) => zone.value === current) ?? ZONES[2];
 
+/** The preview pictures a typical 1920×1080 screen… */
+const DISPLAY_W = 1920;
+const DISPLAY_H = 1080;
+/** …drawn this many CSS px wide, then scaled to fit the page. Text is not
+ *  shrunk with the screen, so the card stays readable. */
+const VIRTUAL_W = 1100;
+const F = VIRTUAL_W / DISPLAY_W;
+const VIRTUAL_H = DISPLAY_H * F;
+/** Taskbar height on the pictured screen, in display px. */
+const TASKBAR = 40;
+
+/** Center last, so it wins wherever two outlines touch. */
+const ANCHORS: Array<{ value: PanelAnchor; key: string }> = [
+  { value: "left", key: "left" },
+  { value: "right", key: "right" },
+  { value: "topcenter", key: "top" },
+  { value: "bottomcenter", key: "bottom" },
+  { value: "center", key: "center" },
+];
+
+interface Frame {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+  maxHeight: number;
+}
+
+/** Where a card of the given height sits at an anchor, in preview px. */
+const frameFor = (
+  anchor: PanelAnchor,
+  size: string,
+  cardHeight: number,
+): Frame => {
+  const { width, maxHeight } = askSizeForDisplay(
+    DISPLAY_W,
+    DISPLAY_H,
+    size,
+    anchor,
+  );
+  const height = Math.min(cardHeight / F, maxHeight);
+  const { x, y } = anchorPosition(anchor, DISPLAY_W, DISPLAY_H, width, height);
+  return {
+    left: x * F,
+    top: y * F,
+    width: width * F,
+    height: height * F,
+    maxHeight: maxHeight * F,
+  };
+};
+
+/** The answer card, drawn with the panel's own stylesheet. */
+const PreviewCard: React.FC = () => {
+  const { t } = useTranslation();
   return (
-    <div
-      role="radiogroup"
-      aria-label={t("settings.assistant.appearance.askAnchorLabel")}
-      className="relative aspect-[16/10] w-[9.5rem] shrink-0 overflow-hidden rounded-lg border border-hairline-strong bg-surface-muted"
-    >
-      <span
-        aria-hidden="true"
-        className="absolute inset-x-0 top-0 h-[6%] bg-ink/[0.06]"
-      />
-      {ZONES.map((zone) => {
-        const active = zone.value === selected.value;
-        const label = t(`settings.assistant.appearance.askAnchors.${zone.key}`);
-        return (
-          <button
-            key={zone.value}
-            type="button"
-            role="radio"
-            aria-checked={active}
-            aria-label={label}
-            title={label}
-            onClick={() => {
-              if (!active) onChange(zone.value);
-            }}
+    <div className="assistant-preview-surface shadow-[0_18px_40px_-18px_rgba(0,0,0,0.7)]">
+      <div className="ask-card">
+        <div className="ask-head">
+          <Mic className="ask-head-icon" size={12} />
+          <p className="ask-question-text">
+            {t("settings.assistant.appearance.previewUser")}
+          </p>
+          <div className="ask-head-actions">
+            <span className="ask-action">
+              <Copy size={13} />
+            </span>
+            <span className="ask-action labelled">
+              <CornerDownLeft size={13} />
+              <span>{t("assistant.insertShort")}</span>
+            </span>
+          </div>
+        </div>
+        <div className="ask-answer-body">
+          {t("settings.assistant.appearance.previewAssistant")}
+        </div>
+        <div className="assistant-input-row">
+          <div
+            className="assistant-input"
             style={{
-              left: `${zone.box.left}%`,
-              top: `${zone.box.top}%`,
-              width: `${zone.box.width}%`,
-              height: `${zone.box.height}%`,
+              display: "flex",
+              alignItems: "center",
+              color: "var(--as-faint)",
             }}
-            className={`absolute cursor-pointer rounded-[3px] border transition-[background-color,border-color] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${
-              active
-                ? "border-accent bg-accent/80"
-                : "border-dashed border-ink/20 bg-surface/60 hover:border-accent/60 hover:bg-accent/10"
-            }`}
-          />
-        );
-      })}
+          >
+            {t("assistant.followUpPlaceholder")}
+          </div>
+          <span className="assistant-send-button">
+            <ArrowUp size={15} strokeWidth={2.5} />
+          </span>
+        </div>
+      </div>
     </div>
   );
 };
 
-const FONT_SIZES = ["small", "medium", "large", "extra_large"] as const;
-const FONT_KEYS: Record<(typeof FONT_SIZES)[number], string> = {
+/** The miniature desktop: the card where it opens, and every other spot. */
+const PanelDesktop: React.FC<{
+  anchor: PanelAnchor;
+  size: string;
+  fontSize: string;
+  opacity: number;
+  onAnchor: (anchor: PanelAnchor) => void;
+}> = ({ anchor, size, fontSize, opacity, onAnchor }) => {
+  const { t } = useTranslation();
+  const screenRef = useRef<HTMLDivElement>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(0);
+  const [cardHeight, setCardHeight] = useState(170);
+
+  // Fit the pictured screen to the width it is given.
+  useLayoutEffect(() => {
+    const screen = screenRef.current;
+    if (!screen) return;
+    const measure = () => setScale(screen.clientWidth / VIRTUAL_W);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(screen);
+    return () => observer.disconnect();
+  }, []);
+
+  // The card is sized to its answer, so where it sits depends on how tall the
+  // text makes it at the chosen text size and width.
+  useLayoutEffect(() => {
+    const card = cardRef.current;
+    if (!card) return;
+    const measure = () => setCardHeight(card.offsetHeight);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(card);
+    return () => observer.disconnect();
+  }, []);
+
+  const card = frameFor(anchor, size, cardHeight);
+
+  return (
+    <div
+      ref={screenRef}
+      className="assistant-desktop relative w-full overflow-hidden rounded-xl"
+      style={{ aspectRatio: `${DISPLAY_W} / ${DISPLAY_H}` }}
+    >
+      <div
+        role="radiogroup"
+        aria-label={t("assistantPage.panel.where")}
+        className="assistant-scope absolute left-0 top-0 origin-top-left"
+        style={
+          {
+            width: VIRTUAL_W,
+            height: VIRTUAL_H,
+            transform: `scale(${scale})`,
+            visibility: scale > 0 ? "visible" : "hidden",
+            "--as-msg-font": FONT_SIZES[fontSize] ?? FONT_SIZES.medium,
+            "--as-alpha": String(Math.max(opacity, 0.5)),
+          } as React.CSSProperties
+        }
+      >
+        <div
+          aria-hidden="true"
+          className="absolute inset-x-0 bottom-0 border-t border-white/[0.07] bg-black/30"
+          style={{ height: TASKBAR * F }}
+        />
+
+        {ANCHORS.map(({ value, key }) => {
+          const frame = frameFor(value, size, cardHeight);
+          const active = value === anchor;
+          const label = t(`settings.assistant.appearance.askAnchors.${key}`);
+          return (
+            <button
+              key={value}
+              type="button"
+              role="radio"
+              aria-checked={active}
+              aria-label={label}
+              title={active ? undefined : label}
+              onClick={() => {
+                if (!active) onAnchor(value);
+              }}
+              style={{
+                left: frame.left,
+                top: frame.top,
+                width: frame.width,
+                height: frame.height,
+              }}
+              className={`group absolute grid place-items-center rounded-[18px] border-2 border-dashed transition-[left,top,width,height,background-color,border-color] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/50 motion-reduce:transition-none ${
+                active
+                  ? "cursor-default border-transparent"
+                  : "cursor-pointer border-white/[0.14] bg-white/[0.02] hover:border-teal-300/70 hover:bg-teal-300/[0.08]"
+              }`}
+            >
+              {!active && (
+                <span className="text-[17px] font-medium text-white/0 transition-colors duration-200 group-hover:text-white/85 group-focus-visible:text-white/85">
+                  {label}
+                </span>
+              )}
+            </button>
+          );
+        })}
+
+        <div
+          ref={cardRef}
+          aria-hidden="true"
+          className="pointer-events-none absolute overflow-hidden transition-[left,top,width] duration-[420ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
+          style={{
+            left: card.left,
+            top: card.top,
+            width: card.width,
+            maxHeight: card.maxHeight,
+          }}
+        >
+          <PreviewCard />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const FONT_SIZE_IDS = ["small", "medium", "large", "extra_large"] as const;
+const FONT_KEYS: Record<(typeof FONT_SIZE_IDS)[number], string> = {
   small: "small",
   medium: "medium",
   large: "large",
@@ -106,25 +256,15 @@ const FONT_KEYS: Record<(typeof FONT_SIZES)[number], string> = {
 };
 const PANEL_SIZES = ["mini", "compact", "standard", "large"] as const;
 
-/** A label (with its short (i)) and its control on one line. */
-const Line: React.FC<{
-  label: string;
-  info?: string;
-  children: React.ReactNode;
-}> = ({ label, info, children }) => (
-  <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-    <span className="flex items-center gap-1 text-[0.8125rem] font-medium text-ink">
-      {label}
-      {info && <InfoTip text={info} />}
-    </span>
-    {children}
-  </div>
-);
+const ANCHOR_KEYS: Record<PanelAnchor, string> = {
+  left: "left",
+  right: "right",
+  topcenter: "top",
+  bottomcenter: "bottom",
+  center: "center",
+};
 
-/**
- * How the floating panel looks and where it appears, beside a preview that
- * redraws as you change it. Every explanation is behind its (i).
- */
+/** "Floating panel": the picture of your screen, then one row per knob. */
 export const PanelCard: React.FC = () => {
   const { t } = useTranslation();
   const { settings } = useSettings();
@@ -134,6 +274,11 @@ export const PanelCard: React.FC = () => {
   const panelSize = settings?.assistant_panel_size ?? "standard";
   const stored = settings?.assistant_panel_opacity ?? 1;
   const [opacity, setOpacity] = useState(stored);
+  const storedAnchor: AskAnchor = settings?.assistant_ask_anchor ?? "center";
+  // "Where I left it" is no longer offered; it reads as the middle, as the
+  // backend treats it.
+  const anchor: PanelAnchor =
+    storedAnchor === "custom" ? "center" : storedAnchor;
 
   useEffect(() => setOpacity(stored), [stored]);
 
@@ -189,105 +334,116 @@ export const PanelCard: React.FC = () => {
     }
   };
 
+  const fill = ((opacity - 0.5) / 0.5) * 100;
+
   return (
-    <div className="grid gap-6 rounded-2xl border border-hairline bg-surface p-5 elev-card @3xl:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)]">
-      <PanelPreview fontSize={fontSize} opacity={opacity} />
-      <div className="flex min-w-0 flex-col gap-4">
-        <Line label={t("settings.assistant.appearance.fontSizeLabel")}>
-          <Segmented
-            size="sm"
-            label={t("settings.assistant.appearance.fontSizeLabel")}
-            value={fontSize as (typeof FONT_SIZES)[number]}
-            onChange={(size) => void run(commands.setAssistantFontSize(size))}
-            options={FONT_SIZES.map((size, index) => ({
-              value: size,
-              ariaLabel: t(
-                `settings.assistant.appearance.fontSizes.${FONT_KEYS[size]}`,
-              ),
-              title: t(
-                `settings.assistant.appearance.fontSizes.${FONT_KEYS[size]}`,
-              ),
-              label: (
-                <span
-                  aria-hidden="true"
-                  className="inline-block w-4 text-center font-semibold leading-none"
-                  style={{ fontSize: `${0.625 + index * 0.15625}rem` }}
-                >
-                  A
-                </span>
-              ),
-            }))}
+    <SettingsGroup title={t("assistantPage.cards.panel.title")}>
+      <SettingContainer
+        title={t("assistantPage.panel.where")}
+        description={t("assistantPage.tips.position")}
+        grouped
+        details={
+          <PanelDesktop
+            anchor={anchor}
+            size={panelSize}
+            fontSize={fontSize}
+            opacity={opacity}
+            onAnchor={(next) => void run(commands.setAssistantAskAnchor(next))}
           />
-        </Line>
-        <Line
-          label={t("settings.assistant.appearance.panelSizeLabel")}
-          info={t("assistantPage.tips.panelSize")}
-        >
-          <Segmented
-            size="sm"
-            label={t("settings.assistant.appearance.panelSizeLabel")}
-            value={panelSize as (typeof PANEL_SIZES)[number]}
-            onChange={(size) => void run(commands.setAssistantPanelSize(size))}
-            options={PANEL_SIZES.map((size) => ({
-              value: size,
-              label: t(`settings.assistant.appearance.panelSizes.${size}`),
-            }))}
+        }
+      >
+        <span className="text-[0.8125rem] text-muted">
+          {t(`settings.assistant.appearance.askAnchors.${ANCHOR_KEYS[anchor]}`)}
+        </span>
+      </SettingContainer>
+
+      <SettingContainer title={t("assistantPage.panel.text")} grouped>
+        <Segmented
+          size="sm"
+          label={t("assistantPage.panel.text")}
+          value={fontSize as (typeof FONT_SIZE_IDS)[number]}
+          onChange={(next) => void run(commands.setAssistantFontSize(next))}
+          options={FONT_SIZE_IDS.map((id, index) => ({
+            value: id,
+            ariaLabel: t(
+              `settings.assistant.appearance.fontSizes.${FONT_KEYS[id]}`,
+            ),
+            title: t(
+              `settings.assistant.appearance.fontSizes.${FONT_KEYS[id]}`,
+            ),
+            label: (
+              <span
+                aria-hidden="true"
+                className="inline-block w-4 text-center font-semibold leading-none"
+                style={{ fontSize: `${0.625 + index * 0.15625}rem` }}
+              >
+                A
+              </span>
+            ),
+          }))}
+        />
+      </SettingContainer>
+
+      <SettingContainer
+        title={t("assistantPage.panel.size")}
+        description={t("assistantPage.tips.panelSize")}
+        grouped
+      >
+        <Segmented
+          size="sm"
+          label={t("assistantPage.panel.size")}
+          value={panelSize as (typeof PANEL_SIZES)[number]}
+          onChange={(next) => void run(commands.setAssistantPanelSize(next))}
+          options={PANEL_SIZES.map((id) => ({
+            value: id,
+            label: t(`settings.assistant.appearance.panelSizes.${id}`),
+          }))}
+        />
+      </SettingContainer>
+
+      <SettingContainer
+        title={t("assistantPage.panel.opacity")}
+        description={t("assistantPage.tips.opacity")}
+        grouped
+      >
+        <div className="flex w-[12rem] items-center gap-2.5">
+          <input
+            type="range"
+            min={0.5}
+            max={1}
+            step={0.05}
+            value={opacity}
+            aria-label={t("assistantPage.panel.opacity")}
+            onChange={(event) => setOpacity(parseFloat(event.target.value))}
+            onPointerUp={commitOpacity}
+            onKeyUp={commitOpacity}
+            className="h-1.5 min-w-0 flex-1 cursor-pointer appearance-none rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+            style={{
+              background: `linear-gradient(to right, var(--color-accent) ${fill}%, var(--color-hairline-strong) ${fill}%)`,
+            }}
           />
-        </Line>
-        <Line
-          label={t("settings.assistant.appearance.opacityLabel")}
-          info={t("assistantPage.tips.opacity")}
+          <span className="w-9 text-end text-xs font-medium text-muted tabular-nums">
+            {Math.round(opacity * 100)}%
+          </span>
+        </div>
+      </SettingContainer>
+
+      {displays.length > 1 && (
+        <SettingContainer
+          title={t("assistantPage.panel.screen")}
+          description={t("assistantPage.tips.display")}
+          grouped
         >
-          <div className="flex w-[11rem] items-center gap-2.5">
-            <input
-              type="range"
-              min={0.5}
-              max={1}
-              step={0.05}
-              value={opacity}
-              aria-label={t("settings.assistant.appearance.opacityLabel")}
-              onChange={(event) => setOpacity(parseFloat(event.target.value))}
-              onPointerUp={commitOpacity}
-              onKeyUp={commitOpacity}
-              className="h-1.5 min-w-0 flex-1 cursor-pointer appearance-none rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
-              style={{
-                background: `linear-gradient(to right, var(--color-accent) ${
-                  ((opacity - 0.5) / 0.5) * 100
-                }%, var(--color-hairline-strong) ${((opacity - 0.5) / 0.5) * 100}%)`,
-              }}
-            />
-            <span className="w-9 text-end text-xs font-medium text-muted tabular-nums">
-              {Math.round(opacity * 100)}%
-            </span>
-          </div>
-        </Line>
-        <Line
-          label={t("settings.assistant.appearance.askAnchorLabel")}
-          info={t("assistantPage.tips.position")}
-        >
-          <PositionPicker
-            value={settings?.assistant_ask_anchor ?? "center"}
-            onChange={(anchor) =>
-              void run(commands.setAssistantAskAnchor(anchor))
+          <Dropdown
+            options={displayOptions}
+            selectedValue={settings?.assistant_ask_display ?? "last_used"}
+            onSelect={(display) =>
+              void run(commands.setAssistantAskDisplay(display))
             }
+            className="w-[15rem]"
           />
-        </Line>
-        {displays.length > 1 && (
-          <Line
-            label={t("settings.assistant.appearance.askDisplayLabel")}
-            info={t("assistantPage.tips.display")}
-          >
-            <Dropdown
-              options={displayOptions}
-              selectedValue={settings?.assistant_ask_display ?? "last_used"}
-              onSelect={(display) =>
-                void run(commands.setAssistantAskDisplay(display))
-              }
-              className="w-[14rem]"
-            />
-          </Line>
-        )}
-      </div>
-    </div>
+        </SettingContainer>
+      )}
+    </SettingsGroup>
   );
 };

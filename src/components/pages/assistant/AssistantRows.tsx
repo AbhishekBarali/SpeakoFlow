@@ -9,6 +9,7 @@ import {
   type AssistantResponseLength,
   type AssistantScreenAccessMode,
   type AssistantSearchDepth,
+  type MemoryDetail,
   type Reminder,
   type VisionCaptureTiming,
 } from "@/bindings";
@@ -23,6 +24,10 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { ProviderTile } from "@/components/icons/ProviderLogos";
 import ScreenRecordingPermission from "@/components/ScreenRecordingPermission";
+import {
+  MemoryActions,
+  MemoryDetails,
+} from "@/components/settings/assistant/MemorySettings";
 
 /**
  * The Assistant page's settings, as plain rows: a name, a short (i), and the
@@ -438,11 +443,11 @@ export const RemindersRow: React.FC = () => {
 
 /* ────────────────────────────── profiles ────────────────────────────── */
 
-/** The active persona as a dropdown of faces, and a way to edit them. */
+/** The active persona as a dropdown, and the way into managing them all. */
 export const ProfilesRow: React.FC<{
-  onEdit: () => void;
+  onManage: () => void;
   avatar: (character: AssistantCharacter, size: number) => React.ReactNode;
-}> = ({ onEdit, avatar }) => {
+}> = ({ onManage, avatar }) => {
   const { t } = useTranslation();
   const { settings } = useSettings();
   const run = useSettingCommand();
@@ -469,8 +474,8 @@ export const ProfilesRow: React.FC<{
           ariaLabel={t("assistantPage.cards.profiles.title")}
           searchable={false}
         />
-        <Button variant="secondary" onClick={onEdit} className="h-10">
-          {t("common.edit")}
+        <Button variant="secondary" onClick={onManage} className="h-10">
+          {t("assistantPage.rows.profiles.manage")}
         </Button>
       </div>
     </SettingContainer>
@@ -479,48 +484,60 @@ export const ProfilesRow: React.FC<{
 
 /* ─────────────────────────────── memory ─────────────────────────────── */
 
+const MEMORY_DETAILS: MemoryDetail[] = ["light", "balanced", "detailed"];
+
 /**
- * Memory is a switch. Only once it is on does the row show what the assistant
- * remembers, and the way into the full list — a switched-off memory stays one
- * quiet line, even when something is saved.
+ * Memory is a switch. Turning it on shows what the assistant remembers right
+ * here — the summary and the notes, each editable in place — plus how much of
+ * it goes into a reply. Off, it is one quiet line, even with memories saved.
  */
-export const MemoryRow: React.FC<{ onManage: () => void }> = ({ onManage }) => {
+export const MemoryRow: React.FC = () => {
   const { t } = useTranslation();
   const { settings } = useSettings();
   const run = useSettingCommand();
   const enabled = settings?.assistant_memory_enabled ?? false;
-  const about = (settings?.assistant_memory?.about_you ?? "").trim();
+  const detail = settings?.assistant_memory_detail ?? "balanced";
 
   return (
-    <SettingContainer
-      title={t("assistantPage.cards.memory.title")}
-      description={t("assistantPage.tips.memory")}
-      grouped
-      details={
-        enabled ? (
-          <p
-            className={`line-clamp-2 rounded-lg bg-surface-muted px-3.5 py-2.5 text-[0.8125rem] leading-relaxed ${about ? "text-body" : "text-muted"}`}
-          >
-            {about || t("settings.personalMemory.aboutYou.collapsedEmpty")}
-          </p>
-        ) : undefined
-      }
-    >
-      <div className="flex items-center gap-3">
-        {enabled && (
-          <Button variant="secondary" size="sm" onClick={onManage}>
-            {t("assistantPage.rows.memory.edit")}
-          </Button>
-        )}
-        <Switch
-          checked={enabled}
-          onChange={(value) =>
-            void run(commands.setAssistantMemoryEnabled(value))
-          }
-          label={t("settings.personalMemory.enable.label")}
-        />
-      </div>
-    </SettingContainer>
+    <>
+      <SettingContainer
+        title={t("assistantPage.cards.memory.title")}
+        description={t("assistantPage.tips.memory")}
+        grouped
+        details={enabled ? <MemoryDetails /> : undefined}
+      >
+        <div className="flex items-center gap-1.5">
+          {enabled && <MemoryActions />}
+          <Switch
+            checked={enabled}
+            onChange={(value) =>
+              void run(commands.setAssistantMemoryEnabled(value))
+            }
+            label={t("settings.personalMemory.enable.label")}
+          />
+        </div>
+      </SettingContainer>
+      {enabled && (
+        <SettingContainer
+          title={t("settings.personalMemory.detail.label")}
+          description={t("assistantPage.memory.detailTip")}
+          grouped
+        >
+          <Segmented
+            size="sm"
+            label={t("settings.personalMemory.detail.label")}
+            value={detail}
+            onChange={(value: MemoryDetail) =>
+              void run(commands.setAssistantMemoryDetail(value))
+            }
+            options={MEMORY_DETAILS.map((value) => ({
+              value,
+              label: t(`settings.personalMemory.detail.options.${value}`),
+            }))}
+          />
+        </SettingContainer>
+      )}
+    </>
   );
 };
 

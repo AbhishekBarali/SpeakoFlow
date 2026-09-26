@@ -312,12 +312,14 @@ export const MeetingsSection: React.FC<{
           title={t("meetingsPage.hero.title")}
           subtitle={t("meetingsPage.hero.subtitle")}
           aside={
-            <div className="flex flex-col items-start gap-4 @3xl:items-end">
+            // One column the width of its widest line, so the button and the
+            // switch under it share a centre instead of a ragged edge.
+            <div className="inline-grid gap-3.5">
               <button
                 type="button"
                 onClick={start}
                 disabled={busy !== null}
-                className="glass-button inline-flex h-11 cursor-pointer items-center gap-2.5 rounded-full px-5 text-[0.9375rem] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:cursor-wait disabled:opacity-70"
+                className="glass-button inline-flex h-11 w-full cursor-pointer items-center justify-center gap-2.5 rounded-full px-6 text-[0.9375rem] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:cursor-wait disabled:opacity-70"
               >
                 <span className="h-2.5 w-2.5 rounded-full bg-[#e5484d]" />
                 {busy === "starting"

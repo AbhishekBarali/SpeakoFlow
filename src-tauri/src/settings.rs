@@ -1566,9 +1566,10 @@ pub struct AppSettings {
     /// only the summary; Balanced adds a few relevant notes; Detailed adds more.
     #[serde(default)]
     pub assistant_memory_detail: MemoryDetail,
-    /// When true, this conversation is "incognito": memory is neither injected
-    /// into replies nor learned from the conversation. A quick switch so a
-    /// private chat leaves no trace in memory.
+    /// Retired: the old "Incognito chat" switch, which meant the same as memory
+    /// off. Kept so older stores still deserialize; `retire_memory_incognito`
+    /// folds a stored `true` into memory off at load, so a running app always
+    /// sees `false` here.
     #[serde(default)]
     pub assistant_memory_incognito: bool,
     #[serde(default = "default_assistant_font_size")]
@@ -2984,8 +2985,26 @@ fn sync_assistant_screen_access_compat(settings: &mut AppSettings) -> bool {
     true
 }
 
+/// Fold the retired "Incognito chat" switch into the memory switch.
+///
+/// Incognito was a second, persisted switch beside "Memory" that meant "don't
+/// use memory and don't learn" — which is what turning memory off means. Two
+/// names for one state read as a puzzle, so the app no longer shows it. A store
+/// that still has it on is honoured rather than dropped: the user wanted memory
+/// out of the way, so memory becomes off, where they can see it and turn it
+/// back on. Without this, a hidden `true` would keep memory silently inert.
+fn retire_memory_incognito(settings: &mut AppSettings) -> bool {
+    if !settings.assistant_memory_incognito {
+        return false;
+    }
+    settings.assistant_memory_incognito = false;
+    settings.assistant_memory_enabled = false;
+    true
+}
+
 fn ensure_assistant_defaults(settings: &mut AppSettings) -> bool {
     let mut changed = sync_assistant_screen_access_compat(settings);
+    changed |= retire_memory_incognito(settings);
     for provider in default_post_process_providers() {
         if !settings.assistant_models.contains_key(&provider.id) {
             settings
@@ -5508,6 +5527,26 @@ mod tests {
         ));
         settings.sync_active_tts_fields();
         assert_eq!(settings.assistant_tts_api_key.0, "real-openrouter-key");
+    }
+
+    /// The retired incognito switch becomes "memory off" instead of lingering as
+    /// an invisible reason memory does nothing, and a store without it is left
+    /// exactly as it was.
+    #[test]
+    fn ensure_assistant_defaults_folds_incognito_into_memory_off() {
+        let mut paused = get_default_settings();
+        paused.assistant_memory_enabled = true;
+        paused.assistant_memory_incognito = true;
+        assert!(ensure_assistant_defaults(&mut paused));
+        assert!(!paused.assistant_memory_incognito);
+        assert!(!paused.assistant_memory_enabled);
+
+        let mut on = get_default_settings();
+        on.assistant_memory_enabled = true;
+        on.assistant_memory_incognito = false;
+        ensure_assistant_defaults(&mut on);
+        assert!(on.assistant_memory_enabled);
+        assert!(!retire_memory_incognito(&mut on));
     }
 
     #[test]

@@ -60,6 +60,7 @@ export const DictionaryPage: React.FC = () => {
           <div className="tab-reveal space-y-5">
             {intro.visible && (
               <Hero
+                art
                 title={t("dictionary.hero.title")}
                 subtitle={t("dictionary.hero.subtitle")}
                 onDismiss={intro.dismiss}

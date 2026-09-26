@@ -2299,7 +2299,7 @@
     "styles": {
       "title": "Writing style",
       "description": "How cleaned text should read. Applied after the fixes, so corrections stay the same.",
-      "createTitle": "Create a style",
+      "createTitle": "New style",
       "createHint": "Describe how you want your text to sound.",
       "editTitle": "Edit style",
       "editorIntro": "Give the style a name and describe how your text should change. It's applied after cleanup, so the corrections stay the same.",
@@ -2335,6 +2335,12 @@
         "concise": "Meet tomorrow at 11 to review the budget.",
         "formal": "I propose that we meet tomorrow at eleven o'clock to review the budget.",
         "casual": "let's meet tomorrow at eleven and go over the budget"
+      },
+      "form": {
+        "name": "Name",
+        "instruction": "Instructions",
+        "instructionTip": "How the wording should change. Applied after cleanup, so the fixes stay the same.",
+        "instructionPlaceholder": "For example: keep it casual and lowercase, and turn spoken emoji names into emoji."
       }
     },
     "hero": {
@@ -2402,7 +2408,7 @@
       },
       "profiles": {
         "title": "Profiles",
-        "description": "Personas with their own name, style, and voice.",
+        "description": "Personas the assistant can switch between, each with its own instructions.",
         "status": "Default"
       },
       "memory": {
@@ -2510,6 +2516,9 @@
       },
       "memory": {
         "edit": "View memory"
+      },
+      "profiles": {
+        "manage": "Manage"
       }
     },
     "tips": {
@@ -2527,10 +2536,83 @@
       "replyLength": "How long answers usually are.",
       "history": "How many recent messages it keeps in mind.",
       "summarize": "Condenses long chats so it doesn't forget the start.",
-      "panelSize": "How large the panel is on your screen.",
+      "panelSize": "How much of your screen it takes.",
       "opacity": "Lower lets your desktop show through.",
-      "position": "Click where the panel should open.",
+      "position": "Click a spot on the screen below. You can also drag the panel there.",
       "display": "The screen the panel opens on."
+    },
+    "memory": {
+      "aboutTip": "A short summary it keeps in mind in every reply. It updates as you talk, and you can edit it any time.",
+      "aboutEmpty": "Nothing yet. It fills this in as you talk, or you can write it yourself.",
+      "write": "Write it",
+      "notesTitle": "Things it remembers",
+      "notesTip": "Facts it picked up from your chats, plus anything you add. Each reply uses the ones that fit.",
+      "notesEmpty": "Nothing yet. It learns from your chats, or add something above.",
+      "showAll": "Show all {{count}}",
+      "showFewer": "Show fewer",
+      "detailTip": "Light uses only the summary. Detailed adds more notes and is a little slower.",
+      "more": "More memory options",
+      "learnNow": "Learn from this chat now",
+      "export": "Export memory…",
+      "import": "Import memory…",
+      "erase": "Erase memory…",
+      "eraseTitle": "Erase memory?",
+      "eraseBody_one": "This deletes the summary and {{count}} note. It can't be undone.",
+      "eraseBody_other": "This deletes the summary and all {{count}} notes. It can't be undone.",
+      "eraseConfirm": "Erase",
+      "learnedToast": "Memory updated from this chat",
+      "exportedToast": "Memory exported",
+      "importedToast": "Memory imported"
+    },
+    "profiles": {
+      "new": "New profile",
+      "newBlank": "Start from scratch",
+      "newWithAi": "Describe it and let AI write it",
+      "listMore": "More profile options",
+      "import": "Import from a file…",
+      "restoreBuiltins": "Bring back built-in profiles",
+      "restored_one": "Brought back {{count}} profile",
+      "restored_other": "Brought back {{count}} profiles",
+      "restoredNone": "All built-in profiles are already here",
+      "inUse": "In use",
+      "use": "Use this profile",
+      "more": "More options for this profile",
+      "duplicate": "Duplicate",
+      "export": "Export…",
+      "exported": "Profile exported",
+      "restoreDefault": "Restore original",
+      "delete": "Delete profile…",
+      "deleteTitle": "Delete {{name}}?",
+      "deleteBody": "This can't be undone.",
+      "addPicture": "Add a picture",
+      "changePicture": "Change picture",
+      "removePicture": "Remove picture",
+      "roleLabel": "Description",
+      "roleTip": "A few words shown under the name.",
+      "rolePlaceholder": "For example: short, direct answers",
+      "instructionsLabel": "Instructions",
+      "instructionsTip": "How this profile thinks and talks. Sent with every message.",
+      "lengthLabel": "Reply length",
+      "lengthTip": "Default follows Reply length on the Assistant page.",
+      "lengths": {
+        "inherit": "Default",
+        "short": "Short",
+        "medium": "Medium",
+        "long": "Long"
+      },
+      "greetingLabel": "Greeting",
+      "greetingTip": "Optional. Shown when a new chat starts.",
+      "greetingPlaceholder": "Hi! What are we working on?",
+      "aiTitle": "Describe a new profile",
+      "aiBody": "Say or type what it should be like. The assistant writes its name and instructions.",
+      "aiCreate": "Create profile"
+    },
+    "panel": {
+      "where": "Where it opens",
+      "text": "Text size",
+      "size": "Panel size",
+      "opacity": "Opacity",
+      "screen": "Which screen"
     }
   },
   "meetingsPage": {
@@ -2554,10 +2636,17 @@
     "hideOriginal": "Hide original",
     "playRecording": "Play recording",
     "hideRecording": "Close player",
-    "audioMissing": "This recording's audio file is no longer available."
+    "audioMissing": "This recording's audio file is no longer available.",
+    "chat": {
+      "continue": "Continue",
+      "continueTitle": "Open this chat in the assistant",
+      "showMessages": "Show messages",
+      "hideMessages": "Hide messages",
+      "assistantOff": "Turn the assistant on to continue this chat."
+    }
   },
   "pickers": {
-    "browse": "Browse all models",
+    "browse": "Manage models",
     "download": "Download more models",
     "choose": "Choose a model",
     "switchFailed": "Couldn't switch models. Try again.",
@@ -2565,13 +2654,44 @@
     "needsKey": "Needs an API key",
     "groups": {
       "device": "On this computer",
-      "cloud": "Cloud"
+      "cloud": "Cloud",
+      "setup": "Not set up yet"
     },
     "label": {
       "assistant": "Assistant model",
       "cleanup": "AI cleanup model",
       "stt": "Speech-to-text model",
       "voice": "Voice"
+    },
+    "needsSetup": "Needs setup",
+    "finishSetup": "Finish setup",
+    "setup": {
+      "title": "Set up {{provider}}",
+      "bodyKey": "Paste your API key, then pick a model.",
+      "bodyServer": "Enter your server's address, then pick a model.",
+      "bodyBoth": "Enter the endpoint and your API key, then pick a model.",
+      "endpoint": "Endpoint URL",
+      "apiKey": "API key",
+      "apiKeyOptional": "API key (optional)",
+      "keyPlaceholder": "Paste your key",
+      "getKey": "Get a key at {{site}}",
+      "model": "Model",
+      "modelPlaceholder": "Choose or type a model",
+      "loadModels": "Load models",
+      "noModels": "No models found. Type the model name instead.",
+      "typeInstead": "Type a name instead",
+      "pickFromList": "Pick from the list",
+      "use": "Save and use",
+      "done": "Now using {{provider}}"
+    },
+    "voiceSetup": {
+      "bodyKey": "Paste your API key, then pick a voice.",
+      "bodyEndpoint": "Enter the endpoint and your API key, then pick a voice.",
+      "voice": "Voice",
+      "voicePlaceholder": "Choose a voice",
+      "loadVoices": "Load voices",
+      "noVoices": "No voices found. Paste a voice ID instead.",
+      "model": "Model (optional)"
     }
   },
   "catalog": {

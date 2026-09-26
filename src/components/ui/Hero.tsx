@@ -8,9 +8,10 @@ import { X } from "lucide-react";
  * shortcut, drawn as frosted keys you can click to change) so the rest of the
  * page can be plain settings.
  *
- * Behind the content sits `FlowArt`: a few quiet lines that start as a gentle
- * wave and settle into a paragraph, drawn once when the page opens. It
- * replaces a bar-chart "audio waveform" that read as a level meter.
+ * Pages with room to spare can opt into `FlowArt` behind the content (`art`):
+ * a few quiet lines that start as a gentle wave and settle into a paragraph,
+ * drawn once when the page opens. Only Dictionary does; on busier heroes it
+ * competed with the title and the keys.
  */
 
 const ART_W = 600;
@@ -136,7 +137,8 @@ export const Hero: React.FC<{
   /** Makes the hero closable. The caller persists the choice. */
   onDismiss?: () => void;
   className?: string;
-  /** Hide the decorative art. */
+  /** Draw the decorative line art. Off by default: it is kept for pages with
+   *  room to spare (Dictionary), and elsewhere it competed with the content. */
   art?: boolean;
 }> = ({
   title,
@@ -145,7 +147,7 @@ export const Hero: React.FC<{
   aside,
   onDismiss,
   className = "",
-  art = true,
+  art = false,
 }) => {
   const { t } = useTranslation();
   return (

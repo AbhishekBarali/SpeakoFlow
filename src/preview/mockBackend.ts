@@ -10,6 +10,7 @@
  * URL knobs: ?page=home|history|assistant|meetings|cleanup|dictionary|models
  *            &tab=stt|cleanup|assistant|voice   &settings=<tab>
  *            &stt=device|cloud   &theme=light|dark   &fresh=1 (no history)
+ *            &memory=on (assistant memory switched on)
  */
 import {
   mockConvertFileSrc,
@@ -346,6 +347,10 @@ const settings: Json = {
   assistant_tts_model: "eleven_v3_conversational",
   assistant_tts_api_key: "xi-preview",
   assistant_tts_api_keys: { elevenlabs: "xi-preview" },
+  assistant_tts_remote_voice: "JBFqnCBsd6RMkjVDRZzb",
+  assistant_tts_remote_voices: { elevenlabs: "JBFqnCBsd6RMkjVDRZzb" },
+  assistant_tts_models: { elevenlabs: "eleven_v3_conversational" },
+  assistant_tts_base_urls: {},
   assistant_characters: [
     {
       id: "default",
@@ -373,7 +378,7 @@ const settings: Json = {
     },
   ],
   assistant_active_character_id: "default",
-  assistant_memory_enabled: false,
+  assistant_memory_enabled: params.get("memory") === "on",
   assistant_memory_detail: "detailed",
   assistant_memory: {
     about_you:
@@ -478,6 +483,30 @@ const history = fresh
       post_process_requested: index % 2 === 1,
     }));
 
+const assistantSessions = fresh
+  ? []
+  : [
+      [
+        "What's the fastest way to rename a git branch?",
+        "Run `git branch -m new-name` on the branch, then push it with `git push -u origin new-name` and delete the old one on the remote.",
+        2400,
+      ],
+      [
+        "Summarize the error on my screen",
+        "The build failed because `serde_json` is imported but not in Cargo.toml. Add it under [dependencies] and rebuild.",
+        86400 + 3600,
+      ],
+    ].map(([question, answer, ago], index) => ({
+      id: 7 - index,
+      timestamp: now - (ago as number) - 600,
+      updated_at: now - (ago as number),
+      title: question,
+      messages: [
+        { role: "user", content: question },
+        { role: "assistant", content: answer },
+      ],
+    }));
+
 const meetings = fresh
   ? []
   : [
@@ -531,7 +560,10 @@ const handlers: Record<string, (args: Json) => unknown> = {
       !!(settings.cloud_stt_api_keys as Record<string, string>)[p.id as string],
     ]),
   get_history_entries: () => ({ entries: history, has_more: false }),
-  get_assistant_history_entries: () => ({ entries: [], has_more: false }),
+  get_assistant_history_entries: () => ({
+    entries: assistantSessions,
+    has_more: false,
+  }),
   get_usage_stats: () =>
     fresh
       ? {
@@ -637,9 +669,26 @@ const handlers: Record<string, (args: Json) => unknown> = {
   get_log_dir_path: () =>
     "C:\\Users\\preview\\AppData\\Local\\SpeakoFlow\\logs",
   check_custom_sounds: () => ({ start: false, stop: false }),
-  assistant_list_tts_voices: () => [],
+  assistant_list_tts_voices: () =>
+    settings.assistant_tts_engine === "elevenlabs"
+      ? [
+          { id: "JBFqnCBsd6RMkjVDRZzb", label: "George" },
+          { id: "EXAVITQu4vr4xnSDxMaL", label: "Sarah" },
+          { id: "IKne3meq5aSn9XLyUdCD", label: "Charlie" },
+        ]
+      : [
+          { id: "alloy", label: "alloy" },
+          { id: "verse", label: "verse" },
+        ],
   assistant_list_tts_models: () => [],
-  fetch_post_process_models: () => [],
+  fetch_post_process_models: ({ providerId }) =>
+    (
+      ({
+        anthropic: ["claude-sonnet-4-5", "claude-haiku-4-5", "claude-opus-4-1"],
+        openai: ["gpt-5-mini", "gpt-5", "gpt-4.1-mini"],
+        groq: ["openai/gpt-oss-120b", "llama-3.3-70b-versatile"],
+      }) as Record<string, string[]>
+    )[providerId as string]?.map((id) => ({ id, label: id })) ?? [],
   preview_recording_retention: () => 0,
   "plugin:app|version": () => "1.5.0",
   "plugin:window|is_maximized": () => false,
@@ -697,7 +746,58 @@ const handlers: Record<string, (args: Json) => unknown> = {
     return null;
   },
   set_assistant_tts_engine: ({ engine }) => {
+    // Like the backend: the engine's own saved values become the live ones.
     settings.assistant_tts_engine = engine;
+    const id = engine as string;
+    const from = (map: string) =>
+      ((settings[map] as Record<string, string> | undefined) ?? {})[id] ?? "";
+    settings.assistant_tts_api_key = from("assistant_tts_api_keys");
+    settings.assistant_tts_remote_voice = from("assistant_tts_remote_voices");
+    settings.assistant_tts_model = from("assistant_tts_models");
+    settings.assistant_tts_base_url =
+      from("assistant_tts_base_urls") ||
+      (id === "openai" ? "https://api.openai.com/v1" : "");
+    return null;
+  },
+  // The per-engine TTS setters write the live field and the engine's own slot.
+  ...Object.fromEntries(
+    (
+      [
+        ["set_assistant_tts_api_key", "apiKey", "assistant_tts_api_key"],
+        [
+          "set_assistant_tts_remote_voice",
+          "voice",
+          "assistant_tts_remote_voice",
+        ],
+        ["set_assistant_tts_model", "model", "assistant_tts_model"],
+        ["set_assistant_tts_base_url", "baseUrl", "assistant_tts_base_url"],
+      ] as const
+    ).map(([command, arg, key]) => [
+      command,
+      (payload: Json) => {
+        settings[key] = payload[arg];
+        const map = `${key}s`;
+        settings[map] = {
+          ...((settings[map] as Json | undefined) ?? {}),
+          [settings.assistant_tts_engine as string]: payload[arg],
+        };
+        return null;
+      },
+    ]),
+  ),
+  change_post_process_api_key_setting: ({ providerId, apiKey }) => {
+    (settings.post_process_api_keys as Json)[providerId as string] = apiKey;
+    return null;
+  },
+  change_post_process_model_setting: ({ providerId, model: id }) => {
+    (settings.post_process_models as Json)[providerId as string] = id;
+    return null;
+  },
+  change_post_process_base_url_setting: ({ providerId, baseUrl }) => {
+    const provider = (settings.post_process_providers as Json[]).find(
+      (item) => item.id === providerId,
+    );
+    if (provider) provider.base_url = baseUrl;
     return null;
   },
   // Generic mirror for the simple assistant setters the new cards call, so

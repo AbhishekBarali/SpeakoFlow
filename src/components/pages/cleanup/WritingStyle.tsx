@@ -7,6 +7,7 @@ import { useSettings } from "@/hooks/useSettings";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
+import { InfoTip } from "@/components/ui/InfoTip";
 
 /** Mirrors `PostProcessTone` ids in settings.rs. */
 const BUILTIN_TONE_IDS = [
@@ -37,7 +38,14 @@ const useCustomTones = (): CustomPostProcessTone[] => {
   );
 };
 
-/** Name and instruction for one style, edited in place inside the card. */
+/** The frame every state of the area under the pills shares. */
+const PANEL = "mt-4 rounded-xl border border-hairline";
+
+/**
+ * A style's name and instructions, stacked, in the same place the preview
+ * sits — so creating or editing a style swaps what is under the pills rather
+ * than growing a second box below them.
+ */
 const StyleEditor: React.FC<{
   state: Exclude<EditorState, null>;
   onDone: () => void;
@@ -131,7 +139,7 @@ const StyleEditor: React.FC<{
 
   return (
     <form
-      className="mt-4 space-y-3 rounded-xl border border-accent/30 bg-accent/[0.03] p-4"
+      className={`${PANEL} tab-reveal space-y-4 p-4 sm:p-5`}
       onSubmit={(event) => {
         event.preventDefault();
         void save();
@@ -148,45 +156,42 @@ const StyleEditor: React.FC<{
           ? t("cleanup.styles.editTitle")
           : t("cleanup.styles.createTitle")}
       </p>
-      <div className="grid gap-3 sm:grid-cols-[12rem_minmax(0,1fr)]">
-        <div className="space-y-1.5">
-          <label
-            htmlFor={nameId}
-            className="block text-xs font-medium text-muted"
-          >
-            {t("settings.postProcessing.tone.nameLabel")}
-          </label>
-          <Input
-            ref={nameRef}
-            id={nameId}
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            placeholder={t("settings.postProcessing.tone.namePlaceholder")}
-            variant="compact"
-            className="w-full"
-          />
-        </div>
-        <div className="space-y-1.5">
+      <div className="space-y-1.5">
+        <label
+          htmlFor={nameId}
+          className="block text-[0.8125rem] font-medium text-ink"
+        >
+          {t("cleanup.styles.form.name")}
+        </label>
+        <Input
+          ref={nameRef}
+          id={nameId}
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+          placeholder={t("settings.postProcessing.tone.namePlaceholder")}
+          className="w-full"
+        />
+      </div>
+      <div className="space-y-1.5">
+        <div className="flex items-center gap-1">
           <label
             htmlFor={instructionId}
-            className="block text-xs font-medium text-muted"
+            className="text-[0.8125rem] font-medium text-ink"
           >
-            {t("settings.postProcessing.tone.instructionsLabel")}
+            {t("cleanup.styles.form.instruction")}
           </label>
-          <Textarea
-            id={instructionId}
-            value={instruction}
-            onChange={(event) => setInstruction(event.target.value)}
-            rows={3}
-            variant="compact"
-            placeholder={t(
-              "settings.postProcessing.tone.instructionsPlaceholder",
-            )}
-            className="w-full"
-          />
+          <InfoTip text={t("cleanup.styles.form.instructionTip")} />
         </div>
+        <Textarea
+          id={instructionId}
+          value={instruction}
+          onChange={(event) => setInstruction(event.target.value)}
+          rows={4}
+          placeholder={t("cleanup.styles.form.instructionPlaceholder")}
+          className="w-full"
+        />
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 pt-1">
         {isEdit && (
           <Button
             type="button"
@@ -218,14 +223,82 @@ const StyleEditor: React.FC<{
   );
 };
 
+/** A built-in style, shown on one real sentence: what you say, what it types. */
+const BuiltinPreview: React.FC<{ tone: BuiltinTone }> = ({ tone }) => {
+  const { t } = useTranslation();
+  return (
+    <>
+      <div
+        className={`${PANEL} grid gap-px overflow-hidden bg-hairline sm:grid-cols-2`}
+      >
+        <div className="bg-surface-muted px-4 py-3.5">
+          <p className="text-xs font-medium text-muted">
+            {t("cleanup.styles.preview.youSay")}
+          </p>
+          <p className="mt-1.5 text-sm leading-relaxed text-muted">
+            {t("cleanup.styles.samples.raw")}
+          </p>
+        </div>
+        <div className="bg-surface px-4 py-3.5">
+          <p className="text-xs font-medium text-accent">
+            {t("cleanup.styles.preview.itTypes")}
+          </p>
+          <p
+            key={tone}
+            className="style-swap mt-1.5 text-[0.9375rem] font-medium leading-relaxed text-ink"
+          >
+            {t(`cleanup.styles.samples.${tone}`)}
+          </p>
+        </div>
+      </div>
+      <p className="mt-2.5 text-xs text-muted">
+        {t(`cleanup.styles.builtin.${tone}`)}
+      </p>
+    </>
+  );
+};
+
+/**
+ * A style of your own: its instruction, which is the whole of what it does.
+ * It cannot be previewed honestly on a sample sentence without running it, so
+ * there is no "you say" beside it.
+ */
+const CustomStyleView: React.FC<{
+  tone: CustomPostProcessTone;
+  onEdit: () => void;
+  disabled: boolean;
+}> = ({ tone, onEdit, disabled }) => {
+  const { t } = useTranslation();
+  return (
+    <div key={tone.id} className={`${PANEL} style-swap px-4 py-3.5`}>
+      <div className="flex min-h-7 items-center gap-2">
+        <p className="min-w-0 flex-1 text-xs font-medium text-accent">
+          {t("cleanup.styles.preview.yourInstruction")}
+        </p>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onEdit}
+          disabled={disabled}
+          className="-me-2"
+        >
+          <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+          {t("common.edit")}
+        </Button>
+      </div>
+      <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-ink">
+        {tone.instruction}
+      </p>
+    </div>
+  );
+};
+
 /**
  * Writing style, with every style in plain sight.
  *
- * Styles used to live in a dropdown with a "Manage" button that opened a
- * dialog, which opened another dialog to edit one — so changing how your
- * dictation reads took three clicks into places nobody looks. Now each style is
- * a pill, the one you pick shows what it does to a real sentence right under
- * it, and your own styles are created and edited in the same card.
+ * Each style is a pill. Under the pills: a built-in style shows what it does
+ * to one real sentence, a style of your own shows its instruction, and
+ * creating or editing one turns that same area into the form.
  */
 export const WritingStyleCard: React.FC<{ disabled?: boolean }> = ({
   disabled = false,
@@ -240,8 +313,12 @@ export const WritingStyleCard: React.FC<{ disabled?: boolean }> = ({
     getSetting("post_process_tone") ??
     "none";
   const selectedCustom = customTones.find((tone) => tone.id === selectedId);
+  const builtin: BuiltinTone = BUILTIN_IDS.has(selectedId)
+    ? (selectedId as BuiltinTone)
+    : "none";
 
   const select = async (toneId: string) => {
+    setEditor(null);
     if (toneId === selectedId || busy) return;
     setBusy(true);
     try {
@@ -259,13 +336,13 @@ export const WritingStyleCard: React.FC<{ disabled?: boolean }> = ({
   };
 
   const pill = (id: string, label: string) => {
-    const selected = id === selectedId;
+    const selected = id === selectedId && !editor;
     return (
       <button
         key={id}
         type="button"
         role="radio"
-        aria-checked={selected}
+        aria-checked={id === selectedId}
         disabled={disabled}
         onClick={() => void select(id)}
         className={`inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full border px-3.5 text-[0.8125rem] font-medium transition-[background-color,border-color,color] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:cursor-not-allowed disabled:opacity-50 ${
@@ -282,9 +359,7 @@ export const WritingStyleCard: React.FC<{ disabled?: boolean }> = ({
     );
   };
 
-  const builtin = BUILTIN_IDS.has(selectedId)
-    ? (selectedId as BuiltinTone)
-    : null;
+  const creating = editor?.mode === "create";
 
   return (
     <div>
@@ -299,70 +374,34 @@ export const WritingStyleCard: React.FC<{ disabled?: boolean }> = ({
         {customTones.map((tone) => pill(tone.id, tone.name))}
         <button
           type="button"
-          onClick={() => setEditor({ mode: "create" })}
+          aria-pressed={creating}
+          onClick={() => setEditor(creating ? null : { mode: "create" })}
           disabled={disabled}
-          className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full border border-dashed border-hairline-strong px-3.5 text-[0.8125rem] font-medium text-muted transition-colors hover:border-accent/50 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:cursor-not-allowed disabled:opacity-50"
+          className={`inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full border border-dashed px-3.5 text-[0.8125rem] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:cursor-not-allowed disabled:opacity-50 ${
+            creating
+              ? "border-accent text-accent"
+              : "border-hairline-strong text-muted hover:border-accent/50 hover:text-accent"
+          }`}
         >
           <Plus className="h-3.5 w-3.5" aria-hidden="true" />
           {t("cleanup.styles.newStyle")}
         </button>
       </div>
 
-      {/* What the selected style does, shown on one real sentence. A style of
-          your own cannot be previewed honestly, so it shows its instruction. */}
-      <div className="mt-4 grid gap-px overflow-hidden rounded-xl border border-hairline bg-hairline sm:grid-cols-2">
-        <div className="bg-surface-muted px-4 py-3.5">
-          <p className="text-xs font-medium text-muted">
-            {t("cleanup.styles.preview.youSay")}
-          </p>
-          <p className="mt-1.5 text-sm leading-relaxed text-muted">
-            {t("cleanup.styles.samples.raw")}
-          </p>
-        </div>
-        <div className="bg-surface px-4 py-3.5">
-          <p className="text-xs font-medium text-accent">
-            {selectedCustom
-              ? t("cleanup.styles.preview.yourInstruction")
-              : t("cleanup.styles.preview.itTypes")}
-          </p>
-          <p
-            key={selectedId}
-            className={`style-swap mt-1.5 leading-relaxed text-ink ${
-              selectedCustom ? "text-sm" : "text-[0.9375rem] font-medium"
-            }`}
-          >
-            {selectedCustom
-              ? selectedCustom.instruction
-              : t(`cleanup.styles.samples.${builtin ?? "none"}`)}
-          </p>
-        </div>
-      </div>
-      <div className="mt-2.5 flex min-h-8 flex-wrap items-center justify-between gap-2">
-        <p className="text-xs text-muted">
-          {builtin
-            ? t(`cleanup.styles.builtin.${builtin}`)
-            : selectedCustom
-              ? t("cleanup.styles.customHint")
-              : null}
-        </p>
-        {selectedCustom && !editor && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setEditor({ mode: "edit", tone: selectedCustom })}
-          >
-            <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
-            {t("cleanup.styles.editNamed", { name: selectedCustom.name })}
-          </Button>
-        )}
-      </div>
-
-      {editor && (
+      {editor ? (
         <StyleEditor
           key={editor.mode === "edit" ? editor.tone.id : "create"}
           state={editor}
           onDone={() => setEditor(null)}
         />
+      ) : selectedCustom ? (
+        <CustomStyleView
+          tone={selectedCustom}
+          disabled={disabled}
+          onEdit={() => setEditor({ mode: "edit", tone: selectedCustom })}
+        />
+      ) : (
+        <BuiltinPreview tone={builtin} />
       )}
     </div>
   );

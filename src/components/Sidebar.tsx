@@ -2,11 +2,11 @@ import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   BookA,
-  Boxes,
   ChartColumn,
   ChevronsLeft,
   ChevronsRight,
   Cloud,
+  Cpu,
   History,
   House,
   MessageCircle,
@@ -37,21 +37,24 @@ interface NavItem {
  * the long tail of preferences — lives behind Settings at the bottom, the way
  * the reference apps arrange it. The old rail was five settings pages, which
  * put a hundred options one click from the top and the product nowhere.
+ *
+ * Insights closes the list: it is where you look back, not where you work, so
+ * the pages used every day come first.
  */
 export const NAV_ITEMS: NavItem[] = [
   { id: "home", labelKey: "nav.home", icon: House },
-  { id: "insights", labelKey: "nav.insights", icon: ChartColumn },
   { id: "history", labelKey: "nav.history", icon: History },
   { id: "assistant", labelKey: "nav.assistant", icon: MessageCircle },
   { id: "meetings", labelKey: "nav.meetings", icon: Users },
   { id: "cleanup", labelKey: "nav.cleanup", icon: Wand2 },
   { id: "dictionary", labelKey: "nav.dictionary", icon: BookA },
+  { id: "insights", labelKey: "nav.insights", icon: ChartColumn },
 ];
 
 const MODELS_ITEM: NavItem = {
   id: "models",
   labelKey: "nav.models",
-  icon: Boxes,
+  icon: Cpu,
 };
 
 const NavButton: React.FC<{

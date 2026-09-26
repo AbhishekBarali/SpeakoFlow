@@ -2387,6 +2387,19 @@
   overflow-y: hidden;
 }
 
+/* The floating-panel preview on the Assistant page: a miniature desktop the
+ * card is drawn on, at the spot it opens. The same calm wallpaper as above, so
+ * lowering the opacity still reads as frosted glass over a desktop. */
+.assistant-desktop {
+  background: radial-gradient(
+    130% 130% at 15% 12%,
+    #3a4252 0%,
+    #262b37 48%,
+    #171920 100%
+  );
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
 /* The two shapes the real surface takes, drawn statically side by side. They
  * borrow the panel's own classes so colour, opacity and text size can only ever
  * be the live ones; only the positioning is preview-specific, because the real
