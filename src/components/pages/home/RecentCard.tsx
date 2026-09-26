@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Check, Copy } from "lucide-react";
+import { Check, Copy, Sparkles, Wand2 } from "lucide-react";
 import { commands, events, type HistoryEntry } from "@/bindings";
 import { useSettings } from "@/hooks/useSettings";
 import { Keycaps } from "@/components/ui/Keycaps";
@@ -45,16 +45,34 @@ const RecentRow: React.FC<{ entry: HistoryEntry }> = ({ entry }) => {
         <p className="line-clamp-2 select-text text-[0.9375rem] leading-relaxed text-ink">
           {text}
         </p>
-        <p className="mt-1 text-xs text-muted">
+        <p className="mt-1 flex items-center text-xs text-muted">
           {formatRelativeTime(String(entry.timestamp), i18n.language)}
           {(cleaned || isFlow) && (
             <>
               <span aria-hidden="true" className="mx-1.5 text-muted-soft">
                 ·
               </span>
-              {isFlow
-                ? t("settings.history.flowLabel")
-                : t("home.recent.cleaned")}
+              {/* An icon rather than a caption, as on the History page. */}
+              <span
+                role="img"
+                aria-label={
+                  isFlow
+                    ? t("settings.history.flowLabel")
+                    : t("home.recent.cleaned")
+                }
+                title={
+                  isFlow
+                    ? t("settings.history.flowLabel")
+                    : t("home.recent.cleaned")
+                }
+                className="inline-flex text-accent"
+              >
+                {isFlow ? (
+                  <Sparkles className="h-3 w-3" aria-hidden="true" />
+                ) : (
+                  <Wand2 className="h-3 w-3" aria-hidden="true" />
+                )}
+              </span>
             </>
           )}
         </p>

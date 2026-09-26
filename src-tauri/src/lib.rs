@@ -41,6 +41,8 @@ mod tts;
 mod utils;
 mod voice_conversation;
 mod web_search;
+#[cfg(any(windows, test))]
+mod webview_prefs;
 
 pub use cli::CliArgs;
 
@@ -1167,6 +1169,21 @@ pub fn run(cli_args: CliArgs) {
         .manage(cli_args.clone())
         .setup(move |app| {
             specta_builder.mount_events(app);
+
+            // Undo a caret browsing mode switched on by a stray F7 before any
+            // webview claims the profile (see webview_prefs.rs). The profile
+            // lives in the portable Data dir or, by default, in the app's local
+            // data dir.
+            #[cfg(windows)]
+            {
+                let user_data_dir = match portable::data_dir() {
+                    Some(data_dir) => Some(data_dir.join("webview")),
+                    None => app.path().app_local_data_dir().ok(),
+                };
+                if let Some(user_data_dir) = user_data_dir {
+                    webview_prefs::disable_caret_browsing(&user_data_dir);
+                }
+            }
 
             // Create main window programmatically so we can set data_directory
             // for portable mode (redirects WebView2 cache to portable Data dir)

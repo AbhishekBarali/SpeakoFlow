@@ -71,7 +71,7 @@ export function Tabs<T extends string>({
               onKeyDown={(event) => onKeyDown(event, index)}
               className={`relative inline-flex cursor-pointer items-center gap-1.5 pb-3 text-[0.9375rem] transition-colors focus-visible:outline-none focus-visible:after:bg-accent ${
                 selected
-                  ? "font-medium text-ink after:absolute after:inset-x-0 after:bottom-0 after:h-[2px] after:rounded-full after:bg-ink"
+                  ? "font-medium text-ink after:absolute after:inset-x-0 after:bottom-0 after:h-[2px] after:rounded-full after:bg-accent"
                   : "text-muted hover:text-ink"
               }`}
             >

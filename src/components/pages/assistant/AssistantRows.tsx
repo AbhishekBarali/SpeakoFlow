@@ -9,7 +9,6 @@ import {
   type AssistantResponseLength,
   type AssistantScreenAccessMode,
   type AssistantSearchDepth,
-  type MemoryDetail,
   type Reminder,
   type VisionCaptureTiming,
 } from "@/bindings";
@@ -21,13 +20,11 @@ import { LogoChoice } from "@/components/ui/LogoChoice";
 import { LogoSelect } from "@/components/ui/LogoSelect";
 import { Switch } from "@/components/ui/Switch";
 import { Button } from "@/components/ui/Button";
+import { Dialog } from "@/components/ui/Dialog";
 import { Input } from "@/components/ui/Input";
 import { ProviderTile } from "@/components/icons/ProviderLogos";
 import ScreenRecordingPermission from "@/components/ScreenRecordingPermission";
-import {
-  MemoryActions,
-  MemoryDetails,
-} from "@/components/settings/assistant/MemorySettings";
+import { MemoryManager } from "@/components/settings/assistant/MemorySettings";
 
 /**
  * The Assistant page's settings, as plain rows: a name, a short (i), and the
@@ -484,19 +481,21 @@ export const ProfilesRow: React.FC<{
 
 /* ─────────────────────────────── memory ─────────────────────────────── */
 
-const MEMORY_DETAILS: MemoryDetail[] = ["light", "balanced", "detailed"];
-
 /**
- * Memory is a switch. Turning it on shows what the assistant remembers right
- * here — the summary and the notes, each editable in place — plus how much of
- * it goes into a reply. Off, it is one quiet line, even with memories saved.
+ * Memory is a switch and a way in, the same shape as Profiles below it. What
+ * it remembers — and how much of that goes into a reply — opens in its own
+ * window, so the page stays a list of settings. Manage stays offered while
+ * memory is off if anything is saved, so it can still be read or erased.
  */
 export const MemoryRow: React.FC = () => {
   const { t } = useTranslation();
   const { settings } = useSettings();
   const run = useSettingCommand();
+  const [open, setOpen] = useState(false);
   const enabled = settings?.assistant_memory_enabled ?? false;
-  const detail = settings?.assistant_memory_detail ?? "balanced";
+  const memory = settings?.assistant_memory;
+  const hasMemory =
+    (memory?.notes?.length ?? 0) > 0 || Boolean(memory?.about_you?.trim());
 
   return (
     <>
@@ -504,10 +503,13 @@ export const MemoryRow: React.FC = () => {
         title={t("assistantPage.cards.memory.title")}
         description={t("assistantPage.tips.memory")}
         grouped
-        details={enabled ? <MemoryDetails /> : undefined}
       >
-        <div className="flex items-center gap-1.5">
-          {enabled && <MemoryActions />}
+        <div className="flex items-center gap-3">
+          {(enabled || hasMemory) && (
+            <Button variant="secondary" onClick={() => setOpen(true)}>
+              {t("assistantPage.rows.memory.manage")}
+            </Button>
+          )}
           <Switch
             checked={enabled}
             onChange={(value) =>
@@ -517,26 +519,15 @@ export const MemoryRow: React.FC = () => {
           />
         </div>
       </SettingContainer>
-      {enabled && (
-        <SettingContainer
-          title={t("settings.personalMemory.detail.label")}
-          description={t("assistantPage.memory.detailTip")}
-          grouped
-        >
-          <Segmented
-            size="sm"
-            label={t("settings.personalMemory.detail.label")}
-            value={detail}
-            onChange={(value: MemoryDetail) =>
-              void run(commands.setAssistantMemoryDetail(value))
-            }
-            options={MEMORY_DETAILS.map((value) => ({
-              value,
-              label: t(`settings.personalMemory.detail.options.${value}`),
-            }))}
-          />
-        </SettingContainer>
-      )}
+      <Dialog
+        open={open}
+        onClose={() => setOpen(false)}
+        size="lg"
+        title={t("assistantPage.cards.memory.title")}
+        description={t("assistantPage.memory.dialogDescription")}
+      >
+        <MemoryManager />
+      </Dialog>
     </>
   );
 };

@@ -168,7 +168,7 @@ export const Dialog: React.FC<DialogProps> = ({
     >
       <div
         aria-hidden="true"
-        className="dialog-scrim pointer-events-none absolute inset-0 bg-[rgb(20_18_16/0.42)] backdrop-blur-[3px]"
+        className="dialog-scrim pointer-events-none absolute inset-0 bg-[rgb(10_20_24/0.42)] backdrop-blur-[3px]"
       />
       <div
         ref={panelRef}
@@ -177,7 +177,7 @@ export const Dialog: React.FC<DialogProps> = ({
         aria-labelledby={bare ? labelledBy : title ? titleId : undefined}
         tabIndex={-1}
         onKeyDown={onPanelKeyDown}
-        className={`dialog-panel relative flex max-h-[calc(100vh-3rem)] flex-col overflow-hidden rounded-[1.25rem] border border-hairline bg-surface text-ink shadow-[0_32px_80px_-28px_rgba(20,18,16,0.5),0_2px_8px_rgba(20,18,16,0.08)] outline-none ${SIZE_CLASSES[size]} ${className}`}
+        className={`dialog-panel relative flex max-h-[calc(100vh-3rem)] flex-col overflow-hidden rounded-[1.25rem] border border-hairline bg-surface text-ink shadow-[0_32px_80px_-28px_rgba(10,20,24,0.5),0_2px_8px_rgba(10,20,24,0.08)] outline-none ${SIZE_CLASSES[size]} ${className}`}
       >
         {!bare && (
           <div className="flex shrink-0 items-start gap-4 px-6 pt-6 pb-4">

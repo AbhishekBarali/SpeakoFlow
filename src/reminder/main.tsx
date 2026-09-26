@@ -2,6 +2,9 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import ReminderPopup from "./ReminderPopup";
 import "@/i18n";
+import { suppressCaretBrowsing } from "@/lib/caretBrowsing";
+
+suppressCaretBrowsing();
 
 // Its own window, so it loads its own font rather than inheriting one. Same
 // family as everywhere else: a reminder that arrives in a different typeface

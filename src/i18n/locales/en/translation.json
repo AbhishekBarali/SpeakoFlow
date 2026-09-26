@@ -2135,6 +2135,8 @@
       "savedLabel": "Time saved",
       "streakLabel_one": "Day streak",
       "streakLabel_other": "Day streak",
+      "streakUnit_one": "day streak",
+      "streakUnit_other": "day streak",
       "seeInsights": "See insights"
     },
     "shortcuts": {
@@ -2515,7 +2517,8 @@
         "count_other": "{{count}} set"
       },
       "memory": {
-        "edit": "View memory"
+        "edit": "View memory",
+        "manage": "Manage"
       },
       "profiles": {
         "manage": "Manage"
@@ -2538,7 +2541,7 @@
       "summarize": "Condenses long chats so it doesn't forget the start.",
       "panelSize": "How much of your screen it takes.",
       "opacity": "Lower lets your desktop show through.",
-      "position": "Click a spot on the screen below. You can also drag the panel there.",
+      "position": "Click a spot on the screen. You can also drag the panel there.",
       "display": "The screen the panel opens on."
     },
     "memory": {
@@ -2562,7 +2565,8 @@
       "eraseConfirm": "Erase",
       "learnedToast": "Memory updated from this chat",
       "exportedToast": "Memory exported",
-      "importedToast": "Memory imported"
+      "importedToast": "Memory imported",
+      "dialogDescription": "What the assistant knows about you. It stays on this computer, and you can change or erase any of it."
     },
     "profiles": {
       "new": "New profile",
@@ -2637,6 +2641,9 @@
     "playRecording": "Play recording",
     "hideRecording": "Close player",
     "audioMissing": "This recording's audio file is no longer available.",
+    "failed": "Transcription failed",
+    "retry": "Try again",
+    "more": "More actions",
     "chat": {
       "continue": "Continue",
       "continueTitle": "Open this chat in the assistant",

@@ -4,6 +4,10 @@ import { platform } from "@tauri-apps/plugin-os";
 import App from "./App";
 import { applyCachedTheme } from "./lib/theme";
 import { watchScreenScale } from "./lib/screenScale";
+import { suppressCaretBrowsing } from "./lib/caretBrowsing";
+
+// No text caret in text that cannot be edited (see lib/caretBrowsing.ts).
+suppressCaretBrowsing();
 
 // Fonts — Inter (variable) carries every heading, label, control, and sentence.
 import "@fontsource-variable/inter";

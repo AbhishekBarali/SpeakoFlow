@@ -8,7 +8,6 @@ import { ShortcutInput } from "@/components/settings/ShortcutInput";
 import { useSettings } from "@/hooks/useSettings";
 import { useNavigation } from "@/components/shell/navigation";
 import { useModelSlots } from "@/components/shell/useModelSlots";
-import { StatsStrip } from "./home/StatsStrip";
 import { ShortcutsCard } from "./home/ShortcutsCard";
 import { ModelsCard } from "./home/ModelsCard";
 import { RecentCard } from "./home/RecentCard";
@@ -37,9 +36,9 @@ const NeedsSpeechModel: React.FC = () => {
  * up.
  *
  * The hero carries the dictation keys at the size of real keys — and they are
- * the button that changes them. Below it, four numbers (the full picture is on
- * Insights); then the other shortcuts beside the models doing each job; then
- * the last few things you said.
+ * the button that changes them. Below it, the other shortcuts beside the
+ * models doing each job; then the last few things you said. Usage numbers
+ * live on Insights.
  */
 export const HomePage: React.FC = () => {
   const { t } = useTranslation();
@@ -72,10 +71,6 @@ export const HomePage: React.FC = () => {
           </HeroShortcut>
         }
       />
-
-      <div className="mt-5">
-        <StatsStrip />
-      </div>
 
       <div className="mt-8 grid grid-cols-1 gap-10 @4xl:grid-cols-[minmax(0,1fr)_22rem] @4xl:gap-8">
         <ShortcutsCard />

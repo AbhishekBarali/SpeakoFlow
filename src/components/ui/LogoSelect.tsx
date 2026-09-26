@@ -216,7 +216,7 @@ export const LogoSelect: React.FC<LogoSelectProps> = ({
             setOpen(true);
           }
         }}
-        className={`flex h-10 min-w-[13rem] cursor-pointer items-center gap-2.5 rounded-lg border border-hairline-strong bg-surface ps-2 pe-2.5 text-start text-sm text-ink shadow-[0_1px_1px_rgba(27,26,24,0.04)] transition-colors hover:border-ink/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
+        className={`flex h-10 min-w-[13rem] cursor-pointer items-center gap-2.5 rounded-lg border border-hairline-strong bg-surface ps-2 pe-2.5 text-start text-sm text-ink shadow-[0_1px_1px_rgba(13,24,28,0.04)] transition-colors hover:border-ink/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
       >
         {selected?.icon && <span className="shrink-0">{selected.icon}</span>}
         <span

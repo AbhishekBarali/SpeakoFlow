@@ -20,6 +20,9 @@ import { applyThemePreference, type ThemePreference } from "@/lib/theme";
 import { watchScreenScale } from "@/lib/screenScale";
 import { useModelStore } from "@/stores/modelStore";
 import { useSettingsStore } from "@/stores/settingsStore";
+import { suppressCaretBrowsing } from "@/lib/caretBrowsing";
+
+suppressCaretBrowsing();
 
 document.documentElement.dataset.platform = "windows";
 applyThemePreference(

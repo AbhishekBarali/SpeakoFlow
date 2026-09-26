@@ -3,6 +3,9 @@ import ReactDOM from "react-dom/client";
 import { useTranslation } from "react-i18next";
 import { commands } from "@/bindings";
 import "@/i18n";
+import { suppressCaretBrowsing } from "@/lib/caretBrowsing";
+
+suppressCaretBrowsing();
 
 /**
  * Region-snip overlay: a fullscreen transparent window where the user drags a

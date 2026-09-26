@@ -2,6 +2,9 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import MeetingPill from "./MeetingPill";
 import "@/i18n";
+import { suppressCaretBrowsing } from "@/lib/caretBrowsing";
+
+suppressCaretBrowsing();
 
 // Its own window, so it loads its own font rather than inheriting one. Same
 // family as everywhere else: an indicator that floats over the user's work in a

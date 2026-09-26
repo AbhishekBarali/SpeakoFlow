@@ -22,6 +22,7 @@ import {
   HardDrive,
   MessageCircle,
   Mic,
+  MoreHorizontal,
   Pause,
   Play,
   RotateCcw,
@@ -44,6 +45,7 @@ import { useOsType } from "@/hooks/useOsType";
 import { useSettings } from "@/hooks/useSettings";
 import { AudioPlayer } from "../../ui/AudioPlayer";
 import { Button } from "../../ui/Button";
+import { MenuButton, type MenuItem } from "../../ui/Menu";
 import { PageHeader } from "../../ui/Page";
 import { Tabs } from "../../ui/Tabs";
 import { useNavigation } from "../../shell/navigation";
@@ -142,19 +144,28 @@ const assistantMarkdown: Components = {
   ),
 };
 
+/** Shared look of a row's small icon actions (and the ⋯ menu trigger). The
+ *  colour is separate so a button can swap it without two text colours
+ *  fighting over the same element. */
+const ICON_BUTTON_SHAPE =
+  "grid h-7 w-7 cursor-pointer place-items-center rounded-md transition-colors hover:bg-ink/6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:cursor-not-allowed disabled:text-muted-soft/50 disabled:hover:bg-transparent aria-expanded:bg-ink/6 aria-expanded:text-ink";
+const ICON_BUTTON_TONE = "text-muted hover:text-ink";
+const ICON_BUTTON = `${ICON_BUTTON_SHAPE} ${ICON_BUTTON_TONE}`;
+
 const IconButton: React.FC<{
   onClick: () => void;
   title: string;
   disabled?: boolean;
-  active?: boolean;
+  /** Replaces the default muted colour. */
+  tone?: string;
   children: React.ReactNode;
-}> = ({ onClick, title, disabled, active, children }) => (
+}> = ({ onClick, title, disabled, tone = ICON_BUTTON_TONE, children }) => (
   <button
+    type="button"
     onClick={onClick}
     disabled={disabled}
-    className={`p-1.5 rounded-md flex items-center justify-center transition-colors cursor-pointer hover:bg-ink/6 disabled:cursor-not-allowed disabled:text-muted-soft/50 disabled:hover:bg-transparent ${
-      active ? "text-ink" : "text-muted hover:text-ink"
-    }`}
+    aria-label={title}
+    className={`${ICON_BUTTON_SHAPE} ${tone}`}
     title={title}
   >
     {children}
@@ -949,9 +960,54 @@ const HistoryEntryComponent: React.FC<HistoryEntryProps> = ({
     ? t("settings.history.flowLabel")
     : t("settings.history.recordingLabel");
   const KindIcon = flowEntry ? Sparkles : Mic;
+  const failed = !retrying && finalText === null;
+  const copyTitle = t(
+    flowEntry && processedText
+      ? "settings.history.copyFlowOutput"
+      : hasDistinctProcessedText
+        ? "settings.history.copyFinalText"
+        : "settings.history.copyToClipboard",
+  );
+
+  const menuItems: MenuItem[] = [
+    {
+      id: "play",
+      label: audioSrc
+        ? t("historyPage.hideRecording")
+        : t("historyPage.playRecording"),
+      icon: audioSrc ? Pause : Play,
+      disabled: loadingAudio || retrying,
+      onSelect: () => void toggleAudio(),
+    },
+    {
+      id: "save",
+      label: entry.saved
+        ? t("settings.history.unsave")
+        : t("settings.history.save"),
+      icon: Star,
+      disabled: retrying,
+      onSelect: onToggleSaved,
+    },
+    {
+      id: "retry",
+      label: t("settings.history.retranscribe"),
+      icon: RotateCcw,
+      disabled: retrying,
+      onSelect: () => void handleRetranscribe(),
+    },
+    {
+      id: "delete",
+      label: t("settings.history.delete"),
+      icon: Trash2,
+      tone: "danger",
+      separated: true,
+      disabled: retrying,
+      onSelect: () => void handleDeleteEntry(),
+    },
+  ];
 
   return (
-    <div className="group px-4 py-3.5">
+    <div className="group px-4 py-3.5 transition-colors hover:bg-surface-muted/70">
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
           {retrying && (
@@ -982,7 +1038,7 @@ const HistoryEntryComponent: React.FC<HistoryEntryProps> = ({
                 ? finalText
                 : flowEntry && hasTranscription
                   ? t("settings.history.flowNoOutput")
-                  : t("settings.history.transcriptionFailed")}
+                  : t("historyPage.failed")}
           </p>
 
           {showOriginal && originalText && (
@@ -1000,6 +1056,9 @@ const HistoryEntryComponent: React.FC<HistoryEntryProps> = ({
             </div>
           )}
 
+          {/* Time and kind, then at most one action. Cleanup is the wand on the
+              "Show original" link rather than a label of its own — the icon
+              already says it, and a caption per row was most of the clutter. */}
           <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
             <span className="tabular-nums">
               {formatTimeOfDay(entry.timestamp, i18n.language)}
@@ -1011,121 +1070,99 @@ const HistoryEntryComponent: React.FC<HistoryEntryProps> = ({
               <KindIcon width={11} height={11} aria-hidden="true" />
               {kindLabel}
             </span>
-            {hasDistinctProcessedText && !flowEntry && (
-              <>
-                <span aria-hidden="true" className="text-muted-soft">
-                  ·
-                </span>
-                <span className="inline-flex items-center gap-1">
-                  <Wand2 width={11} height={11} aria-hidden="true" />
-                  {t("historyPage.cleaned")}
-                </span>
-              </>
-            )}
             {cleanupMadeNoChanges && (
-              <>
-                <span aria-hidden="true" className="text-muted-soft">
-                  ·
-                </span>
-                <span className="inline-flex items-center gap-1">
-                  <Wand2 width={11} height={11} aria-hidden="true" />
-                  {t("settings.history.cleanupNoChanges")}
-                </span>
-              </>
+              <span
+                role="img"
+                aria-label={t("settings.history.cleanupNoChanges")}
+                title={t("settings.history.cleanupNoChanges")}
+                className="inline-flex items-center text-accent"
+              >
+                <Wand2 width={12} height={12} aria-hidden="true" />
+              </span>
             )}
             {originalText && (
               <button
                 type="button"
                 onClick={() => setShowOriginal((value) => !value)}
                 aria-expanded={showOriginal}
-                className="inline-flex cursor-pointer items-center gap-0.5 rounded font-medium text-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+                title={
+                  hasDistinctProcessedText && !flowEntry
+                    ? t("historyPage.cleaned")
+                    : undefined
+                }
+                className="inline-flex cursor-pointer items-center gap-1 rounded font-medium text-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
               >
+                {!flowEntry && (
+                  <Wand2 width={12} height={12} aria-hidden="true" />
+                )}
                 {showOriginal
                   ? t("historyPage.hideOriginal")
                   : flowEntry
                     ? t("historyPage.showSaid")
                     : t("historyPage.showOriginal")}
                 <ChevronDown
-                  className={`h-3 w-3 transition-transform ${showOriginal ? "rotate-180" : ""}`}
+                  className={`-ms-0.5 h-3 w-3 transition-transform ${showOriginal ? "rotate-180" : ""}`}
                   aria-hidden="true"
                 />
+              </button>
+            )}
+            {failed && !(flowEntry && hasTranscription) && (
+              <button
+                type="button"
+                onClick={() => void handleRetranscribe()}
+                className="inline-flex cursor-pointer items-center gap-1 rounded font-medium text-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+              >
+                <RotateCcw width={11} height={11} aria-hidden="true" />
+                {t("historyPage.retry")}
               </button>
             )}
           </div>
         </div>
 
-        <div className="flex shrink-0 items-center gap-0.5 opacity-60 transition-opacity duration-150 group-hover:opacity-100 focus-within:opacity-100">
-          <IconButton
-            onClick={() => void toggleAudio()}
-            disabled={loadingAudio || retrying}
-            active={audioSrc !== null}
-            title={
-              audioSrc
-                ? t("historyPage.hideRecording")
-                : t("historyPage.playRecording")
-            }
-          >
-            {audioSrc ? (
-              <Pause width={14} height={14} />
-            ) : (
-              <Play width={14} height={14} />
-            )}
-          </IconButton>
-          <IconButton
-            onClick={handleCopyText}
-            disabled={!hasCopyableText || retrying}
-            title={t(
-              flowEntry && processedText
-                ? "settings.history.copyFlowOutput"
-                : hasDistinctProcessedText
-                  ? "settings.history.copyFinalText"
-                  : "settings.history.copyToClipboard",
-            )}
-          >
-            {showCopied ? (
-              <Check width={14} height={14} />
-            ) : (
-              <Copy width={14} height={14} />
-            )}
-          </IconButton>
-          <IconButton
-            onClick={onToggleSaved}
-            disabled={retrying}
-            active={entry.saved}
-            title={
-              entry.saved
-                ? t("settings.history.unsave")
-                : t("settings.history.save")
-            }
-          >
-            <Star
-              width={14}
-              height={14}
-              fill={entry.saved ? "currentColor" : "none"}
-            />
-          </IconButton>
-          <IconButton
-            onClick={handleRetranscribe}
-            disabled={retrying}
-            title={t("settings.history.retranscribe")}
-          >
-            <RotateCcw
-              width={14}
-              height={14}
-              style={
-                retrying
-                  ? { animation: "spin 1s linear infinite reverse" }
-                  : undefined
-              }
-            />
-          </IconButton>
-          <IconButton
-            onClick={handleDeleteEntry}
-            disabled={retrying}
-            title={t("settings.history.delete")}
-          >
-            <Trash2 width={14} height={14} />
-          </IconButton>
+        {/* Copy and a ⋯ menu, shown on hover or focus. The rest — play, save,
+            re-transcribe, delete — are occasional, and five icons on every
+            row read as noise. A saved entry keeps its star in view. */}
+        <div className="flex shrink-0 items-center gap-0.5">
+          {entry.saved && (
+            <IconButton
+              onClick={onToggleSaved}
+              disabled={retrying}
+              title={t("settings.history.unsave")}
+              tone="text-amber-500 hover:text-amber-600"
+            >
+              <Star width={14} height={14} fill="currentColor" />
+            </IconButton>
+          )}
+          <div className="flex items-center gap-0.5 opacity-0 transition-opacity duration-150 group-hover:opacity-100 focus-within:opacity-100 has-[[aria-expanded=true]]:opacity-100">
+            <IconButton
+              onClick={handleCopyText}
+              disabled={!hasCopyableText || retrying}
+              title={copyTitle}
+            >
+              {showCopied ? (
+                <Check width={14} height={14} className="text-success" />
+              ) : (
+                <Copy width={14} height={14} />
+              )}
+            </IconButton>
+            <MenuButton
+              items={menuItems}
+              width={220}
+              ariaLabel={t("historyPage.more")}
+              title={t("historyPage.more")}
+              className={ICON_BUTTON}
+            >
+              {retrying ? (
+                <RotateCcw
+                  width={14}
+                  height={14}
+                  style={{ animation: "spin 1s linear infinite reverse" }}
+                />
+              ) : (
+                <MoreHorizontal width={15} height={15} />
+              )}
+            </MenuButton>
+          </div>
         </div>
       </div>
 
@@ -1182,85 +1219,100 @@ const AssistantHistoryEntryComponent: React.FC<AssistantHistoryEntryProps> = ({
     }
   };
 
-  return (
-    <div className="group flex flex-col gap-1.5 px-4 py-3.5">
-      {/* The question, and the way back into the chat. Clicking the question
-          opens it too: a past conversation is something you pick up again,
-          not a transcript to copy. */}
-      <div className="flex items-start gap-3">
-        <button
-          type="button"
-          onClick={onResume}
-          title={t("historyPage.chat.continueTitle")}
-          className="min-w-0 flex-1 cursor-pointer rounded-md text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
-        >
-          <span
-            className={`block break-words text-sm leading-relaxed text-ink transition-colors group-hover:text-accent ${
-              expanded ? "" : "line-clamp-2"
-            }`}
-          >
-            {session.title}
-          </span>
-        </button>
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={onResume}
-          title={t("historyPage.chat.continueTitle")}
-        >
-          {t("historyPage.chat.continue")}
-          <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
-        </Button>
-      </div>
+  const menuItems: MenuItem[] = [
+    {
+      id: "continue",
+      label: t("historyPage.chat.continueTitle"),
+      icon: ArrowUpRight,
+      onSelect: onResume,
+    },
+    {
+      id: "copy",
+      label: t("settings.history.copyConversation"),
+      icon: Copy,
+      onSelect: handleCopy,
+    },
+    {
+      id: "delete",
+      label: t("settings.history.delete"),
+      icon: Trash2,
+      tone: "danger",
+      separated: true,
+      onSelect: () => void handleDelete(),
+    },
+  ];
 
-      {/* Meta row — quiet caption on the left, actions on the right. */}
-      <div className="flex items-center justify-between gap-3">
-        <span className="inline-flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-muted">
-          <span className="tabular-nums">{formattedDate}</span>
-          <span aria-hidden="true" className="text-muted-soft">
-            ·
-          </span>
-          <span className="inline-flex items-center gap-1">
-            <MessageCircle width={11} height={11} aria-hidden="true" />
-            {t("settings.history.assistantLabel")}
-          </span>
-          <span aria-hidden="true" className="text-muted-soft">
-            ·
-          </span>
+  return (
+    <div className="group flex flex-col gap-1.5 px-4 py-3.5 transition-colors hover:bg-surface-muted/70">
+      {/* The question, and the way back into the chat. Clicking the question
+          opens it: a past conversation is something you pick up again, not a
+          transcript to copy. The same two quiet actions as a dictation sit on
+          the right, shown on hover. */}
+      <div className="flex items-start gap-3">
+        <div className="min-w-0 flex-1">
           <button
             type="button"
-            onClick={onToggleExpand}
-            aria-expanded={expanded}
-            className="inline-flex cursor-pointer items-center gap-0.5 rounded font-medium text-muted transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+            onClick={onResume}
+            title={t("historyPage.chat.continueTitle")}
+            className="block w-full cursor-pointer rounded-md text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
           >
-            {expanded
-              ? t("historyPage.chat.hideMessages")
-              : t("settings.history.messageCount", {
-                  count: session.messages.length,
-                })}
-            <ChevronDown
-              className={`h-3 w-3 transition-transform duration-150 ${expanded ? "rotate-180" : ""}`}
-              aria-hidden="true"
-            />
+            <span
+              className={`block break-words text-sm leading-relaxed text-ink transition-colors group-hover:text-accent ${
+                expanded ? "" : "line-clamp-2"
+              }`}
+            >
+              {session.title}
+            </span>
           </button>
-        </span>
-        <div className="flex items-center gap-0.5 opacity-60 transition-opacity duration-150 focus-within:opacity-100 group-hover:opacity-100">
+
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
+            <span className="tabular-nums">{formattedDate}</span>
+            <span aria-hidden="true" className="text-muted-soft">
+              ·
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <MessageCircle width={11} height={11} aria-hidden="true" />
+              {t("settings.history.assistantLabel")}
+            </span>
+            <button
+              type="button"
+              onClick={onToggleExpand}
+              aria-expanded={expanded}
+              className="inline-flex cursor-pointer items-center gap-0.5 rounded font-medium text-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+            >
+              {expanded
+                ? t("historyPage.chat.hideMessages")
+                : t("settings.history.messageCount", {
+                    count: session.messages.length,
+                  })}
+              <ChevronDown
+                className={`h-3 w-3 transition-transform duration-150 ${expanded ? "rotate-180" : ""}`}
+                aria-hidden="true"
+              />
+            </button>
+          </div>
+        </div>
+
+        <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity duration-150 group-hover:opacity-100 focus-within:opacity-100 has-[[aria-expanded=true]]:opacity-100">
           <IconButton
-            onClick={handleCopy}
-            title={t("settings.history.copyConversation")}
+            onClick={onResume}
+            title={t("historyPage.chat.continueTitle")}
+          >
+            <ArrowUpRight width={15} height={15} />
+          </IconButton>
+          <MenuButton
+            items={menuItems}
+            width={240}
+            ariaLabel={t("historyPage.more")}
+            title={t("historyPage.more")}
+            className={ICON_BUTTON}
           >
             {showCopied ? (
-              <Check width={14} height={14} />
+              <Check width={14} height={14} className="text-success" />
             ) : (
-              <Copy width={14} height={14} />
+              <MoreHorizontal width={15} height={15} />
             )}
-          </IconButton>
-          <IconButton
-            onClick={handleDelete}
-            title={t("settings.history.delete")}
-          >
-            <Trash2 width={14} height={14} />
-          </IconButton>
+          </MenuButton>
         </div>
       </div>
 

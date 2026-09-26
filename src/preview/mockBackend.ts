@@ -656,7 +656,25 @@ const handlers: Record<string, (args: Json) => unknown> = {
     ],
     transcribe_cpp_devices: [],
   }),
-  list_assistant_displays: () => [],
+  // Two screens, so the floating panel's screen picker is on show.
+  list_assistant_displays: () => [
+    {
+      id: "DISPLAY1",
+      name: "DISPLAY1",
+      width: 2560,
+      height: 1440,
+      is_primary: true,
+      is_current: true,
+    },
+    {
+      id: "DISPLAY2",
+      name: "DISPLAY2",
+      width: 1920,
+      height: 1080,
+      is_primary: false,
+      is_current: false,
+    },
+  ],
   get_model_folders: () => [],
   get_windows_microphone_permission_status: () => ({
     supported: false,

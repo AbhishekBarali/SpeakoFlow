@@ -186,7 +186,7 @@ export const Dropdown: React.FC<DropdownProps> = ({
         type="button"
         aria-haspopup="listbox"
         aria-expanded={isOpen}
-        className={`w-full h-9 px-3 text-sm bg-surface border border-hairline-strong rounded-lg min-w-[12.5rem] text-start flex items-center justify-between shadow-[0_1px_1px_rgba(27,26,24,0.04)] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${
+        className={`w-full h-9 px-3 text-sm bg-surface border border-hairline-strong rounded-lg min-w-[12.5rem] text-start flex items-center justify-between shadow-[0_1px_1px_rgba(13,24,28,0.04)] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${
           disabled
             ? "opacity-50 cursor-not-allowed"
             : "hover:border-ink/25 cursor-pointer"

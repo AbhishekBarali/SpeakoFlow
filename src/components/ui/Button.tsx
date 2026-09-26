@@ -35,13 +35,13 @@ export const Button: React.FC<ButtonProps> = ({
 
   const variantClasses = {
     primary:
-      "bg-ink text-on-ink border-transparent shadow-[0_1px_2px_rgba(27,26,24,0.18)] hover:bg-ink-soft",
+      "bg-ink text-on-ink border-transparent shadow-[0_1px_2px_rgba(13,24,28,0.18)] hover:bg-ink-soft",
     accent:
       "bg-accent text-on-primary border-transparent hover:bg-accent-strong",
     "primary-soft":
       "bg-surface-strong text-ink border-transparent hover:bg-hairline-strong/70",
     secondary:
-      "bg-surface text-ink border-hairline-strong shadow-[0_1px_1px_rgba(27,26,24,0.04)] hover:bg-surface-strong",
+      "bg-surface text-ink border-hairline-strong shadow-[0_1px_1px_rgba(13,24,28,0.04)] hover:bg-surface-strong",
     danger: "text-white bg-error border-transparent hover:opacity-90",
     "danger-ghost":
       "text-error border-transparent hover:bg-error/10 focus-visible:ring-error/30",

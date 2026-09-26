@@ -76,7 +76,7 @@ const NavButton: React.FC<{
         collapsed ? "justify-center px-0" : "px-2.5"
       } ${
         active
-          ? "bg-ink/[0.07] font-medium text-ink"
+          ? "bg-accent/10 font-medium text-accent-strong"
           : "text-body hover:bg-ink/[0.045] hover:text-ink"
       }`}
     >
@@ -84,7 +84,7 @@ const NavButton: React.FC<{
         size={17}
         strokeWidth={active ? 2 : 1.75}
         className={`shrink-0 transition-colors ${
-          active ? "text-ink" : "text-muted group-hover:text-ink"
+          active ? "text-accent" : "text-muted group-hover:text-ink"
         }`}
       />
       {!collapsed && <span className="truncate text-[0.9375rem]">{label}</span>}

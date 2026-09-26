@@ -17,29 +17,37 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { commands, type MemoryNote, type Result } from "@/bindings";
+import {
+  commands,
+  type MemoryDetail,
+  type MemoryNote,
+  type Result,
+} from "@/bindings";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 import { InfoTip } from "@/components/ui/InfoTip";
 import { Dialog } from "@/components/ui/Dialog";
 import { MenuButton } from "@/components/ui/Menu";
+import { Segmented } from "@/components/ui/Segmented";
 import { useSettings } from "@/hooks/useSettings";
+import { useSettingCommand } from "@/hooks/useSettingCommand";
 
 /**
- * What the assistant remembers, shown in place under the Memory switch.
+ * What the assistant remembers, in a window of its own.
  *
- * It used to sit behind a "View memory" button that opened a window with a
- * second switch ("Incognito chat") meaning the same thing as the first. Now
- * turning memory on simply shows it: the summary it keeps of you, and the
- * things it has picked up, each editable where it stands. The rarer actions
- * (learn now, export, import, erase) live in the row's ⋯ menu.
+ * The page keeps one quiet row — the Memory switch and a Manage button, the
+ * same shape as Profiles beside it — and everything memory holds opens in a
+ * dialog: how much of it goes into a reply, the summary it keeps of you, and
+ * the things it has picked up, each editable where it stands. Rendering all of
+ * that under the switch turned the Assistant page into a memory page. The rarer
+ * actions (learn now, export, import, erase) live in the dialog's ⋯ menu.
  */
 
-/** Notes shown before "Show all". */
-const VISIBLE_NOTES = 5;
 /** A search box only earns its place once the list is long. */
 const SEARCH_FROM = 8;
+
+const MEMORY_DETAILS: MemoryDetail[] = ["light", "balanced", "detailed"];
 
 /**
  * Run a memory command, surface its own error (the backend explains *why* —
@@ -259,7 +267,6 @@ const Notes: React.FC = () => {
   );
   const [newNote, setNewNote] = useState("");
   const [query, setQuery] = useState("");
-  const [showAll, setShowAll] = useState(false);
 
   const sorted = useMemo(
     () =>
@@ -269,12 +276,10 @@ const Notes: React.FC = () => {
     [notes],
   );
   const needle = query.trim().toLowerCase();
-  const matches = needle
+  // The dialog scrolls, so every note is listed; a search narrows it.
+  const shown = needle
     ? sorted.filter((note) => note.text.toLowerCase().includes(needle))
     : sorted;
-  // A search shows every match; otherwise the first few, then "Show all".
-  const shown = needle || showAll ? matches : matches.slice(0, VISIBLE_NOTES);
-  const hidden = matches.length - shown.length;
 
   const add = async () => {
     const text = newNote.trim();
@@ -353,7 +358,7 @@ const Notes: React.FC = () => {
             {t("memoryManager.noMatches")}
           </p>
         ) : (
-          <ul className="max-h-[26rem] divide-y divide-hairline overflow-y-auto border-t border-hairline">
+          <ul className="divide-y divide-hairline border-t border-hairline">
             {shown.map((note) => (
               <NoteRow
                 key={note.id}
@@ -371,32 +376,51 @@ const Notes: React.FC = () => {
           </ul>
         )}
       </div>
-
-      {!needle && (hidden > 0 || showAll) && matches.length > VISIBLE_NOTES && (
-        <button
-          type="button"
-          onClick={() => setShowAll((value) => !value)}
-          className="mt-2 cursor-pointer rounded px-0.5 text-xs font-medium text-muted transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
-        >
-          {showAll
-            ? t("assistantPage.memory.showFewer")
-            : t("assistantPage.memory.showAll", { count: matches.length })}
-        </button>
-      )}
     </section>
   );
 };
 
-/** Everything it remembers, in place. Render only while memory is on. */
-export const MemoryDetails: React.FC = () => (
-  <div className="tab-reveal space-y-5 pb-1">
+/** How much of what it remembers goes into each reply. */
+const DetailRow: React.FC = () => {
+  const { t } = useTranslation();
+  const { settings } = useSettings();
+  const run = useSettingCommand();
+  const detail = settings?.assistant_memory_detail ?? "balanced";
+  return (
+    <Heading
+      title={t("settings.personalMemory.detail.label")}
+      tip={t("assistantPage.memory.detailTip")}
+    >
+      <div className="ms-auto flex items-center gap-1.5">
+        <Segmented
+          size="sm"
+          label={t("settings.personalMemory.detail.label")}
+          value={detail}
+          onChange={(value: MemoryDetail) =>
+            void run(commands.setAssistantMemoryDetail(value))
+          }
+          options={MEMORY_DETAILS.map((value) => ({
+            value,
+            label: t(`settings.personalMemory.detail.options.${value}`),
+          }))}
+        />
+        <MemoryActions />
+      </div>
+    </Heading>
+  );
+};
+
+/** Everything it remembers, for the Memory dialog. */
+export const MemoryManager: React.FC = () => (
+  <div className="space-y-6">
+    <DetailRow />
     <AboutYou />
     <Notes />
   </div>
 );
 
 /**
- * The ⋯ beside the Memory switch: the actions worth having but not worth a
+ * The ⋯ in the Memory dialog: the actions worth having but not worth a
  * button each — learn from the chat now, move memory to another computer, or
  * erase it (which asks first).
  */

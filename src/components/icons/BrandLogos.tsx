@@ -7,8 +7,8 @@ import speakoFlowMiniMark from "@/assets/speakoflow-mini.png";
 /**
  * Real brand marks for the model cards (onboarding + catalogs), so a model
  * reads as "NVIDIA / Qwen / Gemma" instead of a generic glyph. All render at
- * `currentColor` so the surrounding tile controls the hue. Paths are the
- * official marks from the simple-icons set (CC0).
+ * `currentColor` so the surrounding tile controls the hue (see `BRAND_TILES`).
+ * Paths are the official marks from the simple-icons set (CC0).
  */
 
 interface LogoProps {
@@ -107,20 +107,21 @@ export interface ModelBrand {
   tileClass: string;
 }
 
-/** Every model family sits in the same neutral chip with its mark in ink —
- *  see `PROVIDER_TILES` in ProviderLogos.tsx for why the brand washes went. */
-const BRAND_CHIP =
-  "bg-surface text-ink/85 ring-1 ring-inset ring-hairline-strong dark:bg-surface-strong dark:text-ink dark:ring-hairline-strong";
+/** Each model family wears its own colour, like the provider tiles (see
+ *  `PROVIDER_TILES` in ProviderLogos.tsx for the sources): NVIDIA's green eye
+ *  on black, Qwen's violet, Gemma's blue, Whisper in OpenAI's ink. */
+const SOLID =
+  "shadow-[inset_0_1px_0_rgb(255_255_255/0.16),inset_0_0_0_1px_rgb(0_0_0/0.06),0_1px_2px_rgb(0_0_0/0.12)] dark:shadow-[inset_0_1px_0_rgb(255_255_255/0.14),inset_0_0_0_1px_rgb(255_255_255/0.1)]";
 const BRAND_TILES = {
-  nvidia: BRAND_CHIP,
-  qwen: BRAND_CHIP,
-  gemma: BRAND_CHIP,
-  openai: BRAND_CHIP,
-  moonshine: BRAND_CHIP,
+  nvidia: `bg-[#111416] text-[#76B900] ${SOLID}`,
+  qwen: `bg-linear-to-br from-[#6F69F7] to-[#6336E7] text-white ${SOLID}`,
+  gemma: `bg-linear-to-br from-[#2E96FF] to-[#446EFF] text-white ${SOLID}`,
+  openai: `bg-ink text-surface ${SOLID}`,
+  moonshine: "bg-accent/10 text-accent ring-1 ring-inset ring-accent/15",
   // Our own models wear their own artwork rather than a tinted glyph, so the
   // tile stays empty and the mark supplies the color.
   speakoflow: "bg-transparent",
-  neutral: "bg-surface-strong text-muted",
+  neutral: "bg-accent/10 text-accent ring-1 ring-inset ring-accent/15",
 } as const;
 
 /**

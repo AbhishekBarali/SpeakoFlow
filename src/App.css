@@ -7,44 +7,50 @@
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 /*
- * Design system — quiet paper, one deep teal, one typeface.
+ * Design system — clean paper, one bright teal, one typeface.
  *
- * Surfaces are a barely-warm off-white (chroma well under 0.01, so it reads as
- * white, not cream) with a second, slightly deeper neutral for the chrome — the
- * title bar and sidebar — so the content pane floats as one rounded sheet.
+ * Neutrals are tinted a hair toward the brand teal (chroma ≈ 0.003–0.01 in
+ * OKLCH), so the page reads as crisp white rather than grey, and the chrome —
+ * title bar and sidebar — is one step deeper so the content pane floats as a
+ * sheet. They used to lean warm (a beige-grey), which next to the teal read as
+ * faintly dirty paper rather than as a clean surface.
  *
- * Type is Inter, everywhere. Headings used to be set in a display serif, which
- * read as a different product from the sidebar and the controls beside them;
- * hierarchy now comes from size and weight inside one family, the way a tool
- * is expected to look.
+ * Type is Inter, everywhere. Hierarchy comes from size and weight inside one
+ * family, the way a tool is expected to look.
  *
- * Colour is restrained. Ink is the primary action colour (dark buttons, like a
- * pen); the brand teal marks state — a switch that is on, the selected option,
- * a link — and fills the hero surfaces, which is the one place the brand is
- * allowed to be loud.
+ * Colour: ink is the primary action colour (dark buttons, like a pen); the
+ * brand teal marks state — the page you are on, a switch that is on, the
+ * selected option, a link — and fills the hero, the one place it is loud.
+ * Provider and model logos carry their own brand colours (ProviderLogos.tsx),
+ * which is where the rest of the colour on a page comes from.
+ *
+ * Every text pairing below was checked for WCAG AA: muted on canvas 5.2:1,
+ * accent on surface 5.0:1, white on accent 5.0:1.
  */
 @theme {
   /* === Surfaces === */
-  --color-canvas: #fbfaf8; /* content pane */
-  --color-canvas-soft: #f3f2ef; /* chrome: title bar + sidebar */
+  --color-canvas: #f9fcfc; /* content pane */
+  --color-canvas-soft: #f0f4f5; /* chrome: title bar + sidebar */
   --color-surface: #ffffff; /* cards */
-  --color-surface-strong: #f1efeb; /* fills, hover, badges */
-  --color-surface-muted: #f7f6f3; /* quiet wells inside a card */
+  --color-surface-strong: #ebf0f1; /* fills, hover, badges */
+  --color-surface-muted: #f5f8f8; /* quiet wells inside a card */
 
   /* === Ink / text === */
-  --color-ink: #1b1a18;
-  --color-ink-soft: #2d2b28;
-  --color-body: #45423d;
-  --color-muted: #6f6a63; /* ≥5:1 on every surface above */
-  --color-muted-soft: #a39e96; /* decorative + disabled only */
+  --color-ink: #0d181c;
+  --color-ink-soft: #1e2b2f;
+  --color-body: #3d494d;
+  --color-muted: #616d70; /* ≥4.8:1 on every surface above */
+  --color-muted-soft: #99a4a6; /* decorative + disabled only */
 
   /* === Hairlines === */
-  --color-hairline: #eae7e2;
-  --color-hairline-strong: #dbd7d0;
+  --color-hairline: #e3e8e8;
+  --color-hairline-strong: #d1d8da;
 
   /* === Brand teal (state, links, heroes) === */
-  --color-accent: #0d6b62;
-  --color-accent-strong: #0a554e;
+  --color-accent: #007e70;
+  --color-accent-strong: #00675e;
+  /* A lighter teal for fills that carry no text (tiles, bars, dots). */
+  --color-accent-fill: #009684;
 
   /* === Semantic === */
   --color-success: #15803d;
@@ -53,11 +59,11 @@
 
   /* === On-colour text === */
   --color-on-primary: #ffffff; /* text on accent fills */
-  --color-on-ink: #fbfaf8; /* text on ink (primary) buttons */
+  --color-on-ink: #f9fcfc; /* text on ink (primary) buttons */
 
   /* === Toggle switch === */
   --color-toggle-track-on: var(--color-accent);
-  --color-toggle-track-off: #d5d1ca;
+  --color-toggle-track-off: #c9d1d2;
   --color-toggle-knob-on: #ffffff;
 
   /* === Back-compat aliases (leaf components still use these names) === */
@@ -65,9 +71,9 @@
   --color-text: var(--color-ink);
   --color-background-ui: var(--color-accent);
   --color-logo-primary: var(--color-accent);
-  --color-logo-stroke: #2d2b28;
+  --color-logo-stroke: #1e2b2f;
   --color-text-stroke: #ffffff;
-  --color-mid-gray: #8c877f;
+  --color-mid-gray: #7f8a8d;
 
   /* === Type families === */
   --font-sans:
@@ -140,46 +146,69 @@
   font-optical-sizing: auto;
 }
 
-/* === Dark === */
+/* === Dark ===
+ * A deep blue-green slate rather than near-black: the same faint teal tint as
+ * the light theme, with each step lighter than the one under it (chrome →
+ * pane → card → fill), because in the dark depth comes from lightness, not
+ * shadow. The old ramp sat three near-identical blacks on top of each other,
+ * so cards barely separated from the page and the whole window read as flat.
+ *
+ * Text is a step softer than white (13:1 on a card, not 17:1): light glyphs on
+ * a dark ground bloom and look heavier than the same weight on paper, which is
+ * also why the weights ease off a notch below. Every pairing stays above AA —
+ * muted on a card 6.0:1, accent on a card 9.0:1. */
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --color-canvas: #171614;
-  --color-canvas-soft: #100f0e;
-  --color-surface: #1e1d1b;
-  --color-surface-strong: #292724;
-  --color-surface-muted: #1b1a18;
+  --color-canvas: #121a1c;
+  --color-canvas-soft: #0c1315;
+  --color-surface: #1a2326;
+  --color-surface-strong: #263134;
+  /* Lighter than a card, so a hovered row lifts instead of sinking. */
+  --color-surface-muted: #1e282b;
 
-  --color-ink: #f4f2ee;
-  --color-ink-soft: #e8e5e0;
-  --color-body: #d9d5ce;
-  --color-muted: #a49e96;
-  --color-muted-soft: #6f6a63;
+  --color-ink: #e4ebeb;
+  --color-ink-soft: #d6dedf;
+  --color-body: #bfcacb;
+  --color-muted: #94a1a4;
+  --color-muted-soft: #5f6c6e;
 
-  --color-hairline: #2b2926;
-  --color-hairline-strong: #3a3733;
+  --color-hairline: #273133;
+  --color-hairline-strong: #354144;
 
-  --color-accent: #5ed3c1;
-  --color-accent-strong: #86e0d2;
+  --color-accent: #5cd6be;
+  --color-accent-strong: #90e8d4;
+  --color-accent-fill: #1ea28f;
 
   --color-success: #4ade80;
   --color-error: #f06a5f;
   --color-warning: #f5a14a;
 
-  --color-on-primary: #062b27;
-  --color-on-ink: #171614;
+  --color-on-primary: #04241f;
+  --color-on-ink: #121a1c;
 
-  --color-toggle-track-on: var(--color-accent);
-  --color-toggle-track-off: #4a4640;
+  /* The deeper teal, not the mint: a white knob on mint disappeared. */
+  --color-toggle-track-on: var(--color-accent-fill);
+  --color-toggle-track-off: #414d50;
   --color-toggle-knob-on: #ffffff;
 
   --color-background: var(--color-canvas);
   --color-text: var(--color-ink);
   --color-background-ui: var(--color-accent);
   --color-logo-primary: var(--color-accent);
-  --color-logo-stroke: #e8e5e0;
-  --color-mid-gray: #a49e96;
+  --color-logo-stroke: #d6dedf;
+  --color-mid-gray: #94a1a4;
+
+  /* Light-on-dark reads heavier, so every weight eases off a notch (Inter is
+   * variable, so these are real weights, not synthesized). */
+  --font-weight-medium: 470;
+  --font-weight-semibold: 570;
+  --font-weight-bold: 660;
+  font-weight: 380;
 
   background-color: var(--color-canvas);
+}
+:root[data-theme="dark"] .font-display {
+  font-weight: 580;
 }
 
 /* Pre-JS fallback: honour the OS preference only until data-theme is set (it is
@@ -187,22 +216,23 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
     color-scheme: dark;
-    --color-canvas: #171614;
-    --color-canvas-soft: #100f0e;
-    --color-surface: #1e1d1b;
-    --color-surface-strong: #292724;
-    --color-surface-muted: #1b1a18;
-    --color-ink: #f4f2ee;
-    --color-ink-soft: #e8e5e0;
-    --color-body: #d9d5ce;
-    --color-muted: #a49e96;
-    --color-muted-soft: #6f6a63;
-    --color-hairline: #2b2926;
-    --color-hairline-strong: #3a3733;
-    --color-accent: #5ed3c1;
-    --color-accent-strong: #86e0d2;
-    --color-on-primary: #062b27;
-    --color-on-ink: #171614;
+    --color-canvas: #121a1c;
+    --color-canvas-soft: #0c1315;
+    --color-surface: #1a2326;
+    --color-surface-strong: #263134;
+    --color-surface-muted: #1e282b;
+    --color-ink: #e4ebeb;
+    --color-ink-soft: #d6dedf;
+    --color-body: #bfcacb;
+    --color-muted: #94a1a4;
+    --color-muted-soft: #5f6c6e;
+    --color-hairline: #273133;
+    --color-hairline-strong: #354144;
+    --color-accent: #5cd6be;
+    --color-accent-strong: #90e8d4;
+    --color-accent-fill: #1ea28f;
+    --color-on-primary: #04241f;
+    --color-on-ink: #121a1c;
     --color-background: var(--color-canvas);
     --color-text: var(--color-ink);
   }
@@ -255,7 +285,7 @@
   /* Cards carry their edge with a hairline; the shadow only lifts them a hair
    * off the pane. */
   .elev-card {
-    box-shadow: 0 1px 2px rgba(27, 26, 24, 0.035);
+    box-shadow: 0 1px 2px rgba(13, 24, 28, 0.035);
   }
 
   .elev-hover {
@@ -266,19 +296,19 @@
   }
   .elev-hover:hover {
     box-shadow:
-      0 1px 2px rgba(27, 26, 24, 0.04),
-      0 8px 24px -14px rgba(27, 26, 24, 0.18);
+      0 1px 2px rgba(13, 24, 28, 0.04),
+      0 8px 24px -14px rgba(13, 24, 28, 0.18);
   }
 
   .elev-chip {
     box-shadow:
-      0 1px 2px rgba(27, 26, 24, 0.06),
+      0 1px 2px rgba(13, 24, 28, 0.06),
       inset 0 1px 0 rgba(255, 255, 255, 0.9);
   }
 
   /* The content pane, lifted off the chrome toward the sidebar. */
   .elev-pane {
-    box-shadow: -1px 0 0 rgba(27, 26, 24, 0.02);
+    box-shadow: -1px 0 0 rgba(13, 24, 28, 0.02);
   }
 
   /* Floating menus overlay real content, so they are opaque. */
@@ -289,13 +319,17 @@
   /* Popover / menu shadow, shared by every floating surface. */
   .elev-float {
     box-shadow:
-      0 18px 44px -16px rgba(27, 26, 24, 0.3),
-      0 2px 6px rgba(27, 26, 24, 0.06);
+      0 18px 44px -16px rgba(13, 24, 28, 0.3),
+      0 2px 6px rgba(13, 24, 28, 0.06);
   }
 }
 
+/* In the dark a card is lit from above: a hairline of light along its top
+ * edge does what a drop shadow does on paper. */
 :root[data-theme="dark"] .elev-card {
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.035),
+    0 1px 2px rgba(0, 0, 0, 0.35);
 }
 :root[data-theme="dark"] .elev-hover:hover {
   box-shadow:
@@ -325,24 +359,24 @@
   isolation: isolate;
   overflow: hidden;
   color: #ffffff;
-  background-color: #0b4640;
+  background-color: #0a4f47;
   background-image:
     radial-gradient(
       70% 110% at 8% -10%,
-      rgba(116, 222, 204, 0.42) 0%,
-      rgba(116, 222, 204, 0) 60%
+      rgba(94, 234, 212, 0.5) 0%,
+      rgba(94, 234, 212, 0) 60%
     ),
     radial-gradient(
       60% 90% at 100% 0%,
-      rgba(22, 120, 108, 0.55) 0%,
-      rgba(22, 120, 108, 0) 65%
+      rgba(0, 150, 132, 0.55) 0%,
+      rgba(0, 150, 132, 0) 65%
     ),
     radial-gradient(
       80% 120% at 90% 120%,
-      rgba(2, 26, 24, 0.85) 0%,
-      rgba(2, 26, 24, 0) 60%
+      rgba(2, 30, 28, 0.8) 0%,
+      rgba(2, 30, 28, 0) 60%
     ),
-    linear-gradient(135deg, #10645b 0%, #0b4a44 48%, #07312d 100%);
+    linear-gradient(135deg, #0a7a6c 0%, #07564e 48%, #053833 100%);
 }
 .hero-surface::after {
   content: "";
@@ -355,7 +389,7 @@
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.9 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
 }
 :root[data-theme="dark"] .hero-surface {
-  background-color: #093b36;
+  background-color: #08453f;
 }
 
 /* Glass controls for use on the hero. */
@@ -399,18 +433,18 @@
  * Keycaps
  * ==========================================================================*/
 .keycap {
-  background: linear-gradient(180deg, #ffffff 0%, #f4f2ee 100%);
+  background: linear-gradient(180deg, #ffffff 0%, #f1f5f5 100%);
   border: 1px solid var(--color-hairline-strong);
   box-shadow:
-    inset 0 -1.5px 0 rgba(27, 26, 24, 0.09),
-    0 1px 1.5px rgba(27, 26, 24, 0.05);
+    inset 0 -1.5px 0 rgba(13, 24, 28, 0.09),
+    0 1px 1.5px rgba(13, 24, 28, 0.05);
 }
 :root[data-theme="dark"] .keycap {
-  background: linear-gradient(180deg, #2c2a27 0%, #232120 100%);
-  border-color: #3a3733;
+  background: linear-gradient(180deg, #2c373a 0%, #222c2f 100%);
+  border-color: #3a474a;
   box-shadow:
     inset 0 -1.5px 0 rgba(0, 0, 0, 0.45),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 /* On the hero: frosted keys with a lit top edge. */
 .keycap-glass {
@@ -623,12 +657,14 @@
 .segmented-pill {
   background-color: var(--color-surface);
   box-shadow:
-    0 1px 2px rgba(27, 26, 24, 0.12),
-    0 0 0 0.5px rgba(27, 26, 24, 0.05);
+    0 1px 2px rgba(13, 24, 28, 0.12),
+    0 0 0 0.5px rgba(13, 24, 28, 0.05);
 }
 :root[data-theme="dark"] .segmented-pill {
-  background-color: #3a3733;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  background-color: #334044;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 1px 2px rgba(0, 0, 0, 0.45);
 }
 
 /* Native range inputs pick up the brand accent. */
