@@ -130,7 +130,8 @@ export const AutoLearnCorrections: React.FC<AutoLearnProps> = ({
       />
 
       {status.enabled && (
-        <div className="rounded-xl border border-hairline bg-surface-strong/50 px-3.5 py-3">
+        <div className={grouped ? "px-5 pb-4" : undefined}>
+        <div className="rounded-xl border border-hairline bg-surface-muted px-3.5 py-3">
           <div className="mb-2 flex items-center justify-between gap-2">
             <p className="text-[12px] font-medium text-ink">
               {t("settings.advanced.autoLearn.learnedTitle")}
@@ -191,6 +192,7 @@ export const AutoLearnCorrections: React.FC<AutoLearnProps> = ({
               </p>
             </>
           )}
+        </div>
         </div>
       )}
     </div>

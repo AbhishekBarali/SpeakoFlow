@@ -78,7 +78,7 @@ const gradientForId = (id: string): string => {
 /** Round avatar: the uploaded image wins; built-ins get their designed
  *  glyph-on-gradient disc (the Cat too); customs get their initial on a
  *  deterministic gradient. */
-const Avatar: React.FC<{
+export const Avatar: React.FC<{
   character: AssistantCharacter | null;
   size: number;
 }> = ({ character, size }) => {

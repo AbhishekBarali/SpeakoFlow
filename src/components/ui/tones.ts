@@ -23,19 +23,22 @@ export type SettingIcon = React.ComponentType<{
   strokeWidth?: number | string;
 }>;
 
-/** Soft-tinted tile: background wash + saturated glyph. */
+/**
+ * Icon tile wash. Every tone now resolves to the same quiet neutral chip: the
+ * rainbow of pastel tiles read as emoji stickers rather than as an interface,
+ * and colour on an icon that does not mean anything is noise. The tone names
+ * stay so older call sites keep compiling.
+ */
+const NEUTRAL_TILE =
+  "bg-surface-strong text-ink/70 dark:bg-surface-strong dark:text-ink/80";
 export const TONE_TILE: Record<SettingTone, string> = {
-  teal: "bg-teal-500/15 text-teal-600 dark:bg-teal-400/25 dark:text-teal-300",
-  rose: "bg-rose-500/15 text-rose-600 dark:bg-rose-400/25 dark:text-rose-300",
-  violet:
-    "bg-violet-500/15 text-violet-600 dark:bg-violet-400/25 dark:text-violet-300",
-  amber:
-    "bg-amber-500/15 text-amber-600 dark:bg-amber-400/25 dark:text-amber-300",
-  sky: "bg-sky-500/15 text-sky-600 dark:bg-sky-400/25 dark:text-sky-300",
-  emerald:
-    "bg-emerald-500/15 text-emerald-600 dark:bg-emerald-400/25 dark:text-emerald-300",
-  indigo:
-    "bg-indigo-500/15 text-indigo-600 dark:bg-indigo-400/15 dark:text-indigo-300",
+  teal: NEUTRAL_TILE,
+  rose: NEUTRAL_TILE,
+  violet: NEUTRAL_TILE,
+  amber: NEUTRAL_TILE,
+  sky: NEUTRAL_TILE,
+  emerald: NEUTRAL_TILE,
+  indigo: NEUTRAL_TILE,
 };
 /** Vivid gradient tile: saturated gradient + white glyph (iOS feature-tile
  *  style). For hero moments — onboarding cards, nav cards — where the UI

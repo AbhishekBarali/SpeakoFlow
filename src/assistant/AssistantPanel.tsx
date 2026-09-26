@@ -1451,6 +1451,20 @@ const AssistantPanel: React.FC = () => {
     await commands.hideAssistantPanel();
   }, [voice]);
 
+  // Back out of a quick ask that is still working: stop the recording,
+  // transcription or reply, *then* put the surface away.
+  //
+  // Both halves are needed and the order matters. Hiding alone leaves the
+  // microphone open behind an invisible window — the same bug as a call outliving
+  // its panel — and cancelling alone leaves a pill on screen showing a state that
+  // no longer exists. This is what the ask bar's × does in every working phase;
+  // `hidePanel` on its own is for the resting phases, where there is nothing in
+  // flight to stop.
+  const dismissAsk = useCallback(async () => {
+    await cancelVoice();
+    await hidePanel();
+  }, [cancelVoice, hidePanel]);
+
   // Hang up. The same thing as closing the panel, and deliberately so: the
   // window *is* the call, so ending the call has to take the window with it.
   // Ending only the session left the window up and the panel re-rendered as the
@@ -2173,6 +2187,7 @@ const AssistantPanel: React.FC = () => {
                 }}
                 onSubmit={() => void sendText()}
                 onClose={hidePanel}
+                onCancel={dismissAsk}
                 stopDrag={stopDrag}
               />
             </div>
@@ -2333,7 +2348,15 @@ const AssistantPanel: React.FC = () => {
     <div className={shellClass}>
       <div className="assistant-panel">
         <ResizeHandles />
-        <div className="assistant-header conversation-header">
+        {/* The whole bar is the handle, which is what its `cursor: grab` has always
+            claimed. The two inner regions stay marked because the ancestor match is
+            a superset of them, not a replacement — and because an explicit handle on
+            the spacer is what keeps the bar draggable if the header ever stops being
+            one. `useSafeWindowDrag` excludes the buttons on the right. */}
+        <div
+          className="assistant-header conversation-header"
+          data-tauri-drag-region
+        >
           <span className="conversation-header-title" data-tauri-drag-region>
             {t("assistant.conversation.title")}
           </span>

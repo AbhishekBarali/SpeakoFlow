@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Mic, Pause, Play, Square } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import { TONE_TILE_VIVID } from "@/components/ui/tones";
 import type { MeetingSpeaker, MeetingState } from "./api";
 import { formatClock, type TranscriptItem } from "./speakers";
 import { SystemAudioNotice } from "./SystemAudioNotice";
@@ -76,33 +75,19 @@ export const RecorderCard: React.FC<RecorderCardProps> = ({
       )}
 
       <div className="rounded-2xl border border-hairline bg-surface elev-card">
-        <div className="flex items-center gap-3 px-4 py-3.5">
+        <div className="flex items-center gap-3 px-5 py-4">
           <span
-            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${TONE_TILE_VIVID.rose}`}
-          >
-            <Mic size={18} />
-          </span>
+            className={`h-2.5 w-2.5 shrink-0 rounded-full ${paused ? "bg-muted-soft" : "bg-error motion-safe:animate-pulse"}`}
+            aria-hidden="true"
+          />
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <span className="text-[13.5px] font-medium text-ink">
-                {recording
-                  ? paused
-                    ? t("meetings.recorder.paused")
-                    : t("meetings.recorder.recording")
-                  : t("meetings.recorder.idleTitle")}
-              </span>
-              {recording && !paused && (
-                <span
-                  className="h-1.5 w-1.5 rounded-full bg-error motion-safe:animate-pulse"
-                  aria-hidden="true"
-                />
-              )}
-            </div>
-            <p className="mt-0.5 text-xs text-muted">
+            <span className="text-sm font-medium text-ink">
               {recording
-                ? t("meetings.recorder.liveCaption")
-                : t("meetings.recorder.idleCaption")}
-            </p>
+                ? paused
+                  ? t("meetings.recorder.paused")
+                  : t("meetings.recorder.recording")
+                : t("meetings.recorder.idleTitle")}
+            </span>
           </div>
 
           {recording && (

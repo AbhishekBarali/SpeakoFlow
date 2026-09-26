@@ -107,15 +107,16 @@ export interface ModelBrand {
   tileClass: string;
 }
 
+/** Every model family sits in the same neutral chip with its mark in ink —
+ *  see `PROVIDER_TILES` in ProviderLogos.tsx for why the brand washes went. */
+const BRAND_CHIP =
+  "bg-surface text-ink/85 ring-1 ring-inset ring-hairline-strong dark:bg-surface-strong dark:text-ink dark:ring-hairline-strong";
 const BRAND_TILES = {
-  nvidia:
-    "bg-[#76b900]/12 text-[#538200] dark:bg-[#76b900]/20 dark:text-[#a3e635]",
-  qwen: "bg-[#615ced]/12 text-[#544fe0] dark:bg-[#8b7bff]/20 dark:text-[#b0a6ff]",
-  gemma:
-    "bg-[#4285f4]/12 text-[#2f6fe4] dark:bg-[#60a5fa]/20 dark:text-[#93c5fd]",
-  openai: "bg-ink/8 text-ink/80 dark:bg-ink/15 dark:text-ink",
-  moonshine:
-    "bg-amber-500/12 text-amber-600 dark:bg-amber-400/20 dark:text-amber-300",
+  nvidia: BRAND_CHIP,
+  qwen: BRAND_CHIP,
+  gemma: BRAND_CHIP,
+  openai: BRAND_CHIP,
+  moonshine: BRAND_CHIP,
   // Our own models wear their own artwork rather than a tinted glyph, so the
   // tile stays empty and the mark supplies the color.
   speakoflow: "bg-transparent",

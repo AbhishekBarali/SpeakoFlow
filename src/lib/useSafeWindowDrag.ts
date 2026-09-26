@@ -7,6 +7,27 @@ const DRAG_THRESHOLD_PX = 4;
 const DRAG_ATTR = "data-tauri-drag-region";
 
 /**
+ * Things that are never a drag handle, however deep inside a drag region they sit.
+ *
+ * The ancestor match below is what makes a drag region behave the way it looks, and
+ * this is the other half of it: a control inside one has to stay a control. Every
+ * interactive element in these windows is in this list, and a press on one sets no
+ * drag origin at all — so it cannot be turned into a window move by a hand that
+ * shifts four pixels between press and release.
+ */
+const NEVER_DRAGGABLE = [
+  "button",
+  "a",
+  "input",
+  "textarea",
+  "select",
+  "label",
+  "[role='button']",
+  "[role='slider']",
+  "[contenteditable='true']",
+].join(", ");
+
+/**
  * Window dragging that does not wedge Windows.
  *
  * Tauri's own `data-tauri-drag-region` handler starts the drag on `mousedown`
@@ -35,10 +56,29 @@ export function useSafeWindowDrag(): void {
   useEffect(() => {
     let origin: { x: number; y: number } | null = null;
 
+    /**
+     * Is this press on a surface that may move the window?
+     *
+     * Matched against the pressed element's **ancestors**, not just the element
+     * itself. Asking only about the target meant a drag region was a handle for its
+     * own background and nothing else: every inert child had to repeat the attribute
+     * to be draggable, which is why the collapsed pill carries nine copies of it —
+     * and it is why the call view, whose header is styled `cursor: grab` across its
+     * full width, actually dragged only from the word "Conversation". A surface that
+     * shows a grab cursor and then refuses to move is worse than one that never
+     * offered.
+     *
+     * `NEVER_DRAGGABLE` is checked first and checked from the target upward, so a
+     * control inside a drag region is still a control. `closest` is used for both
+     * tests, which means the nearer of the two wins: a button inside a drag region is
+     * a button, and an inert span inside that button is still part of the button.
+     */
     const isDragSurface = (target: EventTarget | null): boolean => {
       if (!(target instanceof Element)) return false;
-      const attr = target.getAttribute(DRAG_ATTR);
-      return attr !== null && attr !== "false";
+      if (target.closest(NEVER_DRAGGABLE)) return false;
+      const region = target.closest(`[${DRAG_ATTR}]`);
+      if (!region) return false;
+      return region.getAttribute(DRAG_ATTR) !== "false";
     };
 
     const onMouseDown = (event: MouseEvent) => {

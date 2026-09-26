@@ -34,12 +34,25 @@ import OverlayProgress from "@/overlay/OverlayProgress";
  *   • a **halo** behind the pill, which is the quietest available way to say
  *     "assistant, not dictation" without a second shape or a second colour.
  *
- * ## Why there are no buttons while it listens
+ * ## Why there is always a way out
  *
- * The dictation pill has none, and it is not missed: the shortcut that started
- * the recording ends it, and Esc throws it away. Cancel and confirm buttons were
- * two more things to aim at, and they were most of what made this surface look
- * bulkier than the one it is supposed to match.
+ * There used to be no control at all while it listened, transcribed or worked, on
+ * the grounds that the dictation pill has none either: the shortcut that started
+ * the recording ends it, and Esc throws it away. That reasoning holds only while
+ * both of those are discoverable, and for this surface neither was. The dictation
+ * pill is a status indicator the user has already committed to; the ask pill is a
+ * thing they opened and may want to back out of, and "press the key again" is not
+ * an affordance — it is a fact you have to have been told. Worse, the whole window
+ * was cursor pass-through for an unrelated reason (see `hitRegion.ts`), so the two
+ * buttons that *did* exist could not be clicked either, and the surface read as
+ * completely inert.
+ *
+ * So there is now exactly one persistent control: a quiet × that cancels whatever
+ * is in flight and closes the surface. It is the same glyph in the same place in
+ * every phase, which is what makes it a thing the user learns once rather than a
+ * button that appears and disappears. It is deliberately the *only* one — no
+ * confirm, no separate stop — because a second target is what made the earlier
+ * version of this bar look bulkier than the dictation pill it mirrors.
  *
  * ## Why every working state is the same size
  *
@@ -102,6 +115,16 @@ export interface AskBarProps {
   onInputChange: (value: string) => void;
   onSubmit: () => void;
   onClose: () => void;
+  /**
+   * Abandon whatever is in flight — a recording, a transcription, a reply being
+   * generated — without sending it.
+   *
+   * Separate from `onClose` because in a working phase the × has to *stop* the
+   * thing before the surface goes away; hiding alone would leave a recording
+   * running behind an invisible window, which is the same class of bug as a call
+   * outliving its panel.
+   */
+  onCancel: () => void;
   /** Keeps a control press from starting a window drag. */
   stopDrag: (event: React.MouseEvent) => void;
 }
@@ -136,6 +159,7 @@ const AskBar: React.FC<AskBarProps> = ({
   onInputChange,
   onSubmit,
   onClose,
+  onCancel,
   stopDrag,
 }) => {
   const { t } = useTranslation();
@@ -143,6 +167,9 @@ const AskBar: React.FC<AskBarProps> = ({
   const listening = phase === "listening";
   const prompt = phase === "prompt";
   const typable = prompt && active;
+  // Is something in flight that the × has to stop before closing? An error is a
+  // finished state, not a working one, even though it is not a prompt either.
+  const working = !prompt && !error;
   // Focused imperatively rather than with `autoFocus`, because the field is
   // remounted every time the phase comes back round to a prompt — including on
   // the way *out*, as an answer lands and the card takes over. `autoFocus` fires
@@ -225,22 +252,24 @@ const AskBar: React.FC<AskBarProps> = ({
         </button>
       )}
 
-      {/* Kept off the working states on purpose: the shortcut that started the
-          recording ends it and Esc discards it, exactly as with dictation. A
-          failure is the other case that needs dismissing, since nothing else will
-          come along to replace it. */}
-      {(prompt || !!error) && (
-        <button
-          type="button"
-          className="ask-pill-btn quiet"
-          onClick={onClose}
-          onMouseDown={stopDrag}
-          title={t("assistant.hide")}
-          aria-label={t("assistant.hide")}
-        >
-          <X size={12} strokeWidth={2.2} />
-        </button>
-      )}
+      {/* The one control that is always here.
+       *
+       * In a working phase it cancels: a recording, a transcription or a reply in
+       * flight is stopped and thrown away, then the surface closes — hiding alone
+       * would leave the microphone open behind an invisible window. In a resting
+       * phase (a prompt, or an error nobody will replace) there is nothing to stop,
+       * so it just closes. Same glyph, same place, every phase, which is what makes
+       * it learnable in one use. */}
+      <button
+        type="button"
+        className="ask-pill-btn quiet"
+        onClick={working ? onCancel : onClose}
+        onMouseDown={stopDrag}
+        title={working ? t("assistant.cancel") : t("assistant.hide")}
+        aria-label={working ? t("assistant.cancel") : t("assistant.hide")}
+      >
+        <X size={12} strokeWidth={2.2} />
+      </button>
     </div>
   );
 };

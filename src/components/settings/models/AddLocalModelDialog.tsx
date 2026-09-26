@@ -1,18 +1,13 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { open } from "@tauri-apps/plugin-dialog";
-import {
-  FilePlus2,
-  FolderOpen,
-  FolderSearch,
-  Loader2,
-  RefreshCw,
-  X,
-} from "lucide-react";
+import { FilePlus2, FolderOpen, Loader2, RefreshCw, X } from "lucide-react";
 import { toast } from "sonner";
 import { commands } from "@/bindings";
 import { useModelStore } from "@/stores/modelStore";
 import { Button } from "@/components/ui/Button";
+import { Dialog } from "@/components/ui/Dialog";
+import { InfoTip } from "@/components/ui/InfoTip";
 
 interface AddLocalModelDialogProps {
   open: boolean;
@@ -55,15 +50,6 @@ export const AddLocalModelDialog: React.FC<AddLocalModelDialogProps> = ({
     void refreshFolders();
   }, [isOpen, refreshFolders]);
 
-  // Close on Escape, matching the Hugging Face dialog.
-  useEffect(() => {
-    if (!isOpen) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [isOpen, onClose]);
 
   const handlePickFiles = async () => {
     setPickingFiles(true);
@@ -171,177 +157,155 @@ export const AddLocalModelDialog: React.FC<AddLocalModelDialogProps> = ({
     }
   };
 
-  if (!isOpen) return null;
-
+  // Through the shared portal Dialog: a `fixed` overlay drawn inside a page is
+  // trapped by the page's container query (it becomes the containing block),
+  // which is how this "modal" used to cover one column of the window.
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-[2px]"
-      onClick={onClose}
-      role="presentation"
+    <Dialog
+      open={isOpen}
+      onClose={onClose}
+      size="lg"
+      title={t("settings.models.localModel.title")}
+      description={t("settings.models.localModel.subtitle")}
     >
-      <div
-        className="flex max-h-[86vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-hairline-strong bg-surface shadow-[0_24px_80px_-24px_rgba(0,0,0,0.55)]"
-        onClick={(event) => event.stopPropagation()}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="local-model-dialog-title"
-      >
-        <div className="flex items-start justify-between gap-4 border-b border-hairline px-6 py-5">
-          <div className="flex min-w-0 items-start gap-3">
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-accent/12 text-accent">
-              <FolderSearch className="h-[18px] w-[18px]" aria-hidden="true" />
-            </span>
-            <div className="min-w-0">
-              <h2
-                id="local-model-dialog-title"
-                className="text-base font-semibold tracking-tight text-ink"
-              >
-                {t("settings.models.localModel.title")}
-              </h2>
-              <p className="mt-0.5 max-w-[62ch] text-xs leading-relaxed text-muted">
-                {t("settings.models.localModel.subtitle")}
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="-me-1 grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-transparent text-muted transition-colors hover:border-hairline hover:bg-surface-strong hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 cursor-pointer"
-            aria-label={t("common.close")}
-          >
-            <X className="h-4 w-4" aria-hidden="true" />
-          </button>
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+          <ChoiceButton
+            icon={
+              pickingFiles ? (
+                <Loader2
+                  className="h-4 w-4 animate-spin motion-reduce:animate-none"
+                  aria-hidden="true"
+                />
+              ) : (
+                <FilePlus2 className="h-4 w-4" aria-hidden="true" />
+              )
+            }
+            title={t("settings.models.localModel.pickFiles")}
+            info={t("settings.models.localModel.pickFilesHint")}
+            onClick={handlePickFiles}
+            disabled={busy}
+          />
+          <ChoiceButton
+            icon={
+              pickingFolder ? (
+                <Loader2
+                  className="h-4 w-4 animate-spin motion-reduce:animate-none"
+                  aria-hidden="true"
+                />
+              ) : (
+                <FolderOpen className="h-4 w-4" aria-hidden="true" />
+              )
+            }
+            title={t("settings.models.localModel.linkFolder")}
+            info={t("settings.models.localModel.linkFolderHint")}
+            onClick={handleLinkFolder}
+            disabled={busy}
+          />
         </div>
 
-        <div className="flex-1 space-y-6 overflow-y-auto px-6 py-5">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <button
-              type="button"
-              onClick={handlePickFiles}
-              disabled={busy}
-              className="group flex flex-col items-start gap-2 rounded-2xl border border-hairline bg-surface p-4 text-start transition-[background-color,border-color,transform] duration-150 hover:border-accent/30 hover:bg-surface-strong/65 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
-            >
-              <span className="grid h-9 w-9 place-items-center rounded-xl bg-surface-strong text-muted transition-colors group-hover:text-accent">
-                {pickingFiles ? (
-                  <Loader2
-                    className="h-4 w-4 animate-spin motion-reduce:animate-none"
-                    aria-hidden="true"
-                  />
-                ) : (
-                  <FilePlus2 className="h-4 w-4" aria-hidden="true" />
-                )}
-              </span>
-              <span className="text-sm font-semibold text-ink">
-                {t("settings.models.localModel.pickFiles")}
-              </span>
-              <span className="text-xs leading-relaxed text-muted">
-                {t("settings.models.localModel.pickFilesHint")}
-              </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={handleLinkFolder}
-              disabled={busy}
-              className="group flex flex-col items-start gap-2 rounded-2xl border border-hairline bg-surface p-4 text-start transition-[background-color,border-color,transform] duration-150 hover:border-accent/30 hover:bg-surface-strong/65 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
-            >
-              <span className="grid h-9 w-9 place-items-center rounded-xl bg-surface-strong text-muted transition-colors group-hover:text-accent">
-                {pickingFolder ? (
-                  <Loader2
-                    className="h-4 w-4 animate-spin motion-reduce:animate-none"
-                    aria-hidden="true"
-                  />
-                ) : (
-                  <FolderOpen className="h-4 w-4" aria-hidden="true" />
-                )}
-              </span>
-              <span className="text-sm font-semibold text-ink">
-                {t("settings.models.localModel.linkFolder")}
-              </span>
-              <span className="text-xs leading-relaxed text-muted">
-                {t("settings.models.localModel.linkFolderHint")}
-              </span>
-            </button>
-          </div>
-
-          <div className="space-y-3">
-            <div className="flex items-center justify-between gap-3">
-              <h3 className="text-sm font-semibold text-ink">
+        <div className="space-y-2.5">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-1">
+              <h3 className="text-[0.8125rem] font-semibold text-muted">
                 {t("settings.models.localModel.foldersTitle")}
               </h3>
-              {folders.length > 0 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleRescan}
-                  disabled={busy}
-                >
-                  {rescanning ? (
-                    <Loader2
-                      className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none"
-                      aria-hidden="true"
-                    />
-                  ) : (
-                    <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
-                  )}
-                  {rescanning
-                    ? t("settings.models.localModel.rescanning")
-                    : t("settings.models.localModel.rescan")}
-                </Button>
-              )}
+              <InfoTip text={t("settings.models.localModel.footnote")} />
             </div>
-
-            {folders.length === 0 ? (
-              <p className="rounded-2xl border border-dashed border-hairline-strong px-4 py-6 text-center text-xs leading-relaxed text-muted">
-                {t("settings.models.localModel.foldersEmpty")}
-              </p>
-            ) : (
-              <ul className="divide-y divide-hairline overflow-hidden rounded-2xl border border-hairline">
-                {folders.map((folder) => (
-                  <li
-                    key={folder}
-                    className="flex items-center gap-3 bg-surface px-3.5 py-3"
-                  >
-                    <FolderOpen
-                      className="h-4 w-4 shrink-0 text-muted"
-                      aria-hidden="true"
-                    />
-                    <span
-                      className="min-w-0 flex-1 truncate font-mono text-xs text-ink"
-                      title={folder}
-                      dir="ltr"
-                    >
-                      {folder}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveFolder(folder)}
-                      disabled={removingFolder !== null || busy}
-                      className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-transparent text-muted transition-colors hover:border-hairline hover:bg-surface-strong hover:text-error focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
-                      aria-label={t("settings.models.localModel.removeFolder", {
-                        folder,
-                      })}
-                    >
-                      {removingFolder === folder ? (
-                        <Loader2
-                          className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none"
-                          aria-hidden="true"
-                        />
-                      ) : (
-                        <X className="h-3.5 w-3.5" aria-hidden="true" />
-                      )}
-                    </button>
-                  </li>
-                ))}
-              </ul>
+            {folders.length > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleRescan}
+                disabled={busy}
+              >
+                {rescanning ? (
+                  <Loader2
+                    className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none"
+                    aria-hidden="true"
+                  />
+                ) : (
+                  <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+                )}
+                {rescanning
+                  ? t("settings.models.localModel.rescanning")
+                  : t("settings.models.localModel.rescan")}
+              </Button>
             )}
-
-            <p className="text-xs leading-relaxed text-muted">
-              {t("settings.models.localModel.footnote")}
-            </p>
           </div>
+
+          {folders.length === 0 ? (
+            <p className="rounded-xl border border-dashed border-hairline-strong px-4 py-5 text-center text-[0.8125rem] text-muted">
+              {t("settings.models.localModel.foldersEmptyShort")}
+            </p>
+          ) : (
+            <ul className="divide-y divide-hairline overflow-hidden rounded-xl border border-hairline">
+              {folders.map((folder) => (
+                <li
+                  key={folder}
+                  className="flex items-center gap-3 bg-surface px-3.5 py-2.5"
+                >
+                  <FolderOpen
+                    className="h-4 w-4 shrink-0 text-muted"
+                    aria-hidden="true"
+                  />
+                  <span
+                    className="min-w-0 flex-1 truncate font-mono text-xs text-ink"
+                    title={folder}
+                    dir="ltr"
+                  >
+                    {folder}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveFolder(folder)}
+                    disabled={removingFolder !== null || busy}
+                    className="grid h-7 w-7 shrink-0 cursor-pointer place-items-center rounded-lg text-muted transition-colors hover:bg-error/10 hover:text-error focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:cursor-not-allowed disabled:opacity-50"
+                    aria-label={t("settings.models.localModel.removeFolder", {
+                      folder,
+                    })}
+                  >
+                    {removingFolder === folder ? (
+                      <Loader2
+                        className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none"
+                        aria-hidden="true"
+                      />
+                    ) : (
+                      <X className="h-3.5 w-3.5" aria-hidden="true" />
+                    )}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </div>
-    </div>
+    </Dialog>
   );
 };
+
+/** One of the two ways in: a short title, with the detail behind its (i). */
+const ChoiceButton: React.FC<{
+  icon: React.ReactNode;
+  title: string;
+  info: string;
+  onClick: () => void;
+  disabled?: boolean;
+}> = ({ icon, title, info, onClick, disabled }) => (
+  <div className="relative">
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="flex w-full cursor-pointer items-center gap-3 rounded-xl border border-hairline-strong bg-surface px-4 py-3.5 pe-10 text-start transition-colors hover:bg-surface-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:cursor-not-allowed disabled:opacity-60"
+    >
+      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-surface-strong text-ink/70">
+        {icon}
+      </span>
+      <span className="text-sm font-medium text-ink">{title}</span>
+    </button>
+    <span className="absolute end-3 top-1/2 -translate-y-1/2">
+      <InfoTip text={info} />
+    </span>
+  </div>
+);

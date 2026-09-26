@@ -195,7 +195,12 @@ export function ConversationView({
       aria-label={t("assistant.conversation.title")}
     >
       <div className="conversation-profile-row">{profilePicker}</div>
-      <div className="conversation-stage">
+      {/* The orb and its status line are the largest inert area in the window, so
+          they are the natural place to grab it from. Before this the call could only
+          be moved by the word "Conversation" in the header — a target a few
+          characters wide on a window the user is meant to park out of their way.
+          Interactive children are excluded by `useSafeWindowDrag`. */}
+      <div className="conversation-stage" data-tauri-drag-region>
         <VoiceOrb phase={voice.phase} level={voice.level} />
         <div className="conversation-status" role="status" aria-live="polite">
           {preparingVoice

@@ -5,6 +5,7 @@ import { SettingsGroup } from "@/components/ui/SettingsGroup";
 import { SettingContainer } from "@/components/ui/SettingContainer";
 import { ToggleSwitch } from "@/components/ui/ToggleSwitch";
 import { Input } from "@/components/ui/Input";
+import Badge from "@/components/ui/Badge";
 import { useSettings } from "@/hooks/useSettings";
 
 /**
@@ -33,7 +34,11 @@ export const GenerateWithFlowGroup: React.FC = () => {
   };
 
   return (
-    <SettingsGroup title={t("settings.dictation.flow.groupTitle")} icon={Wand2}>
+    <SettingsGroup
+      title={t("settings.dictation.flow.groupTitle")}
+      icon={Wand2}
+      action={<Badge variant="outline">{t("common.beta")}</Badge>}
+    >
       <ToggleSwitch
         checked={enabled}
         onChange={(value) => updateSetting("flow_enabled", value)}

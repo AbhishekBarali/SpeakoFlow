@@ -1,42 +1,49 @@
 import React from "react";
+import { InfoTip } from "./InfoTip";
 import type { SettingIcon } from "./tones";
 
 interface SettingsGroupProps {
   title?: string;
+  /** Context for the whole group, behind an (i) next to the title. */
   description?: string;
-  /** Optional accent icon shown in the header tile before the title. */
+  /** @deprecated Groups no longer draw a title icon. */
   icon?: SettingIcon;
+  /** Control at the right end of the header (a link, a badge). */
+  action?: React.ReactNode;
   children: React.ReactNode;
+  className?: string;
 }
 
+/**
+ * A titled card of setting rows. The title sits above the card in the sans
+ * face — groups are too frequent for the display serif — and the rows sit
+ * inside it separated by hairlines.
+ */
 export const SettingsGroup: React.FC<SettingsGroupProps> = ({
   title,
   description,
-  icon: Icon,
+  action,
   children,
+  className = "",
 }) => {
   return (
-    <div className="space-y-2.5">
-      {title && (
-        <div className="flex items-start gap-2 px-1">
-          {Icon && (
-            <span className="mt-px flex h-5 w-5 shrink-0 items-center justify-center text-accent">
-              <Icon size={15} />
-            </span>
-          )}
-          <div>
-            <h2 className="text-[13.5px] font-semibold tracking-tight text-ink">
-              {title}
-            </h2>
-            {description && (
-              <p className="text-xs text-muted mt-0.5">{description}</p>
+    <section className={`space-y-2.5 ${className}`}>
+      {(title || action) && (
+        <div className="flex items-end justify-between gap-3 px-1">
+          <div className="flex min-w-0 items-center gap-1">
+            {title && (
+              <h2 className="text-[0.8125rem] font-semibold text-muted">
+                {title}
+              </h2>
             )}
+            {description && <InfoTip text={description} />}
           </div>
+          {action && <div className="shrink-0">{action}</div>}
         </div>
       )}
-      <div className="bg-surface rounded-2xl overflow-visible border border-hairline elev-card">
+      <div className="overflow-visible rounded-2xl border border-hairline bg-surface elev-card">
         <div className="divide-y divide-hairline">{children}</div>
       </div>
-    </div>
+    </section>
   );
 };

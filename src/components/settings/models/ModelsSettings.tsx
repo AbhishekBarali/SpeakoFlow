@@ -7,12 +7,15 @@ import {
   ChevronRight,
   Globe,
   HardDrive,
+  Languages,
   Plus,
+  Radio,
   Search,
+  Trash2,
   X,
 } from "lucide-react";
 import type { ModelCardStatus } from "@/components/onboarding";
-import { isLegacyModel, ModelCard } from "@/components/onboarding";
+import { isLegacyModel } from "@/components/onboarding";
 import { useModelStore } from "@/stores/modelStore";
 import { useSettings } from "@/hooks/useSettings";
 import { LANGUAGES } from "@/lib/constants/languages.ts";
@@ -20,11 +23,43 @@ import {
   getModelCategory,
   type ModelCategory,
 } from "@/lib/utils/modelCategory";
-import { getTranslatedModelName } from "@/lib/utils/modelTranslation";
+import { formatModelSize } from "@/lib/utils/format";
+import { splitLocalModelName } from "@/lib/utils/prettyModelName";
+import {
+  getTranslatedModelDescription,
+  getTranslatedModelName,
+} from "@/lib/utils/modelTranslation";
 import { commands, type ModelInfo } from "@/bindings";
 import { Button } from "@/components/ui/Button";
 import { AddCustomModelDialog } from "./AddCustomModelDialog";
 import { AddLocalModelDialog } from "./AddLocalModelDialog";
+import { ModelRow, ModelTag, type ModelRowAction } from "./ModelRow";
+
+/** Accuracy or speed as five quiet dots: a comparison, not a number to read. */
+const ScoreDots: React.FC<{ label: string; score: number }> = ({
+  label,
+  score,
+}) => {
+  const filled = Math.max(0, Math.min(5, Math.round(score * 5)));
+  return (
+    <span
+      className="inline-flex items-center gap-1.5"
+      role="img"
+      aria-label={`${label}: ${filled}/5`}
+      title={`${label}: ${filled}/5`}
+    >
+      <span className="capitalize">{label}</span>
+      <span aria-hidden="true" className="flex gap-[3px]">
+        {Array.from({ length: 5 }, (_, index) => (
+          <span
+            key={index}
+            className={`h-1.5 w-1.5 rounded-full ${index < filled ? "bg-ink/55" : "bg-ink/15"}`}
+          />
+        ))}
+      </span>
+    </span>
+  );
+};
 
 // check if model supports a language based on its supported_languages list
 const modelSupportsLanguage = (model: ModelInfo, langCode: string): boolean => {
@@ -384,31 +419,166 @@ export const ModelsSettings: React.FC<ModelsSettingsProps> = ({
     availableModels.length > 0 ||
     olderModels.length > 0;
 
-  const renderModelCard = (model: ModelInfo) => (
-    <ModelCard
-      key={model.id}
-      model={model}
-      status={getModelStatus(model.id)}
-      onSelect={handleModelSelect}
-      onDownload={handleModelDownload}
-      onDelete={
-        // Models from a linked folder can't be removed one at a time — the next
-        // scan would just find them again. Unlinking the folder is the action
-        // that works, so don't offer one that doesn't.
-        categoryFilter === "tts" || model.local_folder
-          ? undefined
-          : handleModelDelete
-      }
-      onCancel={handleModelCancel}
-      downloadProgress={getDownloadProgress(model.id)}
-      downloadSpeed={getDownloadSpeed(model.id)}
-      showRecommended={true}
-    />
+  const renderModelRow = (model: ModelInfo) => {
+    const status = getModelStatus(model.id);
+    const category = getModelCategory(model);
+    const { name, quant } = splitLocalModelName(
+      getTranslatedModelName(model, t),
+      model.filename,
+    );
+    const missing = !!model.local_path && !model.is_downloaded;
+    const busy =
+      status === "downloading" ||
+      status === "verifying" ||
+      status === "extracting";
+    // Models from a linked folder can't be removed one at a time — the next
+    // scan would just find them again. Unlinking the folder is the action that
+    // works, so don't offer one that doesn't.
+    const removable =
+      category !== "tts" &&
+      !model.local_folder &&
+      (model.is_downloaded || model.is_custom || missing);
+
+    const action: ModelRowAction = busy
+      ? { kind: "none" }
+      : missing
+        ? { kind: "missing", title: model.local_path ?? undefined }
+        : status === "downloadable"
+          ? {
+              kind: "download",
+              onClick: () => void handleModelDownload(model.id),
+            }
+          : status === "switching"
+            ? { kind: "switching" }
+            : status === "active"
+              ? { kind: "inUse" }
+              : category === "tts"
+                ? { kind: "none" }
+                : {
+                    kind: "use",
+                    onClick: () => void handleModelSelect(model.id),
+                    ariaLabel: t("catalog.useNamed", {
+                      model: name,
+                      job: t(`settings.models.categories.${category}`),
+                    }),
+                  };
+
+    const languages = model.supported_languages;
+    const languageText =
+      languages.length === 1
+        ? t("modelSelector.capabilities.languageOnly", {
+            language:
+              LANGUAGES.find((lang) => lang.value === languages[0])?.label ??
+              languages[0],
+          })
+        : languages.length > 1
+          ? t("modelSelector.capabilities.multiLanguage")
+          : null;
+
+    return (
+      <ModelRow
+        key={model.id}
+        model={model}
+        name={name}
+        quant={model.is_custom ? quant : null}
+        subtitle={getTranslatedModelDescription(model, t)}
+        size={formatModelSize(Number(model.size_mb))}
+        current={status === "active"}
+        badges={
+          <>
+            {model.supports_streaming && !isLegacyModel(model) && (
+              <ModelTag tone="success" icon={Radio}>
+                {t("modelSelector.capabilities.streaming")}
+              </ModelTag>
+            )}
+            {model.is_recommended && status !== "active" && (
+              <ModelTag>{t("onboarding.recommended")}</ModelTag>
+            )}
+          </>
+        }
+        meta={
+          category === "stt" ? (
+            <>
+              {languageText && (
+                <span className="inline-flex items-center gap-1">
+                  <Globe className="h-3.5 w-3.5" aria-hidden="true" />
+                  {languageText}
+                </span>
+              )}
+              {model.supports_translation && (
+                <span className="inline-flex items-center gap-1">
+                  <Languages className="h-3.5 w-3.5" aria-hidden="true" />
+                  {t("modelSelector.capabilities.translate")}
+                </span>
+              )}
+              {model.accuracy_score > 0 && (
+                <ScoreDots
+                  label={t("onboarding.modelCard.accuracy")}
+                  score={model.accuracy_score}
+                />
+              )}
+              {model.speed_score > 0 && (
+                <ScoreDots
+                  label={t("onboarding.modelCard.speed")}
+                  score={model.speed_score}
+                />
+              )}
+            </>
+          ) : undefined
+        }
+        action={action}
+        menu={
+          removable && !busy
+            ? [
+                {
+                  id: "delete",
+                  icon: Trash2,
+                  tone: "danger",
+                  label: model.local_path
+                    ? t("catalog.removeFromList")
+                    : t("common.delete"),
+                  hint:
+                    status === "active"
+                      ? t("settings.assistant.brain.switchBeforeDelete")
+                      : undefined,
+                  disabled: status === "active",
+                  onSelect: () => void handleModelDelete(model.id),
+                },
+              ]
+            : undefined
+        }
+        progress={
+          busy
+            ? {
+                state: status,
+                percent: getDownloadProgress(model.id),
+                speed: getDownloadSpeed(model.id),
+                onCancel:
+                  status === "downloading"
+                    ? () => void handleModelCancel(model.id)
+                    : undefined,
+              }
+            : null
+        }
+      />
+    );
+  };
+
+  /** A section of the catalog: a quiet heading over one bordered list. */
+  const renderSection = (title: React.ReactNode, list: ModelInfo[]) => (
+    <section className="space-y-2.5">
+      <h2 className="px-1 text-[0.8125rem] font-semibold text-muted">
+        {title}
+      </h2>
+      <div className="divide-y divide-hairline rounded-2xl border border-hairline bg-surface elev-card">
+        {list.map(renderModelRow)}
+      </div>
+    </section>
   );
 
   if (loading) {
     return (
-      <div className="max-w-3xl w-full mx-auto">
+      <div className="w-full">
         <div className="flex items-center justify-center py-16">
           <div className="w-8 h-8 border-2 border-hairline-strong border-t-ink rounded-full animate-spin" />
         </div>
@@ -417,7 +587,7 @@ export const ModelsSettings: React.FC<ModelsSettingsProps> = ({
   }
 
   return (
-    <div className="max-w-3xl w-full mx-auto space-y-6">
+    <div className="w-full space-y-6">
       {/* Category switcher: Transcription / Language Model / Speech — hidden
           when the catalog is locked to a single purpose. */}
       {!lockedCategory && (
@@ -454,9 +624,10 @@ export const ModelsSettings: React.FC<ModelsSettingsProps> = ({
         </p>
       )}
       {/* Toolbar: model-name search + (stt) language filter / (llm) add custom.
-          Kept above the sections so it's always reachable, even with no results. */}
-      <div className="flex items-center gap-2">
-        <div className="flex-1 flex items-center gap-2 px-3 py-2 bg-surface border border-hairline rounded-lg focus-within:border-ink transition-colors">
+          Kept above the sections so it's always reachable, even with no results.
+          Wraps on a narrow window so the buttons never run off the pane. */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex min-w-[12rem] flex-1 items-center gap-2 px-3 py-2 bg-surface border border-hairline rounded-lg focus-within:border-ink transition-colors">
           <Search className="w-4 h-4 shrink-0 text-muted-soft" />
           <input
             type="text"
@@ -591,25 +762,14 @@ export const ModelsSettings: React.FC<ModelsSettingsProps> = ({
 
       {hasAnyResults ? (
         <div className="space-y-8">
-          {/* Downloaded Models Section */}
-          {downloadedModels.length > 0 && (
-            <div className="space-y-3">
-              <h2 className="text-[13px] font-semibold text-ink">
-                {t("settings.models.yourModels")}
-              </h2>
-              {downloadedModels.map(renderModelCard)}
-            </div>
-          )}
+          {downloadedModels.length > 0 &&
+            renderSection(t("settings.models.yourModels"), downloadedModels)}
 
-          {/* Available Models Section (recommended / modern) */}
-          {availableModels.length > 0 && (
-            <div className="space-y-3">
-              <h2 className="text-[13px] font-semibold text-ink">
-                {t("settings.models.availableModels")}
-              </h2>
-              {availableModels.map(renderModelCard)}
-            </div>
-          )}
+          {availableModels.length > 0 &&
+            renderSection(
+              t("settings.models.availableModels"),
+              availableModels,
+            )}
 
           {/* Older models (legacy engine) — collapsed by default, auto-open on search */}
           {categoryFilter === "stt" && olderModels.length > 0 && (
@@ -618,10 +778,10 @@ export const ModelsSettings: React.FC<ModelsSettingsProps> = ({
                 type="button"
                 onClick={() => setShowOlderModels((v) => !v)}
                 aria-expanded={olderModelsOpen}
-                className="flex items-center gap-1.5 text-[13px] font-semibold text-muted hover:text-ink transition-colors cursor-pointer"
+                className="flex cursor-pointer items-center gap-1.5 px-1 text-[0.8125rem] font-semibold text-muted transition-colors hover:text-ink"
               >
                 <ChevronRight
-                  className={`w-3.5 h-3.5 transition-transform ${
+                  className={`h-3.5 w-3.5 transition-transform ${
                     olderModelsOpen ? "rotate-90" : ""
                   }`}
                 />
@@ -631,11 +791,13 @@ export const ModelsSettings: React.FC<ModelsSettingsProps> = ({
                 </span>
               </button>
               {olderModelsOpen && (
-                <div className="space-y-3">
-                  <p className="text-xs text-muted-soft">
+                <div className="space-y-2.5">
+                  <p className="px-1 text-xs text-muted">
                     {t("settings.models.olderModelsHint")}
                   </p>
-                  {olderModels.map(renderModelCard)}
+                  <div className="divide-y divide-hairline rounded-2xl border border-hairline bg-surface elev-card">
+                    {olderModels.map(renderModelRow)}
+                  </div>
                 </div>
               )}
             </div>

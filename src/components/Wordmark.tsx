@@ -6,14 +6,13 @@ interface WordmarkProps {
 }
 
 /**
- * SpeakoFlow brand wordmark. Set in the brand sans (Inter via
- * `.font-display`) so it speaks the same type language as the logo and the
- * section headers. "Flow" takes the accent so the name and the brand color
- * read as one mark.
+ * SpeakoFlow brand wordmark, in the brand sans (`.font-brand`) — the display
+ * serif is for page titles, never for the name. "Flow" takes the accent so the
+ * name and the brand color read as one mark.
  */
 export const Wordmark: React.FC<WordmarkProps> = ({ className = "" }) => (
   <span
-    className={`font-display font-semibold tracking-tight text-ink leading-none select-none inline-block ${className}`}
+    className={`font-brand font-semibold tracking-tight text-ink leading-none select-none inline-block ${className}`}
   >
     Speako<span className="text-accent">Flow</span>
   </span>

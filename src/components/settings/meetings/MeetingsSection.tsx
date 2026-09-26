@@ -2,8 +2,10 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { listen } from "@tauri-apps/api/event";
 import { toast } from "sonner";
-import { SectionHeader } from "@/components/ui/SectionHeader";
+import { PageHeader, SectionTitle } from "@/components/ui/Page";
 import { SubPage } from "@/components/ui/SubPage";
+import { Hero } from "@/components/ui/Hero";
+import { usePageReset } from "@/components/shell/navigation";
 import {
   deleteMeeting,
   getMeetingSpeakers,
@@ -23,7 +25,8 @@ import {
   type SegmentEvent,
 } from "./api";
 import { itemFromEvent, type TranscriptItem } from "./speakers";
-import { CallDetectionToggle } from "./CallDetectionToggle";
+import { CallDetectionHeroSwitch } from "./CallDetectionToggle";
+import { SystemAudioNotice } from "./SystemAudioNotice";
 import { MeetingDetail } from "./MeetingDetail";
 import { MeetingsList } from "./MeetingsList";
 import { RecorderCard } from "./RecorderCard";
@@ -46,7 +49,10 @@ const IDLE_STATE: MeetingState = {
  * listeners would mean two components disagreeing about whether a meeting is
  * running.
  */
-export const MeetingsSection: React.FC = () => {
+export const MeetingsSection: React.FC<{
+  /** One quiet line on the hero: which models write the transcript and notes. */
+  heroFooter?: React.ReactNode;
+}> = ({ heroFooter }) => {
   const { t, i18n } = useTranslation();
 
   const [state, setState] = useState<MeetingState>(IDLE_STATE);
@@ -65,6 +71,8 @@ export const MeetingsSection: React.FC = () => {
   const [systemAudioHelp, setSystemAudioHelp] = useState<string | null>(null);
 
   const [openId, setOpenId] = useState<number | null>(null);
+  // Clicking Meetings in the sidebar again goes back to the list.
+  usePageReset("meetings", () => setOpenId(null));
 
   /* ── the list ── */
 
@@ -258,6 +266,7 @@ export const MeetingsSection: React.FC = () => {
       <SubPage
         title={t("meetings.detail.title")}
         onBack={() => setOpenId(null)}
+        backLabel={t("nav.meetings")}
       >
         <MeetingDetail
           meetingId={openId}
@@ -268,36 +277,64 @@ export const MeetingsSection: React.FC = () => {
     );
   }
 
+  const recording = state.meeting_id !== null;
+
   return (
-    <div className="max-w-3xl w-full mx-auto space-y-6">
-      <SectionHeader
+    <div className="w-full">
+      <PageHeader
         title={t("sidebar.meetings")}
         description={t("sectionSubtitles.meetings")}
       />
 
-      <RecorderCard
-        state={state}
-        busy={busy}
-        liveItems={liveItems}
-        // No speaker names live: the only keys that exist during a recording are
-        // the two channel-derived ones, whose stored names are the English seeds,
-        // and the transcript view translates those itself. Diarization — the pass
-        // that produces real speakers to name — runs after the meeting ends.
-        speakers={[]}
-        systemAudioHelp={systemAudioHelp}
-        systemAudioSupported={systemAudioSupported}
-        onStart={start}
-        onStop={stop}
-        onTogglePause={togglePause}
-      />
+      {!systemAudioSupported && !recording && (
+        <div className="mb-5">
+          <SystemAudioNotice live={false} detail={systemAudioHelp} />
+        </div>
+      )}
 
-      <CallDetectionToggle />
+      {recording ? (
+        <RecorderCard
+          state={state}
+          busy={busy}
+          liveItems={liveItems}
+          // No speaker names live: the only keys that exist during a recording
+          // are the two channel-derived ones, whose stored names are the
+          // English seeds, and the transcript view translates those itself.
+          speakers={[]}
+          systemAudioHelp={systemAudioHelp}
+          systemAudioSupported={systemAudioSupported}
+          onStart={start}
+          onStop={stop}
+          onTogglePause={togglePause}
+        />
+      ) : (
+        <Hero
+          title={t("meetingsPage.hero.title")}
+          subtitle={t("meetingsPage.hero.subtitle")}
+          aside={
+            <div className="flex flex-col items-start gap-4 @3xl:items-end">
+              <button
+                type="button"
+                onClick={start}
+                disabled={busy !== null}
+                className="glass-button inline-flex h-11 cursor-pointer items-center gap-2.5 rounded-full px-5 text-[0.9375rem] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:cursor-wait disabled:opacity-70"
+              >
+                <span className="h-2.5 w-2.5 rounded-full bg-[#e5484d]" />
+                {busy === "starting"
+                  ? t("meetings.recorder.starting")
+                  : t("meetings.recorder.start")}
+              </button>
+              <CallDetectionHeroSwitch />
+            </div>
+          }
+        >
+          {heroFooter}
+        </Hero>
+      )}
 
-      <div className="space-y-2">
-        <h2 className="px-1 text-[13.5px] font-semibold tracking-tight text-ink">
-          {t("meetings.list.title")}
-        </h2>
-        <div className="rounded-2xl border border-hairline bg-surface elev-card overflow-hidden">
+      <section className="mt-10">
+        <SectionTitle title={t("meetings.list.title")} />
+        <div className="overflow-hidden rounded-2xl border border-hairline bg-surface elev-card">
           <MeetingsList
             meetings={meetings}
             speakerCounts={speakerCounts}
@@ -309,7 +346,7 @@ export const MeetingsSection: React.FC = () => {
             recordingMeetingId={state.meeting_id}
           />
         </div>
-      </div>
+      </section>
     </div>
   );
 };

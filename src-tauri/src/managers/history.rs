@@ -1,12 +1,13 @@
 use anyhow::{anyhow, Result};
-use chrono::{DateTime, Local, Months, Utc};
+use chrono::{DateTime, Days, Local, Months, NaiveDate, TimeZone, Utc};
 use log::{debug, error, info};
 use rusqlite::{params, Connection, OptionalExtension};
 use rusqlite_migration::{Migrations, M};
 use serde::{Deserialize, Serialize};
 use specta::Type;
+use std::collections::BTreeMap;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Emitter};
 use tauri_specta::Event;
 
@@ -46,6 +47,25 @@ static MIGRATIONS: &[M] = &[
             updated_at INTEGER NOT NULL,
             title TEXT NOT NULL,
             messages TEXT NOT NULL
+        );",
+    ),
+    // Lifetime dictation usage. Aggregated per local calendar day rather than
+    // derived from `transcription_history`, because retention prunes that table
+    // and these are lifetime numbers: deleting a recording must not make the
+    // user look like they dictated less. `timed_words` counts only the words of
+    // entries whose audio duration was known, so words-per-minute is computed
+    // over the same entries as `audio_seconds`.
+    M::up(
+        "CREATE TABLE IF NOT EXISTS usage_daily (
+            day TEXT PRIMARY KEY,
+            dictations INTEGER NOT NULL DEFAULT 0,
+            words INTEGER NOT NULL DEFAULT 0,
+            timed_words INTEGER NOT NULL DEFAULT 0,
+            audio_seconds REAL NOT NULL DEFAULT 0
+        );
+        CREATE TABLE IF NOT EXISTS usage_meta (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
         );",
     ),
 ];
@@ -164,6 +184,300 @@ fn cutoff_days(now: DateTime<Utc>, days: i64) -> i64 {
     now.timestamp() - days * 24 * 60 * 60
 }
 
+/// One local calendar day of dictation usage, as shown in the recent-activity
+/// chart.
+#[derive(Clone, Debug, Serialize, Deserialize, Type)]
+pub struct UsageDay {
+    /// Local calendar date, `%Y-%m-%d`.
+    pub day: String,
+    pub dictations: i64,
+    pub words: i64,
+    pub audio_seconds: f64,
+}
+
+/// Lifetime dictation usage. These survive history deletion and retention
+/// pruning; they are aggregated in `usage_daily`, not derived from rows.
+#[derive(Clone, Debug, Serialize, Deserialize, Type)]
+pub struct UsageStats {
+    pub total_dictations: i64,
+    pub total_words: i64,
+    /// Words from dictations whose audio duration is known. Words per minute is
+    /// `timed_words / (total_audio_seconds / 60)`, never `total_words / ...`,
+    /// so untimed (backfilled) entries cannot inflate the rate.
+    pub timed_words: i64,
+    pub total_audio_seconds: f64,
+    pub today_words: i64,
+    pub today_dictations: i64,
+    pub current_streak_days: u32,
+    pub longest_streak_days: u32,
+    pub active_days: u32,
+    /// Active days within the last `USAGE_RECENT_WINDOW_DAYS` local days
+    /// including today, ascending. Days without a dictation are omitted.
+    pub recent_days: Vec<UsageDay>,
+}
+
+/// `usage_meta` key recording that existing history has been folded into
+/// `usage_daily`, so the backfill runs exactly once per database.
+const USAGE_BACKFILL_KEY: &str = "backfill_v1";
+
+/// The backfill reads WAV headers only for this many of the newest contributing
+/// rows. It bounds startup cost on a large history; older rows still count
+/// words and dictations but are treated as untimed.
+const USAGE_BACKFILL_TIMED_ROWS: usize = 2000;
+
+/// Length of the `recent_days` window, including today. Fifty-three weeks, so
+/// the Insights activity grid can fill a full year of week columns whatever
+/// weekday today is. `usage_daily` holds one row per active day and is already
+/// read in full for the lifetime totals, so the wider window costs nothing.
+const USAGE_RECENT_WINDOW_DAYS: u64 = 371;
+
+/// Count the words in a transcript: whitespace-separated tokens containing at
+/// least one alphanumeric character, so a lone em dash or `...` is not a word.
+pub fn count_words(text: &str) -> i64 {
+    text.split_whitespace()
+        .filter(|token| token.chars().any(char::is_alphanumeric))
+        .count() as i64
+}
+
+/// The local calendar date (`%Y-%m-%d`) of an epoch-second timestamp. Usage is
+/// bucketed by the day the user experienced, not the UTC day.
+pub fn local_day(ts_secs: i64) -> String {
+    Local
+        .timestamp_opt(ts_secs, 0)
+        .earliest()
+        .unwrap_or_else(Local::now)
+        .format("%Y-%m-%d")
+        .to_string()
+}
+
+/// Duration of a WAV file in seconds, read from its header only. `None` on any
+/// error, a zero sample rate, or a zero-length file.
+pub fn wav_duration_seconds(path: &Path) -> Option<f64> {
+    let reader = hound::WavReader::open(path).ok()?;
+    let sample_rate = reader.spec().sample_rate;
+    let frames = reader.duration();
+    if sample_rate == 0 || frames == 0 {
+        return None;
+    }
+    Some(f64::from(frames) / f64::from(sample_rate))
+}
+
+/// `(current, longest)` streaks of consecutive active days.
+///
+/// The current streak ends today, or yesterday when today has no activity yet —
+/// otherwise every streak would read as broken each morning until the first
+/// dictation. Input may be unsorted and contain duplicates.
+pub fn compute_streaks(active_days: &[NaiveDate], today: NaiveDate) -> (u32, u32) {
+    let mut days = active_days.to_vec();
+    days.sort_unstable();
+    days.dedup();
+
+    let mut longest = 0u32;
+    let mut run = 0u32;
+    let mut prev: Option<NaiveDate> = None;
+    for &day in &days {
+        run = match prev {
+            Some(p) if p.succ_opt() == Some(day) => run + 1,
+            _ => 1,
+        };
+        longest = longest.max(run);
+        prev = Some(day);
+    }
+
+    let is_active = |d: NaiveDate| days.binary_search(&d).is_ok();
+    let mut cursor = if is_active(today) {
+        Some(today)
+    } else {
+        today.pred_opt().filter(|&y| is_active(y))
+    };
+    let mut current = 0u32;
+    while let Some(day) = cursor.filter(|&d| is_active(d)) {
+        current += 1;
+        cursor = day.pred_opt();
+    }
+
+    (current, longest)
+}
+
+/// Add deltas to one day's usage row, creating it if needed. Every column is
+/// clamped at zero, so a correction can never drive a counter negative.
+pub fn apply_usage_delta(
+    conn: &Connection,
+    day: &str,
+    d_dictations: i64,
+    d_words: i64,
+    d_timed_words: i64,
+    d_seconds: f64,
+) -> rusqlite::Result<()> {
+    conn.execute(
+        "INSERT INTO usage_daily (day, dictations, words, timed_words, audio_seconds)
+         VALUES (?1, MAX(0, ?2), MAX(0, ?3), MAX(0, ?4), MAX(0.0, ?5))
+         ON CONFLICT(day) DO UPDATE SET
+             dictations = MAX(0, usage_daily.dictations + ?2),
+             words = MAX(0, usage_daily.words + ?3),
+             timed_words = MAX(0, usage_daily.timed_words + ?4),
+             audio_seconds = MAX(0.0, usage_daily.audio_seconds + ?5)",
+        params![day, d_dictations, d_words, d_timed_words, d_seconds],
+    )?;
+    Ok(())
+}
+
+/// The usage delta `(dictations, words, timed_words, seconds)` for a retry that
+/// replaced a transcript of `old_words` words with one of `new_words`, or `None`
+/// when nothing changes. `duration` is only called when a delta is needed.
+fn retry_usage_delta(
+    old_words: i64,
+    new_words: i64,
+    duration: impl FnOnce() -> Option<f64>,
+) -> Option<(i64, i64, i64, f64)> {
+    if old_words == new_words {
+        return None;
+    }
+    let duration = duration();
+    let timed = |words: i64| if duration.is_some() { words } else { 0 };
+    let seconds = duration.unwrap_or(0.0);
+    Some(match (old_words, new_words) {
+        (0, n) => (1, n, timed(n), seconds),
+        (o, 0) => (-1, -o, -timed(o), -seconds),
+        (o, n) => (0, n - o, timed(n - o), 0.0),
+    })
+}
+
+/// Fold existing history into `usage_daily`, once per database.
+///
+/// Guarded by the `backfill_v1` meta key and done in one transaction, so it is
+/// idempotent and a crash midway leaves nothing half-counted. WAV durations are
+/// looked up only for the newest [`USAGE_BACKFILL_TIMED_ROWS`] contributing
+/// rows. Returns the number of rows counted (0 when already done).
+fn backfill_usage(
+    conn: &mut Connection,
+    duration_for: impl Fn(&str) -> Option<f64>,
+) -> Result<usize> {
+    let tx = conn.transaction()?;
+    let done: bool = tx.query_row(
+        "SELECT EXISTS(SELECT 1 FROM usage_meta WHERE key = ?1)",
+        params![USAGE_BACKFILL_KEY],
+        |row| row.get(0),
+    )?;
+    if done {
+        return Ok(0);
+    }
+
+    // day -> (dictations, words, timed_words, seconds)
+    let mut per_day: BTreeMap<String, (i64, i64, i64, f64)> = BTreeMap::new();
+    let mut contributing = 0usize;
+    {
+        let mut stmt = tx.prepare(
+            "SELECT timestamp, file_name, transcription_text
+             FROM transcription_history ORDER BY id DESC",
+        )?;
+        let mut rows = stmt.query([])?;
+        while let Some(row) = rows.next()? {
+            let timestamp: i64 = row.get(0)?;
+            let file_name: String = row.get(1)?;
+            let text: String = row.get(2)?;
+            let words = count_words(&text);
+            if words == 0 {
+                continue;
+            }
+            let duration = if contributing < USAGE_BACKFILL_TIMED_ROWS {
+                duration_for(&file_name)
+            } else {
+                None
+            };
+            contributing += 1;
+
+            let agg = per_day.entry(local_day(timestamp)).or_default();
+            agg.0 += 1;
+            agg.1 += words;
+            if let Some(seconds) = duration {
+                agg.2 += words;
+                agg.3 += seconds;
+            }
+        }
+    }
+
+    for (day, (dictations, words, timed_words, seconds)) in &per_day {
+        apply_usage_delta(&tx, day, *dictations, *words, *timed_words, *seconds)?;
+    }
+    tx.execute(
+        "INSERT OR REPLACE INTO usage_meta (key, value) VALUES (?1, ?2)",
+        params![USAGE_BACKFILL_KEY, Utc::now().timestamp().to_string()],
+    )?;
+    tx.commit()?;
+    Ok(contributing)
+}
+
+/// Read lifetime usage as of the local date `today`.
+pub fn compute_usage_stats(conn: &Connection, today: NaiveDate) -> rusqlite::Result<UsageStats> {
+    let window_start = today
+        .checked_sub_days(Days::new(USAGE_RECENT_WINDOW_DAYS - 1))
+        .unwrap_or(today);
+    let today_key = today.format("%Y-%m-%d").to_string();
+
+    let mut stats = UsageStats {
+        total_dictations: 0,
+        total_words: 0,
+        timed_words: 0,
+        total_audio_seconds: 0.0,
+        today_words: 0,
+        today_dictations: 0,
+        current_streak_days: 0,
+        longest_streak_days: 0,
+        active_days: 0,
+        recent_days: Vec::new(),
+    };
+    let mut active: Vec<NaiveDate> = Vec::new();
+
+    let mut stmt = conn.prepare(
+        "SELECT day, dictations, words, timed_words, audio_seconds
+         FROM usage_daily ORDER BY day ASC",
+    )?;
+    let rows = stmt.query_map([], |row| {
+        Ok((
+            row.get::<_, String>(0)?,
+            row.get::<_, i64>(1)?,
+            row.get::<_, i64>(2)?,
+            row.get::<_, i64>(3)?,
+            row.get::<_, f64>(4)?,
+        ))
+    })?;
+    for row in rows {
+        let (day, dictations, words, timed_words, audio_seconds) = row?;
+        stats.total_dictations += dictations;
+        stats.total_words += words;
+        stats.timed_words += timed_words;
+        stats.total_audio_seconds += audio_seconds;
+
+        // A row corrected down to zero dictations is not an active day.
+        if dictations <= 0 {
+            continue;
+        }
+        if day == today_key {
+            stats.today_words = words;
+            stats.today_dictations = dictations;
+        }
+        let Ok(date) = NaiveDate::parse_from_str(&day, "%Y-%m-%d") else {
+            continue;
+        };
+        active.push(date);
+        if date >= window_start && date <= today {
+            stats.recent_days.push(UsageDay {
+                day,
+                dictations,
+                words,
+                audio_seconds,
+            });
+        }
+    }
+
+    stats.active_days = active.len() as u32;
+    let (current, longest) = compute_streaks(&active, today);
+    stats.current_streak_days = current;
+    stats.longest_streak_days = longest;
+    Ok(stats)
+}
+
 impl HistoryManager {
     pub fn new(app_handle: &AppHandle) -> Result<Self> {
         // Create recordings directory in app data dir
@@ -223,6 +537,17 @@ impl HistoryManager {
             );
         } else {
             debug!("Database already at latest version {}", version_after);
+        }
+
+        // Fold pre-existing history into the lifetime usage tables, once. A
+        // failure here costs the stats for old entries, never the app launch.
+        let recordings_dir = self.recordings_dir.clone();
+        match backfill_usage(&mut conn, |file_name| {
+            wav_duration_seconds(&recordings_dir.join(file_name))
+        }) {
+            Ok(0) => {}
+            Ok(counted) => info!("Backfilled usage stats from {} history entries", counted),
+            Err(e) => error!("Usage stats backfill failed: {}", e),
         }
 
         Ok(())
@@ -307,6 +632,41 @@ impl HistoryManager {
         &self.recordings_dir
     }
 
+    /// Count a freshly saved entry toward lifetime usage. Never fails the save:
+    /// usage is a nice-to-have, the transcript is not.
+    fn record_new_entry_usage(
+        &self,
+        conn: &Connection,
+        timestamp: i64,
+        file_name: &str,
+        transcription_text: &str,
+    ) {
+        // Raw transcript, not the post-processed text: WPM measures how fast
+        // the user spoke, not how long the cleaned-up output is.
+        let words = count_words(transcription_text);
+        if words == 0 {
+            return;
+        }
+        let duration = wav_duration_seconds(&self.recordings_dir.join(file_name));
+        let timed_words = if duration.is_some() { words } else { 0 };
+        if let Err(e) = apply_usage_delta(
+            conn,
+            &local_day(timestamp),
+            1,
+            words,
+            timed_words,
+            duration.unwrap_or(0.0),
+        ) {
+            error!("Failed to record usage stats: {}", e);
+        }
+    }
+
+    /// Lifetime dictation usage as of the local date today.
+    pub fn get_usage_stats(&self) -> Result<UsageStats> {
+        let conn = self.get_connection()?;
+        Ok(compute_usage_stats(&conn, Local::now().date_naive())?)
+    }
+
     /// Save a new history entry to the database.
     /// The WAV file should already have been written to the recordings directory.
     pub fn save_entry(
@@ -344,8 +704,13 @@ impl HistoryManager {
             ],
         )?;
 
+        // Capture the id before touching usage: the usage UPSERT is an insert
+        // too and would move `last_insert_rowid`.
+        let id = conn.last_insert_rowid();
+        self.record_new_entry_usage(&conn, timestamp, &file_name, &transcription_text);
+
         let entry = HistoryEntry {
-            id: conn.last_insert_rowid(),
+            id,
             file_name,
             timestamp,
             saved: false,
@@ -396,6 +761,21 @@ impl HistoryManager {
         post_process_prompt: Option<String>,
     ) -> Result<HistoryEntry> {
         let conn = self.get_connection()?;
+        // The previous transcript, read before it is overwritten, so usage can
+        // be corrected by the difference. A failure here only skips the usage
+        // correction; the retry itself still goes through.
+        let previous: Option<(String, i64, String)> = conn
+            .query_row(
+                "SELECT transcription_text, timestamp, file_name
+                 FROM transcription_history WHERE id = ?1",
+                params![id],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .optional()
+            .unwrap_or_else(|e| {
+                error!("Failed to read previous transcript for usage stats: {}", e);
+                None
+            });
         let updated = conn.execute(
             "UPDATE transcription_history
              SET transcription_text = ?1,
@@ -412,6 +792,26 @@ impl HistoryManager {
 
         if updated == 0 {
             return Err(anyhow!("History entry {} not found", id));
+        }
+
+        if let Some((old_text, original_timestamp, file_name)) = previous {
+            let delta = retry_usage_delta(
+                count_words(&old_text),
+                count_words(&transcription_text),
+                || wav_duration_seconds(&self.recordings_dir.join(&file_name)),
+            );
+            if let Some((d_dictations, d_words, d_timed, d_seconds)) = delta {
+                if let Err(e) = apply_usage_delta(
+                    &conn,
+                    &local_day(original_timestamp),
+                    d_dictations,
+                    d_words,
+                    d_timed,
+                    d_seconds,
+                ) {
+                    error!("Failed to update usage stats after retry: {}", e);
+                }
+            }
         }
 
         let entry = conn
@@ -1368,5 +1768,315 @@ mod tests {
             by_time.iter().map(|(_, f)| f.as_str()).collect::<Vec<_>>(),
             vec!["speakoflow-100.wav"]
         );
+    }
+
+    // ---- lifetime usage stats ----
+
+    fn migrated_conn() -> Connection {
+        let mut conn = Connection::open_in_memory().expect("open in-memory db");
+        Migrations::new(MIGRATIONS.to_vec())
+            .to_latest(&mut conn)
+            .expect("apply migrations");
+        conn
+    }
+
+    fn date(y: i32, m: u32, d: u32) -> NaiveDate {
+        NaiveDate::from_ymd_opt(y, m, d).expect("valid date")
+    }
+
+    /// Epoch seconds for local noon on a date, so local-day bucketing in the
+    /// tests does not depend on the machine's time zone.
+    fn local_noon(y: i32, m: u32, d: u32) -> i64 {
+        Local
+            .from_local_datetime(&date(y, m, d).and_hms_opt(12, 0, 0).expect("valid time"))
+            .earliest()
+            .expect("local noon exists")
+            .timestamp()
+    }
+
+    fn usage_row(conn: &Connection, day: &str) -> Option<(i64, i64, i64, f64)> {
+        conn.query_row(
+            "SELECT dictations, words, timed_words, audio_seconds FROM usage_daily WHERE day = ?1",
+            params![day],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+        )
+        .optional()
+        .expect("query usage row")
+    }
+
+    #[test]
+    fn count_words_ignores_punctuation_only_tokens() {
+        assert_eq!(count_words(""), 0);
+        assert_eq!(count_words("   \n\t "), 0);
+        assert_eq!(count_words("hello world"), 2);
+        assert_eq!(count_words("  hello,   world!  "), 2);
+        assert_eq!(count_words("wait — what ..."), 2);
+        assert_eq!(count_words("— ... !!"), 0);
+        assert_eq!(count_words("it's 3 o'clock"), 3);
+        assert_eq!(count_words("naïve café"), 2);
+    }
+
+    #[test]
+    fn local_day_formats_local_calendar_date() {
+        assert_eq!(local_day(local_noon(2026, 3, 15)), "2026-03-15");
+    }
+
+    #[test]
+    fn wav_duration_reads_header_and_rejects_missing_files() {
+        let dir = std::env::temp_dir();
+        let path = dir.join(format!("speakoflow-usage-test-{}.wav", std::process::id()));
+        let spec = hound::WavSpec {
+            channels: 1,
+            sample_rate: 16000,
+            bits_per_sample: 16,
+            sample_format: hound::SampleFormat::Int,
+        };
+        {
+            let mut writer = hound::WavWriter::create(&path, spec).expect("create wav");
+            for _ in 0..24000 {
+                writer.write_sample(0i16).expect("write sample");
+            }
+            writer.finalize().expect("finalize wav");
+        }
+        assert_eq!(wav_duration_seconds(&path), Some(1.5));
+
+        let empty = dir.join(format!("speakoflow-usage-empty-{}.wav", std::process::id()));
+        hound::WavWriter::create(&empty, spec)
+            .expect("create empty wav")
+            .finalize()
+            .expect("finalize empty wav");
+        assert_eq!(wav_duration_seconds(&empty), None);
+
+        let _ = fs::remove_file(&path);
+        let _ = fs::remove_file(&empty);
+        assert_eq!(wav_duration_seconds(&dir.join("does-not-exist.wav")), None);
+    }
+
+    #[test]
+    fn streaks_count_today_or_yesterday_and_track_longest() {
+        let today = date(2026, 3, 15);
+
+        // Empty.
+        assert_eq!(compute_streaks(&[], today), (0, 0));
+
+        // Active today.
+        let days = [date(2026, 3, 13), date(2026, 3, 14), today];
+        assert_eq!(compute_streaks(&days, today), (3, 3));
+
+        // Only up to yesterday: the streak is still alive this morning.
+        let days = [date(2026, 3, 13), date(2026, 3, 14)];
+        assert_eq!(compute_streaks(&days, today), (2, 2));
+
+        // A gap breaks it.
+        let days = [date(2026, 3, 12), date(2026, 3, 13)];
+        assert_eq!(compute_streaks(&days, today), (0, 2));
+        let days = [date(2026, 3, 11), date(2026, 3, 12), today];
+        assert_eq!(compute_streaks(&days, today), (1, 2));
+
+        // Longest across history, independent of the current run.
+        let days = [
+            date(2026, 1, 1),
+            date(2026, 1, 2),
+            date(2026, 1, 3),
+            date(2026, 1, 4),
+            date(2026, 3, 14),
+            today,
+        ];
+        assert_eq!(compute_streaks(&days, today), (2, 4));
+
+        // Unsorted with duplicates.
+        let days = [
+            today,
+            date(2026, 3, 13),
+            today,
+            date(2026, 3, 14),
+            date(2026, 3, 13),
+        ];
+        assert_eq!(compute_streaks(&days, today), (3, 3));
+
+        // Month boundary.
+        let days = [date(2026, 2, 28), date(2026, 3, 1)];
+        assert_eq!(compute_streaks(&days, date(2026, 3, 1)), (2, 2));
+    }
+
+    #[test]
+    fn usage_migration_creates_both_tables() {
+        let conn = migrated_conn();
+        for table in ["usage_daily", "usage_meta"] {
+            let exists: bool = conn
+                .query_row(
+                    "SELECT COUNT(*) > 0 FROM sqlite_master WHERE type = 'table' AND name = ?1",
+                    params![table],
+                    |row| row.get(0),
+                )
+                .expect("query sqlite_master");
+            assert!(exists, "{} should exist", table);
+        }
+    }
+
+    #[test]
+    fn apply_usage_delta_upserts_and_clamps_at_zero() {
+        let conn = migrated_conn();
+        apply_usage_delta(&conn, "2026-03-15", 1, 10, 10, 4.0).expect("insert");
+        apply_usage_delta(&conn, "2026-03-15", 1, 5, 0, 0.0).expect("add");
+        assert_eq!(usage_row(&conn, "2026-03-15"), Some((2, 15, 10, 4.0)));
+
+        apply_usage_delta(&conn, "2026-03-15", -5, -100, -100, -100.0).expect("clamp");
+        assert_eq!(usage_row(&conn, "2026-03-15"), Some((0, 0, 0, 0.0)));
+
+        // A negative delta on a new day also starts at zero.
+        apply_usage_delta(&conn, "2026-03-16", -1, -3, -3, -1.0).expect("insert negative");
+        assert_eq!(usage_row(&conn, "2026-03-16"), Some((0, 0, 0, 0.0)));
+    }
+
+    #[test]
+    fn retry_delta_covers_every_transition() {
+        let known = || Some(3.0);
+        let unknown = || None;
+        assert_eq!(retry_usage_delta(0, 0, known), None);
+        assert_eq!(retry_usage_delta(4, 4, known), None);
+        assert_eq!(retry_usage_delta(0, 5, known), Some((1, 5, 5, 3.0)));
+        assert_eq!(retry_usage_delta(0, 5, unknown), Some((1, 5, 0, 0.0)));
+        assert_eq!(retry_usage_delta(5, 0, known), Some((-1, -5, -5, -3.0)));
+        assert_eq!(retry_usage_delta(5, 0, unknown), Some((-1, -5, 0, 0.0)));
+        assert_eq!(retry_usage_delta(5, 8, known), Some((0, 3, 3, 0.0)));
+        assert_eq!(retry_usage_delta(8, 5, unknown), Some((0, -3, 0, 0.0)));
+    }
+
+    #[test]
+    fn backfill_aggregates_by_day_skips_empty_and_is_idempotent() {
+        let mut conn = migrated_conn();
+        let d1 = local_noon(2026, 3, 10);
+        let d2 = local_noon(2026, 3, 11);
+        let d3 = local_noon(2026, 3, 12);
+        insert_entry(&conn, d1, "hello world", None);
+        insert_entry(&conn, d1 + 3600, "one two three", Some("One, two, three."));
+        insert_entry(&conn, d2, "...", None);
+        insert_entry(&conn, d2 + 60, "— !!", None);
+        insert_entry(&conn, d3, "alpha", None);
+
+        let counted = backfill_usage(&mut conn, |_| Some(2.0)).expect("backfill");
+        assert_eq!(counted, 3);
+        assert_eq!(usage_row(&conn, "2026-03-10"), Some((2, 5, 5, 4.0)));
+        assert_eq!(usage_row(&conn, "2026-03-11"), None);
+        assert_eq!(usage_row(&conn, "2026-03-12"), Some((1, 1, 1, 2.0)));
+
+        // Second run does nothing.
+        let again = backfill_usage(&mut conn, |_| Some(2.0)).expect("second backfill");
+        assert_eq!(again, 0);
+        assert_eq!(usage_row(&conn, "2026-03-10"), Some((2, 5, 5, 4.0)));
+        assert_eq!(usage_row(&conn, "2026-03-12"), Some((1, 1, 1, 2.0)));
+    }
+
+    #[test]
+    fn backfill_counts_unknown_durations_as_untimed() {
+        let mut conn = migrated_conn();
+        insert_entry(
+            &conn,
+            local_noon(2026, 3, 10),
+            "four words right here",
+            None,
+        );
+        backfill_usage(&mut conn, |_| None).expect("backfill");
+        assert_eq!(usage_row(&conn, "2026-03-10"), Some((1, 4, 0, 0.0)));
+    }
+
+    #[test]
+    fn backfill_on_fresh_install_only_sets_the_flag() {
+        let mut conn = migrated_conn();
+        assert_eq!(
+            backfill_usage(&mut conn, |_| Some(1.0)).expect("backfill"),
+            0
+        );
+        let rows: i64 = conn
+            .query_row("SELECT COUNT(*) FROM usage_daily", [], |row| row.get(0))
+            .expect("count usage rows");
+        assert_eq!(rows, 0);
+        let flag: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM usage_meta WHERE key = ?1",
+                params![USAGE_BACKFILL_KEY],
+                |row| row.get(0),
+            )
+            .expect("count meta rows");
+        assert_eq!(flag, 1);
+
+        // Entries added after the flag is set are not double-counted by a rerun.
+        insert_entry(&conn, local_noon(2026, 3, 10), "late entry", None);
+        assert_eq!(backfill_usage(&mut conn, |_| Some(1.0)).expect("rerun"), 0);
+        assert_eq!(usage_row(&conn, "2026-03-10"), None);
+    }
+
+    #[test]
+    fn usage_stats_totals_today_and_recent_window() {
+        let conn = migrated_conn();
+        let today = date(2026, 3, 15);
+        let day = |d: NaiveDate| d.format("%Y-%m-%d").to_string();
+
+        // Current streak of three ending today.
+        apply_usage_delta(&conn, &day(today), 2, 30, 30, 12.0).unwrap();
+        apply_usage_delta(&conn, &day(date(2026, 3, 14)), 1, 10, 10, 5.0).unwrap();
+        apply_usage_delta(&conn, &day(date(2026, 3, 13)), 1, 20, 0, 0.0).unwrap();
+        // First day of the 371-day window, and the day just outside it.
+        apply_usage_delta(&conn, &day(date(2025, 3, 10)), 1, 7, 7, 3.0).unwrap();
+        apply_usage_delta(&conn, &day(date(2025, 3, 9)), 1, 8, 8, 4.0).unwrap();
+        // An older five-day run: the longest streak.
+        for d in 1..=5 {
+            apply_usage_delta(&conn, &day(date(2026, 1, d)), 1, 1, 1, 1.0).unwrap();
+        }
+        // A day corrected down to zero is not active.
+        apply_usage_delta(&conn, &day(date(2026, 3, 1)), 1, 3, 3, 1.0).unwrap();
+        apply_usage_delta(&conn, &day(date(2026, 3, 1)), -1, -3, -3, -1.0).unwrap();
+
+        let stats = compute_usage_stats(&conn, today).expect("stats");
+        assert_eq!(stats.total_dictations, 2 + 1 + 1 + 1 + 1 + 5);
+        assert_eq!(stats.total_words, 30 + 10 + 20 + 7 + 8 + 5);
+        assert_eq!(stats.timed_words, 30 + 10 + 7 + 8 + 5);
+        assert!((stats.total_audio_seconds - (12.0 + 5.0 + 3.0 + 4.0 + 5.0)).abs() < 1e-9);
+        assert_eq!(stats.today_words, 30);
+        assert_eq!(stats.today_dictations, 2);
+        assert_eq!(stats.current_streak_days, 3);
+        assert_eq!(stats.longest_streak_days, 5);
+        assert_eq!(stats.active_days, 10);
+        assert_eq!(
+            stats
+                .recent_days
+                .iter()
+                .map(|d| d.day.as_str())
+                .collect::<Vec<_>>(),
+            vec![
+                "2025-03-10",
+                "2026-01-01",
+                "2026-01-02",
+                "2026-01-03",
+                "2026-01-04",
+                "2026-01-05",
+                "2026-03-13",
+                "2026-03-14",
+                "2026-03-15",
+            ]
+        );
+        let today_entry = stats.recent_days.last().expect("today in window");
+        assert_eq!(today_entry.dictations, 2);
+        assert_eq!(today_entry.words, 30);
+
+        // Nothing yet today: today's values are zero, the streak survives.
+        let tomorrow = date(2026, 3, 16);
+        let stats = compute_usage_stats(&conn, tomorrow).expect("stats tomorrow");
+        assert_eq!(stats.today_words, 0);
+        assert_eq!(stats.today_dictations, 0);
+        assert_eq!(stats.current_streak_days, 3);
+    }
+
+    #[test]
+    fn usage_stats_on_empty_database() {
+        let conn = migrated_conn();
+        let stats = compute_usage_stats(&conn, date(2026, 3, 15)).expect("stats");
+        assert_eq!(stats.total_dictations, 0);
+        assert_eq!(stats.total_words, 0);
+        assert_eq!(stats.current_streak_days, 0);
+        assert_eq!(stats.longest_streak_days, 0);
+        assert_eq!(stats.active_days, 0);
+        assert!(stats.recent_days.is_empty());
     }
 }

@@ -69,15 +69,30 @@
   background: var(--mp-surface);
   border: 1px solid var(--mp-hairline);
   box-shadow: var(--mp-inner);
-  /* The whole bar is the expand affordance, so it must read as pressable — but
-   * text inside it must not be selectable, or a click that lands on the clock
-   * starts a drag-select instead of opening the card. */
-  cursor: pointer;
+  /* The bar is the window's drag handle, so it advertises that and not a press:
+   * it used to be one big expand button, which is precisely why this window could
+   * not be moved. Text inside it must still not be selectable, or a drag that
+   * starts on the clock begins a drag-select instead of moving the window. */
+  cursor: grab;
   user-select: none;
+}
+
+.pill-bar:active {
+  cursor: grabbing;
 }
 
 .pill-bar:hover {
   border-color: var(--mp-hairline-strong);
+}
+
+/* The expanded card's header is the same handle for the same reason. */
+.pill-head {
+  cursor: grab;
+  user-select: none;
+}
+
+.pill-head:active {
+  cursor: grabbing;
 }
 
 .pill-dot {
@@ -213,18 +228,58 @@
 
 /* The call offer reuses `.pill-bar`, but it is a card to read rather than a
  * control to click through, so it takes the pointer normally and does not
- * advertise itself as pressable. */
+ * advertise itself as pressable. It stays a drag handle, because an unprompted
+ * card in the way is exactly the one you want to move. */
 .pill-bar[data-offer="true"] {
-  cursor: default;
+  cursor: grab;
   padding-inline-start: 12px;
+  align-items: flex-start;
+  border-radius: 14px;
+}
+
+.pill-bar[data-offer="true"]:active {
+  cursor: grabbing;
+}
+
+/* A hollow, static ring — deliberately a shape the live recorder can never take.
+ *
+ * This was `.pill-dot[data-live="true"]`: a filled red dot breathing on a 2s loop,
+ * i.e. the universal "capturing now" signal, on a card that appears unprompted six
+ * to nine seconds into a call and has started nothing. Being correct in the code did
+ * not stop it reading as "this app began recording my call by itself". */
+.pill-offer-ring {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  margin-block-start: 4px;
+  border-radius: 50%;
+  border: 1.5px solid var(--mp-accent);
+  background: transparent;
+}
+
+.pill-offer-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
 }
 
 .pill-offer-text {
-  flex: 1 1 auto;
   min-width: 0;
   font-size: 12.5px;
   line-height: 1.35;
   color: var(--mp-ink);
+}
+
+/* Redundant next to "Record it?", and kept anyway: this is the one card in the app
+ * where being misread costs trust rather than a click. */
+.pill-offer-state {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--mp-faint);
 }
 
 .pill-action[data-variant="accept"] {

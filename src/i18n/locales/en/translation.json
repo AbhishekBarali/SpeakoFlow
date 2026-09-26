@@ -278,7 +278,7 @@
   },
   "modelSelector": {
     "custom": "Custom",
-    "active": "Active",
+    "active": "In use",
     "switching": "Switching…",
     "noModelsAvailable": "No models available",
     "verifying": "Verifying {{modelName}}…",
@@ -419,19 +419,25 @@
             "description": "Dictate, then clean it up with AI before it's typed out."
           },
           "assistant": {
-            "name": "Ask assistant",
+            "name": "Ask the assistant",
             "description": "Ask the assistant by voice; the answer streams into the floating panel."
           },
           "assistant_vision": {
             "name": "Ask with screen",
             "description": "Ask by voice with your screen attached so it can see what you're looking at."
+          },
+          "assistant_call": {
+            "name": "Start a call",
+            "description": "Talk with the assistant hands-free and hear its replies. Press again to hang up."
           }
         },
         "errors": {
           "restore": "Couldn't restore the original shortcut.",
           "set": "Couldn't set the shortcut: {{error}}",
           "reset": "Couldn't reset the shortcut."
-        }
+        },
+        "clickToChange": "Click to change",
+        "notSet": "Not set"
       },
       "language": {
         "title": "Language",
@@ -443,7 +449,7 @@
       },
       "pushToTalk": {
         "label": "Recording behavior",
-        "description": "Hold records while the Dictate shortcut is pressed. Tap starts recording with one press and stops it with the next.",
+        "description": "Hold: recording runs while you hold a recording shortcut. Tap: one press starts, the next press stops. Applies to every recording shortcut.",
         "hold": "Hold",
         "tap": "Tap"
       },
@@ -543,7 +549,8 @@
         "removeTitle": "Remove from list?",
         "removeConfirm": "Remove \"{{modelName}}\" from your model list?\n\nThe file itself stays where it is:\n{{path}}",
         "missingBadge": "File missing",
-        "fileMissing": "This model's file isn't there any more:\n{{path}}\n\nIt may have been moved or renamed, or be on a drive that isn't connected."
+        "fileMissing": "This model's file isn't there any more:\n{{path}}\n\nIt may have been moved or renamed, or be on a drive that isn't connected.",
+        "foldersEmptyShort": "No folders linked yet."
       }
     },
     "sound": {
@@ -731,8 +738,8 @@
       },
       "autoLearn": {
         "label": "Learn words I correct",
-        "description": "When you fix a word SpeakoFlow got wrong, it remembers your spelling for next time. To do that it reads the text field you just dictated into, for about a minute afterwards.",
-        "info": "Only the field SpeakoFlow just typed into, and only for a minute. Nothing is uploaded — the text is compared with the transcript on your machine and discarded. Every word it picks up is listed below so you can check it.",
+        "description": "Remembers your spelling when you fix a word SpeakoFlow got wrong.",
+        "info": "It reads only the field it just typed into, for about a minute. Nothing is uploaded, and every word it learns is listed here.",
         "unsupported": "Learning from corrections is only available on Windows so far. You can still add words by hand above.",
         "learnedTitle": "Learned from your corrections",
         "learnedEmpty": "Nothing learned yet. Fix a misheard word in the app you dictated into and it appears here.",
@@ -878,7 +885,7 @@
       "prompts": {
         "title": "Prompt",
         "selectedPrompt": {
-          "title": "1 · System prompt",
+          "title": "Prompt",
           "description": "The base instruction: what the model corrects, and what it must leave alone. Your transcribed text is sent separately, so just write instructions."
         },
         "noPrompts": "No prompts available",
@@ -1000,7 +1007,7 @@
         "tunedModelNoticeRestore": "Show model tip",
         "title": "Fix up my dictation with AI",
         "caption": "Experimental — tidies punctuation and filler after you dictate.",
-        "info": "Runs a language model over your dictation to fix punctuation, remove filler words, and optionally adjust the tone. Applies to dictation only, on its own shortcut. It adds a short delay after you speak; if the model fails or times out, your raw text is used instead. Still in development."
+        "info": "Cleanup rewrites what you said with an AI model before it's typed. It can take a moment and falls back to your raw words if it's slow."
       },
       "spokenEmoji": {
         "title": "Spoken emoji",
@@ -1069,7 +1076,8 @@
       "screenshotAttached": "Vision",
       "messageCount_one": "{{count}} message",
       "messageCount_other": "{{count}} messages",
-      "deleteAssistantError": "Couldn't delete the conversation. Please try again."
+      "deleteAssistantError": "Couldn't delete the conversation. Please try again.",
+      "openFolderError": "Couldn't open the recordings folder."
     },
     "debug": {
       "title": "Debug",
@@ -1211,8 +1219,8 @@
         "testDescription": "Sends one short question to check the assistant can actually reach this model. On-device models load first, so the first test can take a while.",
         "testButton": "Test connection",
         "testing": "Testing…",
-        "onDevice": "On my device",
-        "cloud": "Cloud provider",
+        "onDevice": "On this computer",
+        "cloud": "Cloud",
         "downloadModel": "Browse and download models",
         "downloadModelDescription": "Pick a recommended model or search Hugging Face.",
         "downloadModelAction": "Browse models",
@@ -1281,7 +1289,7 @@
         "builtinEngineExtracting": "Installing the local engine…",
         "builtinEngineReady": "Local engine ready.",
         "contextSizeLabel": "Context window",
-        "contextSizeDescription": "How much the local model can keep in mind at once — the system instructions, your chat history, any screenshot (a single image can eat a big chunk), and its reply. Bigger holds more and keeps screen vision and web search reliable, but uses more memory. The default is 8192; 16384 is a good step up if your machine has the RAM to spare. You can lower it later to save memory.",
+        "contextSizeDescription": "How much of the conversation the model can read at once. Bigger remembers more but uses more memory and loads slower.",
         "unloadTimeoutLabel": "Unload from memory after",
         "unloadTimeoutDescription": "Free up memory by unloading the local model after it has been idle this long. It reloads automatically on next use."
       },
@@ -1292,7 +1300,7 @@
       },
       "characters": {
         "title": "Profiles",
-        "description": "Task-focused profiles you can switch between. The active profile sets the assistant's name, role, and instructions — and how long its replies run. Switch anytime from the panel header.",
+        "description": "Personas with their own name, instructions, and reply length. Switch any time from the panel.",
         "galleryLabel": "Your profiles",
         "editSection": "Edit profile",
         "avatarLabel": "Avatar",
@@ -1350,7 +1358,7 @@
       },
       "autoSummarize": {
         "label": "Summarize long chats",
-        "description": "When a conversation grows past the model's context window, automatically condense older messages into a running summary so the chat keeps its context instead of forgetting the start. A subtle indicator shows while it runs."
+        "description": "Condenses long chats so the assistant doesn't forget the start."
       },
       "responseLength": {
         "label": "Response length",
@@ -1367,8 +1375,8 @@
         "modeLabel": "Screen access",
         "modes": {
           "off": "Off",
-          "manual": "Manual",
-          "agentDecides": "Agent decides",
+          "manual": "When I attach it",
+          "agentDecides": "Assistant decides",
           "descriptions": {
             "off": "Screen capture is disabled. Camera and region controls are hidden.",
             "manual": "You choose when to attach the full screen or a region. Voice capture timing applies.",
@@ -1376,12 +1384,12 @@
           }
         },
         "timing": {
-          "label": "When to capture",
+          "label": "Capture timing",
           "description": "For voice questions: capture the moment you start asking, or wait until the message is sent. Typed messages always capture on send.",
-          "descriptionAgent": "Both options prepare the screenshot in advance, so the assistant never makes you wait for one. The difference is what the image shows: \"When I ask\" grabs the screen as it looked when you started speaking, \"When the message sends\" grabs it as it looks now. Either way the image stays on your device and is only sent if the assistant actually asks to see it.",
+          "descriptionAgent": "When I start grabs the screen as you began asking; When I send grabs it as it is now. The image is only sent if the assistant asks to see it.",
           "options": {
-            "immediate": "When I ask",
-            "on_send": "When the message sends"
+            "immediate": "When I start speaking",
+            "on_send": "When I send"
           }
         },
         "screenRecording": {
@@ -1527,7 +1535,7 @@
           "mainSuffix": " · main"
         },
         "askAnchorLabel": "Where it opens",
-        "askAnchorDescription": "Where on that screen the assistant appears. This also picks the shape it opens in: a tall column down one side, a wide strip along an edge. Dragging it near one of these places snaps it there; drop it anywhere else and it stays exactly where you put it.",
+        "askAnchorDescription": "Where the panel opens. Drag it near a spot and it snaps there.",
         "askAnchors": {
           "center": "Middle of the screen",
           "top": "Top",
@@ -1586,12 +1594,13 @@
     "offer": {
       "detected": "You seem to be on a call. Record it?",
       "detectedApp": "{{app}} seems to be in a call. Record it?",
+      "idle": "Not recording",
       "record": "Record this call",
       "dismiss": "Not this time"
     },
     "autoDetect": {
       "title": "Offer to record calls",
-      "description": "Notices when another app is using your microphone and asks whether to record. It never starts on its own, and a call it guesses wrong about costs one dismissed card.",
+      "description": "Notices when another app starts using your microphone and offers to record. It never starts on its own. If it guesses wrong, just dismiss the card.",
       "unsupported": "Call detection is only available on Windows so far. On this system, start a meeting yourself."
     },
     "pill": {
@@ -1624,7 +1633,8 @@
       "loadMore": "Load more",
       "speakers_one": "{{count}} speaker",
       "speakers_other": "{{count}} speakers",
-      "hasNotes": "Notes generated"
+      "hasNotes": "Notes generated",
+      "notesBadge": "Notes"
     },
     "status": {
       "recording": "Recording",
@@ -1745,7 +1755,14 @@
     "noOptionsFound": "No options found",
     "back": "Back",
     "showAdvanced": "More options",
-    "showLess": "Show less"
+    "showLess": "Show less",
+    "beta": "Beta",
+    "select": "Select…",
+    "search": "Search",
+    "moreInfo": "More information",
+    "change": "Change",
+    "saveFailed": "Couldn't save that change. Try again.",
+    "more": "More"
   },
   "accessibility": {
     "permissionsRequired": "Accessibility permissions required",
@@ -1816,7 +1833,7 @@
     "later": "Hide for now — the reminder stays set",
     "settings": {
       "label": "Reminders",
-      "description": "Ask the assistant to remind you about something and it appears here until it is due. Say \"remind me to call the bank in twenty minutes\", or ask it to look at your screen first.",
+      "description": "Ask the assistant to remind you about something; it's listed here until it's due.",
       "empty": "Nothing scheduled. Ask the assistant to remind you about something.",
       "waiting": "Waiting for you",
       "cancel": "Cancel this reminder",
@@ -2008,5 +2025,666 @@
       "extracting": "Installing the local engine…",
       "short": "Setting up engine…"
     }
+  },
+  "nav": {
+    "label": "Main",
+    "home": "Home",
+    "history": "History",
+    "assistant": "Assistant",
+    "meetings": "Meetings",
+    "cleanup": "AI cleanup",
+    "dictionary": "Dictionary",
+    "models": "Models",
+    "settings": "Settings",
+    "status": {
+      "label": "Speech model: {{model}}, {{status}}. Open speech-to-text settings.",
+      "setup": "Needs setup",
+      "cloud": "Cloud · {{provider}}",
+      "loading": "Loading…",
+      "error": "Couldn't load",
+      "ready": "Ready",
+      "idle": "Loads when you dictate",
+      "noModel": "No speech model"
+    },
+    "insights": "Insights"
+  },
+  "settingsDialog": {
+    "title": "Settings",
+    "tabs": {
+      "general": "General",
+      "shortcuts": "Shortcuts",
+      "audio": "Audio",
+      "dictation": "Dictation",
+      "privacy": "Privacy & data",
+      "advanced": "Advanced",
+      "about": "About",
+      "debug": "Debug"
+    },
+    "general": {
+      "appearance": "Appearance"
+    },
+    "shortcuts": {
+      "intro": "Every shortcut works in any app. Click a shortcut to record a new one.",
+      "dictation": "Dictation",
+      "assistant": "Assistant",
+      "cleanupOff": "Turn on AI cleanup to get this shortcut.",
+      "openCleanup": "Open AI cleanup",
+      "assistantOff": "The assistant is turned off, so its shortcuts do nothing.",
+      "openAssistant": "Open Assistant"
+    },
+    "audio": {
+      "microphone": "Microphone",
+      "overlayHint": "The small pill that shows while you record."
+    },
+    "dictation": {
+      "intro": "How your words land in the app you are typing into.",
+      "output": "Typing and pasting",
+      "extras": "Extras"
+    },
+    "privacy": {
+      "intro": "Recordings and history are stored only on this computer. Choose how long recordings are kept.",
+      "recordingsFolder": "Recordings folder"
+    },
+    "advanced": {
+      "performance": "Performance"
+    },
+    "about": {
+      "appName": "SpeakoFlow",
+      "version": "Version {{version}}",
+      "project": "Project",
+      "docs": "Documentation",
+      "openDocs": "Open docs"
+    }
+  },
+  "home": {
+    "greeting": {
+      "morning": "Good morning",
+      "afternoon": "Good afternoon",
+      "evening": "Good evening",
+      "night": "Working late"
+    },
+    "subtitleHold": "Hold your shortcut in any app, talk, and let go. Your words appear where your cursor is.",
+    "subtitleTap": "Tap your shortcut in any app, talk, and tap it again. Your words appear where your cursor is.",
+    "needsModel": {
+      "title": "Pick a speech model to start dictating.",
+      "description": "SpeakoFlow needs a speech-to-text model before it can type what you say.",
+      "action": "Choose a model"
+    },
+    "stats": {
+      "label": "Your usage",
+      "none": "–",
+      "spoken": "spoken",
+      "words": "words",
+      "wpm": "WPM",
+      "wpmHint": "Words per minute across your recordings, pauses included.",
+      "saved": "saved",
+      "savedHint": "Compared with typing the same words at {{wpm}} words per minute.",
+      "empty": "Your numbers show up after your first dictation.",
+      "streak_one": "{{count}} day streak",
+      "streak_other": "{{count}} day streak",
+      "noStreak": "Dictate today to start a streak",
+      "today": "{{words}} words today",
+      "duration": {
+        "seconds": "{{seconds}} sec",
+        "minutes": "{{minutes}} min",
+        "hours": "{{hours}} hr",
+        "hoursMinutes": "{{hours}} hr {{minutes}} min"
+      },
+      "wordsLabel": "Words dictated",
+      "wpmLabel": "Words per minute",
+      "savedLabel": "Time saved",
+      "streakLabel_one": "Day streak",
+      "streakLabel_other": "Day streak",
+      "seeInsights": "See insights"
+    },
+    "shortcuts": {
+      "title": "Shortcuts",
+      "edit": "Edit shortcuts",
+      "turnOn": "Turn on",
+      "off": "Turned off",
+      "setKey": "Set a shortcut",
+      "dictate": {
+        "title": "Dictate",
+        "hold": "Hold, talk, let go. Your words are typed where your cursor is.",
+        "tap": "Tap to start, talk, tap to stop. Your words are typed where your cursor is.",
+        "whatHold": "Hold, talk, let go. Your words type where your cursor is.",
+        "whatTap": "Tap, talk, tap again. Your words type where your cursor is."
+      },
+      "cleanup": {
+        "title": "Dictate and clean up",
+        "description": "Same as Dictate, then AI fixes punctuation, filler words, and style.",
+        "what": "Dictate, then AI fixes punctuation, fillers, and style."
+      },
+      "ask": {
+        "title": "Ask the assistant",
+        "description": "Ask a question out loud and get the answer in a floating panel.",
+        "what": "Ask out loud. The answer appears in a floating panel."
+      },
+      "call": {
+        "title": "Start a call",
+        "description": "A hands-free conversation with spoken replies.",
+        "what": "Talk back and forth, hands-free. Press again to hang up."
+      },
+      "info": "Press these in any app. Click the keys to change them.",
+      "offHint": "Turned off",
+      "mode": {
+        "hold": "Hold to talk",
+        "tap": "Tap to toggle"
+      },
+      "cancel": {
+        "title": "Cancel",
+        "what": "Stop a recording, or a reply being read aloud."
+      }
+    },
+    "setup": {
+      "title": "Your models",
+      "manage": "Manage"
+    },
+    "recent": {
+      "title": "Recent",
+      "viewAll": "View all",
+      "copy": "Copy text",
+      "cleaned": "Cleaned up",
+      "tryPrefix": "Try it: click in the box, then press",
+      "trySuffixHold": "and hold it while you talk.",
+      "trySuffixTap": "and talk. Press it again when you're done.",
+      "tryPlaceholder": "Your words will appear here…"
+    },
+    "hero": {
+      "hold": "Hold the keys in any app, talk, and let go.",
+      "tap": "Tap the keys in any app, talk, and tap again.",
+      "holdHint": "Hold to talk",
+      "tapHint": "Tap to start and stop"
+    },
+    "activity": {
+      "title": "Last 30 days",
+      "summary_one": "{{words}} words on {{count}} day",
+      "summary_other": "{{words}} words on {{count}} days",
+      "chartLabel": "Words dictated each day over the last {{days}} days: {{words}} in total.",
+      "words_one": "{{formatted}} word",
+      "words_other": "{{formatted}} words",
+      "today": "Today"
+    }
+  },
+  "modelsHub": {
+    "description": "Each job in SpeakoFlow is done by a model you choose. Run it on this computer for privacy, or in the cloud for speed.",
+    "addLocal": "Add a model file",
+    "privacyNote": "Models on this computer never send your voice or text anywhere. Cloud models send it to the provider you picked, using your API key.",
+    "inUse": "In use",
+    "needsSetup": "Needs setup",
+    "performance": "Performance",
+    "where": {
+      "device": "On this computer",
+      "cloud": "Cloud",
+      "cloudWith": "Cloud · {{provider}}",
+      "deviceShort": "This computer"
+    },
+    "status": {
+      "voiceOff": "Spoken replies are off",
+      "assistantOff": "Assistant is turned off",
+      "noModel": "No model chosen yet",
+      "notDownloaded": "Model not downloaded",
+      "noKey": "Add an API key"
+    },
+    "voice": {
+      "kokoroModel": "Kokoro voice"
+    },
+    "usedBy": {
+      "label": "Used by",
+      "dictation": "Dictation",
+      "assistant": "Assistant",
+      "meetings": "Meetings",
+      "cleanup": "AI cleanup",
+      "meetingNotes": "Meeting notes",
+      "calls": "Calls",
+      "flow": "Generate with Flow",
+      "spokenReplies": "Spoken replies"
+    },
+    "slots": {
+      "stt": {
+        "name": "Speech to text",
+        "description": "Turns your voice into text.",
+        "whereHint": "On this computer is private and free. Cloud uses a provider's API and your key.",
+        "catalogTitle": "Speech models",
+        "catalogDescription": "Every model here runs on this computer. Faster models suit dictation; larger ones are more accurate."
+      },
+      "cleanup": {
+        "name": "AI cleanup",
+        "description": "Follows your spoken edits and applies a writing style, and writes meeting notes.",
+        "turnOn": "Turn on AI cleanup",
+        "offNotice": "AI cleanup is off. Meeting notes still use this model.",
+        "borrowsNotice": "No cleanup model is set, so cleanup uses your assistant's model ({{model}}).",
+        "catalogTitle": "Cleanup models"
+      },
+      "assistant": {
+        "name": "Assistant",
+        "description": "Answers your questions, looks at your screen, and holds calls.",
+        "openAssistant": "Open Assistant",
+        "offNotice": "The assistant is off. Generate with Flow and the cleanup fallback still use this model.",
+        "catalogTitle": "Assistant models",
+        "fallbackNote": "AI cleanup and meeting notes use this model too when they have none of their own."
+      },
+      "voice": {
+        "name": "Voice",
+        "description": "Reads the assistant's replies aloud."
+      }
+    }
+  },
+  "cleanup": {
+    "description": "Filler words are already removed on every dictation. AI cleanup goes further: it follows your spoken edits and applies a writing style.",
+    "toggle": "AI cleanup",
+    "how": {
+      "plain": "Types exactly what you said.",
+      "cleaned": "Types what you said, cleaned up by AI.",
+      "off": "Turn on AI cleanup to get this shortcut.",
+      "change": "Change"
+    },
+    "model": {
+      "title": "Cleanup model",
+      "borrows": "Borrowed from your assistant",
+      "own": "Runs every time you use the cleanup shortcut",
+      "change": "Change",
+      "info": "Runs every time you use the cleanup shortcut. With no model of its own, cleanup uses your assistant's."
+    },
+    "needsModel": {
+      "description": "AI cleanup needs a model before it can run. Until then, your text is typed as you said it.",
+      "action": "Choose a model",
+      "short": "Choose a model to start cleaning up."
+    },
+    "instructions": {
+      "title": "Cleanup instructions",
+      "description": "The base prompt that tells the model what to fix. Most people never change it.",
+      "current": "Using"
+    },
+    "styles": {
+      "title": "Writing style",
+      "description": "How cleaned text should read. Applied after the fixes, so corrections stay the same.",
+      "createTitle": "Create a style",
+      "createHint": "Describe how you want your text to sound.",
+      "editTitle": "Edit style",
+      "editorIntro": "Give the style a name and describe how your text should change. It's applied after cleanup, so the corrections stay the same.",
+      "inUse": "In use",
+      "editNamed": "Edit {{name}}",
+      "builtin": {
+        "none": "Fixes mistakes and leaves your wording alone.",
+        "professional": "Polished and clear, for work messages and email.",
+        "friendly": "Warm and relaxed, like a note to a friend.",
+        "concise": "Trims extra words and gets to the point.",
+        "formal": "Complete sentences and a formal register.",
+        "casual": "Loose and conversational."
+      },
+      "groups": {
+        "builtin": "Built in",
+        "custom": "Yours"
+      },
+      "manage": "Manage",
+      "manageTitle": "Your writing styles",
+      "noneYet": "No styles of your own yet.",
+      "newStyle": "New style",
+      "customHint": "One of your own styles. It's applied after the fixes.",
+      "preview": {
+        "youSay": "You say",
+        "itTypes": "It types",
+        "yourInstruction": "Your instruction"
+      },
+      "samples": {
+        "raw": "we should meet tomorrow at ten, actually no, eleven, and go over the budget",
+        "none": "We should meet tomorrow at eleven and go over the budget.",
+        "professional": "I suggest we meet tomorrow at 11:00 to review the budget.",
+        "friendly": "How about we meet tomorrow at eleven and go over the budget together?",
+        "concise": "Meet tomorrow at 11 to review the budget.",
+        "formal": "I propose that we meet tomorrow at eleven o'clock to review the budget.",
+        "casual": "let's meet tomorrow at eleven and go over the budget"
+      }
+    },
+    "hero": {
+      "title": "Say it messy. Get it clean.",
+      "before": "let's meet at ten, actually no, make that eleven, and bring the budget",
+      "after": "Let's meet at eleven and bring the budget.",
+      "offHint": "Turn on AI cleanup to use this shortcut",
+      "onHint": "Hold, talk, let go. Cleaned text is typed for you.",
+      "onHintTap": "Tap, talk, tap again. Cleaned text is typed for you."
+    },
+    "shortcutRow": "Shortcut"
+  },
+  "dictionary": {
+    "description": "Teach SpeakoFlow the names and terms you use, and set shortcuts that expand into longer text.",
+    "words": {
+      "title": "Your words",
+      "description": "Names, jargon, and spellings SpeakoFlow should always get right.",
+      "placeholder": "Add a name, a term, or a spelling…",
+      "empty": "Nothing here yet. Add the words SpeakoFlow keeps getting wrong."
+    },
+    "replacements": {
+      "title": "Replacements",
+      "description": "Say a phrase and get different text, like \"my email\" becoming your address."
+    },
+    "addWord": "Add word",
+    "hero": {
+      "title": "SpeakoFlow spells the way you do.",
+      "subtitle": "Add names and jargon it keeps getting wrong."
+    }
+  },
+  "assistantPage": {
+    "description": "Ask anything by voice, from any app. The assistant can see your screen, search the web, and remember what matters to you.",
+    "offNotice": "The assistant is turned off. Its shortcuts do nothing and it uses no memory until you turn it back on.",
+    "hero": {
+      "askHold": "Hold, ask your question, let go. The answer appears in a floating panel.",
+      "askTap": "Tap, ask your question, tap again. The answer appears in a floating panel.",
+      "call": "Talk back and forth hands-free. Press again to hang up.",
+      "title": "Ask anything, from anywhere.",
+      "ask": "Ask",
+      "callLabel": "Call",
+      "askHoldShort": "Hold, ask, let go",
+      "askTapShort": "Tap, ask, tap again",
+      "callShort": "Press again to hang up",
+      "subtitle": "Ask a question out loud, or start a call and talk it through."
+    },
+    "models": {
+      "title": "Powered by",
+      "assistant": "Thinks with",
+      "voice": "Speaks replies"
+    },
+    "features": {
+      "title": "What it can do",
+      "vision": {
+        "title": "Screen vision",
+        "description": "Let the assistant look at your screen when you ask about it."
+      },
+      "webSearch": {
+        "title": "Web search",
+        "description": "Look things up online for current, factual answers."
+      },
+      "reminders": {
+        "title": "Reminders",
+        "description": "Say \"remind me in 20 minutes\" and it will.",
+        "status": "Ask by voice"
+      },
+      "profiles": {
+        "title": "Profiles",
+        "description": "Personas with their own name, style, and voice.",
+        "status": "Default"
+      },
+      "memory": {
+        "title": "Memory",
+        "description": "What the assistant remembers about you, stored on this computer."
+      },
+      "behavior": {
+        "title": "Replies",
+        "description": "How long answers are and how much of the chat it keeps in mind."
+      },
+      "appearance": {
+        "title": "Panel",
+        "description": "Size, text, position, and opacity of the floating panel.",
+        "status": "Customize"
+      }
+    },
+    "cards": {
+      "keySaved": "Key saved",
+      "vision": {
+        "description": "Let it look at your screen to answer questions about what you see.",
+        "modes": {
+          "off": "Off",
+          "manual": "When I attach",
+          "agentDecides": "When needed"
+        },
+        "timing": {
+          "immediate": "When I start",
+          "onSend": "When I send"
+        }
+      },
+      "webSearch": {
+        "description": "Look things up online for current, factual answers.",
+        "offHint": "Off: answers come from the model alone, which may be out of date.",
+        "keyFor": "{{provider}} API key",
+        "getKey": "Get a free key at {{site}}.",
+        "hints": {
+          "tinyfish": "Free, no card",
+          "serper": "Google results",
+          "brave": "Independent index",
+          "tavily": "Built for AI",
+          "exa": "Neural search",
+          "serpapi": "Google results"
+        }
+      },
+      "reminders": {
+        "description": "Ask it to remind you, and a note pops up when it's time.",
+        "trySaying": "Try saying",
+        "examples": {
+          "one": "“Remind me to call Sam in 20 minutes”",
+          "two": "“At 6 pm, remind me to send the invoice”",
+          "three": "“Look at this and remind me tomorrow”"
+        },
+        "upcoming": "Coming up",
+        "none": "Nothing scheduled yet.",
+        "more_one": "and {{count}} more",
+        "more_other": "and {{count}} more"
+      },
+      "memory": {
+        "title": "Memory",
+        "description": "Remembers what matters to you, stored only on this computer.",
+        "open": "Open memory",
+        "manage_one": "See and edit memory · {{count}} note",
+        "manage_other": "See and edit memory · {{count}} notes",
+        "pausedHint": "Paused: saved memories are kept but not used."
+      },
+      "profiles": {
+        "title": "Profiles",
+        "description": "Personas with their own name, instructions, and reply style.",
+        "edit": "Edit profiles",
+        "more": "+{{count}}"
+      },
+      "replies": {
+        "title": "Replies",
+        "description": "How long answers are, and how much of the chat it keeps in mind.",
+        "lengths": {
+          "default": "Default",
+          "short": "Short",
+          "medium": "Medium",
+          "long": "Long"
+        },
+        "lengthHints": {
+          "default": "As long as the question needs.",
+          "short": "A sentence or two.",
+          "medium": "A short paragraph.",
+          "long": "Thorough and detailed."
+        },
+        "history": "Messages it keeps in mind"
+      },
+      "panel": {
+        "title": "Floating panel",
+        "description": "How the panel looks and where it opens. The preview updates as you change it.",
+        "positionHint": "Click a spot on the screen. The shape is the shape it opens in: a tall column down a side, or a wide strip along the top or bottom. Drag the panel near a spot and it snaps there."
+      }
+    },
+    "groups": {
+      "personal": "Personal",
+      "replies": "Replies"
+    },
+    "rows": {
+      "replyLength": "Reply length",
+      "reminders": {
+        "none": "None set",
+        "count_one": "{{count}} set",
+        "count_other": "{{count}} set"
+      },
+      "memory": {
+        "edit": "View memory"
+      }
+    },
+    "tips": {
+      "thinksWith": "The model that answers you. AI cleanup and meeting notes use it too when they have none of their own.",
+      "speaks": "Reads replies aloud during a call.",
+      "vision": "Lets the assistant see your screen. \"When needed\" lets it decide; every capture is shown in the chat.",
+      "captureTiming": "Grab the screen as it was when you started asking, or when you send.",
+      "webSearch": "Looks things up online when a question needs current facts.",
+      "depth": "Quick for simple facts, Deep for hard questions.",
+      "openRouterSearch": "Uses OpenRouter's own search and your OpenRouter credits.",
+      "localSmart": "Lets the on-device model decide when to search.",
+      "reminders": "Just ask: \"Remind me to call Sam in 20 minutes.\" A note pops up when it's time.",
+      "memory": "Remembers what matters to you. Stored only on this computer.",
+      "profiles": "Personas with their own name, instructions, and reply style.",
+      "replyLength": "How long answers usually are.",
+      "history": "How many recent messages it keeps in mind.",
+      "summarize": "Condenses long chats so it doesn't forget the start.",
+      "panelSize": "How large the panel is on your screen.",
+      "opacity": "Lower lets your desktop show through.",
+      "position": "Click where the panel should open.",
+      "display": "The screen the panel opens on."
+    }
+  },
+  "meetingsPage": {
+    "transcript": "Transcript",
+    "notes": "Notes",
+    "hero": {
+      "title": "Every call, written down.",
+      "subtitle": "Split by speaker, with notes when it ends."
+    },
+    "transcribedBy": "Transcribed by",
+    "notesBy": "Notes by",
+    "modelsTip": "Meetings use your Speech to text model for the transcript and your AI cleanup model for the notes. Click either to change it."
+  },
+  "historyPage": {
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "storage": "Storage",
+    "cleaned": "Cleaned up",
+    "showOriginal": "Show original",
+    "showSaid": "Show what you said",
+    "hideOriginal": "Hide original",
+    "playRecording": "Play recording",
+    "hideRecording": "Close player",
+    "audioMissing": "This recording's audio file is no longer available."
+  },
+  "pickers": {
+    "browse": "Browse all models",
+    "download": "Download more models",
+    "choose": "Choose a model",
+    "switchFailed": "Couldn't switch models. Try again.",
+    "borrowsAssistant": "Using the assistant's {{model}}",
+    "needsKey": "Needs an API key",
+    "groups": {
+      "device": "On this computer",
+      "cloud": "Cloud"
+    },
+    "label": {
+      "assistant": "Assistant model",
+      "cleanup": "AI cleanup model",
+      "stt": "Speech-to-text model",
+      "voice": "Voice"
+    }
+  },
+  "catalog": {
+    "recommended": "Recommended",
+    "searchHuggingFace": "Search Hugging Face",
+    "useFor": {
+      "button": "Use for",
+      "label": "Use {{model}} for…",
+      "assistant": "Assistant",
+      "cleanup": "AI cleanup",
+      "cleanupOnly": "Made for cleanup only; it can't hold a conversation."
+    },
+    "inUse": {
+      "assistant": "Assistant",
+      "cleanup": "AI cleanup"
+    },
+    "use": "Use",
+    "useNamed": "Use {{model}} for {{job}}",
+    "useForJob": "Use for {{job}}",
+    "inUseShort": "In use",
+    "more": "More",
+    "moreFor": "More actions for {{model}}",
+    "showDetails": "Show file details",
+    "hideDetails": "Hide file details",
+    "removeFromList": "Remove from list",
+    "nowUsing": "Now using {{model}} for {{job}}.",
+    "yoursInfo": "Models you downloaded or added from your disk. Any of them can do either job; the ⋯ menu puts one to work for the other."
+  },
+  "models": {
+    "runsOn": "Runs on",
+    "options": "Options",
+    "downloadTitle": "Download models",
+    "cleanupOff": "AI cleanup is off. Meeting notes still use this model.",
+    "assistantOff": "The assistant is off. Generate with Flow and cleanup still use this model.",
+    "usedBy": "Used by: {{features}}."
+  },
+  "shortcutEditor": {
+    "change": "Change the {{name}} shortcut",
+    "reset": "Reset {{name}} to its default"
+  },
+  "memoryManager": {
+    "status": {
+      "on": "On: used in replies and learned from chats",
+      "off": "Off: nothing is used or learned"
+    },
+    "incognitoHint": "This chat is not used or learned from",
+    "editNote": "Edit note",
+    "source": {
+      "learned": "Learned",
+      "added": "Added by you"
+    },
+    "filterLabel": "Show notes",
+    "filters": {
+      "all": "All",
+      "learned": "Learned {{count}}",
+      "added": "Mine {{count}}"
+    },
+    "search": "Search notes",
+    "noMatches": "No notes match.",
+    "detailHints": {
+      "light": "Only the About-you summary goes into each reply. Fastest.",
+      "balanced": "The summary plus a few notes that fit the question.",
+      "detailed": "The summary plus more relevant notes. Richest, a little slower."
+    },
+    "learnNow": "Learn from this chat",
+    "tips": {
+      "enable": "Lets the assistant use and learn a memory of you. Off by default.",
+      "incognito": "This chat is neither used nor learned from.",
+      "aboutYou": "A short summary included in every reply while memory is on."
+    }
+  },
+  "providerGrid": {
+    "showAll": "Show all {{count}} providers",
+    "showFewer": "Show fewer"
+  },
+  "voiceEngines": {
+    "kokoro": "Free, on this PC",
+    "openai": "Compatible APIs",
+    "openrouter": "Many voices",
+    "elevenlabs": "Most natural",
+    "azure": "Neural voices",
+    "names": {
+      "kokoro": "Kokoro",
+      "openai": "OpenAI",
+      "openrouter": "OpenRouter",
+      "elevenlabs": "ElevenLabs",
+      "azure": "Azure Speech"
+    }
+  },
+  "insights": {
+    "description": "Your dictation over time, counted on this computer.",
+    "empty": "Your insights appear after your first dictation.",
+    "dictations": "Dictations",
+    "today": "{{words}} words today",
+    "pages_one": "About {{count}} page",
+    "pages_other": "About {{count}} pages",
+    "fasterThanTyping": "{{times}}× faster than typing",
+    "streak_one": "{{count}} day streak",
+    "streak_other": "{{count}} day streak",
+    "longest_one": "Longest: {{count}} day",
+    "longest_other": "Longest: {{count}} days",
+    "gridLabel_one": "{{words}} words on {{count}} day in the last six months",
+    "gridLabel_other": "{{words}} words on {{count}} days in the last six months",
+    "gridSummary_one": "{{words}} words on {{count}} day in the last 6 months",
+    "gridSummary_other": "{{words}} words on {{count}} days in the last 6 months",
+    "dayWords_one": "{{formatted}} word",
+    "dayWords_other": "{{formatted}} words",
+    "dayNone": "No dictation",
+    "less": "Less",
+    "more": "More",
+    "busiest": "Busiest day",
+    "best": "Best day",
+    "typical": "Typical day",
+    "typicalSub": "On days you dictate"
   }
 }

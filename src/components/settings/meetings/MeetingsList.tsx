@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ChevronRight, Sparkles, Trash2, Users } from "lucide-react";
+import { ChevronRight, Trash2, Users } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { TONE_PILL } from "@/components/ui/tones";
 import { formatDateTime } from "@/utils/dateFormat";
@@ -95,39 +95,36 @@ export const MeetingsList: React.FC<MeetingsListProps> = ({
           return (
             <li
               key={meeting.id}
-              className="flex items-center gap-2 px-3 py-2.5"
+              className="group flex items-center gap-2 px-3 py-2"
             >
               <button
                 type="button"
                 onClick={() => onOpen(meeting.id)}
-                className="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-1 py-1 text-start transition-colors hover:bg-ink/4 cursor-pointer"
+                className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-xl px-2 py-2 text-start transition-colors hover:bg-surface-muted focus-visible:bg-surface-muted focus-visible:outline-none"
               >
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[13px] text-ink">
+                  <span className="block truncate text-sm font-medium text-ink">
                     {meeting.title}
                   </span>
-                  <span className="mt-0.5 block truncate text-[11.5px] text-muted">
+                  <span className="mt-0.5 block truncate text-xs text-muted">
                     {meta}
                   </span>
                 </span>
                 {meeting.notes && (
-                  <span
-                    className="shrink-0 text-accent"
-                    title={t("meetings.list.hasNotes")}
-                  >
-                    <Sparkles size={13} />
+                  <span className="shrink-0 text-xs text-muted">
+                    {t("meetings.list.notesBadge")}
                   </span>
                 )}
                 {tone && (
                   <span
-                    className={`shrink-0 rounded-md border px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-wide ${TONE_PILL[tone]}`}
+                    className={`shrink-0 rounded-md border px-1.5 py-0.5 text-[0.6875rem] font-medium ${TONE_PILL[tone]}`}
                   >
                     {t(`meetings.status.${meeting.status}`)}
                   </span>
                 )}
                 <ChevronRight
                   size={15}
-                  className="shrink-0 text-muted-soft"
+                  className="shrink-0 text-muted-soft rtl:rotate-180"
                   aria-hidden="true"
                 />
               </button>
@@ -163,7 +160,7 @@ export const MeetingsList: React.FC<MeetingsListProps> = ({
                       : t("meetings.delete.action")
                   }
                   aria-label={t("meetings.delete.action")}
-                  className="shrink-0 cursor-pointer rounded-md p-1.5 text-muted transition-colors hover:bg-error/10 hover:text-error disabled:cursor-not-allowed disabled:text-muted-soft/50 disabled:hover:bg-transparent"
+                  className="shrink-0 cursor-pointer rounded-lg p-2 text-muted opacity-0 transition-[opacity,background-color,color] group-hover:opacity-100 hover:bg-error/10 hover:text-error focus-visible:opacity-100 disabled:cursor-not-allowed disabled:text-muted-soft/50 disabled:hover:bg-transparent"
                 >
                   <Trash2 size={15} />
                 </button>

@@ -7,100 +7,93 @@
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 /*
- * Design system — quiet, neutral, native-feeling.
- * Light mode is modeled on macOS System Settings: a soft cool-gray canvas,
- * pure-white cards, near-black neutral ink, hairline rules, and the one
- * signature deep-teal accent (the brand color — it lives in the logo and the
- * "Flow" wordmark). No decorative gradients or pastels — hierarchy comes from
- * type weight, spacing and surface contrast; the teal appears only on primary
- * actions, selection and live states so it stays a signature, not chrome.
- * Floating menus frost the content behind them for a light glassmorphism read.
- * The dark inversion (warm near-black + luminous teal) lives under
- * :root[data-theme="dark"] further below. Inter carries the whole UI.
+ * Design system — quiet paper, one deep teal, one typeface.
+ *
+ * Surfaces are a barely-warm off-white (chroma well under 0.01, so it reads as
+ * white, not cream) with a second, slightly deeper neutral for the chrome — the
+ * title bar and sidebar — so the content pane floats as one rounded sheet.
+ *
+ * Type is Inter, everywhere. Headings used to be set in a display serif, which
+ * read as a different product from the sidebar and the controls beside them;
+ * hierarchy now comes from size and weight inside one family, the way a tool
+ * is expected to look.
+ *
+ * Colour is restrained. Ink is the primary action colour (dark buttons, like a
+ * pen); the brand teal marks state — a switch that is on, the selected option,
+ * a link — and fills the hero surfaces, which is the one place the brand is
+ * allowed to be loud.
  */
 @theme {
-  /* === Surfaces (clean cool neutrals — white cards float on a soft gray pane) === */
-  --color-canvas: #f4f5f7; /* content pane floor (soft cool gray) */
-  --color-canvas-soft: #eaecef; /* chrome: title bar / sidebar / footer */
-  --color-surface: #ffffff; /* cards (pure white — floats crisply on the pane) */
-  --color-surface-strong: #eef0f3; /* badges, plates, hover fills */
+  /* === Surfaces === */
+  --color-canvas: #fbfaf8; /* content pane */
+  --color-canvas-soft: #f3f2ef; /* chrome: title bar + sidebar */
+  --color-surface: #ffffff; /* cards */
+  --color-surface-strong: #f1efeb; /* fills, hover, badges */
+  --color-surface-muted: #f7f6f3; /* quiet wells inside a card */
 
-  /* === Ink / text (neutral near-black — no warm tint) === */
-  --color-ink: #16181d; /* display + primary text */
-  --color-ink-soft: #2a2d34; /* emphasis */
-  --color-body: #444851; /* running text */
-  --color-muted: #6b7180; /* sub-titles, captions */
-  --color-muted-soft: #a3a9b5; /* disabled, hints */
+  /* === Ink / text === */
+  --color-ink: #1b1a18;
+  --color-ink-soft: #2d2b28;
+  --color-body: #45423d;
+  --color-muted: #6f6a63; /* ≥5:1 on every surface above */
+  --color-muted-soft: #a39e96; /* decorative + disabled only */
 
-  /* === Hairlines (neutral cool) === */
-  --color-hairline: #e6e8ec; /* default 1px divider */
-  --color-hairline-strong: #d4d8de; /* stronger panel outline */
+  /* === Hairlines === */
+  --color-hairline: #eae7e2;
+  --color-hairline-strong: #dbd7d0;
 
-  /* === Accent (signature deep teal — the one color moment) ===
-   * The brand color: it lives in the logo and the "Flow" wordmark, so the UI
-   * follows it. A petrol teal reads calm and premium against the clean
-   * white/gray surfaces and is distinct from default-blue apps. AA on white as
-   * text (~4.6:1); white passes on the fill. (Dark mode keeps its brighter
-   * luminous teal.) */
-  --color-accent: #0f766e; /* primary actions, active states */
-  --color-accent-strong: #0c5f58; /* hover / pressed */
+  /* === Brand teal (state, links, heroes) === */
+  --color-accent: #0d6b62;
+  --color-accent-strong: #0a554e;
 
-  /* === Semantic ===
-   * `success` is used as tint + text (badges, alerts, the AI-cleanup readiness
-   * row), never as a fill behind white text, so it's tuned to pass AA as small
-   * text on the light surface (~4.9:1). `error` stays the destructive FILL
-   * color (white text sits on it), so it is left as-is. */
+  /* === Semantic === */
   --color-success: #15803d;
-  --color-error: #dc2626;
+  --color-error: #c9372c;
+  --color-warning: #b45309;
 
-  /* === On-color text === */
+  /* === On-colour text === */
   --color-on-primary: #ffffff; /* text on accent fills */
+  --color-on-ink: #fbfaf8; /* text on ink (primary) buttons */
 
   /* === Toggle switch === */
   --color-toggle-track-on: var(--color-accent);
+  --color-toggle-track-off: #d5d1ca;
   --color-toggle-knob-on: #ffffff;
 
-  /* === Back-compat aliases ===
-   * Many leaf components still reference these original token names.
-   * Re-point them at the new palette so the whole app stays coherent
-   * without touching every file. */
+  /* === Back-compat aliases (leaf components still use these names) === */
   --color-background: var(--color-canvas);
   --color-text: var(--color-ink);
-  --color-background-ui: var(--color-accent); /* primary action fill */
-  --color-logo-primary: var(--color-accent); /* accent / active */
-  --color-logo-stroke: #2a2d34;
+  --color-background-ui: var(--color-accent);
+  --color-logo-primary: var(--color-accent);
+  --color-logo-stroke: #2d2b28;
   --color-text-stroke: #ffffff;
-  /* neutral gray: solid it reads as a muted label, at low opacity ≈ a hairline */
-  --color-mid-gray: #8a8f9a;
+  --color-mid-gray: #8c877f;
 
-  /* === Type families ===
-   * One family across the app: Inter. Weight + size carry the hierarchy
-   * (see .font-display); no display face, no rounded novelty. */
+  /* === Type families === */
   --font-sans:
     "Inter Variable", -apple-system, BlinkMacSystemFont,
     "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
-  --font-display:
-    "Inter Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui,
-    sans-serif;
   --font-brand:
     "Inter Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui,
     sans-serif;
 }
 
-/* Explicit light selection — hint native controls/scrollbars to light. The
- * clean neutral values above already apply to :root, so no token overrides
- * needed. */
 :root[data-theme="light"] {
   color-scheme: light;
 }
 
 :root {
-  /* Typography baseline */
+  /* The main window is sized in rem, so this one value sets the scale of the
+   * whole UI. It follows the display the window lives on (see
+   * `applyScreenScale` in main.tsx). */
   font-family: var(--font-sans);
-  font-size: 15px;
+  font-size: 16px;
   line-height: 1.5;
   font-weight: 400;
   letter-spacing: 0;
+  font-feature-settings:
+    "cv11" 1,
+    "ss01" 1;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -108,30 +101,38 @@
   -moz-osx-font-smoothing: grayscale;
   -webkit-text-size-adjust: 100%;
 
-  --scrollbar-thumb: color-mix(in srgb, var(--color-text), transparent 88%);
+  --scrollbar-thumb: color-mix(in srgb, var(--color-text), transparent 86%);
   --scrollbar-thumb-hover: color-mix(
     in srgb,
     var(--color-text),
-    transparent 72%
+    transparent 70%
   );
 
   color: var(--color-text);
   background-color: var(--color-background);
 }
 
-/* Heading face — Inter set semibold with tight tracking. Carries section
- * titles and other display headings; secondary uses override the weight
- * locally. */
+:root[data-screen="compact"] {
+  font-size: 15px;
+}
+:root[data-screen="large"] {
+  font-size: 17px;
+}
+:root[data-screen="huge"] {
+  font-size: 18px;
+}
+
+/* Headings. Inter at a heavier weight with slightly tightened tracking, so a
+ * title reads as the same voice as the label under it, only louder. */
 .font-display {
-  font-family: var(--font-display);
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  font-optical-sizing: auto;
+  font-family: var(--font-sans);
+  font-weight: 620;
+  letter-spacing: -0.021em;
+  line-height: 1.15;
   text-wrap: balance;
 }
 
-/* Brand face — Inter semibold for the wordmark. Pair with a text color
- * utility (e.g. `text-ink`) so it adapts to light/dark automatically. */
+/* Brand wordmark. */
 .font-brand {
   font-family: var(--font-brand);
   font-weight: 600;
@@ -139,132 +140,94 @@
   font-optical-sizing: auto;
 }
 
-/* === Dark inversion — neutral, cool near-black with a soft "gradient black"
- * backdrop and clean, satisfying near-white ink. ===
- * Applied when the user chooses Dark and while the (light-by-default)
- * onboarding is showing. No warm tint: the old warm brown-black + warm-grey
- * text read as "dull grey", so surfaces are a faintly cool neutral and text is
- * a crisp cool white — bright enough to read as white, a step under harsh
- * pure #fff. A soft top-lit radial gives depth so large open areas (the
- * onboarding) read as a rich gradient black instead of a flat slab. */
+/* === Dark === */
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --color-canvas: #121317; /* content pane floor (neutral cool near-black) */
-  --color-canvas-soft: #0d0e11; /* chrome: title bar / sidebar / footer */
-  --color-surface: #1b1d22; /* cards — lifted a step off the canvas */
-  --color-surface-strong: #262931; /* badges, plates, hover fills */
+  --color-canvas: #171614;
+  --color-canvas-soft: #100f0e;
+  --color-surface: #1e1d1b;
+  --color-surface-strong: #292724;
+  --color-surface-muted: #1b1a18;
 
-  /* Clean, satisfying near-white text — cool neutral, not warm/grey. Reads as
-   * white without the glare of pure #fff. Muted stays a clean cool grey so
-   * hierarchy survives (headings > body > captions). */
-  --color-ink: #f6f7f9; /* display + primary text */
-  --color-ink-soft: #eceef2; /* emphasis */
-  --color-body: #e2e5ea; /* running text — reads white, high contrast */
-  --color-muted: #a7adb8; /* sub-titles, captions — clean cool grey */
-  --color-muted-soft: #71767f; /* disabled, hints */
+  --color-ink: #f4f2ee;
+  --color-ink-soft: #e8e5e0;
+  --color-body: #d9d5ce;
+  --color-muted: #a49e96;
+  --color-muted-soft: #6f6a63;
 
-  --color-hairline: #262830;
-  --color-hairline-strong: #343740;
+  --color-hairline: #2b2926;
+  --color-hairline-strong: #3a3733;
 
-  /* Accent stays a luminous teal so it reads as color, not glare, on the
-   * near-black surfaces; on-color text flips to a deep teal-black. */
-  --color-accent: #3dd6c3;
-  --color-accent-strong: #63e0d0;
+  --color-accent: #5ed3c1;
+  --color-accent-strong: #86e0d2;
 
-  --color-on-primary: #04302b;
-
-  /* Success reads as a luminous green on the near-black surfaces (the flat
-   * `#15803d` from light mode is too dark to register here). */
   --color-success: #4ade80;
+  --color-error: #f06a5f;
+  --color-warning: #f5a14a;
+
+  --color-on-primary: #062b27;
+  --color-on-ink: #171614;
 
   --color-toggle-track-on: var(--color-accent);
+  --color-toggle-track-off: #4a4640;
   --color-toggle-knob-on: #ffffff;
 
-  /* aliases */
   --color-background: var(--color-canvas);
   --color-text: var(--color-ink);
   --color-background-ui: var(--color-accent);
   --color-logo-primary: var(--color-accent);
-  --color-logo-stroke: #eceef2;
-  --color-mid-gray: #a7adb8;
+  --color-logo-stroke: #e8e5e0;
+  --color-mid-gray: #a49e96;
 
-  /* Gradient black — a soft, neutral top-lit dome (no color tint). Most
-   * visible in open areas like the onboarding; covered by the chrome + pane
-   * in the settings view, which stays a clean flat neutral. Fixed so it stays
-   * put while content scrolls. */
   background-color: var(--color-canvas);
-  background-image: radial-gradient(
-    145% 115% at 50% -12%,
-    #1e2128 0%,
-    #141519 44%,
-    #0c0d10 100%
-  );
-  background-attachment: fixed;
 }
 
-/* Pre-JS fallback: honor the OS preference only until the data-theme attribute
- * is set (it is set synchronously from the cached preference before render). */
+/* Pre-JS fallback: honour the OS preference only until data-theme is set (it is
+ * set synchronously from the cached preference before render). */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
     color-scheme: dark;
-    --color-canvas: #1c1c1e;
-    --color-canvas-soft: #161618;
-    --color-surface: #26262a;
-    --color-surface-strong: #35353b;
-
-    --color-ink: #f5f5f7;
-    --color-ink-soft: #e4e4e7;
-    --color-body: #d1d1d6;
-    --color-muted: #98989f;
-    --color-muted-soft: #606067;
-
-    --color-hairline: #34343a;
-    --color-hairline-strong: #45454c;
-
-    --color-accent: #3dd6c3;
-    --color-accent-strong: #63e0d0;
-
-    --color-on-primary: #053b34;
-
-    --color-success: #4ade80;
-
-    --color-toggle-track-on: var(--color-accent);
-    --color-toggle-knob-on: #ffffff;
-
+    --color-canvas: #171614;
+    --color-canvas-soft: #100f0e;
+    --color-surface: #1e1d1b;
+    --color-surface-strong: #292724;
+    --color-surface-muted: #1b1a18;
+    --color-ink: #f4f2ee;
+    --color-ink-soft: #e8e5e0;
+    --color-body: #d9d5ce;
+    --color-muted: #a49e96;
+    --color-muted-soft: #6f6a63;
+    --color-hairline: #2b2926;
+    --color-hairline-strong: #3a3733;
+    --color-accent: #5ed3c1;
+    --color-accent-strong: #86e0d2;
+    --color-on-primary: #062b27;
+    --color-on-ink: #171614;
     --color-background: var(--color-canvas);
     --color-text: var(--color-ink);
-    --color-background-ui: var(--color-accent);
-    --color-logo-primary: var(--color-accent);
-    --color-logo-stroke: #e6e1d7;
-    --color-mid-gray: #9c9488;
   }
 }
 
-/* macOS - tint native overlay scrollbar thumb */
+/* macOS — tint the native overlay scrollbar thumb */
 :root[data-platform="macos"] {
   scrollbar-color: var(--scrollbar-thumb) transparent;
 }
 
-/* Custom Scrollbar - only on Windows/Linux; macOS uses native overlay scrollbars */
+/* Custom scrollbar — Windows/Linux only; macOS keeps native overlay bars */
 :root:not([data-platform="macos"]) ::-webkit-scrollbar {
   width: 14px;
   height: 14px;
 }
-
 :root:not([data-platform="macos"]) ::-webkit-scrollbar-track {
   background: transparent;
 }
-
 :root:not([data-platform="macos"]) ::-webkit-scrollbar-thumb {
   background-color: var(--scrollbar-thumb);
   border-radius: 20px;
-  border: 3px solid transparent;
-  border-right-width: 4px;
-  border-left-width: 3px;
+  border: 4px solid transparent;
   background-clip: content-box;
   min-height: 32px;
 }
-
 :root:not([data-platform="macos"]) ::-webkit-scrollbar-thumb:hover {
   background-color: var(--scrollbar-thumb-hover);
 }
@@ -286,75 +249,192 @@
 }
 
 /* ============================================================================
- * Depth — soft, neutral elevation + frosted glass
- * ----------------------------------------------------------------------------
- * White cards float above a soft gray pane; tiles and pills read as gently
- * raised chips; floating menus frost the content behind them. Light shadows
- * are neutral/cool (a hint of slate, never warm brown) and kept subtle so the
- * palette stays clean and airy — depth, not drop-shadow soup. Dark mode swaps
- * to deeper, cooler shadows below (left unchanged).
+ * Depth — hairlines first, shadow second
  * ==========================================================================*/
 @layer components {
-  /* Grouped setting cards — clearly float above the pane (layered soft shadow
-   * + a faint top highlight for the "lit from above" cue). */
+  /* Cards carry their edge with a hairline; the shadow only lifts them a hair
+   * off the pane. */
   .elev-card {
-    box-shadow:
-      0 1px 2px rgba(15, 23, 42, 0.05),
-      0 6px 16px -6px rgba(15, 23, 42, 0.08),
-      0 20px 40px -20px rgba(15, 23, 42, 0.1),
-      inset 0 1px 0 rgba(255, 255, 255, 0.9);
+    box-shadow: 0 1px 2px rgba(27, 26, 24, 0.035);
   }
 
-  /* Small controls (icon tiles, shortcut pills) — soft raised chip: top
-   * highlight + a light drop shadow, refined for the clean white surface. */
+  .elev-hover {
+    transition:
+      box-shadow 160ms cubic-bezier(0.25, 1, 0.5, 1),
+      border-color 160ms cubic-bezier(0.25, 1, 0.5, 1),
+      background-color 160ms cubic-bezier(0.25, 1, 0.5, 1);
+  }
+  .elev-hover:hover {
+    box-shadow:
+      0 1px 2px rgba(27, 26, 24, 0.04),
+      0 8px 24px -14px rgba(27, 26, 24, 0.18);
+  }
+
   .elev-chip {
     box-shadow:
-      0 1px 2px rgba(15, 23, 42, 0.06),
-      0 2px 6px -2px rgba(15, 23, 42, 0.1),
+      0 1px 2px rgba(27, 26, 24, 0.06),
       inset 0 1px 0 rgba(255, 255, 255, 0.9);
   }
 
   /* The content pane, lifted off the chrome toward the sidebar. */
   .elev-pane {
-    box-shadow:
-      -2px 0 14px -6px rgba(15, 23, 42, 0.05),
-      -10px 0 44px -22px rgba(15, 23, 42, 0.08);
+    box-shadow: -1px 0 0 rgba(27, 26, 24, 0.02);
   }
 
-  /* Floating menus / popovers overlay real content (settings rows, the chat),
-   * so they must be OPAQUE — a translucent fill let the rows underneath bleed
-   * through and made options hard to read. Depth comes from the border +
-   * shadow on the element itself, not from letting the background show. */
+  /* Floating menus overlay real content, so they are opaque. */
   .glass-menu {
     background-color: var(--color-surface);
+  }
+
+  /* Popover / menu shadow, shared by every floating surface. */
+  .elev-float {
+    box-shadow:
+      0 18px 44px -16px rgba(27, 26, 24, 0.3),
+      0 2px 6px rgba(27, 26, 24, 0.06);
   }
 }
 
 :root[data-theme="dark"] .elev-card {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+:root[data-theme="dark"] .elev-hover:hover {
   box-shadow:
     0 1px 2px rgba(0, 0, 0, 0.5),
-    0 6px 14px -4px rgba(0, 0, 0, 0.5),
-    0 18px 36px -14px rgba(0, 0, 0, 0.6),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    0 10px 28px -12px rgba(0, 0, 0, 0.7);
 }
 :root[data-theme="dark"] .elev-chip {
   box-shadow:
     0 2px 5px rgba(0, 0, 0, 0.55),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
-:root[data-theme="dark"] .elev-pane {
+:root[data-theme="dark"] .elev-float {
   box-shadow:
-    -2px 0 16px -6px rgba(0, 0, 0, 0.4),
-    -10px 0 48px -22px rgba(0, 0, 0, 0.55);
-}
-:root[data-theme="dark"] .glass-menu {
-  background-color: var(--color-surface);
+    0 20px 48px -16px rgba(0, 0, 0, 0.75),
+    0 2px 6px rgba(0, 0, 0, 0.4);
 }
 
-/* === Entrance animations (onboarding) ===
- * A soft rise-and-fade with a springy ease, staggered via delay classes so a
- * screen builds top-to-bottom instead of popping in at once. Respects
- * prefers-reduced-motion. */
+/* ============================================================================
+ * Hero surface — the one loud place
+ * ----------------------------------------------------------------------------
+ * Deep teal, lit from the top-left, with a fine grain so the gradient reads as
+ * a material rather than a CSS default. Text on it is white; controls on it use
+ * the `glass` variants below.
+ * ==========================================================================*/
+.hero-surface {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  color: #ffffff;
+  background-color: #0b4640;
+  background-image:
+    radial-gradient(
+      70% 110% at 8% -10%,
+      rgba(116, 222, 204, 0.42) 0%,
+      rgba(116, 222, 204, 0) 60%
+    ),
+    radial-gradient(
+      60% 90% at 100% 0%,
+      rgba(22, 120, 108, 0.55) 0%,
+      rgba(22, 120, 108, 0) 65%
+    ),
+    radial-gradient(
+      80% 120% at 90% 120%,
+      rgba(2, 26, 24, 0.85) 0%,
+      rgba(2, 26, 24, 0) 60%
+    ),
+    linear-gradient(135deg, #10645b 0%, #0b4a44 48%, #07312d 100%);
+}
+.hero-surface::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.16;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.9 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+:root[data-theme="dark"] .hero-surface {
+  background-color: #093b36;
+}
+
+/* Glass controls for use on the hero. */
+.glass-chip {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.2) 0%,
+    rgba(255, 255, 255, 0.08) 100%
+  );
+  border: 1px solid rgba(255, 255, 255, 0.26);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 8px 20px -12px rgba(0, 0, 0, 0.5);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  color: #ffffff;
+}
+.glass-button {
+  background: rgba(255, 255, 255, 0.94);
+  color: #0b3f3a;
+  box-shadow: 0 6px 18px -10px rgba(0, 0, 0, 0.6);
+  transition:
+    background-color 150ms ease,
+    transform 150ms ease;
+}
+.glass-button:hover {
+  background: #ffffff;
+}
+.glass-button:active {
+  transform: scale(0.98);
+}
+.glass-ghost {
+  color: rgba(255, 255, 255, 0.92);
+  transition: background-color 150ms ease;
+}
+.glass-ghost:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* ============================================================================
+ * Keycaps
+ * ==========================================================================*/
+.keycap {
+  background: linear-gradient(180deg, #ffffff 0%, #f4f2ee 100%);
+  border: 1px solid var(--color-hairline-strong);
+  box-shadow:
+    inset 0 -1.5px 0 rgba(27, 26, 24, 0.09),
+    0 1px 1.5px rgba(27, 26, 24, 0.05);
+}
+:root[data-theme="dark"] .keycap {
+  background: linear-gradient(180deg, #2c2a27 0%, #232120 100%);
+  border-color: #3a3733;
+  box-shadow:
+    inset 0 -1.5px 0 rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+/* On the hero: frosted keys with a lit top edge. */
+.keycap-glass {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.24) 0%,
+    rgba(255, 255, 255, 0.09) 100%
+  );
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.38),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.18),
+    0 10px 24px -14px rgba(0, 0, 0, 0.6);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  color: #ffffff;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.12);
+}
+
+/* ============================================================================
+ * Motion
+ * ==========================================================================*/
+
+/* Onboarding entrances (unchanged). */
 @keyframes rise-fade {
   from {
     opacity: 0;
@@ -380,8 +460,200 @@
 .anim-delay-4 {
   animation-delay: 0.38s;
 }
+
+/* Dialogs: the scrim fades, the panel rises a few pixels and settles. */
+@keyframes dialog-scrim-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes dialog-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.dialog-scrim {
+  animation: dialog-scrim-in 180ms cubic-bezier(0.25, 1, 0.5, 1) both;
+}
+.dialog-panel {
+  animation: dialog-panel-in 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Pages are kept alive (see shell/PageStack.tsx), so switching is a reveal of
+ * something already rendered. The reveal starts almost fully visible on purpose:
+ * an animation that starts from 0 leaves the page blank whenever the clock is
+ * paused (a hidden window, a headless renderer), and this window starts hidden
+ * in the tray. The rise ends on `translate: none`, not `0 0`: any non-none
+ * transform keeps making the element the containing block for fixed-position
+ * descendants, which is how a modal ends up trapped inside one column. */
+@keyframes page-reveal {
+  from {
+    opacity: 0.35;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes page-rise {
+  from {
+    translate: 0 6px;
+  }
+  to {
+    translate: none;
+  }
+}
+.page-layer-active > .page-layer-content {
+  animation:
+    page-reveal 200ms cubic-bezier(0.22, 1, 0.36, 1) both,
+    page-rise 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.page-layer-hidden {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* Tab panels inside a page get the same short settle. */
+.tab-reveal {
+  animation: page-reveal 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Legacy class some leaf components still apply. */
+@keyframes page-in {
+  from {
+    opacity: 0.85;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.page-in {
+  animation: page-in 180ms cubic-bezier(0.25, 1, 0.5, 1) both;
+}
+
+/* A page's own root for its menus and dialogs (see ui/portal.ts). It takes no
+ * space; everything in it is position: fixed. */
+.page-layer-portal {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+}
+
+/* Floating menus settle in from a few pixels, like the dialogs. */
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-3px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.menu-in {
+  animation: menu-in 140ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  transform-origin: top right;
+}
+
+/* Hero art: each line draws itself in once when its page is revealed
+ * (`pathLength=1` makes the dash one whole path long), then holds still —
+ * nothing here runs continuously. */
+@keyframes flow-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.page-layer-active .flow-art .flow-ribbon {
+  stroke-dasharray: 1;
+  animation: flow-draw 1400ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: calc(var(--i, 0) * 90ms);
+}
+
+/* Writing-style sample: the new sentence settles in when the style changes.
+ * It starts partly visible so a paused clock never leaves it blank. */
+@keyframes style-swap {
+  from {
+    opacity: 0.35;
+    translate: 0 3px;
+  }
+  to {
+    opacity: 1;
+    translate: none;
+  }
+}
+.style-swap {
+  animation: style-swap 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Insights heatmap: the grid sweeps in left to right when the page opens. It
+ * starts partly visible, so a paused clock never leaves an empty grid. */
+@keyframes heat-in {
+  from {
+    opacity: 0.25;
+    transform: scale(0.55);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.page-layer-active .heat-cell {
+  animation: heat-in 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--col, 0) * 18ms + var(--row, 0) * 12ms);
+}
+
+/* Segmented control: the selected pill slides between options. */
+.segmented-thumb {
+  transition:
+    left 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    width 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.segmented-pill {
+  background-color: var(--color-surface);
+  box-shadow:
+    0 1px 2px rgba(27, 26, 24, 0.12),
+    0 0 0 0.5px rgba(27, 26, 24, 0.05);
+}
+:root[data-theme="dark"] .segmented-pill {
+  background-color: #3a3733;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+/* Native range inputs pick up the brand accent. */
+input[type="range"] {
+  accent-color: var(--color-accent);
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .anim-rise {
+  .anim-rise,
+  .dialog-scrim,
+  .dialog-panel,
+  .page-in,
+  .tab-reveal,
+  .menu-in,
+  .style-swap,
+  .page-layer-active > .page-layer-content,
+  .page-layer-active .flow-art .flow-ribbon,
+  .page-layer-active .heat-cell {
     animation: none;
+  }
+  .page-layer-active .flow-art .flow-ribbon {
+    stroke-dasharray: none;
+  }
+  .elev-hover,
+  .segmented-thumb {
+    transition: none;
   }
 }

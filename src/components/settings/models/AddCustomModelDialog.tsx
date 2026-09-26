@@ -22,6 +22,7 @@ import {
 import { useModelStore } from "@/stores/modelStore";
 import { formatModelSize } from "@/lib/utils/format";
 import { Button } from "@/components/ui/Button";
+import { Dialog } from "@/components/ui/Dialog";
 
 interface AddCustomModelDialogProps {
   open: boolean;
@@ -105,15 +106,6 @@ export const AddCustomModelDialog: React.FC<AddCustomModelDialogProps> = ({
     return () => window.clearTimeout(id);
   }, [query, open, selectedRepo, runSearch]);
 
-  // Close on Escape.
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
 
   const handleSelectRepo = async (repo: HfModelSummary) => {
     setSelectedRepo(repo);
@@ -175,24 +167,23 @@ export const AddCustomModelDialog: React.FC<AddCustomModelDialogProps> = ({
     }
   };
 
-  if (!open) return null;
-
   const hasQuery = query.trim().length > 0;
 
+  // Rendered through the shared portal Dialog: this used to be a `fixed`
+  // overlay drawn inside the page, and a page is a container-query container,
+  // which makes it the containing block for fixed descendants — so the "modal"
+  // covered one column of the window and left the sidebar live.
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-[2px]"
-      onClick={onClose}
-      role="presentation"
+    <Dialog
+      open={open}
+      onClose={onClose}
+      size="xl"
+      bare
+      labelledBy="hugging-face-dialog-title"
+      bodyClassName=""
     >
-      <div
-        className="flex max-h-[86vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-hairline-strong bg-surface shadow-[0_24px_80px_-24px_rgba(0,0,0,0.55)]"
-        onClick={(event) => event.stopPropagation()}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="hugging-face-dialog-title"
-      >
-        <div className="flex items-start justify-between gap-4 border-b border-hairline px-6 py-5">
+      <div>
+        <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-hairline bg-surface px-6 py-5">
           <div className="flex min-w-0 items-start gap-3">
             <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-accent/12 text-accent">
               <Search className="h-[18px] w-[18px]" aria-hidden="true" />
@@ -219,7 +210,7 @@ export const AddCustomModelDialog: React.FC<AddCustomModelDialogProps> = ({
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-6 py-5">
+        <div className="px-6 py-5">
           {selectedRepo ? (
             <div className="space-y-5">
               <button
@@ -547,6 +538,6 @@ export const AddCustomModelDialog: React.FC<AddCustomModelDialogProps> = ({
           )}
         </div>
       </div>
-    </div>
+    </Dialog>
   );
 };

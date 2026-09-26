@@ -2,21 +2,19 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pencil, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
-import { commands, type CustomPostProcessTone } from "@/bindings";
+import { commands } from "@/bindings";
 
 import { Alert } from "../../ui/Alert";
 import { Dropdown, SettingContainer, Textarea } from "@/components/ui";
 import { Button } from "../../ui/Button";
 import { Input } from "../../ui/Input";
-import { useModelStore } from "@/stores/modelStore";
-import { getModelCategory } from "@/lib/utils/modelCategory";
+import { LlmModelPicker } from "@/components/shell/ModelPicker";
 
 import { ProviderModeToggle } from "../PostProcessingSettingsApi/ProviderModeToggle";
 import { ProviderSelect } from "../PostProcessingSettingsApi/ProviderSelect";
 import { BaseUrlField } from "../PostProcessingSettingsApi/BaseUrlField";
 import { ApiKeyField } from "../PostProcessingSettingsApi/ApiKeyField";
 import { ModelCombo } from "../../ui/ModelCombo";
-import { CleanupModelRow } from "../dictation/CleanupModelRow";
 import { usePostProcessProviderState } from "../PostProcessingSettingsApi/usePostProcessProviderState";
 import { useSettings } from "../../../hooks/useSettings";
 
@@ -65,22 +63,6 @@ const PostProcessingSettingsApiComponent: React.FC<{
     if (target) state.handleProviderSelect(target);
   };
 
-  const { models } = useModelStore();
-  // The on-device cleanup model, resolved to a real catalog entry. Only a model
-  // that is actually on disk counts as active — a selection whose file is gone
-  // has to read as "nothing selected" or the card would claim cleanup is ready
-  // when it cannot run.
-  const activeLocalModel = useMemo(() => {
-    const id = settings?.post_process_models?.builtin ?? "";
-    if (!id) return undefined;
-    return models.find(
-      (model) =>
-        model.id === id &&
-        getModelCategory(model) === "llm" &&
-        model.is_downloaded,
-    );
-  }, [models, settings?.post_process_models]);
-
   return (
     <>
       <SettingContainer
@@ -105,7 +87,7 @@ const PostProcessingSettingsApiComponent: React.FC<{
           title={t("settings.postProcessing.api.provider.title")}
           description={t("settings.postProcessing.api.provider.description")}
           descriptionMode="tooltip"
-          layout="horizontal"
+          layout="stacked"
           grouped={true}
         >
           <ProviderSelect
@@ -165,10 +147,17 @@ const PostProcessingSettingsApiComponent: React.FC<{
 
       {!state.isAppleProvider &&
         (providerMode === "device" ? (
-          <CleanupModelRow
-            model={activeLocalModel}
-            onChangeModel={onBrowseModels}
-          />
+          <SettingContainer
+            title={t("settings.postProcessing.api.model.title")}
+            layout="horizontal"
+            grouped={true}
+          >
+            <LlmModelPicker
+              role="cleanup"
+              scope="device"
+              onBrowse={onBrowseModels}
+            />
+          </SettingContainer>
         ) : (
           <SettingContainer
             title={t("settings.postProcessing.api.model.title")}
@@ -629,336 +618,3 @@ export const PostProcessingSettingsPrompts = React.memo(
   PostProcessingSettingsPromptsComponent,
 );
 PostProcessingSettingsPrompts.displayName = "PostProcessingSettingsPrompts";
-
-const BUILTIN_TONE_IDS = [
-  "none",
-  "formal",
-  "casual",
-  "professional",
-  "friendly",
-  "concise",
-] as const;
-
-const PostProcessingToneComponent: React.FC = () => {
-  const { t } = useTranslation();
-  const { getSetting, refreshSettings } = useSettings();
-  const customTones: CustomPostProcessTone[] = (
-    getSetting("post_process_custom_tones") ?? []
-  ).filter(
-    (tone) =>
-      tone.id === tone.id.trim() &&
-      tone.id.length > 0 &&
-      !BUILTIN_TONE_IDS.some((builtinId) => builtinId === tone.id) &&
-      tone.name.trim() &&
-      tone.instruction.trim(),
-  );
-  const selectedToneId =
-    getSetting("post_process_selected_tone_id") ??
-    getSetting("post_process_tone") ??
-    "none";
-  const selectedCustomTone =
-    customTones.find((tone) => tone.id === selectedToneId) ?? null;
-
-  const [editorMode, setEditorMode] = useState<"create" | "edit" | null>(null);
-  const [draftName, setDraftName] = useState("");
-  const [draftInstruction, setDraftInstruction] = useState("");
-  const [isToneBusy, setIsToneBusy] = useState(false);
-  const toneNameInputId = React.useId();
-  const toneInstructionInputId = React.useId();
-
-  useEffect(() => {
-    if (editorMode !== null) return;
-    setDraftName(selectedCustomTone?.name ?? "");
-    setDraftInstruction(selectedCustomTone?.instruction ?? "");
-  }, [editorMode, selectedCustomTone]);
-
-  const options = [
-    ...BUILTIN_TONE_IDS.map((value) => ({
-      value,
-      label: t(`settings.postProcessing.tone.options.${value}`),
-    })),
-    ...customTones.map((tone) => ({
-      value: tone.id,
-      label: tone.name,
-    })),
-  ];
-
-  const showError = (key: string, defaultValue: string) => {
-    toast.error(t(key, { defaultValue }));
-  };
-
-  const handleToneSelect = async (toneId: string | null) => {
-    if (!toneId || isToneBusy || toneId === selectedToneId) return;
-    setIsToneBusy(true);
-    try {
-      const result = await commands.changePostProcessToneSetting(toneId);
-      if (result.status !== "ok") {
-        showError(
-          "settings.postProcessing.errors.toneSelectFailed",
-          "Couldn’t select the writing style.",
-        );
-        return;
-      }
-      await refreshSettings();
-      setEditorMode(null);
-    } catch (error) {
-      console.error("Failed to select writing style:", error);
-      showError(
-        "settings.postProcessing.errors.toneSelectFailed",
-        "Couldn’t select the writing style.",
-      );
-    } finally {
-      setIsToneBusy(false);
-    }
-  };
-
-  const handleCreateTone = async () => {
-    if (!draftName.trim() || !draftInstruction.trim() || isToneBusy) return;
-    setIsToneBusy(true);
-    try {
-      const created = await commands.addPostProcessCustomTone(
-        draftName.trim(),
-        draftInstruction.trim(),
-      );
-      if (created.status !== "ok") {
-        showError(
-          "settings.postProcessing.errors.toneCreateFailed",
-          "Couldn’t create the writing style.",
-        );
-        return;
-      }
-      const selected = await commands.changePostProcessToneSetting(
-        created.data.id,
-      );
-      if (selected.status !== "ok") {
-        showError(
-          "settings.postProcessing.errors.toneSelectAfterCreateFailed",
-          "Created the style, but couldn’t select it.",
-        );
-      }
-      await refreshSettings();
-      setEditorMode(null);
-    } catch (error) {
-      console.error("Failed to create writing style:", error);
-      showError(
-        "settings.postProcessing.errors.toneCreateFailed",
-        "Couldn’t create the writing style.",
-      );
-    } finally {
-      setIsToneBusy(false);
-    }
-  };
-
-  const handleUpdateTone = async () => {
-    if (
-      !selectedCustomTone ||
-      !draftName.trim() ||
-      !draftInstruction.trim() ||
-      isToneBusy
-    )
-      return;
-    setIsToneBusy(true);
-    try {
-      const result = await commands.updatePostProcessCustomTone(
-        selectedCustomTone.id,
-        draftName.trim(),
-        draftInstruction.trim(),
-      );
-      if (result.status !== "ok") {
-        showError(
-          "settings.postProcessing.errors.toneUpdateFailed",
-          "Couldn’t update the writing style.",
-        );
-        return;
-      }
-      await refreshSettings();
-      setEditorMode(null);
-    } catch (error) {
-      console.error("Failed to update writing style:", error);
-      showError(
-        "settings.postProcessing.errors.toneUpdateFailed",
-        "Couldn’t update the writing style.",
-      );
-    } finally {
-      setIsToneBusy(false);
-    }
-  };
-
-  const handleDeleteTone = async () => {
-    if (!selectedCustomTone || isToneBusy) return;
-    setIsToneBusy(true);
-    try {
-      const result = await commands.deletePostProcessCustomTone(
-        selectedCustomTone.id,
-      );
-      if (result.status !== "ok") {
-        showError(
-          "settings.postProcessing.errors.toneDeleteFailed",
-          "Couldn’t delete the writing style.",
-        );
-        return;
-      }
-      await refreshSettings();
-      setEditorMode(null);
-    } catch (error) {
-      console.error("Failed to delete writing style:", error);
-      showError(
-        "settings.postProcessing.errors.toneDeleteFailed",
-        "Couldn’t delete the writing style.",
-      );
-    } finally {
-      setIsToneBusy(false);
-    }
-  };
-
-  const startCreate = () => {
-    setDraftName("");
-    setDraftInstruction("");
-    setEditorMode("create");
-  };
-
-  const startEdit = () => {
-    if (!selectedCustomTone) return;
-    setDraftName(selectedCustomTone.name);
-    setDraftInstruction(selectedCustomTone.instruction);
-    setEditorMode("edit");
-  };
-
-  const cancelEditor = () => {
-    setEditorMode(null);
-    setDraftName(selectedCustomTone?.name ?? "");
-    setDraftInstruction(selectedCustomTone?.instruction ?? "");
-  };
-
-  const isDirty =
-    editorMode === "create" ||
-    (!!selectedCustomTone &&
-      (draftName.trim() !== selectedCustomTone.name ||
-        draftInstruction.trim() !== selectedCustomTone.instruction));
-  const canSave =
-    !!draftName.trim() && !!draftInstruction.trim() && isDirty && !isToneBusy;
-  const fieldLabelClasses =
-    "block text-[11px] font-medium uppercase tracking-wide text-muted";
-
-  return (
-    <SettingContainer
-      title={t("settings.postProcessing.tone.title")}
-      description={t("settings.postProcessing.tone.description")}
-      // Tooltip, not inline: the group header already states that the style is
-      // layer 2 and shapes wording rather than corrections, so printing it again
-      // here was the single biggest source of wall-of-text in this section.
-      descriptionMode="tooltip"
-      layout="stacked"
-      grouped={true}
-    >
-      <div className="space-y-4">
-        <div className="flex gap-2">
-          <Dropdown
-            selectedValue={selectedToneId}
-            options={options}
-            onSelect={handleToneSelect}
-            disabled={isToneBusy || editorMode === "create"}
-            className="flex-1"
-          />
-          {selectedCustomTone && editorMode !== "create" && (
-            <Button
-              onClick={() =>
-                editorMode === "edit" ? setEditorMode(null) : startEdit()
-              }
-              variant="secondary"
-              size="md"
-              disabled={isToneBusy}
-            >
-              <Pencil size={14} />
-              {editorMode === "edit"
-                ? t("settings.postProcessing.tone.closeEditor")
-                : t("settings.postProcessing.tone.edit")}
-            </Button>
-          )}
-          <Button
-            onClick={startCreate}
-            variant="secondary"
-            size="md"
-            disabled={editorMode === "create" || isToneBusy}
-          >
-            {t("settings.postProcessing.tone.createNew")}
-          </Button>
-        </div>
-
-        {editorMode && (
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <label htmlFor={toneNameInputId} className={fieldLabelClasses}>
-                {t("settings.postProcessing.tone.nameLabel")}
-              </label>
-              <Input
-                id={toneNameInputId}
-                value={draftName}
-                onChange={(event) => setDraftName(event.target.value)}
-                placeholder={t("settings.postProcessing.tone.namePlaceholder")}
-                variant="compact"
-                className="w-full"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label
-                htmlFor={toneInstructionInputId}
-                className={fieldLabelClasses}
-              >
-                {t("settings.postProcessing.tone.instructionsLabel")}
-              </label>
-              <Textarea
-                id={toneInstructionInputId}
-                value={draftInstruction}
-                onChange={(event) => setDraftInstruction(event.target.value)}
-                rows={5}
-                placeholder={t(
-                  "settings.postProcessing.tone.instructionsPlaceholder",
-                )}
-                className="w-full"
-              />
-              <p className="text-[12px] leading-relaxed text-muted">
-                {t("settings.postProcessing.tone.instructionsHint")}
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                onClick={
-                  editorMode === "create" ? handleCreateTone : handleUpdateTone
-                }
-                variant="primary"
-                size="md"
-                disabled={!canSave}
-              >
-                {editorMode === "create"
-                  ? t("settings.postProcessing.tone.createTone")
-                  : t("settings.postProcessing.tone.updateTone")}
-              </Button>
-              <Button
-                onClick={cancelEditor}
-                variant="secondary"
-                size="md"
-                disabled={isToneBusy}
-              >
-                {t("settings.postProcessing.tone.cancel")}
-              </Button>
-              {editorMode === "edit" && (
-                <Button
-                  onClick={handleDeleteTone}
-                  variant="secondary"
-                  size="md"
-                  disabled={isToneBusy}
-                >
-                  {t("settings.postProcessing.tone.deleteTone")}
-                </Button>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-    </SettingContainer>
-  );
-};
-
-export const PostProcessingTone = React.memo(PostProcessingToneComponent);
-PostProcessingTone.displayName = "PostProcessingTone";

@@ -1134,9 +1134,46 @@ pub fn enter_conversation_size(app: &AppHandle) {
         remember_size_in_lane(&app_main, SizeLane::Panel);
         CONVERSATION_EXPANDED.store(false, Ordering::SeqCst);
         apply_panel_form_size(&app_main);
+        // Place the call by its OWN footprint, as it arrives.
+        //
+        // Without this the call inherits wherever the quick-ask surface was standing
+        // and simply grows out of that corner: a 340x56 pill, positioned for the ask
+        // card's footprint, becomes a 450x620 window pinned to the same top-left. On
+        // a 1080p display that lands it down and to the right of every zone the
+        // anchor setting offers, and `keep_panel_on_monitor` only clamps it back onto
+        // the display — so the window looked deliberately placed while honouring
+        // nothing the user had chosen.
+        //
+        // On entry only, and deliberately not on every show: a call is a surface you
+        // park somewhere and work alongside, so a drag during the call has to win.
+        // That is why `present_assistant_panel` still leaves a live call where it is.
+        anchor_panel_to_zone(&app_main);
     }) {
         error!("Could not queue conversation panel sizing: {}", e);
     }
+}
+
+/// Move the panel to the dock zone the user chose, measured by the form it is
+/// currently wearing. Main thread only.
+///
+/// Split out from `present_assistant_panel` because the two callers disagree about
+/// *when* anchoring is right, not about what it means: showing the ask surface
+/// re-anchors every time, while a conversation is anchored once as it opens and left
+/// alone after that.
+fn anchor_panel_to_zone(app: &AppHandle) {
+    let Some(window) = app.get_webview_window(PANEL_LABEL) else {
+        return;
+    };
+    let collapsed = PILL_MODE.load(Ordering::SeqCst);
+    let (w, h) = if collapsed {
+        collapsed_size(app)
+    } else if crate::voice_conversation::is_active(app) {
+        conversation_size(app)
+    } else {
+        ask_anchor_size(app)
+    };
+    let (x, y) = default_position_for(app, w, h);
+    place_panel(&window, x, y);
 }
 
 /// A voice conversation ended: park its size in the voice lane, drop the
@@ -2824,6 +2861,23 @@ struct HitRect {
 /// listing it as its own surface instead of by widening this (see `HIT_SURFACES`).
 const HIT_TOLERANCE: f64 = 4.0;
 
+/// How long an "everything is faded out" report is believed.
+///
+/// A report with no drawn surface in it is legitimate for the length of a
+/// cross-fade — `.ask-stage` runs 140ms out and 320ms in — and it must be honoured
+/// then, or a half-faded layer leaves an invisible island of live window behind.
+/// It is never legitimate *at rest*: a visible window with nothing tangible in it
+/// is a window the user cannot click, drag or close, which is the exact failure
+/// this module exists to prevent rather than to cause.
+///
+/// So the empty report expires. Comfortably longer than the slowest transition, so
+/// no real cross-fade is cut short, and short enough that a surface the webview has
+/// stopped measuring correctly costs a moment of leaked desktop instead of a dead
+/// panel. `.ask-pill` was missing from `HIT_SURFACES` for exactly this long, and
+/// without an expiry the consequence was unbounded: the whole ask surface — the one
+/// the assistant hotkey opens — was permanently unclickable.
+const EMPTY_RECT_GRACE: std::time::Duration = std::time::Duration::from_millis(600);
+
 impl HitRect {
     /// Is this window-relative point inside the drawn surface?
     ///
@@ -2849,8 +2903,16 @@ fn panel_should_take_pointer(
     hit: Option<HitRect>,
     cursor_in_window: Option<(f64, f64)>,
     pointer_held: bool,
+    empty_for: Option<std::time::Duration>,
 ) -> bool {
     if pointer_held {
+        return true;
+    }
+    // An empty measurement means a cross-fade is mid-flight. True for a few hundred
+    // milliseconds, never true at rest — so once it outlasts any real transition,
+    // stop believing it and hand the pointer back. Without this, one missing
+    // selector makes a visible window permanently unusable.
+    if matches!(empty_for, Some(elapsed) if elapsed >= EMPTY_RECT_GRACE) {
         return true;
     }
     match (hit, cursor_in_window) {
@@ -2876,6 +2938,15 @@ static PANEL_INPUT_GENERATION: std::sync::atomic::AtomicU64 = std::sync::atomic:
 
 /// The rectangle the webview last reported drawing. `None` = nothing measured yet.
 static PANEL_HIT_RECT: Mutex<Option<HitRect>> = Mutex::new(None);
+
+/// When the reported rect last became empty, so `EMPTY_RECT_GRACE` can expire it.
+/// `None` means the current report has a drawn surface in it.
+static PANEL_HIT_EMPTY_SINCE: Mutex<Option<std::time::Instant>> = Mutex::new(None);
+
+/// Whether the expiry has already been logged for the current empty run, so a
+/// genuinely broken surface produces one line naming the fault rather than eleven
+/// per second.
+static PANEL_EMPTY_WARNED: AtomicBool = AtomicBool::new(false);
 
 /// Whether a pointer is currently held down inside the panel.
 static PANEL_POINTER_HELD: AtomicBool = AtomicBool::new(false);
@@ -2909,6 +2980,22 @@ pub fn clear_panel_hit_rect(app: &AppHandle) {
 }
 
 fn store_panel_hit_rect(app: &AppHandle, rect: Option<HitRect>) {
+    // Start (or clear) the clock on an empty report before anything acts on it.
+    // "Empty" is a measurement saying nothing is drawn; `None` is the absence of a
+    // measurement, which already resolves to tangible and needs no expiry.
+    let empty = matches!(rect, Some(r) if r.width <= 0.0 || r.height <= 0.0);
+    if let Ok(mut since) = PANEL_HIT_EMPTY_SINCE.lock() {
+        match (empty, *since) {
+            (true, None) => *since = Some(std::time::Instant::now()),
+            (false, _) => {
+                *since = None;
+                PANEL_EMPTY_WARNED.store(false, Ordering::SeqCst);
+            }
+            // Already timing this run: keep the original instant, or the grace period
+            // would restart on every 50ms report and never expire.
+            (true, Some(_)) => {}
+        }
+    }
     if let Ok(mut current) = PANEL_HIT_RECT.lock() {
         *current = rect;
     }
@@ -2934,10 +3021,28 @@ fn tick_panel_input(app: &AppHandle) {
         _ => None,
     };
     let hit = PANEL_HIT_RECT.lock().ok().and_then(|rect| *rect);
+    let empty_for = PANEL_HIT_EMPTY_SINCE
+        .lock()
+        .ok()
+        .and_then(|since| *since)
+        .map(|since| since.elapsed());
+    if matches!(empty_for, Some(elapsed) if elapsed >= EMPTY_RECT_GRACE)
+        && !PANEL_EMPTY_WARNED.swap(true, Ordering::SeqCst)
+    {
+        // One line, naming the fault, because the symptom on the other side of this
+        // is "the assistant panel does not respond to the mouse" and nothing in the
+        // log used to say why.
+        warn!(
+            "Assistant panel reported no drawn surface for {:?}; taking the pointer \
+             back. A visible surface is missing from HIT_SURFACES in hitRegion.ts.",
+            EMPTY_RECT_GRACE
+        );
+    }
     let take = panel_should_take_pointer(
         hit,
         cursor_in_window,
         PANEL_POINTER_HELD.load(Ordering::SeqCst),
+        empty_for,
     );
     apply_panel_passthrough(&window, !take);
 }
@@ -2990,6 +3095,10 @@ fn stop_panel_input_guard(app: &AppHandle) {
     if let Ok(mut rect) = PANEL_HIT_RECT.lock() {
         *rect = None;
     }
+    if let Ok(mut since) = PANEL_HIT_EMPTY_SINCE.lock() {
+        *since = None;
+    }
+    PANEL_EMPTY_WARNED.store(false, Ordering::SeqCst);
     if let Some(window) = app.get_webview_window(PANEL_LABEL) {
         apply_panel_passthrough(&window, false);
     }
@@ -6356,12 +6465,12 @@ mod tests {
             height: 34.0,
         };
         assert!(
-            panel_should_take_pointer(Some(pill), Some((170.0, 28.0)), false),
+            panel_should_take_pointer(Some(pill), Some((170.0, 28.0)), false, None),
             "a click on the chip belongs to the panel"
         );
         for outside in [(10.0, 28.0), (330.0, 28.0), (170.0, 2.0), (170.0, 54.0)] {
             assert!(
-                !panel_should_take_pointer(Some(pill), Some(outside), false),
+                !panel_should_take_pointer(Some(pill), Some(outside), false, None),
                 "a click at {outside:?} is on the user's desktop, not on the panel"
             );
         }
@@ -6373,7 +6482,12 @@ mod tests {
     /// visible panel impossible to use.
     #[test]
     fn an_unmeasured_panel_keeps_the_pointer() {
-        assert!(panel_should_take_pointer(None, Some((0.0, 0.0)), false));
+        assert!(panel_should_take_pointer(
+            None,
+            Some((0.0, 0.0)),
+            false,
+            None
+        ));
         assert!(panel_should_take_pointer(
             Some(HitRect {
                 x: 0.0,
@@ -6382,9 +6496,10 @@ mod tests {
                 height: 10.0
             }),
             None,
-            false
+            false,
+            None
         ));
-        assert!(panel_should_take_pointer(None, None, false));
+        assert!(panel_should_take_pointer(None, None, false, None));
     }
 
     /// A held pointer is never taken away. The OS runs a window drag well outside
@@ -6399,7 +6514,7 @@ mod tests {
             height: 34.0,
         };
         assert!(
-            panel_should_take_pointer(Some(pill), Some((-4_000.0, 3_000.0)), true),
+            panel_should_take_pointer(Some(pill), Some((-4_000.0, 3_000.0)), true, None),
             "a drag in progress must survive the pointer leaving the chip"
         );
     }
@@ -6417,8 +6532,63 @@ mod tests {
         assert!(!panel_should_take_pointer(
             Some(empty),
             Some((0.0, 0.0)),
-            false
+            false,
+            // Mid-cross-fade, so the empty report is still believed.
+            Some(std::time::Duration::from_millis(80))
         ));
+    }
+
+    /// The same empty rect, once it has outlasted any real cross-fade, is a bug
+    /// rather than a transition — and the window must not stay unclickable for it.
+    ///
+    /// This is the regression guard for `.ask-pill` missing from `HIT_SURFACES`:
+    /// the ask stage keeps both layers mounted, so the only listed element was the
+    /// inactive card, its inherited `pointer-events: none` reported nothing drawn,
+    /// and the whole surface the assistant hotkey opens took no clicks at all.
+    /// Because reports are change-gated the zero rect was sent once and never
+    /// revised, so without an expiry the panel stayed dead for as long as it was up.
+    #[test]
+    fn an_empty_rect_that_outlasts_a_cross_fade_hands_the_pointer_back() {
+        let empty = HitRect {
+            x: 0.0,
+            y: 0.0,
+            width: 0.0,
+            height: 0.0,
+        };
+        assert!(
+            panel_should_take_pointer(
+                Some(empty),
+                Some((170.0, 28.0)),
+                false,
+                Some(EMPTY_RECT_GRACE)
+            ),
+            "a visible window with nothing measured in it must still be clickable"
+        );
+        assert!(
+            panel_should_take_pointer(
+                Some(empty),
+                Some((170.0, 28.0)),
+                false,
+                Some(EMPTY_RECT_GRACE + std::time::Duration::from_secs(30))
+            ),
+            "and it must not recover only once and then fail again"
+        );
+    }
+
+    /// The expiry is a safety net, not a replacement for measuring: a real rect
+    /// still decides, however long the panel has been up.
+    #[test]
+    fn the_expiry_never_overrides_a_real_measurement() {
+        let pill = HitRect {
+            x: 92.0,
+            y: 11.0,
+            width: 155.0,
+            height: 34.0,
+        };
+        assert!(
+            !panel_should_take_pointer(Some(pill), Some((10.0, 28.0)), false, None),
+            "a measured surface keeps its transparent frame pass-through"
+        );
     }
 
     /// The tool list is no longer optional, so a provider that refuses `tools`

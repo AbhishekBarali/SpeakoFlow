@@ -1,0 +1,3 @@
+# Generated audio and ground truth. Regenerate with `python make_fixture.py`
+# rather than committing 42 MB of WAVs that change with the TTS engine.
+fixture/

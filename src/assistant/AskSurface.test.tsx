@@ -27,6 +27,7 @@ mock.module("@/components/shared", () => ({
 
 const { default: AskBar } = await import("./AskBar");
 const { default: AskCard } = await import("./AskCard");
+const { HIT_SURFACE_SELECTORS } = await import("./hitRegion");
 
 let renderer: ReactTestRenderer;
 const noop = () => {};
@@ -39,6 +40,7 @@ const barProps = {
   onInputChange: noop,
   onSubmit: noop,
   onClose: noop,
+  onCancel: noop,
   stopDrag: noop,
 };
 
@@ -89,10 +91,15 @@ test("listening is the bare dictation lozenge: a waveform, a mark, and no button
   // no status prose competing with the wave for a 34px row.
   expect(classes()).toContain("ask-pill");
   expect(classes()).not.toContain("ask-pill labeled");
-  // And no controls at all — the shortcut that started the recording ends it and
-  // Esc discards it, exactly as with dictation. Cancel and confirm buttons were
-  // most of what made this surface look bulkier than the one it mirrors.
-  expect(renderer.root.findAllByType("button")).toHaveLength(0);
+  // One control, and only one: a × that cancels. There is no confirm button —
+  // releasing the shortcut still sends — because a second target is what made this
+  // surface look bulkier than the dictation pill it mirrors. But there is always a
+  // way out, because "press the key again" is a fact you have to be told, not an
+  // affordance.
+  const labels = renderer.root
+    .findAllByType("button")
+    .map((button) => button.props["aria-label"]);
+  expect(labels).toEqual(["assistant.cancel"]);
 });
 
 test("no working state widens the pill, and none of them shows prose", () => {
@@ -116,7 +123,12 @@ test("no working state widens the pill, and none of them shows prose", () => {
     expect(classes()).toContain("ask-pill-indicator");
     // No status text, and so nothing that could lengthen the row.
     expect(texts()).not.toContain("assistant.status.thinking");
-    expect(renderer.root.findAllByType("button")).toHaveLength(0);
+    // Cancel is present in every working phase, and is the only control in any of
+    // them — same glyph, same place, so it is learned once.
+    const labels = renderer.root
+      .findAllByType("button")
+      .map((button) => button.props["aria-label"]);
+    expect(labels).toEqual(["assistant.cancel"]);
     act(() => renderer.unmount());
   }
   // Re-render something so the shared afterEach has a tree to unmount.
@@ -152,8 +164,13 @@ test("the waiting indicator is the dictation overlay's, not a second one", () =>
   // this surface. Sharing the component is the point — a copy would drift.
   expect(classes()).toContain("overlay-progress");
   expect(classes()).toContain("progress-sheen");
-  // No stop button: Esc interrupts a reply, as it does during a call.
-  expect(renderer.root.findAllByType("button")).toHaveLength(0);
+  // One way out, which in this phase stops the reply rather than merely hiding it:
+  // a hidden window with a reply still generating is the same class of bug as a
+  // call outliving its panel.
+  const labels = renderer.root
+    .findAllByType("button")
+    .map((button) => button.props["aria-label"]);
+  expect(labels).toEqual(["assistant.cancel"]);
 });
 
 test("the prompt bar cannot take the caret while the card owns it", () => {
@@ -215,4 +232,62 @@ test("a follow-up being spoken withholds the previous exchange instead of lookin
   expect(shown).not.toContain("the previous answer");
   expect(shown).not.toContain("the previous question");
   expect(shown).toContain("assistant.status.listening");
+});
+
+/**
+ * The measured-surface list must actually contain the surface these components
+ * draw, and that link needs a test rather than a reader's attention.
+ *
+ * `hitRegion.ts` reports the union of the surfaces it can find to Rust, and
+ * everything outside that union is handed to whatever is behind the window. So a
+ * visible surface missing from the list is not a partial failure — it makes the
+ * whole window cursor pass-through, and the ask surface is exactly what that
+ * happened to. `.ask-pill` was absent, the ask stage keeps both layers mounted so
+ * the only listed element was the faded-out card, nothing measured as drawn, and
+ * the surface the assistant hotkey opens took no clicks at all: no cancel, no
+ * typing, no drag, no close. Because the report is change-gated it was sent once
+ * and never revised, so it stayed dead for as long as the panel was up.
+ *
+ * Asserting the rendered class name against the list is what makes a rename on
+ * either side fail here instead of on a user's desktop.
+ */
+test("every surface these components draw is one hitRegion measures", () => {
+  const listed = new Set(
+    HIT_SURFACE_SELECTORS.filter((selector) => selector.startsWith(".")).map(
+      (selector) => selector.slice(1),
+    ),
+  );
+
+  const rootIsMeasured = (label: string) => {
+    const root = classes()[0] ?? "";
+    const tokens = root.split(/\s+/).filter(Boolean);
+    expect(
+      tokens.some((token) => listed.has(token)),
+      `${label} renders "${root}", none of which is in HIT_SURFACE_SELECTORS, so the whole panel window would go pass-through`,
+    ).toBe(true);
+  };
+
+  for (const phase of [
+    "listening",
+    "transcribing",
+    "working",
+    "prompt",
+  ] as const) {
+    render(<AskBar {...barProps} phase={phase} />);
+    rootIsMeasured(`AskBar in the ${phase} phase`);
+    act(() => renderer.unmount());
+  }
+
+  render(
+    <AskCard
+      question="q"
+      answer="a"
+      busy={false}
+      status="assistant.status.thinking"
+      markdown={{}}
+      onClose={noop}
+      stopDrag={noop}
+    />,
+  );
+  rootIsMeasured("AskCard");
 });

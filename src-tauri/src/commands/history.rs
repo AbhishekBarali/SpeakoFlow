@@ -1,6 +1,6 @@
 use crate::actions::process_transcription_output;
 use crate::managers::{
-    history::{HistoryManager, PaginatedAssistantHistory, PaginatedHistory},
+    history::{HistoryManager, PaginatedAssistantHistory, PaginatedHistory, UsageStats},
     transcription::TranscriptionManager,
 };
 use std::sync::Arc;
@@ -297,4 +297,14 @@ pub async fn delete_assistant_history_entry(
 
     let _ = app.emit("assistant-history-updated", ());
     Ok(())
+}
+
+/// Lifetime dictation usage: words, speaking time, streaks, and the last 30
+/// days of activity. Unaffected by deleting history or retention pruning.
+#[tauri::command]
+#[specta::specta]
+pub async fn get_usage_stats(
+    history_manager: State<'_, Arc<HistoryManager>>,
+) -> Result<UsageStats, String> {
+    history_manager.get_usage_stats().map_err(|e| e.to_string())
 }

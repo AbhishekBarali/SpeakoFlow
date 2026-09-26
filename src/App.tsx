@@ -9,15 +9,13 @@ import {
 } from "tauri-plugin-macos-permissions-api";
 import { ModelStateEvent, RecordingErrorEvent } from "./lib/types/events";
 import "./App.css";
-import AccessibilityPermissions from "./components/AccessibilityPermissions";
-import Footer from "./components/footer";
 import Onboarding, {
   AccessibilityOnboarding,
   LlmOnboarding,
   ReadyStep,
 } from "./components/onboarding";
-import { Sidebar, SidebarSection, SECTIONS_CONFIG } from "./components/Sidebar";
 import TitleBar from "./components/TitleBar";
+import { MainShell } from "./components/shell/MainShell";
 import { useSettings } from "./hooks/useSettings";
 import { useSettingsStore } from "./stores/settingsStore";
 import { commands } from "@/bindings";
@@ -38,12 +36,6 @@ type OnboardingStep = "accessibility" | "model" | "llm" | "ready" | "done";
 // no model is installed yet).
 const FORCE_ONBOARDING = import.meta.env.DEV;
 
-const renderSettingsContent = (section: SidebarSection) => {
-  const ActiveComponent =
-    SECTIONS_CONFIG[section]?.component || SECTIONS_CONFIG.general.component;
-  return <ActiveComponent />;
-};
-
 function App() {
   const { t, i18n } = useTranslation();
   const [onboardingStep, setOnboardingStep] = useState<OnboardingStep | null>(
@@ -52,8 +44,6 @@ function App() {
   // Track if this is a returning user who just needs to grant permissions
   // (vs a new user who needs full onboarding including model selection)
   const [isReturningUser, setIsReturningUser] = useState(false);
-  const [currentSection, setCurrentSection] =
-    useState<SidebarSection>("general");
   const { settings, updateSetting } = useSettings();
   const direction = getLanguageDirection(i18n.language);
   const refreshAudioDevices = useSettingsStore(
@@ -307,31 +297,7 @@ function App() {
       </div>
     );
   } else if (onboardingStep === "done") {
-    body = (
-      <>
-        {/* Main content area that takes remaining space. The row carries the
-            cream "chrome" color; the content column is a rounded pane inset
-            into it (title bar + sidebar form a continuous chrome L, the pane
-            floats on top with a soft top-left curve). */}
-        <div className="flex-1 flex overflow-hidden bg-canvas-soft">
-          <Sidebar
-            activeSection={currentSection}
-            onSectionChange={setCurrentSection}
-          />
-          {/* Scrollable content area — inset rounded pane */}
-          <div className="flex-1 flex flex-col overflow-hidden bg-canvas rounded-ss-[18px] border-s border-t border-hairline elev-pane">
-            <div className="flex-1 overflow-y-auto overflow-x-hidden relative">
-              <div className="relative z-10 flex flex-col items-center px-8 pt-7 pb-10 gap-6">
-                <AccessibilityPermissions />
-                {renderSettingsContent(currentSection)}
-              </div>
-            </div>
-          </div>
-        </div>
-        {/* Fixed footer at bottom */}
-        <Footer />
-      </>
-    );
+    body = <MainShell />;
   }
 
   return (

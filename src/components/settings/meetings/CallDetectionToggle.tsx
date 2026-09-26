@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { PhoneCall } from "lucide-react";
 import { ToggleSwitch } from "@/components/ui/ToggleSwitch";
+import { Switch } from "@/components/ui/Switch";
+import { InfoTip } from "@/components/ui/InfoTip";
 import { getCallDetectionStatus, setMeetingAutoDetect } from "./api";
 
 /**
@@ -14,11 +15,9 @@ import { getCallDetectionStatus, setMeetingAutoDetect } from "./api";
  * break a fresh checkout.
  *
  * Hidden entirely where detection cannot work, rather than shown disabled: a switch
- * that does nothing is worse than no switch, and the platform note says what to do
- * instead.
+ * that does nothing is worse than no switch.
  */
-export const CallDetectionToggle: React.FC = () => {
-  const { t } = useTranslation();
+const useCallDetection = () => {
   const [supported, setSupported] = useState<boolean | null>(null);
   const [enabled, setEnabled] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -32,36 +31,56 @@ export const CallDetectionToggle: React.FC = () => {
       .catch(() => setSupported(false));
   }, []);
 
-  if (supported === null) return null;
+  const set = (next: boolean) => {
+    // Optimistic, then reverted on failure — a switch that shows one state
+    // while the backend holds another is worse than one that snaps back.
+    setEnabled(next);
+    setSaving(true);
+    void setMeetingAutoDetect(next)
+      .catch(() => setEnabled(!next))
+      .finally(() => setSaving(false));
+  };
 
-  if (!supported) {
-    return (
-      <p className="px-1 text-xs text-muted-soft">
-        {t("meetings.autoDetect.unsupported")}
-      </p>
-    );
-  }
+  return { supported, enabled, saving, set };
+};
 
+/** As a settings row. */
+export const CallDetectionToggle: React.FC = () => {
+  const { t } = useTranslation();
+  const { supported, enabled, saving, set } = useCallDetection();
+  if (!supported) return null;
   return (
-    <div className="rounded-2xl border border-hairline bg-surface elev-card px-4 py-1">
+    <div className="rounded-2xl border border-hairline bg-surface elev-card">
       <ToggleSwitch
         checked={enabled}
-        onChange={(next) => {
-          // Optimistic, then reverted on failure — a switch that shows one state
-          // while the backend holds another is worse than a switch that snaps back.
-          setEnabled(next);
-          setSaving(true);
-          void setMeetingAutoDetect(next)
-            .catch(() => setEnabled(!next))
-            .finally(() => setSaving(false));
-        }}
+        onChange={set}
         isUpdating={saving}
         label={t("meetings.autoDetect.title")}
         description={t("meetings.autoDetect.description")}
-        descriptionMode="inline"
-        icon={PhoneCall}
-        tone="violet"
+        grouped={true}
       />
+    </div>
+  );
+};
+
+/** As a line on the Meetings hero. */
+export const CallDetectionHeroSwitch: React.FC = () => {
+  const { t } = useTranslation();
+  const { supported, enabled, saving, set } = useCallDetection();
+  if (!supported) return null;
+  return (
+    <div className="flex items-center gap-2.5">
+      <Switch
+        checked={enabled}
+        onChange={set}
+        disabled={saving}
+        label={t("meetings.autoDetect.title")}
+        tone="onHero"
+      />
+      <span className="text-sm text-white/85">
+        {t("meetings.autoDetect.title")}
+      </span>
+      <InfoTip text={t("meetings.autoDetect.description")} tone="onHero" />
     </div>
   );
 };

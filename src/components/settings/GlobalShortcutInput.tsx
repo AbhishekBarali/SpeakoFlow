@@ -12,6 +12,12 @@ import { useSettings } from "../../hooks/useSettings";
 import { useOsType } from "../../hooks/useOsType";
 import { commands } from "@/bindings";
 import { toast } from "sonner";
+import {
+  RecordingKeys,
+  ShortcutKeysButton,
+  type ShortcutFinish,
+  type ShortcutSize,
+} from "./ShortcutControl";
 
 interface GlobalShortcutInputProps {
   descriptionMode?: "inline" | "tooltip";
@@ -20,6 +26,12 @@ interface GlobalShortcutInputProps {
   disabled?: boolean;
   icon?: SettingIcon;
   tone?: SettingTone;
+  /** Only the keys and their reset, without the settings row around them. */
+  bare?: boolean;
+  finish?: ShortcutFinish;
+  size?: ShortcutSize;
+  /** When to offer "back to the default". Rows always; bare only if changed. */
+  showReset?: "always" | "changed" | "never";
 }
 
 export const GlobalShortcutInput: React.FC<GlobalShortcutInputProps> = ({
@@ -29,6 +41,10 @@ export const GlobalShortcutInput: React.FC<GlobalShortcutInputProps> = ({
   disabled = false,
   icon,
   tone = "teal",
+  bare = false,
+  finish = "default",
+  size,
+  showReset,
 }) => {
   const { t } = useTranslation();
   const { getSetting, updateBinding, resetBinding, isUpdating, isLoading } =
@@ -211,6 +227,7 @@ export const GlobalShortcutInput: React.FC<GlobalShortcutInputProps> = ({
 
   // If still loading, show loading state
   if (isLoading) {
+    if (bare) return null;
     return (
       <SettingContainer
         title={t("settings.general.shortcut.title")}
@@ -227,6 +244,7 @@ export const GlobalShortcutInput: React.FC<GlobalShortcutInputProps> = ({
 
   // If no bindings are loaded, show empty state
   if (Object.keys(bindings).length === 0) {
+    if (bare) return null;
     return (
       <SettingContainer
         title={t("settings.general.shortcut.title")}
@@ -243,6 +261,7 @@ export const GlobalShortcutInput: React.FC<GlobalShortcutInputProps> = ({
 
   const binding = bindings[shortcutId];
   if (!binding) {
+    if (bare) return null;
     return (
       <SettingContainer
         title={t("settings.general.shortcut.title")}
@@ -267,6 +286,39 @@ export const GlobalShortcutInput: React.FC<GlobalShortcutInputProps> = ({
     binding.description,
   );
 
+  const resetMode = showReset ?? (bare ? "changed" : "always");
+  const changed = binding.current_binding !== binding.default_binding;
+  const control = (
+    <div className="flex items-center gap-1">
+      {editingShortcutId === shortcutId ? (
+        <RecordingKeys
+          ref={(ref) => setShortcutRef(shortcutId, ref)}
+          text={formatCurrentKeys()}
+          finish={finish}
+          size={size ?? "md"}
+        />
+      ) : (
+        <ShortcutKeysButton
+          binding={binding.current_binding}
+          name={translatedName}
+          finish={finish}
+          size={size}
+          disabled={disabled}
+          onClick={() => void startRecording(shortcutId)}
+        />
+      )}
+      {(resetMode === "always" || (resetMode === "changed" && changed)) && (
+        <ResetButton
+          onClick={() => resetBinding(shortcutId)}
+          disabled={isUpdating(`binding_${shortcutId}`)}
+          ariaLabel={t("shortcutEditor.reset", { name: translatedName })}
+        />
+      )}
+    </div>
+  );
+
+  if (bare) return control;
+
   return (
     <SettingContainer
       title={translatedName}
@@ -278,27 +330,7 @@ export const GlobalShortcutInput: React.FC<GlobalShortcutInputProps> = ({
       disabled={disabled}
       layout="horizontal"
     >
-      <div className="flex items-center space-x-1">
-        {editingShortcutId === shortcutId ? (
-          <div
-            ref={(ref) => setShortcutRef(shortcutId, ref)}
-            className="px-2.5 py-1 text-[13px] font-medium border border-accent bg-accent/10 text-accent rounded-md"
-          >
-            {formatCurrentKeys()}
-          </div>
-        ) : (
-          <div
-            className="px-2.5 py-1 text-[13px] font-medium border rounded-md cursor-pointer transition-all bg-surface-strong text-ink border-hairline-strong elev-chip hover:brightness-[1.03]"
-            onClick={() => startRecording(shortcutId)}
-          >
-            {formatKeyCombination(binding.current_binding, osType)}
-          </div>
-        )}
-        <ResetButton
-          onClick={() => resetBinding(shortcutId)}
-          disabled={isUpdating(`binding_${shortcutId}`)}
-        />
-      </div>
+      {control}
     </SettingContainer>
   );
 };

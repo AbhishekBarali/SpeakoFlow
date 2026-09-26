@@ -6,24 +6,30 @@ import React, {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
+import { usePortalTarget } from "@/components/ui/portal";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { readFile } from "@tauri-apps/plugin-fs";
 import {
   Check,
+  ChevronDown,
   ChevronRight,
   Copy,
   FolderOpen,
   Camera,
   FileText,
   GitBranch,
+  HardDrive,
   MessageCircle,
   MessageSquarePlus,
   Mic,
+  Pause,
+  Play,
   RotateCcw,
   Sparkles,
   Star,
   Trash2,
+  Wand2,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import ReactMarkdown, { type Components } from "react-markdown";
@@ -36,14 +42,11 @@ import {
   type HistoryUpdatePayload,
 } from "@/bindings";
 import { useOsType } from "@/hooks/useOsType";
-import { formatDateTime } from "@/utils/dateFormat";
 import { AudioPlayer } from "../../ui/AudioPlayer";
 import { Button } from "../../ui/Button";
-import { SettingsGroup } from "../../ui/SettingsGroup";
-import { SectionHeader } from "../../ui/SectionHeader";
-// Retention lives above the feed; with a long history the list scrolls forever,
-// so anything below it is effectively unreachable.
-import { RetentionSettings } from "./RetentionSettings";
+import { PageHeader } from "../../ui/Page";
+import { Tabs } from "../../ui/Tabs";
+import { useNavigation } from "../../shell/navigation";
 import { VOICE_INTERRUPTED_MARKER } from "@/assistant/conversationPolicy";
 
 /** Must match the marker constants in src-tauri/src/assistant.rs */
@@ -170,6 +173,7 @@ const HistoryThumbnails: React.FC<{
 }> = ({ urls, hasScreen, isUser, screenLabel }) => {
   const [open, setOpen] = useState<string | null>(null);
   const [shown, setShown] = useState(false);
+  const portalTarget = usePortalTarget();
 
   useEffect(() => {
     if (!open) return;
@@ -213,6 +217,7 @@ const HistoryThumbnails: React.FC<{
         ))}
       </div>
       {open &&
+        portalTarget &&
         createPortal(
           <div
             className="fixed inset-0 z-[100] flex cursor-zoom-out items-center justify-center bg-black/70 p-10"
@@ -229,7 +234,7 @@ const HistoryThumbnails: React.FC<{
               }`}
             />
           </div>,
-          document.body,
+          portalTarget,
         )}
     </>
   );
@@ -268,8 +273,61 @@ type FeedItem =
 
 type HistoryFilter = "all" | "recordings" | "flow" | "assistant";
 
+interface DayGroup {
+  key: string;
+  label: string;
+  items: FeedItem[];
+}
+
+const dayKey = (seconds: number): string => {
+  const date = new Date(seconds * 1000);
+  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+};
+
+/** "Today", "Yesterday", "Monday", or a date — newest group first. */
+const groupFeedByDay = (
+  items: FeedItem[],
+  locale: string,
+  labels: { today: string; yesterday: string },
+): DayGroup[] => {
+  const now = new Date();
+  const today = dayKey(now.getTime() / 1000);
+  const yesterday = dayKey(now.getTime() / 1000 - 86_400);
+  const weekAgo = now.getTime() - 6 * 86_400_000;
+  const groups: DayGroup[] = [];
+  for (const item of items) {
+    const key = dayKey(item.sortTime);
+    let group = groups[groups.length - 1];
+    if (!group || group.key !== key) {
+      const date = new Date(item.sortTime * 1000);
+      let label: string;
+      if (key === today) label = labels.today;
+      else if (key === yesterday) label = labels.yesterday;
+      else {
+        try {
+          label = new Intl.DateTimeFormat(
+            locale,
+            date.getTime() >= weekAgo
+              ? { weekday: "long" }
+              : date.getFullYear() === now.getFullYear()
+                ? { weekday: "short", month: "long", day: "numeric" }
+                : { year: "numeric", month: "long", day: "numeric" },
+          ).format(date);
+        } catch {
+          label = date.toDateString();
+        }
+      }
+      group = { key, label, items: [] };
+      groups.push(group);
+    }
+    group.items.push(item);
+  }
+  return groups;
+};
+
 export const HistorySettings: React.FC = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const { openSettings } = useNavigation();
   const osType = useOsType();
   const [entries, setEntries] = useState<HistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -572,6 +630,7 @@ export const HistorySettings: React.FC = () => {
       }
     } catch (error) {
       console.error("Failed to open recordings folder:", error);
+      toast.error(t("settings.history.openFolderError"));
     }
   };
 
@@ -612,12 +671,27 @@ export const HistorySettings: React.FC = () => {
     [feed, filter],
   );
 
+  const dayGroups = useMemo(
+    () =>
+      groupFeedByDay(filteredFeed, i18n.language, {
+        today: t("historyPage.today"),
+        yesterday: t("historyPage.yesterday"),
+      }),
+    [filteredFeed, i18n.language, t],
+  );
+
   let content: React.ReactNode;
 
   if (loading || !assistantLoaded) {
     content = (
-      <div className="px-4 py-3 text-center text-text/60">
-        {t("settings.history.loading")}
+      <div className="space-y-3" aria-busy="true">
+        {[0, 1, 2].map((index) => (
+          <div
+            key={index}
+            className="h-20 animate-pulse rounded-xl bg-surface-strong/60"
+          />
+        ))}
+        <span className="sr-only">{t("settings.history.loading")}</span>
       </div>
     );
   } else if (filteredFeed.length === 0) {
@@ -630,46 +704,64 @@ export const HistorySettings: React.FC = () => {
             ? "settings.history.emptyAssistant"
             : "settings.history.empty";
     content = (
-      <div className="px-4 py-8 text-center text-sm text-muted">
-        {t(emptyKey)}
+      <div className="rounded-xl border border-dashed border-hairline-strong px-6 py-12 text-center">
+        <p className="text-sm text-muted">{t(emptyKey)}</p>
       </div>
     );
   } else {
     content = (
       <>
-        <div className="divide-y divide-hairline">
-          {filteredFeed.map((item) =>
-            item.kind === "transcription" ? (
-              <HistoryEntryComponent
-                key={`t-${item.entry.id}`}
-                entry={item.entry}
-                onToggleSaved={() => toggleSaved(item.entry.id)}
-                onCopyText={() =>
-                  copyToClipboard(
-                    item.entry.post_processed_text?.trim()
-                      ? item.entry.post_processed_text
-                      : item.entry.transcription_text,
-                  )
-                }
-                getAudioUrl={getAudioUrl}
-                deleteAudio={deleteAudioEntry}
-                retryTranscription={retryHistoryEntry}
-              />
-            ) : (
-              <AssistantHistoryEntryComponent
-                key={`a-${item.session.id}`}
-                session={item.session}
-                expanded={expandedAssistant.has(item.session.id)}
-                onToggleExpand={() => toggleExpandAssistant(item.session.id)}
-                onCopyConversation={() => copyConversation(item.session)}
-                onDelete={() => deleteAssistantSession(item.session.id)}
-                onResume={() => void resumeAssistantSession(item.session.id)}
-                onBranch={(messageIndex) =>
-                  void branchAssistantSession(item.session.id, messageIndex)
-                }
-              />
-            ),
-          )}
+        <div className="space-y-6">
+          {dayGroups.map((group) => (
+            <section key={group.key} aria-label={group.label}>
+              {/* Sticky so a long day keeps its heading in view. The canvas
+                  fill hides rows scrolling underneath it. */}
+              <h2 className="sticky top-0 z-10 -mx-1 mb-2 bg-canvas/95 px-1 py-1.5 text-sm font-semibold text-muted backdrop-blur-[2px]">
+                {group.label}
+              </h2>
+              <div className="divide-y divide-hairline overflow-visible rounded-xl border border-hairline bg-surface elev-card">
+                {group.items.map((item) =>
+                  item.kind === "transcription" ? (
+                    <HistoryEntryComponent
+                      key={`t-${item.entry.id}`}
+                      entry={item.entry}
+                      onToggleSaved={() => toggleSaved(item.entry.id)}
+                      onCopyText={() =>
+                        copyToClipboard(
+                          item.entry.post_processed_text?.trim()
+                            ? item.entry.post_processed_text
+                            : item.entry.transcription_text,
+                        )
+                      }
+                      getAudioUrl={getAudioUrl}
+                      deleteAudio={deleteAudioEntry}
+                      retryTranscription={retryHistoryEntry}
+                    />
+                  ) : (
+                    <AssistantHistoryEntryComponent
+                      key={`a-${item.session.id}`}
+                      session={item.session}
+                      expanded={expandedAssistant.has(item.session.id)}
+                      onToggleExpand={() =>
+                        toggleExpandAssistant(item.session.id)
+                      }
+                      onCopyConversation={() => copyConversation(item.session)}
+                      onDelete={() => deleteAssistantSession(item.session.id)}
+                      onResume={() =>
+                        void resumeAssistantSession(item.session.id)
+                      }
+                      onBranch={(messageIndex) =>
+                        void branchAssistantSession(
+                          item.session.id,
+                          messageIndex,
+                        )
+                      }
+                    />
+                  ),
+                )}
+              </div>
+            </section>
+          ))}
         </div>
         {/* Pagination belongs to recordings; assistant sessions are loaded in one page. */}
         {filter !== "assistant" && <div ref={sentinelRef} className="h-1" />}
@@ -678,58 +770,41 @@ export const HistorySettings: React.FC = () => {
   }
 
   return (
-    <div className="max-w-3xl w-full mx-auto space-y-8">
-      <SectionHeader
+    <div className="w-full">
+      <PageHeader
         title={t("sidebar.history")}
         description={t("sectionSubtitles.history")}
+        actions={
+          <>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => openSettings("privacy")}
+            >
+              <HardDrive className="h-3.5 w-3.5" aria-hidden="true" />
+              {t("historyPage.storage")}
+            </Button>
+            <OpenRecordingsButton
+              onClick={openRecordingsFolder}
+              label={t("settings.history.openFolder")}
+            />
+          </>
+        }
       />
-      {/* Storage settings live above the feed — with a long history the list
-          scrolls forever, so anything below it is effectively unreachable. */}
-      <SettingsGroup
-        title={t("settings.history.storage.title")}
-        description={t("settings.history.storage.description")}
-      >
-        <RetentionSettings grouped={true} />
-      </SettingsGroup>
-      <div className="space-y-2">
-        <div className="flex items-center justify-between gap-3">
-          <div
-            className="inline-flex items-center rounded-lg bg-surface-strong p-0.5"
-            role="group"
-            aria-label={t("settings.history.filters.label")}
-          >
-            {(
-              [
-                ["all", "settings.history.filters.all"],
-                ["recordings", "settings.history.filters.recordings"],
-                ["flow", "settings.history.filters.flow"],
-                ["assistant", "settings.history.filters.assistant"],
-              ] as const
-            ).map(([value, labelKey]) => (
-              <button
-                key={value}
-                type="button"
-                aria-pressed={filter === value}
-                onClick={() => setFilter(value)}
-                className={`rounded-[7px] px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${
-                  filter === value
-                    ? "bg-surface text-ink shadow-sm"
-                    : "text-muted hover:text-ink"
-                }`}
-              >
-                {t(labelKey)}
-              </button>
-            ))}
-          </div>
-          <OpenRecordingsButton
-            onClick={openRecordingsFolder}
-            label={t("settings.history.openFolder")}
-          />
-        </div>
-        <div className="bg-surface border border-hairline rounded-xl overflow-visible">
-          {content}
-        </div>
-      </div>
+      <Tabs
+        label={t("settings.history.filters.label")}
+        value={filter}
+        onChange={setFilter}
+        items={(
+          [
+            ["all", "settings.history.filters.all"],
+            ["recordings", "settings.history.filters.recordings"],
+            ["flow", "settings.history.filters.flow"],
+            ["assistant", "settings.history.filters.assistant"],
+          ] as const
+        ).map(([value, labelKey]) => ({ id: value, label: t(labelKey) }))}
+      />
+      <div className="mt-6">{content}</div>
     </div>
   );
 };
@@ -743,6 +818,24 @@ interface HistoryEntryProps {
   retryTranscription: (id: number) => Promise<void>;
 }
 
+/** "4:07 PM" — the day is already the group heading. */
+const formatTimeOfDay = (seconds: number, locale: string): string => {
+  try {
+    return new Intl.DateTimeFormat(locale, {
+      hour: "numeric",
+      minute: "2-digit",
+    }).format(new Date(seconds * 1000));
+  } catch {
+    return "";
+  }
+};
+
+/**
+ * One dictation. The text that was actually pasted comes first, because that
+ * is what people come back for; what the recogniser heard before cleanup or
+ * Flow rewrote it is one click away rather than stacked on top. The recording
+ * loads only when asked for, instead of every row carrying a full-width player.
+ */
 const HistoryEntryComponent: React.FC<HistoryEntryProps> = ({
   entry,
   onToggleSaved,
@@ -754,6 +847,9 @@ const HistoryEntryComponent: React.FC<HistoryEntryProps> = ({
   const { t, i18n } = useTranslation();
   const [showCopied, setShowCopied] = useState(false);
   const [retrying, setRetrying] = useState(false);
+  const [showOriginal, setShowOriginal] = useState(false);
+  const [audioSrc, setAudioSrc] = useState<string | null>(null);
+  const [loadingAudio, setLoadingAudio] = useState(false);
 
   const hasTranscription = entry.transcription_text.trim().length > 0;
   const flowEntry = isFlowHistoryEntry(entry);
@@ -767,31 +863,29 @@ const HistoryEntryComponent: React.FC<HistoryEntryProps> = ({
    * Cleanup ran and deliberately changed nothing.
    *
    * `post_processed_text` is present-but-identical in that case, and absent when
-   * cleanup never ran, so the two are distinguishable — but the row used to
-   * render them the same way, as a single block of text. With a restrained
-   * cleanup model that returns already-correct dictation byte for byte (which is
-   * the common case, and the point of a cleanup fine-tune) the feature looked
-   * broken every time it worked perfectly.
+   * cleanup never ran, so the two are distinguishable. With a restrained cleanup
+   * model that returns already-correct dictation byte for byte (the common case,
+   * and the point of a cleanup fine-tune) the feature looked broken every time it
+   * worked perfectly unless the row says so.
    */
   const cleanupMadeNoChanges =
     !flowEntry && processedText !== null && !hasDistinctProcessedText;
-  const secondaryText = flowEntry
+  // What was pasted, and what it was made from (when those differ).
+  const finalText = flowEntry
     ? processedText
     : hasDistinctProcessedText
       ? processedText
+      : hasTranscription
+        ? entry.transcription_text
+        : null;
+  const originalText =
+    (flowEntry || hasDistinctProcessedText) && hasTranscription
+      ? entry.transcription_text
       : null;
-  const hasCopyableText = hasTranscription || secondaryText !== null;
-
-  const handleLoadAudio = useCallback(
-    () => getAudioUrl(entry.file_name),
-    [getAudioUrl, entry.file_name],
-  );
+  const hasCopyableText = finalText !== null || hasTranscription;
 
   const handleCopyText = () => {
-    if (!hasCopyableText) {
-      return;
-    }
-
+    if (!hasCopyableText) return;
     onCopyText();
     setShowCopied(true);
     setTimeout(() => setShowCopied(false), 2000);
@@ -818,107 +912,156 @@ const HistoryEntryComponent: React.FC<HistoryEntryProps> = ({
     }
   };
 
-  const formattedDate = formatDateTime(String(entry.timestamp), i18n.language);
+  const toggleAudio = async () => {
+    if (audioSrc) {
+      // Unmounting the player releases a Linux blob URL, so the next play has
+      // to fetch a fresh one.
+      setAudioSrc(null);
+      return;
+    }
+    setLoadingAudio(true);
+    try {
+      const url = await getAudioUrl(entry.file_name);
+      if (url) setAudioSrc(url);
+      else toast.error(t("historyPage.audioMissing"));
+    } finally {
+      setLoadingAudio(false);
+    }
+  };
+
+  const kindLabel = flowEntry
+    ? t("settings.history.flowLabel")
+    : t("settings.history.recordingLabel");
+  const KindIcon = flowEntry ? Sparkles : Mic;
 
   return (
-    <div className="group px-4 py-3.5 flex flex-col gap-1.5">
-      {/* A Flow row is intentionally two-part: what speech recognition heard
-          first, then the exact generated text that was pasted. AI-cleaned
-          dictation uses the same pattern for original vs final text. */}
-      <div className="space-y-2.5">
-        {(flowEntry || secondaryText) && (
-          <div className="text-[11px] font-medium text-muted">
-            {t(
-              flowEntry
-                ? "settings.history.flowTranscriptLabel"
-                : "settings.history.originalTranscriptionLabel",
-            )}
-          </div>
-        )}
-        {retrying && (
-          <style>{`
-            @keyframes transcribe-pulse {
-              0%, 100% { color: color-mix(in srgb, var(--color-text) 40%, transparent); }
-              50% { color: color-mix(in srgb, var(--color-text) 90%, transparent); }
+    <div className="group px-4 py-3.5">
+      <div className="flex items-start gap-3">
+        <div className="min-w-0 flex-1">
+          {retrying && (
+            <style>{`
+              @keyframes transcribe-pulse {
+                0%, 100% { color: color-mix(in srgb, var(--color-text) 40%, transparent); }
+                50% { color: color-mix(in srgb, var(--color-text) 90%, transparent); }
+              }
+            `}</style>
+          )}
+          <p
+            className={`max-w-[75ch] text-sm leading-relaxed ${
+              retrying
+                ? ""
+                : finalText !== null
+                  ? "text-ink select-text cursor-text whitespace-pre-wrap break-words"
+                  : "text-muted-soft"
+            }`}
+            style={
+              retrying
+                ? { animation: "transcribe-pulse 3s ease-in-out infinite" }
+                : undefined
             }
-          `}</style>
-        )}
-        <p
-          className={`text-[13px] leading-relaxed ${
-            retrying
-              ? ""
-              : hasTranscription
-                ? "text-ink select-text cursor-text whitespace-pre-wrap break-words"
-                : "text-muted-soft"
-          }`}
-          style={
-            retrying
-              ? { animation: "transcribe-pulse 3s ease-in-out infinite" }
-              : undefined
-          }
-        >
-          {retrying
-            ? t("settings.history.transcribing")
-            : hasTranscription
-              ? entry.transcription_text
-              : t("settings.history.transcriptionFailed")}
-        </p>
+          >
+            {retrying
+              ? t("settings.history.transcribing")
+              : finalText !== null
+                ? finalText
+                : flowEntry && hasTranscription
+                  ? t("settings.history.flowNoOutput")
+                  : t("settings.history.transcriptionFailed")}
+          </p>
 
-        {secondaryText ? (
-          <div className="rounded-lg border border-hairline bg-surface-strong/55 px-3 py-2.5">
-            <div className="mb-1 inline-flex items-center gap-1.5 text-[11px] font-medium text-muted">
-              <Sparkles width={11} height={11} />
-              {t(
-                flowEntry
-                  ? "settings.history.flowOutputLabel"
-                  : "settings.history.finalTextLabel",
-              )}
+          {showOriginal && originalText && (
+            <div className="mt-2.5 rounded-lg border border-hairline bg-canvas px-3 py-2.5">
+              <p className="mb-1 text-xs font-medium text-muted">
+                {t(
+                  flowEntry
+                    ? "settings.history.flowTranscriptLabel"
+                    : "settings.history.originalTranscriptionLabel",
+                )}
+              </p>
+              <p className="select-text whitespace-pre-wrap break-words text-[0.8125rem] leading-relaxed text-body">
+                {originalText}
+              </p>
             </div>
-            <p className="select-text whitespace-pre-wrap break-words text-[13px] leading-relaxed text-ink">
-              {secondaryText}
-            </p>
-          </div>
-        ) : cleanupMadeNoChanges ? (
-          <div className="inline-flex items-center gap-1.5 text-[11px] font-medium text-muted">
-            <Sparkles width={11} height={11} />
-            {t("settings.history.cleanupNoChanges")}
-          </div>
-        ) : flowEntry ? (
-          <div className="inline-flex items-center gap-1.5 rounded-lg border border-hairline bg-surface-strong/40 px-3 py-2 text-xs text-muted">
-            <Sparkles width={11} height={11} />
-            {t("settings.history.flowNoOutput")}
-          </div>
-        ) : null}
-      </div>
+          )}
 
-      {/* Meta row — quiet caption on the left, actions surface on hover. */}
-      <div className="flex items-center justify-between gap-3">
-        <span className="inline-flex shrink-0 items-center gap-1.5 text-xs text-muted">
-          <span className="inline-flex items-center gap-1 font-medium text-ink/75">
-            {flowEntry ? (
-              <Sparkles width={11} height={11} />
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
+            <span className="tabular-nums">
+              {formatTimeOfDay(entry.timestamp, i18n.language)}
+            </span>
+            <span aria-hidden="true" className="text-muted-soft">
+              ·
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <KindIcon width={11} height={11} aria-hidden="true" />
+              {kindLabel}
+            </span>
+            {hasDistinctProcessedText && !flowEntry && (
+              <>
+                <span aria-hidden="true" className="text-muted-soft">
+                  ·
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  <Wand2 width={11} height={11} aria-hidden="true" />
+                  {t("historyPage.cleaned")}
+                </span>
+              </>
+            )}
+            {cleanupMadeNoChanges && (
+              <>
+                <span aria-hidden="true" className="text-muted-soft">
+                  ·
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  <Wand2 width={11} height={11} aria-hidden="true" />
+                  {t("settings.history.cleanupNoChanges")}
+                </span>
+              </>
+            )}
+            {originalText && (
+              <button
+                type="button"
+                onClick={() => setShowOriginal((value) => !value)}
+                aria-expanded={showOriginal}
+                className="inline-flex cursor-pointer items-center gap-0.5 rounded font-medium text-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+              >
+                {showOriginal
+                  ? t("historyPage.hideOriginal")
+                  : flowEntry
+                    ? t("historyPage.showSaid")
+                    : t("historyPage.showOriginal")}
+                <ChevronDown
+                  className={`h-3 w-3 transition-transform ${showOriginal ? "rotate-180" : ""}`}
+                  aria-hidden="true"
+                />
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="flex shrink-0 items-center gap-0.5 opacity-60 transition-opacity duration-150 group-hover:opacity-100 focus-within:opacity-100">
+          <IconButton
+            onClick={() => void toggleAudio()}
+            disabled={loadingAudio || retrying}
+            active={audioSrc !== null}
+            title={
+              audioSrc
+                ? t("historyPage.hideRecording")
+                : t("historyPage.playRecording")
+            }
+          >
+            {audioSrc ? (
+              <Pause width={14} height={14} />
             ) : (
-              <Mic width={11} height={11} />
+              <Play width={14} height={14} />
             )}
-            {t(
-              flowEntry
-                ? "settings.history.flowLabel"
-                : "settings.history.recordingLabel",
-            )}
-          </span>
-          <span aria-hidden="true" className="text-muted-soft">
-            ·
-          </span>
-          {formattedDate}
-        </span>
-        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-150">
+          </IconButton>
           <IconButton
             onClick={handleCopyText}
             disabled={!hasCopyableText || retrying}
             title={t(
-              flowEntry && secondaryText
+              flowEntry && processedText
                 ? "settings.history.copyFlowOutput"
-                : secondaryText
+                : hasDistinctProcessedText
                   ? "settings.history.copyFinalText"
                   : "settings.history.copyToClipboard",
             )}
@@ -970,7 +1113,9 @@ const HistoryEntryComponent: React.FC<HistoryEntryProps> = ({
         </div>
       </div>
 
-      <AudioPlayer onLoadRequest={handleLoadAudio} className="w-full" />
+      {audioSrc && (
+        <AudioPlayer src={audioSrc} autoPlay className="mt-2.5 w-full" />
+      )}
     </div>
   );
 };
@@ -1004,10 +1149,7 @@ const AssistantHistoryEntryComponent: React.FC<AssistantHistoryEntryProps> = ({
   const { t, i18n } = useTranslation();
   const [showCopied, setShowCopied] = useState(false);
 
-  const formattedDate = formatDateTime(
-    String(session.updated_at),
-    i18n.language,
-  );
+  const formattedDate = formatTimeOfDay(session.updated_at, i18n.language);
 
   const handleCopy = () => {
     onCopyConversation();
@@ -1044,7 +1186,7 @@ const AssistantHistoryEntryComponent: React.FC<AssistantHistoryEntryProps> = ({
           <ChevronRight width={13} height={13} />
         </span>
         <span
-          className={`text-[13px] leading-relaxed text-ink break-words ${
+          className={`text-sm leading-relaxed text-ink break-words ${
             expanded ? "" : "line-clamp-2"
           }`}
         >
@@ -1052,17 +1194,17 @@ const AssistantHistoryEntryComponent: React.FC<AssistantHistoryEntryProps> = ({
         </span>
       </button>
 
-      {/* Meta row — quiet caption on the left, actions surface on hover. */}
+      {/* Meta row — quiet caption on the left, actions on the right. */}
       <div className="flex items-center justify-between gap-3 ps-[19px]">
         <span className="inline-flex shrink-0 items-center gap-1.5 text-xs text-muted">
-          <span className="inline-flex items-center gap-1 font-medium text-ink/75">
-            <MessageCircle width={11} height={11} />
-            {t("settings.history.assistantLabel")}
-          </span>
+          <span className="tabular-nums">{formattedDate}</span>
           <span aria-hidden="true" className="text-muted-soft">
             ·
           </span>
-          {formattedDate}
+          <span className="inline-flex items-center gap-1">
+            <MessageCircle width={11} height={11} aria-hidden="true" />
+            {t("settings.history.assistantLabel")}
+          </span>
           <span aria-hidden="true" className="text-muted-soft">
             ·
           </span>
@@ -1072,7 +1214,7 @@ const AssistantHistoryEntryComponent: React.FC<AssistantHistoryEntryProps> = ({
             })}
           </span>
         </span>
-        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-150">
+        <div className="flex items-center gap-0.5 opacity-60 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-150">
           <IconButton
             onClick={onResume}
             title={t("settings.history.resumeConversation")}

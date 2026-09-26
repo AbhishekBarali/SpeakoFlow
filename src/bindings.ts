@@ -1481,6 +1481,18 @@ async deleteAssistantHistoryEntry(id: number) : Promise<Result<null, string>> {
 }
 },
 /**
+ * Lifetime dictation usage: words, speaking time, streaks, and the last 30
+ * days of activity. Unaffected by deleting history or retention pruning.
+ */
+async getUsageStats() : Promise<Result<UsageStats, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_usage_stats") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * Send a typed message to the assistant (keyboard alternative to voice).
  */
 async assistantSendText(text: string) : Promise<Result<null, string>> {
@@ -2926,6 +2938,149 @@ async cancelMeetingChat() : Promise<Result<null, string>> {
     else return { status: "error", error: e  as any };
 }
 },
+async getDiarizationStatus() : Promise<Result<DiarizationStatus, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_diarization_status") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Download the speaker-embedding model.
+ * 
+ * A separate step from recording on purpose: a first meeting must not stall behind
+ * a download nobody asked for, and a user who only ever talks to one person does
+ * not need it at all.
+ */
+async downloadDiarizationModel() : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("download_diarization_model") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Identify the speakers in one recorded meeting.
+ * 
+ * Normally runs automatically when a call ends. This is the explicit path: for a
+ * meeting recorded before the model was installed, and for a retry.
+ * 
+ * Runs on the blocking pool — it is ONNX inference over every voiced window of the
+ * recording, minutes of CPU on a long meeting.
+ */
+async diarizeMeeting(meetingId: number) : Promise<Result<DiarizationOutcome, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("diarize_meeting", { meetingId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * The user declined to record the detected call.
+ * 
+ * Two separate effects, and both are needed. This call is never offered again, with
+ * no dependence on a clock — the answer to "record this call?" does not expire while
+ * the call is still running. And it starts a cooldown covering the *next* call,
+ * because the usual reason a call ends and restarts within the hour is a dropped
+ * connection or a rejoin: the same conversation the user just declined.
+ */
+async dismissCallOffer() : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("dismiss_call_offer") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * The user accepted. Tells the watcher to stop offering **without** arming the
+ * dismissal cooldown, since the answer was yes.
+ * 
+ * Starting the recording is the frontend's own next call, not this one's job: the
+ * title has to be composed there so its default is localised.
+ */
+async acceptCallOffer() : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("accept_call_offer") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async getCallDetectionStatus() : Promise<Result<CallDetectionStatus, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_call_detection_status") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async setMeetingAutoDetect(enabled: boolean) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_meeting_auto_detect", { enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async getAutoLearnStatus() : Promise<Result<AutoLearnStatus, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_auto_learn_status") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Turn auto-learn on or off.
+ * 
+ * Turning it off also stops any watch already running, rather than letting the current
+ * one finish: the switch means "stop reading my text fields", and honouring it a minute
+ * later would not be honouring it.
+ */
+async setAutoLearnCorrections(enabled: boolean) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_auto_learn_corrections", { enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Replace the learned-word list.
+ * 
+ * The whole list rather than a remove-one command, for the reason the text-replacement
+ * and custom-word commands take whole lists too: the UI holds the authoritative order,
+ * and a per-item API would need to identify an item by a value that is itself editable.
+ * 
+ * Blank entries are dropped and the list is de-duplicated case-insensitively, because a
+ * duplicate would be sent to the recogniser twice and bias it twice.
+ */
+async setLearnedWords(words: string[]) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_learned_words", { words }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Promote a learned word into the user's own dictionary.
+ * 
+ * The point of the two lists: accepting a guess makes it theirs, at which point it stops
+ * being reviewable as a guess and stops counting against the learned-word cap.
+ */
+async keepLearnedWord(word: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("keep_learned_word", { word }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 /**
  * Stub implementation for non-macOS platforms
  * Always returns false since laptop detection is macOS-specific
@@ -3081,6 +3236,42 @@ overlay_style?: OverlayStyle;
  * transcript plus the streamed reply as readable text; Minimal is the pill.
  */
 assistant_overlay_style?: OverlayStyle; debug_mode?: boolean; log_level?: LogLevel; custom_words?: string[]; 
+/**
+ * Offer to record when a call appears to be in progress.
+ * 
+ * On by default. It is safe to default on because the detector's entire output
+ * is a *question*: it has no route by which it could start recording, and
+ * software that began recording a private conversation because it inferred one
+ * was happening is software nobody should leave installed. If the inference is
+ * wrong the cost is one dismissed card.
+ */
+meeting_auto_detect?: boolean; 
+/**
+ * Learn a spelling when the user corrects a dictated word.
+ * 
+ * **Off by default, and it must stay that way.** Unlike every other setting
+ * here, turning this on means the app reads the contents of a text field in
+ * another application — the one just dictated into — in order to notice that
+ * "brali" became "Barali". That is worth doing, because a correction the user
+ * already made is the highest-quality vocabulary signal available and it costs
+ * them no extra interaction. But it is not something to enable on anyone's
+ * behalf.
+ * 
+ * Scope is deliberately narrow: only the field that was just pasted into, only
+ * for a short window afterwards, and only single-word substitutions of words
+ * that were in our own transcript. See `autolearn`.
+ */
+auto_learn_corrections?: boolean; 
+/**
+ * Words learned from corrections, newest last.
+ * 
+ * Kept apart from [`Self::custom_words`] rather than merged into it, for two
+ * reasons. The user's own list is theirs and an automatic process must not
+ * silently grow it. And a learned word needs to be reviewable *as* a guess —
+ * shown separately, removable individually, and clearable in one action — which
+ * is impossible once it is indistinguishable from a word they typed in.
+ */
+learned_words?: string[]; 
 /**
  * Folders the user keeps their own models in. Each is scanned recursively
  * and every `.gguf` / Whisper `.bin` found is registered as a catalog entry
@@ -3542,6 +3733,20 @@ export type AssistantSearchDepth =
  */
 "high"
 export type AudioDevice = { index: string; name: string; is_default: boolean }
+/**
+ * Whether auto-learn can work here, whether it is on, and what it has learned.
+ */
+export type AutoLearnStatus = { 
+/**
+ * False on macOS and Linux, where reading the field just dictated into is not
+ * implemented yet. The UI hides the switch rather than offering a dead one.
+ */
+supported: boolean; enabled: boolean; 
+/**
+ * Words learned so far, oldest first. Shown for review, because a learned word is
+ * a guess and the user is entitled to see and remove it.
+ */
+learned: string[]; max_learned: number }
 export type AutoSubmitKey = "enter" | "ctrl_enter" | "cmd_enter"
 export type AvailableAccelerators = { whisper: string[]; ort: string[]; gpu_devices: GpuDeviceOption[]; 
 /**
@@ -3572,6 +3777,15 @@ locale: string;
  */
 gender: string }
 export type BindingResponse = { success: boolean; binding: ShortcutBinding | null; error: string | null }
+/**
+ * Whether call detection can work here, and whether it is switched on.
+ */
+export type CallDetectionStatus = { 
+/**
+ * False on macOS and Linux, where the question cannot currently be asked. The
+ * UI hides the switch rather than offering one that does nothing.
+ */
+supported: boolean; enabled: boolean }
 /**
  * Case transform applied to the output of a text replacement rule.
  */
@@ -3740,6 +3954,40 @@ export type ConversationPace =
  */
 export type CustomPostProcessTone = { id: string; name: string; instruction: string }
 export type CustomSounds = { start: boolean; stop: boolean }
+/**
+ * Outcome of a pass, so callers can tell the three "nothing was written" cases
+ * apart — they need different follow-up.
+ */
+export type DiarizationOutcome = 
+/**
+ * Several voices were found and rows were relabelled.
+ */
+{ outcome: "labelled"; speakers: number; segments: number } | 
+/**
+ * Exactly one voice on the system side.
+ * 
+ * No span is written — renaming a lone remote voice to "Speaker 1" implies
+ * there are others — but the meeting **is** marked diarized, so this does not
+ * re-run on every open and spend a minute of CPU reaching the same answer.
+ */
+{ outcome: "one_speaker" } | 
+/**
+ * Nothing was attempted. Carries the reason, so the UI can offer the right
+ * next step rather than a generic retry.
+ */
+{ outcome: "skipped"; reason: SkipReason }
+/**
+ * Whether per-speaker labelling is available on this machine.
+ */
+export type DiarizationStatus = { 
+/**
+ * The speaker-embedding model is on disk.
+ */
+installed: boolean; 
+/**
+ * Download size, so the UI can promise it before starting.
+ */
+download_mb: number }
 /**
  * A connected display, as the settings dropdown needs to describe it.
  */
@@ -4327,6 +4575,19 @@ content?: string }
 export type SecretMap = Partial<{ [key in string]: string }>
 export type SecretString = string
 export type ShortcutBinding = { id: string; name: string; description: string; default_binding: string; current_binding: string }
+export type SkipReason = 
+/**
+ * The 27 MB model is not on disk. The one reason worth an affordance.
+ */
+"model_not_installed" | "no_system_audio" | "audio_unreadable" | 
+/**
+ * One segment cannot contain two speakers.
+ */
+"too_few_segments" | "already_diarized" | 
+/**
+ * The model is installed but would not load.
+ */
+"model_unusable"
 /**
  * Rectangle chosen in the snip overlay, in that window's logical pixels.
  */
@@ -4420,6 +4681,31 @@ export type TypingTool = "auto" | "wtype" | "kwtype" | "dotool" | "ydotool" | "x
  * "large", "extra_large") to match the values the settings dropdown uses.
  */
 export type UiTextSize = "small" | "default" | "large" | "extra_large"
+/**
+ * One local calendar day of dictation usage, as shown in the recent-activity
+ * chart.
+ */
+export type UsageDay = { 
+/**
+ * Local calendar date, `%Y-%m-%d`.
+ */
+day: string; dictations: number; words: number; audio_seconds: number }
+/**
+ * Lifetime dictation usage. These survive history deletion and retention
+ * pruning; they are aggregated in `usage_daily`, not derived from rows.
+ */
+export type UsageStats = { total_dictations: number; total_words: number; 
+/**
+ * Words from dictations whose audio duration is known. Words per minute is
+ * `timed_words / (total_audio_seconds / 60)`, never `total_words / ...`,
+ * so untimed (backfilled) entries cannot inflate the rate.
+ */
+timed_words: number; total_audio_seconds: number; today_words: number; today_dictations: number; current_streak_days: number; longest_streak_days: number; active_days: number; 
+/**
+ * Active days within the last `USAGE_RECENT_WINDOW_DAYS` local days
+ * including today, ascending. Days without a dictation are omitted.
+ */
+recent_days: UsageDay[] }
 /**
  * The user's personal, local-first memory: a short always-on "About You"
  * summary plus a list of durable notes. Stored on-device in settings and

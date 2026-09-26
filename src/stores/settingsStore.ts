@@ -310,18 +310,31 @@ export const useSettingsStore = create<SettingsStore>()(
     // recomputes "ready" rules in TypeScript.
     refreshPostProcessReadiness: async () => {
       const generation = ++readinessRefreshGeneration;
-      set({
-        isPostProcessReadinessLoading: true,
-        postProcessReadinessError: false,
-      });
+      // Only announce loading the first time. Once there is an answer on
+      // screen, flipping a flag here re-rendered every settings consumer twice
+      // per refresh for a state no component shows.
+      if (get().postProcessReadiness === null) {
+        set({
+          isPostProcessReadinessLoading: true,
+          postProcessReadinessError: false,
+        });
+      }
       try {
         const readiness = await commands.getPostProcessReadiness();
         if (generation !== readinessRefreshGeneration) return;
-        set({
-          postProcessReadiness: readiness,
-          isPostProcessReadinessLoading: false,
-          postProcessReadinessError: false,
-        });
+        const current = get();
+        if (
+          current.isPostProcessReadinessLoading ||
+          current.postProcessReadinessError ||
+          JSON.stringify(current.postProcessReadiness) !==
+            JSON.stringify(readiness)
+        ) {
+          set({
+            postProcessReadiness: readiness,
+            isPostProcessReadinessLoading: false,
+            postProcessReadinessError: false,
+          });
+        }
       } catch (error) {
         console.error("Failed to load AI cleanup readiness:", error);
         if (generation === readinessRefreshGeneration) {

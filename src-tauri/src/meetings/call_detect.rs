@@ -245,22 +245,43 @@ pub struct CallDetector {
     dismissed_at: Option<Instant>,
 }
 
+/// What one observation changed.
+///
+/// `step` used to answer `bool`, which could only express "offer now". The call
+/// *ending* was therefore unreportable: the branch below reset the detector's own
+/// memory and told nobody, so an offer the user had neither accepted nor dismissed
+/// stayed on screen for the rest of the session. An enum makes the second edge
+/// sayable, and leaves room for a third without changing the signature again.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CallEvent {
+    /// Nothing the caller needs to act on.
+    Quiet,
+    /// Ask the user whether to record. Never an instruction to record.
+    Prompt,
+    /// A run of call-shaped audio has ended, `CALL_ENDED_GRACE` ago.
+    Ended,
+}
+
 impl CallDetector {
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Feed one observation; returns `true` when the user should be offered a
-    /// recording.
+    /// Feed one observation; returns what, if anything, the caller should do.
     ///
-    /// Returning `true` marks the current run as prompted, so a call produces at
+    /// [`CallEvent::Prompt`] marks the current run as prompted, so a call produces at
     /// most one offer no matter how long it lasts or how often this is polled.
+    /// [`CallEvent::Ended`] is reported once per run, on the poll where the quiet
+    /// finally outlasts [`CALL_ENDED_GRACE`], because that is the same moment the
+    /// detector re-arms itself — so the two can never disagree about whether a run
+    /// is over.
     pub fn step(
         &mut self,
         observation: &CallObservation,
         already_recording: bool,
         now: Instant,
-    ) -> bool {
+    ) -> CallEvent {
+        let mut ended = false;
         if observation.indicates_call() {
             if self.call_since.is_none() {
                 self.call_since = Some(now);
@@ -273,6 +294,7 @@ impl CallDetector {
                 self.call_since = None;
                 self.last_seen = None;
                 self.prompted = false;
+                ended = true;
             }
         }
 
@@ -283,11 +305,14 @@ impl CallDetector {
             already_prompted: self.prompted,
         };
 
-        let prompt = should_prompt(observation, &ctx, now);
-        if prompt {
+        if should_prompt(observation, &ctx, now) {
             self.prompted = true;
+            return CallEvent::Prompt;
         }
-        prompt
+        if ended {
+            return CallEvent::Ended;
+        }
+        CallEvent::Quiet
     }
 
     /// The user said no.
@@ -365,13 +390,13 @@ impl CallWatcher {
     ///
     /// `is_recording` is a closure rather than a handle to the recorder so this
     /// module keeps no dependency on Tauri state — and, more to the point, so it
-    /// has no route by which it *could* start a recording. `on_call` runs on the
+    /// has no route by which it *could* start a recording. `on_event` runs on the
     /// watcher thread and must not block; it is expected to emit an event to the
     /// UI and return.
-    pub fn start<R, F>(is_recording: R, mut on_call: F) -> Option<Self>
+    pub fn start<R, F>(is_recording: R, mut on_event: F) -> Option<Self>
     where
         R: Fn() -> bool + Send + 'static,
-        F: FnMut(&CallObservation) + Send + 'static,
+        F: FnMut(CallEvent, &CallObservation) + Send + 'static,
     {
         if !detection_supported() {
             log::info!(
@@ -383,7 +408,7 @@ impl CallWatcher {
         let (tx, rx) = mpsc::channel();
         let handle = std::thread::Builder::new()
             .name("call-detect".into())
-            .spawn(move || run(rx, is_recording, &mut on_call))
+            .spawn(move || run(rx, is_recording, &mut on_event))
             .map_err(|e| log::error!("Could not start the call watcher: {e}"))
             .ok()?;
 
@@ -432,10 +457,10 @@ impl Drop for CallWatcher {
     }
 }
 
-fn run<R, F>(rx: Receiver<Msg>, is_recording: R, on_call: &mut F)
+fn run<R, F>(rx: Receiver<Msg>, is_recording: R, on_event: &mut F)
 where
     R: Fn() -> bool,
-    F: FnMut(&CallObservation),
+    F: FnMut(CallEvent, &CallObservation),
 {
     log::debug!("Call auto-detection started");
     let mut detector = CallDetector::new();
@@ -467,12 +492,22 @@ where
             None => return,
         };
 
-        if detector.step(&observation, is_recording(), Instant::now()) {
-            match observation.app_label() {
-                Some(app) => log::info!("{app} appears to be in a call; offering to record"),
-                None => log::info!("A call appears to be in progress; offering to record"),
+        match detector.step(&observation, is_recording(), Instant::now()) {
+            CallEvent::Prompt => {
+                match observation.app_label() {
+                    Some(app) => log::info!("{app} appears to be in a call; offering to record"),
+                    None => log::info!("A call appears to be in progress; offering to record"),
+                }
+                on_event(CallEvent::Prompt, &observation);
             }
-            on_call(&observation);
+            // The call is over. Whether an offer is still on screen is the pill's
+            // business, not ours — this module's whole contract is that it reports
+            // and never acts.
+            CallEvent::Ended => {
+                log::debug!("The detected call has ended");
+                on_event(CallEvent::Ended, &observation);
+            }
+            CallEvent::Quiet => {}
         }
     }
 }
@@ -711,6 +746,17 @@ mod tests {
         }
     }
 
+    /// `step` answers an enum, and most of these cases only care about the offer.
+    /// Named predicates keep the assertions reading as sentences rather than as
+    /// comparisons against a variant.
+    fn prompted(event: CallEvent) -> bool {
+        event == CallEvent::Prompt
+    }
+
+    fn ended(event: CallEvent) -> bool {
+        event == CallEvent::Ended
+    }
+
     #[test]
     fn playback_alone_is_not_a_call() {
         assert!(!playback_only().indicates_call());
@@ -811,13 +857,21 @@ mod tests {
         let mut detector = CallDetector::new();
 
         // First sighting starts the run but is too early to be believed.
-        assert!(!detector.step(&call(), false, t0));
-        assert!(!detector.step(&call(), false, t0 + POLL_INTERVAL));
+        assert!(!prompted(detector.step(&call(), false, t0)));
+        assert!(!prompted(detector.step(&call(), false, t0 + POLL_INTERVAL)));
         // Sustained: offer.
-        assert!(detector.step(&call(), false, t0 + SUSTAINED_FOR));
+        assert!(prompted(detector.step(&call(), false, t0 + SUSTAINED_FOR)));
         // And never again for the same call, however long it runs.
-        assert!(!detector.step(&call(), false, t0 + SUSTAINED_FOR * 2));
-        assert!(!detector.step(&call(), false, t0 + Duration::from_secs(3600)));
+        assert!(!prompted(detector.step(
+            &call(),
+            false,
+            t0 + SUSTAINED_FOR * 2
+        )));
+        assert!(!prompted(detector.step(
+            &call(),
+            false,
+            t0 + Duration::from_secs(3600)
+        )));
     }
 
     #[test]
@@ -826,7 +880,7 @@ mod tests {
         let mut detector = CallDetector::new();
         for tick in 0..20 {
             let now = t0 + POLL_INTERVAL * tick;
-            assert!(!detector.step(&call(), true, now));
+            assert!(!prompted(detector.step(&call(), true, now)));
         }
     }
 
@@ -837,14 +891,22 @@ mod tests {
         let t0 = base();
         let mut detector = CallDetector::new();
         // Establish the run and consume its single prompt.
-        assert!(!detector.step(&call(), false, t0));
-        assert!(detector.step(&call(), false, t0 + SUSTAINED_FOR));
+        assert!(!prompted(detector.step(&call(), false, t0)));
+        assert!(prompted(detector.step(&call(), false, t0 + SUSTAINED_FOR)));
 
         // A single quiet poll, well inside the grace window, then audio again.
         let blip = t0 + SUSTAINED_FOR + POLL_INTERVAL;
-        assert!(!detector.step(&playback_only(), false, blip));
-        assert!(!detector.step(&call(), false, blip + POLL_INTERVAL));
-        assert!(!detector.step(&call(), false, blip + POLL_INTERVAL + SUSTAINED_FOR * 2));
+        assert!(!prompted(detector.step(&playback_only(), false, blip)));
+        assert!(!prompted(detector.step(
+            &call(),
+            false,
+            blip + POLL_INTERVAL
+        )));
+        assert!(!prompted(detector.step(
+            &call(),
+            false,
+            blip + POLL_INTERVAL + SUSTAINED_FOR * 2
+        )));
     }
 
     /// A call that genuinely ends re-arms, so the *next* meeting is offered.
@@ -852,18 +914,74 @@ mod tests {
     fn a_finished_call_arms_the_next_one() {
         let t0 = base();
         let mut detector = CallDetector::new();
-        assert!(!detector.step(&call(), false, t0));
-        assert!(detector.step(&call(), false, t0 + SUSTAINED_FOR));
+        assert!(!prompted(detector.step(&call(), false, t0)));
+        assert!(prompted(detector.step(&call(), false, t0 + SUSTAINED_FOR)));
 
         // Quiet for longer than the grace period.
         let quiet = t0 + SUSTAINED_FOR + CALL_ENDED_GRACE;
-        assert!(!detector.step(&playback_only(), false, quiet));
+        assert!(!prompted(detector.step(&playback_only(), false, quiet)));
 
         // A new call, sustained, is offered again — no dismissal was involved,
         // so no cooldown applies.
         let second = quiet + Duration::from_secs(30);
-        assert!(!detector.step(&call(), false, second));
-        assert!(detector.step(&call(), false, second + SUSTAINED_FOR));
+        assert!(!prompted(detector.step(&call(), false, second)));
+        assert!(prompted(detector.step(
+            &call(),
+            false,
+            second + SUSTAINED_FOR
+        )));
+    }
+
+    /// The call ending has to be *reported*, not merely noticed.
+    ///
+    /// This is the regression guard for an offer that outlived its call. The
+    /// end-of-call branch reset the detector's own memory and then returned the same
+    /// `false` as an ordinary quiet poll, so the only things that could ever remove an
+    /// offer were the user's X, a meeting starting, and the setting being switched
+    /// off — an ignored card therefore stayed always-on-top for the rest of the
+    /// session, long after the conversation it was asking about had finished.
+    #[test]
+    fn the_end_of_a_call_is_announced_exactly_once() {
+        let t0 = base();
+        let mut detector = CallDetector::new();
+        assert!(!prompted(detector.step(&call(), false, t0)));
+        assert!(prompted(detector.step(&call(), false, t0 + SUSTAINED_FOR)));
+
+        // Still inside the grace window: a flicker, not an ending, so nothing to say.
+        let blip = t0 + SUSTAINED_FOR + POLL_INTERVAL;
+        assert_eq!(
+            detector.step(&playback_only(), false, blip),
+            CallEvent::Quiet
+        );
+
+        // Past the grace window: over, and said so.
+        let quiet = t0 + SUSTAINED_FOR + CALL_ENDED_GRACE;
+        assert!(ended(detector.step(&playback_only(), false, quiet)));
+
+        // Once only. Every later poll must be silent, or the app would keep trying to
+        // withdraw an offer that is already gone.
+        assert_eq!(
+            detector.step(&playback_only(), false, quiet + POLL_INTERVAL),
+            CallEvent::Quiet
+        );
+        assert_eq!(
+            detector.step(&playback_only(), false, quiet + Duration::from_secs(3600)),
+            CallEvent::Quiet
+        );
+    }
+
+    /// A fresh sighting is neither an offer nor an ending: it has to sustain first.
+    #[test]
+    fn a_new_call_starts_from_silence() {
+        let t0 = base();
+        let mut detector = CallDetector::new();
+        assert!(!prompted(detector.step(&call(), false, t0)));
+        assert!(prompted(detector.step(&call(), false, t0 + SUSTAINED_FOR)));
+        let quiet = t0 + SUSTAINED_FOR + CALL_ENDED_GRACE;
+        assert!(ended(detector.step(&playback_only(), false, quiet)));
+
+        let second = quiet + Duration::from_secs(30);
+        assert_eq!(detector.step(&call(), false, second), CallEvent::Quiet);
     }
 
     /// Dismissing covers the current call without a clock, and the next one with
@@ -872,26 +990,38 @@ mod tests {
     fn dismissing_survives_the_call_ending() {
         let t0 = base();
         let mut detector = CallDetector::new();
-        assert!(!detector.step(&call(), false, t0));
-        assert!(detector.step(&call(), false, t0 + SUSTAINED_FOR));
+        assert!(!prompted(detector.step(&call(), false, t0)));
+        assert!(prompted(detector.step(&call(), false, t0 + SUSTAINED_FOR)));
         detector.dismiss(t0 + SUSTAINED_FOR);
 
         // Call drops and is rejoined a minute later: the user already said no.
         let quiet = t0 + SUSTAINED_FOR + CALL_ENDED_GRACE;
-        assert!(!detector.step(&playback_only(), false, quiet));
+        assert!(!prompted(detector.step(&playback_only(), false, quiet)));
         let rejoin = quiet + Duration::from_secs(60);
-        assert!(!detector.step(&call(), false, rejoin));
-        assert!(!detector.step(&call(), false, rejoin + SUSTAINED_FOR));
+        assert!(!prompted(detector.step(&call(), false, rejoin)));
+        assert!(!prompted(detector.step(
+            &call(),
+            false,
+            rejoin + SUSTAINED_FOR
+        )));
 
         // A different call, after the cooldown, is offered.
         let much_later = t0 + DISMISS_COOLDOWN + Duration::from_secs(60);
-        assert!(!detector.step(&playback_only(), false, much_later));
-        assert!(!detector.step(&call(), false, much_later + Duration::from_secs(1)));
-        assert!(detector.step(
+        assert!(!prompted(detector.step(
+            &playback_only(),
+            false,
+            much_later
+        )));
+        assert!(!prompted(detector.step(
+            &call(),
+            false,
+            much_later + Duration::from_secs(1)
+        )));
+        assert!(prompted(detector.step(
             &call(),
             false,
             much_later + Duration::from_secs(1) + SUSTAINED_FOR
-        ));
+        )));
     }
 
     /// Accepting stops the offers without pretending the user refused.
@@ -899,15 +1029,19 @@ mod tests {
     fn accepting_does_not_arm_the_cooldown() {
         let t0 = base();
         let mut detector = CallDetector::new();
-        assert!(!detector.step(&call(), false, t0));
-        assert!(detector.step(&call(), false, t0 + SUSTAINED_FOR));
+        assert!(!prompted(detector.step(&call(), false, t0)));
+        assert!(prompted(detector.step(&call(), false, t0 + SUSTAINED_FOR)));
         detector.accept();
 
         let quiet = t0 + SUSTAINED_FOR + CALL_ENDED_GRACE;
-        assert!(!detector.step(&playback_only(), false, quiet));
+        assert!(!prompted(detector.step(&playback_only(), false, quiet)));
         let next = quiet + Duration::from_secs(30);
-        assert!(!detector.step(&call(), false, next));
-        assert!(detector.step(&call(), false, next + SUSTAINED_FOR));
+        assert!(!prompted(detector.step(&call(), false, next)));
+        assert!(prompted(detector.step(
+            &call(),
+            false,
+            next + SUSTAINED_FOR
+        )));
     }
 
     /// The prompt must be phrasable with no process name at all, since reading

@@ -56,7 +56,12 @@ interface ActiveItem {
   speed?: number;
 }
 
-const DownloadIndicator: React.FC = () => {
+const DownloadIndicator: React.FC<{
+  /** Where the details panel opens relative to the pill. */
+  placement?: "center" | "start";
+  /** Ring only, for the collapsed sidebar. */
+  compact?: boolean;
+}> = ({ placement = "center", compact = false }) => {
   const { t } = useTranslation();
   const models = useModelStore((s) => s.models);
   const downloadingModels = useModelStore((s) => s.downloadingModels);
@@ -188,7 +193,9 @@ const DownloadIndicator: React.FC = () => {
         title={t("modelSelector.downloadDetails")}
         aria-label={t("modelSelector.downloadDetails")}
         aria-expanded={expanded}
-        className="flex items-center gap-2 rounded-full border border-hairline bg-surface px-2.5 py-1 text-xs text-text transition-colors hover:border-hairline-strong"
+        className={`flex items-center gap-2 rounded-full border border-hairline bg-surface text-xs text-text transition-colors hover:border-hairline-strong ${
+          compact ? "h-8 w-8 justify-center p-0" : "px-2.5 py-1"
+        }`}
       >
         {summary.showRing ? (
           <span className="relative inline-flex h-4 w-4 items-center justify-center">
@@ -217,19 +224,25 @@ const DownloadIndicator: React.FC = () => {
         ) : (
           <Loader2 className="h-3.5 w-3.5 animate-spin text-logo-primary" />
         )}
-        <span className="tabular-nums font-medium">{summary.label}</span>
-        <ChevronUp
-          className={`h-3 w-3 text-muted transition-transform ${
-            expanded ? "rotate-180" : ""
-          }`}
-        />
+        {!compact && (
+          <>
+            <span className="tabular-nums font-medium">{summary.label}</span>
+            <ChevronUp
+              className={`h-3 w-3 text-muted transition-transform ${
+                expanded ? "rotate-180" : ""
+              }`}
+            />
+          </>
+        )}
       </button>
 
       {expanded && (
         <div
           role="status"
           aria-live="polite"
-          className="absolute bottom-full left-1/2 z-50 mb-2 w-80 -translate-x-1/2 space-y-3 rounded-xl border border-hairline bg-surface p-3 shadow-[0_16px_40px_rgba(0,0,0,0.24)]"
+          className={`absolute bottom-full z-50 mb-2 w-80 space-y-3 rounded-xl border border-hairline bg-surface p-3 shadow-[0_16px_40px_rgba(0,0,0,0.24)] ${
+            placement === "start" ? "start-0" : "left-1/2 -translate-x-1/2"
+          }`}
         >
           {items.map((item) => {
             const indeterminate = item.phase !== "downloading";

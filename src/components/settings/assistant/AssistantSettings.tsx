@@ -9,14 +9,13 @@ import {
   ArrowUp,
   Copy,
   CornerDownLeft,
+  Download,
   Globe,
   Keyboard,
   Mic,
   Sparkles,
   Monitor,
   PanelTop,
-  Download,
-  ChevronRight,
   Power,
   PlugZap,
   Square,
@@ -44,9 +43,12 @@ import {
 } from "@/components/ui";
 import { Input } from "../../ui/Input";
 import { ModelCombo } from "../../ui/ModelCombo";
+import { LogoChoice } from "../../ui/LogoChoice";
+import { ProviderTile } from "../../icons/ProviderLogos";
 import { Button } from "../../ui/Button";
-import { TONE_TILE } from "../../ui/tones";
+import { LlmModelPicker } from "@/components/shell/ModelPicker";
 import { ProviderModeToggle } from "../PostProcessingSettingsApi/ProviderModeToggle";
+import { ProviderSelect } from "../PostProcessingSettingsApi/ProviderSelect";
 import { ShortcutInput } from "../ShortcutInput";
 import { PushToTalk } from "../PushToTalk";
 import { RemindersSettings } from "./RemindersSettings";
@@ -55,8 +57,6 @@ import { useKokoroTts } from "../../../assistant/useKokoroTts";
 import { localTtsActive } from "../../../assistant/localTts";
 import { FONT_SIZES } from "../../../assistant/appearance";
 import "../../../assistant/AssistantPanel.css";
-import { useModelStore } from "@/stores/modelStore";
-import { getModelCategory } from "@/lib/utils/modelCategory";
 import { useLocalLlmEngineStatus } from "@/hooks/useLocalLlmEngineStatus";
 import ScreenRecordingPermission from "@/components/ScreenRecordingPermission";
 
@@ -113,7 +113,7 @@ const LoadableSelect = ModelCombo;
 /** Live preview of the assistant panel. Renders the REAL panel classes from
  *  AssistantPanel.css (dark-only, like the STT overlay), so the preview and
  *  the actual panel share one stylesheet and can never drift. */
-const PanelPreview: React.FC<{
+export const PanelPreview: React.FC<{
   fontSize: string;
   opacity: number;
 }> = ({ fontSize, opacity }) => {
@@ -189,15 +189,38 @@ const PanelPreview: React.FC<{
   );
 };
 
+/** A block of the assistant's settings. Pages render the ones they own: the
+ *  Models page shows `brain` and `voice`, the Assistant page opens each of the
+ *  rest in its own dialog. */
+export type AssistantSettingsSection =
+  | "master"
+  | "shortcuts"
+  | "brain"
+  | "voice"
+  | "vision"
+  | "webSearch"
+  | "reminders"
+  | "appearance"
+  | "behavior";
+
 interface AssistantSettingsProps {
-  /** Open the on-device model catalog sub-page (owned by the parent section). */
+  /** Open the on-device model catalog (owned by the parent page). */
   onOpenLlmCatalog?: () => void;
+  /** Only render these sections. Omit for the full page. */
+  sections?: AssistantSettingsSection[];
 }
 
 export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
   onOpenLlmCatalog,
+  sections,
 }) => {
   const { t } = useTranslation();
+  const show = (section: AssistantSettingsSection) =>
+    !sections || sections.includes(section);
+  // A single section is shown under its own page or dialog heading, so the
+  // group's title would only repeat it.
+  const groupTitle = (text: string) =>
+    sections && sections.length === 1 ? undefined : text;
   const {
     settings,
     refreshSettings,
@@ -212,21 +235,7 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
   // Built-in (local) provider: model is chosen from downloaded LLM models and
   // there is no API key. The engine is the bundled llama.cpp sidecar.
   const isBuiltin = selectedProviderId === BUILTIN_PROVIDER_ID;
-  const { models } = useModelStore();
-  const llmModels = useMemo(
-    () =>
-      models.filter(
-        (m) =>
-          getModelCategory(m) === "llm" &&
-          m.is_downloaded &&
-          // A dictation-cleanup fine-tune can't hold a conversation. It is
-          // hidden here for the same reason the assistant catalog hides it: an
-          // 0.8B single-transform model chosen as the brain doesn't fail
-          // loudly, it just answers badly, and the user blames the assistant.
-          !m.is_cleanup_specialist,
-      ),
-    [models],
-  );
+
   const [localLlmStatus, setLocalLlmStatus] = useState<LocalLlmStatus | null>(
     null,
   );
@@ -1012,14 +1021,15 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
     <>
       <SettingContainer
         title={t("settings.assistant.provider.providerLabel")}
-        layout="horizontal"
+        layout="stacked"
         grouped={true}
       >
-        <Dropdown
+        <ProviderSelect
           options={cloudProviderOptions}
-          selectedValue={selectedProviderId}
-          onSelect={handleProviderSelect}
+          value={selectedProviderId}
+          onChange={handleProviderSelect}
           disabled={isProviderSwitching}
+          modelsFor="assistant"
         />
       </SettingContainer>
 
@@ -1092,32 +1102,13 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
         grouped={true}
       >
         <div className="flex flex-col items-end gap-1">
-          {llmModels.length > 0 ? (
-            <Dropdown
-              options={llmModels.map((m) => ({
-                value: m.id,
-                label: m.name,
-              }))}
-              selectedValue={model}
-              onSelect={(value) => {
-                setModel(value);
-                void setAndRefresh(
-                  commands.changeAssistantModelSetting(
-                    selectedProviderId,
-                    value,
-                  ),
-                );
-              }}
-              placeholder={t(
-                "settings.assistant.provider.builtinModelPlaceholder",
-              )}
-              className="min-w-[200px]"
-            />
-          ) : (
-            <span className="text-xs text-muted-soft max-w-[360px] text-right">
-              {t("settings.assistant.provider.builtinNoModels")}
-            </span>
-          )}
+          {/* The same picker the Assistant page uses, limited to this
+              computer; its footer jumps to the catalog below. */}
+          <LlmModelPicker
+            role="assistant"
+            scope="device"
+            onBrowse={onOpenLlmCatalog}
+          />
           {engineStatus.active ? (
             <div className="flex w-full max-w-[360px] flex-col items-end gap-1">
               <span className="inline-flex items-center gap-1.5 text-xs text-muted">
@@ -1158,36 +1149,6 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
           )}
         </div>
       </SettingContainer>
-
-      <div className="px-4 py-3">
-        <button
-          type="button"
-          onClick={onOpenLlmCatalog}
-          className={`flex w-full items-center gap-3 rounded-xl border px-3.5 py-3 text-start transition-colors cursor-pointer ${
-            llmModels.length === 0
-              ? "border-accent/35 bg-accent/8 hover:bg-accent/12"
-              : "border-hairline bg-surface-strong/55 hover:border-hairline-strong hover:bg-surface-strong"
-          }`}
-        >
-          <span
-            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${TONE_TILE.teal}`}
-          >
-            <Download size={17} />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block text-[13px] font-medium text-ink">
-              {t("settings.assistant.brain.downloadModel")}
-            </span>
-            <span className="mt-0.5 block text-xs text-muted">
-              {t("settings.assistant.brain.downloadModelDescription")}
-            </span>
-          </span>
-          <span className="flex shrink-0 items-center gap-1 text-xs font-medium text-accent">
-            {t("settings.assistant.brain.downloadModelAction")}
-            <ChevronRight width={15} height={15} />
-          </span>
-        </button>
-      </div>
 
       <SettingContainer
         title={t("settings.assistant.provider.contextSizeLabel")}
@@ -1233,7 +1194,10 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
    *  Flow" and AI Correction run on the same provider and model, so the brain
    *  picker stays reachable even with the assistant switched off. */
   const masterSwitchGroup = (
-    <SettingsGroup title={t("settings.assistant.enable.title")} icon={Power}>
+    <SettingsGroup
+      title={groupTitle(t("settings.assistant.enable.title"))}
+      icon={Power}
+    >
       <ToggleSwitch
         checked={assistantEnabled}
         onChange={(checked) =>
@@ -1247,7 +1211,10 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
   );
 
   const brainGroup = (
-    <SettingsGroup title={t("settings.assistant.brain.title")} icon={Sparkles}>
+    <SettingsGroup
+      title={groupTitle(t("settings.assistant.brain.title"))}
+      icon={Sparkles}
+    >
       <SettingContainer
         title={t("settings.assistant.brain.whereLabel")}
         layout="horizontal"
@@ -1303,7 +1270,8 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
 
   // Assistant off: the page shrinks to the switch that turns it back on, plus
   // the shared brain picker. Everything below belongs to the assistant itself.
-  if (!assistantEnabled) {
+  // A caller that asked for specific sections gets exactly those.
+  if (!assistantEnabled && !sections) {
     return (
       <div className="max-w-3xl w-full mx-auto space-y-8">
         {masterSwitchGroup}
@@ -1313,173 +1281,362 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
   }
 
   return (
-    <div className="max-w-3xl w-full mx-auto space-y-8">
-      {masterSwitchGroup}
+    <div className="w-full space-y-8">
+      {show("master") && masterSwitchGroup}
 
       {/* Hotkeys ---------------------------------------------------------- */}
-      <SettingsGroup
-        title={t("settings.assistant.shortcuts.title")}
-        icon={Keyboard}
-      >
-        <ShortcutInput
-          shortcutId="assistant"
-          grouped={true}
-          icon={Sparkles}
-          tone="teal"
-        />
-        {/* The call's own key, listed next to the quick ask so the split between
+      {show("shortcuts") && (
+        <SettingsGroup
+          title={groupTitle(t("settings.assistant.shortcuts.title"))}
+          icon={Keyboard}
+        >
+          <ShortcutInput
+            shortcutId="assistant"
+            grouped={true}
+            icon={Sparkles}
+            tone="teal"
+          />
+          {/* The call's own key, listed next to the quick ask so the split between
             the two features is visible in the one place people go looking for
             it. They are separate features with separate lifetimes: one answers a
             question and closes, the other holds a conversation. */}
-        <ShortcutInput
-          shortcutId="assistant_call"
-          grouped={true}
-          icon={AudioLines}
-          tone="indigo"
-        />
-        <PushToTalk grouped={true} />
-      </SettingsGroup>
+          <ShortcutInput
+            shortcutId="assistant_call"
+            grouped={true}
+            icon={AudioLines}
+            tone="indigo"
+          />
+          <PushToTalk grouped={true} />
+        </SettingsGroup>
+      )}
 
       {/* Brain picker ----------------------------------------------------- */}
-      {brainGroup}
+      {show("brain") && brainGroup}
 
       {/* Voice output ----------------------------------------------------- */}
-      <SettingsGroup title={t("settings.assistant.tts.title")} icon={Volume2}>
-        <ToggleSwitch
-          checked={settings?.assistant_tts_enabled ?? false}
-          onChange={(checked) =>
-            setAndRefresh(commands.setAssistantTtsEnabled(checked))
-          }
-          label={t("settings.assistant.tts.enableLabel")}
-          description={t("settings.assistant.tts.enableDescription")}
-          grouped={true}
-        />
-        {ttsEnabled && (
-          <>
-            <SettingContainer
-              title={t("settings.assistant.tts.engineLabel")}
-              info={t("settings.assistant.tts.engineDescription")}
-              layout="horizontal"
-              grouped={true}
-            >
-              <Dropdown
-                options={[
-                  {
-                    value: "kokoro",
-                    label: t("settings.assistant.tts.engines.kokoro"),
-                  },
-                  {
-                    value: "openai",
-                    label: t("settings.assistant.tts.engines.openai"),
-                  },
-                  {
-                    value: "openrouter",
-                    label: t("settings.assistant.tts.engines.openrouter"),
-                  },
-                  {
-                    value: "elevenlabs",
-                    label: t("settings.assistant.tts.engines.elevenlabs"),
-                  },
-                  {
-                    value: "azure",
-                    label: t("settings.assistant.tts.engines.azure"),
-                  },
-                ]}
-                selectedValue={settings?.assistant_tts_engine ?? "kokoro"}
-                onSelect={(engine) => {
-                  void queueTtsTask(async () => {
-                    await setAndRefresh(commands.setAssistantTtsEngine(engine));
-                  });
-                }}
-                disabled={!settings?.assistant_tts_enabled}
-                className="min-w-[340px]"
-              />
-            </SettingContainer>
+      {show("voice") && (
+        <SettingsGroup
+          title={groupTitle(t("settings.assistant.tts.title"))}
+          icon={Volume2}
+        >
+          <ToggleSwitch
+            checked={settings?.assistant_tts_enabled ?? false}
+            onChange={(checked) =>
+              setAndRefresh(commands.setAssistantTtsEnabled(checked))
+            }
+            label={t("settings.assistant.tts.enableLabel")}
+            description={t("settings.assistant.tts.enableDescription")}
+            grouped={true}
+          />
+          {ttsEnabled && (
+            <>
+              <SettingContainer
+                title={t("settings.assistant.tts.engineLabel")}
+                info={t("settings.assistant.tts.engineDescription")}
+                layout="stacked"
+                grouped={true}
+              >
+                <LogoChoice
+                  label={t("settings.assistant.tts.engineLabel")}
+                  minTile="9.5rem"
+                  readyLabel={t("assistantPage.cards.keySaved")}
+                  options={(
+                    [
+                      "kokoro",
+                      "openai",
+                      "openrouter",
+                      "elevenlabs",
+                      "azure",
+                    ] as const
+                  ).map((engine) => ({
+                    value: engine,
+                    label: t(`voiceEngines.names.${engine}`),
+                    hint: t(`voiceEngines.${engine}`),
+                    title: t(`settings.assistant.tts.engines.${engine}`),
+                    ready:
+                      engine === "kokoro" ||
+                      !!settings?.assistant_tts_api_keys?.[engine]?.trim(),
+                    icon: <ProviderTile id={engine} kind="tts" size="md" />,
+                  }))}
+                  value={settings?.assistant_tts_engine ?? "kokoro"}
+                  onChange={(engine) => {
+                    void queueTtsTask(async () => {
+                      await setAndRefresh(
+                        commands.setAssistantTtsEngine(engine),
+                      );
+                    });
+                  }}
+                  disabled={!settings?.assistant_tts_enabled}
+                />
+              </SettingContainer>
 
-            {(settings?.assistant_tts_engine ?? "kokoro") === "kokoro" && (
-              <>
-                <SettingContainer
-                  title={t("settings.assistant.tts.kokoroSetupLabel")}
-                  description={t(
-                    "settings.assistant.tts.kokoroSetupDescription",
-                  )}
-                  descriptionMode="inline"
-                  layout="horizontal"
-                  grouped={true}
-                >
-                  <div className="flex min-w-[340px] justify-end">
-                    {kokoroStatus === "loading" ? (
-                      <div className="w-full max-w-[260px] space-y-1.5">
-                        <div className="flex items-center justify-between gap-3 text-xs text-muted">
-                          <span className="inline-flex items-center gap-1.5">
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            {t("settings.assistant.tts.kokoroDownloading")}
-                          </span>
-                          <span className="tabular-nums">
-                            {kokoroProgress}%
-                          </span>
-                        </div>
-                        <div className="h-1.5 overflow-hidden rounded-full bg-hairline-strong">
-                          <div
-                            className="h-full rounded-full bg-accent transition-[width] duration-200"
-                            style={{ width: `${kokoroProgress}%` }}
-                          />
-                        </div>
-                      </div>
-                    ) : kokoroPrepared ||
-                      kokoroStatus === "ready" ||
-                      kokoroStatus === "speaking" ? (
-                      <span className="inline-flex items-center gap-1.5 text-[13px] font-medium text-accent">
-                        <Check className="h-4 w-4" />
-                        {t("settings.assistant.tts.kokoroReady")}
-                      </span>
-                    ) : (
-                      <div className="flex flex-col items-end gap-1.5">
-                        <Button
-                          variant={kokoroError ? "secondary" : "primary-soft"}
-                          size="sm"
-                          onClick={() => void handlePrepareKokoro()}
-                        >
-                          <Download className="h-3.5 w-3.5" />
-                          {kokoroError
-                            ? t("settings.assistant.tts.kokoroRetry")
-                            : t("settings.assistant.tts.kokoroDownload")}
-                        </Button>
-                        {kokoroError && (
-                          <span className="text-xs text-error">
-                            {t("settings.assistant.tts.downloadError")}
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </SettingContainer>
-
-                <SettingContainer
-                  title={t("settings.assistant.tts.voiceLabel")}
-                  layout="horizontal"
-                  grouped={true}
-                >
-                  <Dropdown
-                    options={KOKORO_VOICES}
-                    selectedValue={settings?.assistant_tts_voice ?? "af_heart"}
-                    onSelect={(voice) =>
-                      setAndRefresh(commands.setAssistantTtsVoice(voice))
-                    }
-                    disabled={!settings?.assistant_tts_enabled}
-                    className="min-w-[340px]"
-                  />
-                </SettingContainer>
-              </>
-            )}
-
-            {(settings?.assistant_tts_engine === "openai" ||
-              settings?.assistant_tts_engine === "openrouter") && (
-              <>
-                {settings?.assistant_tts_engine === "openai" && (
+              {(settings?.assistant_tts_engine ?? "kokoro") === "kokoro" && (
+                <>
                   <SettingContainer
-                    title={t("settings.assistant.tts.baseUrlLabel")}
-                    info={t("settings.assistant.tts.baseUrlDescription")}
+                    title={t("settings.assistant.tts.kokoroSetupLabel")}
+                    description={t(
+                      "settings.assistant.tts.kokoroSetupDescription",
+                    )}
+                    descriptionMode="inline"
+                    layout="horizontal"
+                    grouped={true}
+                  >
+                    <div className="flex min-w-[340px] justify-end">
+                      {kokoroStatus === "loading" ? (
+                        <div className="w-full max-w-[260px] space-y-1.5">
+                          <div className="flex items-center justify-between gap-3 text-xs text-muted">
+                            <span className="inline-flex items-center gap-1.5">
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              {t("settings.assistant.tts.kokoroDownloading")}
+                            </span>
+                            <span className="tabular-nums">
+                              {kokoroProgress}%
+                            </span>
+                          </div>
+                          <div className="h-1.5 overflow-hidden rounded-full bg-hairline-strong">
+                            <div
+                              className="h-full rounded-full bg-accent transition-[width] duration-200"
+                              style={{ width: `${kokoroProgress}%` }}
+                            />
+                          </div>
+                        </div>
+                      ) : kokoroPrepared ||
+                        kokoroStatus === "ready" ||
+                        kokoroStatus === "speaking" ? (
+                        <span className="inline-flex items-center gap-1.5 text-[13px] font-medium text-accent">
+                          <Check className="h-4 w-4" />
+                          {t("settings.assistant.tts.kokoroReady")}
+                        </span>
+                      ) : (
+                        <div className="flex flex-col items-end gap-1.5">
+                          <Button
+                            variant={kokoroError ? "secondary" : "primary-soft"}
+                            size="sm"
+                            onClick={() => void handlePrepareKokoro()}
+                          >
+                            <Download className="h-3.5 w-3.5" />
+                            {kokoroError
+                              ? t("settings.assistant.tts.kokoroRetry")
+                              : t("settings.assistant.tts.kokoroDownload")}
+                          </Button>
+                          {kokoroError && (
+                            <span className="text-xs text-error">
+                              {t("settings.assistant.tts.downloadError")}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </SettingContainer>
+
+                  <SettingContainer
+                    title={t("settings.assistant.tts.voiceLabel")}
+                    layout="horizontal"
+                    grouped={true}
+                  >
+                    <Dropdown
+                      options={KOKORO_VOICES}
+                      selectedValue={
+                        settings?.assistant_tts_voice ?? "af_heart"
+                      }
+                      onSelect={(voice) =>
+                        setAndRefresh(commands.setAssistantTtsVoice(voice))
+                      }
+                      disabled={!settings?.assistant_tts_enabled}
+                      className="min-w-[340px]"
+                    />
+                  </SettingContainer>
+                </>
+              )}
+
+              {(settings?.assistant_tts_engine === "openai" ||
+                settings?.assistant_tts_engine === "openrouter") && (
+                <>
+                  {settings?.assistant_tts_engine === "openai" && (
+                    <SettingContainer
+                      title={t("settings.assistant.tts.baseUrlLabel")}
+                      info={t("settings.assistant.tts.baseUrlDescription")}
+                      layout="horizontal"
+                      grouped={true}
+                    >
+                      <Input
+                        type="text"
+                        value={ttsBaseUrl}
+                        onChange={(e) => setTtsBaseUrl(e.target.value)}
+                        onBlur={() => {
+                          void queueTtsTask(async () => {
+                            await setAndRefresh(
+                              commands.setAssistantTtsBaseUrl(ttsBaseUrl),
+                            );
+                          });
+                        }}
+                        placeholder="https://my-resource.openai.azure.com/openai/v1/audio/speech?api-version=2025-03-01-preview"
+                        className="w-[340px]"
+                      />
+                    </SettingContainer>
+                  )}
+                  <SettingContainer
+                    title={t("settings.assistant.tts.apiKeyLabel")}
+                    info={t("settings.assistant.tts.apiKeyDescription")}
+                    layout="horizontal"
+                    grouped={true}
+                  >
+                    <Input
+                      type="password"
+                      value={ttsApiKey}
+                      onChange={(e) => setTtsApiKey(e.target.value)}
+                      onBlur={() => {
+                        void queueTtsTask(async () => {
+                          await setAndRefresh(
+                            commands.setAssistantTtsApiKey(ttsApiKey),
+                          );
+                        });
+                      }}
+                      className="w-[340px]"
+                    />
+                  </SettingContainer>
+                  <SettingContainer
+                    title={t("settings.assistant.tts.modelLabel")}
+                    layout="horizontal"
+                    grouped={true}
+                  >
+                    <LoadableSelect
+                      value={ttsModel}
+                      options={ttsModelOptions}
+                      onCommit={(v) => {
+                        setTtsModel(v);
+                        void queueTtsTask(async () => {
+                          await setAndRefresh(commands.setAssistantTtsModel(v));
+                        });
+                      }}
+                      onLoad={handleLoadTtsModels}
+                      loading={ttsModelsLoading}
+                      error={ttsModelsError}
+                      placeholder="gpt-4o-mini-tts"
+                      loadLabel={t("settings.assistant.tts.loadModels")}
+                      formatCreateLabel={(input) =>
+                        t("settings.assistant.tts.modelsUse", { model: input })
+                      }
+                    />
+                  </SettingContainer>
+                  <SettingContainer
+                    title={t("settings.assistant.tts.remoteVoiceLabel")}
+                    info={t("settings.assistant.tts.remoteVoiceDescription")}
+                    layout="horizontal"
+                    grouped={true}
+                  >
+                    <LoadableSelect
+                      value={ttsRemoteVoice}
+                      options={ttsVoiceOptions}
+                      onCommit={(v) => {
+                        setTtsRemoteVoice(v);
+                        void queueTtsTask(async () => {
+                          await setAndRefresh(
+                            commands.setAssistantTtsRemoteVoice(v),
+                          );
+                        });
+                      }}
+                      onLoad={handleLoadTtsVoices}
+                      loading={ttsVoicesLoading}
+                      error={ttsVoicesError}
+                      placeholder={
+                        ttsModel.toLowerCase().includes("gemini") &&
+                        ttsModel.toLowerCase().includes("tts")
+                          ? "Puck"
+                          : "alloy"
+                      }
+                      loadLabel={t("settings.assistant.tts.loadVoices")}
+                      formatCreateLabel={(input) =>
+                        t("settings.assistant.tts.voicesUse", { voice: input })
+                      }
+                    />
+                  </SettingContainer>
+                </>
+              )}
+
+              {settings?.assistant_tts_engine === "elevenlabs" && (
+                <>
+                  <SettingContainer
+                    title={t("settings.assistant.tts.apiKeyLabel")}
+                    info={t("settings.assistant.tts.apiKeyDescription")}
+                    layout="horizontal"
+                    grouped={true}
+                  >
+                    <Input
+                      type="password"
+                      value={ttsApiKey}
+                      onChange={(e) => setTtsApiKey(e.target.value)}
+                      onBlur={() => {
+                        void queueTtsTask(async () => {
+                          await setAndRefresh(
+                            commands.setAssistantTtsApiKey(ttsApiKey),
+                          );
+                        });
+                      }}
+                      className="w-[340px]"
+                    />
+                  </SettingContainer>
+                  <SettingContainer
+                    title={t("settings.assistant.tts.elevenVoiceLabel")}
+                    info={t("settings.assistant.tts.elevenVoiceDescription")}
+                    layout="horizontal"
+                    grouped={true}
+                  >
+                    <LoadableSelect
+                      value={ttsRemoteVoice}
+                      options={ttsVoiceOptions}
+                      onCommit={(v) => {
+                        setTtsRemoteVoice(v);
+                        void queueTtsTask(async () => {
+                          await setAndRefresh(
+                            commands.setAssistantTtsRemoteVoice(v),
+                          );
+                        });
+                      }}
+                      onLoad={handleLoadTtsVoices}
+                      loading={ttsVoicesLoading}
+                      error={ttsVoicesError}
+                      placeholder="JBFqnCBsd6RMkjVDRZzb"
+                      loadLabel={t("settings.assistant.tts.loadVoices")}
+                      formatCreateLabel={(input) =>
+                        t("settings.assistant.tts.voicesUse", { voice: input })
+                      }
+                    />
+                  </SettingContainer>
+                  <SettingContainer
+                    title={t("settings.assistant.tts.modelLabel")}
+                    description={t("settings.assistant.tts.modelDescription")}
+                    descriptionMode="tooltip"
+                    layout="horizontal"
+                    grouped={true}
+                  >
+                    <LoadableSelect
+                      value={ttsModel}
+                      options={ttsModelOptions}
+                      onCommit={(v) => {
+                        setTtsModel(v);
+                        void queueTtsTask(async () => {
+                          await setAndRefresh(commands.setAssistantTtsModel(v));
+                        });
+                      }}
+                      onLoad={handleLoadTtsModels}
+                      loading={ttsModelsLoading}
+                      error={ttsModelsError}
+                      placeholder="eleven_flash_v2_5"
+                      loadLabel={t("settings.assistant.tts.loadModels")}
+                      formatCreateLabel={(input) =>
+                        t("settings.assistant.tts.modelsUse", { model: input })
+                      }
+                    />
+                  </SettingContainer>
+                </>
+              )}
+
+              {settings?.assistant_tts_engine === "azure" && (
+                <>
+                  <SettingContainer
+                    title={t("settings.assistant.tts.azureBaseUrlLabel")}
+                    info={t("settings.assistant.tts.azureBaseUrlDescription")}
                     layout="horizontal"
                     grouped={true}
                   >
@@ -1494,879 +1651,727 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
                           );
                         });
                       }}
-                      placeholder="https://my-resource.openai.azure.com/openai/v1/audio/speech?api-version=2025-03-01-preview"
+                      placeholder="https://eastus2.tts.speech.microsoft.com"
                       className="w-[340px]"
                     />
                   </SettingContainer>
-                )}
-                <SettingContainer
-                  title={t("settings.assistant.tts.apiKeyLabel")}
-                  info={t("settings.assistant.tts.apiKeyDescription")}
-                  layout="horizontal"
-                  grouped={true}
-                >
-                  <Input
-                    type="password"
-                    value={ttsApiKey}
-                    onChange={(e) => setTtsApiKey(e.target.value)}
-                    onBlur={() => {
-                      void queueTtsTask(async () => {
-                        await setAndRefresh(
-                          commands.setAssistantTtsApiKey(ttsApiKey),
-                        );
-                      });
-                    }}
-                    className="w-[340px]"
-                  />
-                </SettingContainer>
-                <SettingContainer
-                  title={t("settings.assistant.tts.modelLabel")}
-                  layout="horizontal"
-                  grouped={true}
-                >
-                  <LoadableSelect
-                    value={ttsModel}
-                    options={ttsModelOptions}
-                    onCommit={(v) => {
-                      setTtsModel(v);
-                      void queueTtsTask(async () => {
-                        await setAndRefresh(commands.setAssistantTtsModel(v));
-                      });
-                    }}
-                    onLoad={handleLoadTtsModels}
-                    loading={ttsModelsLoading}
-                    error={ttsModelsError}
-                    placeholder="gpt-4o-mini-tts"
-                    loadLabel={t("settings.assistant.tts.loadModels")}
-                    formatCreateLabel={(input) =>
-                      t("settings.assistant.tts.modelsUse", { model: input })
-                    }
-                  />
-                </SettingContainer>
-                <SettingContainer
-                  title={t("settings.assistant.tts.remoteVoiceLabel")}
-                  info={t("settings.assistant.tts.remoteVoiceDescription")}
-                  layout="horizontal"
-                  grouped={true}
-                >
-                  <LoadableSelect
-                    value={ttsRemoteVoice}
-                    options={ttsVoiceOptions}
-                    onCommit={(v) => {
-                      setTtsRemoteVoice(v);
-                      void queueTtsTask(async () => {
-                        await setAndRefresh(
-                          commands.setAssistantTtsRemoteVoice(v),
-                        );
-                      });
-                    }}
-                    onLoad={handleLoadTtsVoices}
-                    loading={ttsVoicesLoading}
-                    error={ttsVoicesError}
-                    placeholder={
-                      ttsModel.toLowerCase().includes("gemini") &&
-                      ttsModel.toLowerCase().includes("tts")
-                        ? "Puck"
-                        : "alloy"
-                    }
-                    loadLabel={t("settings.assistant.tts.loadVoices")}
-                    formatCreateLabel={(input) =>
-                      t("settings.assistant.tts.voicesUse", { voice: input })
-                    }
-                  />
-                </SettingContainer>
-              </>
-            )}
-
-            {settings?.assistant_tts_engine === "elevenlabs" && (
-              <>
-                <SettingContainer
-                  title={t("settings.assistant.tts.apiKeyLabel")}
-                  info={t("settings.assistant.tts.apiKeyDescription")}
-                  layout="horizontal"
-                  grouped={true}
-                >
-                  <Input
-                    type="password"
-                    value={ttsApiKey}
-                    onChange={(e) => setTtsApiKey(e.target.value)}
-                    onBlur={() => {
-                      void queueTtsTask(async () => {
-                        await setAndRefresh(
-                          commands.setAssistantTtsApiKey(ttsApiKey),
-                        );
-                      });
-                    }}
-                    className="w-[340px]"
-                  />
-                </SettingContainer>
-                <SettingContainer
-                  title={t("settings.assistant.tts.elevenVoiceLabel")}
-                  info={t("settings.assistant.tts.elevenVoiceDescription")}
-                  layout="horizontal"
-                  grouped={true}
-                >
-                  <LoadableSelect
-                    value={ttsRemoteVoice}
-                    options={ttsVoiceOptions}
-                    onCommit={(v) => {
-                      setTtsRemoteVoice(v);
-                      void queueTtsTask(async () => {
-                        await setAndRefresh(
-                          commands.setAssistantTtsRemoteVoice(v),
-                        );
-                      });
-                    }}
-                    onLoad={handleLoadTtsVoices}
-                    loading={ttsVoicesLoading}
-                    error={ttsVoicesError}
-                    placeholder="JBFqnCBsd6RMkjVDRZzb"
-                    loadLabel={t("settings.assistant.tts.loadVoices")}
-                    formatCreateLabel={(input) =>
-                      t("settings.assistant.tts.voicesUse", { voice: input })
-                    }
-                  />
-                </SettingContainer>
-                <SettingContainer
-                  title={t("settings.assistant.tts.modelLabel")}
-                  description={t("settings.assistant.tts.modelDescription")}
-                  descriptionMode="tooltip"
-                  layout="horizontal"
-                  grouped={true}
-                >
-                  <LoadableSelect
-                    value={ttsModel}
-                    options={ttsModelOptions}
-                    onCommit={(v) => {
-                      setTtsModel(v);
-                      void queueTtsTask(async () => {
-                        await setAndRefresh(commands.setAssistantTtsModel(v));
-                      });
-                    }}
-                    onLoad={handleLoadTtsModels}
-                    loading={ttsModelsLoading}
-                    error={ttsModelsError}
-                    placeholder="eleven_flash_v2_5"
-                    loadLabel={t("settings.assistant.tts.loadModels")}
-                    formatCreateLabel={(input) =>
-                      t("settings.assistant.tts.modelsUse", { model: input })
-                    }
-                  />
-                </SettingContainer>
-              </>
-            )}
-
-            {settings?.assistant_tts_engine === "azure" && (
-              <>
-                <SettingContainer
-                  title={t("settings.assistant.tts.azureBaseUrlLabel")}
-                  info={t("settings.assistant.tts.azureBaseUrlDescription")}
-                  layout="horizontal"
-                  grouped={true}
-                >
-                  <Input
-                    type="text"
-                    value={ttsBaseUrl}
-                    onChange={(e) => setTtsBaseUrl(e.target.value)}
-                    onBlur={() => {
-                      void queueTtsTask(async () => {
-                        await setAndRefresh(
-                          commands.setAssistantTtsBaseUrl(ttsBaseUrl),
-                        );
-                      });
-                    }}
-                    placeholder="https://eastus2.tts.speech.microsoft.com"
-                    className="w-[340px]"
-                  />
-                </SettingContainer>
-                <SettingContainer
-                  title={t("settings.assistant.tts.apiKeyLabel")}
-                  info={t("settings.assistant.tts.apiKeyDescription")}
-                  layout="horizontal"
-                  grouped={true}
-                >
-                  <Input
-                    type="password"
-                    value={ttsApiKey}
-                    onChange={(e) => setTtsApiKey(e.target.value)}
-                    onBlur={() => {
-                      void queueTtsTask(async () => {
-                        await setAndRefresh(
-                          commands.setAssistantTtsApiKey(ttsApiKey),
-                        );
-                      });
-                    }}
-                    className="w-[340px]"
-                  />
-                </SettingContainer>
-                <SettingContainer
-                  title={t("settings.assistant.tts.azureVoiceLabel")}
-                  info={t("settings.assistant.tts.azureVoiceDescription")}
-                  layout="horizontal"
-                  grouped={true}
-                >
-                  <LoadableSelect
-                    value={ttsRemoteVoice}
-                    options={ttsVoiceOptions}
-                    onCommit={(v) => {
-                      setTtsRemoteVoice(v);
-                      void queueTtsTask(async () => {
-                        await setAndRefresh(
-                          commands.setAssistantTtsRemoteVoice(v),
-                        );
-                      });
-                    }}
-                    onLoad={handleLoadTtsVoices}
-                    loading={ttsVoicesLoading}
-                    error={ttsVoicesError}
-                    placeholder="en-US-JennyNeural"
-                    loadLabel={t("settings.assistant.tts.loadVoices")}
-                    formatCreateLabel={(input) =>
-                      t("settings.assistant.tts.voicesUse", { voice: input })
-                    }
-                  />
-                </SettingContainer>
-              </>
-            )}
-
-            <SettingContainer
-              title={t("settings.assistant.tts.speedLabel")}
-              info={t("settings.assistant.tts.speedDescription")}
-              layout="horizontal"
-              grouped={true}
-            >
-              <div className="flex items-center gap-1.5">
-                {TTS_SPEED_PRESETS.map((preset) => {
-                  const active = Math.abs(currentTtsSpeed - preset) < 0.001;
-                  return (
-                    <button
-                      key={preset}
-                      type="button"
-                      onClick={() => {
-                        void queueTtsTask(() => commitTtsSpeed(preset));
+                  <SettingContainer
+                    title={t("settings.assistant.tts.apiKeyLabel")}
+                    info={t("settings.assistant.tts.apiKeyDescription")}
+                    layout="horizontal"
+                    grouped={true}
+                  >
+                    <Input
+                      type="password"
+                      value={ttsApiKey}
+                      onChange={(e) => setTtsApiKey(e.target.value)}
+                      onBlur={() => {
+                        void queueTtsTask(async () => {
+                          await setAndRefresh(
+                            commands.setAssistantTtsApiKey(ttsApiKey),
+                          );
+                        });
                       }}
-                      disabled={!settings?.assistant_tts_enabled}
-                      className={`px-2.5 py-1 text-[13px] font-medium rounded-md transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
-                        active
-                          ? "bg-accent/12 text-accent"
-                          : "bg-surface-strong text-muted hover:text-ink"
-                      }`}
-                    >
-                      {t("settings.assistant.tts.speedValue", {
-                        value: preset,
-                      })}
-                    </button>
-                  );
-                })}
-                <Input
-                  type="number"
-                  value={ttsSpeedInput}
-                  onChange={(e) => setTtsSpeedInput(e.target.value)}
-                  onBlur={handleTtsSpeedBlur}
-                  min="0.25"
-                  max="4"
-                  step="0.1"
-                  disabled={!settings?.assistant_tts_enabled}
-                  aria-label={t("settings.assistant.tts.speedCustomLabel")}
-                  className="w-20"
-                />
-              </div>
-            </SettingContainer>
+                      className="w-[340px]"
+                    />
+                  </SettingContainer>
+                  <SettingContainer
+                    title={t("settings.assistant.tts.azureVoiceLabel")}
+                    info={t("settings.assistant.tts.azureVoiceDescription")}
+                    layout="horizontal"
+                    grouped={true}
+                  >
+                    <LoadableSelect
+                      value={ttsRemoteVoice}
+                      options={ttsVoiceOptions}
+                      onCommit={(v) => {
+                        setTtsRemoteVoice(v);
+                        void queueTtsTask(async () => {
+                          await setAndRefresh(
+                            commands.setAssistantTtsRemoteVoice(v),
+                          );
+                        });
+                      }}
+                      onLoad={handleLoadTtsVoices}
+                      loading={ttsVoicesLoading}
+                      error={ttsVoicesError}
+                      placeholder="en-US-JennyNeural"
+                      loadLabel={t("settings.assistant.tts.loadVoices")}
+                      formatCreateLabel={(input) =>
+                        t("settings.assistant.tts.voicesUse", { voice: input })
+                      }
+                    />
+                  </SettingContainer>
+                </>
+              )}
 
-            {/* Its own control, deliberately. Spoken replies used to be gained
+              <SettingContainer
+                title={t("settings.assistant.tts.speedLabel")}
+                info={t("settings.assistant.tts.speedDescription")}
+                layout="horizontal"
+                grouped={true}
+              >
+                <div className="flex items-center gap-1.5">
+                  {TTS_SPEED_PRESETS.map((preset) => {
+                    const active = Math.abs(currentTtsSpeed - preset) < 0.001;
+                    return (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => {
+                          void queueTtsTask(() => commitTtsSpeed(preset));
+                        }}
+                        disabled={!settings?.assistant_tts_enabled}
+                        className={`px-2.5 py-1 text-[13px] font-medium rounded-md transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
+                          active
+                            ? "bg-accent/12 text-accent"
+                            : "bg-surface-strong text-muted hover:text-ink"
+                        }`}
+                      >
+                        {t("settings.assistant.tts.speedValue", {
+                          value: preset,
+                        })}
+                      </button>
+                    );
+                  })}
+                  <Input
+                    type="number"
+                    value={ttsSpeedInput}
+                    onChange={(e) => setTtsSpeedInput(e.target.value)}
+                    onBlur={handleTtsSpeedBlur}
+                    min="0.25"
+                    max="4"
+                    step="0.1"
+                    disabled={!settings?.assistant_tts_enabled}
+                    aria-label={t("settings.assistant.tts.speedCustomLabel")}
+                    className="w-20"
+                  />
+                </div>
+              </SettingContainer>
+
+              {/* Its own control, deliberately. Spoken replies used to be gained
                 by the feedback-sound slider, which is greyed out whenever
                 feedback sounds are off — so turning the beeps down once and
                 then switching them off left the voice quiet with nothing to
                 turn it back up. Unlike Speed it stays enabled with spoken
                 replies off, because a call turns them on regardless. */}
-            <Slider
-              value={settings?.assistant_tts_volume ?? 1}
-              onChange={(value) =>
-                setAndRefresh(commands.setAssistantTtsVolume(value))
-              }
-              min={0}
-              max={1}
-              step={0.05}
-              label={t("settings.assistant.tts.volumeLabel")}
-              info={t("settings.assistant.tts.volumeDescription")}
-              grouped={true}
-              controlClassName="w-[200px]"
-              formatValue={(v) => `${Math.round(v * 100)}%`}
-            />
+              <Slider
+                value={settings?.assistant_tts_volume ?? 1}
+                onChange={(value) =>
+                  setAndRefresh(commands.setAssistantTtsVolume(value))
+                }
+                min={0}
+                max={1}
+                step={0.05}
+                label={t("settings.assistant.tts.volumeLabel")}
+                info={t("settings.assistant.tts.volumeDescription")}
+                grouped={true}
+                controlClassName="w-[200px]"
+                formatValue={(v) => `${Math.round(v * 100)}%`}
+              />
 
-            <SettingContainer
-              title={t("settings.assistant.tts.testLabel")}
-              layout="horizontal"
-              grouped={true}
-            >
-              <div className="flex flex-col items-end gap-1">
-                <button
-                  type="button"
-                  onClick={handleTestTts}
-                  disabled={
-                    !settings?.assistant_tts_enabled || testState === "testing"
-                  }
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-hairline-strong bg-surface hover:bg-surface-strong disabled:opacity-50 disabled:cursor-not-allowed text-[13px] font-medium cursor-pointer transition-colors"
-                >
-                  <Volume2 size={14} />
-                  {testState === "testing"
-                    ? t("settings.assistant.tts.testing")
-                    : testState === "ok"
-                      ? t("settings.assistant.tts.testOk")
-                      : t("settings.assistant.tts.testButton")}
-                </button>
-                {testState === "error" && testError && (
-                  <span className="text-xs text-error max-w-[360px] text-right break-words">
-                    {testError}
-                  </span>
-                )}
-              </div>
-            </SettingContainer>
-
-            <ToggleSwitch
-              checked={settings?.assistant_tts_stop_on_dictation ?? false}
-              onChange={(checked) =>
-                setAndRefresh(commands.setAssistantTtsStopOnDictation(checked))
-              }
-              label={t("settings.assistant.tts.stopOnDictationLabel")}
-              grouped={true}
-            />
-            {(settings?.assistant_tts_engine ?? "kokoro") === "kokoro" && (
               <SettingContainer
-                title={t("settings.assistant.tts.dtypeLabel")}
-                info={t("settings.assistant.tts.dtypeDescription")}
+                title={t("settings.assistant.tts.testLabel")}
                 layout="horizontal"
                 grouped={true}
               >
-                <Dropdown
-                  options={KOKORO_DTYPES}
-                  selectedValue={settings?.assistant_tts_kokoro_dtype ?? "fp32"}
-                  onSelect={(dtype) =>
-                    setAndRefresh(commands.setAssistantTtsKokoroDtype(dtype))
-                  }
-                  disabled={!settings?.assistant_tts_enabled}
-                />
+                <div className="flex flex-col items-end gap-1">
+                  <button
+                    type="button"
+                    onClick={handleTestTts}
+                    disabled={
+                      !settings?.assistant_tts_enabled ||
+                      testState === "testing"
+                    }
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-hairline-strong bg-surface hover:bg-surface-strong disabled:opacity-50 disabled:cursor-not-allowed text-[13px] font-medium cursor-pointer transition-colors"
+                  >
+                    <Volume2 size={14} />
+                    {testState === "testing"
+                      ? t("settings.assistant.tts.testing")
+                      : testState === "ok"
+                        ? t("settings.assistant.tts.testOk")
+                        : t("settings.assistant.tts.testButton")}
+                  </button>
+                  {testState === "error" && testError && (
+                    <span className="text-xs text-error max-w-[360px] text-right break-words">
+                      {testError}
+                    </span>
+                  )}
+                </div>
               </SettingContainer>
-            )}
-          </>
-        )}
-      </SettingsGroup>
+
+              <ToggleSwitch
+                checked={settings?.assistant_tts_stop_on_dictation ?? false}
+                onChange={(checked) =>
+                  setAndRefresh(
+                    commands.setAssistantTtsStopOnDictation(checked),
+                  )
+                }
+                label={t("settings.assistant.tts.stopOnDictationLabel")}
+                grouped={true}
+              />
+              {(settings?.assistant_tts_engine ?? "kokoro") === "kokoro" && (
+                <SettingContainer
+                  title={t("settings.assistant.tts.dtypeLabel")}
+                  info={t("settings.assistant.tts.dtypeDescription")}
+                  layout="horizontal"
+                  grouped={true}
+                >
+                  <Dropdown
+                    options={KOKORO_DTYPES}
+                    selectedValue={
+                      settings?.assistant_tts_kokoro_dtype ?? "fp32"
+                    }
+                    onSelect={(dtype) =>
+                      setAndRefresh(commands.setAssistantTtsKokoroDtype(dtype))
+                    }
+                    disabled={!settings?.assistant_tts_enabled}
+                  />
+                </SettingContainer>
+              )}
+            </>
+          )}
+        </SettingsGroup>
+      )}
 
       {/* Screen vision ---------------------------------------------------- */}
-      <SettingsGroup
-        title={t("settings.assistant.vision.title")}
-        icon={Monitor}
-      >
-        <SettingContainer
-          title={t("settings.assistant.vision.modeLabel")}
-          info={screenAccessDescription}
-          layout="horizontal"
-          grouped={true}
+      {show("vision") && (
+        <SettingsGroup
+          title={groupTitle(t("settings.assistant.vision.title"))}
+          icon={Monitor}
         >
-          <Dropdown
-            options={[
-              {
-                value: "off",
-                label: t("settings.assistant.vision.modes.off"),
-              },
-              {
-                value: "manual",
-                label: t("settings.assistant.vision.modes.manual"),
-              },
-              {
-                value: "agent_decides",
-                label: t("settings.assistant.vision.modes.agentDecides"),
-              },
-            ]}
-            selectedValue={screenAccessMode}
-            onSelect={(mode) =>
-              setAndRefresh(
-                commands.setAssistantScreenAccessMode(
-                  mode as AssistantScreenAccessMode,
-                ),
-              )
-            }
-          />
-        </SettingContainer>
-        {screenAccessMode !== "off" && (
           <SettingContainer
-            title={t("settings.assistant.vision.timing.label")}
-            info={t(
-              screenAccessMode === "agent_decides"
-                ? "settings.assistant.vision.timing.descriptionAgent"
-                : "settings.assistant.vision.timing.description",
-            )}
+            title={t("settings.assistant.vision.modeLabel")}
+            info={screenAccessDescription}
             layout="horizontal"
             grouped={true}
           >
             <Dropdown
               options={[
                 {
-                  value: "immediate",
-                  label: t(
-                    "settings.assistant.vision.timing.options.immediate",
-                  ),
+                  value: "off",
+                  label: t("settings.assistant.vision.modes.off"),
                 },
                 {
-                  value: "on_send",
-                  label: t("settings.assistant.vision.timing.options.on_send"),
+                  value: "manual",
+                  label: t("settings.assistant.vision.modes.manual"),
+                },
+                {
+                  value: "agent_decides",
+                  label: t("settings.assistant.vision.modes.agentDecides"),
                 },
               ]}
-              selectedValue={
-                settings?.assistant_vision_capture_timing ?? "immediate"
-              }
-              onSelect={(value) =>
+              selectedValue={screenAccessMode}
+              onSelect={(mode) =>
                 setAndRefresh(
-                  commands.setAssistantVisionCaptureTiming(
-                    value as VisionCaptureTiming,
+                  commands.setAssistantScreenAccessMode(
+                    mode as AssistantScreenAccessMode,
                   ),
                 )
               }
             />
           </SettingContainer>
-        )}
-        {screenAccessMode !== "off" && <ScreenRecordingPermission />}
-      </SettingsGroup>
-
-      {/* Web search ------------------------------------------------------- */}
-      <SettingsGroup
-        title={t("settings.assistant.webSearch.title")}
-        icon={Globe}
-      >
-        <ToggleSwitch
-          checked={webSearchEnabled}
-          onChange={(checked) =>
-            setAndRefresh(commands.setAssistantWebSearchEnabled(checked))
-          }
-          label={t("settings.assistant.webSearch.enableLabel")}
-          description={t("settings.assistant.webSearch.enableDescription")}
-          grouped={true}
-        />
-        {webSearchEnabled && (
-          <>
-            {selectedProviderId === "openrouter" && (
-              <ToggleSwitch
-                checked={settings?.assistant_prefer_provider_web_search ?? true}
-                onChange={(checked) =>
-                  setAndRefresh(
-                    commands.setAssistantPreferProviderWebSearch(checked),
-                  )
-                }
-                label={t("settings.assistant.webSearch.openRouterNativeLabel")}
-                info={t(
-                  "settings.assistant.webSearch.openRouterNativeDescription",
-                )}
-                grouped={true}
-              />
-            )}
+          {screenAccessMode !== "off" && (
             <SettingContainer
-              title={t("settings.assistant.webSearch.providerLabel")}
-              info={t("settings.assistant.webSearch.providerDescription")}
+              title={t("settings.assistant.vision.timing.label")}
+              info={t(
+                screenAccessMode === "agent_decides"
+                  ? "settings.assistant.vision.timing.descriptionAgent"
+                  : "settings.assistant.vision.timing.description",
+              )}
               layout="horizontal"
               grouped={true}
             >
               <Dropdown
                 options={[
                   {
-                    value: "serper",
-                    label: t("settings.assistant.webSearch.providers.serper"),
+                    value: "immediate",
+                    label: t(
+                      "settings.assistant.vision.timing.options.immediate",
+                    ),
                   },
                   {
-                    value: "brave",
-                    label: t("settings.assistant.webSearch.providers.brave"),
-                  },
-                  {
-                    value: "tavily",
-                    label: t("settings.assistant.webSearch.providers.tavily"),
-                  },
-                  {
-                    value: "exa",
-                    label: t("settings.assistant.webSearch.providers.exa"),
-                  },
-                  {
-                    value: "serpapi",
-                    label: t("settings.assistant.webSearch.providers.serpapi"),
-                  },
-                  {
-                    value: "tinyfish",
-                    label: t("settings.assistant.webSearch.providers.tinyfish"),
+                    value: "on_send",
+                    label: t(
+                      "settings.assistant.vision.timing.options.on_send",
+                    ),
                   },
                 ]}
-                selectedValue={webSearchProvider}
-                onSelect={(provider) =>
+                selectedValue={
+                  settings?.assistant_vision_capture_timing ?? "immediate"
+                }
+                onSelect={(value) =>
                   setAndRefresh(
-                    commands.setAssistantWebSearchProvider(provider),
+                    commands.setAssistantVisionCaptureTiming(
+                      value as VisionCaptureTiming,
+                    ),
                   )
                 }
-                disabled={!webSearchEnabled}
               />
             </SettingContainer>
+          )}
+          {screenAccessMode !== "off" && <ScreenRecordingPermission />}
+        </SettingsGroup>
+      )}
 
-            {webSearchNeedsKey && (
+      {/* Web search ------------------------------------------------------- */}
+      {show("webSearch") && (
+        <SettingsGroup
+          title={groupTitle(t("settings.assistant.webSearch.title"))}
+          icon={Globe}
+        >
+          <ToggleSwitch
+            checked={webSearchEnabled}
+            onChange={(checked) =>
+              setAndRefresh(commands.setAssistantWebSearchEnabled(checked))
+            }
+            label={t("settings.assistant.webSearch.enableLabel")}
+            description={t("settings.assistant.webSearch.enableDescription")}
+            grouped={true}
+          />
+          {webSearchEnabled && (
+            <>
+              {selectedProviderId === "openrouter" && (
+                <ToggleSwitch
+                  checked={
+                    settings?.assistant_prefer_provider_web_search ?? true
+                  }
+                  onChange={(checked) =>
+                    setAndRefresh(
+                      commands.setAssistantPreferProviderWebSearch(checked),
+                    )
+                  }
+                  label={t(
+                    "settings.assistant.webSearch.openRouterNativeLabel",
+                  )}
+                  info={t(
+                    "settings.assistant.webSearch.openRouterNativeDescription",
+                  )}
+                  grouped={true}
+                />
+              )}
               <SettingContainer
-                title={t("settings.assistant.webSearch.apiKeyLabel")}
-                layout="horizontal"
+                title={t("settings.assistant.webSearch.providerLabel")}
+                info={t("settings.assistant.webSearch.providerDescription")}
+                layout="stacked"
                 grouped={true}
               >
-                <Input
-                  type="password"
-                  value={webSearchApiKey}
-                  onChange={(e) => setWebSearchApiKey(e.target.value)}
-                  onBlur={handleWebSearchApiKeyBlur}
-                  placeholder={t(
-                    "settings.assistant.webSearch.apiKeyPlaceholder",
-                  )}
-                  className="min-w-[320px]"
+                <LogoChoice
+                  label={t("settings.assistant.webSearch.providerLabel")}
+                  minTile="9rem"
+                  readyLabel={t("assistantPage.cards.keySaved")}
+                  options={(
+                    [
+                      "tinyfish",
+                      "serper",
+                      "brave",
+                      "tavily",
+                      "exa",
+                      "serpapi",
+                    ] as const
+                  ).map((provider) => ({
+                    value: provider,
+                    label: t(
+                      `settings.assistant.webSearch.providers.${provider}`,
+                    ).replace(/\s*\([^)]*\)\s*$/, ""),
+                    hint: t(`assistantPage.cards.webSearch.hints.${provider}`),
+                    ready: !!settings?.web_search_api_keys?.[provider]?.trim(),
+                    icon: (
+                      <ProviderTile id={provider} kind="search" size="md" />
+                    ),
+                  }))}
+                  value={webSearchProvider}
+                  onChange={(provider) =>
+                    setAndRefresh(
+                      commands.setAssistantWebSearchProvider(provider),
+                    )
+                  }
                   disabled={!webSearchEnabled}
                 />
               </SettingContainer>
-            )}
 
-            <SettingContainer
-              title={t("settings.assistant.webSearch.testLabel")}
-              layout="horizontal"
-              grouped={true}
-            >
-              <div className="flex flex-col items-end gap-1">
-                <button
-                  type="button"
-                  onClick={handleTestWebSearch}
-                  disabled={!webSearchEnabled || webSearchTest === "testing"}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-hairline-strong bg-surface hover:bg-surface-strong disabled:opacity-50 disabled:cursor-not-allowed text-[13px] font-medium cursor-pointer transition-colors"
+              {webSearchNeedsKey && (
+                <SettingContainer
+                  title={t("settings.assistant.webSearch.apiKeyLabel")}
+                  layout="horizontal"
+                  grouped={true}
                 >
-                  <Globe size={14} />
-                  {webSearchTest === "testing"
-                    ? t("settings.assistant.webSearch.testing")
-                    : t("settings.assistant.webSearch.testButton")}
-                </button>
-                {webSearchTestMsg && (
-                  <span
-                    className={`text-xs max-w-[360px] text-right break-words ${
-                      webSearchTest === "error"
-                        ? "text-error"
-                        : "text-muted-soft"
-                    }`}
-                  >
-                    {webSearchTestMsg}
-                  </span>
-                )}
-              </div>
-            </SettingContainer>
+                  <Input
+                    type="password"
+                    value={webSearchApiKey}
+                    onChange={(e) => setWebSearchApiKey(e.target.value)}
+                    onBlur={handleWebSearchApiKeyBlur}
+                    placeholder={t(
+                      "settings.assistant.webSearch.apiKeyPlaceholder",
+                    )}
+                    className="min-w-[320px]"
+                    disabled={!webSearchEnabled}
+                  />
+                </SettingContainer>
+              )}
 
-            <SettingContainer
-              title={t("settings.assistant.webSearch.depthLabel")}
-              info={t("settings.assistant.webSearch.depthDescription")}
-              layout="horizontal"
-              grouped={true}
-            >
-              <Dropdown
-                options={[
-                  {
-                    value: "low",
-                    label: t("settings.assistant.webSearch.depthOptions.low"),
-                  },
-                  {
-                    value: "medium",
-                    label: t(
-                      "settings.assistant.webSearch.depthOptions.medium",
-                    ),
-                  },
-                  {
-                    value: "high",
-                    label: t("settings.assistant.webSearch.depthOptions.high"),
-                  },
-                ]}
-                selectedValue={settings?.assistant_search_depth ?? "medium"}
-                onSelect={(depth) =>
-                  setAndRefresh(
-                    commands.setAssistantSearchDepth(
-                      depth as AssistantSearchDepth,
-                    ),
-                  )
-                }
-                disabled={!webSearchEnabled}
-              />
-            </SettingContainer>
-
-            {selectedProviderId === "builtin" && (
-              <ToggleSwitch
-                checked={settings?.assistant_local_search_smart ?? false}
-                onChange={(checked) =>
-                  setAndRefresh(commands.setAssistantLocalSearchSmart(checked))
-                }
-                label={t("settings.assistant.webSearch.localSmartLabel")}
-                info={t("settings.assistant.webSearch.localSmartDescription")}
+              <SettingContainer
+                title={t("settings.assistant.webSearch.testLabel")}
+                layout="horizontal"
                 grouped={true}
-                disabled={!webSearchEnabled}
-              />
-            )}
-          </>
-        )}
-      </SettingsGroup>
+              >
+                <div className="flex flex-col items-end gap-1">
+                  <button
+                    type="button"
+                    onClick={handleTestWebSearch}
+                    disabled={!webSearchEnabled || webSearchTest === "testing"}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-hairline-strong bg-surface hover:bg-surface-strong disabled:opacity-50 disabled:cursor-not-allowed text-[13px] font-medium cursor-pointer transition-colors"
+                  >
+                    <Globe size={14} />
+                    {webSearchTest === "testing"
+                      ? t("settings.assistant.webSearch.testing")
+                      : t("settings.assistant.webSearch.testButton")}
+                  </button>
+                  {webSearchTestMsg && (
+                    <span
+                      className={`text-xs max-w-[360px] text-right break-words ${
+                        webSearchTest === "error"
+                          ? "text-error"
+                          : "text-muted-soft"
+                      }`}
+                    >
+                      {webSearchTestMsg}
+                    </span>
+                  )}
+                </div>
+              </SettingContainer>
+
+              <SettingContainer
+                title={t("settings.assistant.webSearch.depthLabel")}
+                info={t("settings.assistant.webSearch.depthDescription")}
+                layout="horizontal"
+                grouped={true}
+              >
+                <Dropdown
+                  options={[
+                    {
+                      value: "low",
+                      label: t("settings.assistant.webSearch.depthOptions.low"),
+                    },
+                    {
+                      value: "medium",
+                      label: t(
+                        "settings.assistant.webSearch.depthOptions.medium",
+                      ),
+                    },
+                    {
+                      value: "high",
+                      label: t(
+                        "settings.assistant.webSearch.depthOptions.high",
+                      ),
+                    },
+                  ]}
+                  selectedValue={settings?.assistant_search_depth ?? "medium"}
+                  onSelect={(depth) =>
+                    setAndRefresh(
+                      commands.setAssistantSearchDepth(
+                        depth as AssistantSearchDepth,
+                      ),
+                    )
+                  }
+                  disabled={!webSearchEnabled}
+                />
+              </SettingContainer>
+
+              {selectedProviderId === "builtin" && (
+                <ToggleSwitch
+                  checked={settings?.assistant_local_search_smart ?? false}
+                  onChange={(checked) =>
+                    setAndRefresh(
+                      commands.setAssistantLocalSearchSmart(checked),
+                    )
+                  }
+                  label={t("settings.assistant.webSearch.localSmartLabel")}
+                  info={t("settings.assistant.webSearch.localSmartDescription")}
+                  grouped={true}
+                  disabled={!webSearchEnabled}
+                />
+              )}
+            </>
+          )}
+        </SettingsGroup>
+      )}
 
       {/* Reminders ---------------------------------------------------------
           Directly after search, because both are things the assistant does on
           your behalf rather than settings that change how it talks. */}
-      <RemindersSettings />
+      {show("reminders") && <RemindersSettings />}
 
       {/* Panel appearance -------------------------------------------------- */}
-      <SettingsGroup
-        title={t("settings.assistant.appearance.title")}
-        icon={PanelTop}
-      >
-        <SettingContainer
-          title={t("settings.assistant.appearance.previewLabel")}
-          layout="stacked"
-          grouped={true}
+      {show("appearance") && (
+        <SettingsGroup
+          title={groupTitle(t("settings.assistant.appearance.title"))}
+          icon={PanelTop}
         >
-          <PanelPreview
-            fontSize={settings?.assistant_font_size ?? "medium"}
-            opacity={settings?.assistant_panel_opacity ?? 1}
-          />
-        </SettingContainer>
-        <SettingContainer
-          title={t("settings.assistant.appearance.fontSizeLabel")}
-          layout="horizontal"
-          grouped={true}
-        >
-          <Dropdown
-            options={[
-              {
-                value: "small",
-                label: t("settings.assistant.appearance.fontSizes.small"),
-              },
-              {
-                value: "medium",
-                label: t("settings.assistant.appearance.fontSizes.medium"),
-              },
-              {
-                value: "large",
-                label: t("settings.assistant.appearance.fontSizes.large"),
-              },
-              {
-                value: "extra_large",
-                label: t("settings.assistant.appearance.fontSizes.extraLarge"),
-              },
-            ]}
-            selectedValue={settings?.assistant_font_size ?? "medium"}
-            onSelect={(size) =>
-              setAndRefresh(commands.setAssistantFontSize(size))
-            }
-          />
-        </SettingContainer>
-        <SettingContainer
-          title={t("settings.assistant.appearance.panelSizeLabel")}
-          info={t("settings.assistant.appearance.panelSizeDescription")}
-          layout="horizontal"
-          grouped={true}
-        >
-          <Dropdown
-            options={[
-              {
-                value: "mini",
-                label: t("settings.assistant.appearance.panelSizes.mini"),
-              },
-              {
-                value: "compact",
-                label: t("settings.assistant.appearance.panelSizes.compact"),
-              },
-              {
-                value: "standard",
-                label: t("settings.assistant.appearance.panelSizes.standard"),
-              },
-              {
-                value: "large",
-                label: t("settings.assistant.appearance.panelSizes.large"),
-              },
-            ]}
-            selectedValue={settings?.assistant_panel_size ?? "standard"}
-            onSelect={(size) =>
-              setAndRefresh(commands.setAssistantPanelSize(size))
-            }
-          />
-        </SettingContainer>
-        {/* Only worth showing when there is a choice to make. On one monitor the
-            row would be a dropdown with a single meaningful entry. */}
-        {displays.length > 1 && (
           <SettingContainer
-            title={t("settings.assistant.appearance.askDisplayLabel")}
-            info={t("settings.assistant.appearance.askDisplayDescription")}
+            title={t("settings.assistant.appearance.previewLabel")}
+            layout="stacked"
+            grouped={true}
+          >
+            <PanelPreview
+              fontSize={settings?.assistant_font_size ?? "medium"}
+              opacity={settings?.assistant_panel_opacity ?? 1}
+            />
+          </SettingContainer>
+          <SettingContainer
+            title={t("settings.assistant.appearance.fontSizeLabel")}
             layout="horizontal"
             grouped={true}
           >
             <Dropdown
               options={[
                 {
-                  value: "last_used",
-                  // Naming the screen it currently resolves to is what makes this
-                  // option usable. On its own it is a policy with no visible
-                  // consequence, and working out which physical monitor is which is
-                  // the hardest part of any display picker.
-                  label: currentDisplayNumber
-                    ? t(
-                        "settings.assistant.appearance.askDisplays.lastUsedOn",
-                        {
-                          number: currentDisplayNumber,
-                        },
-                      )
-                    : t("settings.assistant.appearance.askDisplays.lastUsed"),
+                  value: "small",
+                  label: t("settings.assistant.appearance.fontSizes.small"),
                 },
                 {
-                  value: "cursor",
-                  label: t("settings.assistant.appearance.askDisplays.cursor"),
+                  value: "medium",
+                  label: t("settings.assistant.appearance.fontSizes.medium"),
                 },
-                ...displays.map((display, index) => ({
-                  value: display.id,
-                  // Numbered by position in the list, because a raw device name
-                  // ("\\.\DISPLAY2") means nothing to anyone. The resolution is what
-                  // people actually recognise their screens by, so it carries the
-                  // label rather than sitting in a tooltip.
+                {
+                  value: "large",
+                  label: t("settings.assistant.appearance.fontSizes.large"),
+                },
+                {
+                  value: "extra_large",
                   label: t(
-                    "settings.assistant.appearance.askDisplays.numbered",
-                    {
-                      number: index + 1,
-                      width: display.width,
-                      height: display.height,
-                      suffix: display.is_primary
-                        ? t(
-                            "settings.assistant.appearance.askDisplays.mainSuffix",
-                          )
-                        : "",
-                    },
+                    "settings.assistant.appearance.fontSizes.extraLarge",
                   ),
-                })),
+                },
               ]}
-              selectedValue={settings?.assistant_ask_display ?? "last_used"}
-              onSelect={(display) =>
-                setAndRefresh(commands.setAssistantAskDisplay(display))
+              selectedValue={settings?.assistant_font_size ?? "medium"}
+              onSelect={(size) =>
+                setAndRefresh(commands.setAssistantFontSize(size))
               }
             />
           </SettingContainer>
-        )}
-        <SettingContainer
-          title={t("settings.assistant.appearance.askAnchorLabel")}
-          info={t("settings.assistant.appearance.askAnchorDescription")}
-          layout="horizontal"
-          grouped={true}
-        >
-          <Dropdown
-            options={[
-              {
-                value: "center",
-                label: t("settings.assistant.appearance.askAnchors.center"),
-              },
-              {
-                value: "topcenter",
-                label: t("settings.assistant.appearance.askAnchors.top"),
-              },
-              {
-                value: "bottomcenter",
-                label: t("settings.assistant.appearance.askAnchors.bottom"),
-              },
-              {
-                value: "left",
-                label: t("settings.assistant.appearance.askAnchors.left"),
-              },
-              {
-                value: "right",
-                label: t("settings.assistant.appearance.askAnchors.right"),
-              },
-              // "Where I left it" is deliberately absent. Dragging used to set it,
-              // which meant the one gesture available on the surface permanently
-              // switched off the zone that shapes it — and left a stale coordinate
-              // behind that every later open obeyed, so the panel opened off-centre
-              // for no visible reason. A drop now picks a zone instead, and a stored
-              // `custom` from before reads as Centre (see `default_position_for`).
-            ]}
-            selectedValue={
-              settings?.assistant_ask_anchor === "custom"
-                ? "center"
-                : (settings?.assistant_ask_anchor ?? "center")
+          <SettingContainer
+            title={t("settings.assistant.appearance.panelSizeLabel")}
+            info={t("settings.assistant.appearance.panelSizeDescription")}
+            layout="horizontal"
+            grouped={true}
+          >
+            <Dropdown
+              options={[
+                {
+                  value: "mini",
+                  label: t("settings.assistant.appearance.panelSizes.mini"),
+                },
+                {
+                  value: "compact",
+                  label: t("settings.assistant.appearance.panelSizes.compact"),
+                },
+                {
+                  value: "standard",
+                  label: t("settings.assistant.appearance.panelSizes.standard"),
+                },
+                {
+                  value: "large",
+                  label: t("settings.assistant.appearance.panelSizes.large"),
+                },
+              ]}
+              selectedValue={settings?.assistant_panel_size ?? "standard"}
+              onSelect={(size) =>
+                setAndRefresh(commands.setAssistantPanelSize(size))
+              }
+            />
+          </SettingContainer>
+          {/* Only worth showing when there is a choice to make. On one monitor the
+            row would be a dropdown with a single meaningful entry. */}
+          {displays.length > 1 && (
+            <SettingContainer
+              title={t("settings.assistant.appearance.askDisplayLabel")}
+              info={t("settings.assistant.appearance.askDisplayDescription")}
+              layout="horizontal"
+              grouped={true}
+            >
+              <Dropdown
+                options={[
+                  {
+                    value: "last_used",
+                    // Naming the screen it currently resolves to is what makes this
+                    // option usable. On its own it is a policy with no visible
+                    // consequence, and working out which physical monitor is which is
+                    // the hardest part of any display picker.
+                    label: currentDisplayNumber
+                      ? t(
+                          "settings.assistant.appearance.askDisplays.lastUsedOn",
+                          {
+                            number: currentDisplayNumber,
+                          },
+                        )
+                      : t("settings.assistant.appearance.askDisplays.lastUsed"),
+                  },
+                  {
+                    value: "cursor",
+                    label: t(
+                      "settings.assistant.appearance.askDisplays.cursor",
+                    ),
+                  },
+                  ...displays.map((display, index) => ({
+                    value: display.id,
+                    // Numbered by position in the list, because a raw device name
+                    // ("\\.\DISPLAY2") means nothing to anyone. The resolution is what
+                    // people actually recognise their screens by, so it carries the
+                    // label rather than sitting in a tooltip.
+                    label: t(
+                      "settings.assistant.appearance.askDisplays.numbered",
+                      {
+                        number: index + 1,
+                        width: display.width,
+                        height: display.height,
+                        suffix: display.is_primary
+                          ? t(
+                              "settings.assistant.appearance.askDisplays.mainSuffix",
+                            )
+                          : "",
+                      },
+                    ),
+                  })),
+                ]}
+                selectedValue={settings?.assistant_ask_display ?? "last_used"}
+                onSelect={(display) =>
+                  setAndRefresh(commands.setAssistantAskDisplay(display))
+                }
+              />
+            </SettingContainer>
+          )}
+          <SettingContainer
+            title={t("settings.assistant.appearance.askAnchorLabel")}
+            info={t("settings.assistant.appearance.askAnchorDescription")}
+            layout="horizontal"
+            grouped={true}
+          >
+            <Dropdown
+              options={[
+                {
+                  value: "center",
+                  label: t("settings.assistant.appearance.askAnchors.center"),
+                },
+                {
+                  value: "topcenter",
+                  label: t("settings.assistant.appearance.askAnchors.top"),
+                },
+                {
+                  value: "bottomcenter",
+                  label: t("settings.assistant.appearance.askAnchors.bottom"),
+                },
+                {
+                  value: "left",
+                  label: t("settings.assistant.appearance.askAnchors.left"),
+                },
+                {
+                  value: "right",
+                  label: t("settings.assistant.appearance.askAnchors.right"),
+                },
+                // "Where I left it" is deliberately absent. Dragging used to set it,
+                // which meant the one gesture available on the surface permanently
+                // switched off the zone that shapes it — and left a stale coordinate
+                // behind that every later open obeyed, so the panel opened off-centre
+                // for no visible reason. A drop now picks a zone instead, and a stored
+                // `custom` from before reads as Centre (see `default_position_for`).
+              ]}
+              selectedValue={
+                settings?.assistant_ask_anchor === "custom"
+                  ? "center"
+                  : (settings?.assistant_ask_anchor ?? "center")
+              }
+              onSelect={(anchor) =>
+                setAndRefresh(
+                  commands.setAssistantAskAnchor(anchor as AskAnchor),
+                )
+              }
+            />
+          </SettingContainer>
+          <Slider
+            value={settings?.assistant_panel_opacity ?? 1}
+            onChange={(value) =>
+              setAndRefresh(commands.setAssistantPanelOpacity(value))
             }
-            onSelect={(anchor) =>
-              setAndRefresh(commands.setAssistantAskAnchor(anchor as AskAnchor))
-            }
+            min={0.5}
+            max={1}
+            step={0.05}
+            label={t("settings.assistant.appearance.opacityLabel")}
+            info={t("settings.assistant.appearance.opacityDescription")}
+            grouped={true}
+            controlClassName="w-[200px]"
+            formatValue={(v) => `${Math.round(v * 100)}%`}
           />
-        </SettingContainer>
-        <Slider
-          value={settings?.assistant_panel_opacity ?? 1}
-          onChange={(value) =>
-            setAndRefresh(commands.setAssistantPanelOpacity(value))
-          }
-          min={0.5}
-          max={1}
-          step={0.05}
-          label={t("settings.assistant.appearance.opacityLabel")}
-          info={t("settings.assistant.appearance.opacityDescription")}
-          grouped={true}
-          controlClassName="w-[200px]"
-          formatValue={(v) => `${Math.round(v * 100)}%`}
-        />
-      </SettingsGroup>
+        </SettingsGroup>
+      )}
 
       {/* Reply behavior ---------------------------------------------------- */}
-      <SettingsGroup title={t("settings.assistant.behavior.title")}>
-        <SettingContainer
-          title={t("settings.assistant.responseLength.label")}
-          info={t("settings.assistant.responseLength.description")}
-          layout="horizontal"
-          grouped={true}
+      {show("behavior") && (
+        <SettingsGroup
+          title={groupTitle(t("settings.assistant.behavior.title"))}
         >
-          <Dropdown
-            options={[
-              {
-                value: "default",
-                label: t("settings.assistant.responseLength.options.default"),
-              },
-              {
-                value: "short",
-                label: t("settings.assistant.responseLength.options.short"),
-              },
-              {
-                value: "medium",
-                label: t("settings.assistant.responseLength.options.medium"),
-              },
-              {
-                value: "long",
-                label: t("settings.assistant.responseLength.options.long"),
-              },
-            ]}
-            selectedValue={settings?.assistant_response_length ?? "default"}
-            onSelect={(value) =>
-              setAndRefresh(
-                commands.setAssistantResponseLength(
-                  value as AssistantResponseLength,
-                ),
-              )
+          <SettingContainer
+            title={t("settings.assistant.responseLength.label")}
+            info={t("settings.assistant.responseLength.description")}
+            layout="horizontal"
+            grouped={true}
+          >
+            <Dropdown
+              options={[
+                {
+                  value: "default",
+                  label: t("settings.assistant.responseLength.options.default"),
+                },
+                {
+                  value: "short",
+                  label: t("settings.assistant.responseLength.options.short"),
+                },
+                {
+                  value: "medium",
+                  label: t("settings.assistant.responseLength.options.medium"),
+                },
+                {
+                  value: "long",
+                  label: t("settings.assistant.responseLength.options.long"),
+                },
+              ]}
+              selectedValue={settings?.assistant_response_length ?? "default"}
+              onSelect={(value) =>
+                setAndRefresh(
+                  commands.setAssistantResponseLength(
+                    value as AssistantResponseLength,
+                  ),
+                )
+              }
+            />
+          </SettingContainer>
+          <SettingContainer
+            title={t("settings.assistant.memory.label")}
+            description={t("settings.assistant.memory.description")}
+            layout="horizontal"
+            grouped={true}
+          >
+            <Input
+              type="number"
+              min={0}
+              max={200}
+              value={historyLimit}
+              onChange={(e) => setHistoryLimit(e.target.value)}
+              onBlur={handleHistoryLimitBlur}
+              className="w-[120px]"
+            />
+          </SettingContainer>
+          <ToggleSwitch
+            checked={settings?.assistant_auto_summarize ?? true}
+            onChange={(value) =>
+              setAndRefresh(commands.setAssistantAutoSummarize(value))
             }
+            label={t("settings.assistant.autoSummarize.label")}
+            description={t("settings.assistant.autoSummarize.description")}
+            grouped={true}
           />
-        </SettingContainer>
-        <SettingContainer
-          title={t("settings.assistant.memory.label")}
-          description={t("settings.assistant.memory.description")}
-          layout="horizontal"
-          grouped={true}
-        >
-          <Input
-            type="number"
-            min={0}
-            max={200}
-            value={historyLimit}
-            onChange={(e) => setHistoryLimit(e.target.value)}
-            onBlur={handleHistoryLimitBlur}
-            className="w-[120px]"
-          />
-        </SettingContainer>
-        <ToggleSwitch
-          checked={settings?.assistant_auto_summarize ?? true}
-          onChange={(value) =>
-            setAndRefresh(commands.setAssistantAutoSummarize(value))
-          }
-          label={t("settings.assistant.autoSummarize.label")}
-          description={t("settings.assistant.autoSummarize.description")}
-          grouped={true}
-        />
-      </SettingsGroup>
+        </SettingsGroup>
+      )}
     </div>
   );
 };

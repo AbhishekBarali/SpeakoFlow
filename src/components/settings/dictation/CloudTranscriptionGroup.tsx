@@ -6,11 +6,12 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { SettingsGroup } from "@/components/ui/SettingsGroup";
 import { SettingContainer } from "@/components/ui/SettingContainer";
 import { ToggleSwitch } from "@/components/ui/ToggleSwitch";
-import { Dropdown } from "@/components/ui/Dropdown";
+import { ProviderGrid } from "@/components/ui/ProviderGrid";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Alert } from "@/components/ui/Alert";
 import { ModelCombo } from "@/components/ui/ModelCombo";
+import { prettyModelName } from "@/lib/utils/prettyModelName";
 import { ProviderModeToggle } from "../PostProcessingSettingsApi/ProviderModeToggle";
 import { LanguageSelector } from "../LanguageSelector";
 import { TranslateToEnglish } from "../TranslateToEnglish";
@@ -42,7 +43,23 @@ import { commands, type CloudSttProvider } from "@/bindings";
  *   with the transcript gone. One second of audio here turns all three into an
  *   error message with a name on it, before it costs the user a thought.
  */
-export const CloudTranscriptionGroup: React.FC = () => {
+export const CloudTranscriptionGroup: React.FC<{
+  /**
+   * Render only the cloud provider rows, without the group card, the engine
+   * switch, or the "model above is bypassed" notice. Used by the Models page,
+   * which owns the device/cloud choice itself and does not show a local model
+   * while cloud is selected — so there is nothing to explain away.
+   */
+  embedded?: boolean;
+  /**
+   * Which rows an embedded caller wants: `setup` (provider, key, model,
+   * language — the same shape as the on-device card above it) or `options`
+   * (streaming, custom words, fillers, the test). Omit for all of them.
+   */
+  section?: "setup" | "options";
+}> = ({ embedded = false, section }) => {
+  const showSetup = !section || section === "setup";
+  const showOptions = !section || section === "options";
   const { t } = useTranslation();
   const { settings, getSetting, refreshSettings } = useSettings();
 
@@ -163,6 +180,11 @@ export const CloudTranscriptionGroup: React.FC = () => {
   const providerOptions = providers.map((entry) => ({
     value: entry.id,
     label: entry.label,
+    ready: !!keyStatus[entry.id] || !!entry.allow_base_url_edit,
+    hint:
+      prettyModelName(
+        settings?.cloud_stt_models?.[entry.id]?.trim() || entry.default_model,
+      ) || undefined,
   }));
 
   const modelOptions = models.map((id) => ({ value: id, label: id }));
@@ -184,243 +206,260 @@ export const CloudTranscriptionGroup: React.FC = () => {
   // rather than offering a switch that would do nothing.
   const supportsTranslation = provider?.supports_translation ?? false;
 
-  return (
-    <SettingsGroup
-      title={t("settings.dictation.cloud.groupTitle")}
-      icon={Cloud}
+  const engineRow = (
+    <SettingContainer
+      title={t("settings.dictation.cloud.engine.title")}
+      description={t("settings.dictation.cloud.engine.description")}
+      info={t("settings.dictation.cloud.engine.info")}
+      grouped={true}
     >
+      <ProviderModeToggle
+        mode={isCloud ? "cloud" : "device"}
+        disabled={busy}
+        onChange={(mode) =>
+          void commit(() =>
+            commands.setSttEngineMode(mode === "cloud" ? "cloud" : "local"),
+          )
+        }
+      />
+    </SettingContainer>
+  );
+
+  const setupRows = isCloud && showSetup && (
+    <>
+      {!embedded && (
+        <Alert variant="info" contained>
+          {t("settings.dictation.cloud.bypassNotice")}
+        </Alert>
+      )}
+
       <SettingContainer
-        title={t("settings.dictation.cloud.engine.title")}
-        description={t("settings.dictation.cloud.engine.description")}
-        info={t("settings.dictation.cloud.engine.info")}
+        title={t("settings.dictation.cloud.provider.title")}
+        layout="stacked"
         grouped={true}
       >
-        <ProviderModeToggle
-          mode={isCloud ? "cloud" : "device"}
-          disabled={busy}
-          onChange={(mode) =>
-            void commit(() =>
-              commands.setSttEngineMode(mode === "cloud" ? "cloud" : "local"),
-            )
+        <ProviderGrid
+          kind="stt"
+          label={t("settings.dictation.cloud.provider.title")}
+          options={providerOptions}
+          value={providerId}
+          onChange={(value) =>
+            void commit(() => commands.setCloudSttProvider(value))
           }
+          disabled={busy}
         />
       </SettingContainer>
 
-      {isCloud && (
-        <>
-          <Alert variant="info" contained>
-            {t("settings.dictation.cloud.bypassNotice")}
-          </Alert>
-
-          <SettingContainer
-            title={t("settings.dictation.cloud.provider.title")}
-            grouped={true}
-          >
-            <Dropdown
-              options={providerOptions}
-              selectedValue={providerId}
-              onSelect={(value) =>
-                void commit(() => commands.setCloudSttProvider(value))
-              }
-              disabled={busy}
-              className="min-w-[200px]"
-            />
-          </SettingContainer>
-
-          <SettingContainer
-            title={t("settings.dictation.cloud.key.title")}
-            description={
+      <SettingContainer
+        title={t("settings.dictation.cloud.key.title")}
+        description={
+          hasKey
+            ? t("settings.dictation.cloud.key.stored")
+            : t("settings.dictation.cloud.key.missing")
+        }
+        descriptionMode="caption"
+        grouped={true}
+        layout="stacked"
+      >
+        <div className="flex w-full flex-wrap items-center gap-2">
+          <Input
+            type="password"
+            value={keyDraft}
+            onChange={(event) => setKeyDraft(event.target.value)}
+            placeholder={
               hasKey
-                ? t("settings.dictation.cloud.key.stored")
-                : t("settings.dictation.cloud.key.missing")
+                ? t("settings.dictation.cloud.key.replacePlaceholder")
+                : t("settings.dictation.cloud.key.placeholder")
             }
-            descriptionMode="inline"
-            grouped={true}
-            layout="stacked"
+            variant="compact"
+            className="min-w-[260px] flex-1"
+          />
+          <Button
+            size="sm"
+            onClick={() => void saveKey()}
+            disabled={!keyDraft.trim() || savingKey}
           >
-            <div className="flex w-full flex-wrap items-center gap-2">
-              <Input
-                type="password"
-                value={keyDraft}
-                onChange={(event) => setKeyDraft(event.target.value)}
-                placeholder={
-                  hasKey
-                    ? t("settings.dictation.cloud.key.replacePlaceholder")
-                    : t("settings.dictation.cloud.key.placeholder")
-                }
-                variant="compact"
-                className="min-w-[260px] flex-1"
-              />
-              <Button
-                size="sm"
-                onClick={() => void saveKey()}
-                disabled={!keyDraft.trim() || savingKey}
-              >
-                {t("settings.dictation.cloud.key.save")}
-              </Button>
-              {hasKey && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => void clearKey()}
-                >
-                  {t("settings.dictation.cloud.key.clear")}
-                </Button>
-              )}
-              {provider?.api_key_url && (
-                <button
-                  type="button"
-                  onClick={() => void openUrl(provider.api_key_url as string)}
-                  className="inline-flex items-center gap-1 text-xs text-muted underline decoration-dotted underline-offset-2 transition-colors hover:text-accent"
-                >
-                  {t("settings.dictation.cloud.key.getOne")}
-                  <ExternalLink size={11} />
-                </button>
-              )}
-            </div>
-          </SettingContainer>
-
-          {provider?.allow_base_url_edit && (
-            <SettingContainer
-              title={t("settings.dictation.cloud.endpoint.title")}
-              description={t("settings.dictation.cloud.endpoint.description")}
-              grouped={true}
+            {t("settings.dictation.cloud.key.save")}
+          </Button>
+          {hasKey && (
+            <Button size="sm" variant="ghost" onClick={() => void clearKey()}>
+              {t("settings.dictation.cloud.key.clear")}
+            </Button>
+          )}
+          {provider?.api_key_url && (
+            <button
+              type="button"
+              onClick={() => void openUrl(provider.api_key_url as string)}
+              className="inline-flex items-center gap-1 text-xs text-muted underline decoration-dotted underline-offset-2 transition-colors hover:text-accent"
             >
-              {/* Committed on blur, not per keystroke: each write is a full
+              {t("settings.dictation.cloud.key.getOne")}
+              <ExternalLink size={11} />
+            </button>
+          )}
+        </div>
+      </SettingContainer>
+
+      {provider?.allow_base_url_edit && (
+        <SettingContainer
+          title={t("settings.dictation.cloud.endpoint.title")}
+          description={t("settings.dictation.cloud.endpoint.description")}
+          grouped={true}
+        >
+          {/* Committed on blur, not per keystroke: each write is a full
                   settings save, which also re-syncs every stored key with the OS
                   keychain. One save per edit, not one per character. */}
-              <Input
-                defaultValue={baseUrlOverride}
-                key={`${providerId}-${baseUrlOverride}`}
-                onBlur={(event) => {
-                  const next = event.target.value.trim();
-                  if (next === baseUrlOverride) return;
-                  void commit(() =>
-                    commands.setCloudSttBaseUrl(providerId, next),
-                  );
-                }}
-                placeholder={provider.base_url}
-                variant="compact"
-                className="min-w-[280px]"
-              />
-            </SettingContainer>
-          )}
+          <Input
+            defaultValue={baseUrlOverride}
+            key={`${providerId}-${baseUrlOverride}`}
+            onBlur={(event) => {
+              const next = event.target.value.trim();
+              if (next === baseUrlOverride) return;
+              void commit(() => commands.setCloudSttBaseUrl(providerId, next));
+            }}
+            placeholder={provider.base_url}
+            variant="compact"
+            className="min-w-[280px]"
+          />
+        </SettingContainer>
+      )}
 
-          <SettingContainer
-            title={t("settings.dictation.cloud.model.title")}
-            info={t("settings.dictation.cloud.model.info")}
-            grouped={true}
-          >
-            <ModelCombo
-              value={selectedModel}
-              options={modelOptions}
-              onCommit={(value) =>
-                void commit(() => commands.setCloudSttModel(providerId, value))
-              }
-              onLoad={() => void loadModels()}
-              loading={loadingModels}
-              error={modelsError}
-              placeholder={provider?.default_model}
-              loadLabel={t("settings.dictation.cloud.model.load")}
-              disabled={busy}
-            />
-          </SettingContainer>
+      <SettingContainer
+        title={t("settings.dictation.cloud.model.title")}
+        info={t("settings.dictation.cloud.model.info")}
+        grouped={true}
+      >
+        <ModelCombo
+          value={selectedModel}
+          options={modelOptions}
+          onCommit={(value) =>
+            void commit(() => commands.setCloudSttModel(providerId, value))
+          }
+          onLoad={() => void loadModels()}
+          loading={loadingModels}
+          error={modelsError}
+          placeholder={provider?.default_model}
+          loadLabel={t("settings.dictation.cloud.model.load")}
+          disabled={busy}
+        />
+      </SettingContainer>
 
-          {providerStreams && (
-            <ToggleSwitch
-              checked={getSetting("cloud_stt_streaming") ?? true}
-              onChange={(value) =>
-                void commit(() => commands.setCloudSttStreaming(value))
-              }
-              isUpdating={busy}
-              label={t("settings.dictation.cloud.streaming.label")}
-              description={
-                modelStreams
-                  ? t("settings.dictation.cloud.streaming.description")
-                  : t("settings.dictation.cloud.streaming.needsRealtimeModel")
-              }
-              descriptionMode="inline"
-              grouped={true}
-            />
-          )}
-
-          {/* Language rows live here, not in the local model card above, because
+      {/* Language rows live here, not in the local model card above, because
               in cloud mode that model is unloaded and its capabilities describe
               nothing. Every provider wired up here accepts a spoken-language
               hint, so the picker is unconditional and offers the full list rather
               than a local model's subset — a cloud user on an English-only local
               model previously had no language control at all, because the card
               that owned it was hidden along with the model. */}
-          <LanguageSelector
-            descriptionMode="inline"
-            grouped={true}
-            icon={Globe}
-            tone="emerald"
-            description={t("settings.dictation.cloud.language.description")}
-          />
+      <LanguageSelector
+        descriptionMode="inline"
+        grouped={true}
+        icon={Globe}
+        tone="emerald"
+        description={t("settings.dictation.cloud.language.description")}
+      />
 
-          <TranslateToEnglish
-            descriptionMode="inline"
-            grouped={true}
-            icon={Languages}
-            tone="violet"
-            disabled={!supportsTranslation}
-            description={
-              supportsTranslation
-                ? t("settings.dictation.cloud.translate.supported", {
-                    provider: provider?.label ?? "",
-                  })
-                : t("settings.dictation.cloud.translate.unsupported", {
-                    provider: provider?.label ?? "",
-                  })
-            }
-          />
+      <TranslateToEnglish
+        descriptionMode="inline"
+        grouped={true}
+        icon={Languages}
+        tone="violet"
+        disabled={!supportsTranslation}
+        description={
+          supportsTranslation
+            ? t("settings.dictation.cloud.translate.supported", {
+                provider: provider?.label ?? "",
+              })
+            : t("settings.dictation.cloud.translate.unsupported", {
+                provider: provider?.label ?? "",
+              })
+        }
+      />
+    </>
+  );
 
-          <ToggleSwitch
-            checked={getSetting("cloud_stt_send_custom_words") ?? true}
-            onChange={(value) =>
-              void commit(() => commands.setCloudSttSendCustomWords(value))
-            }
-            isUpdating={busy}
-            label={t("settings.dictation.cloud.keyterms.label")}
-            description={t("settings.dictation.cloud.keyterms.description")}
-            grouped={true}
-          />
-
-          <ToggleSwitch
-            checked={getSetting("cloud_stt_no_verbatim") ?? false}
-            onChange={(value) =>
-              void commit(() => commands.setCloudSttNoVerbatim(value))
-            }
-            isUpdating={busy}
-            label={t("settings.dictation.cloud.noVerbatim.label")}
-            description={t("settings.dictation.cloud.noVerbatim.description")}
-            grouped={true}
-          />
-
-          <SettingContainer
-            title={t("settings.dictation.cloud.test.title")}
-            description={t("settings.dictation.cloud.test.description")}
-            grouped={true}
-          >
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => void runTest()}
-              disabled={testing || (!hasKey && !provider?.allow_base_url_edit)}
-            >
-              {testing ? (
-                <span className="inline-flex items-center gap-1.5">
-                  <Loader2 size={13} className="animate-spin" />
-                  {t("settings.dictation.cloud.test.running")}
-                </span>
-              ) : (
-                t("settings.dictation.cloud.test.action")
-              )}
-            </Button>
-          </SettingContainer>
-        </>
+  const optionRows = isCloud && showOptions && (
+    <>
+      {providerStreams && (
+        <ToggleSwitch
+          checked={getSetting("cloud_stt_streaming") ?? true}
+          onChange={(value) =>
+            void commit(() => commands.setCloudSttStreaming(value))
+          }
+          isUpdating={busy}
+          label={t("settings.dictation.cloud.streaming.label")}
+          description={
+            modelStreams
+              ? t("settings.dictation.cloud.streaming.description")
+              : t("settings.dictation.cloud.streaming.needsRealtimeModel")
+          }
+          descriptionMode="inline"
+          grouped={true}
+        />
       )}
+
+      <ToggleSwitch
+        checked={getSetting("cloud_stt_send_custom_words") ?? true}
+        onChange={(value) =>
+          void commit(() => commands.setCloudSttSendCustomWords(value))
+        }
+        isUpdating={busy}
+        label={t("settings.dictation.cloud.keyterms.label")}
+        description={t("settings.dictation.cloud.keyterms.description")}
+        grouped={true}
+      />
+
+      <ToggleSwitch
+        checked={getSetting("cloud_stt_no_verbatim") ?? false}
+        onChange={(value) =>
+          void commit(() => commands.setCloudSttNoVerbatim(value))
+        }
+        isUpdating={busy}
+        label={t("settings.dictation.cloud.noVerbatim.label")}
+        description={t("settings.dictation.cloud.noVerbatim.description")}
+        grouped={true}
+      />
+
+      <SettingContainer
+        title={t("settings.dictation.cloud.test.title")}
+        description={t("settings.dictation.cloud.test.description")}
+        grouped={true}
+      >
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={() => void runTest()}
+          disabled={testing || (!hasKey && !provider?.allow_base_url_edit)}
+        >
+          {testing ? (
+            <span className="inline-flex items-center gap-1.5">
+              <Loader2 size={13} className="animate-spin" />
+              {t("settings.dictation.cloud.test.running")}
+            </span>
+          ) : (
+            t("settings.dictation.cloud.test.action")
+          )}
+        </Button>
+      </SettingContainer>
+    </>
+  );
+
+  if (embedded) {
+    return (
+      <>
+        {setupRows}
+        {optionRows}
+      </>
+    );
+  }
+
+  return (
+    <SettingsGroup
+      title={t("settings.dictation.cloud.groupTitle")}
+      icon={Cloud}
+    >
+      {engineRow}
+      {setupRows}
+      {optionRows}
     </SettingsGroup>
   );
 };

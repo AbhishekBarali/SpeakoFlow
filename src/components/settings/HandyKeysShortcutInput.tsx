@@ -9,6 +9,12 @@ import { useSettings } from "../../hooks/useSettings";
 import { useOsType } from "../../hooks/useOsType";
 import { commands } from "@/bindings";
 import { toast } from "sonner";
+import {
+  RecordingKeys,
+  ShortcutKeysButton,
+  type ShortcutFinish,
+  type ShortcutSize,
+} from "./ShortcutControl";
 
 interface HandyKeysShortcutInputProps {
   descriptionMode?: "inline" | "tooltip";
@@ -17,6 +23,12 @@ interface HandyKeysShortcutInputProps {
   disabled?: boolean;
   icon?: SettingIcon;
   tone?: SettingTone;
+  /** Only the keys and their reset, without the settings row around them. */
+  bare?: boolean;
+  finish?: ShortcutFinish;
+  size?: ShortcutSize;
+  /** When to offer "back to the default". Rows always; bare only if changed. */
+  showReset?: "always" | "changed" | "never";
 }
 
 interface HandyKeysEvent {
@@ -33,6 +45,10 @@ export const HandyKeysShortcutInput: React.FC<HandyKeysShortcutInputProps> = ({
   disabled = false,
   icon,
   tone = "teal",
+  bare = false,
+  finish = "default",
+  size,
+  showReset,
 }) => {
   const { t } = useTranslation();
   const { getSetting, updateBinding, resetBinding, isUpdating, isLoading } =
@@ -203,6 +219,7 @@ export const HandyKeysShortcutInput: React.FC<HandyKeysShortcutInputProps> = ({
 
   // If still loading, show loading state
   if (isLoading) {
+    if (bare) return null;
     return (
       <SettingContainer
         title={t("settings.general.shortcut.title")}
@@ -219,6 +236,7 @@ export const HandyKeysShortcutInput: React.FC<HandyKeysShortcutInputProps> = ({
 
   // If no bindings are loaded, show empty state
   if (Object.keys(bindings).length === 0) {
+    if (bare) return null;
     return (
       <SettingContainer
         title={t("settings.general.shortcut.title")}
@@ -235,6 +253,7 @@ export const HandyKeysShortcutInput: React.FC<HandyKeysShortcutInputProps> = ({
 
   const binding = bindings[shortcutId];
   if (!binding) {
+    if (bare) return null;
     return (
       <SettingContainer
         title={t("settings.general.shortcut.title")}
@@ -259,6 +278,42 @@ export const HandyKeysShortcutInput: React.FC<HandyKeysShortcutInputProps> = ({
     binding.description,
   );
 
+  const resetMode = showReset ?? (bare ? "changed" : "always");
+  const changed = binding.current_binding !== binding.default_binding;
+  const control = (
+    <div className="flex items-center gap-1">
+      {isRecording ? (
+        <RecordingKeys
+          ref={shortcutRef}
+          text={formatCurrentKeys()}
+          finish={finish}
+          size={size ?? "md"}
+        />
+      ) : (
+        <ShortcutKeysButton
+          binding={binding.current_binding}
+          name={translatedName}
+          finish={finish}
+          size={size}
+          disabled={disabled}
+          onClick={() => void startRecording()}
+        />
+      )}
+      {(resetMode === "always" || (resetMode === "changed" && changed)) && (
+        <ResetButton
+          onClick={() => resetBinding(shortcutId)}
+          disabled={isUpdating(`binding_${shortcutId}`)}
+          ariaLabel={t("shortcutEditor.reset", { name: translatedName })}
+          className={
+            finish === "glass" ? "text-white/70 hover:bg-white/10" : ""
+          }
+        />
+      )}
+    </div>
+  );
+
+  if (bare) return control;
+
   return (
     <SettingContainer
       title={translatedName}
@@ -270,27 +325,7 @@ export const HandyKeysShortcutInput: React.FC<HandyKeysShortcutInputProps> = ({
       disabled={disabled}
       layout="horizontal"
     >
-      <div className="flex items-center space-x-1">
-        {isRecording ? (
-          <div
-            ref={shortcutRef}
-            className="px-2.5 py-1 text-[13px] font-medium border border-accent bg-accent/10 text-accent rounded-md"
-          >
-            {formatCurrentKeys()}
-          </div>
-        ) : (
-          <div
-            className="px-2.5 py-1 text-[13px] font-medium border rounded-md cursor-pointer transition-all bg-surface-strong text-ink border-hairline-strong elev-chip hover:brightness-[1.03]"
-            onClick={startRecording}
-          >
-            {formatKeyCombination(binding.current_binding, osType)}
-          </div>
-        )}
-        <ResetButton
-          onClick={() => resetBinding(shortcutId)}
-          disabled={isUpdating(`binding_${shortcutId}`)}
-        />
-      </div>
+      {control}
     </SettingContainer>
   );
 };

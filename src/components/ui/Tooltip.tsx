@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { usePortalTarget } from "./portal";
 
 type TooltipPosition = "top" | "bottom";
 
@@ -16,7 +17,7 @@ interface TooltipProps {
   children: React.ReactNode;
 }
 
-const TOOLTIP_WIDTH = 260;
+const TOOLTIP_WIDTH = 280;
 const VIEWPORT_PADDING = 12;
 const GAP = 8;
 const ARROW_MARGIN = 12;
@@ -29,6 +30,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
 }) => {
   const [coords, setCoords] = useState<TooltipCoords | null>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
+  const portalTarget = usePortalTarget();
 
   const updatePosition = useCallback(() => {
     if (!targetRef.current) return;
@@ -90,6 +92,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
   const arrowClasses =
     coords?.actualPosition === "top" ? "top-full" : "bottom-full rotate-180";
 
+  if (!portalTarget) return null;
   return createPortal(
     <div
       ref={tooltipRef}
@@ -101,7 +104,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
         zIndex: 9999,
         opacity: coords ? 1 : 0,
       }}
-      className="px-3 py-2 bg-surface border border-hairline rounded-lg shadow-[0_4px_16px_rgba(0,0,0,0.1)] whitespace-normal transition-opacity duration-150"
+      className="elev-float rounded-xl border border-hairline bg-surface px-3.5 py-2.5 whitespace-normal transition-opacity duration-150"
     >
       {children}
       <div
@@ -109,6 +112,6 @@ export const Tooltip: React.FC<TooltipProps> = ({
         className={`absolute ${arrowClasses} transform -translate-x-1/2 w-0 h-0 border-l-[6px] border-r-[6px] border-t-[6px] border-l-transparent border-r-transparent border-t-hairline-strong`}
       />
     </div>,
-    document.body,
+    portalTarget,
   );
 };

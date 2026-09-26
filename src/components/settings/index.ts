@@ -1,13 +1,10 @@
-// Settings section components
-export { GeneralSettings } from "./general/GeneralSettings";
-export { DebugSettings } from "./debug/DebugSettings";
+// Settings section components. The page-level layouts now live in
+// `components/pages/*` (sidebar pages) and `components/settings-dialog/*`
+// (the Settings window); these are the building blocks they compose.
 export { HistorySettings } from "./history/HistorySettings";
 export { MeetingsSection } from "./meetings/MeetingsSection";
-export { AboutSettings } from "./about/AboutSettings";
 export { ModelsSettings } from "./models/ModelsSettings";
-export { DictationSettings } from "./dictation/DictationSettings";
 export { AssistantSettings } from "./assistant/AssistantSettings";
-export { AssistantSection } from "./assistant/AssistantSection";
 export { CharactersSettings } from "./assistant/CharactersSettings";
 export { MemorySettings } from "./assistant/MemorySettings";
 

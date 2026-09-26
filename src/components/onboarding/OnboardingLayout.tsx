@@ -78,7 +78,7 @@ const OnboardingLayout: React.FC<OnboardingLayoutProps> = ({
 
       {/* Title + subtitle */}
       <div className="anim-rise flex flex-col items-center gap-2 text-center shrink-0 max-w-[560px]">
-        <h1 className="font-display text-3xl leading-tight text-ink">
+        <h1 className="font-display text-[1.75rem] leading-tight text-ink">
           {title}
         </h1>
         {subtitle && (

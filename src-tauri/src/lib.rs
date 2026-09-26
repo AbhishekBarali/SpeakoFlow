@@ -326,17 +326,33 @@ fn initialize_core_logic(app_handle: &AppHandle) {
                             .map(|recorder| recorder.is_recording())
                             .unwrap_or(false)
                     },
-                    move |observation| {
-                        // Checked here rather than inside the watcher so turning the
-                        // setting off takes effect immediately, without restarting a
-                        // thread or losing its debounce state.
-                        if !settings::get_settings(&watcher_app).meeting_auto_detect {
-                            return;
+                    move |event, observation| {
+                        use meetings::call_detect::CallEvent;
+                        match event {
+                            CallEvent::Prompt => {
+                                // Checked here rather than inside the watcher so
+                                // turning the setting off takes effect immediately,
+                                // without restarting a thread or losing its debounce
+                                // state.
+                                if !settings::get_settings(&watcher_app).meeting_auto_detect {
+                                    return;
+                                }
+                                meetings::pill::show_call_offer(
+                                    &watcher_app,
+                                    observation.app_label().map(str::to_string),
+                                );
+                            }
+                            // The call is over. Take down an offer nobody answered —
+                            // deliberately *not* gated on `meeting_auto_detect`, because
+                            // a card raised while the setting was on must still be
+                            // cleanable after it is turned off. `withdraw_call_offer` is
+                            // a no-op unless an offer is actually on screen, so it can
+                            // never hide a live recording.
+                            CallEvent::Ended => {
+                                meetings::pill::withdraw_call_offer(&watcher_app);
+                            }
+                            CallEvent::Quiet => {}
                         }
-                        meetings::pill::show_call_offer(
-                            &watcher_app,
-                            observation.app_label().map(str::to_string),
-                        );
                     },
                 ) {
                     app_handle.manage(Arc::new(watcher));
@@ -910,6 +926,7 @@ pub fn run(cli_args: CliArgs) {
             commands::history::enforce_recording_retention,
             commands::history::get_assistant_history_entries,
             commands::history::delete_assistant_history_entry,
+            commands::history::get_usage_stats,
             commands::assistant::assistant_send_text,
             commands::assistant::assistant_send_composed,
             commands::assistant::assistant_read_file,

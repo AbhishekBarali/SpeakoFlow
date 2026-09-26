@@ -30,6 +30,7 @@ import {
 import { TONE_HEX } from "./tones";
 import { useMeetingPill } from "./useMeetingPill";
 import { MeetingAsk } from "./MeetingAsk";
+import { useSafeWindowDrag } from "@/lib/useSafeWindowDrag";
 import "./MeetingPill.css";
 
 /** Bars in each row of the level meter. */
@@ -55,9 +56,23 @@ const SILENT_LEVEL = 0.02;
  *   is unfocusable so it can never take the caret from the app the user is
  *   working in, and the platform will not remove focusability from a window that
  *   currently holds focus.
+ *
+ * ## Why the bar no longer expands on click
+ *
+ * It used to, and that was the whole reason this window could not be moved: an
+ * always-on-top strip parked at the bottom centre of the display, over whatever the
+ * user was reading, with no way to shift it. This was the only floating window in the
+ * app with no drag region at all — the permission for it (`core:window:allow-start-
+ * dragging`) was already granted and simply unused.
+ *
+ * So the bar is now the window handle and the chevron is the expand control. That is
+ * also the arrangement the expanded card already had, where a chevron collapses it,
+ * so the two forms finally agree instead of one being click-anywhere and the other
+ * having a button. The bar keeps its keyboard affordance for the same gesture.
  */
 const MeetingPill: React.FC = () => {
   const { t } = useTranslation();
+  useSafeWindowDrag();
   const {
     state,
     recording,
@@ -209,19 +224,7 @@ const MeetingPill: React.FC = () => {
   if (!expanded) {
     return (
       <div ref={rootRef} className="pill-shell">
-        <div
-          className="pill-bar"
-          role="button"
-          tabIndex={0}
-          onClick={() => setExpanded(true)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" || event.key === " ") {
-              event.preventDefault();
-              setExpanded(true);
-            }
-          }}
-          aria-label={t("meetings.pill.expand")}
-        >
+        <div className="pill-bar" data-tauri-drag-region>
           <span
             className="pill-dot"
             // Amber, not red, when the far side is not being captured: the
@@ -230,18 +233,26 @@ const MeetingPill: React.FC = () => {
             data-live={paused ? "false" : String(state.system_audio)}
             aria-hidden="true"
           />
-          <span className="pill-clock">{clock}</span>
+          <span className="pill-clock" data-tauri-drag-region>
+            {clock}
+          </span>
           {meter}
-          {/* Stop propagation so pressing a control does not also expand. */}
           <span
             className="pill-controls"
-            onClick={(event) => event.stopPropagation()}
             style={{ display: "flex", gap: 6, flex: "none" }}
           >
             {pauseButton}
             {stopButton}
+            <button
+              type="button"
+              className="pill-action"
+              onClick={() => setExpanded(true)}
+              title={t("meetings.pill.expand")}
+              aria-label={t("meetings.pill.expand")}
+            >
+              <ChevronUp size={13} />
+            </button>
           </span>
-          <ChevronUp size={13} style={{ flex: "none", opacity: 0.5 }} />
         </div>
       </div>
     );
@@ -250,14 +261,16 @@ const MeetingPill: React.FC = () => {
   return (
     <div ref={rootRef} className="pill-shell">
       <div className="pill-card">
-        <div className="pill-head">
+        <div className="pill-head" data-tauri-drag-region>
           <span
             className="pill-dot"
             data-live={paused ? "false" : String(state.system_audio)}
             aria-hidden="true"
           />
-          <span className="pill-clock">{clock}</span>
-          <span className="pill-head-meta">
+          <span className="pill-clock" data-tauri-drag-region>
+            {clock}
+          </span>
+          <span className="pill-head-meta" data-tauri-drag-region>
             <span className="pill-head-label">
               {paused
                 ? t("meetings.recorder.paused")
@@ -317,6 +330,22 @@ interface OfferCardProps {
  * began capturing a private conversation because it inferred one was happening would
  * be unacceptable however accurate the inference was.
  *
+ * ## Why it must not look like the recorder
+ *
+ * It did, and that was the single most alarming thing in this feature. The card
+ * reused `.pill-bar` *and* the live recorder's `pill-dot` with `data-live="true"` —
+ * a filled red dot, breathing on a 2s loop, which is the universal "capturing now"
+ * signal. It arrives six to nine seconds into a call (`POLL_INTERVAL` plus
+ * `SUSTAINED_FOR`), unprompted, in the same place and the same shape the live
+ * indicator uses. So a user who glanced at it read "SpeakoFlow started recording my
+ * call by itself, at some moment I did not choose" — and nothing had started.
+ *
+ * Being right in the code is not the same as being readable on screen. The indicator
+ * is now a hollow, static ring in the accent colour, which is not a state the live
+ * recorder can ever be in, and the card says "Not recording" in as many words. That
+ * sentence is redundant next to "Record it?" and it stays anyway: this is the one
+ * card in the app where a misreading costs the user's trust rather than a click.
+ *
  * The title is composed here rather than in Rust so its default is localised, which
  * is the same reason `MeetingsSection` composes it.
  */
@@ -344,12 +373,15 @@ const OfferCard: React.FC<OfferCardProps> = ({ app, onDone }) => {
   };
 
   return (
-    <div className="pill-bar" data-offer="true">
-      <span className="pill-dot" data-live="true" aria-hidden="true" />
-      <span className="pill-offer-text">
-        {app
-          ? t("meetings.offer.detectedApp", { app: friendlyAppName(app) })
-          : t("meetings.offer.detected")}
+    <div className="pill-bar" data-offer="true" data-tauri-drag-region>
+      <span className="pill-offer-ring" aria-hidden="true" />
+      <span className="pill-offer-body" data-tauri-drag-region>
+        <span className="pill-offer-text">
+          {app
+            ? t("meetings.offer.detectedApp", { app: friendlyAppName(app) })
+            : t("meetings.offer.detected")}
+        </span>
+        <span className="pill-offer-state">{t("meetings.offer.idle")}</span>
       </span>
       <button
         type="button"

@@ -138,6 +138,15 @@ const PILL_GUARD_INTERVAL_MS: u64 = 700;
 #[cfg(not(target_os = "windows"))]
 static PILL_GUARD: AtomicU64 = AtomicU64::new(0);
 
+/// Whether the window is currently showing a call *offer* rather than a recording.
+///
+/// The two share one window, so "take the offer down" and "take the recorder down"
+/// are the same call — which makes it essential to know which one is up. Withdrawing
+/// an offer that has already been replaced by a live recording would hide the
+/// indicator for a meeting that is still capturing, and that is the one state this
+/// window exists to never show.
+static OFFER_ACTIVE: AtomicBool = AtomicBool::new(false);
+
 pub fn is_visible() -> bool {
     PILL_VISIBLE.load(Ordering::SeqCst)
 }
@@ -242,6 +251,11 @@ pub fn ensure_pill_window(app: &AppHandle) {
 pub fn show_pill(app: &AppHandle) {
     ensure_pill_window(app);
 
+    // A recording supersedes any offer, so the window is no longer an offer. Without
+    // this, a later "the call ended" would withdraw an offer that no longer exists
+    // and hide the live recording indicator with it.
+    OFFER_ACTIVE.store(false, Ordering::SeqCst);
+
     // A fresh show should not inherit the previous meeting's expansion or its
     // measured height — the transcript is empty again.
     PILL_EXPANDED.store(false, Ordering::SeqCst);
@@ -317,6 +331,7 @@ pub fn hide_pill(app: &AppHandle) {
 pub fn show_call_offer(app: &AppHandle, app_label: Option<String>) {
     ensure_pill_window(app);
 
+    OFFER_ACTIVE.store(true, Ordering::SeqCst);
     PILL_EXPANDED.store(false, Ordering::SeqCst);
     PILL_HEIGHT.store(0, Ordering::SeqCst);
 
@@ -351,6 +366,7 @@ pub fn show_call_offer(app: &AppHandle, app_label: Option<String>) {
 /// Clears the offer payload *before* hiding, so a window reused for a real
 /// recording a moment later cannot render the stale card for a frame.
 pub fn hide_call_offer(app: &AppHandle) {
+    OFFER_ACTIVE.store(false, Ordering::SeqCst);
     let app_main = app.clone();
     if let Err(e) = app.run_on_main_thread(move || {
         let _ = app_main.emit_to(
@@ -365,6 +381,27 @@ pub fn hide_call_offer(app: &AppHandle) {
         debug!("Could not clear the call offer: {e}");
     }
     hide_pill(app);
+}
+
+/// Take down an offer the user never answered, because the call it was about is
+/// over.
+///
+/// The gap this closes: the detector's own end-of-call branch reset its internal
+/// state and told nobody, and the only things that could remove an offer were the
+/// user's own X, a meeting starting, and the setting being switched off. So a card
+/// nobody touched stayed on screen, always on top, indefinitely — long after the
+/// call it was asking about had finished. "After I'm done with the call it's just
+/// annoying" is exactly this.
+///
+/// Guarded on the window actually showing an offer, because the offer and the live
+/// recorder are the same window: unguarded, a call ending 20 seconds after the user
+/// accepted would hide the indicator for the meeting still being recorded.
+pub fn withdraw_call_offer(app: &AppHandle) {
+    if !OFFER_ACTIVE.load(Ordering::SeqCst) {
+        return;
+    }
+    debug!("The detected call ended with the offer unanswered; withdrawing it");
+    hide_call_offer(app);
 }
 
 /* ─────────────────────────────── expand / collapse ────────────────────────── */

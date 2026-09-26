@@ -33,8 +33,37 @@ import { useEffect } from "react";
  * measures as `unknown` and stays fully tangible. That is the behaviour that
  * shipped, so an unlisted form can never become unclickable; it just does not get
  * pass-through until it is listed.
+ *
+ * **Every visible surface must be listed, and an omission is not a partial
+ * failure.** `.ask-pill` was missing here, which made the surface the assistant
+ * hotkey actually opens completely dead: the ask stage keeps both layers in the
+ * DOM at all times (the card has to be laid out to be measured), so the only
+ * element this selector matched was the *inactive* `.ask-card`, whose inherited
+ * `pointer-events: none` correctly reported it as not drawn. Nothing drawn resolves
+ * to `none`, `none` is sent as a zero rect, and a zero rect makes the whole window
+ * pass-through — so the pill, its cancel button, its text field and its drag region
+ * were all unreachable, and because reports are change-gated the zero rect was sent
+ * once and never revised. `[data-hit-surface]` is offered alongside the class list
+ * so a new surface can opt in at its own element rather than by remembering to edit
+ * a selector in another file.
+ *
+ * The two rows below `.ask-card` are listed for the same reason: they are DOM
+ * siblings of the card rather than children of it (see `AssistantPanel.tsx`), so the
+ * card's own rect stops above them and the follow-up input, the camera, the snip
+ * button and the attachment chips all fell outside the tangible area.
  */
-const HIT_SURFACES = ".apill, .apill-screen, .alive-card, .ask-card";
+export const HIT_SURFACE_SELECTORS = [
+  "[data-hit-surface]",
+  ".apill",
+  ".apill-screen",
+  ".alive-card",
+  ".ask-card",
+  ".ask-pill",
+  ".assistant-attachments",
+  ".assistant-input-row",
+] as const;
+
+const HIT_SURFACES = HIT_SURFACE_SELECTORS.join(", ");
 
 /**
  * How often the drawn rect is re-measured.
