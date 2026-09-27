@@ -18,6 +18,7 @@ mod managers;
 mod meetings;
 mod memory;
 mod overlay;
+mod overlay_follow;
 mod overlay_lifecycle;
 pub mod portable;
 mod reminders;
@@ -337,6 +338,14 @@ fn initialize_core_logic(app_handle: &AppHandle) {
                                 // without restarting a thread or losing its debounce
                                 // state.
                                 if !settings::get_settings(&watcher_app).meeting_auto_detect {
+                                    return;
+                                }
+                                // A hands-free call with the assistant holds the
+                                // microphone too. The detector no longer sees it
+                                // (it excludes our own process tree), and this is
+                                // the second line: never ask to record over a
+                                // conversation the user is having with us.
+                                if voice_conversation::is_active(&watcher_app) {
                                     return;
                                 }
                                 meetings::pill::show_call_offer(
@@ -830,6 +839,7 @@ pub fn run(cli_args: CliArgs) {
             shortcut::change_live_transcription_window_enabled_setting,
             shortcut::change_overlay_style_setting,
             shortcut::change_assistant_overlay_style_setting,
+            shortcut::change_overlay_linger_setting,
             shortcut::change_app_language_setting,
             shortcut::change_update_checks_setting,
             shortcut::change_keyboard_implementation_setting,
@@ -974,6 +984,7 @@ pub fn run(cli_args: CliArgs) {
             commands::assistant::set_assistant_tts_speed,
             commands::assistant::set_assistant_tts_volume,
             commands::assistant::set_assistant_conversation_pace,
+            commands::assistant::set_assistant_conversation_sensitivity,
             commands::assistant::set_assistant_panel_opacity,
             commands::assistant::set_assistant_panel_size,
             commands::assistant::set_assistant_tts_stop_on_dictation,
@@ -1004,6 +1015,10 @@ pub fn run(cli_args: CliArgs) {
             voice_conversation::assistant_conversation_end,
             voice_conversation::assistant_conversation_set_expanded,
             voice_conversation::assistant_conversation_interrupt,
+            voice_conversation::assistant_conversation_text,
+            voice_conversation::assistant_conversation_new,
+            voice_conversation::assistant_conversation_load,
+            voice_conversation::assistant_conversation_set_speaker,
             commands::assistant::set_assistant_max_history_messages,
             commands::assistant::set_assistant_auto_summarize,
             commands::assistant::set_assistant_web_search_enabled,
@@ -1040,6 +1055,7 @@ pub fn run(cli_args: CliArgs) {
             commands::meetings::rename_meeting_speaker,
             commands::meetings::set_meeting_my_notes,
             commands::meetings::generate_meeting_notes,
+            commands::meetings::is_meeting_notes_running,
             commands::meetings::delete_meeting,
             commands::meetings::fit_meeting_pill,
             commands::meetings::set_meeting_pill_expanded,
@@ -1055,6 +1071,9 @@ pub fn run(cli_args: CliArgs) {
             commands::meetings::accept_call_offer,
             commands::meetings::get_call_detection_status,
             commands::meetings::set_meeting_auto_detect,
+            commands::meetings::get_meeting_indicator,
+            commands::meetings::set_meeting_indicator,
+            commands::meetings::set_meeting_notes,
             commands::autolearn::get_auto_learn_status,
             commands::autolearn::set_auto_learn_corrections,
             commands::autolearn::set_learned_words,

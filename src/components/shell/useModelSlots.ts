@@ -10,6 +10,7 @@ import {
 import { useSettings } from "@/hooks/useSettings";
 import { useModelStore } from "@/stores/modelStore";
 import { getTranslatedModelName } from "@/lib/utils/modelTranslation";
+import { ttsEngineSpec, ttsNeedsSetup, ttsValues } from "@/lib/ttsEngines";
 import {
   prettyModelName,
   splitLocalModelName,
@@ -228,14 +229,21 @@ export const summarizeVoice = (
   t: TFunction,
 ): SlotSummary => {
   const engine = settings?.assistant_tts_engine ?? "kokoro";
+  const spec = ttsEngineSpec(engine);
   const isDevice = engine === "kokoro";
-  const hasKey = !!settings?.assistant_tts_api_key?.trim();
-  const model = settings?.assistant_tts_model?.trim();
+  const values = ttsValues(settings, engine);
+  const ready = !ttsNeedsSetup(settings, engine);
+  const model = values.model || null;
+  // A custom server on this machine runs on this computer too.
+  const onThisComputer =
+    isDevice ||
+    (!!spec?.url &&
+      /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:|\/|$)/i.test(values.url));
   return {
     slot: "voice",
     active: settings?.assistant_tts_enabled ?? false,
-    ready: isDevice || hasKey,
-    where: isDevice ? "device" : "cloud",
+    ready,
+    where: onThisComputer ? "device" : "cloud",
     providerId: engine,
     providerKind: "tts",
     providerLabel: t(`settings.assistant.tts.engines.${engine}`, {
@@ -244,10 +252,12 @@ export const summarizeVoice = (
     modelLabel: isDevice
       ? t("modelsHub.voice.kokoroModel")
       : prettyModelName(model) || null,
-    modelId: isDevice ? "kokoro" : model || null,
+    modelId: isDevice ? "kokoro" : model,
     localModel: null,
     borrowsAssistant: false,
-    issue: isDevice || hasKey ? null : "no_key",
+    // "Add a key" only when a key is what's missing; an address or a voice
+    // still reads as "Needs setup" without pointing at the wrong field.
+    issue: !ready && spec?.key === "required" && !values.key ? "no_key" : null,
   };
 };
 

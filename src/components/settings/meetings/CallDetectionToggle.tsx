@@ -3,7 +3,12 @@ import { useTranslation } from "react-i18next";
 import { ToggleSwitch } from "@/components/ui/ToggleSwitch";
 import { Switch } from "@/components/ui/Switch";
 import { InfoTip } from "@/components/ui/InfoTip";
-import { getCallDetectionStatus, setMeetingAutoDetect } from "./api";
+import {
+  getCallDetectionStatus,
+  getMeetingIndicator,
+  setMeetingAutoDetect,
+  setMeetingIndicator,
+} from "./api";
 
 /**
  * "Offer to record calls."
@@ -81,6 +86,58 @@ export const CallDetectionHeroSwitch: React.FC = () => {
         {t("meetings.autoDetect.title")}
       </span>
       <InfoTip text={t("meetings.autoDetect.description")} tone="onHero" />
+    </div>
+  );
+};
+
+/**
+ * "Show a floating indicator while recording."
+ *
+ * Read through `invoke` for the same reason as call detection above. Applies to
+ * a meeting already recording too — the backend shows or hides the pill on the
+ * spot — so every surface that offers the switch shares this one hook and
+ * cannot disagree about its state.
+ */
+export const useMeetingIndicator = () => {
+  const [enabled, setEnabled] = useState<boolean | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    void getMeetingIndicator()
+      .then(setEnabled)
+      // An older backend without the command: the indicator is on there.
+      .catch(() => setEnabled(true));
+  }, []);
+
+  const set = (next: boolean) => {
+    setEnabled(next);
+    setSaving(true);
+    void setMeetingIndicator(next)
+      .catch(() => setEnabled(!next))
+      .finally(() => setSaving(false));
+  };
+
+  return { enabled, saving, set };
+};
+
+/** As a line on the Meetings hero, under "Offer to record calls". */
+export const IndicatorHeroSwitch: React.FC = () => {
+  const { t } = useTranslation();
+  const { enabled, saving, set } = useMeetingIndicator();
+  if (enabled === null) return null;
+  return (
+    <div className="flex items-center justify-center gap-2.5">
+      <Switch
+        checked={enabled}
+        onChange={set}
+        disabled={saving}
+        label={t("meetings.indicator.title")}
+        tone="onHero"
+      />
+      <span className="text-sm text-white/85">
+        {t("meetings.indicator.title")}
+      </span>
+      <InfoTip text={t("meetings.indicator.description")} tone="onHero" />
     </div>
   );
 };

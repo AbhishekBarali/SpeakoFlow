@@ -30,9 +30,7 @@ use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::meetings::session::{MeetingRecorder, MeetingState};
 use crate::meetings::store::{MeetingStore, SEGMENT_PAGE_SIZE};
-use crate::meetings::summarize::{
-    generate_meeting_notes as run_notes_job, GeneratedNotes, NotesTemplate,
-};
+use crate::meetings::summarize::{GeneratedNotes, NotesTemplate};
 use crate::meetings::{Meeting, MeetingSpeaker, PaginatedMeetings, PaginatedSegments};
 
 /// Emitted whenever the meeting list changes in a way a list view cannot infer
@@ -148,7 +146,15 @@ pub async fn start_meeting(
         //
         // After the recorder has already started, so a failure to put the pill on
         // screen costs an indicator rather than the recording.
-        crate::meetings::pill::show_pill(&pill_app);
+        //
+        // With the indicator switched off the window still has to come down: a
+        // meeting accepted from the call offer starts with that same window on
+        // screen showing the offer card.
+        if crate::settings::get_settings(&pill_app).meeting_show_indicator {
+            crate::meetings::pill::show_pill(&pill_app);
+        } else {
+            crate::meetings::pill::hide_call_offer(&pill_app);
+        }
         Ok::<i64, String>(meeting_id)
     })
     .await
@@ -421,6 +427,31 @@ pub async fn set_meeting_my_notes(
     .map_err(|e| format!("Saving your notes panicked: {e}"))?
 }
 
+/// Save an edit to the generated notes, such as a ticked next step.
+///
+/// Refuses while a notes job is writing the same row: the job's result would
+/// land a moment later and silently discard the edit, which is worse than
+/// telling the user to wait.
+#[tauri::command]
+#[specta::specta]
+pub async fn set_meeting_notes(
+    store: State<'_, Arc<MeetingStore>>,
+    meeting_id: i64,
+    notes: String,
+) -> Result<(), String> {
+    if crate::meetings::summarize::notes_job_running(meeting_id) {
+        return Err("The notes are being rewritten right now. Try again in a moment.".to_string());
+    }
+    let store = Arc::clone(&store);
+    tauri::async_runtime::spawn_blocking(move || {
+        store
+            .update_notes_text(meeting_id, &notes)
+            .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| format!("Saving the notes panicked: {e}"))?
+}
+
 /* ──────────────────────────────── notes ────────────────────────────────── */
 
 /// Generate notes for a meeting and store them.
@@ -450,23 +481,28 @@ pub async fn generate_meeting_notes(
     template: Option<NotesTemplate>,
 ) -> Result<GeneratedNotes, String> {
     let store = Arc::clone(&store);
-    let notes = run_notes_job(
+    // Announced like the automatic job, so the list, the pill and any other open
+    // view of this meeting learn about the run, and so a click during the
+    // post-call job is refused instead of racing it. Completion and the
+    // `MEETINGS_UPDATED_EVENT` are handled there too.
+    crate::meetings::summarize::generate_and_announce(
         &app,
         store.as_ref(),
         meeting_id,
         template.unwrap_or_default(),
     )
-    .await?;
+    .await
+}
 
-    // Notes generation is the last step of a meeting; a row that was left in
-    // `processing` (a recording interrupted mid-flight, then re-transcribed) is
-    // finished once it has notes.
-    if let Err(e) = store.complete_meeting(meeting_id) {
-        log::error!("Meeting {meeting_id} has notes but could not be marked complete: {e}");
-    }
-
-    let _ = app.emit(MEETINGS_UPDATED_EVENT, ());
-    Ok(notes)
+/// Whether notes are being written for a meeting right now.
+///
+/// Asked once when a detail page opens: progress arrives as events, and a page
+/// opened after `Started` was emitted would otherwise not know a job is running
+/// and offer to start a second one.
+#[tauri::command]
+#[specta::specta]
+pub fn is_meeting_notes_running(meeting_id: i64) -> bool {
+    crate::meetings::summarize::notes_job_running(meeting_id)
 }
 
 /* ─────────────────────────── the call offer ─────────────────────────── */
@@ -532,6 +568,47 @@ pub async fn set_meeting_auto_detect(app: AppHandle, enabled: bool) -> Result<()
         crate::meetings::pill::hide_call_offer(&app);
     }
     Ok(())
+}
+
+/// Whether the floating indicator is shown while a meeting records.
+#[tauri::command]
+#[specta::specta]
+pub async fn get_meeting_indicator(app: AppHandle) -> Result<bool, String> {
+    Ok(crate::settings::get_settings(&app).meeting_show_indicator)
+}
+
+/// Show or hide the floating indicator, including for a meeting already
+/// recording — a switch that only applied to the next meeting would read as
+/// broken to someone who turned it off because the pill was in their way now.
+///
+/// On the blocking pool because showing may build the pill's webview, which has
+/// to happen inline on a thread that is not the main one (see
+/// `pill::ensure_pill_window`).
+#[tauri::command]
+#[specta::specta]
+pub async fn set_meeting_indicator(
+    app: AppHandle,
+    recorder: State<'_, Arc<MeetingRecorder>>,
+    enabled: bool,
+) -> Result<(), String> {
+    let mut settings = crate::settings::get_settings(&app);
+    settings.meeting_show_indicator = enabled;
+    crate::settings::write_settings(&app, settings);
+
+    let recording = recorder.is_recording();
+    let pill_app = app.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        if !recording {
+            return;
+        }
+        if enabled {
+            crate::meetings::pill::show_pill(&pill_app);
+        } else {
+            crate::meetings::pill::hide_pill(&pill_app);
+        }
+    })
+    .await
+    .map_err(|e| format!("Changing the meeting indicator panicked: {e}"))
 }
 
 /* ───────────────────────────── diarization ───────────────────────────── */

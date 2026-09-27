@@ -10,6 +10,14 @@ interface AppLanguageSelectorProps {
   grouped?: boolean;
 }
 
+// TODO(Abhishek): App language is broken. Reported 2026-09-27: picking a
+// language here no longer changes the app. Deliberately left as-is for now
+// (the dropdown's scroll-jump was fixed separately in `ui/Dropdown.tsx`; that
+// was a different bug). Not investigated yet. Places to start: the
+// `app_language` updater in `stores/settingsStore.ts`,
+// `syncLanguageFromSettings` in `i18n/index.ts`, and
+// `change_app_language_setting` in `src-tauri/src/shortcut/mod.rs`.
+
 export const AppLanguageSelector: React.FC<AppLanguageSelectorProps> =
   React.memo(({ descriptionMode = "tooltip", grouped = false }) => {
     const { t, i18n } = useTranslation();

@@ -42,7 +42,21 @@ const IDS: Record<ProviderKind, string[]> = {
     "mistral",
     "custom",
   ],
-  tts: ["kokoro", "openai", "openrouter", "elevenlabs", "azure"],
+  tts: [
+    "kokoro",
+    "openai",
+    "elevenlabs",
+    "openrouter",
+    "deepgram",
+    "cartesia",
+    "google",
+    "azure",
+    "groq",
+    "xai",
+    "mistral",
+    "inworld",
+    "custom",
+  ],
   search: ["serper", "brave", "tavily", "exa", "serpapi", "tinyfish"],
 };
 
@@ -54,6 +68,8 @@ const LUCIDE: Record<string, string> = {
   builtin: "lucide-cpu",
   custom: "lucide-plug",
   kokoro: "lucide-audio-lines",
+  cartesia: "lucide-audio-waveform",
+  inworld: "lucide-earth",
   serper: "lucide-search",
   serpapi: "lucide-search-code",
   tinyfish: "lucide-fish",
@@ -94,6 +110,8 @@ describe("provider brands", () => {
     expect(markup("custom", "stt")).toContain("lucide-mic");
     expect(markup("custom", "llm")).toContain("lucide-plug");
     expect(markup("openai", "tts")).toBe(markup("openai", "llm"));
+    // Google the voice engine is Google Cloud, not the Gemini chat models.
+    expect(markup("google", "tts")).not.toBe(markup("gemini", "llm"));
   });
 
   test("search backends without a mark are still told apart", () => {

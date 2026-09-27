@@ -70,13 +70,24 @@ const PANEL_DRAGGED_KEY: &str = "assistant_panel_dragged";
 const PILL_WIDTH: f64 = 240.0;
 const PILL_HEIGHT: f64 = 44.0;
 
-/// The collapsed form of a live CALL, which is a different chip: it carries the
-/// orb, the phase line and three controls — microphone, sound, hang up — where
-/// the quick-ask pill carries text and an expand affordance. Adding the sound
-/// switch pushed `.conversation-pill` (272px in `ConversationView.css`) past the
-/// 240px window it used to float in, and a chip wider than its window is a chip
-/// with its hang-up button clipped off.
-const CONVERSATION_PILL_WIDTH: f64 = 288.0;
+/// The live call's resting form: a small floating bar — type, microphone, the
+/// orb that hangs up, speaker — drawn small and grown on hover, with a status
+/// bubble above it that says what the assistant is doing and shows the reply as
+/// it arrives.
+///
+/// The window is the transparent frame both float in, bar at the bottom. It is
+/// taller than the bar because the bubble grows with its text and must not need
+/// a window resize per line; the empty part passes clicks through (see
+/// `hitRegion.ts`), so the frame costs nothing on the desktop. Keep in step with
+/// `.call-frame` in `CallBar.css`: the bar's slot is 46px, sits 10px above the
+/// frame's bottom edge, and the bubble may use the rest.
+const CALL_BAR_FRAME_WIDTH: f64 = 440.0;
+const CALL_BAR_FRAME_HEIGHT: f64 = 200.0;
+
+/// How far above the bottom of the display the call bar opens, over and above
+/// the taskbar allowance — close enough to read as docked, far enough not to sit
+/// on the taskbar's edge.
+const CALL_BAR_BOTTOM_GAP: f64 = 12.0;
 
 /// Readable voice HUD used by the assistant's `Live` overlay style. It stays
 /// much smaller than the full chat panel while leaving enough room for the
@@ -84,9 +95,13 @@ const CONVERSATION_PILL_WIDTH: f64 = 288.0;
 const LIVE_WIDTH: f64 = 560.0;
 const LIVE_HEIGHT: f64 = 188.0;
 
+/// The collapsed form of a live call. A call no longer has a separate collapsed
+/// chip: its resting form already *is* the small floating bar, so a collapse that
+/// arrives mid-call (an old webview, a stray command) lands on the same frame
+/// instead of on a third shape.
 fn collapsed_size(app: &AppHandle) -> (f64, f64) {
     if crate::voice_conversation::is_active(app) {
-        return (CONVERSATION_PILL_WIDTH, PILL_HEIGHT);
+        return (CALL_BAR_FRAME_WIDTH, CALL_BAR_FRAME_HEIGHT);
     }
     match get_settings(app).assistant_overlay_style {
         OverlayStyle::Live => (LIVE_WIDTH, LIVE_HEIGHT),
@@ -701,65 +716,115 @@ fn ask_anchor_size(app: &AppHandle) -> (f64, f64) {
     expanded_size(app)
 }
 
-/// Voice conversation is a different shape of window from the chat panel: an
-/// orb, a status line and a call bar, centred, with no message list. It wants
-/// height more than width, and the chat presets are too small for the view's
-/// own container queries — the reply caption only appears past 440x600, which
-/// is why the default chat size (390x500) showed a voice session with no text
-/// at all. Sharing one size also meant a resize made for voice was written
-/// back over the chat panel's remembered size, so leaving a conversation left
-/// the chat wherever the orb view had been dragged.
+/// A live call has two forms, and neither is the chat panel.
 ///
-/// So voice gets its own lane: its own base sizes, and its own session memory
-/// of a manual resize (below). Switching modes moves between the two lanes
-/// instead of overwriting either.
+/// At rest it is the floating call bar (see [`CALL_BAR_FRAME_WIDTH`]). Expanded,
+/// it is the same bar with the conversation above it — the transcript, the saved
+/// conversations to go back to, and the call's options — in a window the user
+/// can resize. The expanded size gets its own lane (base sizes and a session
+/// memory of a manual resize, below) so a resize made for the call is never
+/// written back over the chat panel's remembered size.
+///
+/// The old orb view needed height for a 156px sphere and a status line; nothing
+/// in it was text, which is why a call used to run with no visible reply at all
+/// below 440x600. The expanded form is mostly text, so these read as a panel.
 fn conversation_preset_size(size: &str) -> (f64, f64) {
     match size {
-        "mini" => (360.0, 480.0),
-        "compact" => (400.0, 540.0),
-        "large" => (520.0, 700.0),
-        _ => (450.0, 620.0),
+        "mini" => (400.0, 520.0),
+        "compact" => (440.0, 580.0),
+        "large" => (560.0, 760.0),
+        _ => (480.0, 660.0),
     }
 }
 
-/// How much bigger the transcript-reading form is than the orb view. One
-/// factor keeps both forms proportional to whichever base the size preset
-/// picked, rather than a second table of magic numbers, and makes the zoom
-/// control exactly reversible: expand multiplies, restore divides.
-const CONVERSATION_EXPAND_FACTOR: f64 = 1.3;
+/// Floor for a manual drag-resize of the expanded call. Wide enough that the
+/// call bar (whose widest form, typing, is 300px) still fits with its margins,
+/// tall enough that at least a few messages sit above it.
+const CONVERSATION_MIN_WIDTH: f64 = 400.0;
+const CONVERSATION_MIN_HEIGHT: f64 = 420.0;
 
-/// Floor for a manual drag-resize during a conversation. The panel's own floor
-/// is the pill (240x44), which for the voice view means the user can drag the
-/// window down to a strip with no reachable Mute or End button. This is the
-/// smallest size at which the orb, the status line and the call bar all still
-/// fit (see the `max-height: 440px` band in `ConversationView.css`).
-const CONVERSATION_MIN_WIDTH: f64 = 300.0;
-const CONVERSATION_MIN_HEIGHT: f64 = 340.0;
-
-/// Session memory of a manual resize made during a conversation, always stored
-/// as the ORB-view base even when the resize happened in the larger transcript
-/// form. Kept apart from `EXPANDED_W` so neither mode can silently
-/// rewrite the other's size.
+/// Session memory of a manual resize of the expanded call. The bar form is a
+/// fixed frame and has nothing to remember. Kept apart from `EXPANDED_W` so
+/// neither mode can silently rewrite the other's size.
 static CONVERSATION_W: AtomicU32 = AtomicU32::new(0);
 static CONVERSATION_H: AtomicU32 = AtomicU32::new(0);
 
-/// Whether the conversation window is in the larger transcript-reading form.
-/// Reset when a conversation ends, so the next one opens on the orb view.
+/// Whether the call is in its expanded form. Reset when a call ends, so the
+/// next one opens as the bar.
 static CONVERSATION_EXPANDED: AtomicBool = AtomicBool::new(false);
 
+/// Where the call bar was last left this session, as the window's bottom-centre
+/// point in logical coordinates. `None` until the user drags a call somewhere.
+///
+/// Bottom-centre rather than top-left because that is the point the two forms
+/// share: expanding grows the window upward and outward around it, so the bar
+/// stays exactly where the user's eye already is. It is deliberately separate
+/// from the quick ask's dragged position — parking the call bar at the bottom of
+/// the screen must not make the next quick ask open there too.
+static CALL_BAR_ANCHOR: Mutex<Option<(f64, f64)>> = Mutex::new(None);
+
 fn conversation_size(app: &AppHandle) -> (f64, f64) {
+    if !CONVERSATION_EXPANDED.load(Ordering::SeqCst) {
+        return (CALL_BAR_FRAME_WIDTH, CALL_BAR_FRAME_HEIGHT);
+    }
     let w = CONVERSATION_W.load(Ordering::SeqCst);
     let h = CONVERSATION_H.load(Ordering::SeqCst);
-    let (mut base_w, mut base_h) = if w == 0 || h == 0 {
+    let (w, h) = if w == 0 || h == 0 {
         conversation_preset_size(&get_settings(app).assistant_panel_size)
     } else {
         (w as f64, h as f64)
     };
-    if CONVERSATION_EXPANDED.load(Ordering::SeqCst) {
-        base_w *= CONVERSATION_EXPAND_FACTOR;
-        base_h *= CONVERSATION_EXPAND_FACTOR;
+    clamp_to_monitor(app, w, h)
+}
+
+/// Top-left of a window of `w`x`h` whose bottom-centre sits at `anchor`, kept
+/// inside `display`. Pure, because "the bar does not move when the call
+/// expands" is a property worth a test rather than a screen to squint at.
+fn bottom_anchored_position(
+    anchor: (f64, f64),
+    w: f64,
+    h: f64,
+    display: DisplayBounds,
+) -> (f64, f64) {
+    let (cx, bottom) = anchor;
+    let min_x = display.x + 8.0;
+    let min_y = display.y + 8.0;
+    let max_x = (display.x + display.width - w - 8.0).max(min_x);
+    let max_y = (display.y + display.height - h - 8.0).max(min_y);
+    (
+        (cx - w / 2.0).clamp(min_x, max_x),
+        (bottom - h).clamp(min_y, max_y),
+    )
+}
+
+/// Where the call bar opens when it has not been moved this session: centred
+/// at the bottom of the display, clear of the taskbar — where ChatGPT's own
+/// floating voice bar sits, and where a thing you talk to while working belongs.
+fn default_call_bar_anchor(display: DisplayBounds) -> (f64, f64) {
+    (
+        display.x + display.width / 2.0,
+        display.y + display.height - TASKBAR_CLEARANCE - CALL_BAR_BOTTOM_GAP,
+    )
+}
+
+/// The bottom-centre point of the window as it stands. Main thread only.
+fn window_bottom_centre(window: &tauri::WebviewWindow) -> Option<(f64, f64)> {
+    let scale = window.current_monitor().ok().flatten()?.scale_factor();
+    let pos = window.outer_position().ok()?;
+    let size = window.inner_size().ok()?;
+    let (x, y) = (pos.x as f64 / scale, pos.y as f64 / scale);
+    let (w, h) = (size.width as f64 / scale, size.height as f64 / scale);
+    Some((x + w / 2.0, y + h))
+}
+
+/// Record where the user left the call, so the next form change (and the next
+/// call this session) keeps the bar there.
+fn remember_call_anchor(window: &tauri::WebviewWindow) {
+    if let Some(anchor) = window_bottom_centre(window) {
+        if let Ok(mut slot) = CALL_BAR_ANCHOR.lock() {
+            *slot = Some(anchor);
+        }
     }
-    clamp_to_monitor(app, base_w, base_h)
 }
 
 /// Which of the two size lanes a remembered resize belongs to.
@@ -767,7 +832,7 @@ fn conversation_size(app: &AppHandle) -> (f64, f64) {
 enum SizeLane {
     /// The text chat panel.
     Panel,
-    /// The voice conversation view.
+    /// The expanded voice call.
     Conversation,
 }
 
@@ -785,6 +850,10 @@ fn current_size_lane(app: &AppHandle) -> SizeLane {
 /// never shrink a remembered size.
 fn remember_size_in_lane(app: &AppHandle, lane: SizeLane) {
     if PILL_MODE.load(Ordering::SeqCst) {
+        return;
+    }
+    // The call bar is a fixed frame; only the expanded call is the user's to size.
+    if lane == SizeLane::Conversation && !CONVERSATION_EXPANDED.load(Ordering::SeqCst) {
         return;
     }
     let Some(window) = app.get_webview_window(PANEL_LABEL) else {
@@ -808,7 +877,11 @@ fn remember_size_in_lane(app: &AppHandle, lane: SizeLane) {
     // Against the card's floor, not the pill's: the pill is a fixed shape the
     // user cannot usefully drag, so any resize worth remembering was made on the
     // card.
-    let (min_w, min_h) = panel_min_size(false, lane == SizeLane::Conversation, true);
+    let form = match lane {
+        SizeLane::Panel => PanelForm::AskCard,
+        SizeLane::Conversation => PanelForm::CallExpanded,
+    };
+    let (min_w, min_h) = panel_min_size(form);
     if w < min_w || h < min_h {
         return;
     }
@@ -819,16 +892,44 @@ fn remember_size_in_lane(app: &AppHandle, lane: SizeLane) {
             EXPANDED_W.store(w.round() as u32, Ordering::SeqCst);
         }
         SizeLane::Conversation => {
-            // The stored value is the orb-view base; undo the growth factor so
-            // a resize made while reading the transcript doesn't compound.
-            let divisor = if CONVERSATION_EXPANDED.load(Ordering::SeqCst) {
-                CONVERSATION_EXPAND_FACTOR
-            } else {
-                1.0
-            };
-            CONVERSATION_W.store((w / divisor).round() as u32, Ordering::SeqCst);
-            CONVERSATION_H.store((h / divisor).round() as u32, Ordering::SeqCst);
+            CONVERSATION_W.store(w.round() as u32, Ordering::SeqCst);
+            CONVERSATION_H.store(h.round() as u32, Ordering::SeqCst);
         }
+    }
+}
+
+/// Every shape the panel window takes. Each has its own resize floor, and a
+/// floor left over from the previous shape refuses the next one outright — the
+/// 240x44 pill cannot be entered while a 400x420 floor is in force.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum PanelForm {
+    /// The collapsed quick-ask pill (or the Live overlay).
+    Pill,
+    /// The quick ask's talking bar.
+    AskBar,
+    /// The quick ask's answer card.
+    AskCard,
+    /// A live call at rest: the floating bar and its status bubble.
+    CallBar,
+    /// A live call with its conversation open above the bar.
+    CallExpanded,
+}
+
+/// The form the window is in, read from the three flags that decide it.
+fn panel_form(collapsed: bool, call_active: bool, call_expanded: bool, card: bool) -> PanelForm {
+    if call_active {
+        // A call's collapsed form is its bar (see `collapsed_size`).
+        if call_expanded && !collapsed {
+            PanelForm::CallExpanded
+        } else {
+            PanelForm::CallBar
+        }
+    } else if collapsed {
+        PanelForm::Pill
+    } else if card {
+        PanelForm::AskCard
+    } else {
+        PanelForm::AskBar
     }
 }
 
@@ -837,24 +938,22 @@ fn remember_size_in_lane(app: &AppHandle, lane: SizeLane) {
 /// its controls reachable, and neither the collapsed pill nor the talking pill is
 /// ever refused — are testable without a window.
 ///
-/// `card` distinguishes the quick ask's two stages. It matters for the width as
-/// well as the height: the talking pill is narrower than the card's width floor,
-/// so a single floor for both stages would quietly stretch the pill to 300px and
-/// undo the whole point of it.
-fn panel_min_size(collapsed: bool, conversation: bool, card: bool) -> (f64, f64) {
-    if collapsed {
+/// The quick ask's two stages differ in width as well as height: the talking
+/// pill is narrower than the card's width floor, so a single floor for both
+/// stages would quietly stretch the pill to 300px and undo the whole point of it.
+fn panel_min_size(form: PanelForm) -> (f64, f64) {
+    match form {
         // Collapsing must never be refused, so the pill's own size is the floor.
-        (PILL_WIDTH, PILL_HEIGHT)
-    } else if conversation {
-        (CONVERSATION_MIN_WIDTH, CONVERSATION_MIN_HEIGHT)
-    } else if card {
+        PanelForm::Pill => (PILL_WIDTH, PILL_HEIGHT),
+        PanelForm::AskBar => (ASK_PILL_WIDTH, ASK_PILL_HEIGHT),
         // `PANEL_MIN_HEIGHT` was the floor for a window that always held a message
         // list and an input row; a 360px floor would refuse a card sized to a
         // one-line answer. Width still has a real floor, because the width is the
         // one dimension the user drags and the one the answer wraps to.
-        (PANEL_MIN_WIDTH, ASK_CARD_MIN_HEIGHT)
-    } else {
-        (ASK_PILL_WIDTH, ASK_PILL_HEIGHT)
+        PanelForm::AskCard => (PANEL_MIN_WIDTH, ASK_CARD_MIN_HEIGHT),
+        // A fixed frame: its floor is itself.
+        PanelForm::CallBar => (CALL_BAR_FRAME_WIDTH, CALL_BAR_FRAME_HEIGHT),
+        PanelForm::CallExpanded => (CONVERSATION_MIN_WIDTH, CONVERSATION_MIN_HEIGHT),
     }
 }
 
@@ -862,11 +961,12 @@ fn panel_min_size(collapsed: bool, conversation: bool, card: bool) -> (f64, f64)
 /// to move with the form: the pill is 240x44, so a conversation-sized floor
 /// left in place would refuse the collapse outright.
 fn apply_panel_min_size(app: &AppHandle, window: &tauri::WebviewWindow, collapsed: bool) {
-    let (w, h) = panel_min_size(
+    let (w, h) = panel_min_size(panel_form(
         collapsed,
         crate::voice_conversation::is_active(app),
+        CONVERSATION_EXPANDED.load(Ordering::SeqCst),
         ASK_STAGE_CARD.load(Ordering::SeqCst),
-    );
+    ));
     let _ = window.set_min_size(Some(tauri::LogicalSize::new(w, h)));
 }
 
@@ -1125,9 +1225,8 @@ fn resize_ask_card_in_place(app: &AppHandle, width: f64, target: f64, previous: 
 }
 
 /// A voice conversation is starting: park the chat panel's current size in its
-/// own lane, then move the window to the conversation lane's size. Safe on any
-/// thread — `assistant_conversation_start` is an async command, not the event
-/// loop.
+/// own lane, then turn the window into the call bar. Safe on any thread —
+/// `assistant_conversation_start` is an async command, not the event loop.
 pub fn enter_conversation_size(app: &AppHandle) {
     let app_main = app.clone();
     if let Err(e) = app.run_on_main_thread(move || {
@@ -1137,47 +1236,46 @@ pub fn enter_conversation_size(app: &AppHandle) {
         // Place the call by its OWN footprint, as it arrives.
         //
         // Without this the call inherits wherever the quick-ask surface was standing
-        // and simply grows out of that corner: a 340x56 pill, positioned for the ask
-        // card's footprint, becomes a 450x620 window pinned to the same top-left. On
-        // a 1080p display that lands it down and to the right of every zone the
-        // anchor setting offers, and `keep_panel_on_monitor` only clamps it back onto
-        // the display — so the window looked deliberately placed while honouring
-        // nothing the user had chosen.
+        // and grows out of that corner, which honours nothing the user chose. The
+        // bar opens where it was last left this session, else docked at the bottom
+        // centre of the display.
         //
         // On entry only, and deliberately not on every show: a call is a surface you
         // park somewhere and work alongside, so a drag during the call has to win.
-        // That is why `present_assistant_panel` still leaves a live call where it is.
-        anchor_panel_to_zone(&app_main);
+        // That is why `present_assistant_panel` leaves a live call where it is.
+        place_call_window(&app_main);
     }) {
         error!("Could not queue conversation panel sizing: {}", e);
     }
 }
 
-/// Move the panel to the dock zone the user chose, measured by the form it is
-/// currently wearing. Main thread only.
-///
-/// Split out from `present_assistant_panel` because the two callers disagree about
-/// *when* anchoring is right, not about what it means: showing the ask surface
-/// re-anchors every time, while a conversation is anchored once as it opens and left
-/// alone after that.
-fn anchor_panel_to_zone(app: &AppHandle) {
+/// Put the call window at its anchor, for whichever form it is in. Main thread
+/// only.
+fn place_call_window(app: &AppHandle) {
     let Some(window) = app.get_webview_window(PANEL_LABEL) else {
         return;
     };
-    let collapsed = PILL_MODE.load(Ordering::SeqCst);
-    let (w, h) = if collapsed {
-        collapsed_size(app)
-    } else if crate::voice_conversation::is_active(app) {
-        conversation_size(app)
-    } else {
-        ask_anchor_size(app)
+    let Some(display) = active_display_bounds(app) else {
+        return;
     };
-    let (x, y) = default_position_for(app, w, h);
+    let remembered = CALL_BAR_ANCHOR.lock().ok().and_then(|slot| *slot);
+    // A remembered anchor on a display that has since gone away is ignored
+    // rather than clamped onto whichever screen happens to be active.
+    let anchor = remembered
+        .filter(|&(cx, bottom)| {
+            cx >= display.x
+                && cx <= display.x + display.width
+                && bottom >= display.y
+                && bottom <= display.y + display.height
+        })
+        .unwrap_or_else(|| default_call_bar_anchor(display));
+    let (w, h) = conversation_size(app);
+    let (x, y) = bottom_anchored_position(anchor, w, h, display);
     place_panel(&window, x, y);
 }
 
 /// A voice conversation ended: park its size in the voice lane, drop the
-/// transcript form, and put the window back into the chat panel's lane. Called
+/// expanded form, and put the window back into the chat panel's lane. Called
 /// after the session ticket is cleared, so the lane lookups below already
 /// resolve to the chat panel.
 pub fn leave_conversation_size(app: &AppHandle) {
@@ -1186,9 +1284,9 @@ pub fn leave_conversation_size(app: &AppHandle) {
         remember_size_in_lane(&app_main, SizeLane::Conversation);
         CONVERSATION_EXPANDED.store(false, Ordering::SeqCst);
         if PILL_MODE.load(Ordering::SeqCst) {
-            // The collapsed form changes shape too: the conversation pill gives
-            // way to whichever overlay style the user picked, and Live is a
-            // different size again.
+            // The collapsed form changes shape too: the call bar gives way to
+            // whichever overlay style the user picked, and Live is a different
+            // size again.
             set_panel_collapsed(&app_main, true);
         } else {
             apply_panel_form_size(&app_main);
@@ -1198,24 +1296,50 @@ pub fn leave_conversation_size(app: &AppHandle) {
     }
 }
 
-/// Switch the conversation window between the orb view and the larger
-/// transcript-reading form. One flag drives both the window size and what the
-/// view renders, which is what makes the control a toggle in both directions
-/// instead of a one-way "grow".
+/// Switch the call between its bar and its expanded form (conversation above
+/// the bar). One flag drives both the window size and what the view renders,
+/// which is what makes the control a toggle in both directions.
+///
+/// The window grows and shrinks around its bottom-centre point, so the bar the
+/// user just clicked stays exactly where it was: expanding opens the
+/// conversation *above* it, and collapsing folds it back down onto it.
+///
+/// Emits `assistant-call-frame` (the form now in place) once the geometry has
+/// been applied. The webview draws nothing while the window changes shape and
+/// waits for this before it animates the new form in, because a resized
+/// webview briefly paints its old picture at the new window's corner.
 pub fn set_conversation_expanded(app: &AppHandle, expanded: bool) {
     if !crate::voice_conversation::is_active(app) {
         return;
     }
     let app_main = app.clone();
     if let Err(e) = app.run_on_main_thread(move || {
+        let report = |app: &AppHandle| {
+            let _ = app.emit_to(PANEL_LABEL, "assistant-call-frame", expanded);
+        };
         if CONVERSATION_EXPANDED.load(Ordering::SeqCst) == expanded {
+            report(&app_main);
             return;
         }
-        // Capture a manual resize before the factor is applied or undone, so
-        // the two forms stay each other's exact inverse.
+        let Some(window) = app_main.get_webview_window(PANEL_LABEL) else {
+            return;
+        };
+        // Capture a manual resize of the expanded form before leaving it.
         remember_size_in_lane(&app_main, SizeLane::Conversation);
+        let anchor = window_bottom_centre(&window);
         CONVERSATION_EXPANDED.store(expanded, Ordering::SeqCst);
-        apply_panel_form_size(&app_main);
+        let (w, h) = conversation_size(&app_main);
+        apply_panel_min_size(&app_main, &window, PILL_MODE.load(Ordering::SeqCst));
+        let _ = window.set_size(tauri::LogicalSize::new(w, h));
+        match (anchor, window.current_monitor()) {
+            (Some(anchor), Ok(Some(monitor))) => {
+                let (x, y) = bottom_anchored_position(anchor, w, h, display_bounds_of(&monitor));
+                place_panel(&window, x, y);
+            }
+            _ => keep_panel_on_monitor(&window, w, h),
+        }
+        save_position(&app_main);
+        report(&app_main);
     }) {
         error!("Could not queue conversation resize: {}", e);
     }
@@ -1799,14 +1923,15 @@ pub const SELECTION_CLOSE: &str = "</selected_text>";
 /// Speaking is a property of the surface that asked, not a global preference —
 /// which is why asking for a translation used to get read aloud at you. A quick
 /// text answer is read and dismissed, so it is always silent. A call is the only
-/// surface that speaks, and there the user's setting decides: off gives a call
-/// that shows replies as text without reading them out, which is a reasonable
-/// thing to want in a shared room.
+/// surface that speaks, and there the call's speaker switch decides (seeded from
+/// the user's setting when the call starts): off gives a call that shows replies
+/// as text without reading them out, which is a reasonable thing to want in a
+/// shared room.
 ///
 /// Pulled out of [`run_assistant_turn_inner`] so the rule is testable without a
 /// window, a model, or a microphone.
-fn should_speak_reply(is_call: bool, setting_enabled: bool) -> bool {
-    is_call && setting_enabled
+fn should_speak_reply(is_call: bool, speaker_on: bool) -> bool {
+    is_call && speaker_on
 }
 
 /// Wrap a captured selection and the user's question into one user message.
@@ -2763,7 +2888,29 @@ fn snap_and_remember(app: &AppHandle) {
     };
     // The collapsed pill has its own small footprint and its own remembered slot;
     // snapping it to a card-sized grid would fling it across the screen.
-    if PILL_MODE.load(Ordering::SeqCst) {
+    if PILL_MODE.load(Ordering::SeqCst) && !crate::voice_conversation::is_active(app) {
+        save_position(app);
+        remember_panel_display(app);
+        return;
+    }
+    // A call is parked wherever it is dropped, with no snapping: the dock zones
+    // are laid out for the quick-ask card, and snapping a 440px bar frame to them
+    // pulled it away from the bottom edge the user dragged it to. Its position is
+    // remembered as its own, so it never becomes the quick ask's dragged position.
+    if crate::voice_conversation::is_active(app) {
+        // Our own placement echoing back through `Moved` is not the user parking it.
+        let own = window
+            .current_monitor()
+            .ok()
+            .flatten()
+            .zip(window.outer_position().ok())
+            .is_some_and(|(monitor, pos)| {
+                let scale = monitor.scale_factor();
+                is_our_own_placement(pos.x as f64 / scale, pos.y as f64 / scale)
+            });
+        if !own {
+            remember_call_anchor(&window);
+        }
         save_position(app);
         remember_panel_display(app);
         return;
@@ -3411,6 +3558,27 @@ pub fn reset_conversation_for_new_exchange(app: &AppHandle) {
         });
     }
     debug!("Quick ask starting from an empty conversation");
+}
+
+/// Replace the live conversation with one saved in History, keeping the call
+/// (or panel) it is shown in. Later turns update that same History row.
+///
+/// Whatever was on screen before is handed to memory on the way out, exactly as
+/// clearing it would. The adopted thread is marked as already distilled, so
+/// hanging up afterwards learns from what was said *since* it was opened rather
+/// than distilling the whole old conversation a second time.
+pub fn adopt_saved_conversation(app: &AppHandle, id: i64, messages: Vec<ChatMessage>) {
+    let conversation = app.state::<AssistantConversation>();
+    let snapshot = conversation.take_distillable();
+    conversation.load_session(id, messages);
+    conversation.mark_distilled_current();
+    emit_conversation(app);
+    if let Some(messages) = snapshot {
+        let app_for_memory = app.clone();
+        tauri::async_runtime::spawn(async move {
+            crate::memory::distill_and_store(app_for_memory, messages).await;
+        });
+    }
 }
 
 /// Put the quick-ask card on screen for a voice turn, already listening.
@@ -4925,17 +5093,20 @@ async fn run_assistant_turn_inner(
     // aloud at you.
     //
     // A quick text answer is read and dismissed, so it is now *always* silent. A
-    // call is the only surface that speaks, and there the user's setting still
-    // decides: off gives a call that shows its replies as text without reading
-    // them out, which is a reasonable thing to want in a shared room.
+    // call is the only surface that speaks, and there the call's own speaker
+    // switch decides (seeded from the user's setting when the call starts): off
+    // gives a call that shows its replies as text without reading them out,
+    // which is a reasonable thing to want in a shared room.
     //
     // Deciding it here rather than at each use site means the four downstream
     // readers — the spoken-brevity prompt directive, the response-length hint, the
     // speech pipeline, and the Cat path — agree by construction. It also stops the
     // local Kokoro engine's ~310 MB of weights from ever loading for someone who
     // only asks quick questions.
-    settings.assistant_tts_enabled =
-        should_speak_reply(voice_ticket.is_some(), settings.assistant_tts_enabled);
+    settings.assistant_tts_enabled = should_speak_reply(
+        voice_ticket.is_some(),
+        crate::voice_conversation::speaker_on(&app),
+    );
 
     // Build the small display thumbnails once (screen capture first, then
     // attached images), before branching. Stored on the user message so the
@@ -6819,40 +6990,96 @@ mod tests {
     /// the regression this surface was redesigned to undo.
     #[test]
     fn the_resize_floor_admits_both_ask_shapes() {
-        let (pill_w, pill_h) = panel_min_size(false, false, false);
+        let (pill_w, pill_h) = panel_min_size(PanelForm::AskBar);
         assert!(
             pill_w <= ASK_PILL_WIDTH && pill_h <= ASK_PILL_HEIGHT,
             "a floor of {pill_w}x{pill_h} would refuse the \
              {ASK_PILL_WIDTH}x{ASK_PILL_HEIGHT} pill"
         );
-        let (_, card_h) = panel_min_size(false, false, true);
+        let (_, card_h) = panel_min_size(PanelForm::AskCard);
         assert!(
             card_h <= ASK_CARD_MIN_HEIGHT,
             "a floor of {card_h} would refuse a card sized to a one-line answer"
         );
     }
 
-    /// A collapsed call carries one control more than the quick-ask pill (the
-    /// microphone, the sound switch and hang up), so its chip is wider and its
-    /// window has to be wider still. The collapse floor has to admit it too, or
-    /// collapsing mid-call is refused outright.
+    /// The window's form is decided by three flags, and a live call wins over
+    /// the other two: a collapse that reaches a call lands on the call bar, not
+    /// on the quick-ask pill, and the expanded flag means nothing outside a call.
     #[test]
-    fn the_collapsed_call_chip_fits_its_window() {
-        /// `.conversation-pill` in `ConversationView.css`.
-        const CHIP_WIDTH: f64 = 272.0;
-        assert!(
-            CONVERSATION_PILL_WIDTH >= CHIP_WIDTH,
-            "a {CONVERSATION_PILL_WIDTH}px window clips a {CHIP_WIDTH}px chip"
+    fn a_live_call_decides_the_form_before_anything_else() {
+        assert_eq!(panel_form(false, true, false, false), PanelForm::CallBar);
+        assert_eq!(panel_form(false, true, true, true), PanelForm::CallExpanded);
+        assert_eq!(panel_form(true, true, true, false), PanelForm::CallBar);
+        assert_eq!(panel_form(true, false, true, true), PanelForm::Pill);
+        assert_eq!(panel_form(false, false, true, true), PanelForm::AskCard);
+        assert_eq!(panel_form(false, false, true, false), PanelForm::AskBar);
+    }
+
+    /// The call bar's frame has to hold the widest bar (typing, 300px) and a
+    /// status bubble above it, and the expanded call has to be able to shrink
+    /// back to no smaller than that bar — otherwise expanding and resizing could
+    /// clip the controls that hang up.
+    #[test]
+    fn the_call_bar_frame_holds_the_bar_and_its_bubble() {
+        /// `.call-bar.typing` width and `.call-bar-slot` height in `CallBar.css`.
+        const TYPING_BAR_WIDTH: f64 = 300.0;
+        const BAR_HEIGHT: f64 = 46.0;
+        // Checked at compile time: the frame is made of constants.
+        const _: () = assert!(CALL_BAR_FRAME_WIDTH >= TYPING_BAR_WIDTH + 2.0 * 16.0);
+        // Room for at least three lines of status above the bar.
+        const _: () = assert!(CALL_BAR_FRAME_HEIGHT >= BAR_HEIGHT + 3.0 * 22.0);
+        assert_eq!(
+            panel_min_size(PanelForm::CallBar),
+            (CALL_BAR_FRAME_WIDTH, CALL_BAR_FRAME_HEIGHT),
+            "the bar is a fixed frame"
         );
-        assert!(
-            CONVERSATION_PILL_WIDTH > PILL_WIDTH,
-            "the call chip carries more controls than the quick-ask pill"
+        let (floor_w, _) = panel_min_size(PanelForm::CallExpanded);
+        assert!(floor_w >= TYPING_BAR_WIDTH + 2.0 * 10.0);
+    }
+
+    /// Expanding grows the window upward around its bottom-centre, which is
+    /// what keeps the bar under the user's cursor. Collapsing must land exactly
+    /// where it started, and a window near an edge is kept on the display.
+    #[test]
+    fn the_call_expands_upward_around_the_bar() {
+        let display = DisplayBounds {
+            x: 0.0,
+            y: 0.0,
+            width: 1920.0,
+            height: 1080.0,
+        };
+        let anchor = default_call_bar_anchor(display);
+        let (bx, by) =
+            bottom_anchored_position(anchor, CALL_BAR_FRAME_WIDTH, CALL_BAR_FRAME_HEIGHT, display);
+        // Centred, and above the taskbar.
+        assert_eq!(bx, (1920.0 - CALL_BAR_FRAME_WIDTH) / 2.0);
+        assert!(by + CALL_BAR_FRAME_HEIGHT <= 1080.0 - TASKBAR_CLEARANCE);
+        let (ew, eh) = conversation_preset_size("standard");
+        let (ex, ey) = bottom_anchored_position(anchor, ew, eh, display);
+        // Same bottom edge and same centre line: the bar does not move.
+        assert_eq!(ey + eh, by + CALL_BAR_FRAME_HEIGHT);
+        assert_eq!(ex + ew / 2.0, bx + CALL_BAR_FRAME_WIDTH / 2.0);
+        // Round trip.
+        let back = bottom_anchored_position(
+            (ex + ew / 2.0, ey + eh),
+            CALL_BAR_FRAME_WIDTH,
+            CALL_BAR_FRAME_HEIGHT,
+            display,
         );
-        let (floor_w, floor_h) = panel_min_size(true, true, false);
-        assert!(
-            floor_w <= CONVERSATION_PILL_WIDTH && floor_h <= PILL_HEIGHT,
-            "a floor of {floor_w}x{floor_h} would refuse the collapsed call chip"
-        );
+        assert_eq!(back, (bx, by));
+        // A bar parked at the very top-left still expands onto the display.
+        let (cx, cy) = bottom_anchored_position((10.0, 60.0), ew, eh, display);
+        assert!(cx >= 0.0 && cy >= 0.0);
+        // And on a second monitor to the left, it stays on that monitor.
+        let left = DisplayBounds {
+            x: -1920.0,
+            y: 0.0,
+            width: 1920.0,
+            height: 1080.0,
+        };
+        let (lx, _) = bottom_anchored_position(default_call_bar_anchor(left), ew, eh, left);
+        assert!(lx < 0.0 && lx + ew <= 0.0);
     }
 
     /// Dropping the surface near an edge has to choose *that* zone. This is the
@@ -7012,22 +7239,18 @@ mod tests {
         ));
     }
 
-    /// The voice window has to clear the view's own container-query thresholds,
-    /// or a conversation runs with no visible text at all: `ConversationView.css`
-    /// only reveals the reply caption past 440x600 (minus the panel's 1px
-    /// border), which the chat panel's 390x500 default never reached.
+    /// The expanded call is mostly text now, so every preset must be a real
+    /// panel, at least as large as the chat panel at the same preset, and able
+    /// to hold the call bar below the conversation.
     #[test]
-    fn the_default_conversation_size_can_show_a_reply_caption() {
-        let (w, h) = conversation_preset_size("standard");
-        assert!(w - 2.0 >= 440.0, "width {w} leaves the caption hidden");
-        assert!(h - 2.0 >= 600.0, "height {h} leaves the caption hidden");
-        // Every preset must still be a usable window, not a pill.
+    fn every_expanded_call_preset_is_a_panel_that_holds_the_bar() {
         for preset in ["mini", "compact", "standard", "large", "unknown-legacy"] {
             let (w, h) = conversation_preset_size(preset);
-            assert!(w > PILL_WIDTH && h > PILL_HEIGHT, "{preset} is pill-sized");
+            assert!(
+                w >= CALL_BAR_FRAME_WIDTH - 40.0 && h > CALL_BAR_FRAME_HEIGHT * 2.0,
+                "{preset} is too small for a conversation above the bar"
+            );
         }
-        // Voice is taller than the chat panel at the same preset: the orb, the
-        // status line and the call bar stack vertically.
         for preset in ["mini", "compact", "standard", "large"] {
             let (chat_w, chat_h) = panel_preset_size(preset);
             let (voice_w, voice_h) = conversation_preset_size(preset);
@@ -7035,35 +7258,15 @@ mod tests {
         }
     }
 
-    /// The zoom control is one state read in both directions, so growing and
-    /// shrinking have to be exact inverses — otherwise repeated toggling walks
-    /// the window a few pixels every time (`remember_size_in_lane` divides by
-    /// the same factor `conversation_size` multiplies by).
-    #[test]
-    fn the_conversation_zoom_toggle_round_trips_to_the_same_size() {
-        for preset in ["mini", "compact", "standard", "large"] {
-            let (base_w, base_h) = conversation_preset_size(preset);
-            let expanded_w = (base_w * CONVERSATION_EXPAND_FACTOR).round();
-            let expanded_h = (base_h * CONVERSATION_EXPAND_FACTOR).round();
-            assert!(expanded_w > base_w && expanded_h > base_h);
-            assert_eq!((expanded_w / CONVERSATION_EXPAND_FACTOR).round(), base_w);
-            assert_eq!((expanded_h / CONVERSATION_EXPAND_FACTOR).round(), base_h);
-        }
-    }
-
     /// The drag-resize floor has to sit under every preset (or the smallest one
     /// could not be applied) and above the pill (or the user could drag a live
-    /// call down to a strip with no reachable Mute or End button) — and it must
-    /// drop back to the pill's floor on collapse, or the collapse is refused.
+    /// call down to a strip with no reachable hang-up) — and a collapse must use
+    /// the pill's floor, or the collapse is refused.
     #[test]
     fn the_conversation_resize_floor_sits_between_the_pill_and_every_preset() {
-        let (call_w, call_h) = panel_min_size(false, true, true);
-        let (pill_w, pill_h) = panel_min_size(true, true, true);
+        let (call_w, call_h) = panel_min_size(PanelForm::CallExpanded);
+        let (pill_w, pill_h) = panel_min_size(PanelForm::Pill);
         assert!(call_w > pill_w && call_h > pill_h);
-        assert_eq!(
-            panel_min_size(true, true, true),
-            panel_min_size(true, false, true)
-        );
         for preset in ["mini", "compact", "standard", "large", "unknown-legacy"] {
             let (w, h) = conversation_preset_size(preset);
             assert!(
@@ -7086,8 +7289,8 @@ mod tests {
     /// surface deliberately takes that shape while a question is being asked.
     #[test]
     fn the_chat_panel_resize_floor_sits_between_the_pill_and_every_preset() {
-        let (panel_w, panel_h) = panel_min_size(false, false, true);
-        let (pill_w, pill_h) = panel_min_size(true, false, true);
+        let (panel_w, panel_h) = panel_min_size(PanelForm::AskCard);
+        let (pill_w, pill_h) = panel_min_size(PanelForm::Pill);
         assert!(
             panel_w > pill_w && panel_h > pill_h,
             "the expanded surface's floor must sit above the pill's, not equal it"
@@ -7180,14 +7383,14 @@ mod tests {
         assert!(!should_speak_reply(false, false));
     }
 
-    /// A call is the one surface that speaks, and there the user still decides —
-    /// off means a call that shows text without reading it out.
+    /// A call is the one surface that speaks, and there its speaker switch
+    /// decides — off means a call that shows text without reading it out.
     #[test]
-    fn only_a_call_speaks_and_only_when_the_user_wants_it_to() {
+    fn only_a_call_speaks_and_only_when_its_speaker_is_on() {
         assert!(should_speak_reply(true, true));
         assert!(
             !should_speak_reply(true, false),
-            "turning spoken replies off must silence a call, not be ignored"
+            "turning the call's speaker off must silence it, not be ignored"
         );
     }
 

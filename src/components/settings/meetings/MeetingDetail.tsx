@@ -10,7 +10,15 @@ import { listen } from "@tauri-apps/api/event";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { toast } from "sonner";
-import { Check, Pencil, Sparkles, Users, X } from "lucide-react";
+import {
+  Check,
+  Copy,
+  Pencil,
+  RefreshCw,
+  Sparkles,
+  Users,
+  X,
+} from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Dropdown } from "@/components/ui/Dropdown";
 import { Textarea } from "@/components/ui/Textarea";
@@ -21,6 +29,7 @@ import {
   getMeeting,
   getMeetingSegments,
   getMeetingSpeakers,
+  isMeetingNotesRunning,
   MEETING_NOTES_PROGRESS_EVENT,
   MEETING_SEGMENT_EVENT,
   NOTES_TEMPLATES,
@@ -28,6 +37,7 @@ import {
   renameMeetingSpeaker,
   SEGMENT_PAGE_SIZE,
   setMeetingMyNotes,
+  setMeetingNotes,
   type Meeting,
   type MeetingSpeaker,
   type NotesProgress,
@@ -43,6 +53,7 @@ import {
   type TranscriptItem,
 } from "./speakers";
 import { MeetingAskPanel } from "./MeetingAskPanel";
+import { toggleTaskAt } from "./notesTasks";
 import { SpeakerIdentification } from "./SpeakerIdentification";
 import { TranscriptView } from "./TranscriptView";
 
@@ -115,6 +126,101 @@ const notesMarkdown: Components = {
 const isTemplateId = (value: string | null): value is NotesTemplateId =>
   value !== null && NOTES_TEMPLATES.includes(value as NotesTemplateId);
 
+/** How long the copy button says "Copied". */
+const COPIED_MS = 1600;
+
+/** The bits of a hast node the task renderer reads. */
+type TaskNode = {
+  position?: { start: { offset?: number } };
+  children?: Array<{
+    type: string;
+    tagName?: string;
+    properties?: { checked?: unknown };
+  }>;
+};
+
+/**
+ * Markdown for the finished notes.
+ *
+ * Styled as a document rather than as a chat reply: section headings are small
+ * labels so the content, not the scaffolding, carries the page; topic headings
+ * are the scannable spine; and next steps render as real checkboxes that save,
+ * because a task list you can tick off is the part of the notes people actually
+ * return to.
+ */
+const summaryMarkdown = (
+  onToggleTask: (offset: number) => void,
+  toggleLabel: string,
+): Components => ({
+  ...notesMarkdown,
+  h1: ({ children }) => <SectionLabel>{children}</SectionLabel>,
+  h2: ({ children }) => <SectionLabel>{children}</SectionLabel>,
+  h3: ({ children }) => (
+    <h4 className="mb-1 mt-3.5 text-[13.5px] font-semibold text-ink first:mt-0">
+      {children}
+    </h4>
+  ),
+  p: ({ children }) => (
+    <p className="mb-2 text-[13.5px] leading-relaxed text-body last:mb-0">
+      {children}
+    </p>
+  ),
+  ul: ({ className, children }) =>
+    className?.includes("contains-task-list") ? (
+      <ul className="mb-2 space-y-1.5 last:mb-0">{children}</ul>
+    ) : (
+      <ul className="mb-2 list-disc space-y-1 ps-5 marker:text-muted-soft last:mb-0">
+        {children}
+      </ul>
+    ),
+  li: ({ node, className, children }) => {
+    if (!className?.includes("task-list-item"))
+      return <li className="text-[13.5px] leading-relaxed">{children}</li>;
+    const task = node as TaskNode | undefined;
+    const box = task?.children?.find(
+      (child) => child.type === "element" && child.tagName === "input",
+    );
+    const checked = Boolean(box?.properties?.checked);
+    const offset = task?.position?.start.offset;
+    return (
+      <li className="flex items-start gap-2.5 text-[13.5px] leading-relaxed">
+        <button
+          type="button"
+          role="checkbox"
+          aria-checked={checked}
+          aria-label={toggleLabel}
+          title={toggleLabel}
+          disabled={offset === undefined}
+          onClick={() => offset !== undefined && onToggleTask(offset)}
+          className={`mt-[3px] flex h-4 w-4 shrink-0 cursor-pointer items-center justify-center rounded-[5px] border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${
+            checked
+              ? "border-accent bg-accent text-white"
+              : "border-hairline-strong hover:border-ink/50"
+          }`}
+        >
+          {checked && <Check size={11} strokeWidth={3} />}
+        </button>
+        <span
+          className={`min-w-0 flex-1 ${checked ? "text-muted line-through decoration-muted-soft" : ""}`}
+        >
+          {children}
+        </span>
+      </li>
+    );
+  },
+  // The box is drawn by `li` above; the one GFM emits would be a second,
+  // disabled checkbox beside it.
+  input: () => null,
+});
+
+const SectionLabel: React.FC<{ children?: React.ReactNode }> = ({
+  children,
+}) => (
+  <h3 className="mb-2 mt-6 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted first:mt-0">
+    {children}
+  </h3>
+);
+
 /**
  * One meeting: what the user thought, what was said, and what it added up to.
  *
@@ -151,10 +257,6 @@ export const MeetingDetail: React.FC<MeetingDetailProps> = ({
   const [skippedWindows, setSkippedWindows] = useState(0);
   /** Why the automatic notes job failed, so the retry says what to expect. */
   const [notesError, setNotesError] = useState<string | null>(null);
-  /** Whether the template picker is showing. Hidden by default: the notes are
-   *  already written by the time anyone reads this page, so a template is an
-   *  override for the minority case rather than a step on the way in. */
-  const [showTemplates, setShowTemplates] = useState(false);
 
   const isLive = recordingMeetingId === meetingId;
 
@@ -169,6 +271,9 @@ export const MeetingDetail: React.FC<MeetingDetailProps> = ({
     setLoaded(false);
     setItems([]);
     setTranscriptLoading(true);
+    setGenerating(false);
+    setNotesError(null);
+    setSkippedWindows(0);
 
     void getMeeting(meetingId)
       .then((result) => {
@@ -187,6 +292,14 @@ export const MeetingDetail: React.FC<MeetingDetailProps> = ({
       });
 
     refreshSpeakers();
+
+    // A page opened after the post-call job announced itself would otherwise
+    // think nothing is running and offer to start a second, racing job.
+    void isMeetingNotesRunning(meetingId)
+      .then((running) => {
+        if (!cancelled && running) setGenerating(true);
+      })
+      .catch(() => {});
 
     // Pages are fetched back to back rather than on scroll: the transcript is
     // append-only and finished by the time it is read, so offsets are stable and
@@ -377,9 +490,13 @@ export const MeetingDetail: React.FC<MeetingDetailProps> = ({
   /* ── summary ── */
 
   const generate = () => {
+    if (generating) return;
     setGenerating(true);
     setSkippedWindows(0);
     setNotesError(null);
+    // Progress and the refreshed title also arrive as events, since the backend
+    // announces manual runs the same way as the automatic one. The promise is
+    // still handled so this page updates even if the event raced its listener.
     void generateMeetingNotes(meetingId, template)
       .then((result) => {
         setMeeting((current) =>
@@ -392,14 +509,16 @@ export const MeetingDetail: React.FC<MeetingDetailProps> = ({
             : current,
         );
         setSkippedWindows(result.skipped_windows);
-        setShowTemplates(false);
+        void getMeeting(meetingId)
+          .then((fresh) => {
+            if (fresh) setMeeting(fresh);
+          })
+          .catch(() => {});
         onChanged();
       })
       .catch((error: unknown) => {
+        // Shown in the error box with its own retry, so no toast on top.
         setNotesError(String(error));
-        toast.error(
-          t("meetings.errors.generateFailed", { error: String(error) }),
-        );
       })
       .finally(() => setGenerating(false));
   };
@@ -412,6 +531,52 @@ export const MeetingDetail: React.FC<MeetingDetailProps> = ({
       })),
     [t],
   );
+
+  /* ── ticking off next steps, and copying ── */
+
+  const notesText = meeting?.notes ?? null;
+  const toggleTask = useCallback(
+    (offset: number) => {
+      if (notesText === null || generating) return;
+      const next = toggleTaskAt(notesText, offset);
+      if (next === notesText) return;
+      // Optimistic: a checkbox that waits for a round trip feels broken.
+      setMeeting((current) =>
+        current ? { ...current, notes: next } : current,
+      );
+      void setMeetingNotes(meetingId, next).catch((error: unknown) => {
+        setMeeting((current) =>
+          current ? { ...current, notes: notesText } : current,
+        );
+        toast.error(
+          t("meetings.errors.notesSaveFailed", { error: String(error) }),
+        );
+      });
+    },
+    [notesText, generating, meetingId, t],
+  );
+
+  const summaryComponents = useMemo(
+    () => summaryMarkdown(toggleTask, t("meetings.summary.toggleTask")),
+    [toggleTask, t],
+  );
+
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    if (!copied) return;
+    const timer = window.setTimeout(() => setCopied(false), COPIED_MS);
+    return () => window.clearTimeout(timer);
+  }, [copied]);
+
+  const copyNotes = () => {
+    if (!notesText) return;
+    void navigator.clipboard
+      .writeText(notesText)
+      .then(() => setCopied(true))
+      .catch((error: unknown) => {
+        toast.error(t("meetings.errors.copyFailed", { error: String(error) }));
+      });
+  };
 
   /* ── header numbers ── */
 
@@ -634,29 +799,143 @@ export const MeetingDetail: React.FC<MeetingDetailProps> = ({
 
       {tab === "summary" && (
         <div className="space-y-3">
-          {/* The notes themselves come first. They are written automatically when
-              the call ends, so on this page they are the content rather than
-              something the user has to go and produce. */}
-          <div className="rounded-2xl border border-hairline bg-surface elev-card p-4">
-            {generating && !meeting.notes ? (
-              <p className="py-6 text-center text-[13px] text-muted">
-                {t("meetings.summary.writing")}
-              </p>
-            ) : meeting.notes ? (
-              <div className="text-[13px] leading-relaxed text-body">
+          {/* The notes are the page. They are written automatically when the
+              call ends, so the controls that act on them — copy, pick another
+              template, rewrite — sit in one quiet row on top of the document
+              instead of in a second card below it. */}
+          <div className="rounded-2xl border border-hairline bg-surface elev-card">
+            {(meeting.notes || generating) && (
+              <div className="flex flex-wrap items-center gap-2 border-b border-hairline px-4 py-2.5">
+                <span
+                  className="min-w-0 flex-1 truncate text-[11.5px] text-muted-soft"
+                  role={generating ? "status" : undefined}
+                >
+                  {generating ? (
+                    <span className="inline-flex items-center gap-1.5 text-muted">
+                      <Sparkles size={12} className="animate-pulse" />
+                      {meeting.notes
+                        ? t("meetings.summary.generating")
+                        : t("meetings.summary.writing")}
+                    </span>
+                  ) : (
+                    t("meetings.summary.autoCaption")
+                  )}
+                </span>
+                {meeting.notes && (
+                  <button
+                    type="button"
+                    onClick={copyNotes}
+                    title={
+                      copied
+                        ? t("meetings.summary.copied")
+                        : t("meetings.summary.copy")
+                    }
+                    aria-label={
+                      copied
+                        ? t("meetings.summary.copied")
+                        : t("meetings.summary.copy")
+                    }
+                    className="inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-lg px-2 text-xs text-muted transition-colors hover:bg-ink/6 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+                  >
+                    {copied ? <Check size={13} /> : <Copy size={13} />}
+                    {copied
+                      ? t("meetings.summary.copied")
+                      : t("meetings.summary.copy")}
+                  </button>
+                )}
+                {items.length > 0 && (
+                  <>
+                    <div
+                      className="min-w-[150px]"
+                      title={t(`meetings.summary.templateHints.${template}`)}
+                    >
+                      <Dropdown
+                        options={templateOptions}
+                        selectedValue={template}
+                        onSelect={(value) =>
+                          setTemplate(value as NotesTemplateId)
+                        }
+                        disabled={generating}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={generate}
+                      disabled={generating}
+                      title={t("meetings.summary.regenerate")}
+                      aria-label={t("meetings.summary.regenerate")}
+                      className="inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-lg px-2 text-xs text-muted transition-colors hover:bg-ink/6 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:cursor-wait disabled:opacity-60"
+                    >
+                      <RefreshCw
+                        size={13}
+                        className={generating ? "animate-spin" : ""}
+                      />
+                      {t("meetings.summary.regenerate")}
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+
+            {meeting.notes ? (
+              <div
+                className={`px-5 py-4 transition-opacity ${
+                  generating ? "opacity-50" : ""
+                }`}
+              >
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
-                  components={notesMarkdown}
+                  components={summaryComponents}
                 >
                   {meeting.notes}
                 </ReactMarkdown>
               </div>
+            ) : generating ? (
+              <div className="space-y-2.5 px-5 py-5" aria-hidden="true">
+                {/* A skeleton of the document that is coming, so the wait reads
+                    as progress rather than as an empty page. */}
+                <div className="h-3 w-24 animate-pulse rounded bg-mid-gray/15" />
+                <div className="h-3 w-full animate-pulse rounded bg-mid-gray/10" />
+                <div className="h-3 w-5/6 animate-pulse rounded bg-mid-gray/10" />
+                <div className="mt-5 h-3 w-28 animate-pulse rounded bg-mid-gray/15" />
+                <div className="h-3 w-2/3 animate-pulse rounded bg-mid-gray/10" />
+                <div className="h-3 w-3/4 animate-pulse rounded bg-mid-gray/10" />
+              </div>
             ) : (
-              <p className="py-6 text-center text-[13px] text-muted">
-                {items.length === 0
-                  ? t("meetings.summary.needsTranscript")
-                  : t("meetings.summary.empty")}
-              </p>
+              <div className="flex flex-col items-center gap-3 px-5 py-8 text-center">
+                <p className="text-[13px] text-muted">
+                  {items.length === 0
+                    ? t("meetings.summary.needsTranscript")
+                    : t("meetings.summary.retryCaption")}
+                </p>
+                {items.length > 0 && (
+                  <div className="flex flex-wrap items-center justify-center gap-2">
+                    <div className="min-w-[170px]">
+                      <Dropdown
+                        options={templateOptions}
+                        selectedValue={template}
+                        onSelect={(value) =>
+                          setTemplate(value as NotesTemplateId)
+                        }
+                      />
+                    </div>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={generate}
+                      className="gap-1.5"
+                    >
+                      <Sparkles size={13} />
+                      {t("meetings.summary.generate")}
+                    </Button>
+                  </div>
+                )}
+                {items.length > 0 && (
+                  <p className="text-[11.5px] text-muted-soft">
+                    {t(`meetings.summary.templateHints.${template}`)}
+                  </p>
+                )}
+              </div>
             )}
           </div>
 
@@ -668,85 +947,20 @@ export const MeetingDetail: React.FC<MeetingDetailProps> = ({
             </div>
           )}
 
-          {notesError && (
-            <div className="rounded-xl border border-error/40 bg-error/10 px-3.5 py-2.5">
-              <p className="text-[12.5px] text-error">
+          {notesError && !generating && (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-error/40 bg-error/10 px-3.5 py-2.5">
+              <p className="min-w-0 flex-1 text-[12.5px] text-error">
                 {t("meetings.summary.failed", { error: notesError })}
               </p>
-            </div>
-          )}
-
-          {/* Regenerating is the override, so it sits below the notes and its
-              template picker stays folded away until asked for. Offering the
-              choice up front meant deciding how to shape a summary of a transcript
-              nobody had read yet. */}
-          {items.length > 0 && (
-            <div className="rounded-2xl border border-hairline bg-surface elev-card p-4">
-              {showTemplates ? (
-                <div className="space-y-3">
-                  <div>
-                    <p className="mb-1.5 text-[12.5px] font-medium text-ink">
-                      {t("meetings.summary.template")}
-                    </p>
-                    <Dropdown
-                      options={templateOptions}
-                      selectedValue={template}
-                      onSelect={(value) =>
-                        setTemplate(value as NotesTemplateId)
-                      }
-                      disabled={generating}
-                    />
-                    <p className="mt-1.5 text-[11.5px] text-muted-soft">
-                      {t(`meetings.summary.templateHints.${template}`)}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      onClick={generate}
-                      disabled={generating}
-                      className="gap-1.5"
-                    >
-                      <Sparkles size={13} />
-                      {generating
-                        ? t("meetings.summary.generating")
-                        : t("meetings.summary.regenerate")}
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => setShowTemplates(false)}
-                      disabled={generating}
-                    >
-                      {t("common.cancel")}
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-xs text-muted">
-                    {meeting.notes
-                      ? t("meetings.summary.autoCaption")
-                      : t("meetings.summary.retryCaption")}
-                  </p>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() =>
-                      meeting.notes ? setShowTemplates(true) : generate()
-                    }
-                    disabled={generating}
-                    className="gap-1.5"
-                  >
-                    <Sparkles size={13} />
-                    {generating
-                      ? t("meetings.summary.generating")
-                      : meeting.notes
-                        ? t("meetings.summary.rewrite")
-                        : t("meetings.summary.generate")}
-                  </Button>
-                </div>
+              {items.length > 0 && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={generate}
+                  className="shrink-0"
+                >
+                  {t("meetings.summary.tryAgain")}
+                </Button>
               )}
             </div>
           )}

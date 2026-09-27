@@ -47,9 +47,11 @@
 //! window operations and the callers are audio and shortcut threads.
 
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
+use std::sync::Mutex;
 
 use log::{debug, error, warn};
 use tauri::{AppHandle, Emitter, Manager, WebviewWindowBuilder};
+use tauri_plugin_store::StoreExt;
 
 /// Window label. Must also appear in `capabilities/default.json`, or the window
 /// renders and can `invoke` but every `listen` is denied by the ACL — which
@@ -78,16 +80,25 @@ pub struct CallOffer {
     pub app: Option<String>,
 }
 
-const PILL_WIDTH_COLLAPSED: f64 = 276.0;
-const PILL_WIDTH_EXPANDED: f64 = 452.0;
+/// The collapsed pill: a dot, a small waveform and the clock — the same object
+/// as the dictation overlay's compact pill, and about as small. The window is
+/// exactly the pill, with no transparent frame around it, so there is no
+/// invisible margin sitting over the user's work and eating clicks. Hovering
+/// swaps the waveform for pause and stop *inside* the same width, which is what
+/// lets the controls appear without the window resizing under the pointer.
+const PILL_WIDTH_COLLAPSED: f64 = 152.0;
+/// The call offer is a sentence and two buttons; it needs more room than the
+/// recording pill.
+const PILL_WIDTH_OFFER: f64 = 304.0;
+const PILL_WIDTH_EXPANDED: f64 = 420.0;
 
 /// Used only until the webview reports its measured height.
-const COLLAPSED_FALLBACK_HEIGHT: f64 = 52.0;
+const COLLAPSED_FALLBACK_HEIGHT: f64 = 36.0;
 const EXPANDED_FALLBACK_HEIGHT: f64 = 420.0;
 
 /// Floor, so a measurement that arrives mid-render cannot collapse the window to
 /// nothing and leave the user with no way to click it.
-const MIN_HEIGHT: f64 = 44.0;
+const MIN_HEIGHT: f64 = 30.0;
 
 /// Ceiling on the expanded card, as a fraction of the display's height.
 ///
@@ -97,16 +108,24 @@ const MIN_HEIGHT: f64 = 44.0;
 /// `assistant::fit_ask_card`.
 const MAX_HEIGHT_FRACTION: f64 = 0.62;
 
-/// Gap between the pill and the bottom of the work area.
-///
-/// Deliberately larger than `overlay::OVERLAY_BOTTOM_OFFSET`: the dictation
-/// overlay lives at the bottom centre too, and a user who dictates a note during
-/// a call would otherwise have the two windows stacked on the same pixels. This
-/// puts the meeting pill above it.
+/// Gap between the pill and the display edge it first docks against.
+const EDGE_MARGIN: f64 = 16.0;
+
+/// Kept clear at the top and bottom of the display: the macOS menu bar, the
+/// Windows taskbar. Monitor bounds rather than `work_area()` for the reason
+/// `overlay.rs` gives — the latter misreports negative-origin displays on macOS.
 #[cfg(target_os = "macos")]
-const PILL_BOTTOM_OFFSET: f64 = 78.0;
+const TOP_CLEARANCE: f64 = 32.0;
 #[cfg(not(target_os = "macos"))]
-const PILL_BOTTOM_OFFSET: f64 = 104.0;
+const TOP_CLEARANCE: f64 = 8.0;
+#[cfg(target_os = "macos")]
+const BOTTOM_CLEARANCE: f64 = 16.0;
+#[cfg(not(target_os = "macos"))]
+const BOTTOM_CLEARANCE: f64 = 48.0;
+
+/// Where the pill was left, in the settings store, so the next meeting — and the
+/// next launch — puts it back there instead of at the default.
+const POSITION_KEY: &str = "meeting_pill_position";
 
 /// Mirrors the window's real visibility.
 ///
@@ -146,6 +165,18 @@ static PILL_GUARD: AtomicU64 = AtomicU64::new(0);
 /// indicator for a meeting that is still capturing, and that is the one state this
 /// window exists to never show.
 static OFFER_ACTIVE: AtomicBool = AtomicBool::new(false);
+
+/// Which corner of the window stays fixed when it changes size.
+///
+/// Decided from where the *small* form sits and then kept while the card is
+/// open, so the card grows out of the pill and folds back into the same corner.
+/// Recomputing it from the card instead made a pill that opened downward come
+/// back at the card's far end.
+static CORNER: Mutex<Option<Corner>> = Mutex::new(None);
+
+/// The shape the window currently has on screen, `None` until it is first
+/// placed this run.
+static APPLIED: Mutex<Option<PillShape>> = Mutex::new(None);
 
 pub fn is_visible() -> bool {
     PILL_VISIBLE.load(Ordering::SeqCst)
@@ -298,6 +329,9 @@ pub fn hide_pill(app: &AppHandle) {
         let Some(window) = app_main.get_webview_window(PILL_LABEL) else {
             return;
         };
+        // Remembered before it goes, while the position is still the one the
+        // user can see.
+        save_position(&app_main, &window);
         let _ = window.hide();
         // Back to unfocusable, so the next show cannot arrive able to steal the
         // caret. Safe here precisely because the window is now hidden and holds
@@ -475,44 +509,307 @@ pub fn fit_pill(app: &AppHandle, requested: f64) {
 }
 
 /// Size and place the window for the current mode. Main thread only.
+///
+/// # Where it goes
+///
+/// It used to be recomputed from scratch on every call — bottom centre of
+/// whichever display had the cursor — so every measurement the webview reported
+/// snapped a pill the user had dragged aside straight back to the middle of the
+/// screen. Now the window's own position is the input: the first placement in a
+/// run uses the remembered spot (or the default), and every later one resizes
+/// around a fixed corner of wherever the window is right now.
+///
+/// The default is the right edge, vertically centred, rather than the bottom
+/// centre. Bottom centre is where the dictation overlay and the assistant's call
+/// bar both live, and the meeting pill sat directly on top of the call's status
+/// bubble — two always-on-top windows fighting for the same pixels.
 fn apply_geometry(app: &AppHandle, window: &tauri::WebviewWindow) {
-    let expanded = PILL_EXPANDED.load(Ordering::SeqCst);
-    let width = if expanded {
-        PILL_WIDTH_EXPANDED
+    let shape = current_shape();
+    let width = shape.width();
+    let applied = APPLIED.lock().ok().and_then(|slot| *slot);
+
+    // Where the window is now, when it has been placed this run; otherwise where
+    // it was left last time. Either answer brings the display it is on, so the
+    // clamp and the position agree about which screen they mean.
+    let placed = if applied.is_some() {
+        live_rect(app, window)
     } else {
-        PILL_WIDTH_COLLAPSED
+        saved_rect(app)
+    };
+    let (current, monitor) = match placed {
+        Some((rect, monitor)) => (Some(rect), Some(monitor)),
+        None => (
+            None,
+            crate::overlay::get_monitor_with_cursor(app)
+                .or_else(|| window.current_monitor().ok().flatten()),
+        ),
     };
 
-    // The monitor is resolved once and used for both the clamp and the position,
-    // so a pill clamped against one display cannot be placed on another.
-    let monitor = crate::overlay::get_monitor_with_cursor(app)
-        .or_else(|| window.current_monitor().ok().flatten());
+    let Some(monitor) = monitor else {
+        let height = resolve_height(shape == PillShape::Expanded, None);
+        let _ = window.set_size(tauri::LogicalSize::new(width, height));
+        return;
+    };
+    let area = usable_area(&monitor);
+    let height = resolve_height(shape == PillShape::Expanded, Some(area.h));
 
-    let height = resolve_height(expanded, monitor.as_ref());
-    let _ = window.set_size(tauri::LogicalSize::new(width, height));
+    let target = match current {
+        Some(current) => {
+            // Only a small form chooses the corner. The card keeps the one it
+            // opened from, so collapsing lands the pill where it started.
+            let stored = CORNER.lock().ok().and_then(|slot| *slot);
+            let corner = match (applied, stored) {
+                (Some(PillShape::Expanded), Some(corner)) => corner,
+                _ => {
+                    let corner = corner_for(current, area);
+                    if let Ok(mut slot) = CORNER.lock() {
+                        *slot = Some(corner);
+                    }
+                    corner
+                }
+            };
+            resize_from_corner(current, corner, width, height, area)
+        }
+        None => default_rect(width, height, area),
+    };
 
-    if let Some(monitor) = monitor {
-        let scale = monitor.scale_factor();
-        let monitor_x = monitor.position().x as f64 / scale;
-        let monitor_y = monitor.position().y as f64 / scale;
-        let monitor_w = monitor.size().width as f64 / scale;
-        let monitor_h = monitor.size().height as f64 / scale;
-
-        let x = monitor_x + ((monitor_w - width) / 2.0).max(0.0);
-        let y = monitor_y + (monitor_h - height - PILL_BOTTOM_OFFSET).max(monitor_y);
-
-        // Logical, never physical: tao converts a `PhysicalPosition` using the
-        // scale factor of the monitor the window is *currently* on, which is the
-        // wrong one whenever the window is moving between displays.
-        let _ = window.set_position(tauri::LogicalPosition::new(x, y));
+    let _ = window.set_size(tauri::LogicalSize::new(target.w, target.h));
+    // Logical, never physical: tao converts a `PhysicalPosition` using the scale
+    // factor of the monitor the window is *currently* on, which is the wrong one
+    // whenever the window is moving between displays.
+    let _ = window.set_position(tauri::LogicalPosition::new(target.x, target.y));
+    if let Ok(mut slot) = APPLIED.lock() {
+        *slot = Some(shape);
     }
 }
 
-/// The height to use, given the mode and the display to clamp against.
+/// Which form the window should take right now.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum PillShape {
+    Collapsed,
+    Offer,
+    Expanded,
+}
+
+impl PillShape {
+    fn width(self) -> f64 {
+        match self {
+            Self::Collapsed => PILL_WIDTH_COLLAPSED,
+            Self::Offer => PILL_WIDTH_OFFER,
+            Self::Expanded => PILL_WIDTH_EXPANDED,
+        }
+    }
+}
+
+fn current_shape() -> PillShape {
+    if PILL_EXPANDED.load(Ordering::SeqCst) {
+        PillShape::Expanded
+    } else if OFFER_ACTIVE.load(Ordering::SeqCst) {
+        PillShape::Offer
+    } else {
+        PillShape::Collapsed
+    }
+}
+
+/// A rectangle in one display's logical points.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct Rect {
+    x: f64,
+    y: f64,
+    w: f64,
+    h: f64,
+}
+
+impl Rect {
+    fn centre(&self) -> (f64, f64) {
+        (self.x + self.w / 2.0, self.y + self.h / 2.0)
+    }
+}
+
+/// The corner that stays put when the window changes size.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct Corner {
+    right: bool,
+    bottom: bool,
+}
+
+/// The corner nearest the display edges the window sits against.
 ///
-/// Pure so the clamp can be tested without a window: every bug this has had was
-/// in the arithmetic, not in the `set_size` call.
-fn resolve_height(expanded: bool, monitor: Option<&tauri::Monitor>) -> f64 {
+/// A pill in the right half keeps its right edge, so the card opens leftward
+/// into the screen instead of off it; a pill in the lower half keeps its bottom
+/// edge and the card opens upward. Pure, like the rest of the arithmetic here.
+fn corner_for(rect: Rect, area: Rect) -> Corner {
+    let (cx, cy) = rect.centre();
+    let (ax, ay) = area.centre();
+    Corner {
+        right: cx >= ax,
+        bottom: cy >= ay,
+    }
+}
+
+/// Resize `current` to `w`x`h` around `corner`, then keep it on the display.
+fn resize_from_corner(current: Rect, corner: Corner, w: f64, h: f64, area: Rect) -> Rect {
+    let x = if corner.right {
+        current.x + current.w - w
+    } else {
+        current.x
+    };
+    let y = if corner.bottom {
+        current.y + current.h - h
+    } else {
+        current.y
+    };
+    clamp_into(Rect { x, y, w, h }, area)
+}
+
+/// First placement ever: docked to the right edge, vertically centred.
+fn default_rect(w: f64, h: f64, area: Rect) -> Rect {
+    clamp_into(
+        Rect {
+            x: area.x + area.w - w - EDGE_MARGIN,
+            y: area.y + (area.h - h) / 2.0,
+            w,
+            h,
+        },
+        area,
+    )
+}
+
+/// Keep a rectangle fully inside `area`, moving it as little as possible.
+fn clamp_into(rect: Rect, area: Rect) -> Rect {
+    let max_x = (area.x + area.w - rect.w).max(area.x);
+    let max_y = (area.y + area.h - rect.h).max(area.y);
+    Rect {
+        x: rect.x.clamp(area.x, max_x),
+        y: rect.y.clamp(area.y, max_y),
+        ..rect
+    }
+}
+
+/// A monitor's bounds in its own logical points, minus the system chrome.
+fn usable_area(monitor: &tauri::Monitor) -> Rect {
+    let scale = monitor.scale_factor();
+    let x = monitor.position().x as f64 / scale;
+    let y = monitor.position().y as f64 / scale;
+    let w = monitor.size().width as f64 / scale;
+    let h = monitor.size().height as f64 / scale;
+    Rect {
+        x,
+        y: y + TOP_CLEARANCE,
+        w,
+        h: (h - TOP_CLEARANCE - BOTTOM_CLEARANCE).max(MIN_HEIGHT),
+    }
+}
+
+/// The monitor whose physical bounds contain a physical point.
+///
+/// Hit-tested in physical pixels because logical coordinates of neighbouring
+/// displays with different scale factors do not tile — the same trap
+/// `overlay::get_monitor_with_cursor` documents.
+fn monitor_at(app: &AppHandle, px: f64, py: f64) -> Option<tauri::Monitor> {
+    app.available_monitors().ok()?.into_iter().find(|monitor| {
+        let position = monitor.position();
+        let size = monitor.size();
+        px >= position.x as f64
+            && px < position.x as f64 + size.width as f64
+            && py >= position.y as f64
+            && py < position.y as f64 + size.height as f64
+    })
+}
+
+/// A physical rectangle, expressed in the logical points of the display that
+/// holds its centre.
+fn physical_to_logical(
+    app: &AppHandle,
+    x: f64,
+    y: f64,
+    w: f64,
+    h: f64,
+) -> Option<(Rect, tauri::Monitor)> {
+    let monitor = monitor_at(app, x + w / 2.0, y + h / 2.0)?;
+    let scale = monitor.scale_factor();
+    Some((
+        Rect {
+            x: x / scale,
+            y: y / scale,
+            w: w / scale,
+            h: h / scale,
+        },
+        monitor,
+    ))
+}
+
+/// Where the window is on screen right now.
+fn live_rect(app: &AppHandle, window: &tauri::WebviewWindow) -> Option<(Rect, tauri::Monitor)> {
+    let position = window.outer_position().ok()?;
+    let size = window.outer_size().ok()?;
+    physical_to_logical(
+        app,
+        position.x as f64,
+        position.y as f64,
+        size.width as f64,
+        size.height as f64,
+    )
+}
+
+/// Where the pill was left at the end of an earlier meeting, if that spot is
+/// still on a connected display.
+fn saved_rect(app: &AppHandle) -> Option<(Rect, tauri::Monitor)> {
+    let store = app
+        .store(crate::portable::store_path(
+            crate::settings::SETTINGS_STORE_PATH,
+        ))
+        .ok()?;
+    let value = store.get(POSITION_KEY)?;
+    let read = |key: &str| value.get(key).and_then(serde_json::Value::as_f64);
+    let (x, y, w, h) = (read("x")?, read("y")?, read("w")?, read("h")?);
+    if w <= 0.0 || h <= 0.0 {
+        return None;
+    }
+    physical_to_logical(app, x, y, w, h)
+}
+
+/// Remember where the pill is, in physical pixels, as the collapsed pill.
+///
+/// The collapsed form is what gets stored even when the card is open, so the
+/// next meeting starts from the pill the card grew out of rather than from the
+/// card's top-left corner. Main thread only.
+fn save_position(app: &AppHandle, window: &tauri::WebviewWindow) {
+    if APPLIED.lock().ok().and_then(|slot| *slot).is_none() {
+        return;
+    }
+    let Some((rect, monitor)) = live_rect(app, window) else {
+        return;
+    };
+    let area = usable_area(&monitor);
+    let pill = match CORNER.lock().ok().and_then(|slot| *slot) {
+        Some(corner) if rect.w > PILL_WIDTH_COLLAPSED + 1.0 => resize_from_corner(
+            rect,
+            corner,
+            PILL_WIDTH_COLLAPSED,
+            COLLAPSED_FALLBACK_HEIGHT,
+            area,
+        ),
+        _ => rect,
+    };
+    let scale = monitor.scale_factor();
+    if let Ok(store) = app.store(crate::portable::store_path(
+        crate::settings::SETTINGS_STORE_PATH,
+    )) {
+        store.set(
+            POSITION_KEY,
+            serde_json::json!({
+                "x": pill.x * scale,
+                "y": pill.y * scale,
+                "w": pill.w * scale,
+                "h": pill.h * scale,
+            }),
+        );
+    }
+}
+
+/// The height to use, given the mode and the display height to clamp against.
+fn resolve_height(expanded: bool, display_height: Option<f64>) -> f64 {
     let fallback = if expanded {
         EXPANDED_FALLBACK_HEIGHT
     } else {
@@ -522,12 +819,7 @@ fn resolve_height(expanded: bool, monitor: Option<&tauri::Monitor>) -> f64 {
         0 => fallback,
         value => (value as f64).max(MIN_HEIGHT),
     };
-    clamp_height(measured, expanded, monitor.map(available_height))
-}
-
-/// Available logical height of a monitor.
-fn available_height(monitor: &tauri::Monitor) -> f64 {
-    monitor.size().height as f64 / monitor.scale_factor()
+    clamp_height(measured, expanded, display_height)
 }
 
 /// Clamp a measured height against the display.
@@ -629,7 +921,17 @@ fn reassert_on_top(window: &tauri::WebviewWindow, last_reported: &AtomicU64, gen
             return;
         }
         // Still flagged topmost, but possibly no longer first among topmost
-        // windows. Re-asking is a no-op when we are already there.
+        // windows. Re-raise only when what covers us belongs to someone else.
+        //
+        // Unconditionally re-raising every tick was a fight with our own
+        // windows: the assistant panel and the dictation overlay are topmost
+        // too, and a meeting pill that jumped back above them 1.4 times a second
+        // punched through an open assistant conversation wherever the two
+        // overlapped. Those are windows the user opened on purpose, on top of
+        // this one; leaving them there is the right stacking.
+        if topmost_neighbour_is_ours(hwnd) {
+            return;
+        }
         let _ = SetWindowPos(
             hwnd,
             Some(HWND_TOPMOST),
@@ -640,6 +942,37 @@ fn reassert_on_top(window: &tauri::WebviewWindow, last_reported: &AtomicU64, gen
             SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
         );
     }
+}
+
+/// Whether the nearest visible window stacked above the pill is one of ours.
+///
+/// Bounded, because a z-order walk over a busy desktop is otherwise unbounded
+/// work on the main thread every tick.
+#[cfg(target_os = "windows")]
+unsafe fn topmost_neighbour_is_ours(hwnd: windows::Win32::Foundation::HWND) -> bool {
+    use windows::Win32::System::Threading::GetCurrentProcessId;
+    use windows::Win32::UI::WindowsAndMessaging::{
+        GetWindow, GetWindowThreadProcessId, IsWindowVisible, GW_HWNDPREV,
+    };
+
+    let own_pid = GetCurrentProcessId();
+    let mut current = hwnd;
+    for _ in 0..64 {
+        let Ok(above) = GetWindow(current, GW_HWNDPREV) else {
+            // Nothing above us at all: already first.
+            return true;
+        };
+        if above.is_invalid() {
+            return true;
+        }
+        if IsWindowVisible(above).as_bool() {
+            let mut pid = 0u32;
+            GetWindowThreadProcessId(above, Some(&mut pid));
+            return pid == own_pid;
+        }
+        current = above;
+    }
+    false
 }
 
 #[cfg(test)]
@@ -695,12 +1028,86 @@ mod tests {
     #[test]
     fn the_expanded_card_is_wider_than_the_collapsed_pill() {
         assert!(PILL_WIDTH_EXPANDED > PILL_WIDTH_COLLAPSED);
+        assert!(PILL_WIDTH_OFFER > PILL_WIDTH_COLLAPSED);
     }
 
-    /// The pill sits above where the dictation overlay draws, so dictating during
-    /// a call does not stack two windows on the same pixels.
+    const AREA: Rect = Rect {
+        x: 0.0,
+        y: 0.0,
+        w: 1920.0,
+        h: 1000.0,
+    };
+
+    /// The default dock is the right edge, clear of the bottom centre where the
+    /// dictation overlay and the assistant's call bar live.
     #[test]
-    fn the_pill_clears_the_dictation_overlay() {
-        assert!(PILL_BOTTOM_OFFSET > 40.0);
+    fn the_default_pill_docks_to_the_right_edge() {
+        let pill = default_rect(PILL_WIDTH_COLLAPSED, 36.0, AREA);
+        assert_eq!(pill.x + pill.w, AREA.w - EDGE_MARGIN);
+        let (_, cy) = pill.centre();
+        assert!((cy - AREA.h / 2.0).abs() < 1.0, "vertically centred");
+    }
+
+    /// The card grows out of the pill's own corner and folds back into it, so a
+    /// round trip lands the pill exactly where it started.
+    #[test]
+    fn expanding_and_collapsing_returns_the_pill_to_its_spot() {
+        let pill = Rect {
+            x: 1700.0,
+            y: 700.0,
+            w: PILL_WIDTH_COLLAPSED,
+            h: 36.0,
+        };
+        let corner = corner_for(pill, AREA);
+        assert_eq!(
+            corner,
+            Corner {
+                right: true,
+                bottom: true
+            }
+        );
+        let card = resize_from_corner(pill, corner, PILL_WIDTH_EXPANDED, 400.0, AREA);
+        assert_eq!(card.x + card.w, pill.x + pill.w, "right edges agree");
+        assert_eq!(card.y + card.h, pill.y + pill.h, "bottom edges agree");
+        let back = resize_from_corner(card, corner, PILL_WIDTH_COLLAPSED, 36.0, AREA);
+        assert_eq!(back, pill);
+    }
+
+    /// A pill dragged to the top-left opens down and to the right, into the
+    /// screen rather than off it.
+    #[test]
+    fn a_pill_in_the_top_left_opens_down_and_right() {
+        let pill = Rect {
+            x: 40.0,
+            y: 60.0,
+            w: PILL_WIDTH_COLLAPSED,
+            h: 36.0,
+        };
+        let corner = corner_for(pill, AREA);
+        let card = resize_from_corner(pill, corner, PILL_WIDTH_EXPANDED, 400.0, AREA);
+        assert_eq!((card.x, card.y), (pill.x, pill.y));
+    }
+
+    /// A card that would overhang the display is moved back onto it.
+    #[test]
+    fn a_card_is_kept_on_the_display() {
+        let pill = Rect {
+            x: 1760.0,
+            y: 20.0,
+            w: PILL_WIDTH_COLLAPSED,
+            h: 36.0,
+        };
+        let card = resize_from_corner(
+            pill,
+            Corner {
+                right: false,
+                bottom: true,
+            },
+            PILL_WIDTH_EXPANDED,
+            400.0,
+            AREA,
+        );
+        assert!(card.x + card.w <= AREA.w);
+        assert!(card.y >= AREA.y);
     }
 }

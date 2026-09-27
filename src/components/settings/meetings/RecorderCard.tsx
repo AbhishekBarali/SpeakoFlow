@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Mic, Pause, Play, Square } from "lucide-react";
+import { Eye, EyeOff, Mic, Pause, Play, Square } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import type { MeetingSpeaker, MeetingState } from "./api";
+import { useMeetingIndicator } from "./CallDetectionToggle";
 import { formatClock, type TranscriptItem } from "./speakers";
 import { SystemAudioNotice } from "./SystemAudioNotice";
 import { TranscriptView } from "./TranscriptView";
@@ -44,6 +45,7 @@ export const RecorderCard: React.FC<RecorderCardProps> = ({
   onTogglePause,
 }) => {
   const { t } = useTranslation();
+  const indicator = useMeetingIndicator();
   const recording = state.meeting_id !== null;
   const paused = state.paused;
 
@@ -99,6 +101,33 @@ export const RecorderCard: React.FC<RecorderCardProps> = ({
           <div className="flex shrink-0 items-center gap-2">
             {recording ? (
               <>
+                {indicator.enabled !== null && (
+                  // The floating pill, from the one place that is still on
+                  // screen when it has been switched off.
+                  <button
+                    type="button"
+                    onClick={() => indicator.set(!indicator.enabled)}
+                    disabled={indicator.saving}
+                    title={
+                      indicator.enabled
+                        ? t("meetings.indicator.hide")
+                        : t("meetings.indicator.show")
+                    }
+                    aria-label={
+                      indicator.enabled
+                        ? t("meetings.indicator.hide")
+                        : t("meetings.indicator.show")
+                    }
+                    aria-pressed={indicator.enabled}
+                    className="cursor-pointer rounded-lg p-2 text-muted transition-colors hover:bg-ink/6 hover:text-ink disabled:cursor-wait disabled:opacity-60"
+                  >
+                    {indicator.enabled ? (
+                      <Eye size={14} />
+                    ) : (
+                      <EyeOff size={14} />
+                    )}
+                  </button>
+                )}
                 <Button
                   variant="secondary"
                   size="sm"

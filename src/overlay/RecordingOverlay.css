@@ -59,6 +59,7 @@
 .pill-wave {
   display: flex;
   align-items: center;
+  justify-content: center;
   width: 54px;
 }
 .pill-wave.compact {
@@ -176,9 +177,42 @@
   display: flex;
   align-items: center;
   height: 24px;
+  /* Narrows to the mark's width on completion, so the label slides over to it
+     instead of jumping once the working indicator is gone. */
+  transition: flex-basis 260ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+.overlay-card.completed .card-wave {
+  flex-basis: 16px;
 }
 .card-label {
   color: rgba(245, 245, 244, 0.7);
+  animation: card-label-in 200ms ease-out both;
+}
+.overlay-card.completed .card-label {
+  color: rgba(245, 245, 244, 0.86);
+}
+@keyframes card-label-in {
+  from {
+    opacity: 0;
+    transform: translateX(-3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+[dir="rtl"] .card-label {
+  animation-name: card-label-in-rtl;
+}
+@keyframes card-label-in-rtl {
+  from {
+    opacity: 0;
+    transform: translateX(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 .card-actions {
   display: flex;
@@ -221,9 +255,10 @@
 .overlay-card .overlay-copy.is-error {
   color: #efb4a7;
 }
-.overlay-card.completed .card-wave:not(.is-progress) {
-  flex-basis: 14px;
-  color: #d9c7a8;
+/* A finished card takes a faint warm edge: the whole object says "done", not
+   just the glyph in its corner, and it does so without moving anything. */
+.overlay-card.completed {
+  border-color: rgba(229, 201, 155, 0.2);
 }
 /* ── Leaving ───────────────────────────────────────────────────────────────
  * One decisive movement, not a long dissolve. Most of the opacity is gone
@@ -243,7 +278,8 @@
 .overlay-root:not(.is-fading) > .overlay-card {
   transition:
     opacity 150ms ease-out,
-    transform 150ms cubic-bezier(0.22, 0.61, 0.36, 1);
+    transform 150ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    border-color 420ms ease-out;
 }
 .overlay-sr-only {
   position: absolute;
@@ -333,6 +369,12 @@
     transform: none;
   }
   .transcript-arriving {
+    animation: none;
+  }
+  .card-wave {
+    transition: none;
+  }
+  .card-label {
     animation: none;
   }
 }

@@ -1,18 +1,23 @@
-//! Remote TTS engines for the assistant's spoken summaries.
+//! Remote TTS engines for the assistant's spoken replies.
 //!
-//! Two engines are handled here in Rust (audio fetched and played natively
-//! via rodio, so playback works even when the panel webview is hidden):
-//! - "openai": any OpenAI-compatible `/audio/speech` endpoint — OpenAI,
-//!   Azure OpenAI (`https://{res}.openai.azure.com/openai/v1` or
-//!   `cognitiveservices.azure.com/openai/v1`, model = deployment name),
-//!   Groq, LocalAI, Kokoro-FastAPI, openai-edge-tts, etc.
-//! - "elevenlabs": ElevenLabs `text-to-speech/{voice_id}` API.
-//! - "azure": Azure AI Speech (Neural TTS) `cognitiveservices/v1` SSML API —
-//!   base URL is the regional TTS endpoint
-//!   (`https://{region}.tts.speech.microsoft.com`), auth via the
-//!   `Ocp-Apim-Subscription-Key` header, voice = a neural voice name such as
-//!   `en-US-JennyNeural`. This is distinct from Azure OpenAI (use "openai"
-//!   for `*.openai.azure.com` / `*.cognitiveservices.azure.com/openai/v1`).
+//! Every engine except Kokoro is handled here in Rust: audio is fetched and
+//! played natively via rodio, so playback works even when the panel webview is
+//! hidden. The engines are described once, in [`TTS_PROVIDERS`], and the
+//! engine id stored in `assistant_tts_engine` is a key into that table.
+//!
+//! "OpenAI-compatible" is near-universal for chat but not for speech. Only
+//! OpenAI, OpenRouter, Groq, Inworld and self-hosted servers accept the
+//! `/audio/speech` shape; everyone else gets its own [`TtsProtocol`] variant,
+//! because the differences are not cosmetic — Deepgram takes the model as a
+//! query parameter and the voice as part of the model id, Google and Mistral
+//! answer with base64 inside JSON, xAI requires a `language`, and Cartesia
+//! rejects a request without its version header.
+//!
+//! The "custom" engine is what makes the list open-ended: any server that
+//! implements `POST /v1/audio/speech` (Kokoro-FastAPI, Speaches, Chatterbox,
+//! Orpheus-FastAPI, LocalAI, AllTalk, openai-edge-tts, vLLM-Omni, Azure
+//! OpenAI…) is reachable by pasting its address, with no key unless the server
+//! asks for one.
 //!
 //! The "kokoro" engine runs fully locally in the panel webview
 //! (kokoro-js, WebGPU) and never reaches this module.
@@ -22,10 +27,480 @@ use log::{debug, error};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::io::Cursor;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::time::Duration;
 use tauri::AppHandle;
+
+// ---------------------------------------------------------------------------
+// Provider registry
+// ---------------------------------------------------------------------------
+
+/// The request shape an engine speaks. Each variant is a genuinely different
+/// wire format; see the module docs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum TtsProtocol {
+    /// Kokoro, synthesized inside the assistant webview.
+    Local,
+    /// `POST {base}/audio/speech` with `{model, input, voice, response_format, speed}`.
+    OpenAiCompatible,
+    /// `POST /v1/text-to-speech/{voice_id}` with an `xi-api-key` header.
+    ElevenLabs,
+    /// SSML to `{region}.tts.speech.microsoft.com/cognitiveservices/v1`.
+    AzureSpeech,
+    /// `POST /v1/speak?model=…` with `{text}`. The voice is part of the model id.
+    Deepgram,
+    /// `POST /tts/bytes` with a `Cartesia-Version` header.
+    Cartesia,
+    /// `POST /v1/text:synthesize`, answered with base64 audio inside JSON.
+    GoogleCloud,
+    /// `POST /v1/tts` with `{text, voice_id, language}`.
+    Xai,
+    /// `POST /v1/audio/speech` with `voice_id`, answered with base64 audio inside JSON.
+    Mistral,
+}
+
+/// How an OpenAI-compatible engine takes its key.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum TtsAuth {
+    /// `Authorization: Bearer <key>`.
+    Bearer,
+    /// `Authorization: Basic <key>`. Inworld hands out a ready-encoded Basic
+    /// credential, and its voice listing accepts nothing else.
+    Basic,
+}
+
+/// One voice engine, described once so the request path, the voice and model
+/// pickers, the call precondition and the chunk sizing cannot disagree.
+#[derive(Debug)]
+pub(crate) struct TtsProvider {
+    pub id: &'static str,
+    pub label: &'static str,
+    pub protocol: TtsProtocol,
+    /// Fixed API root. `None` means the user supplies it (Azure, custom).
+    pub base_url: Option<&'static str>,
+    /// Model used when the user has not chosen one. Empty where the engine has
+    /// no model field (the voice implies the model, or there is only one).
+    pub default_model: &'static str,
+    /// Voice used when the user has not chosen one. Empty where no voice is
+    /// safe to assume (ElevenLabs and Mistral voices belong to an account).
+    pub default_voice: &'static str,
+    /// Suggested models for the picker when the engine has no listing of its
+    /// own. Not a whitelist — the field stays free text.
+    pub models: &'static [&'static str],
+    /// Whether a request can succeed without a key. False only for the custom
+    /// engine: a self-hosted server legitimately needs none.
+    pub requires_key: bool,
+    /// Longest text one request accepts, in characters. Speech is split below
+    /// this, which is what lets a 200-character engine (Groq) read a long reply.
+    pub max_chars: usize,
+    /// Speed range the API accepts, or `None` when it has no speed control.
+    pub speed_range: Option<(f64, f64)>,
+    /// OpenAI-compatible only: the `response_format` to ask for first.
+    pub response_format: &'static str,
+    /// OpenAI-compatible only.
+    pub auth: TtsAuth,
+}
+
+/// `Cartesia-Version` sent with every Cartesia request. The API rejects a
+/// request without one; this is the version whose schema the request below is
+/// written against.
+const CARTESIA_VERSION: &str = "2026-08-14";
+
+/// Every voice engine the app ships, in the order the settings UI shows them.
+pub(crate) const TTS_PROVIDERS: &[TtsProvider] = &[
+    TtsProvider {
+        id: "kokoro",
+        label: "Kokoro",
+        protocol: TtsProtocol::Local,
+        base_url: None,
+        default_model: "",
+        default_voice: "af_heart",
+        models: &[],
+        requires_key: false,
+        max_chars: usize::MAX,
+        speed_range: Some((0.25, 4.0)),
+        response_format: "",
+        auth: TtsAuth::Bearer,
+    },
+    TtsProvider {
+        id: "openai",
+        label: "OpenAI",
+        protocol: TtsProtocol::OpenAiCompatible,
+        base_url: Some("https://api.openai.com/v1"),
+        default_model: "gpt-4o-mini-tts",
+        default_voice: "alloy",
+        models: &["gpt-4o-mini-tts", "tts-1", "tts-1-hd"],
+        requires_key: true,
+        max_chars: 4096,
+        speed_range: Some((0.25, 4.0)),
+        response_format: "mp3",
+        auth: TtsAuth::Bearer,
+    },
+    TtsProvider {
+        id: "elevenlabs",
+        label: "ElevenLabs",
+        protocol: TtsProtocol::ElevenLabs,
+        base_url: Some("https://api.elevenlabs.io"),
+        default_model: "eleven_flash_v2_5",
+        default_voice: "",
+        models: &[],
+        requires_key: true,
+        // eleven_v3 caps a request at 5,000 characters; the other models allow
+        // more, so the smallest limit is the safe one.
+        max_chars: 5000,
+        speed_range: Some((0.7, 1.2)),
+        response_format: "",
+        auth: TtsAuth::Bearer,
+    },
+    TtsProvider {
+        id: "openrouter",
+        label: "OpenRouter",
+        protocol: TtsProtocol::OpenAiCompatible,
+        base_url: Some(OPENROUTER_TTS_BASE_URL),
+        // OpenRouter slugs are namespaced, so OpenAI's bare `gpt-4o-mini-tts`
+        // (the old fallback) does not exist there. Gemini TTS is listed on the
+        // live speech catalog and has a documented voice set.
+        default_model: "google/gemini-3.1-flash-tts-preview",
+        default_voice: "Kore",
+        models: &[],
+        requires_key: true,
+        max_chars: 4000,
+        speed_range: Some((0.25, 4.0)),
+        response_format: "mp3",
+        auth: TtsAuth::Bearer,
+    },
+    TtsProvider {
+        id: "deepgram",
+        label: "Deepgram",
+        protocol: TtsProtocol::Deepgram,
+        base_url: Some("https://api.deepgram.com"),
+        default_model: "",
+        default_voice: "aura-2-thalia-en",
+        models: &[],
+        requires_key: true,
+        // Aura rejects anything longer with HTTP 413.
+        max_chars: 2000,
+        speed_range: Some((0.7, 1.5)),
+        response_format: "",
+        auth: TtsAuth::Bearer,
+    },
+    TtsProvider {
+        id: "cartesia",
+        label: "Cartesia",
+        protocol: TtsProtocol::Cartesia,
+        base_url: Some("https://api.cartesia.ai"),
+        default_model: "sonic-3.6",
+        // "Skylar", the voice Cartesia's own examples use.
+        default_voice: "db6b0ed5-d5d3-463d-ae85-518a07d3c2b4",
+        models: &["sonic-3.6", "sonic-3.5", "sonic-3", "sonic-latest"],
+        requires_key: true,
+        // Undocumented; generous for speech and far above a streamed chunk.
+        max_chars: 2000,
+        speed_range: Some((0.6, 1.5)),
+        response_format: "",
+        auth: TtsAuth::Bearer,
+    },
+    TtsProvider {
+        id: "google",
+        label: "Google Cloud",
+        protocol: TtsProtocol::GoogleCloud,
+        base_url: Some("https://texttospeech.googleapis.com"),
+        default_model: "",
+        default_voice: "en-US-Chirp3-HD-Kore",
+        models: &[],
+        requires_key: true,
+        // The documented limit is 5,000 *bytes*. Characters are what the
+        // splitter counts, so this leaves room for three-byte scripts.
+        max_chars: 1600,
+        speed_range: Some((0.25, 2.0)),
+        response_format: "",
+        auth: TtsAuth::Bearer,
+    },
+    TtsProvider {
+        id: "azure",
+        label: "Azure AI Speech",
+        protocol: TtsProtocol::AzureSpeech,
+        base_url: None,
+        default_model: "",
+        default_voice: "en-US-JennyNeural",
+        models: &[],
+        requires_key: true,
+        max_chars: 4000,
+        speed_range: Some((0.5, 2.0)),
+        response_format: "",
+        auth: TtsAuth::Bearer,
+    },
+    TtsProvider {
+        id: "groq",
+        label: "Groq",
+        protocol: TtsProtocol::OpenAiCompatible,
+        base_url: Some("https://api.groq.com/openai/v1"),
+        default_model: "canopylabs/orpheus-v1-english",
+        default_voice: "troy",
+        models: &[
+            "canopylabs/orpheus-v1-english",
+            "canopylabs/orpheus-arabic-saudi",
+        ],
+        requires_key: true,
+        // Orpheus on Groq accepts at most 200 characters per request, answers
+        // only in WAV, and documents no speed control.
+        max_chars: 200,
+        speed_range: None,
+        response_format: "wav",
+        auth: TtsAuth::Bearer,
+    },
+    TtsProvider {
+        id: "xai",
+        label: "xAI",
+        protocol: TtsProtocol::Xai,
+        base_url: Some("https://api.x.ai/v1"),
+        default_model: "",
+        default_voice: "eve",
+        models: &[],
+        requires_key: true,
+        max_chars: 4000,
+        speed_range: Some((0.7, 1.5)),
+        response_format: "",
+        auth: TtsAuth::Bearer,
+    },
+    TtsProvider {
+        id: "mistral",
+        label: "Mistral",
+        protocol: TtsProtocol::Mistral,
+        base_url: Some("https://api.mistral.ai/v1"),
+        default_model: "voxtral-mini-tts-2603",
+        // `voice_id` is required and the preset ids are opaque, so the user
+        // picks one from the loaded list.
+        default_voice: "",
+        models: &["voxtral-mini-tts-2603"],
+        requires_key: true,
+        // Mistral recommends staying under 300 words.
+        max_chars: 1500,
+        speed_range: None,
+        response_format: "",
+        auth: TtsAuth::Bearer,
+    },
+    TtsProvider {
+        id: "inworld",
+        label: "Inworld",
+        protocol: TtsProtocol::OpenAiCompatible,
+        base_url: Some("https://api.inworld.ai/v1"),
+        default_model: "inworld-tts-2",
+        default_voice: "Dennis",
+        models: &["inworld-tts-2", "inworld-tts-2-flash"],
+        requires_key: true,
+        max_chars: 4000,
+        // A speed outside this range is a 400, not a clamp.
+        speed_range: Some((0.5, 1.5)),
+        response_format: "mp3",
+        auth: TtsAuth::Basic,
+    },
+    TtsProvider {
+        id: "custom",
+        label: "Custom server",
+        protocol: TtsProtocol::OpenAiCompatible,
+        base_url: None,
+        // `tts-1` is the one model name nearly every self-hosted server
+        // accepts (Kokoro-FastAPI, Speaches, openedai-speech, openai-edge-tts)
+        // or ignores (Chatterbox, Orpheus-FastAPI, AllTalk).
+        default_model: "tts-1",
+        default_voice: "alloy",
+        models: &[],
+        requires_key: false,
+        max_chars: 4000,
+        speed_range: Some((0.25, 4.0)),
+        response_format: "mp3",
+        auth: TtsAuth::Bearer,
+    },
+];
+
+/// The registry entry for an engine id.
+pub(crate) fn provider(id: &str) -> Option<&'static TtsProvider> {
+    TTS_PROVIDERS.iter().find(|p| p.id == id)
+}
+
+/// Whether `id` names an engine this build knows how to drive.
+pub fn is_known_engine(id: &str) -> bool {
+    provider(id).is_some()
+}
+
+/// The fixed API root of an engine, or `None` when the user supplies it.
+pub fn fixed_base_url(engine: &str) -> Option<&'static str> {
+    provider(engine).and_then(|p| p.base_url)
+}
+
+/// Longest text one request to the active engine may carry.
+pub(crate) fn max_chars_for(settings: &AppSettings) -> usize {
+    provider(&settings.assistant_tts_engine)
+        .map(|p| p.max_chars)
+        .unwrap_or(usize::MAX)
+}
+
+fn active_provider(settings: &AppSettings) -> Result<&'static TtsProvider, String> {
+    provider(&settings.assistant_tts_engine)
+        .ok_or_else(|| format!("Unknown TTS engine: {}", settings.assistant_tts_engine))
+}
+
+/// The user's value, or the engine's default when they left the field empty.
+fn or_default<'a>(value: &'a str, default: &'a str) -> &'a str {
+    let value = value.trim();
+    if value.is_empty() {
+        default
+    } else {
+        value
+    }
+}
+
+/// The speed to request, clamped to what the engine accepts. `None` when the
+/// engine has no speed control, or when the rate is normal and there is no
+/// reason to send it.
+fn speed_for(provider: &TtsProvider, settings: &AppSettings) -> Option<f64> {
+    let (min, max) = provider.speed_range?;
+    let speed = settings.assistant_tts_speed.clamp(min, max);
+    ((speed - 1.0).abs() > f64::EPSILON).then_some(speed)
+}
+
+/// The engine's API root: the registry's fixed URL, or the one the user typed.
+fn api_root(provider: &TtsProvider, settings: &AppSettings) -> Result<String, String> {
+    if let Some(fixed) = provider.base_url {
+        return Ok(fixed.to_string());
+    }
+    let raw = settings.assistant_tts_base_url.trim();
+    if raw.is_empty() {
+        return Err(format!(
+            "{} needs a server address. Add it in the Voice settings.",
+            provider.label
+        ));
+    }
+    Ok(normalize_server_url(raw))
+}
+
+/// A bare `http://host:port` gets `/v1` appended, because every OpenAI-compatible
+/// speech server serves its routes there and people paste the address a
+/// server's startup log prints, which usually has no path. Anything with a path
+/// is taken as given.
+fn normalize_server_url(raw: &str) -> String {
+    let trimmed = raw.trim().trim_end_matches('/');
+    match reqwest::Url::parse(trimmed) {
+        Ok(url) if url.path().is_empty() || url.path() == "/" => format!("{trimmed}/v1"),
+        _ => trimmed.to_string(),
+    }
+}
+
+/// Uniform message for a non-2xx response.
+fn http_error(status: reqwest::StatusCode, body: &str) -> String {
+    format!("{}: {}", status, truncate(body, 300))
+}
+
+/// Read a successful response body as raw audio bytes.
+async fn audio_body(response: reqwest::Response) -> Result<Vec<u8>, String> {
+    let status = response.status();
+    if !status.is_success() {
+        let body = response.text().await.unwrap_or_default();
+        return Err(http_error(status, &body));
+    }
+    response
+        .bytes()
+        .await
+        .map(|b| b.to_vec())
+        .map_err(|e| format!("Failed to read audio: {}", e))
+}
+
+/// Read a successful response body as JSON.
+async fn json_body(response: reqwest::Response) -> Result<serde_json::Value, String> {
+    let status = response.status();
+    if !status.is_success() {
+        let body = response.text().await.unwrap_or_default();
+        return Err(http_error(status, &body));
+    }
+    response
+        .json()
+        .await
+        .map_err(|e| format!("Unexpected response: {}", e))
+}
+
+/// Decode base64 audio held in a JSON field (Google `audioContent`, Mistral
+/// `audio_data`).
+fn decode_base64_audio(value: &serde_json::Value, field: &str) -> Result<Vec<u8>, String> {
+    use base64::Engine;
+    let encoded = value
+        .get(field)
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| format!("The response had no `{field}` field"))?;
+    base64::engine::general_purpose::STANDARD
+        .decode(encoded)
+        .map_err(|e| format!("Couldn't decode the audio: {}", e))
+}
+
+/// Split `text` into pieces no longer than `max_chars` characters, preferring
+/// sentence ends, then clause marks, then word gaps, and only as a last resort
+/// a hard cut. Pieces are trimmed and never empty.
+///
+/// The streaming chunker already aims below an engine's limit, but it can emit
+/// one long sentence whole, and the one-shot paths (a spoken summary, a replay)
+/// never pass through it. An engine that rejects long input — Groq caps a
+/// request at 200 characters — would otherwise fail on exactly those.
+pub(crate) fn split_to_limit(text: &str, max_chars: usize) -> Vec<String> {
+    const SENTENCE: &[char] = &['.', '!', '?', '…', '。', '！', '？'];
+    const CLAUSE: &[char] = &[',', ';', ':', '，', '；', '：', '、'];
+
+    let mut pieces = Vec::new();
+    let mut rest = text.trim();
+    if max_chars == 0 {
+        if !rest.is_empty() {
+            pieces.push(rest.to_string());
+        }
+        return pieces;
+    }
+    while rest.chars().count() > max_chars {
+        // Byte offset just past the `max_chars`-th character.
+        let limit = rest
+            .char_indices()
+            .nth(max_chars)
+            .map(|(i, _)| i)
+            .unwrap_or(rest.len());
+        let window = &rest[..limit];
+        // A mark only counts as a boundary when whitespace follows it, so
+        // "3.5" or "e.g.x" is never split.
+        let boundary_after = |marks: &[char]| -> Option<usize> {
+            let mut found = None;
+            for (i, c) in window.char_indices() {
+                if !marks.contains(&c) {
+                    continue;
+                }
+                let end = i + c.len_utf8();
+                let next = rest[end..].chars().next();
+                if next.is_none_or(char::is_whitespace) {
+                    found = Some(end);
+                }
+            }
+            found
+        };
+        let cut = boundary_after(SENTENCE)
+            .or_else(|| boundary_after(CLAUSE))
+            .or_else(|| {
+                window
+                    .char_indices()
+                    .rev()
+                    .find(|(_, c)| c.is_whitespace())
+                    .map(|(i, _)| i)
+            })
+            .filter(|&cut| cut > 0)
+            .unwrap_or(limit);
+        let (head, tail) = rest.split_at(cut);
+        let head = head.trim();
+        if !head.is_empty() {
+            pieces.push(head.to_string());
+        }
+        rest = tail.trim_start();
+    }
+    if !rest.is_empty() {
+        pieces.push(rest.to_string());
+    }
+    pieces
+}
 
 /// A neural voice returned by the Azure Speech `voices/list` endpoint.
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
@@ -80,36 +555,32 @@ pub fn current_epoch() -> u64 {
 /// no API key fails once per turn, forever, with a generic provider error. This
 /// is the check that turns that into one clear message before the call starts.
 ///
-/// Loopback endpoints are exempt: a self-hosted OpenAI-compatible speech server
-/// legitimately needs no key, and refusing it would break a working setup.
+/// The custom engine is exempt from the key check: a self-hosted speech server
+/// legitimately needs no key, and refusing it would break a working setup. It
+/// does need an address, which no default can supply.
 pub fn voice_engine_blocker(settings: &AppSettings) -> Option<String> {
     let engine = settings.assistant_tts_engine.trim();
     // The in-webview engine needs nothing configured.
     if engine.is_empty() || engine == "kokoro" {
         return None;
     }
-    if !settings.assistant_tts_api_key.0.trim().is_empty() {
-        return None;
-    }
-    let base_url = settings.assistant_tts_base_url.to_ascii_lowercase();
-    let self_hosted = engine == "openai"
-        && (base_url.contains("127.0.0.1")
-            || base_url.contains("localhost")
-            || base_url.contains("0.0.0.0")
-            || base_url.contains("[::1]"));
-    if self_hosted {
-        return None;
-    }
-    let label = match engine {
-        "openai" => "OpenAI",
-        "openrouter" => "OpenRouter",
-        "elevenlabs" => "ElevenLabs",
-        "azure" => "Azure AI Speech",
-        other => other,
+    let Some(provider) = provider(engine) else {
+        return Some(format!(
+            "The assistant's voice is set to an engine this version doesn't know ({engine}). Pick another in Models → Voice."
+        ));
     };
-    Some(format!(
-        "The assistant's voice is set to {label}, which needs an API key. Add one in Settings → Assistant → Voice, or switch the voice to On-device."
-    ))
+    let label = provider.label;
+    if provider.base_url.is_none() && settings.assistant_tts_base_url.trim().is_empty() {
+        return Some(format!(
+            "The assistant's voice is set to {label}, which needs a server address. Add it in Models → Voice, or switch the voice to Kokoro."
+        ));
+    }
+    if provider.requires_key && settings.assistant_tts_api_key.0.trim().is_empty() {
+        return Some(format!(
+            "The assistant's voice is set to {label}, which needs an API key. Add one in Models → Voice, or switch the voice to Kokoro."
+        ));
+    }
+    None
 }
 
 /// Cancel any in-flight or queued remote TTS: native playback stops within
@@ -443,21 +914,34 @@ pub(crate) async fn synthesize_speech(
     settings: &AppSettings,
     request: SpeechRequest<'_>,
 ) -> Result<SynthesizedSpeech, String> {
-    match settings.assistant_tts_engine.as_str() {
-        "openai" | "openrouter" => fetch_openai_speech(settings, request.text)
+    let provider = active_provider(settings)?;
+    let plain = |bytes: Vec<u8>| SynthesizedSpeech {
+        bytes,
+        request_id: None,
+    };
+    let text = request.text;
+    match provider.protocol {
+        TtsProtocol::Local => {
+            Err("Kokoro speaks inside the assistant panel, not through this path".to_string())
+        }
+        TtsProtocol::OpenAiCompatible => fetch_openai_speech(settings, provider, text)
             .await
-            .map(|bytes| SynthesizedSpeech {
-                bytes,
-                request_id: None,
-            }),
-        "elevenlabs" => fetch_elevenlabs_speech(settings, &request).await,
-        "azure" => fetch_azure_speech(settings, request.text)
+            .map(plain),
+        TtsProtocol::ElevenLabs => fetch_elevenlabs_speech(settings, &request).await,
+        TtsProtocol::AzureSpeech => fetch_azure_speech(settings, text).await.map(plain),
+        TtsProtocol::Deepgram => fetch_deepgram_speech(settings, provider, text)
             .await
-            .map(|bytes| SynthesizedSpeech {
-                bytes,
-                request_id: None,
-            }),
-        other => Err(format!("Unknown TTS engine: {}", other)),
+            .map(plain),
+        TtsProtocol::Cartesia => fetch_cartesia_speech(settings, provider, text)
+            .await
+            .map(plain),
+        TtsProtocol::GoogleCloud => fetch_google_speech(settings, provider, text)
+            .await
+            .map(plain),
+        TtsProtocol::Xai => fetch_xai_speech(settings, provider, text).await.map(plain),
+        TtsProtocol::Mistral => fetch_mistral_speech(settings, provider, text)
+            .await
+            .map(plain),
     }
 }
 
@@ -476,6 +960,17 @@ pub async fn speak_remote_epoch(app: &AppHandle, settings: &AppSettings, text: S
         debug!("TTS request superseded before fetch; skipping");
         return;
     }
+
+    // Longer than one request may carry: speak it as a gapless series instead
+    // of letting the provider reject the whole thing.
+    let pieces = split_to_limit(&text, max_chars_for(settings));
+    if pieces.len() > 1 {
+        speak_pieces(app, settings, pieces, epoch).await;
+        return;
+    }
+    let Some(text) = pieces.into_iter().next() else {
+        return;
+    };
 
     let result = synthesize_speech(
         settings,
@@ -527,6 +1022,53 @@ pub async fn speak_remote_epoch(app: &AppHandle, settings: &AppSettings, text: S
             crate::assistant::emit_error(app, "tts", e);
         }
     }
+}
+
+/// Speak several pieces of one reply back to back through a single playback
+/// session, so the seams between them are gapless. Synthesis of the next piece
+/// overlaps playback of the current one, because queueing returns before the
+/// audio is heard.
+async fn speak_pieces(app: &AppHandle, settings: &AppSettings, pieces: Vec<String>, epoch: u64) {
+    let device = settings.selected_output_device.clone();
+    let volume = settings.assistant_tts_volume;
+    let mut request_ids: Vec<String> = Vec::new();
+    for piece in pieces {
+        if current_epoch() != epoch {
+            break;
+        }
+        let speech = match synthesize_speech(
+            settings,
+            SpeechRequest {
+                text: &piece,
+                previous_request_ids: &request_ids,
+            },
+        )
+        .await
+        {
+            Ok(speech) => speech,
+            Err(e) => {
+                error!("TTS request failed: {}", e);
+                if current_epoch() == epoch {
+                    crate::assistant::emit_error(app, "tts", e);
+                }
+                break;
+            }
+        };
+        if let Some(id) = speech.request_id {
+            request_ids.push(id);
+        }
+        let app_play = app.clone();
+        let device = device.clone();
+        let queued = tauri::async_runtime::spawn_blocking(move || {
+            enqueue_speech_chunk(&app_play, speech.bytes, device, volume, epoch)
+        })
+        .await;
+        if let Ok(Err(e)) | Err(e) = queued.map_err(|e| e.to_string()) {
+            error!("TTS playback failed: {}", e);
+            break;
+        }
+    }
+    finish_speech_stream(epoch);
 }
 
 /// HTTP client for remote TTS. Forces HTTP/1.1 — some hosted TTS gateways/
@@ -631,49 +1173,34 @@ enum SpeechAttempt {
 /// so the caller can look at the body (e.g. to detect a pcm-only model).
 async fn openai_speech_attempt(
     settings: &AppSettings,
+    provider: &TtsProvider,
     text: &str,
     url: &str,
     response_format: &str,
 ) -> Result<SpeechAttempt, String> {
     let client = tts_client()?;
-    // OpenAI-compatible `speed` (0.25x–4x). Pitch is preserved by the service.
-    // Providers that don't support it (e.g. Gemini via OpenRouter) ignore it.
-    let speed = settings.assistant_tts_speed.clamp(0.25, 4.0);
     // The model/voice fields start empty (they're loadable pickers). Fall back to
-    // OpenAI's defaults when left blank so synthesis still works out of the box
-    // without forcing a pre-filled value into the settings UI (mirrors the
-    // ElevenLabs model fallback below).
-    let model = {
-        let m = settings.assistant_tts_model.trim();
-        if m.is_empty() {
-            "gpt-4o-mini-tts"
-        } else {
-            m
-        }
-    };
-    let voice = {
-        let v = settings.assistant_tts_remote_voice.trim();
-        if v.is_empty() {
-            "alloy"
-        } else {
-            v
-        }
-    };
-    let mut request = client.post(url).json(&serde_json::json!({
+    // the engine's own defaults so synthesis works out of the box without
+    // forcing a pre-filled value into the settings UI.
+    let model = or_default(&settings.assistant_tts_model, provider.default_model);
+    let voice = or_default(&settings.assistant_tts_remote_voice, provider.default_voice);
+    let mut body = serde_json::json!({
         "model": model,
         "input": text,
         "voice": voice,
         "response_format": response_format,
-        "speed": speed,
-    }));
-
-    let api_key = settings.assistant_tts_api_key.0.trim();
-    if !api_key.is_empty() {
-        // Bearer covers OpenAI, Groq, OpenRouter, and Azure's v1 API; the
-        // `api-key` header covers classic Azure OpenAI deployment endpoints.
-        // Sending both is harmless — endpoints ignore the header they don't use.
-        request = request.bearer_auth(api_key).header("api-key", api_key);
+    });
+    // Sent only when it differs from normal, and never to an engine without
+    // speed control (Groq's Orpheus rejects unknown fields it doesn't document
+    // less predictably than it ignores their absence).
+    if let Some(speed) = speed_for(provider, settings) {
+        body["speed"] = serde_json::json!(speed);
     }
+    let request = with_openai_auth(
+        client.post(url).json(&body),
+        provider,
+        settings.assistant_tts_api_key.0.trim(),
+    );
 
     let response = send_tts_with_retries(request).await?;
     let status = response.status();
@@ -699,78 +1226,172 @@ async fn openai_speech_attempt(
     })
 }
 
-/// POST {base}/audio/speech — OpenAI-compatible shape.
+/// Attach an OpenAI-compatible engine's key.
 ///
-/// If the configured base URL already contains `/audio/speech`, it is used
+/// The custom engine also gets the `api-key` header: that is how classic Azure
+/// OpenAI deployment endpoints authenticate, and a server that uses Bearer
+/// ignores it.
+fn with_openai_auth(
+    request: reqwest::RequestBuilder,
+    provider: &TtsProvider,
+    api_key: &str,
+) -> reqwest::RequestBuilder {
+    if api_key.is_empty() {
+        return request;
+    }
+    match provider.auth {
+        TtsAuth::Basic => {
+            request.header(reqwest::header::AUTHORIZATION, format!("Basic {api_key}"))
+        }
+        TtsAuth::Bearer if provider.id == "custom" => {
+            request.bearer_auth(api_key).header("api-key", api_key)
+        }
+        TtsAuth::Bearer => request.bearer_auth(api_key),
+    }
+}
+
+/// The `/audio/speech` URL for an OpenAI-compatible root.
+///
+/// If the configured address already contains `/audio/speech`, it is used
 /// verbatim (matching SillyTavern's "Provider Endpoint" behaviour). This lets
 /// users paste a full Azure endpoint such as
 /// `https://{res}.cognitiveservices.azure.com/openai/deployments/{dep}/audio/speech?api-version=2025-03-01-preview`,
 /// including the `?api-version=` query string, which a base-plus-suffix scheme
 /// cannot express.
-///
-/// Requests `mp3` first (compressed, and rodio decodes it directly). Some models
-/// are pcm-only — notably Gemini TTS via OpenRouter, which rejects mp3 with a
-/// 400 — so on that specific error we transparently retry as `pcm` and wrap the
-/// raw samples in a WAV container (see [`pcm_to_wav`]) so playback still works.
-/// This self-heals for any pcm-only model without a hardcoded model list.
-fn openai_tts_base_url(settings: &AppSettings) -> &str {
-    if settings.assistant_tts_engine == "openrouter" {
-        OPENROUTER_TTS_BASE_URL
+fn openai_speech_url(root: &str) -> String {
+    if root.contains("/audio/speech") {
+        root.to_string()
     } else {
-        settings.assistant_tts_base_url.trim()
+        format!("{}/audio/speech", root.trim_end_matches('/'))
     }
 }
 
-async fn fetch_openai_speech(settings: &AppSettings, text: &str) -> Result<Vec<u8>, String> {
-    if settings.assistant_tts_engine == "openrouter"
-        && settings.assistant_tts_api_key.0.trim().is_empty()
-    {
-        return Err("OpenRouter API key is required for voice output".to_string());
+/// The API root of an OpenAI-compatible address that may point straight at
+/// `/audio/speech` (with a query string), for deriving sibling routes.
+fn openai_root(root: &str) -> String {
+    let trimmed = root.trim_end_matches('/');
+    match trimmed.split_once("/audio/speech") {
+        Some((prefix, _)) => prefix.trim_end_matches('/').to_string(),
+        None => trimmed.to_string(),
+    }
+}
+
+/// Endpoint + model pairs already known to reject `mp3` and accept only `pcm`.
+///
+/// Discovering that costs a rejected request, and streamed speech sends one
+/// request per sentence, so without this every sentence of a Gemini-TTS reply
+/// paid a full extra round trip. Process-lifetime is the right scope: the
+/// answer only changes if the provider changes the model.
+static PCM_ONLY: Lazy<std::sync::Mutex<HashSet<String>>> =
+    Lazy::new(|| std::sync::Mutex::new(HashSet::new()));
+
+/// POST {base}/audio/speech — OpenAI-compatible shape.
+///
+/// Requests the engine's preferred format first (mp3 for most, wav for Groq,
+/// which accepts nothing else). Some models are pcm-only — notably Gemini TTS
+/// via OpenRouter, which rejects mp3 with a 400 — so on that specific error we
+/// transparently retry as `pcm` and wrap the raw samples in a WAV container
+/// (see [`pcm_to_wav`]) so playback still works. This self-heals for any
+/// pcm-only model without a hardcoded model list.
+async fn fetch_openai_speech(
+    settings: &AppSettings,
+    provider: &TtsProvider,
+    text: &str,
+) -> Result<Vec<u8>, String> {
+    if provider.requires_key && settings.assistant_tts_api_key.0.trim().is_empty() {
+        return Err(format!(
+            "{} API key is required for voice output",
+            provider.label
+        ));
     }
 
-    let raw = openai_tts_base_url(settings);
-    let url = if raw.contains("/audio/speech") {
-        raw.to_string()
+    let url = openai_speech_url(&api_root(provider, settings)?);
+    let model = or_default(&settings.assistant_tts_model, provider.default_model);
+    let pcm_key = format!("{url}|{model}");
+    let known_pcm_only = PCM_ONLY
+        .lock()
+        .map(|set| set.contains(&pcm_key))
+        .unwrap_or(false);
+    let first_format = if known_pcm_only {
+        "pcm"
     } else {
-        format!("{}/audio/speech", raw.trim_end_matches('/'))
+        provider.response_format
     };
 
-    match openai_speech_attempt(settings, text, &url, "mp3").await? {
+    match openai_speech_attempt(settings, provider, text, &url, first_format).await? {
         SpeechAttempt::Ok {
             content_type,
             bytes,
-        } => Ok(maybe_wrap_pcm(&content_type, bytes)),
+        } => Ok(if first_format == "pcm" {
+            wrap_requested_pcm(&content_type, bytes)
+        } else {
+            maybe_wrap_pcm(&content_type, bytes)
+        }),
         SpeechAttempt::HttpError { status, body } => {
             // Only retry as pcm for the specific "this model needs pcm" 400 so
             // unrelated 4xx/5xx errors (bad key, missing model, gateway) still
             // surface to the user immediately instead of doubling the latency.
-            let pcm_only =
-                status == reqwest::StatusCode::BAD_REQUEST && body.to_lowercase().contains("pcm");
+            let pcm_only = first_format != "pcm"
+                && status == reqwest::StatusCode::BAD_REQUEST
+                && body.to_lowercase().contains("pcm");
             if !pcm_only {
-                return Err(format!("{}: {}", status, truncate(&body, 300)));
+                return Err(http_error(status, &body));
             }
-            debug!("TTS model rejected mp3 (pcm-only); retrying as pcm and wrapping to WAV");
-            match openai_speech_attempt(settings, text, &url, "pcm").await? {
+            debug!(
+                "TTS model rejected {first_format} (pcm-only); retrying as pcm and wrapping to WAV"
+            );
+            match openai_speech_attempt(settings, provider, text, &url, "pcm").await? {
                 SpeechAttempt::Ok {
                     content_type,
                     bytes,
                 } => {
-                    // We explicitly asked for pcm, so wrap unconditionally: the
-                    // bytes are raw PCM even if the endpoint omits a Content-Type.
-                    let sample_rate =
-                        parse_pcm_rate(&content_type).unwrap_or(PCM_DEFAULT_SAMPLE_RATE);
-                    Ok(pcm_to_wav(
-                        &bytes,
-                        sample_rate,
-                        PCM_DEFAULT_CHANNELS,
-                        PCM_BITS_PER_SAMPLE,
-                    ))
+                    if let Ok(mut set) = PCM_ONLY.lock() {
+                        set.insert(pcm_key);
+                    }
+                    Ok(wrap_requested_pcm(&content_type, bytes))
                 }
-                SpeechAttempt::HttpError { status, body } => {
-                    Err(format!("{}: {}", status, truncate(&body, 300)))
-                }
+                SpeechAttempt::HttpError { status, body } => Err(http_error(status, &body)),
             }
         }
+    }
+}
+
+/// Audio from a request that explicitly asked for `pcm`. The bytes are raw
+/// samples even if the endpoint omits a Content-Type — unless they carry a
+/// container header after all, which some servers send regardless of the
+/// requested format.
+fn wrap_requested_pcm(content_type: &str, bytes: Vec<u8>) -> Vec<u8> {
+    if sniff_container(&bytes).is_some() {
+        return bytes;
+    }
+    let sample_rate = parse_pcm_rate(content_type).unwrap_or(PCM_DEFAULT_SAMPLE_RATE);
+    pcm_to_wav(
+        &bytes,
+        sample_rate,
+        PCM_DEFAULT_CHANNELS,
+        PCM_BITS_PER_SAMPLE,
+    )
+}
+
+/// The container format of an audio payload, read from its first bytes, or
+/// `None` when it has no recognisable header (i.e. is raw PCM).
+///
+/// The Content-Type cannot be trusted for this: openai-edge-tts without ffmpeg
+/// answers every format request with MP3 while labelling it as the format that
+/// was asked for, and Chatterbox and Orpheus servers always answer in WAV.
+fn sniff_container(bytes: &[u8]) -> Option<&'static str> {
+    if bytes.starts_with(b"RIFF") {
+        Some("wav")
+    } else if bytes.starts_with(b"ID3")
+        || (bytes.len() > 1 && bytes[0] == 0xFF && (bytes[1] & 0xE0) == 0xE0)
+    {
+        Some("mp3")
+    } else if bytes.starts_with(b"OggS") {
+        Some("ogg")
+    } else if bytes.starts_with(b"fLaC") {
+        Some("flac")
+    } else {
+        None
     }
 }
 
@@ -781,7 +1402,7 @@ async fn fetch_openai_speech(settings: &AppSettings, text: &str) -> Result<Vec<u
 fn maybe_wrap_pcm(content_type: &str, bytes: Vec<u8>) -> Vec<u8> {
     let ct = content_type.to_ascii_lowercase();
     let is_pcm = ct.contains("audio/pcm") || ct.contains("audio/l16") || ct.contains("codec=pcm");
-    if !is_pcm {
+    if !is_pcm || sniff_container(&bytes).is_some() {
         return bytes;
     }
     let sample_rate = parse_pcm_rate(&ct).unwrap_or(PCM_DEFAULT_SAMPLE_RATE);
@@ -927,6 +1548,183 @@ async fn fetch_elevenlabs_speech(
     Ok(SynthesizedSpeech { bytes, request_id })
 }
 
+/// The key for an engine that cannot work without one, or a clear error.
+fn required_key<'a>(settings: &'a AppSettings, provider: &TtsProvider) -> Result<&'a str, String> {
+    let key = settings.assistant_tts_api_key.0.trim();
+    if key.is_empty() {
+        return Err(format!("No {} API key configured", provider.label));
+    }
+    Ok(key)
+}
+
+/// The locale a voice name starts with — `en-US` from `en-US-JennyNeural` or
+/// `en-US-Chirp3-HD-Kore` — falling back to `en-US`. Azure and Google both
+/// name voices this way, and both need the locale sent alongside the voice.
+fn voice_locale(voice: &str) -> String {
+    let prefix: Vec<&str> = voice.splitn(3, '-').take(2).collect();
+    if prefix.len() == 2 && !prefix[0].is_empty() && !prefix[1].is_empty() {
+        format!("{}-{}", prefix[0], prefix[1])
+    } else {
+        "en-US".to_string()
+    }
+}
+
+/// POST https://api.deepgram.com/v1/speak?model=…
+///
+/// Deepgram folds the voice into the model id (`aura-2-thalia-en`), so the
+/// "voice" the user picks *is* the model, and everything except the text rides
+/// in the query string. Flux voices live on the newer `/v2/speak` route.
+async fn fetch_deepgram_speech(
+    settings: &AppSettings,
+    provider: &TtsProvider,
+    text: &str,
+) -> Result<Vec<u8>, String> {
+    let key = required_key(settings, provider)?;
+    let voice = or_default(
+        &settings.assistant_tts_remote_voice,
+        or_default(&settings.assistant_tts_model, provider.default_voice),
+    );
+    let route = if voice.starts_with("flux-") {
+        "/v2/speak"
+    } else {
+        "/v1/speak"
+    };
+    let mut url = reqwest::Url::parse(&format!("{}{route}", api_root(provider, settings)?))
+        .map_err(|e| format!("Invalid Deepgram URL: {e}"))?;
+    {
+        let mut query = url.query_pairs_mut();
+        query.append_pair("model", voice);
+        // The docs disagree on the default encoding, so ask for mp3 explicitly.
+        query.append_pair("encoding", "mp3");
+        if let Some(speed) = speed_for(provider, settings) {
+            query.append_pair("speed", &format!("{speed:.2}"));
+        }
+    }
+    let request = tts_client()?
+        .post(url)
+        .header(reqwest::header::AUTHORIZATION, format!("Token {key}"))
+        .json(&serde_json::json!({ "text": text }));
+    audio_body(send_tts_with_retries(request).await?).await
+}
+
+/// POST https://api.cartesia.ai/tts/bytes
+///
+/// Asks for 16-bit WAV: it is the one output shape the current API reference
+/// documents unambiguously, and rodio plays it without transcoding.
+async fn fetch_cartesia_speech(
+    settings: &AppSettings,
+    provider: &TtsProvider,
+    text: &str,
+) -> Result<Vec<u8>, String> {
+    let key = required_key(settings, provider)?;
+    let mut body = serde_json::json!({
+        "model_id": or_default(&settings.assistant_tts_model, provider.default_model),
+        "transcript": text,
+        "voice": or_default(&settings.assistant_tts_remote_voice, provider.default_voice),
+        "output_format": {
+            "container": "wav",
+            "encoding": "pcm_s16le",
+            "sample_rate": 44100,
+        },
+    });
+    if let Some(speed) = speed_for(provider, settings) {
+        body["generation_config"] = serde_json::json!({ "speed": speed });
+    }
+    let request = tts_client()?
+        .post(format!("{}/tts/bytes", api_root(provider, settings)?))
+        .bearer_auth(key)
+        .header("Cartesia-Version", CARTESIA_VERSION)
+        .json(&body);
+    audio_body(send_tts_with_retries(request).await?).await
+}
+
+/// POST https://texttospeech.googleapis.com/v1/text:synthesize
+///
+/// Authenticated with a plain API key in `x-goog-api-key` (the key's project
+/// needs the Text-to-Speech API enabled). `LINEAR16` comes back with a WAV
+/// header, which is higher quality than Google's fixed 32 kbps MP3.
+async fn fetch_google_speech(
+    settings: &AppSettings,
+    provider: &TtsProvider,
+    text: &str,
+) -> Result<Vec<u8>, String> {
+    let key = required_key(settings, provider)?;
+    let voice = or_default(&settings.assistant_tts_remote_voice, provider.default_voice);
+    let mut audio_config = serde_json::json!({ "audioEncoding": "LINEAR16" });
+    if let Some(speed) = speed_for(provider, settings) {
+        audio_config["speakingRate"] = serde_json::json!(speed);
+    }
+    let request = tts_client()?
+        .post(format!(
+            "{}/v1/text:synthesize",
+            api_root(provider, settings)?
+        ))
+        .header("x-goog-api-key", key)
+        .json(&serde_json::json!({
+            "input": { "text": text },
+            "voice": { "languageCode": voice_locale(voice), "name": voice },
+            "audioConfig": audio_config,
+        }));
+    let value = json_body(send_tts_with_retries(request).await?).await?;
+    decode_base64_audio(&value, "audioContent")
+}
+
+/// POST https://api.x.ai/v1/tts
+///
+/// `language` is required; `auto` lets the model detect it, which matches the
+/// assistant replying in whatever language the user spoke.
+async fn fetch_xai_speech(
+    settings: &AppSettings,
+    provider: &TtsProvider,
+    text: &str,
+) -> Result<Vec<u8>, String> {
+    let key = required_key(settings, provider)?;
+    let mut body = serde_json::json!({
+        "text": text,
+        "voice_id": or_default(&settings.assistant_tts_remote_voice, provider.default_voice),
+        "language": "auto",
+        "output_format": { "codec": "mp3", "sample_rate": 24000, "bit_rate": 128000 },
+    });
+    if let Some(speed) = speed_for(provider, settings) {
+        body["speed"] = serde_json::json!(speed);
+    }
+    let request = tts_client()?
+        .post(format!("{}/tts", api_root(provider, settings)?))
+        .bearer_auth(key)
+        .json(&body);
+    audio_body(send_tts_with_retries(request).await?).await
+}
+
+/// POST https://api.mistral.ai/v1/audio/speech
+///
+/// Same path as OpenAI's, different contract: the voice is `voice_id`, there is
+/// no speed, and the audio comes back base64-encoded inside JSON.
+async fn fetch_mistral_speech(
+    settings: &AppSettings,
+    provider: &TtsProvider,
+    text: &str,
+) -> Result<Vec<u8>, String> {
+    let key = required_key(settings, provider)?;
+    let voice = settings.assistant_tts_remote_voice.trim();
+    if voice.is_empty() {
+        return Err(
+            "No Mistral voice chosen. Press Load voices in the Voice settings and pick one."
+                .to_string(),
+        );
+    }
+    let request = tts_client()?
+        .post(format!("{}/audio/speech", api_root(provider, settings)?))
+        .bearer_auth(key)
+        .json(&serde_json::json!({
+            "model": or_default(&settings.assistant_tts_model, provider.default_model),
+            "input": text,
+            "voice_id": voice,
+            "response_format": "mp3",
+        }));
+    let value = json_body(send_tts_with_retries(request).await?).await?;
+    decode_base64_audio(&value, "audio_data")
+}
+
 /// Resolve the Azure Speech regional TTS host from a user-provided endpoint.
 ///
 /// Azure synthesis and the voices list live on `{region}.tts.speech.microsoft.com`,
@@ -1062,10 +1860,12 @@ pub async fn list_azure_voices(settings: &AppSettings) -> Result<Vec<AzureVoice>
 /// List available voices for the configured remote TTS engine, for the settings
 /// voice picker. Errors are returned for inline display.
 pub async fn list_tts_voices(settings: &AppSettings) -> Result<Vec<TtsVoice>, String> {
-    match settings.assistant_tts_engine.as_str() {
-        "openai" | "openrouter" => list_openai_tts_voices(settings).await,
-        "elevenlabs" => list_elevenlabs_voices(settings).await,
-        "azure" => {
+    let provider = active_provider(settings)?;
+    match provider.protocol {
+        TtsProtocol::Local => Err("Kokoro's voices are built in".to_string()),
+        TtsProtocol::OpenAiCompatible => list_openai_tts_voices(settings, provider).await,
+        TtsProtocol::ElevenLabs => list_elevenlabs_voices(settings).await,
+        TtsProtocol::AzureSpeech => {
             let voices = list_azure_voices(settings).await?;
             Ok(voices
                 .into_iter()
@@ -1077,17 +1877,323 @@ pub async fn list_tts_voices(settings: &AppSettings) -> Result<Vec<TtsVoice>, St
                 })
                 .collect())
         }
-        other => Err(format!(
-            "Voice listing isn't supported for engine: {}",
-            other
-        )),
+        TtsProtocol::Deepgram => list_deepgram_voices(settings, provider).await,
+        TtsProtocol::Cartesia => list_cartesia_voices(settings, provider).await,
+        TtsProtocol::GoogleCloud => list_google_voices(settings, provider).await,
+        TtsProtocol::Xai => list_xai_voices(settings, provider).await,
+        TtsProtocol::Mistral => list_mistral_voices(settings, provider).await,
+    }
+    .and_then(|voices| {
+        if voices.is_empty() {
+            Err("The endpoint returned no voices".to_string())
+        } else {
+            Ok(voices)
+        }
+    })
+}
+
+/// Title-case a lowercase voice slug for display (`thalia` → `Thalia`).
+fn capitalized(name: &str) -> String {
+    let mut chars = name.chars();
+    match chars.next() {
+        Some(first) => first.to_uppercase().chain(chars).collect(),
+        None => String::new(),
     }
 }
+
+/// Join the non-empty parts of a picker label with the separator the other
+/// engines use.
+fn voice_label(parts: &[&str]) -> String {
+    parts
+        .iter()
+        .map(|part| part.trim())
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join(" · ")
+}
+
+/// Deepgram voices via `GET /v1/models`. Each `tts` entry's `canonical_name`
+/// (`aura-2-thalia-en`) is what `/v1/speak` takes as its model.
+async fn list_deepgram_voices(
+    settings: &AppSettings,
+    provider: &TtsProvider,
+) -> Result<Vec<TtsVoice>, String> {
+    let key = required_key(settings, provider)?;
+    let request = tts_client()?
+        .get(format!("{}/v1/models", api_root(provider, settings)?))
+        .header(reqwest::header::AUTHORIZATION, format!("Token {key}"));
+    let value = json_body(
+        request
+            .send()
+            .await
+            .map_err(|e| format!("HTTP request failed: {e}"))?,
+    )
+    .await?;
+    let mut voices: Vec<TtsVoice> = value
+        .get("tts")
+        .and_then(|v| v.as_array())
+        .into_iter()
+        .flatten()
+        .filter_map(|item| {
+            let id = item.get("canonical_name")?.as_str()?.to_string();
+            let name = item.get("name").and_then(|v| v.as_str()).unwrap_or(&id);
+            let accent = item
+                .pointer("/metadata/accent")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            let language = item
+                .get("languages")
+                .and_then(|v| v.as_array())
+                .and_then(|langs| langs.first())
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            let label = voice_label(&[&capitalized(name), accent, language, &id]);
+            Some(TtsVoice { id, label })
+        })
+        .collect();
+    // 102 voices across languages; English first so the common case is at the
+    // top of the picker instead of behind every French and Spanish voice.
+    voices.sort_by(|a, b| (!a.id.ends_with("-en"), &a.id).cmp(&(!b.id.ends_with("-en"), &b.id)));
+    voices.dedup_by(|a, b| a.id == b.id);
+    Ok(voices)
+}
+
+/// Cartesia voices via `GET /voices`, following its cursor for a few pages so
+/// the list is useful without downloading the entire public library.
+async fn list_cartesia_voices(
+    settings: &AppSettings,
+    provider: &TtsProvider,
+) -> Result<Vec<TtsVoice>, String> {
+    const MAX_PAGES: usize = 5;
+    let key = required_key(settings, provider)?;
+    let root = api_root(provider, settings)?;
+    let client = tts_client()?;
+    let mut voices = Vec::new();
+    let mut cursor: Option<String> = None;
+    for _ in 0..MAX_PAGES {
+        let mut request = client
+            .get(format!("{root}/voices"))
+            .bearer_auth(key)
+            .header("Cartesia-Version", CARTESIA_VERSION)
+            .query(&[("limit", "100")]);
+        if let Some(after) = &cursor {
+            request = request.query(&[("starting_after", after.as_str())]);
+        }
+        let value = json_body(
+            request
+                .send()
+                .await
+                .map_err(|e| format!("HTTP request failed: {e}"))?,
+        )
+        .await?;
+        for item in value
+            .get("data")
+            .and_then(|v| v.as_array())
+            .into_iter()
+            .flatten()
+        {
+            let Some(id) = item.get("id").and_then(|v| v.as_str()) else {
+                continue;
+            };
+            let name = item.get("name").and_then(|v| v.as_str()).unwrap_or(id);
+            let language = item.get("language").and_then(|v| v.as_str()).unwrap_or("");
+            let gender = item.get("gender").and_then(|v| v.as_str()).unwrap_or("");
+            voices.push(TtsVoice {
+                id: id.to_string(),
+                label: voice_label(&[name, language, gender]),
+            });
+        }
+        let more = value
+            .get("has_more")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+        cursor = value
+            .get("next_page")
+            .and_then(|v| v.as_str())
+            .map(str::to_string)
+            .or_else(|| voices.last().map(|voice| voice.id.clone()));
+        if !more {
+            break;
+        }
+    }
+    Ok(voices)
+}
+
+/// Google Cloud voices via `GET /v1/voices`, sorted so each locale's voices
+/// sit together.
+async fn list_google_voices(
+    settings: &AppSettings,
+    provider: &TtsProvider,
+) -> Result<Vec<TtsVoice>, String> {
+    let key = required_key(settings, provider)?;
+    let request = tts_client()?
+        .get(format!("{}/v1/voices", api_root(provider, settings)?))
+        .header("x-goog-api-key", key);
+    let value = json_body(
+        request
+            .send()
+            .await
+            .map_err(|e| format!("HTTP request failed: {e}"))?,
+    )
+    .await?;
+    let mut voices: Vec<TtsVoice> = value
+        .get("voices")
+        .and_then(|v| v.as_array())
+        .into_iter()
+        .flatten()
+        .filter_map(|item| {
+            let id = item.get("name")?.as_str()?.to_string();
+            let gender = item
+                .get("ssmlGender")
+                .and_then(|v| v.as_str())
+                .map(|g| capitalized(&g.to_ascii_lowercase()))
+                .unwrap_or_default();
+            let label = voice_label(&[&id, &gender]);
+            Some(TtsVoice { id, label })
+        })
+        .collect();
+    // Hundreds of voices in every locale; English first, then each locale's
+    // voices together.
+    voices
+        .sort_by(|a, b| (!a.id.starts_with("en-"), &a.id).cmp(&(!b.id.starts_with("en-"), &b.id)));
+    Ok(voices)
+}
+
+/// xAI voices via `GET /v1/tts/voices`.
+async fn list_xai_voices(
+    settings: &AppSettings,
+    provider: &TtsProvider,
+) -> Result<Vec<TtsVoice>, String> {
+    let key = required_key(settings, provider)?;
+    let request = tts_client()?
+        .get(format!("{}/tts/voices", api_root(provider, settings)?))
+        .bearer_auth(key);
+    let value = json_body(
+        request
+            .send()
+            .await
+            .map_err(|e| format!("HTTP request failed: {e}"))?,
+    )
+    .await?;
+    Ok(value
+        .get("voices")
+        .and_then(|v| v.as_array())
+        .into_iter()
+        .flatten()
+        .filter_map(|item| {
+            let id = item.get("voice_id")?.as_str()?.to_string();
+            let name = item.get("name").and_then(|v| v.as_str()).unwrap_or(&id);
+            let language = item.get("language").and_then(|v| v.as_str()).unwrap_or("");
+            let label = voice_label(&[name, language]);
+            Some(TtsVoice { id, label })
+        })
+        .collect())
+}
+
+/// Mistral voices via `GET /v1/audio/voices`: the presets plus any voices the
+/// account has cloned.
+async fn list_mistral_voices(
+    settings: &AppSettings,
+    provider: &TtsProvider,
+) -> Result<Vec<TtsVoice>, String> {
+    let key = required_key(settings, provider)?;
+    let request = tts_client()?
+        .get(format!("{}/audio/voices", api_root(provider, settings)?))
+        .bearer_auth(key)
+        .query(&[("type", "all"), ("limit", "100")]);
+    let value = json_body(
+        request
+            .send()
+            .await
+            .map_err(|e| format!("HTTP request failed: {e}"))?,
+    )
+    .await?;
+    Ok(value
+        .get("items")
+        .and_then(|v| v.as_array())
+        .into_iter()
+        .flatten()
+        .filter_map(|item| {
+            let id = item.get("id")?.as_str()?.to_string();
+            let name = item.get("name").and_then(|v| v.as_str()).unwrap_or(&id);
+            let kind = item.get("type").and_then(|v| v.as_str()).unwrap_or("");
+            let label = voice_label(&[name, kind]);
+            Some(TtsVoice { id, label })
+        })
+        .collect())
+}
+
+/// Inworld voices via its TTS voice listing, which takes the portal's Basic
+/// credential.
+async fn list_inworld_voices(settings: &AppSettings) -> Result<Vec<TtsVoice>, String> {
+    let key = settings.assistant_tts_api_key.0.trim();
+    if key.is_empty() {
+        return Err("No Inworld API key configured".to_string());
+    }
+    let request = tts_client()?
+        .get("https://api.inworld.ai/tts/v1/voices")
+        .header(reqwest::header::AUTHORIZATION, format!("Basic {key}"));
+    let value = json_body(
+        request
+            .send()
+            .await
+            .map_err(|e| format!("HTTP request failed: {e}"))?,
+    )
+    .await?;
+    Ok(value
+        .get("voices")
+        .and_then(|v| v.as_array())
+        .into_iter()
+        .flatten()
+        .filter_map(|item| {
+            let id = item.get("voiceId")?.as_str()?.to_string();
+            let name = item
+                .get("displayName")
+                .and_then(|v| v.as_str())
+                .unwrap_or(&id);
+            let languages = item
+                .get("languages")
+                .and_then(|v| v.as_array())
+                .map(|langs| {
+                    langs
+                        .iter()
+                        .filter_map(|l| l.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                })
+                .unwrap_or_default();
+            let label = voice_label(&[name, &languages]);
+            Some(TtsVoice { id, label })
+        })
+        .collect())
+}
+
+/// Groq's Orpheus voices, documented per model rather than listed by the API.
+const GROQ_ENGLISH_VOICES: &[&str] = &["autumn", "diana", "hannah", "austin", "daniel", "troy"];
+const GROQ_ARABIC_VOICES: &[&str] = &["abdullah", "fahad", "sultan", "lulwa", "noura", "aisha"];
 
 /// xAI Grok Voice TTS built-in voices. Grok's `/audio/speech` route rejects
 /// OpenAI voice names, so offering `alloy`/`verse` here would only 404 — these
 /// are the five voices it actually accepts.
 const GROK_TTS_VOICES: &[&str] = &["Eve", "Ara", "Rex", "Sal", "Leo"];
+
+/// The Kokoro v1.0 English voices, for Kokoro served over the OpenAI schema.
+const KOKORO_VOICES: &[&str] = &[
+    "af_heart",
+    "af_bella",
+    "af_nicole",
+    "af_sky",
+    "af_sarah",
+    "af_nova",
+    "am_adam",
+    "am_michael",
+    "am_fenrir",
+    "am_puck",
+    "bf_emma",
+    "bf_isabella",
+    "bm_george",
+    "bm_fable",
+];
 
 /// Gemini TTS voices and Google's documented style labels. Shared by Gemini
 /// 3.1 Flash TTS Preview and Gemini 2.5 Flash/Pro Preview TTS.
@@ -1166,6 +2272,11 @@ fn curated_tts_voices(model: &str, base_url: &str) -> Option<Vec<TtsVoice>> {
     if m.contains("gemini") && m.contains("tts") {
         return Some(labeled_voices_from(GEMINI_TTS_VOICES));
     }
+    // Kokoro served over the OpenAI schema (OpenRouter's `hexgrad/kokoro-82m`,
+    // or a local server whose model is named after it) takes Kokoro's own ids.
+    if m.contains("kokoro") {
+        return Some(voices_from(KOKORO_VOICES));
+    }
     // OpenAI speech models (`openai/gpt-4o-mini-tts…`, bare `gpt-4o-mini-tts`,
     // `tts-1`, `tts-1-hd`) or OpenAI's own endpoint use the standard voice set.
     let is_openai_model = m.starts_with("openai/")
@@ -1178,105 +2289,120 @@ fn curated_tts_voices(model: &str, base_url: &str) -> Option<Vec<TtsVoice>> {
     None
 }
 
-/// GET `{base}/audio/voices` for local OpenAI-compatible servers (Kokoro-FastAPI,
-/// openai-edge-tts) that expose a real voice list. Returns the parsed voices, or
-/// `None` when the endpoint has no such route / the request fails (the caller
-/// then falls back to a curated set).
-async fn fetch_openai_audio_voices(settings: &AppSettings, raw: &str) -> Option<Vec<TtsVoice>> {
-    // Derive an `/audio/voices` URL from the configured base (which may already
-    // point straight at `/audio/speech`, possibly with a query string).
-    let base = raw.trim_end_matches('/');
-    let voices_url = match base.split_once("/audio/speech") {
-        Some((prefix, _)) => format!("{}/audio/voices", prefix.trim_end_matches('/')),
-        None => format!("{}/audio/voices", base),
-    };
-
-    let client = tts_client().ok()?;
-    let mut req = client.get(&voices_url);
-    let api_key = settings.assistant_tts_api_key.0.trim();
-    if !api_key.is_empty() {
-        req = req.bearer_auth(api_key).header("api-key", api_key);
-    }
-
-    let resp = match req.send().await {
-        Ok(r) if r.status().is_success() => r,
-        _ => return None,
-    };
-    let value: serde_json::Value = resp.json().await.ok()?;
-
-    // Accept several shapes: {voices:[...]} / {data:[...]} / top-level array,
-    // where each item is a bare string or an object with an id/name.
-    let arr = value
+/// Parse a self-hosted server's voice listing. There is no standard, so every
+/// shape the popular servers use is accepted: `{voices:[…]}` (Kokoro-FastAPI,
+/// Speaches, Orpheus-FastAPI, vLLM-Omni, Chatterbox), `{data:[…]}`, or a bare
+/// array — each item a string, or an object with an `id` / `voice_id` / `name`.
+fn parse_voice_listing(value: &serde_json::Value) -> Vec<TtsVoice> {
+    let items = value
         .get("voices")
         .and_then(|v| v.as_array())
         .or_else(|| value.get("data").and_then(|v| v.as_array()))
         .or_else(|| value.as_array());
-
     let mut voices = Vec::new();
-    if let Some(items) = arr {
-        for item in items {
-            if let Some(s) = item.as_str() {
-                voices.push(TtsVoice {
-                    id: s.to_string(),
-                    label: s.to_string(),
-                });
-            } else if let Some(id) = item
-                .get("id")
-                .and_then(|v| v.as_str())
-                .or_else(|| item.get("voice_id").and_then(|v| v.as_str()))
-                .or_else(|| item.get("name").and_then(|v| v.as_str()))
-            {
-                let label = item
-                    .get("name")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or(id)
-                    .to_string();
-                voices.push(TtsVoice {
-                    id: id.to_string(),
-                    label,
-                });
-            }
+    for item in items.into_iter().flatten() {
+        if let Some(s) = item.as_str() {
+            voices.push(TtsVoice {
+                id: s.to_string(),
+                label: s.to_string(),
+            });
+        } else if let Some(id) = item
+            .get("id")
+            .and_then(|v| v.as_str())
+            .or_else(|| item.get("voice_id").and_then(|v| v.as_str()))
+            .or_else(|| item.get("name").and_then(|v| v.as_str()))
+        {
+            let name = item.get("name").and_then(|v| v.as_str()).unwrap_or(id);
+            let language = item.get("language").and_then(|v| v.as_str()).unwrap_or("");
+            // openai-edge-tts reports `{id: "alloy", name: "en-US-JennyNeural"}`,
+            // where the name is the Edge voice the alias maps to — worth
+            // showing, but it must not replace the id.
+            let label = if name == id {
+                voice_label(&[id, language])
+            } else {
+                voice_label(&[name, language, id])
+            };
+            voices.push(TtsVoice {
+                id: id.to_string(),
+                label,
+            });
         }
     }
-    Some(voices)
+    voices
 }
 
-/// Voices for the OpenAI-compatible / OpenRouter engine, chosen by the selected
-/// MODEL so the picker never misleads with OpenAI's voices under a non-OpenAI
-/// model (the root of "the voice name is the same for every model").
+/// A self-hosted server's own voice list. `GET {root}/audio/voices` is the
+/// common route; Chatterbox (travisvn) serves `GET {root}/voices` instead.
+/// `None` when neither answers with a usable list.
+async fn fetch_server_voices(
+    settings: &AppSettings,
+    provider: &TtsProvider,
+    root: &str,
+) -> Option<Vec<TtsVoice>> {
+    let client = tts_client().ok()?;
+    let key = settings.assistant_tts_api_key.0.trim();
+    for path in ["/audio/voices", "/voices"] {
+        let request = with_openai_auth(client.get(format!("{root}{path}")), provider, key);
+        let Ok(response) = request.send().await else {
+            continue;
+        };
+        if !response.status().is_success() {
+            continue;
+        }
+        let Ok(value) = response.json::<serde_json::Value>().await else {
+            continue;
+        };
+        let voices = parse_voice_listing(&value);
+        if !voices.is_empty() {
+            return Some(voices);
+        }
+    }
+    None
+}
+
+/// Voices for an OpenAI-compatible engine.
 ///
-/// Order of preference:
-/// 1. A local server's own `GET {base}/audio/voices` list, when present.
-/// 2. A curated set keyed by the selected model / provider (OpenAI, Grok).
-/// 3. An informative error so the user types the model's own voice — the field
-///    is free-text, so an unrecognized model is never a dead end.
-async fn list_openai_tts_voices(settings: &AppSettings) -> Result<Vec<TtsVoice>, String> {
-    let raw = openai_tts_base_url(settings);
-    let model = settings.assistant_tts_model.trim();
+/// Hosted engines publish no voice listing on this schema, so each gets the
+/// set its own docs name, chosen by the selected MODEL where the engine fronts
+/// several (the root of "the voice name is the same for every model" — OpenAI's
+/// `alloy` 404s under Grok or Gemini). A custom server is asked for its own
+/// list first. When nothing applies the error says what to type instead; the
+/// field is free text, so an unrecognized model is never a dead end.
+async fn list_openai_tts_voices(
+    settings: &AppSettings,
+    provider: &TtsProvider,
+) -> Result<Vec<TtsVoice>, String> {
+    let model = or_default(&settings.assistant_tts_model, provider.default_model);
+    match provider.id {
+        "openai" => return Ok(voices_from(OPENAI_TTS_VOICES)),
+        "groq" => {
+            return Ok(voices_from(if model.contains("arabic") {
+                GROQ_ARABIC_VOICES
+            } else {
+                GROQ_ENGLISH_VOICES
+            }))
+        }
+        "inworld" => return list_inworld_voices(settings).await,
+        _ => {}
+    }
 
-    // Hosted providers (OpenAI, OpenRouter) don't expose `/audio/voices`, so
-    // skip the probe and go straight to a model-aware curated set. Only local /
-    // custom OpenAI-compatible servers are probed for their real list.
-    let is_hosted =
-        raw.is_empty() || raw.contains("api.openai.com") || raw.contains("openrouter.ai");
-
-    if !is_hosted {
-        if let Some(voices) = fetch_openai_audio_voices(settings, raw).await {
-            if !voices.is_empty() {
-                return Ok(voices);
-            }
+    let root = openai_root(&api_root(provider, settings)?);
+    if provider.base_url.is_none() {
+        if let Some(voices) = fetch_server_voices(settings, provider, &root).await {
+            return Ok(voices);
         }
     }
 
-    if let Some(voices) = curated_tts_voices(model, raw) {
+    if let Some(voices) = curated_tts_voices(model, &root) {
         return Ok(voices);
     }
 
     Err(
-        "Voices vary by model, and this provider doesn't publish a list. \
+        "Voices vary by model, and this endpoint doesn't publish a list. \
          Type the voice from the model's page — e.g. Grok TTS uses \
-         Eve/Ara/Rex/Sal/Leo, OpenAI models use alloy/echo/nova/…, and \
-         unrecognized models use the names from their own model page."
+         Eve/Ara/Rex/Sal/Leo, OpenAI models use alloy/echo/nova/…, Kokoro \
+         uses af_heart/am_adam/…, and other models use the names from their \
+         own page."
             .to_string(),
     )
 }
@@ -1336,75 +2462,87 @@ async fn list_elevenlabs_voices(settings: &AppSettings) -> Result<Vec<TtsVoice>,
 }
 
 /// List available models for the configured remote TTS engine, for the settings
-/// model picker. Only the OpenAI-compatible and ElevenLabs engines expose a
-/// model list; Azure/Kokoro return an error the UI surfaces as "not supported".
+/// model picker. Engines with a live listing are asked; engines with a small
+/// documented set answer from the registry; engines whose voice implies the
+/// model (Deepgram, Google, xAI, Azure) have no model field and say so.
 pub async fn list_tts_models(settings: &AppSettings) -> Result<Vec<String>, String> {
-    match settings.assistant_tts_engine.as_str() {
-        "openai" | "openrouter" => list_openai_tts_models(settings).await,
-        "elevenlabs" => list_elevenlabs_models(settings).await,
-        other => Err(format!(
-            "Model listing isn't supported for engine: {}",
-            other
+    let provider = active_provider(settings)?;
+    match provider.protocol {
+        TtsProtocol::ElevenLabs => list_elevenlabs_models(settings).await,
+        TtsProtocol::OpenAiCompatible
+            if matches!(provider.id, "openai" | "openrouter" | "custom") =>
+        {
+            list_openai_tts_models(settings, provider).await
+        }
+        _ if !provider.models.is_empty() => {
+            Ok(provider.models.iter().map(|m| m.to_string()).collect())
+        }
+        _ => Err(format!(
+            "{} picks its model from the voice, so there is no model to choose.",
+            provider.label
         )),
     }
 }
 
+/// Model ids from an OpenAI-compatible `/models` listing: the standard
+/// `{data:[{id}]}`, openai-edge-tts' `{models:[{id}]}`, or a bare array.
+fn parse_model_listing(value: &serde_json::Value) -> Vec<String> {
+    let items = value
+        .get("data")
+        .and_then(|v| v.as_array())
+        .or_else(|| value.get("models").and_then(|v| v.as_array()))
+        .or_else(|| value.as_array());
+    items
+        .into_iter()
+        .flatten()
+        .filter_map(|item| {
+            item.as_str()
+                .or_else(|| item.get("id").and_then(|v| v.as_str()))
+                .map(str::to_string)
+        })
+        .collect()
+}
+
 /// OpenAI-compatible models via `GET {base}/models`.
-async fn list_openai_tts_models(settings: &AppSettings) -> Result<Vec<String>, String> {
-    let raw = openai_tts_base_url(settings);
-    let base = if raw.is_empty() {
-        "https://api.openai.com/v1".to_string()
-    } else {
-        let b = raw.trim_end_matches('/');
-        match b.split_once("/audio/speech") {
-            Some((prefix, _)) => prefix.trim_end_matches('/').to_string(),
-            None => b.to_string(),
-        }
-    };
-    let url = format!("{}/models", base);
+async fn list_openai_tts_models(
+    settings: &AppSettings,
+    provider: &TtsProvider,
+) -> Result<Vec<String>, String> {
+    let base = openai_root(&api_root(provider, settings)?);
     // OpenRouter's /models returns thousands of chat models; ask it for only
-    // speech-capable ones so the TTS model picker is actually usable. Harmless
-    // for other providers (this arm only runs for the openai/openrouter path).
-    let url = if base.contains("openrouter.ai") {
-        format!("{}?output_modalities=speech", url)
+    // speech-capable ones so the TTS model picker is actually usable.
+    let url = if provider.id == "openrouter" {
+        format!("{base}/models?output_modalities=speech")
     } else {
-        url
+        format!("{base}/models")
     };
 
-    let client = tts_client()?;
-    let mut req = client.get(&url);
-    let api_key = settings.assistant_tts_api_key.0.trim();
-    if !api_key.is_empty() {
-        req = req.bearer_auth(api_key).header("api-key", api_key);
-    }
-
-    let resp = req
+    let request = with_openai_auth(
+        tts_client()?.get(&url),
+        provider,
+        settings.assistant_tts_api_key.0.trim(),
+    );
+    let resp = request
         .send()
         .await
         .map_err(|e| format!("HTTP request failed: {}", e))?;
     let status = resp.status();
     if !status.is_success() {
         let body = resp.text().await.unwrap_or_default();
-        return Err(format!("{}: {}", status, truncate(&body, 300)));
+        return Err(http_error(status, &body));
     }
 
     let value: serde_json::Value = resp
         .json()
         .await
         .map_err(|e| format!("Failed to parse models list: {}", e))?;
-
-    let mut models = Vec::new();
-    if let Some(items) = value.get("data").and_then(|v| v.as_array()) {
-        for item in items {
-            if let Some(id) = item.get("id").and_then(|v| v.as_str()) {
-                models.push(id.to_string());
-            }
-        }
-    } else if let Some(items) = value.as_array() {
-        for item in items {
-            if let Some(id) = item.as_str() {
-                models.push(id.to_string());
-            }
+    let mut models = parse_model_listing(&value);
+    // OpenAI's listing is every model on the account, chat included; only the
+    // speech ones belong in this picker.
+    if provider.id == "openai" {
+        models.retain(|id| id.contains("tts"));
+        if models.is_empty() {
+            models = provider.models.iter().map(|m| m.to_string()).collect();
         }
     }
     Ok(models)
@@ -1486,19 +2624,15 @@ async fn fetch_azure_speech(settings: &AppSettings, text: &str) -> Result<Vec<u8
 
     // Derive the locale (xml:lang) from the voice name prefix, e.g. a voice
     // named "en-US-JennyNeural" yields "en-US". Fall back to en-US otherwise.
-    let prefix: Vec<&str> = voice.splitn(3, '-').take(2).collect();
-    let lang = if prefix.len() == 2 {
-        format!("{}-{}", prefix[0], prefix[1])
-    } else {
-        "en-US".to_string()
-    };
+    let lang = voice_locale(voice);
 
     // Apply playback speed via SSML <prosody rate>. Azure takes a relative
-    // percentage (e.g. +100% ≈ 2x, -50% ≈ 0.5x) and preserves pitch. Wrap only
-    // when the rate actually differs from normal.
+    // percentage (e.g. +100% ≈ 2x, -50% ≈ 0.5x) and preserves pitch, within
+    // 0.5x–2x. Wrap only when the rate actually differs from normal.
     let escaped_text = xml_escape(text);
-    let inner = if (settings.assistant_tts_speed - 1.0).abs() > f64::EPSILON {
-        let rate = format!("{:+.0}%", (settings.assistant_tts_speed - 1.0) * 100.0);
+    let speed = provider("azure").and_then(|azure| speed_for(azure, settings));
+    let inner = if let Some(speed) = speed {
+        let rate = format!("{:+.0}%", (speed - 1.0) * 100.0);
         format!("<prosody rate='{}'>{}</prosody>", rate, escaped_text)
     } else {
         escaped_text
@@ -1769,11 +2903,13 @@ mod tests {
     /// generic provider error on a surface the orb view hides.
     #[test]
     fn a_remote_voice_with_no_key_blocks_a_call_before_it_starts() {
-        for engine in ["openai", "openrouter", "elevenlabs", "azure"] {
-            let blocker = voice_engine_blocker(&with_voice(engine, "", "https://api.example.com"));
+        for provider in super::TTS_PROVIDERS.iter().filter(|p| p.requires_key) {
+            let blocker =
+                voice_engine_blocker(&with_voice(provider.id, "", "https://api.example.com"));
             assert!(
                 blocker.is_some_and(|m| m.contains("API key")),
-                "{engine} with no key should block a call"
+                "{} with no key should block a call",
+                provider.id
             );
         }
     }
@@ -1782,33 +2918,230 @@ mod tests {
     fn a_configured_or_on_device_voice_does_not_block_a_call() {
         assert!(voice_engine_blocker(&with_voice("kokoro", "", "")).is_none());
         assert!(voice_engine_blocker(&get_default_settings()).is_none());
-        for engine in ["openai", "openrouter", "elevenlabs", "azure"] {
+        for provider in super::TTS_PROVIDERS {
             assert!(
-                voice_engine_blocker(&with_voice(engine, "sk-test", "https://api.example.com"))
-                    .is_none(),
-                "{engine} with a key should be allowed"
+                voice_engine_blocker(&with_voice(
+                    provider.id,
+                    "sk-test",
+                    "https://api.example.com"
+                ))
+                .is_none(),
+                "{} with a key should be allowed",
+                provider.id
             );
         }
     }
 
-    /// A self-hosted OpenAI-compatible speech server legitimately needs no key;
-    /// refusing it would break a working offline setup.
+    /// A self-hosted speech server legitimately needs no key; refusing it would
+    /// break a working offline setup. It does need an address.
     #[test]
-    fn a_loopback_speech_server_needs_no_key() {
+    fn a_custom_speech_server_needs_an_address_but_no_key() {
         for base_url in [
-            "http://127.0.0.1:8080/v1",
-            "http://localhost:5002/v1",
-            "http://[::1]:8080/v1",
+            "http://127.0.0.1:8880/v1",
+            "http://localhost:5005/v1",
+            "http://[::1]:8000/v1",
+            "http://192.168.1.20:4123/v1",
         ] {
             assert!(
-                voice_engine_blocker(&with_voice("openai", "", base_url)).is_none(),
+                voice_engine_blocker(&with_voice("custom", "", base_url)).is_none(),
                 "{base_url} should be allowed without a key"
             );
         }
-        // A hosted endpoint is not exempt just because another engine is.
+        assert!(voice_engine_blocker(&with_voice("custom", "", ""))
+            .is_some_and(|m| m.contains("server address")));
+        // OpenAI itself is a hosted engine now, whatever URL is lying around.
         assert!(
-            voice_engine_blocker(&with_voice("openai", "", "https://api.openai.com/v1")).is_some()
+            voice_engine_blocker(&with_voice("openai", "", "http://localhost:8880/v1")).is_some()
         );
+    }
+
+    #[test]
+    fn an_unknown_engine_blocks_with_a_readable_message() {
+        assert!(voice_engine_blocker(&with_voice("not-an-engine", "k", ""))
+            .is_some_and(|m| m.contains("not-an-engine")));
+    }
+
+    #[test]
+    fn registry_ids_are_unique_and_fixed_endpoints_are_https() {
+        let mut seen = std::collections::HashSet::new();
+        for provider in super::TTS_PROVIDERS {
+            assert!(seen.insert(provider.id), "duplicate id {}", provider.id);
+            assert!(
+                provider.max_chars > 0,
+                "{} has no length limit",
+                provider.id
+            );
+            if let Some(url) = provider.base_url {
+                assert!(url.starts_with("https://"), "{} is not https", provider.id);
+                assert!(!url.ends_with('/'), "{} has a trailing slash", provider.id);
+            }
+            if let Some((min, max)) = provider.speed_range {
+                assert!(min < 1.0 && max > 1.0, "{} can't speak at 1x", provider.id);
+            }
+        }
+        // The two engines people configure themselves have no fixed endpoint.
+        assert!(super::fixed_base_url("custom").is_none());
+        assert!(super::fixed_base_url("azure").is_none());
+        assert!(super::is_known_engine("kokoro"));
+        assert!(!super::is_known_engine("playai"));
+    }
+
+    #[test]
+    fn split_to_limit_keeps_short_text_whole() {
+        assert_eq!(
+            super::split_to_limit("  Hello there.  ", 200),
+            vec!["Hello there.".to_string()]
+        );
+        assert!(super::split_to_limit("   ", 200).is_empty());
+    }
+
+    #[test]
+    fn split_to_limit_prefers_sentence_ends_and_never_exceeds_the_limit() {
+        let text = "The weather is mild today. Expect light rain after noon, \
+                    so bring a jacket. Tomorrow clears up nicely, with a high of 3.5 degrees above normal.";
+        let pieces = super::split_to_limit(text, 60);
+        assert!(pieces.len() > 1);
+        for piece in &pieces {
+            assert!(piece.chars().count() <= 60, "{piece:?} is too long");
+            assert!(!piece.is_empty());
+        }
+        assert_eq!(pieces[0], "The weather is mild today.");
+        // A decimal point is not a sentence end.
+        assert!(pieces.iter().all(|p| !p.ends_with("3.")));
+        // Nothing is lost or duplicated.
+        let rejoined = pieces.join(" ");
+        let words = |s: &str| s.split_whitespace().map(str::to_string).collect::<Vec<_>>();
+        assert_eq!(words(&rejoined), words(text));
+    }
+
+    #[test]
+    fn split_to_limit_falls_back_to_a_hard_cut_for_an_unbroken_run() {
+        let run = "a".repeat(450);
+        let pieces = super::split_to_limit(&run, 200);
+        assert_eq!(
+            pieces.iter().map(|p| p.len()).collect::<Vec<_>>(),
+            vec![200, 200, 50]
+        );
+        // Multi-byte text is cut on character boundaries, not bytes.
+        let wide = "語".repeat(250);
+        for piece in super::split_to_limit(&wide, 200) {
+            assert!(piece.chars().count() <= 200);
+        }
+    }
+
+    #[test]
+    fn a_bare_server_address_gets_the_v1_root() {
+        use super::normalize_server_url;
+        assert_eq!(
+            normalize_server_url("http://localhost:8880"),
+            "http://localhost:8880/v1"
+        );
+        assert_eq!(
+            normalize_server_url("http://localhost:8880/"),
+            "http://localhost:8880/v1"
+        );
+        assert_eq!(
+            normalize_server_url("http://localhost:8880/v1/"),
+            "http://localhost:8880/v1"
+        );
+        let azure = "https://res.cognitiveservices.azure.com/openai/deployments/tts/audio/speech?api-version=2025-03-01-preview";
+        assert_eq!(normalize_server_url(azure), azure);
+        assert_eq!(super::openai_speech_url(azure), azure);
+        assert_eq!(
+            super::openai_root(azure),
+            "https://res.cognitiveservices.azure.com/openai/deployments/tts"
+        );
+    }
+
+    #[test]
+    fn speed_is_clamped_per_engine_and_omitted_where_unsupported() {
+        use super::{provider, speed_for};
+        let mut settings = get_default_settings();
+        settings.assistant_tts_speed = 3.0;
+        assert_eq!(speed_for(provider("openai").unwrap(), &settings), Some(3.0));
+        assert_eq!(
+            speed_for(provider("deepgram").unwrap(), &settings),
+            Some(1.5)
+        );
+        assert_eq!(speed_for(provider("groq").unwrap(), &settings), None);
+        settings.assistant_tts_speed = 1.0;
+        assert_eq!(speed_for(provider("openai").unwrap(), &settings), None);
+    }
+
+    #[test]
+    fn server_voice_listings_in_every_known_shape_parse() {
+        use super::parse_voice_listing;
+        let ids = |v: serde_json::Value| {
+            parse_voice_listing(&v)
+                .into_iter()
+                .map(|x| x.id)
+                .collect::<Vec<_>>()
+        };
+        // Kokoro-FastAPI / Speaches: objects with ids.
+        assert_eq!(
+            ids(serde_json::json!({"voices":[{"id":"af_heart","name":"af_heart"}]})),
+            vec!["af_heart"]
+        );
+        // Orpheus-FastAPI / devnen Chatterbox: bare strings beside a status.
+        assert_eq!(
+            ids(serde_json::json!({"status":"ok","voices":["tara","leo"]})),
+            vec!["tara", "leo"]
+        );
+        // travisvn Chatterbox: objects with only a name.
+        assert_eq!(
+            ids(serde_json::json!({"voices":[{"name":"narrator","filename":"n.wav"}],"count":1})),
+            vec!["narrator"]
+        );
+        // openai-edge-tts: the id is the alias, the name is the Edge voice.
+        let edge = parse_voice_listing(
+            &serde_json::json!({"voices":[{"id":"alloy","name":"en-US-JennyNeural"}]}),
+        );
+        assert_eq!(edge[0].id, "alloy");
+        assert!(edge[0].label.contains("en-US-JennyNeural"));
+        // A top-level array.
+        assert_eq!(ids(serde_json::json!(["a", "b"])), vec!["a", "b"]);
+    }
+
+    #[test]
+    fn server_model_listings_in_every_known_shape_parse() {
+        use super::parse_model_listing;
+        assert_eq!(
+            parse_model_listing(&serde_json::json!({"object":"list","data":[{"id":"tts-1"}]})),
+            vec!["tts-1"]
+        );
+        // openai-edge-tts answers `{models:[…]}` rather than `{data:[…]}`.
+        assert_eq!(
+            parse_model_listing(&serde_json::json!({"models":[{"id":"tts-1-hd"}]})),
+            vec!["tts-1-hd"]
+        );
+        assert_eq!(
+            parse_model_listing(&serde_json::json!(["kokoro"])),
+            vec!["kokoro"]
+        );
+    }
+
+    #[test]
+    fn audio_is_recognised_by_its_header_not_its_label() {
+        use super::{sniff_container, wrap_requested_pcm};
+        assert_eq!(sniff_container(b"RIFF\x00\x00\x00\x00WAVE"), Some("wav"));
+        assert_eq!(sniff_container(b"ID3\x04"), Some("mp3"));
+        assert_eq!(sniff_container(&[0xFF, 0xFB, 0x90]), Some("mp3"));
+        assert_eq!(sniff_container(b"OggS"), Some("ogg"));
+        assert_eq!(sniff_container(&[0x00, 0x01, 0x02]), None);
+        // A server that answers a pcm request with a WAV file must not have a
+        // second header stacked on top.
+        let wav = b"RIFF\x24\x00\x00\x00WAVEfmt ".to_vec();
+        assert_eq!(wrap_requested_pcm("audio/pcm", wav.clone()), wav);
+        assert_eq!(&wrap_requested_pcm("", vec![0, 0])[0..4], b"RIFF");
+    }
+
+    #[test]
+    fn voice_locale_comes_from_the_voice_name() {
+        use super::voice_locale;
+        assert_eq!(voice_locale("en-US-JennyNeural"), "en-US");
+        assert_eq!(voice_locale("en-GB-Chirp3-HD-Kore"), "en-GB");
+        assert_eq!(voice_locale("cmn-CN-Wavenet-A"), "cmn-CN");
+        assert_eq!(voice_locale("Kore"), "en-US");
     }
 
     #[test]
@@ -1979,13 +3312,24 @@ mod tests {
     }
 
     #[test]
-    fn openrouter_tts_uses_its_fixed_endpoint() {
-        use super::{openai_tts_base_url, OPENROUTER_TTS_BASE_URL};
+    fn fixed_engines_ignore_a_stale_saved_url() {
+        use super::{api_root, provider, OPENROUTER_TTS_BASE_URL};
 
         let mut settings = crate::settings::get_default_settings();
-        settings.assistant_tts_engine = "openrouter".to_string();
         settings.assistant_tts_base_url = "https://wrong.example/v1".to_string();
-        assert_eq!(openai_tts_base_url(&settings), OPENROUTER_TTS_BASE_URL);
+        assert_eq!(
+            api_root(provider("openrouter").unwrap(), &settings).unwrap(),
+            OPENROUTER_TTS_BASE_URL
+        );
+        assert_eq!(
+            api_root(provider("openai").unwrap(), &settings).unwrap(),
+            "https://api.openai.com/v1"
+        );
+        // The custom engine is the one that takes it.
+        assert_eq!(
+            api_root(provider("custom").unwrap(), &settings).unwrap(),
+            "https://wrong.example/v1"
+        );
     }
 
     #[test]

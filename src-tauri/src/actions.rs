@@ -1177,6 +1177,13 @@ fn model_rejection_detail(
     if !matches!(status, 400 | 403 | 404) {
         return None;
     }
+    // A refusal of one *request parameter* names the model too ("'temperature'
+    // does not support 0 with this model") and used to match the phrases below,
+    // so Azure's GPT-6 deployments were reported as "the provider does not
+    // recognise that model id" — advice to re-pick a model that works fine.
+    if is_parameter_rejection(detail) {
+        return None;
+    }
     let haystack = detail.to_lowercase();
     /// Phrases that only ever appear when the *model* is the problem.
     const STANDALONE: [&str; 5] = [
@@ -1219,6 +1226,34 @@ fn model_rejection_detail(
         detail: detail.trim().to_string(),
         kind,
     })
+}
+
+/// Whether a 400 body is about one request parameter rather than the model.
+///
+/// OpenAI and Azure put the offending field in `error.param` and use the codes
+/// `unsupported_parameter` / `unsupported_value`; a `param` of `model` is the one
+/// case that really is about the model.
+fn is_parameter_rejection(detail: &str) -> bool {
+    if let Ok(json) = serde_json::from_str::<serde_json::Value>(detail) {
+        let error = json.get("error");
+        let param = error
+            .and_then(|e| e.get("param"))
+            .and_then(|p| p.as_str())
+            .map(str::trim)
+            .filter(|p| !p.is_empty());
+        if let Some(param) = param {
+            return !param.eq_ignore_ascii_case("model");
+        }
+        let code = error
+            .and_then(|e| e.get("code"))
+            .and_then(|c| c.as_str())
+            .unwrap_or_default();
+        if matches!(code, "unsupported_parameter" | "unsupported_value") {
+            return true;
+        }
+    }
+    let text = detail.to_lowercase();
+    text.contains("unsupported parameter") || text.contains("unsupported value")
 }
 
 /// Whether a failure is the structured-output probe (or another optional tuning
@@ -3386,6 +3421,31 @@ Try plugging it into a coding agent or productivity app listed on https://openro
 
         // A plain outage carries no model wording either.
         assert_eq!(refused(400, "Bad Request"), None);
+    }
+
+    /// Azure's GPT-6 deployments refuse `temperature: 0` and `max_tokens` with
+    /// messages that say "with this model". That is a parameter to adapt, not a
+    /// model to re-pick, and it must stay on the retry ladder.
+    #[test]
+    fn a_refused_request_parameter_is_not_read_as_a_bad_model() {
+        for detail in [
+            r#"{"error":{"message":"Unsupported value: 'temperature' does not support 0 with this model. Only the default (1) value is supported.","type":"invalid_request_error","param":"temperature","code":"unsupported_value"}}"#,
+            r#"{"error":{"message":"Unsupported parameter: 'max_tokens' is not supported with this model. Use 'max_completion_tokens' instead.","type":"invalid_request_error","param":"max_tokens","code":"unsupported_parameter"}}"#,
+            "Unsupported value: 'temperature' does not support 0 with this model.",
+        ] {
+            let error = http_error(400, detail);
+            assert!(
+                model_rejection_detail(&error).is_none(),
+                "{detail} names a parameter, not the model"
+            );
+            assert!(is_schema_compatibility_error(&error));
+        }
+        // `param: "model"` really is about the model.
+        let wrong_model = http_error(
+            400,
+            r#"{"error":{"message":"The model 'gpt-9' does not exist","param":"model","code":"model_not_found"}}"#,
+        );
+        assert!(model_rejection_detail(&wrong_model).is_some());
     }
 
     /// A refused model id costs exactly ONE request.

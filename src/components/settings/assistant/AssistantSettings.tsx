@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { toast } from "sonner";
 import {
+  ArrowUpRight,
   Check,
   Loader2,
   AudioLines,
@@ -55,6 +57,12 @@ import { RemindersSettings } from "./RemindersSettings";
 import { useSettings } from "../../../hooks/useSettings";
 import { useKokoroTts } from "../../../assistant/useKokoroTts";
 import { localTtsActive } from "../../../assistant/localTts";
+import {
+  TTS_ENGINES,
+  hostOf,
+  ttsEngineSpec,
+  ttsNeedsSetup,
+} from "@/lib/ttsEngines";
 import { FONT_SIZES } from "../../../assistant/appearance";
 import "../../../assistant/AssistantPanel.css";
 import { useLocalLlmEngineStatus } from "@/hooks/useLocalLlmEngineStatus";
@@ -360,6 +368,36 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
   const ttsVoice = settings?.assistant_tts_voice ?? "af_heart";
   const ttsDtype = settings?.assistant_tts_kokoro_dtype ?? "fp32";
   const ttsSpeed = settings?.assistant_tts_speed ?? 1;
+  const ttsSpec = ttsEngineSpec(ttsEngine);
+  const ttsEngineName = t(`voiceEngines.names.${ttsEngine}`, {
+    defaultValue: ttsEngine,
+  });
+  const ttsHasSpeed = ttsSpec?.speed != null;
+  // What speed does on this engine: its own range, or that it has none.
+  const ttsSpeedHelp = [
+    t("settings.assistant.tts.speedDescription"),
+    ttsSpec?.speed
+      ? t("settings.assistant.tts.speedRange", {
+          engine: ttsEngineName,
+          min: ttsSpec.speed[0],
+          max: ttsSpec.speed[1],
+        })
+      : t("settings.assistant.tts.speedUnsupported", {
+          engine: ttsEngineName,
+        }),
+  ].join(" ");
+  // The voice row's help: engines with a well-known id format say what it
+  // looks like; the rest point at Load voices.
+  const ttsVoiceHelp =
+    ttsEngine === "elevenlabs"
+      ? t("settings.assistant.tts.elevenVoiceDescription")
+      : ttsEngine === "azure"
+        ? t("settings.assistant.tts.azureVoiceDescription")
+        : ttsEngine === "deepgram"
+          ? t("settings.assistant.tts.deepgramVoiceDescription")
+          : ttsEngine === "openai" || ttsEngine === "custom"
+            ? t("settings.assistant.tts.remoteVoiceDescription")
+            : t("settings.assistant.tts.voiceLoadDescription");
 
   // TTS fields save on blur. Serialize those saves with actions such as Load
   // and Test so a click can never overtake the blur that contains a newly typed
@@ -380,31 +418,29 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
   /** Persist every visible remote-TTS draft before an action consumes it. */
   const persistRemoteTtsDraft = async () => {
     let changed = false;
-    if (
-      (ttsEngine === "openai" || ttsEngine === "azure") &&
-      ttsBaseUrl !== (settings?.assistant_tts_base_url ?? "")
-    ) {
+    const spec = ttsEngineSpec(ttsEngine);
+    const remote = !!spec && !spec.local;
+    if (spec?.url && ttsBaseUrl !== (settings?.assistant_tts_base_url ?? "")) {
       await runTtsCommand(commands.setAssistantTtsBaseUrl(ttsBaseUrl));
       changed = true;
     }
     if (
-      ttsEngine !== "kokoro" &&
+      remote &&
+      spec.key !== "none" &&
       ttsApiKey !== (settings?.assistant_tts_api_key ?? "")
     ) {
       await runTtsCommand(commands.setAssistantTtsApiKey(ttsApiKey));
       changed = true;
     }
     if (
-      (ttsEngine === "openai" ||
-        ttsEngine === "openrouter" ||
-        ttsEngine === "elevenlabs") &&
+      spec?.model &&
       ttsModel.trim() !== (settings?.assistant_tts_model ?? "").trim()
     ) {
       await runTtsCommand(commands.setAssistantTtsModel(ttsModel.trim()));
       changed = true;
     }
     if (
-      ttsEngine !== "kokoro" &&
+      remote &&
       ttsRemoteVoice.trim() !==
         (settings?.assistant_tts_remote_voice ?? "").trim()
     ) {
@@ -799,6 +835,15 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
     if (ttsModel.trim()) add(ttsModel);
     return opts;
   }, [ttsModelList, ttsModel]);
+
+  // The voice the backend falls back to when the field is left empty, which is
+  // exactly what a placeholder should show. Gemini TTS behind OpenRouter takes
+  // Google's named voices whatever the engine default is.
+  const ttsVoicePlaceholder =
+    ttsModel.toLowerCase().includes("gemini") &&
+    ttsModel.toLowerCase().includes("tts")
+      ? "Kore"
+      : ttsSpec?.voice.example || t("pickers.voiceSetup.voicePlaceholder");
 
   const showProviderSwitchError = () => {
     toast.error(
@@ -1340,23 +1385,14 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
                   label={t("settings.assistant.tts.engineLabel")}
                   minTile="9.5rem"
                   readyLabel={t("assistantPage.cards.keySaved")}
-                  options={(
-                    [
-                      "kokoro",
-                      "openai",
-                      "openrouter",
-                      "elevenlabs",
-                      "azure",
-                    ] as const
-                  ).map((engine) => ({
-                    value: engine,
-                    label: t(`voiceEngines.names.${engine}`),
-                    hint: t(`voiceEngines.${engine}`),
-                    title: t(`settings.assistant.tts.engines.${engine}`),
+                  options={TTS_ENGINES.map((engine) => ({
+                    value: engine.id,
+                    label: t(`voiceEngines.names.${engine.id}`),
+                    hint: t(`voiceEngines.${engine.id}`),
+                    title: t(`settings.assistant.tts.engines.${engine.id}`),
                     ready:
-                      engine === "kokoro" ||
-                      !!settings?.assistant_tts_api_keys?.[engine]?.trim(),
-                    icon: <ProviderTile id={engine} kind="tts" size="md" />,
+                      !!engine.local || !ttsNeedsSetup(settings, engine.id),
+                    icon: <ProviderTile id={engine.id} kind="tts" size="md" />,
                   }))}
                   value={settings?.assistant_tts_engine ?? "kokoro"}
                   onChange={(engine) => {
@@ -1449,13 +1485,20 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
                 </>
               )}
 
-              {(settings?.assistant_tts_engine === "openai" ||
-                settings?.assistant_tts_engine === "openrouter") && (
+              {ttsSpec && !ttsSpec.local && (
                 <>
-                  {settings?.assistant_tts_engine === "openai" && (
+                  {ttsSpec.url && (
                     <SettingContainer
-                      title={t("settings.assistant.tts.baseUrlLabel")}
-                      info={t("settings.assistant.tts.baseUrlDescription")}
+                      title={
+                        ttsEngine === "azure"
+                          ? t("settings.assistant.tts.azureBaseUrlLabel")
+                          : t("settings.assistant.tts.baseUrlLabel")
+                      }
+                      info={
+                        ttsEngine === "azure"
+                          ? t("settings.assistant.tts.azureBaseUrlDescription")
+                          : t("settings.assistant.tts.baseUrlDescription")
+                      }
                       layout="horizontal"
                       grouped={true}
                     >
@@ -1470,115 +1513,98 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
                             );
                           });
                         }}
-                        placeholder="https://my-resource.openai.azure.com/openai/v1/audio/speech?api-version=2025-03-01-preview"
+                        placeholder={ttsSpec.url.example}
+                        spellCheck={false}
                         className="w-[340px]"
                       />
                     </SettingContainer>
                   )}
                   <SettingContainer
-                    title={t("settings.assistant.tts.apiKeyLabel")}
-                    info={t("settings.assistant.tts.apiKeyDescription")}
+                    title={
+                      ttsSpec.key === "optional"
+                        ? t("pickers.setup.apiKeyOptional")
+                        : t("settings.assistant.tts.apiKeyLabel")
+                    }
+                    info={
+                      ttsSpec.key === "optional"
+                        ? t("settings.assistant.tts.apiKeyOptionalDescription")
+                        : t("settings.assistant.tts.apiKeyDescription", {
+                            provider: ttsEngineName,
+                          })
+                    }
                     layout="horizontal"
                     grouped={true}
                   >
-                    <Input
-                      type="password"
-                      value={ttsApiKey}
-                      onChange={(e) => setTtsApiKey(e.target.value)}
-                      onBlur={() => {
-                        void queueTtsTask(async () => {
-                          await setAndRefresh(
-                            commands.setAssistantTtsApiKey(ttsApiKey),
-                          );
-                        });
-                      }}
-                      className="w-[340px]"
-                    />
+                    <div className="flex w-[340px] flex-col items-end gap-1">
+                      <Input
+                        type="password"
+                        value={ttsApiKey}
+                        onChange={(e) => setTtsApiKey(e.target.value)}
+                        onBlur={() => {
+                          void queueTtsTask(async () => {
+                            await setAndRefresh(
+                              commands.setAssistantTtsApiKey(ttsApiKey),
+                            );
+                          });
+                        }}
+                        autoComplete="off"
+                        spellCheck={false}
+                        className="w-full"
+                      />
+                      {ttsSpec.keyUrl && !ttsApiKey.trim() && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            void openUrl(ttsSpec.keyUrl!).catch(() => {})
+                          }
+                          className="inline-flex cursor-pointer items-center gap-0.5 rounded text-xs font-medium text-muted transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+                        >
+                          {t("pickers.setup.getKey", {
+                            site: hostOf(ttsSpec.keyUrl),
+                          })}
+                          <ArrowUpRight className="h-3 w-3" aria-hidden />
+                        </button>
+                      )}
+                    </div>
                   </SettingContainer>
+                  {ttsSpec.model && (
+                    <SettingContainer
+                      title={t("settings.assistant.tts.modelLabel")}
+                      info={t("settings.assistant.tts.modelDescription")}
+                      layout="horizontal"
+                      grouped={true}
+                    >
+                      <LoadableSelect
+                        value={ttsModel}
+                        options={ttsModelOptions}
+                        onCommit={(v) => {
+                          setTtsModel(v);
+                          void queueTtsTask(async () => {
+                            await setAndRefresh(
+                              commands.setAssistantTtsModel(v),
+                            );
+                          });
+                        }}
+                        onLoad={handleLoadTtsModels}
+                        loading={ttsModelsLoading}
+                        error={ttsModelsError}
+                        placeholder={ttsSpec.model.example}
+                        loadLabel={t("settings.assistant.tts.loadModels")}
+                        formatCreateLabel={(input) =>
+                          t("settings.assistant.tts.modelsUse", {
+                            model: input,
+                          })
+                        }
+                      />
+                    </SettingContainer>
+                  )}
                   <SettingContainer
-                    title={t("settings.assistant.tts.modelLabel")}
-                    layout="horizontal"
-                    grouped={true}
-                  >
-                    <LoadableSelect
-                      value={ttsModel}
-                      options={ttsModelOptions}
-                      onCommit={(v) => {
-                        setTtsModel(v);
-                        void queueTtsTask(async () => {
-                          await setAndRefresh(commands.setAssistantTtsModel(v));
-                        });
-                      }}
-                      onLoad={handleLoadTtsModels}
-                      loading={ttsModelsLoading}
-                      error={ttsModelsError}
-                      placeholder="gpt-4o-mini-tts"
-                      loadLabel={t("settings.assistant.tts.loadModels")}
-                      formatCreateLabel={(input) =>
-                        t("settings.assistant.tts.modelsUse", { model: input })
-                      }
-                    />
-                  </SettingContainer>
-                  <SettingContainer
-                    title={t("settings.assistant.tts.remoteVoiceLabel")}
-                    info={t("settings.assistant.tts.remoteVoiceDescription")}
-                    layout="horizontal"
-                    grouped={true}
-                  >
-                    <LoadableSelect
-                      value={ttsRemoteVoice}
-                      options={ttsVoiceOptions}
-                      onCommit={(v) => {
-                        setTtsRemoteVoice(v);
-                        void queueTtsTask(async () => {
-                          await setAndRefresh(
-                            commands.setAssistantTtsRemoteVoice(v),
-                          );
-                        });
-                      }}
-                      onLoad={handleLoadTtsVoices}
-                      loading={ttsVoicesLoading}
-                      error={ttsVoicesError}
-                      placeholder={
-                        ttsModel.toLowerCase().includes("gemini") &&
-                        ttsModel.toLowerCase().includes("tts")
-                          ? "Puck"
-                          : "alloy"
-                      }
-                      loadLabel={t("settings.assistant.tts.loadVoices")}
-                      formatCreateLabel={(input) =>
-                        t("settings.assistant.tts.voicesUse", { voice: input })
-                      }
-                    />
-                  </SettingContainer>
-                </>
-              )}
-
-              {settings?.assistant_tts_engine === "elevenlabs" && (
-                <>
-                  <SettingContainer
-                    title={t("settings.assistant.tts.apiKeyLabel")}
-                    info={t("settings.assistant.tts.apiKeyDescription")}
-                    layout="horizontal"
-                    grouped={true}
-                  >
-                    <Input
-                      type="password"
-                      value={ttsApiKey}
-                      onChange={(e) => setTtsApiKey(e.target.value)}
-                      onBlur={() => {
-                        void queueTtsTask(async () => {
-                          await setAndRefresh(
-                            commands.setAssistantTtsApiKey(ttsApiKey),
-                          );
-                        });
-                      }}
-                      className="w-[340px]"
-                    />
-                  </SettingContainer>
-                  <SettingContainer
-                    title={t("settings.assistant.tts.elevenVoiceLabel")}
-                    info={t("settings.assistant.tts.elevenVoiceDescription")}
+                    title={
+                      ttsEngine === "elevenlabs"
+                        ? t("settings.assistant.tts.elevenVoiceLabel")
+                        : t("settings.assistant.tts.voiceLabel")
+                    }
+                    info={ttsVoiceHelp}
                     layout="horizontal"
                     grouped={true}
                   >
@@ -1596,106 +1622,7 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
                       onLoad={handleLoadTtsVoices}
                       loading={ttsVoicesLoading}
                       error={ttsVoicesError}
-                      placeholder="JBFqnCBsd6RMkjVDRZzb"
-                      loadLabel={t("settings.assistant.tts.loadVoices")}
-                      formatCreateLabel={(input) =>
-                        t("settings.assistant.tts.voicesUse", { voice: input })
-                      }
-                    />
-                  </SettingContainer>
-                  <SettingContainer
-                    title={t("settings.assistant.tts.modelLabel")}
-                    description={t("settings.assistant.tts.modelDescription")}
-                    descriptionMode="tooltip"
-                    layout="horizontal"
-                    grouped={true}
-                  >
-                    <LoadableSelect
-                      value={ttsModel}
-                      options={ttsModelOptions}
-                      onCommit={(v) => {
-                        setTtsModel(v);
-                        void queueTtsTask(async () => {
-                          await setAndRefresh(commands.setAssistantTtsModel(v));
-                        });
-                      }}
-                      onLoad={handleLoadTtsModels}
-                      loading={ttsModelsLoading}
-                      error={ttsModelsError}
-                      placeholder="eleven_flash_v2_5"
-                      loadLabel={t("settings.assistant.tts.loadModels")}
-                      formatCreateLabel={(input) =>
-                        t("settings.assistant.tts.modelsUse", { model: input })
-                      }
-                    />
-                  </SettingContainer>
-                </>
-              )}
-
-              {settings?.assistant_tts_engine === "azure" && (
-                <>
-                  <SettingContainer
-                    title={t("settings.assistant.tts.azureBaseUrlLabel")}
-                    info={t("settings.assistant.tts.azureBaseUrlDescription")}
-                    layout="horizontal"
-                    grouped={true}
-                  >
-                    <Input
-                      type="text"
-                      value={ttsBaseUrl}
-                      onChange={(e) => setTtsBaseUrl(e.target.value)}
-                      onBlur={() => {
-                        void queueTtsTask(async () => {
-                          await setAndRefresh(
-                            commands.setAssistantTtsBaseUrl(ttsBaseUrl),
-                          );
-                        });
-                      }}
-                      placeholder="https://eastus2.tts.speech.microsoft.com"
-                      className="w-[340px]"
-                    />
-                  </SettingContainer>
-                  <SettingContainer
-                    title={t("settings.assistant.tts.apiKeyLabel")}
-                    info={t("settings.assistant.tts.apiKeyDescription")}
-                    layout="horizontal"
-                    grouped={true}
-                  >
-                    <Input
-                      type="password"
-                      value={ttsApiKey}
-                      onChange={(e) => setTtsApiKey(e.target.value)}
-                      onBlur={() => {
-                        void queueTtsTask(async () => {
-                          await setAndRefresh(
-                            commands.setAssistantTtsApiKey(ttsApiKey),
-                          );
-                        });
-                      }}
-                      className="w-[340px]"
-                    />
-                  </SettingContainer>
-                  <SettingContainer
-                    title={t("settings.assistant.tts.azureVoiceLabel")}
-                    info={t("settings.assistant.tts.azureVoiceDescription")}
-                    layout="horizontal"
-                    grouped={true}
-                  >
-                    <LoadableSelect
-                      value={ttsRemoteVoice}
-                      options={ttsVoiceOptions}
-                      onCommit={(v) => {
-                        setTtsRemoteVoice(v);
-                        void queueTtsTask(async () => {
-                          await setAndRefresh(
-                            commands.setAssistantTtsRemoteVoice(v),
-                          );
-                        });
-                      }}
-                      onLoad={handleLoadTtsVoices}
-                      loading={ttsVoicesLoading}
-                      error={ttsVoicesError}
-                      placeholder="en-US-JennyNeural"
+                      placeholder={ttsVoicePlaceholder}
                       loadLabel={t("settings.assistant.tts.loadVoices")}
                       formatCreateLabel={(input) =>
                         t("settings.assistant.tts.voicesUse", { voice: input })
@@ -1707,7 +1634,7 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
 
               <SettingContainer
                 title={t("settings.assistant.tts.speedLabel")}
-                info={t("settings.assistant.tts.speedDescription")}
+                info={ttsSpeedHelp}
                 layout="horizontal"
                 grouped={true}
               >
@@ -1721,7 +1648,9 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
                         onClick={() => {
                           void queueTtsTask(() => commitTtsSpeed(preset));
                         }}
-                        disabled={!settings?.assistant_tts_enabled}
+                        disabled={
+                          !settings?.assistant_tts_enabled || !ttsHasSpeed
+                        }
                         className={`px-2.5 py-1 text-[13px] font-medium rounded-md transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
                           active
                             ? "bg-accent/12 text-accent"
@@ -1742,7 +1671,7 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
                     min="0.25"
                     max="4"
                     step="0.1"
-                    disabled={!settings?.assistant_tts_enabled}
+                    disabled={!settings?.assistant_tts_enabled || !ttsHasSpeed}
                     aria-label={t("settings.assistant.tts.speedCustomLabel")}
                     className="w-20"
                   />

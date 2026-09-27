@@ -641,6 +641,17 @@ impl MeetingStore {
         Ok(())
     }
 
+    /// Replace the text of generated notes the user edited — today, ticking a
+    /// next step off — leaving the template that wrote them on record.
+    pub fn update_notes_text(&self, meeting_id: i64, notes: &str) -> Result<()> {
+        let conn = self.open()?;
+        conn.execute(
+            "UPDATE meetings SET notes = ?2 WHERE id = ?1 AND notes IS NOT NULL",
+            params![meeting_id, notes],
+        )?;
+        Ok(())
+    }
+
     /// Delete a meeting and return the audio files that are now safe to unlink.
     ///
     /// The caller unlinks **after** this returns, not before: the row is the

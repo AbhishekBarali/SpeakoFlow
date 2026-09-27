@@ -25,7 +25,10 @@ import {
   type SegmentEvent,
 } from "./api";
 import { itemFromEvent, type TranscriptItem } from "./speakers";
-import { CallDetectionHeroSwitch } from "./CallDetectionToggle";
+import {
+  CallDetectionHeroSwitch,
+  IndicatorHeroSwitch,
+} from "./CallDetectionToggle";
 import { SystemAudioNotice } from "./SystemAudioNotice";
 import { MeetingDetail } from "./MeetingDetail";
 import { MeetingsList } from "./MeetingsList";
@@ -327,6 +330,7 @@ export const MeetingsSection: React.FC<{
                   : t("meetings.recorder.start")}
               </button>
               <CallDetectionHeroSwitch />
+              <IndicatorHeroSwitch />
             </div>
           }
         >

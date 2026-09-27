@@ -1,7 +1,9 @@
 import React from "react";
 import {
   AudioLines,
+  AudioWaveform,
   Cpu,
+  Earth,
   Fish,
   Mic,
   Plug,
@@ -28,12 +30,12 @@ import { OpenAILogo } from "./BrandLogos";
  *   (https://github.com/lobehub/lobe-icons), MIT License,
  *   Copyright (c) 2023 LobeHub:
  *   Groq, xAI (Grok), Cerebras, Together AI, Fireworks AI, Microsoft Azure,
- *   Microsoft (four-square mark), AWS, Z.ai, Tavily, Exa.
+ *   Microsoft (four-square mark), AWS, Z.ai, Tavily, Exa, Google Cloud.
  *
  * No open-source monochrome mark exists in either set (or svgl) for SerpApi,
- * Serper, or TinyFish. Those get distinct lucide glyphs (a search glass, a
- * search-with-code glass, a fish) rather than an invented logo, so three
- * search backends do not render as three identical tiles.
+ * Serper, TinyFish, Cartesia or Inworld. Those get distinct lucide glyphs (a
+ * search glass, a search-with-code glass, a fish, a waveform, a globe) rather
+ * than an invented logo, so no two of them render as identical tiles.
  */
 
 interface LogoProps {
@@ -256,6 +258,15 @@ export const ExaLogo: React.FC<LogoProps> = (p) => (
   </Mark>
 );
 
+export const GoogleCloudLogo: React.FC<LogoProps> = (p) => (
+  <Mark {...p} evenOdd>
+    <path
+      clipRule="evenodd"
+      d="M4.914 5.18c3.32-3.762 9.095-4.247 12.91-1.13l.362.312.252.232A9.4 9.4 0 0121.02 8.93 6.778 6.778 0 0124 14.597c-.028 3.744-3.087 6.726-6.83 6.697H6.739a6.746 6.746 0 01-3.869-1.222l-.224-.162-.302-.247a6.778 6.778 0 01.54-10.673l-.004.001a9.644 9.644 0 012.034-3.812zm10.345 2.11c-2.143-1.734-5.282-1.46-7.138.578l-.026.025a6.77 6.77 0 014.045 2.523l-3.023 3.023a2.606 2.606 0 10-2.379 3.682h10.43c1.44 0 2.607-1.137 2.607-2.576a2.607 2.607 0 00-2.606-2.607v-.52a5.205 5.205 0 00-1.685-3.933l-.225-.195z"
+    />
+  </Mark>
+);
+
 // ---------------------------------------------------------------------------
 
 export type ProviderKind = "llm" | "stt" | "tts" | "search";
@@ -305,6 +316,7 @@ const PROVIDER_TILES = {
     "bg-white text-ink ring-1 ring-inset ring-hairline-strong dark:ring-transparent",
   aws: `bg-[#222F3E] text-white ${SOLID}`,
   deepgram: `bg-[#101416] text-[#13EF93] ${SOLID}`,
+  googlecloud: `bg-[#4285F4] text-white ${SOLID}`,
   brave: `bg-[#FB542B] text-white ${SOLID}`,
   tavily: `bg-[#468BFF] text-white ${SOLID}`,
   exa: `bg-[#1F40ED] text-white ${SOLID}`,
@@ -361,6 +373,9 @@ const E = {
   apple: { glyph: logo(AppleLogo), tile: "mono" },
   elevenlabs: { glyph: logo(ElevenLabsLogo), tile: "mono" },
   deepgram: { glyph: logo(DeepgramLogo), tile: "deepgram" },
+  googlecloud: { glyph: logo(GoogleCloudLogo), tile: "googlecloud" },
+  cartesia: { glyph: lucide(AudioWaveform), tile: "mono" },
+  inworld: { glyph: lucide(Earth), tile: "mono" },
   brave: { glyph: logo(BraveLogo), tile: "brave" },
   tavily: { glyph: logo(TavilyLogo), tile: "tavily" },
   exa: { glyph: logo(ExaLogo), tile: "exa" },
@@ -404,6 +419,8 @@ const EXACT: Record<string, Entry> = {
   // TTS engines
   kokoro: E.kokoro,
   azure: E.azure,
+  cartesia: E.cartesia,
+  inworld: E.inworld,
   // Web search backends
   brave: E.brave,
   tavily: E.tavily,
@@ -416,7 +433,7 @@ const EXACT: Record<string, Entry> = {
 /** Per-kind overrides for ids shared across registries. */
 const BY_KIND: Partial<Record<ProviderKind, Record<string, Entry>>> = {
   stt: { custom: E.customMic },
-  tts: { azure: E.microsoft },
+  tts: { azure: E.microsoft, google: E.googlecloud },
 };
 
 /** Ordered: more specific brands first (`azure_openai` must not read as

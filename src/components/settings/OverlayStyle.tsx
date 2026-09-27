@@ -12,6 +12,31 @@ interface OverlayStyleProps {
 }
 
 /**
+ * The overlay style as the user sees it: "auto" (the default) resolved to Live
+ * when the active speech engine streams, otherwise Minimal. Shared with the
+ * settings that only mean something for one of the styles.
+ *
+ * Cloud transcription has no local model to ask; there the "Transcribe as I
+ * speak" switch is the closest thing the UI has to the backend's answer
+ * (`selected_model_supports_live`), which also checks the provider.
+ */
+export const useResolvedOverlayStyle = (): Exclude<
+  OverlayStyleValue,
+  "auto"
+> => {
+  const { getSetting } = useSettings();
+  const models = useModelStore((s) => s.models);
+  const currentModel = useModelStore((s) => s.currentModel);
+  const supportsLive =
+    getSetting("stt_engine_mode") === "cloud"
+      ? !!getSetting("cloud_stt_streaming")
+      : (models.find((m) => m.id === currentModel)?.supports_streaming ??
+        false);
+  const stored = (getSetting("overlay_style") ?? "auto") as OverlayStyleValue;
+  return stored === "auto" ? (supportsLive ? "live" : "minimal") : stored;
+};
+
+/**
  * Dictation-overlay style selector: None / Minimal / Live (Handy-style).
  * The stored value can also be "auto" (the default), which follows the model —
  * Live when the selected model supports live streaming, otherwise Minimal — so
@@ -21,12 +46,8 @@ interface OverlayStyleProps {
 export const OverlayStyle: React.FC<OverlayStyleProps> = React.memo(
   ({ descriptionMode = "tooltip", grouped = false }) => {
     const { t } = useTranslation();
-    const { getSetting, updateSetting, isUpdating } = useSettings();
-    const models = useModelStore((s) => s.models);
-    const currentModel = useModelStore((s) => s.currentModel);
-
-    const supportsLive =
-      models.find((m) => m.id === currentModel)?.supports_streaming ?? false;
+    const { updateSetting, isUpdating } = useSettings();
+    const selected = useResolvedOverlayStyle();
 
     const options = [
       {
@@ -42,10 +63,6 @@ export const OverlayStyle: React.FC<OverlayStyleProps> = React.memo(
         label: t("settings.advanced.overlayStyle.options.live"),
       },
     ];
-
-    const stored = (getSetting("overlay_style") ?? "auto") as OverlayStyleValue;
-    const selected =
-      stored === "auto" ? (supportsLive ? "live" : "minimal") : stored;
 
     return (
       <SettingContainer

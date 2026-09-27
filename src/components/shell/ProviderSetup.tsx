@@ -5,7 +5,6 @@ import { toast } from "sonner";
 import { ArrowUpRight, Loader2, RefreshCw } from "lucide-react";
 import {
   commands,
-  type AppSettings,
   type ModelChoice,
   type PostProcessProvider,
   type Result,
@@ -13,6 +12,12 @@ import {
 } from "@/bindings";
 import { useSettings } from "@/hooks/useSettings";
 import { prettyModelName } from "@/lib/utils/prettyModelName";
+import {
+  ttsEngineSpec,
+  ttsNeedsSetup,
+  ttsValues,
+  type TtsValues,
+} from "@/lib/ttsEngines";
 import { ProviderTile } from "@/components/icons/ProviderLogos";
 import { Dialog } from "@/components/ui/Dialog";
 import { Button } from "@/components/ui/Button";
@@ -67,12 +72,6 @@ const LLM_KEY_PAGES: Record<string, string> = {
   perplexity: "https://www.perplexity.ai/settings/api",
   moonshot: "https://platform.moonshot.ai",
   zai: "https://z.ai",
-};
-
-const TTS_KEY_PAGES: Record<string, string> = {
-  openai: LLM_KEY_PAGES.openai,
-  openrouter: LLM_KEY_PAGES.openrouter,
-  elevenlabs: "https://elevenlabs.io/app/settings/api-keys",
 };
 
 /** Placeholders only: example values, never saved on their own. */
@@ -542,101 +541,10 @@ export const LlmProviderSetup: React.FC<{
 
 /* ──────────────────────────────── voices ──────────────────────────────── */
 
-interface TtsValues {
-  url: string;
-  key: string;
-  model: string;
-  voice: string;
-}
-
-const OPENAI_TTS_URL = "https://api.openai.com/v1";
-
-/**
- * An engine's saved endpoint, key, model and voice. The engine in use keeps
- * its values in the flat fields (which older stores may hold alone); every
- * other engine keeps them in the per-engine maps.
- */
-export const ttsValues = (
-  settings: AppSettings | null | undefined,
-  engine: string,
-): TtsValues => {
-  const active = settings?.assistant_tts_engine === engine;
-  const pick = (
-    flat: string | undefined,
-    map: Partial<Record<string, string>> | undefined,
-  ) => ((active ? flat : map?.[engine]) ?? "").trim();
-  return {
-    url:
-      pick(
-        settings?.assistant_tts_base_url,
-        settings?.assistant_tts_base_urls,
-      ) || (engine === "openai" ? OPENAI_TTS_URL : ""),
-    key: pick(
-      settings?.assistant_tts_api_key,
-      settings?.assistant_tts_api_keys,
-    ),
-    model: pick(settings?.assistant_tts_model, settings?.assistant_tts_models),
-    voice: pick(
-      settings?.assistant_tts_remote_voice,
-      settings?.assistant_tts_remote_voices,
-    ),
-  };
-};
-
-/** A self-hosted speech server legitimately needs no key. */
-const isLoopback = (url: string) =>
-  /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:|\/|$)/i.test(url.trim());
-
-/** Whether an engine still needs something before it can speak. */
-export const ttsNeedsSetup = (
-  settings: AppSettings | null | undefined,
-  engine: string,
-): boolean => {
-  if (engine === "kokoro") return false;
-  const values = ttsValues(settings, engine);
-  switch (engine) {
-    case "openai":
-      return !values.key && !isLoopback(values.url);
-    case "elevenlabs":
-      // It cannot speak without a voice id; there is no default voice.
-      return !values.key || !values.voice;
-    case "azure":
-      return !values.key || !values.url;
-    default:
-      return !values.key;
-  }
-};
-
-/** Which fields each remote engine has. Examples are placeholders only. */
-const TTS_FIELDS: Record<
-  string,
-  {
-    url?: { required: boolean; example: string };
-    model?: { example: string };
-    voice: { required: boolean; example?: string };
-  }
-> = {
-  openai: {
-    url: { required: false, example: OPENAI_TTS_URL },
-    model: { example: "gpt-4o-mini-tts" },
-    voice: { required: false, example: "alloy" },
-  },
-  openrouter: {
-    model: { example: "gpt-4o-mini-tts" },
-    voice: { required: false, example: "alloy" },
-  },
-  elevenlabs: {
-    model: { example: "eleven_flash_v2_5" },
-    voice: { required: true },
-  },
-  azure: {
-    url: {
-      required: true,
-      example: "https://eastus2.tts.speech.microsoft.com",
-    },
-    voice: { required: false, example: "en-US-JennyNeural" },
-  },
-};
+// The voice engines' fields and setup rules live in one registry shared with
+// the Voice settings and the Models summary; re-exported here for the pickers
+// that already import them from this module.
+export { ttsNeedsSetup, ttsValues };
 
 const VoiceSetupForm: React.FC<{
   engine: string;
@@ -645,7 +553,7 @@ const VoiceSetupForm: React.FC<{
 }> = ({ engine, onSaved, onCancel }) => {
   const { t } = useTranslation();
   const { settings, refreshSettings } = useSettings();
-  const fields = TTS_FIELDS[engine] ?? TTS_FIELDS.openai;
+  const spec = ttsEngineSpec(engine) ?? ttsEngineSpec("custom")!;
   const initial = useRef(ttsValues(settings, engine));
   const saved = useRef<TtsValues>({ ...initial.current });
   // The voice and model lists come from the engine in use, so setting one up
@@ -685,9 +593,9 @@ const VoiceSetupForm: React.FC<{
       saved.current[field] = next;
       changed = true;
     };
-    if (fields.url) await put("url", commands.setAssistantTtsBaseUrl);
+    if (spec.url) await put("url", commands.setAssistantTtsBaseUrl);
     await put("key", commands.setAssistantTtsApiKey);
-    if (fields.model) await put("model", commands.setAssistantTtsModel);
+    if (spec.model) await put("model", commands.setAssistantTtsModel);
     await put("voice", commands.setAssistantTtsRemoteVoice);
     if (changed) await refreshSettings();
   };
@@ -724,18 +632,19 @@ const VoiceSetupForm: React.FC<{
     }
   };
 
-  // With a key already saved, the voices can be listed straight away.
+  // With what the listing needs already saved, the voices load straight away.
   useEffect(() => {
     const ready =
-      !!initial.current.key && (!fields.url?.required || !!initial.current.url);
+      (spec.key !== "required" || !!initial.current.key) &&
+      (!spec.url?.required || !!initial.current.url);
     if (ready) void loadVoices();
   }, []);
 
-  const keyOptional = engine === "openai" && isLoopback(url);
+  const keyOptional = spec.key !== "required";
   const canSave =
     (keyOptional || !!key.trim()) &&
-    (!fields.url?.required || !!url.trim()) &&
-    (!fields.voice.required || !!voice.trim());
+    (!spec.url?.required || !!url.trim()) &&
+    (!spec.voice.required || !!voice.trim());
 
   const voiceChoices: Choice[] = voices.map((item) => ({
     value: item.id,
@@ -766,11 +675,11 @@ const VoiceSetupForm: React.FC<{
     }
   };
 
-  const keyPage = TTS_KEY_PAGES[engine];
+  const keyPage = spec.keyUrl;
   const focus: "url" | "key" | "voice" =
-    fields.url?.required && !initial.current.url
+    spec.url?.required && !initial.current.url
       ? "url"
-      : !initial.current.key
+      : !initial.current.key && spec.key === "required"
         ? "key"
         : "voice";
 
@@ -782,13 +691,13 @@ const VoiceSetupForm: React.FC<{
         void save();
       }}
     >
-      {fields.url && (
+      {spec.url && (
         <Field id={urlId} label={t("pickers.setup.endpoint")}>
           <Input
             id={urlId}
             value={url}
             onChange={(event) => setUrl(event.target.value)}
-            placeholder={fields.url.example}
+            placeholder={spec.url.example}
             autoComplete="off"
             spellCheck={false}
             className="h-10 w-full"
@@ -830,7 +739,7 @@ const VoiceSetupForm: React.FC<{
         onChange={setVoice}
         choices={voiceChoices}
         placeholder={
-          fields.voice.example ?? t("pickers.voiceSetup.voicePlaceholder")
+          spec.voice.example || t("pickers.voiceSetup.voicePlaceholder")
         }
         loadLabel={t("pickers.voiceSetup.loadVoices")}
         loading={loadingVoices}
@@ -838,14 +747,14 @@ const VoiceSetupForm: React.FC<{
         error={voiceError}
         autoFocus={focus === "voice"}
       />
-      {fields.model && (
+      {spec.model && (
         <ChoiceField
           id={modelId}
           label={t("pickers.voiceSetup.model")}
           value={model}
           onChange={setModel}
           choices={modelChoices}
-          placeholder={fields.model.example}
+          placeholder={spec.model.example}
           loadLabel={t("pickers.setup.loadModels")}
           loading={loadingModels}
           onLoad={() => void loadModels()}
@@ -885,7 +794,7 @@ export const VoiceEngineSetup: React.FC<{
       }
       description={
         engine &&
-        (TTS_FIELDS[engine]?.url?.required
+        (ttsEngineSpec(engine)?.url?.required
           ? t("pickers.voiceSetup.bodyEndpoint")
           : t("pickers.voiceSetup.bodyKey"))
       }

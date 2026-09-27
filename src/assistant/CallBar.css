@@ -1,0 +1,1121 @@
+/* =========================================================================
+ * The live call: a floating bar with a status bubble above it, and the same
+ * bar under the conversation when expanded. See `CallBar.tsx`.
+ *
+ * Geometry is shared with Rust, so keep these in step with `assistant.rs`:
+ *   window at rest   CALL_BAR_FRAME_WIDTH x CALL_BAR_FRAME_HEIGHT (440 x 200)
+ *   bar slot         46px tall, 10px above the window's bottom edge
+ *   typing bar       300px wide
+ * The bar sits at the same bottom-centre point in both forms, which is what
+ * lets the window grow around it without the bar moving.
+ *
+ * At rest the bar is drawn small and grows when the pointer is over the call.
+ * It grows inside a slot of fixed height, centred, so the bubble above it does
+ * not jump up and down as the bar breathes.
+ * ========================================================================= */
+
+.call-frame {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  padding-bottom: 10px;
+  color: var(--as-ink);
+}
+
+/* The bubble and the bar, hovered as one: moving the pointer from the bar up
+   to the bubble must not shrink the bar or hide the bubble on the way. */
+.call-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+}
+
+/* ---------- The bar ---------- */
+
+.call-bar-slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  height: 46px;
+}
+
+.call-bar {
+  --call-icon: 30px;
+  --call-glyph: 16px;
+  --call-orb: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  flex-shrink: 0;
+  height: calc(var(--call-icon) + 8px);
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--as-chip-surface);
+  border: 1px solid var(--as-hairline-strong);
+  box-shadow: var(--as-inner);
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  cursor: grab;
+  user-select: none;
+  transition:
+    height 180ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    padding 180ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    border-color 180ms ease;
+  animation: call-rise 220ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+/* Hover, keyboard focus, or a popover open inside it: the full-size bar. The
+   custom properties themselves do not animate, so every size that depends on
+   them carries its own transition below. */
+.call-stack:hover .call-bar,
+.call-bar:focus-within,
+.call-bar.typing {
+  --call-icon: 34px;
+  --call-glyph: 18px;
+  --call-orb: 30px;
+  padding: 0 5px;
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.call-bar.typing {
+  width: 300px;
+  max-width: calc(100vw - 20px);
+  padding-left: 5px;
+}
+
+/* While the bar morphs between voice and typing (see `MORPH_MS` in
+   `CallBar.tsx`), every size inside it is settled at once, so the one motion
+   on screen is the bar's own. */
+.call-bar.morphing,
+.call-bar.morphing * {
+  transition: none !important;
+}
+
+@keyframes call-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.call-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: var(--call-icon, 30px);
+  height: var(--call-icon, 30px);
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--as-muted);
+  cursor: pointer;
+  transition:
+    width 180ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    height 180ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    background 140ms ease,
+    color 140ms ease,
+    transform 140ms ease;
+}
+
+.call-icon svg {
+  width: var(--call-glyph, 16px);
+  height: var(--call-glyph, 16px);
+  transition:
+    width 180ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    height 180ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.call-icon:hover:not(:disabled) {
+  background: var(--as-raise);
+  color: var(--as-ink);
+}
+
+.call-icon:active:not(:disabled) {
+  transform: scale(0.93);
+}
+
+.call-icon:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.call-icon[aria-pressed="true"],
+.call-icon[aria-expanded="true"] {
+  background: var(--as-raise-strong);
+  color: var(--as-ink);
+}
+
+/* A muted microphone is the one state that must be visible at a glance from
+   across the desk, so it is the one control with a colour. */
+.call-icon.danger[aria-pressed="true"] {
+  background: rgba(229, 72, 77, 0.18);
+  color: #ff9a9e;
+}
+
+.call-divider {
+  flex-shrink: 0;
+  width: 1px;
+  height: calc(var(--call-icon, 30px) * 0.55);
+  margin: 0 3px;
+  background: var(--as-hairline-strong);
+  transition: height 180ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+/* ---------- The orb: presence, and the hang-up ---------- */
+
+.call-orb {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: calc(var(--call-orb, 26px) + 6px);
+  height: calc(var(--call-orb, 26px) + 6px);
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  transition:
+    width 180ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    height 180ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.call-orb .voice-orb {
+  width: var(--call-orb, 26px);
+  height: var(--call-orb, 26px);
+  transition:
+    width 180ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    height 180ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.call-orb .voice-orb-flow {
+  filter: blur(4px);
+}
+
+.call-orb-end {
+  position: absolute;
+  inset: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(20, 18, 17, 0.45);
+  color: #fff;
+  opacity: 0;
+  transform: scale(0.85);
+  transition:
+    opacity 140ms ease,
+    transform 140ms ease;
+}
+
+.call-orb:hover .call-orb-end,
+.call-orb:focus-visible .call-orb-end {
+  opacity: 1;
+  transform: none;
+}
+
+/* ---------- Typing ---------- */
+
+.call-input {
+  flex: 1;
+  min-width: 0;
+  height: 34px;
+  padding: 0 6px;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--as-ink);
+  font: inherit;
+  font-size: 14px;
+  cursor: text;
+}
+
+.call-input::placeholder {
+  color: var(--as-faint);
+}
+
+.call-send {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  margin-left: 2px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--as-ink);
+  color: #1b1917;
+  cursor: pointer;
+  transition:
+    opacity 140ms ease,
+    transform 140ms ease;
+}
+
+.call-send:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.call-send:disabled {
+  background: var(--as-raise-strong);
+  color: var(--as-faint);
+  cursor: default;
+}
+
+.call-send.stop {
+  background: var(--as-raise-strong);
+  color: var(--as-ink);
+}
+
+/* ---------- The bubble above the bar ---------- */
+
+.call-bubble {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  max-width: min(400px, calc(100vw - 32px));
+  border-radius: 16px;
+  background: var(--as-chip-surface);
+  border: 1px solid var(--as-hairline);
+  box-shadow: var(--as-inner);
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  color: var(--as-muted);
+  font-size: 13px;
+  line-height: 1.5;
+  user-select: none;
+  transition: border-color 140ms ease;
+  animation: call-bubble-in 180ms ease-out;
+}
+
+@keyframes call-bubble-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.call-bubble:hover {
+  border-color: var(--as-hairline-strong);
+}
+
+/* A status or hint bubble is one button: clicking it opens the conversation. */
+.call-bubble-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px 14px;
+  border: 0;
+  border-radius: inherit;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.call-bubble-open:disabled {
+  cursor: default;
+}
+
+.call-bubble-open > span:not(.call-level) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.call-bubble.hint {
+  color: var(--as-faint);
+}
+
+/* The "this opens" mark: absent at rest, it slides in on hover so the bubble
+   explains itself without adding anything to a call nobody is looking at. */
+.call-bubble-go {
+  flex-shrink: 0;
+  width: 0;
+  opacity: 0;
+  margin-left: -8px;
+  color: var(--as-faint);
+  transition:
+    width 140ms ease,
+    opacity 140ms ease,
+    margin 140ms ease;
+}
+
+.call-bubble:hover .call-bubble-go,
+.call-bubble-open:focus-visible .call-bubble-go {
+  width: 12px;
+  opacity: 1;
+  margin-left: 0;
+}
+
+.call-bubble-dismiss {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--as-faint);
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity 140ms ease,
+    background 140ms ease;
+}
+
+.call-bubble:hover .call-bubble-dismiss,
+.call-bubble-dismiss:focus-visible,
+.call-bubble.error .call-bubble-dismiss {
+  opacity: 1;
+}
+
+.call-bubble-dismiss:hover {
+  background: var(--as-raise);
+  color: var(--as-ink);
+}
+
+/* Nothing to say at rest, so nothing is drawn — and `pointer-events: none`
+   keeps it out of the tangible area (`hitRegion.ts`), so the empty space
+   passes clicks through. Hovering the call brings it back as the way in. */
+.call-bubble.peek {
+  opacity: 0;
+  transform: translateY(4px);
+  pointer-events: none;
+  animation: none;
+  transition:
+    opacity 160ms ease,
+    transform 160ms ease;
+}
+
+.call-stack:hover .call-bubble.peek,
+.call-bubble.peek:focus-within {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+.call-stack.typing .call-bubble.peek {
+  display: none;
+}
+
+.call-bubble.peek .call-bubble-open {
+  color: var(--as-muted);
+}
+
+.call-bubble.peek .call-bubble-go {
+  width: 12px;
+  opacity: 1;
+  margin-left: 0;
+}
+
+.call-bubble.error {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 9px 34px 9px 14px;
+  color: var(--as-error);
+  background: color-mix(
+    in srgb,
+    var(--as-error-bg) 70%,
+    var(--as-chip-surface)
+  );
+  border-color: color-mix(in srgb, var(--as-error) 25%, transparent);
+  overflow-wrap: anywhere;
+}
+
+.call-bubble.error p {
+  margin: 0;
+}
+
+.call-bubble.error details {
+  color: var(--as-muted);
+  font-size: 11.5px;
+}
+
+.call-bubble.error details p {
+  margin-top: 4px;
+  max-height: 5.5em;
+  overflow-y: auto;
+}
+
+.call-bubble.error summary {
+  cursor: pointer;
+}
+
+.call-bubble.error .call-bubble-dismiss {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+}
+
+.call-bubble-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1px solid var(--as-hairline-strong);
+  border-radius: 8px;
+  background: var(--as-raise);
+  color: var(--as-ink);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.call-spin {
+  flex-shrink: 0;
+  animation: call-spin 0.9s linear infinite;
+}
+
+@keyframes call-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Three bars that follow the microphone while the user is speaking. */
+.call-level {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 2px;
+  height: 14px;
+}
+
+.call-level span {
+  width: 3px;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--as-ink);
+  transform: scaleY(calc(0.25 + var(--level, 0) * 0.75));
+  transition: transform 90ms ease-out;
+}
+
+.call-level span:nth-child(2) {
+  transform: scaleY(calc(0.35 + var(--level, 0) * 0.65));
+}
+
+/* ---------- Expanded: the conversation above the bar ---------- */
+
+/* Opening, beat 1: the bar and its bubble step back before the window grows
+   (see `useCallForm`). */
+.call-frame.leaving .call-stack {
+  animation: call-leave 120ms ease-in forwards;
+  pointer-events: none;
+}
+
+@keyframes call-leave {
+  to {
+    opacity: 0;
+    transform: translateY(3px) scale(0.97);
+  }
+}
+
+.call-frame.expanded {
+  padding: 0;
+  gap: 0;
+}
+
+/* The footprint the panel grows out of and folds back into: the call bar,
+   where it sits at the bottom of the panel. A typing bar is wider. */
+.call-panel {
+  --fold-w: 190px;
+  --fold-h: 58px;
+}
+
+.call-panel.typing {
+  --fold-w: 310px;
+}
+
+.call-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--as-panel-surface);
+  border: 1px solid var(--as-hairline);
+  border-radius: 18px;
+  box-shadow: var(--as-inner);
+  backdrop-filter: blur(22px) saturate(1.4);
+  -webkit-backdrop-filter: blur(22px) saturate(1.4);
+  font-size: 13.5px;
+  animation: call-panel-grow 300ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* Opening, beat 3: the panel grows up out of the bar, and its contents
+   arrive a moment behind the edge. */
+@keyframes call-panel-grow {
+  from {
+    clip-path: inset(
+      calc(100% - var(--fold-h)) calc(50% - var(--fold-w) / 2) 4px
+        calc(50% - var(--fold-w) / 2) round 24px
+    );
+  }
+  to {
+    clip-path: inset(0 round 18px);
+  }
+}
+
+.call-panel > .call-panel-head,
+.call-panel > .call-panel-body {
+  animation: call-panel-content-in 220ms 110ms ease-out backwards;
+}
+
+@keyframes call-panel-content-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+/* Closing: the contents leave first, then the panel folds down onto the bar,
+   which stays put the whole time — it is the one thing both forms share. */
+.call-panel.closing {
+  animation: call-panel-fold 220ms cubic-bezier(0.4, 0, 0.7, 0.2) forwards;
+  pointer-events: none;
+}
+
+.call-panel.closing > .call-panel-head,
+.call-panel.closing > .call-panel-body {
+  animation: call-panel-content-out 110ms ease-in forwards;
+}
+
+@keyframes call-panel-fold {
+  from {
+    clip-path: inset(0 round 18px);
+  }
+  to {
+    clip-path: inset(
+      calc(100% - var(--fold-h)) calc(50% - var(--fold-w) / 2) 4px
+        calc(50% - var(--fold-w) / 2) round 24px
+    );
+  }
+}
+
+@keyframes call-panel-content-out {
+  to {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+.call-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+  padding: 8px 8px 6px 10px;
+  cursor: grab;
+  user-select: none;
+}
+
+/* The header's controls are a fixed size; only the call bar breathes. */
+.call-panel-head .call-icon {
+  --call-icon: 30px;
+  --call-glyph: 16px;
+}
+
+.call-panel-profile {
+  display: flex;
+  min-width: 0;
+  flex-shrink: 1;
+}
+
+.call-panel-head .assistant-character-switch {
+  max-width: 170px;
+}
+
+/* The picker sits at the left edge here, so its menu opens rightward rather
+   than centred on the trigger. */
+.call-panel-head .assistant-character-menu {
+  left: 0;
+  transform: none;
+}
+
+.call-panel-status {
+  flex-shrink: 1;
+  min-width: 0;
+  margin-left: 6px;
+  overflow: hidden;
+  color: var(--as-faint);
+  font-size: 11.5px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.call-panel-status.hearing,
+.call-panel-status.speaking {
+  color: var(--as-body);
+}
+
+.call-panel-status.muted {
+  color: #ff9a9e;
+}
+
+.call-panel-drag {
+  flex: 1;
+  align-self: stretch;
+  min-width: 8px;
+}
+
+.call-panel-body {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.call-panel-transcript {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.call-panel-transcript[hidden] {
+  display: none;
+}
+
+.call-panel-foot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  max-width: none;
+  /* The panel's 1px border plus this is the 10px the bar sits above the
+     window's bottom edge in both forms. */
+  padding: 4px 12px 9px;
+}
+
+.call-panel-foot .call-bubble {
+  max-width: 100%;
+}
+
+.call-panel .call-bar {
+  animation: none;
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* ---------- Past conversations ---------- */
+
+.call-history {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px 10px 12px;
+}
+
+.call-history-head {
+  padding: 6px 6px 10px;
+}
+
+.call-history-head h2 {
+  margin: 0;
+  color: var(--as-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.call-history-head p {
+  margin: 4px 0 0;
+  color: var(--as-faint);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+.call-history-note {
+  margin: 12px 6px;
+  color: var(--as-muted);
+  font-size: 12.5px;
+}
+
+.call-history-note.error {
+  color: var(--as-error);
+}
+
+.call-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.call-history-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 9px 34px 9px 10px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--as-body);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 140ms ease;
+}
+
+.call-history-item:hover:not(:disabled) {
+  background: var(--as-raise);
+}
+
+.call-history-item.current {
+  background: var(--as-raise);
+}
+
+.call-history-item:disabled {
+  cursor: default;
+}
+
+.call-history-title {
+  overflow: hidden;
+  color: var(--as-ink);
+  font-size: 13px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.call-history-meta {
+  color: var(--as-faint);
+  font-size: 11.5px;
+}
+
+.call-history-spin {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  margin-top: -7px;
+  color: var(--as-muted);
+}
+
+.call-history-more {
+  display: block;
+  margin: 10px auto 0;
+  padding: 6px 12px;
+  border: 1px solid var(--as-hairline-strong);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--as-muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.call-history-more:hover {
+  color: var(--as-ink);
+  background: var(--as-raise);
+}
+
+/* ---------- Options ---------- */
+
+.call-options {
+  position: relative;
+  display: flex;
+}
+
+.call-options-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: -4px;
+  z-index: 60;
+  width: 256px;
+  max-height: min(420px, 70vh);
+  overflow-y: auto;
+  padding: 14px;
+  background: #1c1a18;
+  border: 1px solid var(--as-hairline-strong);
+  border-radius: 12px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4);
+  cursor: default;
+}
+
+.call-options-popover label {
+  display: block;
+  color: var(--as-ink);
+  font-size: 12px;
+  font-weight: 550;
+}
+
+.call-options-popover label + p {
+  margin: 4px 0 8px;
+  color: var(--as-muted);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.call-options-popover select {
+  width: 100%;
+  margin-bottom: 14px;
+  padding: 7px 9px;
+  border: 1px solid var(--as-hairline-strong);
+  border-radius: 7px;
+  background: #151311;
+  color: var(--as-ink);
+  font: inherit;
+  font-size: 12px;
+  color-scheme: dark;
+}
+
+.call-options-popover select:last-child {
+  margin-bottom: 0;
+}
+
+/* ---------- Profile picker, call flavour ---------- */
+
+.voice-profile .assistant-character-switch {
+  padding: 5px 9px 5px 6px;
+  border: 1px solid var(--as-hairline);
+  border-radius: 20px;
+  font-weight: 450;
+  font-size: 12.5px;
+  gap: 7px;
+}
+
+.assistant-character-avatar {
+  width: 20px;
+  height: 20px;
+  font-size: 10px;
+}
+
+.voice-profile .assistant-character-menu {
+  width: 232px;
+  max-width: calc(100vw - 24px);
+  max-height: min(300px, 65vh);
+  padding: 6px;
+  border-radius: 12px;
+}
+
+.assistant-profile-heading {
+  padding: 8px 10px 10px;
+  color: var(--as-ink);
+  font-size: 12px;
+}
+
+.assistant-profile-heading p {
+  margin: 5px 0 0;
+  color: var(--as-muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.assistant-profile-error {
+  padding: 0 10px;
+  color: var(--as-error);
+  font-size: 12px;
+}
+
+.voice-profile .assistant-character-item {
+  padding: 10px;
+  min-height: 42px;
+}
+
+.assistant-character-item:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* ---------- Focus ---------- */
+
+.call-frame button:focus-visible,
+.call-frame select:focus-visible,
+.assistant-character button:focus-visible {
+  outline: 2px solid var(--as-ink);
+  outline-offset: 2px;
+}
+
+/* =========================================================================
+ * The orb itself: a softly lit glass sphere. The flowing light represents an
+ * active call; movement quickens while the assistant speaks and follows the
+ * microphone while the user does.
+ * ========================================================================= */
+
+.voice-orb {
+  --orb-size: 156px;
+  --orb-speed: 14s;
+  width: var(--orb-size);
+  height: var(--orb-size);
+  flex-shrink: 0;
+  position: relative;
+  isolation: isolate;
+}
+
+.voice-orb-body {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  overflow: hidden;
+  background: radial-gradient(
+    circle at 34% 23%,
+    #eef9ff 0%,
+    #c7e5e9 20%,
+    #9eb9cd 42%,
+    #7774a1 65%,
+    #3d425d 85%,
+    #303b4e 100%
+  );
+  box-shadow:
+    inset 0 0 2px 1px #e1f2ff66,
+    inset -8px -12px 24px #27324b55;
+  transform: scale(calc(1 + var(--voice-energy, 0) * 0.12));
+  transition:
+    transform 120ms ease-out,
+    filter 400ms,
+    opacity 400ms;
+}
+
+.voice-orb-flow {
+  position: absolute;
+  inset: -25%;
+  border-radius: 43%;
+  background: conic-gradient(
+    from 40deg,
+    transparent 8%,
+    #def7edbb 24%,
+    #6777a855 38%,
+    transparent 47%,
+    #c9bdecbf 64%,
+    #b7e7eabf 80%,
+    transparent 94%
+  );
+  filter: blur(13px);
+  animation: voice-orbit var(--orb-speed) linear infinite;
+}
+
+.voice-orb-light {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background:
+    radial-gradient(ellipse at 30% 19%, #faffffb3, transparent 43%),
+    radial-gradient(ellipse at 74% 87%, #e5d3ff77, transparent 37%);
+  box-shadow:
+    inset 1px 1px 5px #f4ffff77,
+    inset -2px -4px 8px #1e284866;
+}
+
+.voice-orb.speaking {
+  --orb-speed: 4s;
+}
+
+.voice-orb.speaking .voice-orb-body {
+  animation: voice-speak 1.4s ease-in-out infinite;
+}
+
+.voice-orb.hearing {
+  --orb-speed: 7s;
+}
+
+.voice-orb.hearing .voice-orb-body {
+  filter: saturate(1.15);
+}
+
+.voice-orb.responding,
+.voice-orb.transcribing {
+  --orb-speed: 5s;
+}
+
+.voice-orb.starting .voice-orb-body {
+  opacity: 0.6;
+  animation: voice-breathe 2s ease-in-out infinite;
+}
+
+.voice-orb.muted .voice-orb-body,
+.voice-orb.error .voice-orb-body,
+.voice-orb.off .voice-orb-body {
+  filter: grayscale(0.95);
+  opacity: 0.5;
+}
+
+.voice-orb.muted .voice-orb-flow,
+.voice-orb.error .voice-orb-flow,
+.voice-orb.off .voice-orb-flow {
+  animation-play-state: paused;
+}
+
+@keyframes voice-orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes voice-speak {
+  0%,
+  100% {
+    transform: scale(0.94);
+  }
+  48% {
+    transform: scale(1.05);
+  }
+}
+
+@keyframes voice-breathe {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .voice-orb *,
+  .voice-orb.speaking .voice-orb-body,
+  .voice-orb.starting .voice-orb-body,
+  .call-bar,
+  .call-bubble,
+  .call-panel,
+  .call-panel > .call-panel-head,
+  .call-panel > .call-panel-body,
+  .call-frame.leaving .call-stack,
+  .call-spin {
+    animation: none;
+  }
+  .call-icon,
+  .call-icon svg,
+  .call-bar,
+  .call-orb,
+  .call-orb .voice-orb,
+  .call-divider,
+  .call-orb-end,
+  .call-send,
+  .call-bubble,
+  .call-bubble-go,
+  .call-level span {
+    transition: none;
+  }
+}

@@ -37,15 +37,35 @@ use super::session::label_segments;
 use super::store::MeetingStore;
 use super::MeetingSegment;
 
-/// Characters of transcript that go to the model in one question.
+/// Characters of transcript that go to a **cloud** model in one question.
 ///
-/// Larger than [`super::summarize::WINDOW_CHAR_BUDGET`] because that budget has to
-/// leave room for a template, the user's notes and a document-length answer, while
-/// this leaves room for a short answer and a few turns of chat history. Still a
-/// character count rather than a token count, for the reason `summarize` documents:
-/// the tokenizer is a property of the model, and this code does not know which
-/// model it is talking to.
-pub const CONTEXT_CHAR_BUDGET: usize = 24_000;
+/// Sized to be comfortably inside any listed cloud model's context. The whole
+/// transcript under this is sent verbatim — which reads like the inefficient
+/// option and is not: the transcript sits at the front of the system message, so
+/// on providers with prompt caching (OpenAI, Azure, Anthropic, Gemini) every
+/// follow-up question reuses the cached prefix, and an answer drawn from the
+/// whole meeting beats one drawn from keyword hits. Past this, retrieval takes
+/// over. See [`context_budget`] for the built-in engine.
+pub const CONTEXT_CHAR_BUDGET: usize = 48_000;
+
+/// Transcript characters for one question, by where the model runs.
+///
+/// The built-in engine's context is the user's `local_llm_context_size`, and the
+/// answer, chat history and rules all have to fit beside the transcript — the old
+/// single 24,000-character budget overflowed the default 8k window on its own.
+pub fn context_budget(provider_id: &str, local_context_tokens: u32) -> usize {
+    if provider_id != crate::settings::BUILTIN_POST_PROCESS_PROVIDER_ID {
+        return CONTEXT_CHAR_BUDGET;
+    }
+    /// Answer + rules + a few turns of history.
+    const RESERVED_TOKENS: usize = 2_500;
+    /// Pessimistic for code-switched Devanagari; see `summarize::NotesBudget`.
+    const CHARS_PER_TOKEN: usize = 2;
+    (local_context_tokens as usize)
+        .saturating_sub(RESERVED_TOKENS)
+        .max(1_000)
+        * CHARS_PER_TOKEN
+}
 
 /// Segments fetched per FTS query before context expansion.
 ///
@@ -205,6 +225,7 @@ pub fn context_for_question(
     store: &MeetingStore,
     meeting_id: i64,
     question: &str,
+    budget: usize,
 ) -> Result<RetrievedContext> {
     let speakers = store.speakers(meeting_id)?;
     let all = store.all_segments(meeting_id)?;
@@ -215,7 +236,7 @@ pub fn context_for_question(
 
     // The whole thing fits, so there is nothing retrieval could add and one less
     // thing that can go wrong.
-    if full_size <= CONTEXT_CHAR_BUDGET {
+    if full_size <= budget {
         return Ok(RetrievedContext {
             lines: full_lines,
             complete: true,
@@ -240,7 +261,7 @@ pub fn context_for_question(
 
     if retrieved.is_empty() {
         return Ok(RetrievedContext {
-            lines: clip_to_budget(full_lines, CONTEXT_CHAR_BUDGET),
+            lines: clip_to_budget(full_lines, budget),
             complete: false,
             total_segments,
         });
@@ -248,7 +269,7 @@ pub fn context_for_question(
 
     let lines = super::summarize::transcript_lines(&label_segments(&retrieved, &speakers));
     Ok(RetrievedContext {
-        lines: clip_to_budget(lines, CONTEXT_CHAR_BUDGET),
+        lines: clip_to_budget(lines, budget),
         complete: false,
         total_segments,
     })
@@ -359,6 +380,19 @@ mod tests {
     }
 
     /* ───────────────────────────── hit ids ───────────────────────────── */
+
+    /// The built-in engine's default 8k context cannot hold the cloud budget plus
+    /// an answer; a cloud model can hold far more than the old 24,000.
+    #[test]
+    fn the_context_budget_depends_on_where_the_model_runs() {
+        assert_eq!(context_budget("azure_openai", 8_192), CONTEXT_CHAR_BUDGET);
+        let local = context_budget("builtin", 8_192);
+        assert!(
+            local < 8_192 * 2,
+            "{local} chars would overflow an 8k context"
+        );
+        assert!(local > 4_000, "{local} chars is too little to be useful");
+    }
 
     #[test]
     fn hit_ids_preserve_order() {

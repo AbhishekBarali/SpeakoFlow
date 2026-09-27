@@ -112,13 +112,25 @@ export const LogoSelect: React.FC<LogoSelectProps> = ({
       Math.max(8, rect.left),
       window.innerWidth - width - 8,
     );
-    setPosition({
+    const next: MenuPosition = {
       top: placement === "below" ? rect.bottom + MENU_GAP : rect.top - MENU_GAP,
       left,
       width,
       maxHeight,
       placement,
-    });
+    };
+    // Same object when nothing moved: see `Dropdown` for why a no-op
+    // reposition must not look like a change.
+    setPosition((current) =>
+      current &&
+      current.top === next.top &&
+      current.left === next.left &&
+      current.width === next.width &&
+      current.maxHeight === next.maxHeight &&
+      current.placement === next.placement
+        ? current
+        : next,
+    );
   }, []);
 
   useLayoutEffect(() => {
@@ -129,6 +141,17 @@ export const LogoSelect: React.FC<LogoSelectProps> = ({
   useEffect(() => {
     if (!open) return;
     const reposition = () => place();
+    // Scrolling the option list itself is not a reason to reposition (and
+    // used to re-run the focus-on-open effect, which scrolled the list back to
+    // the selected option).
+    const onScroll = (event: Event) => {
+      if (
+        event.target instanceof Node &&
+        menuRef.current?.contains(event.target)
+      )
+        return;
+      place();
+    };
     const onPointerDown = (event: MouseEvent) => {
       const target = event.target as Node;
       if (
@@ -148,20 +171,28 @@ export const LogoSelect: React.FC<LogoSelectProps> = ({
       }
     };
     window.addEventListener("resize", reposition);
-    window.addEventListener("scroll", reposition, true);
+    window.addEventListener("scroll", onScroll, true);
     document.addEventListener("mousedown", onPointerDown);
     window.addEventListener("keydown", onKeyDown);
     return () => {
       window.removeEventListener("resize", reposition);
-      window.removeEventListener("scroll", reposition, true);
+      window.removeEventListener("scroll", onScroll, true);
       document.removeEventListener("mousedown", onPointerDown);
       window.removeEventListener("keydown", onKeyDown);
     };
   }, [open, place]);
 
-  // Focus the filter (or the selected option) when the menu opens.
+  // Focus the filter (or the selected option) when the menu opens — once per
+  // opening. Focusing an option scrolls it into view, so repeating this on a
+  // later position change would drag the list back to the selection.
+  const focusedOnOpen = useRef(false);
   useEffect(() => {
-    if (!open || !position) return;
+    if (!open) {
+      focusedOnOpen.current = false;
+      return;
+    }
+    if (!position || focusedOnOpen.current) return;
+    focusedOnOpen.current = true;
     if (showSearch) {
       searchRef.current?.focus();
       return;

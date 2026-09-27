@@ -30,6 +30,7 @@ import {
   VoiceEngineSetup,
   ttsNeedsSetup,
 } from "./ProviderSetup";
+import { TTS_ENGINE_IDS } from "@/lib/ttsEngines";
 
 /**
  * "Which model does this job" as one control, usable on any page.
@@ -366,8 +367,6 @@ export const SttModelPicker: React.FC<{ className?: string }> = ({
 
 /* ──────────────────────────────── voice ──────────────────────────────── */
 
-const TTS_ENGINES = ["kokoro", "openai", "openrouter", "elevenlabs", "azure"];
-
 /**
  * Which voice engine reads replies aloud. An engine that still needs a key or
  * a voice is marked, and choosing it opens its setup in place; cancelling
@@ -387,7 +386,7 @@ export const VoicePicker: React.FC<{ className?: string }> = ({
   } | null>(null);
   const current = settings?.assistant_tts_engine ?? "kokoro";
 
-  const options = TTS_ENGINES.map<LogoSelectOption>((engine) => ({
+  const options = TTS_ENGINE_IDS.map<LogoSelectOption>((engine) => ({
     value: engine,
     label: t(`settings.assistant.tts.engines.${engine}`),
     hint:

@@ -23,7 +23,8 @@ const ModelRow: React.FC<{
   const { openModelSlot } = useNavigation();
   const summary = useModelSlots()[slot];
   const statusText = useSlotStatusText();
-  // Notes use the cleanup model whether or not cleanup itself is switched on.
+  // Notes and questions use the assistant's model whether or not the assistant
+  // panel itself is switched on.
   const shown = { ...summary, active: true };
   const value =
     shown.ready && shown.modelLabel ? shown.modelLabel : statusText(shown);
@@ -65,7 +66,7 @@ export const MeetingsPage: React.FC = () => {
           <div className="-ms-2 flex max-w-full items-center gap-1.5">
             <div className="grid min-w-0 grid-cols-[auto_minmax(0,auto)] gap-x-4 gap-y-0.5">
               <ModelRow slot="stt" label={t("meetingsPage.transcribedBy")} />
-              <ModelRow slot="cleanup" label={t("meetingsPage.notesBy")} />
+              <ModelRow slot="assistant" label={t("meetingsPage.notesBy")} />
             </div>
             <InfoTip tone="onHero" text={t("meetingsPage.modelsTip")} />
           </div>

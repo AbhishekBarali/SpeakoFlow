@@ -266,6 +266,10 @@ export const generateMeetingNotes = (
 ): Promise<GeneratedNotes> =>
   invoke<GeneratedNotes>("generate_meeting_notes", { meetingId, template });
 
+/** Whether notes are being written right now, for a page opened mid-job. */
+export const isMeetingNotesRunning = (meetingId: number): Promise<boolean> =>
+  invoke<boolean>("is_meeting_notes_running", { meetingId });
+
 export const deleteMeeting = (meetingId: number): Promise<null> =>
   invoke<null>("delete_meeting", { meetingId });
 
@@ -307,6 +311,22 @@ export const getCallDetectionStatus = (): Promise<CallDetectionStatus> =>
 
 export const setMeetingAutoDetect = (enabled: boolean): Promise<null> =>
   invoke<null>("set_meeting_auto_detect", { enabled });
+
+/** Whether the floating indicator shows while a meeting records. */
+export const getMeetingIndicator = (): Promise<boolean> =>
+  invoke<boolean>("get_meeting_indicator");
+
+/** Show or hide the floating indicator — including for a meeting already
+ *  recording. */
+export const setMeetingIndicator = (enabled: boolean): Promise<null> =>
+  invoke<null>("set_meeting_indicator", { enabled });
+
+/** Save an edit to the generated notes (a ticked next step). Rejects while a
+ *  notes job is rewriting the same meeting. */
+export const setMeetingNotes = (
+  meetingId: number,
+  notes: string,
+): Promise<null> => invoke<null>("set_meeting_notes", { meetingId, notes });
 
 /* ───────────────────────────── diarization ───────────────────────────── */
 

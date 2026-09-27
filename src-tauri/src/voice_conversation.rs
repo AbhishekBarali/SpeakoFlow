@@ -55,6 +55,10 @@ struct Session {
     /// dropped.
     carried: Vec<String>,
     carried_at: Option<std::time::Instant>,
+    /// Whether this call reads its replies aloud. The call bar's speaker switch;
+    /// off turns the call into voice-in, text-out without touching the
+    /// microphone. Seeded from `assistant_tts_enabled` when the call starts.
+    speaker_on: bool,
 }
 
 #[derive(Default)]
@@ -91,6 +95,46 @@ impl VoiceConversation {
         self.session
             .lock()
             .map(|s| s.ticket == Some(ticket))
+            .unwrap_or(false)
+    }
+
+    /// Open a new turn in `session`, which makes everything still in flight for
+    /// the previous one stale: its transcript is carried, its reply and its
+    /// audio are dropped. Speech onset, a typed message, New chat and opening a
+    /// saved conversation all start here.
+    fn advance_turn(&self, session: u32) -> Result<VoiceTicket, String> {
+        let mut s = self
+            .session
+            .lock()
+            .map_err(|_| "Voice session lock unavailable")?;
+        let ticket = s
+            .ticket
+            .as_mut()
+            .filter(|t| t.session == session)
+            .ok_or("Voice session ended")?;
+        ticket.turn = ticket.turn.wrapping_add(1);
+        Ok(*ticket)
+    }
+
+    /// Whether the live call speaks its replies. `false` when no call is live.
+    pub fn speaker_on(&self) -> bool {
+        self.session
+            .lock()
+            .map(|s| s.ticket.is_some() && s.speaker_on)
+            .unwrap_or(false)
+    }
+
+    /// Flip the speaker switch for `session`. Returns whether it applied.
+    fn set_speaker(&self, session: u32, on: bool) -> bool {
+        self.session
+            .lock()
+            .map(|mut s| {
+                if s.ticket.is_none_or(|t| t.session != session) {
+                    return false;
+                }
+                s.speaker_on = on;
+                true
+            })
             .unwrap_or(false)
     }
 
@@ -180,6 +224,13 @@ pub fn is_current(app: &AppHandle, ticket: VoiceTicket) -> bool {
 pub fn is_active(app: &AppHandle) -> bool {
     app.try_state::<VoiceConversation>()
         .is_some_and(|voice| voice.is_active())
+}
+
+/// Whether the live call reads its replies aloud (the call bar's speaker
+/// switch). `false` when there is no call.
+pub fn speaker_on(app: &AppHandle) -> bool {
+    app.try_state::<VoiceConversation>()
+        .is_some_and(|voice| voice.speaker_on())
 }
 
 /// End on an explicit stop or destruction, independently of panel visibility.
@@ -311,6 +362,7 @@ pub async fn assistant_conversation_start(app: AppHandle) -> Result<VoiceTicket,
         s.ticket = Some(ticket);
         s.carried.clear();
         s.carried_at = None;
+        s.speaker_on = settings.assistant_tts_enabled;
         ticket
     };
     // A call is its own conversation, so it starts from nothing.
@@ -372,19 +424,7 @@ pub async fn assistant_conversation_interrupt(
     interrupted_reply: bool,
 ) -> Result<VoiceTicket, String> {
     let voice = app.state::<VoiceConversation>();
-    let ticket = {
-        let mut s = voice
-            .session
-            .lock()
-            .map_err(|_| "Voice session lock unavailable")?;
-        let ticket = s
-            .ticket
-            .as_mut()
-            .filter(|t| t.session == session)
-            .ok_or("Voice session ended")?;
-        ticket.turn = ticket.turn.wrapping_add(1);
-        *ticket
-    };
+    let ticket = voice.advance_turn(session)?;
     app.state::<AssistantConversation>().request_cancel();
     crate::tts::stop_all(&app);
     // Generation can finish before playback. Keep that full answer readable,
@@ -455,21 +495,183 @@ pub async fn assistant_conversation_audio(
         voice.carry(&text);
         return Ok(());
     }
-    // Let a cancelled tool/model future release the shared turn guard. The
-    // ticket is rechecked on every wake; stale audio never becomes a new turn.
-    let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(5);
-    while app.state::<AssistantConversation>().is_busy() {
-        if !voice.is_current(ticket) {
+    match wait_for_turn_slot(&app, &voice, ticket).await {
+        TurnSlot::Ready => {}
+        TurnSlot::Superseded => {
             voice.carry(&text);
             return Ok(());
         }
-        if tokio::time::Instant::now() >= deadline {
+        TurnSlot::TimedOut => {
             voice.carry(&text);
-            return Err("The previous reply is still stopping. Please try again.".into());
+            return Err(STILL_STOPPING.into());
+        }
+    }
+    assistant::run_conversation_turn(app.clone(), voice.with_carried(&text), ticket).await;
+    Ok(())
+}
+
+const STILL_STOPPING: &str = "The previous reply is still stopping. Please try again.";
+
+/// How long a new turn waits for a cancelled one to let go of the shared busy
+/// guard. A cancelled model or tool future normally unwinds in milliseconds.
+const TURN_SLOT_WAIT: std::time::Duration = std::time::Duration::from_secs(5);
+
+enum TurnSlot {
+    Ready,
+    /// A newer turn was opened while this one waited.
+    Superseded,
+    TimedOut,
+}
+
+/// Wait for the previous turn to release the assistant, rechecking the ticket
+/// on every wake so a superseded turn never starts.
+async fn wait_for_turn_slot(
+    app: &AppHandle,
+    voice: &VoiceConversation,
+    ticket: VoiceTicket,
+) -> TurnSlot {
+    let deadline = tokio::time::Instant::now() + TURN_SLOT_WAIT;
+    while app.state::<AssistantConversation>().is_busy() {
+        if !voice.is_current(ticket) {
+            return TurnSlot::Superseded;
+        }
+        if tokio::time::Instant::now() >= deadline {
+            return TurnSlot::TimedOut;
         }
         tokio::time::sleep(std::time::Duration::from_millis(20)).await;
     }
-    assistant::run_conversation_turn(app.clone(), voice.with_carried(&text), ticket).await;
+    if voice.is_current(ticket) {
+        TurnSlot::Ready
+    } else {
+        TurnSlot::Superseded
+    }
+}
+
+/// Longest message the call bar will send. Generous for anything typed; the
+/// bound exists so a paste of a whole document cannot become one turn by
+/// accident.
+const MAX_TYPED_CHARS: usize = 8_000;
+
+/// A typed message in a live call.
+///
+/// Same turn discipline as speech: the frontend opens the turn with
+/// `assistant_conversation_interrupt` first, so a reply in flight is cut off
+/// exactly as if the user had started talking, and the reply to this message is
+/// spoken or not by the same speaker switch. Nothing is carried in front of it —
+/// a sentence abandoned mid-air is not part of something the user chose to type.
+#[tauri::command]
+#[specta::specta]
+pub async fn assistant_conversation_text(
+    app: AppHandle,
+    session: u32,
+    turn: u32,
+    text: String,
+) -> Result<(), String> {
+    let text = text.trim().to_string();
+    if text.is_empty() {
+        return Err("Type a message first".into());
+    }
+    if text.chars().count() > MAX_TYPED_CHARS {
+        return Err(format!(
+            "That message is too long to send in a call ({MAX_TYPED_CHARS} characters at most)."
+        ));
+    }
+    let ticket = VoiceTicket { session, turn };
+    let voice = app.state::<VoiceConversation>();
+    let _processing = voice.processing.lock().await;
+    if !voice.claim(ticket) {
+        return Ok(());
+    }
+    voice.clear_carried();
+    match wait_for_turn_slot(&app, &voice, ticket).await {
+        TurnSlot::Ready => {}
+        TurnSlot::Superseded => return Ok(()),
+        TurnSlot::TimedOut => return Err(STILL_STOPPING.into()),
+    }
+    assistant::run_conversation_turn(app.clone(), text, ticket).await;
+    Ok(())
+}
+
+/// Put a live call between conversations: stop what it is saying and thinking,
+/// and make everything still in flight for the old conversation stale, so a
+/// late transcript or reply cannot land in the new one.
+async fn settle_call_for_switch(app: &AppHandle, session: u32) -> Result<(), String> {
+    let voice = app.state::<VoiceConversation>();
+    voice.advance_turn(session)?;
+    voice.clear_carried();
+    app.state::<AssistantConversation>().request_cancel();
+    crate::tts::stop_all(app);
+    let deadline = tokio::time::Instant::now() + TURN_SLOT_WAIT;
+    while app.state::<AssistantConversation>().is_busy() {
+        if tokio::time::Instant::now() >= deadline {
+            return Err(STILL_STOPPING.into());
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+    }
+    Ok(())
+}
+
+/// Start a new conversation without hanging up (the call bar's New chat).
+///
+/// The one that just finished is saved and distilled like any other ended
+/// conversation; the microphone, the speaker switch and the window stay as
+/// they are.
+#[tauri::command]
+#[specta::specta]
+pub async fn assistant_conversation_new(app: AppHandle, session: u32) -> Result<(), String> {
+    settle_call_for_switch(&app, session).await?;
+    assistant::reset_conversation_for_new_exchange(&app);
+    Ok(())
+}
+
+/// Continue a saved conversation inside the live call.
+///
+/// This is what makes history reachable from a call at all. The only way back
+/// to an old conversation used to be History → Continue, which hung the call up
+/// first and then reopened the thread as a quick-ask card showing one exchange.
+/// Here the thread replaces the call's conversation in place, the next thing
+/// said is appended to it, and later turns keep updating the same History row.
+#[tauri::command]
+#[specta::specta]
+pub async fn assistant_conversation_load(
+    app: AppHandle,
+    session: u32,
+    id: i64,
+) -> Result<(), String> {
+    let history = app
+        .try_state::<Arc<crate::managers::history::HistoryManager>>()
+        .ok_or("History unavailable")?
+        .inner()
+        .clone();
+    let entry = history
+        .get_assistant_session(id)
+        .map_err(|e| format!("Couldn't load the conversation: {e}"))?
+        .ok_or("That conversation no longer exists.")?;
+    settle_call_for_switch(&app, session).await?;
+    assistant::adopt_saved_conversation(&app, entry.id, entry.messages);
+    Ok(())
+}
+
+/// The call bar's speaker switch.
+///
+/// Off stops what is being read out right now but lets the reply finish as
+/// text, and later replies are not synthesized at all. The microphone is not
+/// touched: that is the mute button's job, and the two used to be tangled into
+/// one "sound off" switch that closed the microphone as well.
+#[tauri::command]
+#[specta::specta]
+pub fn assistant_conversation_set_speaker(
+    app: AppHandle,
+    session: u32,
+    on: bool,
+) -> Result<(), String> {
+    let voice = app.state::<VoiceConversation>();
+    if !voice.set_speaker(session, on) {
+        return Err("Voice session ended".into());
+    }
+    if !on {
+        crate::tts::stop_all(&app);
+    }
     Ok(())
 }
 
@@ -545,6 +747,45 @@ mod tests {
         voice.session.lock().unwrap().ticket = None;
         voice.carry("after the call ended");
         assert!(voice.session.lock().unwrap().carried.is_empty());
+    }
+
+    /// Opening a turn (speech, a typed message, New chat, opening a saved
+    /// conversation) must make the previous turn's results unacceptable, and must
+    /// refuse a session that is not the live one.
+    #[test]
+    fn a_new_turn_makes_the_previous_one_stale() {
+        let voice = live_session(4);
+        let old = VoiceTicket {
+            session: 1,
+            turn: 4,
+        };
+        assert!(voice.is_current(old));
+        let next = voice.advance_turn(1).unwrap();
+        assert_eq!(next.turn, 5);
+        assert!(!voice.is_current(old));
+        assert!(voice.is_current(next));
+        assert!(voice.advance_turn(2).is_err(), "another session's call");
+        voice.session.lock().unwrap().ticket = None;
+        assert!(voice.advance_turn(1).is_err(), "no call at all");
+    }
+
+    /// The speaker switch belongs to the live session. It must read as off
+    /// once the call is over, so a later quick ask can never be spoken because
+    /// a call that ended had its speaker on.
+    #[test]
+    fn the_speaker_switch_belongs_to_the_live_call() {
+        let voice = live_session(1);
+        assert!(!voice.speaker_on(), "seeded by start, not by default");
+        assert!(voice.set_speaker(1, true));
+        assert!(voice.speaker_on());
+        assert!(!voice.set_speaker(2, false), "another session's switch");
+        assert!(voice.speaker_on());
+        assert!(voice.set_speaker(1, false));
+        assert!(!voice.speaker_on());
+        assert!(voice.set_speaker(1, true));
+        voice.session.lock().unwrap().ticket = None;
+        assert!(!voice.speaker_on(), "no call, no speaker");
+        assert!(!voice.set_speaker(1, true));
     }
 
     #[test]

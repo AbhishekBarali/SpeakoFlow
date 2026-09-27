@@ -36,6 +36,14 @@ interface MenuPosition {
 const MENU_GAP = 6;
 const MENU_MAX = 256;
 
+const samePosition = (a: MenuPosition | null, b: MenuPosition) =>
+  !!a &&
+  a.top === b.top &&
+  a.left === b.left &&
+  a.width === b.width &&
+  a.maxHeight === b.maxHeight &&
+  a.placement === b.placement;
+
 /**
  * Plain select. The menu renders in a portal with fixed positioning and flips
  * above the button when there is no room below, so it is never clipped by a
@@ -58,6 +66,8 @@ export const Dropdown: React.FC<DropdownProps> = ({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  /** Whether this opening has already been scrolled to the selection. */
+  const centered = useRef(false);
 
   const place = useCallback(() => {
     const button = buttonRef.current;
@@ -78,13 +88,16 @@ export const Dropdown: React.FC<DropdownProps> = ({
       Math.max(8, rect.left),
       window.innerWidth - width - 8,
     );
-    setPosition({
+    const next: MenuPosition = {
       top: placement === "below" ? rect.bottom + MENU_GAP : rect.top - MENU_GAP,
       left,
       width,
       maxHeight,
       placement,
-    });
+    };
+    // Keep the old object when nothing moved, so a reposition that changes
+    // nothing is not a re-render (and re-runs no effect keyed on position).
+    setPosition((current) => (samePosition(current, next) ? current : next));
   }, []);
 
   useLayoutEffect(() => {
@@ -116,15 +129,28 @@ export const Dropdown: React.FC<DropdownProps> = ({
       }
     };
     const reposition = () => place();
+    // Capture phase, so a scroll anywhere — the page, a dialog body — keeps the
+    // menu pinned to its button. Except the menu's own list: scrolling it moves
+    // nothing the menu is anchored to, and treating it as a reposition is what
+    // yanked a long list back up to the selected entry on every wheel tick
+    // (reposition → new position → the centre-on-open effect ran again).
+    const onScroll = (event: Event) => {
+      if (
+        event.target instanceof Node &&
+        listRef.current?.contains(event.target)
+      )
+        return;
+      place();
+    };
     document.addEventListener("mousedown", handleClickOutside);
     window.addEventListener("keydown", handleKeyDown);
     window.addEventListener("resize", reposition);
-    window.addEventListener("scroll", reposition, true);
+    window.addEventListener("scroll", onScroll, true);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("resize", reposition);
-      window.removeEventListener("scroll", reposition, true);
+      window.removeEventListener("scroll", onScroll, true);
     };
   }, [isOpen, place]);
 
@@ -133,17 +159,24 @@ export const Dropdown: React.FC<DropdownProps> = ({
   // model ids) a selection past the fold looked like the setting had reset to
   // the first entry and forced the user to scroll to find their own choice.
   //
-  // `useLayoutEffect` so the scroll lands before the menu is painted — with a
-  // plain effect the list is visibly at the top for a frame. `options` is in the
-  // deps because a dropdown with `onRefresh` fetches its options *after* opening,
-  // and the first pass then has nothing to centre on.
+  // Once per opening, and never after the user has scrolled: from then on the
+  // scroll position is theirs. `useLayoutEffect` so the scroll lands before the
+  // menu is painted — with a plain effect the list is visibly at the top for a
+  // frame. `options` is in the deps because a dropdown with `onRefresh` fetches
+  // its options *after* opening, and the first pass then has nothing to centre
+  // on.
   useLayoutEffect(() => {
-    if (!isOpen || !position) return;
+    if (!isOpen) {
+      centered.current = false;
+      return;
+    }
+    if (!position || centered.current) return;
     const list = listRef.current;
     const selected = list?.querySelector<HTMLElement>('[data-selected="true"]');
     if (!list || !selected) return;
     list.scrollTop =
       selected.offsetTop - list.clientHeight / 2 + selected.offsetHeight / 2;
+    centered.current = true;
   }, [isOpen, options, position]);
 
   const selectedOption = options.find(
@@ -229,6 +262,11 @@ export const Dropdown: React.FC<DropdownProps> = ({
             ref={listRef}
             role="listbox"
             onKeyDown={onListKeyDown}
+            onScroll={() => {
+              // The user has taken the scroll position; a late option load
+              // must not snap it back to the selection.
+              centered.current = true;
+            }}
             style={{
               position: "fixed",
               left: position.left,

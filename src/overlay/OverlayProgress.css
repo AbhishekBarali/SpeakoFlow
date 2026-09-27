@@ -63,37 +63,12 @@
 .overlay-progress.is-paused .progress-sheen {
   animation-play-state: paused;
 }
-/* A real result is the only thing that resolves this. The block goes solid and
-   takes one short beat of height — a confirmation, not a fill reaching 100%. */
-.overlay-progress.is-complete {
-  background: #e5c99b;
-  animation: progress-settle 280ms cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-.overlay-progress.is-complete .progress-sheen {
-  animation: none;
-  opacity: 0;
-}
-@keyframes progress-settle {
-  0% {
-    transform: scaleY(1);
-  }
-  45% {
-    transform: scaleY(1.4);
-  }
-  100% {
-    transform: scaleY(1);
-  }
-}
 @media (prefers-reduced-motion: reduce) {
-  /* No travelling light and no settle beat. The waiting block simply sits at a
-     brighter rest value than the finished one, so the two states are still
-     told apart by tone alone. */
+  /* No travelling light: the waiting block simply sits at a brighter rest
+     value, so it still reads as "busy" rather than as an empty track. */
   .overlay-progress {
     background: rgba(229, 201, 155, 0.46);
     transition: none;
-  }
-  .overlay-progress.is-complete {
-    animation: none;
   }
   .progress-sheen {
     display: none;

@@ -15,7 +15,7 @@
 
 /* ---------- Theme tokens (dark only) ---------- */
 
-@import "./ConversationView.css";
+@import "./CallBar.css";
 
 .assistant-scope {
   /* --as-alpha (surface opacity) and --as-msg-font (message text size) are the
@@ -60,6 +60,51 @@
 
 * {
   box-sizing: border-box;
+}
+
+/* ---------- Scrollbars ----------
+ * One scrollbar for everything in the assistant window: a slim, faint rounded
+ * thumb with no track and no arrow buttons, brightening under the pointer.
+ * Nothing here may set `scrollbar-width` or `scrollbar-color`: in Chromium
+ * either one switches these rules off and brings back Windows' native
+ * scrollbar, arrows and all — which is what the profile menu and the
+ * transcript were showing.
+ *
+ * The thumb is always drawn rather than revealed on hover of the list, because
+ * Chromium does not repaint a custom thumb when its scroller's `:hover` changes
+ * (measured: the rule matched and nothing was painted), so a hover-revealed
+ * thumb would only appear after the list had already been scrolled. */
+.assistant-scope ::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.assistant-scope ::-webkit-scrollbar-track,
+.assistant-scope ::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+.assistant-scope ::-webkit-scrollbar-track {
+  margin-block: 6px;
+}
+
+.assistant-scope ::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.assistant-scope ::-webkit-scrollbar-thumb {
+  min-height: 28px;
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background-color: rgba(255, 255, 255, 0.13);
+  background-clip: padding-box;
+}
+
+.assistant-scope ::-webkit-scrollbar-thumb:hover,
+.assistant-scope ::-webkit-scrollbar-thumb:active {
+  background-color: rgba(255, 255, 255, 0.3);
 }
 
 /* ---------- Window shell ----------
@@ -963,8 +1008,6 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-  scrollbar-width: thin;
-  scrollbar-color: var(--as-hairline-strong) transparent;
 }
 
 .assistant-empty {
@@ -1989,8 +2032,6 @@
      the moment its scrollbar appears — and so the height measured for it is the
      height it keeps. */
   scrollbar-gutter: stable;
-  scrollbar-width: thin;
-  scrollbar-color: var(--as-hairline-strong) transparent;
   /* Cap the measure. The card is as wide as the panel, so at a standard size a
      line of answer ran past 100 characters — roughly a third more than the eye
      tracks comfortably, and the single biggest reason a well-contrasted answer

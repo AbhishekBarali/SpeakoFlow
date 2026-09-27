@@ -631,6 +631,21 @@ pub fn set_assistant_conversation_pace(
     Ok(())
 }
 
+/// How readily a hands-free call treats a sound as the user speaking. Persisted
+/// for the same reason as the pace: a noisy room is noisy in every call.
+#[tauri::command]
+#[specta::specta]
+pub fn set_assistant_conversation_sensitivity(
+    app: AppHandle,
+    sensitivity: crate::settings::ConversationSensitivity,
+) -> Result<(), String> {
+    let mut settings = get_settings(&app);
+    settings.assistant_conversation_sensitivity = sensitivity;
+    write_settings(&app, settings);
+    emit_settings_changed(&app);
+    Ok(())
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn set_assistant_response_length(
@@ -660,10 +675,7 @@ pub fn set_assistant_font_size(app: AppHandle, size: String) -> Result<(), Strin
 #[tauri::command]
 #[specta::specta]
 pub fn set_assistant_tts_engine(app: AppHandle, engine: String) -> Result<(), String> {
-    if !matches!(
-        engine.as_str(),
-        "kokoro" | "openai" | "openrouter" | "elevenlabs" | "azure"
-    ) {
+    if !crate::tts::is_known_engine(&engine) {
         return Err(format!("Unknown TTS engine: {}", engine));
     }
     // Switching engine mid-playback should stop the current clip.
@@ -1051,10 +1063,10 @@ pub async fn assistant_list_azure_voices(
     crate::tts::list_azure_voices(&settings).await
 }
 
-/// List selectable voices for the currently-configured remote TTS engine
-/// (OpenAI-compatible, ElevenLabs, or Azure), so the settings UI can offer a
-/// searchable voice picker instead of a raw text field. Returns an error string
-/// for inline display when the lookup fails (bad key, unreachable endpoint).
+/// List selectable voices for the currently-configured remote TTS engine, so
+/// the settings UI can offer a searchable voice picker instead of a raw text
+/// field. Returns an error string for inline display when the lookup fails
+/// (bad key, unreachable endpoint).
 #[tauri::command]
 #[specta::specta]
 pub async fn assistant_list_tts_voices(
@@ -1064,9 +1076,8 @@ pub async fn assistant_list_tts_voices(
     crate::tts::list_tts_voices(&settings).await
 }
 
-/// List selectable models for the currently-configured remote TTS engine
-/// (OpenAI-compatible `/models`, or ElevenLabs text-to-speech models). Azure and
-/// Kokoro don't expose a model list and return an error the UI shows inline.
+/// List selectable models for the currently-configured remote TTS engine.
+/// Engines whose voice implies the model return an error the UI shows inline.
 #[tauri::command]
 #[specta::specta]
 pub async fn assistant_list_tts_models(app: AppHandle) -> Result<Vec<String>, String> {

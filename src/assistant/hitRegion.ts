@@ -29,10 +29,12 @@ import { useEffect } from "react";
  * says capture is on. Its own `pointer-events` still decides whether it counts, so
  * a hidden badge is correctly ignored.
  *
- * A form with none of these — the voice conversation view, the full chat panel —
- * measures as `unknown` and stays fully tangible. That is the behaviour that
- * shipped, so an unlisted form can never become unclickable; it just does not get
- * pass-through until it is listed.
+ * A form with none of these — the full chat panel — measures as `unknown` and
+ * stays fully tangible. That is the behaviour that shipped, so an unlisted form
+ * can never become unclickable; it just does not get pass-through until it is
+ * listed. The live call opts in with `[data-hit-surface]` on its bar, its status
+ * bubble and (expanded) its whole panel, because at rest it is a small bar in a
+ * 440x200 frame and the rest of that frame must not sit dead over the desktop.
  *
  * **Every visible surface must be listed, and an omission is not a partial
  * failure.** `.ask-pill` was missing here, which made the surface the assistant

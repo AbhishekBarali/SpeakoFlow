@@ -213,7 +213,7 @@ const AskBar: React.FC<AskBarProps> = ({
               active
             />
           ) : (
-            <OverlayProgress label={status} completed={false} active />
+            <OverlayProgress label={status} active />
           )}
         </div>
       ) : null}

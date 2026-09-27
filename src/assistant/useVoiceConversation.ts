@@ -4,13 +4,20 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type { MicVAD } from "@ricky0123/vad-web";
 import { ConversationAudio } from "./conversationAudio";
 import {
+  BARGE_IN_DENSITY,
   DEFAULT_CONVERSATION_PACE,
+  DEFAULT_CONVERSATION_SENSITIVITY,
   MAX_UTTERANCE_MS,
   matchDeviceByName,
   sameVoiceTicket,
+  SPEECH_LEAD_HISTORY_FRAMES,
+  speechLeadFrames,
   TURN_PAUSE_MS,
+  VAD_FRAME_MS,
+  VAD_SENSITIVITY,
   VoiceTurnGate,
   type ConversationPace,
+  type ConversationSensitivity,
   type VoiceTicket,
 } from "./conversationPolicy";
 
@@ -23,10 +30,16 @@ export type ConversationPhase =
   | "responding"
   | "speaking"
   | "muted"
-  | "deafened"
   | "error";
 type VoiceError = {
-  code: "microphone" | "device" | "setup" | "turn" | "playback" | "tooLong";
+  code:
+    | "microphone"
+    | "device"
+    | "setup"
+    | "turn"
+    | "playback"
+    | "tooLong"
+    | "history";
   detail?: string;
 };
 interface VoiceCallbacks {
@@ -44,6 +57,15 @@ interface VoiceCallbacks {
    */
   pace?: ConversationPace | null;
   onPaceChange: (pace: ConversationPace) => void;
+  /** The persisted sensitivity (`assistant_conversation_sensitivity`). */
+  sensitivity?: ConversationSensitivity | null;
+  onSensitivityChange: (sensitivity: ConversationSensitivity) => void;
+  /**
+   * Whether a new call reads its replies aloud. Where the call's speaker switch
+   * starts; `assistant_tts_enabled` in the panel, and the backend seeds its own
+   * copy from the same setting.
+   */
+  speakerOn?: boolean;
   /**
    * Hang up: end the session *and* send the surface away.
    *
@@ -54,6 +76,34 @@ interface VoiceCallbacks {
    */
   onHangUp?: () => void;
 }
+
+/**
+ * Speech heard while the assistant is still talking, not yet allowed to cut it
+ * off. `frames` is a sliding window of per-frame "was this speech" verdicts;
+ * see `VAD_SENSITIVITY.bargeInMs` for why.
+ */
+interface PendingBargeIn {
+  frames: boolean[];
+}
+
+/** One frame the detector has seen, kept for an utterance's lead-in. */
+interface HeardFrame {
+  frame: Float32Array;
+  /** Speech probability, or `null` when the assistant's reply was playing. */
+  probability: number | null;
+}
+
+/** Join audio chunks into one buffer, in order. */
+const joinAudio = (parts: readonly Float32Array[]): Float32Array => {
+  const out = new Float32Array(parts.reduce((sum, p) => sum + p.length, 0));
+  let at = 0;
+  for (const part of parts) {
+    out.set(part, at);
+    at += part.length;
+  }
+  return out;
+};
+
 interface Session {
   id: number;
   ticket: VoiceTicket | null;
@@ -61,20 +111,34 @@ interface Session {
   stream: MediaStream | null;
   context: AudioContext;
   audio: ConversationAudio;
-  /**
-   * Microphone off. Input only: a muted call still speaks.
-   *
-   * This used to mean both directions at once, which is what made the button
-   * confusing — muting to stop the assistant hearing a conversation in the room
-   * also cut off the answer being read out, and there was no way to ask for one
-   * without the other. `deafened` is now the switch for the output side.
-   */
+  /** Microphone off. Input only: a muted call still speaks and still types. */
   muted: boolean;
-  /** Both directions off: nothing is heard and nothing is spoken. */
-  deafened: boolean;
-  /** A VAD pause/start is in flight; the two switches share it. */
-  changingAudio: boolean;
+  /**
+   * Replies are not read aloud. Output only: the microphone stays live.
+   *
+   * This replaced a "sound off" switch that closed the microphone as well,
+   * which made the one control people reach for in a shared room also stop the
+   * call from hearing them.
+   */
+  speakerOff: boolean;
+  /** A VAD pause/start is in flight. */
+  changingMic: boolean;
+  /** An utterance is being captured as the next turn. */
   hearing: boolean;
+  /** Speech over a playing reply that has not proven it is not echo. */
+  pending: PendingBargeIn | null;
+  /** The utterance in progress is to be dropped when it ends. */
+  discard: boolean;
+  /**
+   * The frames heard since the last utterance was submitted, newest last and
+   * capped at what a lead-in can use. See `SPEECH_LEAD`.
+   */
+  heard: HeardFrame[];
+  /**
+   * Audio from before the detector recognised the utterance in progress, put
+   * back in front of it when it is submitted. `null` when nothing is pending.
+   */
+  lead: Float32Array | null;
   turnDone: boolean;
   synthesisDone: boolean;
   playing: boolean;
@@ -84,17 +148,8 @@ interface Session {
   releaseBackgroundLock?: () => void;
 }
 
-/**
- * The microphone is live only when neither switch is down.
- *
- * Deafening closes it too, because "you won't hear it and it won't take your
- * input" is one gesture: leaving capture running behind a silenced call would
- * keep answering questions whose replies nobody can hear.
- */
-const micLive = (s: Session) => !s.muted && !s.deafened;
-
-/** Only deafening silences the assistant. Mute is the input side alone. */
-const canHear = (s: Session) => !s.deafened;
+const micLive = (s: Session) => !s.muted;
+const canHear = (s: Session) => !s.speakerOff;
 
 export function useVoiceConversation(callbacks: VoiceCallbacks) {
   const callbacksRef = useRef(callbacks);
@@ -109,16 +164,21 @@ export function useVoiceConversation(callbacks: VoiceCallbacks) {
    * The two switches, exposed as state rather than read back off `phase`.
    *
    * `phase` says what the call is *doing*, and a muted call still does things —
-   * it thinks and it speaks. Deriving the button's pressed state from a "muted"
-   * phase forced the phase to mask "Thinking"/"Speaking" for the whole time the
-   * microphone was off, which is the half of the old mute that read as a bug.
+   * it thinks and it speaks. Deriving a switch from the phase would force the
+   * phase to mask "Thinking"/"Speaking" whenever the switch is down.
    */
   const [muted, setMuted] = useState(false);
-  const [deafened, setDeafened] = useState(false);
+  const [speakerOff, setSpeakerOff] = useState(false);
   const pace = callbacks.pace ?? DEFAULT_CONVERSATION_PACE;
   const setPace = callbacks.onPaceChange;
   const paceRef = useRef(pace);
   paceRef.current = pace;
+  const sensitivity = callbacks.sensitivity ?? DEFAULT_CONVERSATION_SENSITIVITY;
+  const setSensitivity = callbacks.onSensitivityChange;
+  const sensitivityRef = useRef(sensitivity);
+  sensitivityRef.current = sensitivity;
+  /** The user is writing a message; keyboard noise must not start a turn. */
+  const composingRef = useRef(false);
   const sessionRef = useRef<Session | null>(null);
   const lifecycle = useRef(new VoiceTurnGate());
   const turns = useRef(new VoiceTurnGate());
@@ -139,17 +199,15 @@ export function useVoiceConversation(callbacks: VoiceCallbacks) {
   const refreshPhase = useCallback((s: Session) => {
     if (sessionRef.current !== s) return;
     setPhase(
-      s.deafened
-        ? "deafened"
-        : s.hearing
-          ? "hearing"
-          : s.playing
-            ? "speaking"
-            : !s.turnDone || !s.synthesisDone
-              ? "responding"
-              : s.muted
-                ? "muted"
-                : "listening",
+      s.hearing
+        ? "hearing"
+        : s.playing
+          ? "speaking"
+          : !s.turnDone || !s.synthesisDone
+            ? "responding"
+            : s.muted
+              ? "muted"
+              : "listening",
     );
   }, []);
 
@@ -177,12 +235,13 @@ export function useVoiceConversation(callbacks: VoiceCallbacks) {
       callbacksRef.current.stopLocal();
       release(s);
     }
+    composingRef.current = false;
     setOpen(false);
     setPhase("off");
     setError(null);
     setLevel(0);
     setMuted(false);
-    setDeafened(false);
+    setSpeakerOff(false);
   }, [release]);
 
   const fail = useCallback(
@@ -199,8 +258,7 @@ export function useVoiceConversation(callbacks: VoiceCallbacks) {
    * One failed turn is not a failed session. A provider that rejects a request,
    * or an utterance that could not be submitted, says nothing about the
    * microphone — so show what went wrong and keep listening instead of tearing
-   * the session down and dropping the user back into the chat view. The next
-   * time they speak, `onSpeechRealStart` clears the message.
+   * the session down. The next time they speak, the message clears.
    */
   const recover = useCallback(
     (failure: VoiceError, session: Session) => {
@@ -213,24 +271,62 @@ export function useVoiceConversation(callbacks: VoiceCallbacks) {
     [refreshPhase],
   );
 
-  const interrupt = useCallback((s: Session) => {
-    const interruptedReply = s.playing || !s.synthesisDone;
-    turns.current.next();
-    s.ticket = null;
+  /** Forget the utterance in progress; the VAD's end of it will be dropped. */
+  const abandonUtterance = useCallback((s: Session) => {
+    if (s.hearing || s.pending) s.discard = true;
+    s.hearing = false;
+    s.pending = null;
+    if (s.timeout) clearTimeout(s.timeout);
+    s.timeout = null;
+    setLevel(0);
+  }, []);
+
+  /** Stop whatever the assistant is saying locally, without a new turn. */
+  const silence = useCallback((s: Session) => {
     s.epoch = null;
     s.audio.stop();
     callbacksRef.current.stopLocal();
-    s.turnDone = true;
-    s.synthesisDone = true;
-    s.onset = invoke<VoiceTicket>("assistant_conversation_interrupt", {
-      session: s.id,
-      interruptedReply,
-    });
-    // The rejection is handled on submission; no unhandled rejection if the
-    // user mutes/ends while a speech-start command is crossing IPC.
-    void s.onset.catch(() => {});
-    return s.onset;
   }, []);
+
+  const interrupt = useCallback(
+    (s: Session) => {
+      const interruptedReply = s.playing || !s.synthesisDone;
+      turns.current.next();
+      s.ticket = null;
+      silence(s);
+      s.turnDone = true;
+      s.synthesisDone = true;
+      s.onset = invoke<VoiceTicket>("assistant_conversation_interrupt", {
+        session: s.id,
+        interruptedReply,
+      });
+      // The rejection is handled on submission; no unhandled rejection if the
+      // user mutes/ends while a speech-start command is crossing IPC.
+      void s.onset.catch(() => {});
+      return s.onset;
+    },
+    [silence],
+  );
+
+  /** Speech is real and becomes the next turn: cut the reply off, listen. */
+  const confirmSpeech = useCallback(
+    (s: Session) => {
+      s.pending = null;
+      s.hearing = true;
+      setError(null);
+      interrupt(s);
+      refreshPhase(s);
+      if (s.timeout) clearTimeout(s.timeout);
+      // A segment this long is either a monologue or a room the VAD never hears
+      // fall silent (a fan, a TV). Either way it is one bad turn, not a dead
+      // microphone: say so and keep listening.
+      s.timeout = setTimeout(
+        () => recover({ code: "tooLong" }, s),
+        MAX_UTTERANCE_MS,
+      );
+    },
+    [interrupt, recover, refreshPhase],
+  );
 
   const submit = useCallback(
     async (s: Session, audio: Float32Array) => {
@@ -240,12 +336,14 @@ export function useVoiceConversation(callbacks: VoiceCallbacks) {
       s.hearing = false;
       const generation = turns.current.next();
       setLevel(0);
-      setPhase("transcribing");
       try {
+        // No onset means the turn this speech opened was replaced (a typed
+        // message, New chat, a saved conversation) while it was being spoken.
         if (!s.onset) {
           refreshPhase(s);
           return;
         }
+        setPhase("transcribing");
         const ticket = await s.onset;
         if (
           sessionRef.current !== s ||
@@ -290,6 +388,8 @@ export function useVoiceConversation(callbacks: VoiceCallbacks) {
     setOpen(true);
     setError(null);
     setPhase("starting");
+    const speakerStartsOff = callbacksRef.current.speakerOn === false;
+    setSpeakerOff(speakerStartsOff);
     let s: Session | null = null;
     try {
       const context = new AudioContext();
@@ -308,9 +408,13 @@ export function useVoiceConversation(callbacks: VoiceCallbacks) {
           callbacksRef.current.volume,
         ),
         muted: false,
-        deafened: false,
-        changingAudio: false,
+        speakerOff: speakerStartsOff,
+        changingMic: false,
         hearing: false,
+        pending: null,
+        discard: false,
+        heard: [],
+        lead: null,
         turnDone: true,
         synthesisDone: true,
         playing: false,
@@ -439,6 +543,14 @@ export function useVoiceConversation(callbacks: VoiceCallbacks) {
         release(session);
         return;
       }
+      // Rust seeds its speaker switch from the same setting, but the switch may
+      // have been flipped while the call was still connecting. One source of
+      // truth: whatever this side shows.
+      void invoke("assistant_conversation_set_speaker", {
+        session: ticket.session,
+        on: !session.speakerOff,
+      }).catch(() => {});
+      const tuning = VAD_SENSITIVITY[sensitivityRef.current];
       session.vad = await MicVAD.new({
         model: "v5",
         baseAssetPath: "/voice-assets/",
@@ -446,10 +558,14 @@ export function useVoiceConversation(callbacks: VoiceCallbacks) {
         audioContext: context,
         startOnLoad: true,
         processorType: "AudioWorklet",
-        positiveSpeechThreshold: 0.65,
-        negativeSpeechThreshold: 0.4,
-        minSpeechMs: 160,
-        preSpeechPadMs: 320,
+        positiveSpeechThreshold: tuning.positiveSpeechThreshold,
+        negativeSpeechThreshold: tuning.negativeSpeechThreshold,
+        minSpeechMs: tuning.minSpeechMs,
+        // Zero, because the lead-in is ours: the library's own pre-roll is a
+        // fixed length, and a fixed length is what cut off first words. With it
+        // at zero the audio the library hands back starts exactly at the frame
+        // that opened the segment, which is what `onSpeechStart` below assumes.
+        preSpeechPadMs: 0,
         redemptionMs: TURN_PAUSE_MS[paceRef.current],
         submitUserSpeechOnPause: false,
         ortConfig: (ort) => {
@@ -462,10 +578,43 @@ export function useVoiceConversation(callbacks: VoiceCallbacks) {
           session.stream = null;
         },
         resumeStream: acquire,
-        onFrameProcessed: (_probability, frame) => {
+        onFrameProcessed: (probabilities, frame) => {
           if (sessionRef.current !== session || !micLive(session)) return;
+          // Every frame, before anything below can return early: this is the
+          // history a lead-in is cut from. Frames heard while a reply plays are
+          // marked, so a lead-in never reaches back into the assistant's voice.
+          session.heard.push({
+            frame,
+            probability: session.playing ? null : probabilities.isSpeech,
+          });
+          if (session.heard.length > SPEECH_LEAD_HISTORY_FRAMES)
+            session.heard.shift();
+          const pending = session.pending;
+          if (pending) {
+            // The echo guard. Speech that arrives while the assistant is
+            // talking only interrupts once it has been speech-dense for a whole
+            // `bargeInMs` window. Leaked playback comes through the echo
+            // canceller in fragments and never gets there; a person who means
+            // to interrupt keeps talking and does.
+            const tuning = VAD_SENSITIVITY[sensitivityRef.current];
+            const window = Math.max(
+              1,
+              Math.round(tuning.bargeInMs / VAD_FRAME_MS),
+            );
+            pending.frames.push(
+              probabilities.isSpeech >= tuning.positiveSpeechThreshold,
+            );
+            if (pending.frames.length > window) pending.frames.shift();
+            const speech = pending.frames.filter(Boolean).length;
+            if (
+              pending.frames.length >= window &&
+              speech / window >= BARGE_IN_DENSITY
+            )
+              confirmSpeech(session);
+            return;
+          }
           // An open mic can run for hours. Keep room noise from re-rendering
-          // the whole transcript on every 32 ms inference frame.
+          // the whole panel on every 32 ms inference frame.
           if (!session.hearing) return;
           const now = performance.now();
           if (now - lastLevelAt.current < 75) return;
@@ -474,29 +623,62 @@ export function useVoiceConversation(callbacks: VoiceCallbacks) {
           for (const sample of frame) sum += sample * sample;
           setLevel(Math.min(1, Math.sqrt(sum / frame.length) * 8));
         },
+        onSpeechStart: () => {
+          if (sessionRef.current !== session || !micLive(session)) return;
+          // The frame that opened the segment is the newest one heard (the
+          // library reports a frame before it reports what that frame started),
+          // and the library's audio begins with it. Everything before it is
+          // candidate lead-in.
+          const before = session.heard.slice(0, -1);
+          const count = speechLeadFrames(before.map((f) => f.probability));
+          session.lead =
+            count > 0
+              ? joinAudio(
+                  before.slice(before.length - count).map((f) => f.frame),
+                )
+              : null;
+        },
         onSpeechRealStart: () => {
           if (sessionRef.current !== session || !micLive(session)) return;
-          session.hearing = true;
-          setError(null);
-          interrupt(session);
-          refreshPhase(session);
-          // A segment this long is either a monologue or a room the VAD never
-          // hears fall silent (a fan, a TV). Either way it is one bad turn, not
-          // a dead microphone: say so and keep listening. Ending the session
-          // here released the mic mid-call and threw the speech away.
-          session.timeout = setTimeout(
-            () => recover({ code: "tooLong" }, session),
-            MAX_UTTERANCE_MS,
-          );
+          // Typing makes noise the detector hears as speech. A message being
+          // written is the user's turn already.
+          if (composingRef.current) {
+            session.discard = true;
+            return;
+          }
+          if (session.playing) {
+            session.pending = { frames: [] };
+            return;
+          }
+          confirmSpeech(session);
         },
         onVADMisfire: () => {
-          if (sessionRef.current === session) {
-            session.hearing = false;
-            refreshPhase(session);
-          }
+          if (sessionRef.current !== session) return;
+          session.hearing = false;
+          session.pending = null;
+          session.discard = false;
+          // The frames stay in `heard`: a short sound the detector rejected
+          // ("hey", then a pause) is exactly what the next utterance's lead-in
+          // may need to reach back to.
+          session.lead = null;
+          refreshPhase(session);
         },
         onSpeechEnd: (audio) => {
-          void submit(session, audio);
+          if (sessionRef.current !== session) return;
+          const lead = session.lead;
+          session.lead = null;
+          // Submitted or dropped, this audio is spoken for: a later lead-in must
+          // not reach back into it and repeat its words.
+          session.heard = [];
+          // Speech that never earned the right to interrupt is dropped rather
+          // than answered: it was most likely the assistant hearing itself.
+          if (session.discard || session.pending) {
+            session.discard = false;
+            session.pending = null;
+            refreshPhase(session);
+            return;
+          }
+          void submit(session, lead ? joinAudio([lead, audio]) : audio);
         },
       });
       if (!lifecycle.current.accepts(generation)) {
@@ -520,93 +702,189 @@ export function useVoiceConversation(callbacks: VoiceCallbacks) {
         detail: String(cause),
       });
     }
-  }, [end, fail, interrupt, recover, refreshPhase, release, submit]);
+  }, [confirmSpeech, end, fail, refreshPhase, release, submit]);
+
+  /** Microphone on or off. The speaker and the reply in flight are untouched. */
+  const toggleMute = useCallback(async () => {
+    const s = sessionRef.current;
+    if (!s?.vad || s.changingMic) return;
+    const next = !s.muted;
+    s.muted = next;
+    setMuted(next);
+    if (next) {
+      // The microphone is closing, so an utterance in progress is abandoned.
+      // Nothing to cancel on the backend: `submit` drops it before it is sent.
+      s.hearing = false;
+      s.pending = null;
+      s.discard = false;
+      // Nothing heard before the mute may open the first utterance after it.
+      s.heard = [];
+      s.lead = null;
+      if (s.timeout) clearTimeout(s.timeout);
+      s.timeout = null;
+    }
+    refreshPhase(s);
+    setLevel(0);
+    s.changingMic = true;
+    try {
+      if (next) await s.vad.pause();
+      else await s.vad.start();
+    } catch (cause) {
+      // Reopening the microphone fails whenever another app has taken it in
+      // the meantime. That is retryable: put the switch back and keep the call
+      // alive so a second tap can succeed.
+      if (sessionRef.current === s) {
+        s.muted = !next;
+        setMuted(!next);
+        recover({ code: "microphone", detail: String(cause) }, s);
+      }
+    } finally {
+      s.changingMic = false;
+    }
+  }, [recover, refreshPhase]);
 
   /**
-   * Apply a change to the two audio switches and reconcile the session with it.
-   *
-   * One function for both buttons because the microphone is a function of both
-   * (see `micLive`) and because only one VAD pause/start may be in flight at a
-   * time. The asymmetry between them lives here and nowhere else: deafening
-   * cancels the reply, muting deliberately leaves it running.
+   * Replies read aloud, or not. Turning it off stops what is being said right
+   * now and lets the reply finish as text; the microphone stays exactly as the
+   * mute button left it.
    */
-  const setAudioState = useCallback(
-    async (mutate: (s: Session) => void) => {
+  const toggleSpeaker = useCallback(async () => {
+    const s = sessionRef.current;
+    if (!s) return;
+    const off = !s.speakerOff;
+    s.speakerOff = off;
+    setSpeakerOff(off);
+    if (off) {
+      silence(s);
+      s.synthesisDone = true;
+      // Nothing is playing any more, so nothing can be echo.
+      if (s.pending) confirmSpeech(s);
+    }
+    refreshPhase(s);
+    if (s.id)
+      await invoke("assistant_conversation_set_speaker", {
+        session: s.id,
+        on: !off,
+      }).catch(() => {});
+  }, [confirmSpeech, refreshPhase, silence]);
+
+  /**
+   * Send a typed message as the next turn. Resolves `true` once the reply has
+   * finished (or was superseded), `false` when it could not be sent.
+   */
+  const sendText = useCallback(
+    async (text: string): Promise<boolean> => {
       const s = sessionRef.current;
-      if (!s?.vad || s.changingAudio) return;
-      const wasMuted = s.muted;
-      const wasDeafened = s.deafened;
-      const wasLive = micLive(s);
-      mutate(s);
-      if (s.muted === wasMuted && s.deafened === wasDeafened) return;
-      setMuted(s.muted);
-      setDeafened(s.deafened);
-      if (!micLive(s) && wasLive) {
-        // The microphone is closing, so an utterance in progress is abandoned.
-        // Nothing to cancel on the backend: `submit` drops it before it is sent.
-        s.hearing = false;
-        if (s.timeout) clearTimeout(s.timeout);
-        s.timeout = null;
-      }
-      // Deafening stops the answer as a barge-in does — there is no point
-      // generating and synthesizing speech nobody can hear. Muting must not,
-      // which is the whole reason the two are separate controls: the assistant
-      // keeps talking while your microphone is off.
-      if (s.deafened && !wasDeafened) interrupt(s);
+      const message = text.trim();
+      if (!s?.id || !message) return false;
+      // Speech in progress belonged to the turn this message replaces.
+      abandonUtterance(s);
+      const onset = interrupt(s);
+      // The spoken turn that onset would have carried is gone.
+      s.onset = null;
+      const generation = turns.current.next();
+      setError(null);
       refreshPhase(s);
-      setLevel(0);
-      if (micLive(s) === wasLive) return;
-      s.changingAudio = true;
       try {
-        if (micLive(s)) await s.vad.start();
-        else await s.vad.pause();
-      } catch (cause) {
-        // Reopening the microphone fails whenever another app has taken it in
-        // the meantime. That is retryable: put the switches back and keep the
-        // call alive so a second tap can succeed.
-        if (sessionRef.current === s) {
-          s.muted = wasMuted;
-          s.deafened = wasDeafened;
-          setMuted(wasMuted);
-          setDeafened(wasDeafened);
-          recover({ code: "microphone", detail: String(cause) }, s);
+        const ticket = await onset;
+        if (sessionRef.current !== s || !turns.current.accepts(generation))
+          return false;
+        s.ticket = ticket;
+        s.turnDone = false;
+        s.synthesisDone = true;
+        refreshPhase(s);
+        await invoke("assistant_conversation_text", {
+          session: ticket.session,
+          turn: ticket.turn,
+          text: message,
+        });
+        if (sessionRef.current === s && turns.current.accepts(generation)) {
+          s.turnDone = true;
+          refreshPhase(s);
         }
-      } finally {
-        s.changingAudio = false;
+        return true;
+      } catch (cause) {
+        if (sessionRef.current !== s || !turns.current.accepts(generation))
+          return false;
+        recover({ code: "turn", detail: String(cause) }, s);
+        return false;
       }
     },
-    [interrupt, recover, refreshPhase],
+    [abandonUtterance, interrupt, recover, refreshPhase],
   );
 
-  /** Microphone off, speaker untouched: the assistant can still answer aloud. */
-  const toggleMute = useCallback(
-    () =>
-      setAudioState((s) => {
-        s.muted = !s.muted;
-      }),
-    [setAudioState],
-  );
+  /** Stop the reply the assistant is giving, and keep the call listening. */
+  const stopReply = useCallback(() => {
+    const s = sessionRef.current;
+    if (!s?.id) return;
+    if (s.turnDone && s.synthesisDone && !s.playing) return;
+    s.pending = null;
+    interrupt(s);
+    refreshPhase(s);
+  }, [interrupt, refreshPhase]);
 
   /**
-   * Both directions off — the headphones-down gesture. Turning it on also cuts
-   * the reply in flight; turning it off restores whatever the microphone switch
-   * was set to on its own, so deafening during a muted call does not silently
-   * unmute you on the way back.
+   * Replace the call's conversation — with a new one, or with one from
+   * History — without hanging up.
    */
-  const toggleDeafen = useCallback(
-    () =>
-      setAudioState((s) => {
-        s.deafened = !s.deafened;
-      }),
-    [setAudioState],
+  const switchConversation = useCallback(
+    async (
+      command: "assistant_conversation_new" | "assistant_conversation_load",
+      args: Record<string, number>,
+    ): Promise<boolean> => {
+      const s = sessionRef.current;
+      if (!s?.id) return false;
+      turns.current.next();
+      abandonUtterance(s);
+      s.ticket = null;
+      s.onset = null;
+      silence(s);
+      s.turnDone = true;
+      s.synthesisDone = true;
+      setError(null);
+      refreshPhase(s);
+      try {
+        await invoke(command, { session: s.id, ...args });
+        return true;
+      } catch (cause) {
+        if (sessionRef.current === s)
+          setError({ code: "history", detail: String(cause) });
+        return false;
+      }
+    },
+    [abandonUtterance, refreshPhase, silence],
   );
+  const newConversation = useCallback(
+    () => switchConversation("assistant_conversation_new", {}),
+    [switchConversation],
+  );
+  const loadConversation = useCallback(
+    (id: number) => switchConversation("assistant_conversation_load", { id }),
+    [switchConversation],
+  );
+
+  /** Whether a message is being written (see `composingRef`). */
+  const setComposing = useCallback((composing: boolean) => {
+    composingRef.current = composing;
+  }, []);
+
+  const clearError = useCallback(() => setError(null), []);
 
   useEffect(() => {
     sessionRef.current?.vad?.setOptions({ redemptionMs: TURN_PAUSE_MS[pace] });
   }, [pace]);
 
-  // Both dials reach a running session: the pace above, the volume here. A
-  // setting changed mid-call should apply to that call.
+  useEffect(() => {
+    const tuning = VAD_SENSITIVITY[sensitivity];
+    sessionRef.current?.vad?.setOptions({
+      positiveSpeechThreshold: tuning.positiveSpeechThreshold,
+      negativeSpeechThreshold: tuning.negativeSpeechThreshold,
+      minSpeechMs: tuning.minSpeechMs,
+    });
+  }, [sensitivity]);
+
+  // Every dial reaches a running session: the pace and sensitivity above, the
+  // volume here. A setting changed mid-call should apply to that call.
   const volume = callbacks.volume;
   useEffect(() => {
     if (volume !== undefined) sessionRef.current?.audio.setVolume(volume);
@@ -723,8 +1001,7 @@ export function useVoiceConversation(callbacks: VoiceCallbacks) {
           // Rust considers a call active from the moment it issues that ticket,
           // so an "ended" event can legitimately arrive before the id lands
           // here — and requiring the ids to match left the VAD holding the
-          // microphone for a call the backend had already torn down, which is
-          // what "the panel is using the mic and nothing works" looked like. The
+          // microphone for a call the backend had already torn down. The
           // in-flight start closes its own late ticket via the lifecycle
           // generation, so ending early is safe.
           if (s.id === payload || s.id === 0) end();
@@ -734,10 +1011,6 @@ export function useVoiceConversation(callbacks: VoiceCallbacks) {
       // surface changes must dismiss it too, or the call UI masks quick asks.
       track(await listen("assistant-panel-hidden", end));
       track(await listen("assistant-quick-ask", end));
-      // Collapsing to the pill keeps the microphone, because the pill is on
-      // screen and says the call is live. Hiding the panel does not: the backend
-      // ends the session (see `assistant::hide_assistant_panel`) and this
-      // listener tears the local side down with it.
       track(
         await listen<{ code: string; detail: string }>(
           "assistant-error",
@@ -748,8 +1021,7 @@ export function useVoiceConversation(callbacks: VoiceCallbacks) {
             // superseded turn's speech synthesis, TTS playback, screen capture).
             // Only treat it as *this* turn's failure when a turn is actually in
             // flight — otherwise a late error from work already abandoned marked
-            // the live turn finished and flipped the orb back to "Listening"
-            // while its reply was still being written.
+            // the live turn finished while its reply was still being written.
             if (s.turnDone && s.synthesisDone) {
               setError({ code: "turn", detail: payload.detail });
               return;
@@ -805,15 +1077,23 @@ export function useVoiceConversation(callbacks: VoiceCallbacks) {
     open,
     phase,
     error,
+    clearError,
     level,
     pace,
     setPace,
+    sensitivity,
+    setSensitivity,
     muted,
-    deafened,
+    speakerOff,
     start,
     end,
     toggleMute,
-    toggleDeafen,
+    toggleSpeaker,
+    sendText,
+    stopReply,
+    newConversation,
+    loadConversation,
+    setComposing,
     browserSink,
   };
 }

@@ -27,12 +27,19 @@
 //! brain and does the network calls.
 //!
 //! The provider, model and credential come from
-//! [`crate::settings::resolve_post_process_brain`], the same resolution dictation
-//! cleanup uses: dedicated cleanup selection first, the assistant's brain as the
-//! fallback. Meetings deliberately add **no** provider setting of their own — a
-//! fourth brain to configure would be a worse feature than a shared one.
+//! [`crate::settings::resolve_meeting_brain`]: the assistant's model first, the
+//! cleanup model only as a fallback, and never a cleanup fine-tune. Meetings
+//! deliberately add **no** provider setting of their own — a fourth brain to
+//! configure would be a worse feature than a shared one. They used to share
+//! dictation cleanup's resolution (cleanup first), which sent every meeting to
+//! SpeakoFlow Mini whenever it was the cleanup model; see that function for what
+//! that produced.
+
+use std::collections::HashSet;
+use std::sync::Mutex;
 
 use log::{debug, info, warn};
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use tauri::{AppHandle, Emitter, Manager};
@@ -41,28 +48,18 @@ use super::session::label_segments;
 use super::store::MeetingStore;
 use crate::settings::PostProcessProvider;
 
-/// Characters of transcript per map window.
+/// Default window size used by the unit tests; production sizes come from
+/// [`NotesBudget::for_provider`].
 ///
-/// A character budget rather than a token count, because the tokenizer is a
+/// Character budgets rather than token counts, because the tokenizer is a
 /// property of the model and this module does not know which model it is talking
-/// to: the same job runs on a 0.8B local GGUF and on a cloud frontier model.
-/// English runs roughly 4 characters per token, and the code-switched
-/// Hindi/English this app targets is worse — Devanagari is closer to 1–2
-/// characters per token — so 12,000 characters is somewhere between 3,000 and
-/// 6,000 tokens depending on what was actually said. That leaves room for the
-/// template, the user's notes and the model's own answer inside an 8k context,
-/// which is the smallest window worth planning for.
-///
-/// Counting tokens properly would mean shipping a tokenizer per model to gain
-/// very little: being wrong here costs one extra window, not a failed job.
-pub const WINDOW_CHAR_BUDGET: usize = 12_000;
+/// to. Counting tokens properly would mean shipping a tokenizer per model to gain
+/// very little: being wrong costs one extra window, not a failed job.
+#[cfg(test)]
+const WINDOW_CHAR_BUDGET: usize = 12_000;
 
-/// Characters of partial summaries per reduce call.
-///
-/// Lower than [`WINDOW_CHAR_BUDGET`] because the reduce step's *output* is the
-/// finished document rather than a few bullets, and that output has to fit in
-/// the same context as its input.
-pub const REDUCE_CHAR_BUDGET: usize = 9_000;
+#[cfg(test)]
+const REDUCE_CHAR_BUDGET: usize = 9_000;
 
 /// Refuse to map more than this many windows.
 ///
@@ -81,16 +78,76 @@ pub const MAX_WINDOWS: usize = 40;
 /// request with something longer than it was given cannot loop forever.
 const MAX_REDUCE_ROUNDS: usize = 3;
 
-/// Output tokens reserved for a notes call.
+/// Output tokens reserved for a notes call on a cloud provider.
 ///
 /// Explicit because the shared default is tuned for dictation cleanup, where the
 /// answer is a sentence. Meeting notes for a long call are a document, and a
 /// generic ~2048 limit truncates one mid-bullet — then stores the truncated text,
-/// because a short reply is indistinguishable from a complete one. Deliberately
-/// *not* paired with a completeness check: a clipped set of notes is still worth
-/// keeping, and refusing to save it would turn a cosmetic problem into losing the
-/// summary entirely.
-const NOTES_MAX_OUTPUT_TOKENS: u32 = 4_096;
+/// because a short reply is indistinguishable from a complete one. Generous,
+/// because on a reasoning model (GPT-6, o-series, gpt-oss) this one ceiling
+/// covers the hidden thinking *and* the visible notes, and a ceiling consumed by
+/// thinking returns no content at all.
+const NOTES_MAX_OUTPUT_TOKENS: u32 = 16_000;
+
+/// Characters of transcript per map window on a cloud provider.
+///
+/// Every cloud model the app lists has a context of 32k tokens or more, and a
+/// transcript runs 2–4 characters per token, so 48,000 characters is at most
+/// ~24k tokens of input. The old universal 12,000-character window was sized for
+/// the smallest local context and split a twelve-minute conversation into two
+/// halves, each summarised blind to the other — strictly worse notes, for two
+/// extra calls.
+const CLOUD_WINDOW_CHARS: usize = 48_000;
+
+/// Per-provider sizing for one notes job.
+///
+/// A property of *where* the model runs, not of the job: the built-in engine's
+/// context is whatever the user set `local_llm_context_size` to (8k by default)
+/// and prompt + transcript + answer all have to fit inside it, while a cloud model
+/// has room to read a whole meeting at once.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct NotesBudget {
+    pub window_chars: usize,
+    pub reduce_chars: usize,
+    pub max_output_tokens: u32,
+}
+
+impl NotesBudget {
+    /// Tokens the fixed instructions (template, rules, contract) take.
+    const PROMPT_OVERHEAD_TOKENS: usize = 1_500;
+    /// Characters per token assumed for the transcript. Pessimistic on purpose:
+    /// Devanagari is 1–2 characters per token, and an overflowing window fails
+    /// the call outright while an undersized one only costs an extra window.
+    const CHARS_PER_TOKEN: usize = 2;
+
+    pub fn for_provider(provider_id: &str, local_context_tokens: u32) -> Self {
+        if provider_id != crate::settings::BUILTIN_POST_PROCESS_PROVIDER_ID {
+            return Self {
+                window_chars: CLOUD_WINDOW_CHARS,
+                reduce_chars: CLOUD_WINDOW_CHARS,
+                max_output_tokens: NOTES_MAX_OUTPUT_TOKENS,
+            };
+        }
+        let context = local_context_tokens.clamp(
+            crate::managers::local_llm::MIN_CONTEXT_SIZE,
+            crate::managers::local_llm::MAX_CONTEXT_SIZE,
+        ) as usize;
+        // A quarter of the window for the answer, capped at a long document.
+        let output = (context / 4).clamp(256, 4_096);
+        let input_tokens = context
+            .saturating_sub(output)
+            .saturating_sub(Self::PROMPT_OVERHEAD_TOKENS)
+            .max(256);
+        let window_chars = input_tokens * Self::CHARS_PER_TOKEN;
+        Self {
+            window_chars,
+            // Partials are bullets in the model's own output language, which is
+            // denser than raw speech, so the same arithmetic holds.
+            reduce_chars: window_chars,
+            max_output_tokens: output as u32,
+        }
+    }
+}
 
 /// Deadline for one notes call.
 ///
@@ -115,6 +172,37 @@ const NON_SUBSTANTIVE_RULE: &str = concat!(
     "headings and do not invent content to fill them. Reply with a single plain sentence saying what was ",
     "captured — for example \"Only a brief sound check was recorded.\" — and nothing else. ",
     "This rule overrides the section structure above."
+);
+
+/// What the transcript actually is, sent with every prompt that reads it.
+///
+/// Without this a model treats every line as testimony. The reporting user's
+/// meeting — a Nepali/Hindi/English conversation — also contained "Antina,
+/// voulez-vous venir avec?", "Nein. Da." and "[crying] ええ。" on the far-side
+/// stream: speech recognition hallucinating other languages out of background
+/// noise and cross-talk. A summary that dutifully reports someone speaking French
+/// is wrong in a way the user notices immediately. Speaker labels need the same
+/// caveat: "Speaker 1" … "Speaker 5" are voice clusters, and one person often
+/// becomes two.
+///
+/// The language line exists because the answer to "what language should the
+/// notes be in" is not "whatever the transcript is in" when the transcript is in
+/// three at once.
+pub const ASR_NOISE_RULE: &str = concat!(
+    "ABOUT THE TRANSCRIPT\n",
+    "It was produced automatically by speech recognition, so it contains errors. Expect misheard words, and short ",
+    "fragments in languages nobody in the meeting was speaking (a line of French, German or Japanese in a conversation ",
+    "that is otherwise in other languages) — those are recognition noise from background sound, not speech. Ignore ",
+    "fragments that make no sense in context and never report them as something a participant said. People often switch ",
+    "languages mid-sentence (for example Nepali, Hindi and English); understand what they meant as a whole. Labels such as ",
+    "\"Speaker 1\" come from automatic voice clustering, so one person may appear under several labels."
+);
+
+/// Which language the notes are written in. Separate from [`ASR_NOISE_RULE`]
+/// because Ask answers in the language of the question instead.
+const NOTES_LANGUAGE_RULE: &str = concat!(
+    "Write in English unless the user's own notes are written in another language, in which case use theirs. Translate ",
+    "what people meant; do not transliterate what they said."
 );
 
 /// How much of the user's own notes is echoed into each *map* prompt.
@@ -217,11 +305,16 @@ impl NotesTemplate {
             Self::General => concat!(
                 "Write general meeting notes under these headings, in this order, ",
                 "omitting any heading the meeting genuinely had nothing for:\n",
-                "## Summary — three to five sentences on what this meeting was for and where it landed.\n",
-                "## Decisions — what was actually settled, and by whom.\n",
-                "## Action items — see the ownership rule below.\n",
-                "## Open questions — what was raised and left unresolved.\n",
-                "## Details worth keeping — names, numbers, dates, links, and anything a person would otherwise have to re-listen for."
+                "## Summary — two or three sentences: what this meeting was for and where it landed. Prose, not bullets.\n",
+                "## Key takeaways — three to five bullets, the outcomes and facts someone who missed the meeting needs first. ",
+                "Each one specific: the number, the name, the date, not \"pricing was discussed\".\n",
+                "## Topics — one `### Short topic name` per subject that got real discussion, in the order it came up, ",
+                "with two to four terse bullets under each: what was said, who held which position, the specifics. ",
+                "Skip small talk and logistics.\n",
+                "## Decisions — what was actually settled, and by whom. Only decisions, not discussion.\n",
+                "## Next steps — every commitment, as a checklist: `- [ ] **Owner** — the task (by when)`. ",
+                "Add the deadline only if one was said. This is the only place action items appear.\n",
+                "## Open questions — what was raised and left unresolved."
             ),
             Self::Standup => concat!(
                 "Write standup notes grouped by person, because a standup is per-person by construction. ",
@@ -331,6 +424,23 @@ const OUTPUT_CONTRACT: &str = concat!(
     "Write nothing that was not said in the meeting or in the user's notes — no filler sections, no invented ",
     "attendees, no recommendations of your own. Where the transcript is garbled, say it is unclear rather than ",
     "guessing what it meant. Use the speakers' names exactly as they appear in the transcript."
+);
+
+/// How the notes read, sent with every prompt that writes finished notes.
+///
+/// Every mainstream note taker converges on the same shape — a short summary,
+/// the takeaways, per-topic bullets, owned next steps — and the complaints about
+/// them converge too: notes that are too long to skim, generic ("pricing was
+/// discussed") where the reader needed the number, and the same action item
+/// repeated in the summary, the body and the task list until nobody trusts any
+/// of the three. This rule is aimed at exactly those three failures.
+const STYLE_RULE: &str = concat!(
+    "STYLE\n",
+    "Write like a sharp colleague's notes, not like minutes. Bullets are short fragments, one line each, no more than ",
+    "about twenty words; no bullet restates its heading. Keep every specific the meeting produced — numbers, amounts, ",
+    "dates, names, product and file names — because those are what people come back for. Scale the length to the ",
+    "meeting: a ten-minute call is a few lines per section, not a page. Say each thing once: a task belongs under the ",
+    "next steps and nowhere else, and a decision is not repeated as a takeaway."
 );
 
 /// One slice of transcript, sized to fit one model call.
@@ -563,14 +673,18 @@ Do not write the final notes yet, and do not write a conclusion — this part ma
     ));
     prompt.push_str(concat!(
         "Extract from this part, as short markdown bullets and nothing else:\n",
+        "- The topics discussed in this part, each as a short label with its key points and specifics under it.\n",
         "- Decisions reached in this part.\n",
         "- Action items in this part, each naming its owner.\n",
         "- Facts worth keeping: names, numbers, dates, amounts, links, commitments.\n",
         "- Questions raised and left open.\n",
-        "- One or two sentences on what this part was about.\n",
         "Be compact. Another pass will merge your output with the other parts, and it can only keep what you write down.\n\n"
     ));
     prompt.push_str(ATTRIBUTION_RULE);
+    prompt.push_str("\n\n");
+    prompt.push_str(ASR_NOISE_RULE);
+    prompt.push('\n');
+    prompt.push_str(NOTES_LANGUAGE_RULE);
     prompt.push_str("\n\n");
 
     let my_notes = my_notes.trim();
@@ -645,7 +759,13 @@ The material below is speaker-attributed: each line begins with the name of the 
 
     prompt.push_str(ATTRIBUTION_RULE);
     prompt.push_str("\n\n");
+    prompt.push_str(ASR_NOISE_RULE);
+    prompt.push('\n');
+    prompt.push_str(NOTES_LANGUAGE_RULE);
+    prompt.push_str("\n\n");
     prompt.push_str(NON_SUBSTANTIVE_RULE);
+    prompt.push_str("\n\n");
+    prompt.push_str(STYLE_RULE);
     prompt.push_str("\n\n");
     prompt.push_str(OUTPUT_CONTRACT);
     prompt.push_str("\n\n");
@@ -740,6 +860,27 @@ pub fn sanitize_notes(raw: &str) -> String {
     text
 }
 
+/// Whether a reply is our own instructions coming back instead of an answer.
+///
+/// The failure is real and it was stored: a model that cannot do the task (here,
+/// a dictation-cleanup fine-tune) "cleans" the prompt it was handed and returns
+/// it. Saved as notes, it then became the meeting's auto-generated title.
+/// Checked on the opening only, because a legitimate summary never starts by
+/// addressing the reader in the second person with the app's own phrasing.
+pub fn looks_like_echoed_prompt(reply: &str) -> bool {
+    const OPENINGS: [&str; 4] = [
+        "you are reading one part",
+        "you are writing the notes for one meeting",
+        "below are extracted notes from consecutive parts",
+        "you answer questions about one meeting",
+    ];
+    let head: String = reply.trim_start().chars().take(80).collect();
+    let head = head.to_lowercase();
+    OPENINGS.iter().any(|opening| head.starts_with(opening))
+        || reply.contains("<transcript_part>")
+        || reply.contains("</transcript>")
+}
+
 fn strip_think_blocks(raw: &str) -> String {
     let mut out = String::with_capacity(raw.len());
     let mut rest = raw;
@@ -762,14 +903,112 @@ fn strip_think_blocks(raw: &str) -> String {
 
 /* ─────────────────────────────── the job itself ─────────────────────────── */
 
+/// Meetings whose notes are being written right now.
+///
+/// The UI needs this to tell "not written yet" from "being written": the
+/// automatic job runs for a minute after the call ends, and a detail page opened
+/// during that minute used to offer "Generate notes" — a second, concurrent job
+/// racing the first to write the same row.
+static NOTES_IN_FLIGHT: Lazy<Mutex<HashSet<i64>>> = Lazy::new(|| Mutex::new(HashSet::new()));
+
+/// Whether a notes job is running for `meeting_id`.
+pub fn notes_job_running(meeting_id: i64) -> bool {
+    NOTES_IN_FLIGHT
+        .lock()
+        .map(|set| set.contains(&meeting_id))
+        .unwrap_or(false)
+}
+
+/// Holds a meeting's in-flight slot; released on drop, so every exit path —
+/// error, panic, cancelled future — frees it.
+struct InFlight(i64);
+
+impl InFlight {
+    fn claim(meeting_id: i64) -> Option<Self> {
+        let mut set = NOTES_IN_FLIGHT.lock().ok()?;
+        // Not `then_some(Self(..))`: that builds the guard eagerly, and dropping
+        // the unused one would re-lock this mutex (deadlock) and free the slot
+        // the running job holds.
+        if set.insert(meeting_id) {
+            Some(Self(meeting_id))
+        } else {
+            None
+        }
+    }
+}
+
+impl Drop for InFlight {
+    fn drop(&mut self) {
+        if let Ok(mut set) = NOTES_IN_FLIGHT.lock() {
+            set.remove(&self.0);
+        }
+    }
+}
+
+/// Generate notes for a meeting, announcing progress on [`NOTES_PROGRESS_EVENT`].
+///
+/// Used by both the automatic post-call job and the Regenerate button, so every
+/// open view — the detail page, the list, the pill — learns about a run no
+/// matter which of them started it.
+pub async fn generate_and_announce(
+    app: &AppHandle,
+    store: &MeetingStore,
+    meeting_id: i64,
+    template: NotesTemplate,
+) -> Result<GeneratedNotes, String> {
+    let Some(slot) = InFlight::claim(meeting_id) else {
+        return Err("The notes for this meeting are already being written.".to_string());
+    };
+    let _ = app.emit(NOTES_PROGRESS_EVENT, NotesProgress::Started { meeting_id });
+    run_claimed(app, store, meeting_id, template, slot).await
+}
+
+/// The body of an announced job, for a caller that already holds the slot and
+/// has already emitted `Started` (the post-call job diarizes in between).
+async fn run_claimed(
+    app: &AppHandle,
+    store: &MeetingStore,
+    meeting_id: i64,
+    template: NotesTemplate,
+    _slot: InFlight,
+) -> Result<GeneratedNotes, String> {
+    let result = generate_meeting_notes(app, store, meeting_id, template).await;
+    match &result {
+        Ok(generated) => {
+            if let Err(e) = store.complete_meeting(meeting_id) {
+                warn!("Meeting {meeting_id} has notes but could not be marked complete: {e}");
+            }
+            let _ = app.emit(
+                NOTES_PROGRESS_EVENT,
+                NotesProgress::Finished {
+                    meeting_id,
+                    notes: generated.notes.clone(),
+                    skipped_windows: generated.skipped_windows,
+                },
+            );
+        }
+        Err(error) => {
+            warn!("Notes for meeting {meeting_id} failed: {error}");
+            let _ = app.emit(
+                NOTES_PROGRESS_EVENT,
+                NotesProgress::Failed {
+                    meeting_id,
+                    error: error.clone(),
+                },
+            );
+        }
+    }
+    let _ = app.emit(crate::commands::meetings::MEETINGS_UPDATED_EVENT, ());
+    result
+}
+
 /// Generate and store notes for one meeting.
 ///
-/// Reads the transcript, resolves the same brain dictation cleanup uses, runs
-/// map-reduce, writes the result with [`MeetingStore::set_notes`], and returns
-/// what it produced.
+/// Reads the transcript, resolves the meeting brain, runs map-reduce, writes the
+/// result with [`MeetingStore::set_notes`], and returns what it produced.
 ///
-/// A single failed window does not fail the job — a two-hour meeting is nine
-/// calls, and a provider hiccup on one of them must not throw away the eight
+/// A single failed window does not fail the job — a two-hour meeting is several
+/// calls, and a provider hiccup on one of them must not throw away the ones
 /// that worked. All of them failing does return `Err`, because notes assembled
 /// from nothing would be an invented document presented as a record.
 pub async fn generate_meeting_notes(
@@ -801,18 +1040,14 @@ pub async fn generate_meeting_notes(
         );
     }
 
-    let windows = split_into_windows(&lines, WINDOW_CHAR_BUDGET);
     let settings = crate::settings::get_settings(app);
-    let (provider, model, api_key, source) = crate::settings::resolve_post_process_brain(&settings)
-        .map_err(|error| {
-            format!(
-                "No model is configured to write meeting notes ({:?}). Pick one in Settings.",
-                error.reason
-            )
-        })?;
+    let (provider, model, api_key, source) = crate::settings::resolve_meeting_brain(&settings)?;
+    let budget = NotesBudget::for_provider(&provider.id, settings.local_llm_context_size);
+    let windows = split_into_windows(&lines, budget.window_chars);
     info!(
-        "Generating notes for meeting {meeting_id}: {} window(s), template '{}', provider '{}' model '{}' ({:?})",
+        "Generating notes for meeting {meeting_id}: {} window(s) of up to {} chars, template '{}', provider '{}' model '{}' ({:?})",
         windows.len(),
+        budget.window_chars,
         template.id(),
         provider.id,
         model,
@@ -820,7 +1055,7 @@ pub async fn generate_meeting_notes(
     );
 
     // The built-in engine has to be running before it can be called, and it must
-    // not idle out between windows: a nine-window job on a local model can take
+    // not idle out between windows: a multi-window job on a local model can take
     // minutes, which is longer than the unload timeout.
     let _activity_guard = if provider.id == crate::settings::BUILTIN_POST_PROCESS_PROVIDER_ID {
         // Cloned out of Tauri state rather than held as a `State` borrow: this
@@ -839,6 +1074,12 @@ pub async fn generate_meeting_notes(
         None
     };
 
+    let call = NotesCall {
+        provider: &provider,
+        api_key: &api_key,
+        model: &model,
+        max_output_tokens: budget.max_output_tokens,
+    };
     let my_notes = meeting.my_notes.trim().to_string();
 
     let (material, source_kind, skipped) = if windows.len() == 1 {
@@ -848,26 +1089,42 @@ pub async fn generate_meeting_notes(
         let window = windows.first().ok_or("no transcript window")?;
         (window.text.clone(), NotesSource::FullTranscript, 0)
     } else {
-        let (partials, skipped) =
-            summarize_windows(&provider, &api_key, &model, &windows, template, &my_notes).await;
+        let (partials, skipped) = summarize_windows(&call, &windows, template, &my_notes).await;
         if partials.is_empty() {
             return Err(
                 "Every part of this meeting failed to summarize. Check the model configuration and try again."
                     .to_string(),
             );
         }
-        let merged = reduce_partials(&provider, &api_key, &model, partials).await?;
+        let merged = reduce_partials(&call, partials, budget.reduce_chars).await?;
         (merged, NotesSource::Partials, skipped)
     };
 
     let prompt = build_notes_prompt(source_kind, &material, template, &my_notes);
-    let notes = request_completion(&provider, &api_key, &model, prompt)
+    let notes = call
+        .complete(prompt)
         .await
         .map_err(|error| format!("Writing the notes failed: {error}"))?;
 
     store
         .set_notes(meeting_id, &notes, Some(template.id()))
         .map_err(|error| error.to_string())?;
+
+    // Retitle when the current title is one nobody typed: a timestamp default,
+    // the title an earlier run derived from its own notes, or one made from an
+    // echoed prompt. The last two are what let a regeneration repair a title made
+    // from bad notes.
+    let derived_before = meeting.notes.as_deref().and_then(title_from_notes);
+    if looks_auto_titled(&meeting.title)
+        || derived_before.as_deref() == Some(meeting.title.as_str())
+        || looks_like_echoed_prompt(&meeting.title)
+    {
+        if let Some(title) = title_from_notes(&notes) {
+            if let Err(e) = store.rename_meeting(meeting_id, &title) {
+                debug!("Could not retitle meeting {meeting_id}: {e}");
+            }
+        }
+    }
 
     Ok(GeneratedNotes {
         notes,
@@ -877,17 +1134,23 @@ pub async fn generate_meeting_notes(
     })
 }
 
+/// Everything one notes request needs besides its prompt.
+struct NotesCall<'a> {
+    provider: &'a PostProcessProvider,
+    api_key: &'a str,
+    model: &'a str,
+    max_output_tokens: u32,
+}
+
 /// Map step. Returns the partials that succeeded and how many windows were lost.
 ///
 /// Sequential, not concurrent. The built-in engine is one llama.cpp process
 /// serving one request at a time, so parallel windows would queue there anyway,
-/// and on a cloud provider a burst of nine requests is exactly what a
-/// rate-limiter answers with 429s. Nothing interactive is waiting on this — it
-/// runs after the meeting has ended — so latency is the cheapest thing to spend.
+/// and on a cloud provider a burst of requests is exactly what a rate-limiter
+/// answers with 429s. Nothing interactive is waiting on this — it runs after the
+/// meeting has ended — so latency is the cheapest thing to spend.
 async fn summarize_windows(
-    provider: &PostProcessProvider,
-    api_key: &str,
-    model: &str,
+    call: &NotesCall<'_>,
     windows: &[TranscriptWindow],
     template: NotesTemplate,
     my_notes: &str,
@@ -897,7 +1160,7 @@ async fn summarize_windows(
 
     for window in windows {
         let prompt = build_window_prompt(window, template, my_notes);
-        match request_completion(provider, api_key, model, prompt).await {
+        match call.complete(prompt).await {
             Ok(text) => partials.push(format!(
                 "### Part {} of {}\n{}",
                 window.index, window.total, text
@@ -925,15 +1188,14 @@ async fn summarize_windows(
 /// is a real behaviour, and it must cost one wasted call rather than an infinite
 /// job.
 async fn reduce_partials(
-    provider: &PostProcessProvider,
-    api_key: &str,
-    model: &str,
+    call: &NotesCall<'_>,
     partials: Vec<String>,
+    budget: usize,
 ) -> Result<String, String> {
     let mut partials = partials;
 
     for round in 0..MAX_REDUCE_ROUNDS {
-        let groups = group_partials(&partials, REDUCE_CHAR_BUDGET);
+        let groups = group_partials(&partials, budget);
         if groups.len() <= 1 {
             break;
         }
@@ -948,7 +1210,7 @@ async fn reduce_partials(
         let mut condensed = Vec::with_capacity(groups.len());
         for group in &groups {
             let prompt = build_condense_prompt(&group.join("\n\n"));
-            match request_completion(provider, api_key, model, prompt).await {
+            match call.complete(prompt).await {
                 Ok(text) => condensed.push(text),
                 // Keeping the group's own text is better than dropping it: it is
                 // too long, which the next round may fix, whereas dropping it
@@ -976,57 +1238,93 @@ async fn reduce_partials(
     Ok(partials.join("\n\n"))
 }
 
-/// One completion, with an empty reply treated as a failure.
-///
-/// An empty reply is a failure here even though the assistant's connection test
-/// treats it as a pass: there, the request being accepted was the signal, but
-/// notes with no text in them are indistinguishable from a job that never ran.
-///
-/// Two things this does that a bare `send_chat_completion` does not, both from
-/// summaries specifically rather than from LLM calls in general:
-///
-/// * **Reserves [`NOTES_MAX_OUTPUT_TOKENS`].** The shared default is sized for a
-///   cleaned-up sentence and silently truncates a document.
-/// * **Bounds the call at [`NOTES_CALL_TIMEOUT`].** Without a deadline a wedged
-///   provider leaves the job hanging for the life of the app; with the *cleanup*
-///   deadline it would abort work that legitimately takes minutes and pay for it
-///   anyway. There is no retry: a retry on a timeout doubles the cost of the
-///   thing that just proved too slow.
-async fn request_completion(
-    provider: &PostProcessProvider,
-    api_key: &str,
-    model: &str,
-    prompt: String,
-) -> Result<String, String> {
-    let call = crate::llm_client::send_chat_completion_with_schema_typed(
-        provider,
-        api_key.to_string(),
-        model,
-        prompt,
-        None,
-        None,
-        None,
-        None,
-        None,
-        Some(NOTES_MAX_OUTPUT_TOKENS),
-        false,
-    );
-
-    match tokio::time::timeout(NOTES_CALL_TIMEOUT, call).await {
-        Ok(Ok(Some(text))) => {
-            let cleaned = sanitize_notes(&text);
-            if cleaned.trim().is_empty() {
-                Err("the model returned no usable text".to_string())
-            } else {
-                Ok(cleaned)
+impl NotesCall<'_> {
+    /// One completion, with an empty or echoed reply treated as a failure.
+    ///
+    /// An empty reply is a failure here even though the assistant's connection
+    /// test treats it as a pass: notes with no text in them are indistinguishable
+    /// from a job that never ran.
+    ///
+    /// * **Reserves an output budget** sized to the provider — the shared default
+    ///   is sized for a cleaned-up sentence and silently truncates a document.
+    /// * **Retries once without the ceiling when the reply is empty.** That is
+    ///   the signature of a reasoning model that spent the whole ceiling
+    ///   thinking; a retry with the same cap would fail identically.
+    /// * **Bounds each call at [`NOTES_CALL_TIMEOUT`].** No retry on a timeout: it
+    ///   doubles the cost of the thing that just proved too slow.
+    async fn complete(&self, prompt: String) -> Result<String, String> {
+        match self
+            .attempt(prompt.clone(), Some(self.max_output_tokens))
+            .await
+        {
+            Err(NotesAttemptError::Empty)
+                if self.provider.id != crate::settings::BUILTIN_POST_PROCESS_PROVIDER_ID =>
+            {
+                warn!(
+                    "Model '{}' returned no text within {} output tokens; retrying without a ceiling",
+                    self.model, self.max_output_tokens
+                );
+                self.attempt(prompt, None).await.map_err(|e| e.to_string())
             }
+            other => other.map_err(|e| e.to_string()),
         }
-        Ok(Ok(None)) => Err("the model returned no content".to_string()),
-        Ok(Err(error)) => Err(error.to_string()),
-        Err(_) => Err(format!(
-            "the model did not answer within {} seconds",
-            NOTES_CALL_TIMEOUT.as_secs()
-        )),
+    }
+
+    async fn attempt(
+        &self,
+        prompt: String,
+        max_tokens: Option<u32>,
+    ) -> Result<String, NotesAttemptError> {
+        let request = crate::llm_client::send_chat_completion_with_schema_typed(
+            self.provider,
+            self.api_key.to_string(),
+            self.model,
+            prompt,
+            None,
+            None,
+            None,
+            None,
+            None,
+            max_tokens,
+            false,
+        );
+
+        match tokio::time::timeout(NOTES_CALL_TIMEOUT, request).await {
+            Ok(Ok(Some(text))) => {
+                let cleaned = sanitize_notes(&text);
+                if cleaned.trim().is_empty() {
+                    Err(NotesAttemptError::Empty)
+                } else if looks_like_echoed_prompt(&cleaned) {
+                    Err(NotesAttemptError::Failed(
+                        "the model repeated its instructions instead of answering — it is probably \
+not a chat model. Choose a different assistant model."
+                            .to_string(),
+                    ))
+                } else {
+                    Ok(cleaned)
+                }
+            }
+            Ok(Ok(None)) => Err(NotesAttemptError::Empty),
+            Ok(Err(error)) => Err(NotesAttemptError::Failed(error.to_string())),
+            Err(_) => Err(NotesAttemptError::Failed(format!(
+                "the model did not answer within {} seconds",
+                NOTES_CALL_TIMEOUT.as_secs()
+            ))),
+        }
+    }
+}
+
+enum NotesAttemptError {
+    Empty,
+    Failed(String),
+}
+
+impl std::fmt::Display for NotesAttemptError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Empty => write!(f, "the model returned no text"),
+            Self::Failed(detail) => write!(f, "{detail}"),
+        }
     }
 }
 
@@ -1109,6 +1407,12 @@ pub fn spawn_notes_job(app: &AppHandle, meeting_id: i64) {
             }
         }
 
+        // Held from here, across diarization, so a detail page opened in the
+        // meantime shows "writing" instead of offering a second, racing job.
+        let Some(slot) = InFlight::claim(meeting_id) else {
+            debug!("Notes for meeting {meeting_id} are already being written");
+            return;
+        };
         let _ = app.emit(NOTES_PROGRESS_EVENT, NotesProgress::Started { meeting_id });
 
         // Diarization first, deliberately. It renames "Others" into "Speaker 1" and
@@ -1140,59 +1444,18 @@ pub fn spawn_notes_job(app: &AppHandle, meeting_id: i64) {
             }
         }
 
-        match generate_meeting_notes(&app, store.as_ref(), meeting_id, NotesTemplate::default())
-            .await
-        {
-            Ok(generated) => {
-                // Titling is deliberately after the notes and deliberately
-                // best-effort: a meeting with good notes and a timestamp title is
-                // far better than no notes.
-                retitle_from_notes(&store, meeting_id, &generated.notes);
-                if let Err(e) = store.complete_meeting(meeting_id) {
-                    warn!("Meeting {meeting_id} has notes but could not be marked complete: {e}");
-                }
-                let _ = app.emit(
-                    NOTES_PROGRESS_EVENT,
-                    NotesProgress::Finished {
-                        meeting_id,
-                        notes: generated.notes,
-                        skipped_windows: generated.skipped_windows,
-                    },
-                );
-                let _ = app.emit(crate::commands::meetings::MEETINGS_UPDATED_EVENT, ());
-            }
-            Err(error) => {
-                // A warning, not an error dialog. The transcript and the audio are
-                // both safe, and the Summary tab offers a retry.
-                warn!("Automatic notes for meeting {meeting_id} failed: {error}");
-                let _ = app.emit(
-                    NOTES_PROGRESS_EVENT,
-                    NotesProgress::Failed { meeting_id, error },
-                );
-                let _ = app.emit(crate::commands::meetings::MEETINGS_UPDATED_EVENT, ());
-            }
-        }
+        // Failure is announced by `run_claimed` as a warning and a `Failed` event,
+        // not an error dialog: the transcript and the audio are both safe, and
+        // the Summary tab offers a retry.
+        let _ = run_claimed(
+            &app,
+            store.as_ref(),
+            meeting_id,
+            NotesTemplate::default(),
+            slot,
+        )
+        .await;
     });
-}
-
-/// Replace a default timestamp title with one derived from the notes.
-///
-/// Only when the title still looks auto-generated: a title the user typed is
-/// theirs, and overwriting it because a summary finished later would be the app
-/// undoing the user's own edit.
-fn retitle_from_notes(store: &MeetingStore, meeting_id: i64, notes: &str) {
-    let Ok(Some(meeting)) = store.get_meeting(meeting_id) else {
-        return;
-    };
-    if !looks_auto_titled(&meeting.title) {
-        return;
-    }
-    let Some(title) = title_from_notes(notes) else {
-        return;
-    };
-    if let Err(e) = store.rename_meeting(meeting_id, &title) {
-        debug!("Could not retitle meeting {meeting_id}: {e}");
-    }
 }
 
 /// Whether a title is one nobody chose.
@@ -1312,6 +1575,90 @@ fn clip_title(title: &str, max: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /* ───────────────────────────── budgets ───────────────────────────── */
+
+    /// The reporting user's twelve-minute meeting was 14,755 characters and got
+    /// split in two at the old universal 12,000. A cloud model reads it whole.
+    #[test]
+    fn a_cloud_model_reads_a_short_meeting_in_one_window() {
+        let budget = NotesBudget::for_provider("azure_openai", 8_192);
+        assert!(budget.window_chars >= 15_000);
+        let lines: Vec<String> = (0..100)
+            .map(|i| format!("Me: {}", "x".repeat(140 + i % 7)))
+            .collect();
+        assert_eq!(split_into_windows(&lines, budget.window_chars).len(), 1);
+    }
+
+    /// Prompt + window + answer must fit the engine's context, or the call fails.
+    #[test]
+    fn the_builtin_budget_fits_the_configured_context() {
+        for context in [4_096u32, 8_192, 32_768] {
+            let budget = NotesBudget::for_provider("builtin", context);
+            let input_tokens = budget.window_chars / NotesBudget::CHARS_PER_TOKEN;
+            let total = input_tokens
+                + NotesBudget::PROMPT_OVERHEAD_TOKENS
+                + budget.max_output_tokens as usize;
+            assert!(
+                total <= context as usize,
+                "{context}-token context: {total} tokens needed"
+            );
+        }
+    }
+
+    /* ───────────────────────── echoed prompts ───────────────────────── */
+
+    /// Verbatim from the reporting user's database: a cleanup model returned the
+    /// map prompt, and it was stored as notes and then as the title.
+    #[test]
+    fn an_echoed_prompt_is_not_accepted_as_notes() {
+        assert!(looks_like_echoed_prompt(
+            "You are reading ONE PART of a longer meeting transcript: part 2 of 2. Do not write the final notes yet"
+        ));
+        assert!(looks_like_echoed_prompt(
+            "You are writing the notes for one meeting that has already…"
+        ));
+        assert!(!looks_like_echoed_prompt(
+            "## Summary\nThe meeting focused on a plan to revive a stalled GitHub project."
+        ));
+    }
+
+    /// Recognition noise must be named for what it is, in both the map and the
+    /// final prompt, or a summary reports a participant speaking French.
+    #[test]
+    fn every_transcript_prompt_explains_recognition_noise_and_language() {
+        let window = TranscriptWindow {
+            index: 1,
+            total: 2,
+            text: "Speaker 2: Antina, voulez-vous venir avec?".to_string(),
+        };
+        for prompt in [
+            build_window_prompt(&window, NotesTemplate::General, ""),
+            build_notes_prompt(
+                NotesSource::FullTranscript,
+                "Me: hi",
+                NotesTemplate::General,
+                "",
+            ),
+        ] {
+            assert!(prompt.contains(ASR_NOISE_RULE));
+            assert!(prompt.contains(NOTES_LANGUAGE_RULE));
+        }
+    }
+
+    #[test]
+    fn a_notes_job_slot_is_exclusive_and_released_on_drop() {
+        let id = -4242;
+        let first = InFlight::claim(id).expect("free");
+        assert!(notes_job_running(id));
+        assert!(
+            InFlight::claim(id).is_none(),
+            "a second job must be refused"
+        );
+        drop(first);
+        assert!(!notes_job_running(id));
+        assert!(InFlight::claim(id).is_some());
+    }
 
     /* ────────────────────── the non-substantive fallback ────────────────────── */
 
@@ -1837,6 +2184,39 @@ We reviewed the quarterly pricing model together.";
                 "the model needs an explicit escape hatch or it invents an owner"
             );
         }
+    }
+
+    /// The three complaints every note taker gets — too long, too generic, the
+    /// same task in three places — are addressed in every finished-notes prompt,
+    /// but not in the map step, whose output is raw material rather than notes.
+    #[test]
+    fn the_style_rule_reaches_finished_notes_only() {
+        let prompt = build_notes_prompt(
+            NotesSource::FullTranscript,
+            "Me: hi",
+            NotesTemplate::General,
+            "",
+        );
+        assert!(prompt.contains(STYLE_RULE));
+        let window = TranscriptWindow {
+            index: 1,
+            total: 2,
+            text: "Me: hi".to_string(),
+        };
+        assert!(!build_window_prompt(&window, NotesTemplate::General, "").contains(STYLE_RULE));
+    }
+
+    /// Next steps are a checklist the Summary tab can tick off, and they are the
+    /// one place tasks live.
+    #[test]
+    fn general_notes_put_owned_tasks_in_one_checklist() {
+        let instruction = NotesTemplate::General.instruction();
+        assert!(instruction.contains("## Next steps"));
+        assert!(instruction.contains("- [ ] **Owner**"));
+        assert!(instruction.contains("only place action items appear"));
+        // `title_from_notes` reads the first prose line, so the summary must stay
+        // first and stay prose.
+        assert!(instruction.find("## Summary") < instruction.find("## Key takeaways"));
     }
 
     #[test]

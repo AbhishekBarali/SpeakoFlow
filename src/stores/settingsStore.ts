@@ -5,7 +5,9 @@ import type {
   AppSettings as Settings,
   AudioDevice,
   ConversationPace,
+  ConversationSensitivity,
   ModelChoice,
+  OverlayLinger,
   PostProcessReadiness,
   RecordingRetentionPeriod,
   Replacement,
@@ -140,6 +142,10 @@ const settingUpdaters: {
     commands.setAssistantTtsVolume(value as number),
   assistant_conversation_pace: (value) =>
     commands.setAssistantConversationPace(value as ConversationPace),
+  assistant_conversation_sensitivity: (value) =>
+    commands.setAssistantConversationSensitivity(
+      value as ConversationSensitivity,
+    ),
   sound_theme: (value) => commands.changeSoundThemeSetting(value as string),
   theme: (value) => commands.changeThemeSetting(value as string),
   ui_text_size: (value) => commands.changeUiTextSizeSetting(value as string),
@@ -183,6 +189,8 @@ const settingUpdaters: {
   overlay_style: (value) => commands.changeOverlayStyleSetting(value as string),
   assistant_overlay_style: (value) =>
     commands.changeAssistantOverlayStyleSetting(value as string),
+  overlay_linger: (value) =>
+    commands.changeOverlayLingerSetting(value as OverlayLinger),
   debug_mode: (value) => commands.changeDebugModeSetting(value as boolean),
   custom_words: (value) => commands.updateCustomWords(value as string[]),
   spoken_emojis_enabled: (value) =>

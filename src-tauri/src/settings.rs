@@ -1,4 +1,4 @@
-use log::{debug, warn};
+use log::{debug, info, warn};
 use serde::de::{self, Visitor};
 use serde::{Deserialize, Deserializer, Serialize};
 use specta::Type;
@@ -693,6 +693,34 @@ pub fn resolve_overlay_style(style: OverlayStyle, supports_live: bool) -> Overla
     }
 }
 
+/// How long the finished live-transcription card stays on screen before it
+/// leaves. Only the Live card lingers — the compact pill dismisses as soon as
+/// the paste lands — so this is the window in which the final text can be read
+/// and copied. Hovering the card holds it regardless of the choice, so a short
+/// linger never takes the copy button away mid-reach.
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum OverlayLinger {
+    /// Gone almost at once: a glance, then out of the way.
+    Quick,
+    /// The long-standing behaviour.
+    #[default]
+    Standard,
+    Long,
+    Extended,
+}
+
+impl OverlayLinger {
+    pub fn duration(self) -> std::time::Duration {
+        std::time::Duration::from_millis(match self {
+            OverlayLinger::Quick => 1_000,
+            OverlayLinger::Standard => 3_000,
+            OverlayLinger::Long => 6_000,
+            OverlayLinger::Extended => 10_000,
+        })
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Type)]
 #[serde(rename_all = "snake_case")]
 pub enum ModelUnloadTimeout {
@@ -821,6 +849,27 @@ pub enum ConversationPace {
     Natural,
     /// ~1100 ms. Room to pause mid-sentence without being interrupted.
     Patient,
+}
+
+/// How readily a hands-free call decides that a sound is the user speaking.
+///
+/// The pace above is about *when a turn ends*; this is about *whether a turn
+/// starts at all*. They were one fixed tuning before, and it was tuned for a
+/// quiet room: a keyboard, a chair, a fan or the assistant's own voice coming
+/// back through the speakers was enough to start a turn — and a turn that starts
+/// while the assistant is talking cuts the answer off. The frontend maps each
+/// level to the voice detector's thresholds and to how long speech has to last
+/// before it is allowed to interrupt a reply (`conversationPolicy.ts`).
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum ConversationSensitivity {
+    /// Only clear, sustained speech. For a noisy room or open speakers.
+    Low,
+    /// The default: ignores clicks, coughs and short noises.
+    #[default]
+    Normal,
+    /// Picks up quiet speech quickly. Best with headphones in a quiet room.
+    High,
 }
 
 /// How thorough a web search should be. This is the single dial that replaces
@@ -1270,6 +1319,9 @@ pub struct AppSettings {
     /// transcript plus the streamed reply as readable text; Minimal is the pill.
     #[serde(default = "default_overlay_style")]
     pub assistant_overlay_style: OverlayStyle,
+    /// How long the finished live-transcription card stays up before leaving.
+    #[serde(default)]
+    pub overlay_linger: OverlayLinger,
     #[serde(default = "default_debug_mode")]
     pub debug_mode: bool,
     #[serde(default = "default_log_level")]
@@ -1285,6 +1337,15 @@ pub struct AppSettings {
     /// wrong the cost is one dismissed card.
     #[serde(default = "default_true")]
     pub meeting_auto_detect: bool,
+    /// Show the small floating indicator while a meeting records.
+    ///
+    /// On by default, because a recording nobody can see is indistinguishable
+    /// from one that silently stopped. Off is for people who find any floating
+    /// window during a call distracting — the recording then lives only in
+    /// Settings → Meetings, which is where it is stopped. Other note takers were
+    /// asked for exactly this switch.
+    #[serde(default = "default_true")]
+    pub meeting_show_indicator: bool,
     /// Learn a spelling when the user corrects a dictated word.
     ///
     /// **Off by default, and it must stay that way.** Unlike every other setting
@@ -1531,6 +1592,9 @@ pub struct AppSettings {
     /// How long a hands-free conversation waits for you to finish speaking.
     #[serde(default)]
     pub assistant_conversation_pace: ConversationPace,
+    /// How readily a hands-free call treats a sound as the user speaking.
+    #[serde(default)]
+    pub assistant_conversation_sensitivity: ConversationSensitivity,
     #[serde(default = "default_assistant_max_history_messages")]
     pub assistant_max_history_messages: u32,
     /// When on, once a conversation grows past the model's context window the
@@ -2801,20 +2865,14 @@ fn default_assistant_tts_base_url() -> String {
 /// OpenRouter is a preset provider, not a user-configurable compatible server.
 pub(crate) const OPENROUTER_TTS_BASE_URL: &str = "https://openrouter.ai/api/v1";
 
-/// Sensible default TTS base URL for a given engine. Used when the engine is
-/// switched so a stale value (e.g. the OpenAI URL lingering under the Azure
-/// engine and 404ing on Load voices) never leaks across engines.
+/// Sensible default TTS base URL for a given engine: the engine's fixed API
+/// root from the registry, or empty for the engines the user points somewhere
+/// themselves (Azure, custom) so the field shows its placeholder instead of
+/// another engine's URL.
 pub fn default_tts_base_url_for_engine(engine: &str) -> String {
-    match engine {
-        "openai" => "https://api.openai.com/v1".to_string(),
-        // OpenRouter is the OpenAI-compatible engine pointed at OpenRouter's
-        // hosted `/audio/speech` endpoint, so it gets its own default base URL.
-        "openrouter" => OPENROUTER_TTS_BASE_URL.to_string(),
-        // Azure Speech / ElevenLabs / Kokoro don't reuse the OpenAI base URL; an
-        // empty value shows the field's placeholder so the user enters the right
-        // endpoint (or needs none, for ElevenLabs/Kokoro).
-        _ => String::new(),
-    }
+    crate::tts::fixed_base_url(engine)
+        .unwrap_or_default()
+        .to_string()
 }
 
 /// Default TTS model for a given engine.
@@ -3058,17 +3116,14 @@ fn ensure_assistant_defaults(settings: &mut AppSettings) -> bool {
         settings.assistant_tts_voice = default_assistant_tts_voice();
         changed = true;
     }
-    if !matches!(
-        settings.assistant_tts_engine.as_str(),
-        "kokoro" | "openai" | "openrouter" | "elevenlabs" | "azure"
-    ) {
+    if !crate::tts::is_known_engine(&settings.assistant_tts_engine) {
         settings.assistant_tts_engine = default_assistant_tts_engine();
         changed = true;
     }
-    if settings.assistant_tts_base_url.trim().is_empty() {
-        settings.assistant_tts_base_url = default_assistant_tts_base_url();
-        changed = true;
-    }
+    // NOTE: the flat `assistant_tts_base_url` is NOT forced to OpenAI's URL when
+    // empty any more. It is a mirror of the active engine, and the migration
+    // block below seeds the active engine's map slot from it — so forcing it
+    // stamped `api.openai.com` into Azure's or a custom server's slot.
     // NOTE: the flat `assistant_tts_model` / `assistant_tts_remote_voice` fields
     // are deliberately NOT forced to a default here. They are loadable picker
     // fields that start empty (see `default_tts_model_for_engine` /
@@ -3557,10 +3612,12 @@ pub fn get_default_settings() -> AppSettings {
         overlay_position: default_overlay_position(),
         overlay_style: default_overlay_style(),
         assistant_overlay_style: default_overlay_style(),
+        overlay_linger: OverlayLinger::default(),
         debug_mode: false,
         log_level: default_log_level(),
         custom_words: Vec::new(),
         meeting_auto_detect: true,
+        meeting_show_indicator: true,
         auto_learn_corrections: false,
         learned_words: Vec::new(),
         model_folders: Vec::new(),
@@ -3641,6 +3698,7 @@ pub fn get_default_settings() -> AppSettings {
         assistant_tts_speed: default_assistant_tts_speed(),
         assistant_tts_volume: default_assistant_tts_volume(),
         assistant_conversation_pace: ConversationPace::default(),
+        assistant_conversation_sensitivity: ConversationSensitivity::default(),
         assistant_max_history_messages: default_assistant_max_history_messages(),
         assistant_auto_summarize: default_assistant_auto_summarize(),
         local_llm_context_size: default_local_llm_context_size(),
@@ -3758,16 +3816,16 @@ impl AppSettings {
     /// back to each engine's sensible default when a value hasn't been set.
     pub fn sync_active_tts_fields(&mut self) {
         let engine = self.assistant_tts_engine.clone();
-        self.assistant_tts_base_url = if engine == "openrouter" {
-            // A preset provider always uses its canonical endpoint. Ignore any
+        self.assistant_tts_base_url = match crate::tts::fixed_base_url(&engine) {
+            // A hosted engine always uses its canonical endpoint. Ignore any
             // stale value saved by builds that exposed this as an editable field.
-            OPENROUTER_TTS_BASE_URL.to_string()
-        } else {
-            self.assistant_tts_base_urls
+            Some(fixed) => fixed.to_string(),
+            None => self
+                .assistant_tts_base_urls
                 .get(&engine)
                 .cloned()
                 .filter(|s| !s.trim().is_empty())
-                .unwrap_or_else(|| default_tts_base_url_for_engine(&engine))
+                .unwrap_or_else(|| default_tts_base_url_for_engine(&engine)),
         };
         self.assistant_tts_model = self
             .assistant_tts_models
@@ -3949,6 +4007,81 @@ pub(crate) fn resolve_post_process_brain(
             Err(_) => Err(dedicated_error),
         },
     }
+}
+
+/// Which selection supplied the model that writes and answers about meetings.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum MeetingBrainSource {
+    Assistant,
+    Cleanup,
+}
+
+/// Resolve the model that writes meeting notes and answers questions about a
+/// meeting.
+///
+/// **Assistant first, cleanup second — the reverse of dictation cleanup.** Notes
+/// are a long-document job and Ask is a conversation; both are what the
+/// assistant's model is chosen for, while the cleanup slot is usually a small
+/// model picked because it rewrites one sentence fast. This used to share
+/// [`resolve_post_process_brain`], and with SpeakoFlow Mini selected for cleanup
+/// every meeting went to a 0.8B model trained only to tidy dictation. It could
+/// not summarise, so it echoed the instructions back — meeting 13 of the
+/// reporting user's own database had the map prompt ("You are reading ONE PART
+/// of a longer meeting transcript…") stored as its notes and, via auto-titling,
+/// as its title.
+///
+/// **A cleanup specialist is never used here**, whichever slot it is in: it
+/// cannot converse, which is the same reason the assistant catalog hides it.
+/// When neither slot holds a usable model the error says so in a sentence the
+/// meeting UI can show as-is.
+pub(crate) fn resolve_meeting_brain(
+    settings: &AppSettings,
+) -> Result<(PostProcessProvider, String, String, MeetingBrainSource), String> {
+    let candidates = [
+        (
+            &settings.assistant_provider_id,
+            &settings.assistant_models,
+            PostProcessConfigSource::AssistantFallback,
+            MeetingBrainSource::Assistant,
+        ),
+        (
+            &settings.post_process_provider_id,
+            &settings.post_process_models,
+            PostProcessConfigSource::DedicatedCleanupSelection,
+            MeetingBrainSource::Cleanup,
+        ),
+    ];
+
+    let mut first_error: Option<PostProcessResolutionError> = None;
+    let mut skipped_specialist: Option<String> = None;
+    for (provider_id, models, source, meeting_source) in candidates {
+        match resolve_post_process_candidate(settings, provider_id, models, source) {
+            Ok((provider, model, api_key)) => {
+                if crate::managers::model::is_cleanup_specialist(&model) {
+                    skipped_specialist.get_or_insert(model);
+                    continue;
+                }
+                return Ok((provider, model, api_key, meeting_source));
+            }
+            Err(error) => {
+                first_error.get_or_insert(error);
+            }
+        }
+    }
+
+    if let Some(model) = skipped_specialist {
+        return Err(format!(
+            "'{model}' is a dictation-cleanup model and cannot write meeting notes or answer questions. \
+Choose an assistant model on the Models page."
+        ));
+    }
+    Err(match first_error.map(|error| error.reason) {
+        Some(PostProcessUnavailableReason::MissingApiKey) => {
+            "The assistant's model has no API key. Add one on the Models page.".to_string()
+        }
+        _ => "No assistant model is set up to write meeting notes. Choose one on the Models page."
+            .to_string(),
+    })
 }
 
 /// Resolve the exact provider, model, prompt, writing style, source, and
@@ -4278,6 +4411,99 @@ fn migrate_legacy_shared_tts_key(settings: &mut AppSettings) -> bool {
     }
 }
 
+/// Whether a TTS base URL is OpenAI's own API rather than some other server
+/// that happens to speak its schema.
+fn is_official_openai_tts_url(url: &str) -> bool {
+    url.trim().to_ascii_lowercase().contains("api.openai.com")
+}
+
+/// Move a pre-registry "OpenAI-compatible" voice setup that pointed somewhere
+/// other than OpenAI onto the custom engine.
+///
+/// Older builds had one "openai" engine with an editable base URL, and that is
+/// how everyone reached a self-hosted server or Azure OpenAI. "OpenAI" is now a
+/// fixed hosted engine and "custom" is the one with an address, so without this
+/// an upgrade would quietly send those users' text to api.openai.com with their
+/// local server's (or Azure's) key. The endpoint, model, voice and key slot all
+/// move together because they only make sense together; the active engine
+/// follows if it was the one moved.
+///
+/// Pure (maps only) so it can be tested; the keychain half is
+/// [`migrate_openai_tts_endpoint`]. Returns whether anything moved.
+fn move_openai_compatible_tts_to_custom(settings: &mut AppSettings) -> bool {
+    let Some(url) = settings
+        .assistant_tts_base_urls
+        .get("openai")
+        .map(|u| u.trim().to_string())
+    else {
+        return false;
+    };
+    if url.is_empty() || is_official_openai_tts_url(&url) {
+        return false;
+    }
+    // Never overwrite a custom engine the user has already set up.
+    if settings
+        .assistant_tts_base_urls
+        .get("custom")
+        .is_some_and(|u| !u.trim().is_empty())
+    {
+        return false;
+    }
+    settings.assistant_tts_base_urls.remove("openai");
+    settings
+        .assistant_tts_base_urls
+        .insert("custom".to_string(), url);
+    for map in [
+        &mut settings.assistant_tts_models,
+        &mut settings.assistant_tts_remote_voices,
+    ] {
+        if let Some(value) = map.remove("openai") {
+            map.insert("custom".to_string(), value);
+        }
+    }
+    if let Some(key) = settings.assistant_tts_api_keys.remove("openai") {
+        settings
+            .assistant_tts_api_keys
+            .insert("custom".to_string(), key);
+    }
+    if settings.assistant_tts_engine == "openai" {
+        settings.assistant_tts_engine = "custom".to_string();
+    }
+    true
+}
+
+/// [`move_openai_compatible_tts_to_custom`] plus the keychain: the key that
+/// belonged to that server moves to the custom engine's account, so it is
+/// neither lost nor left where the OpenAI engine would send it to OpenAI.
+///
+/// Startup-only (called from `load_or_create_app_settings`), like the other
+/// keychain migrations. Returns whether the store needs rewriting.
+fn migrate_openai_tts_endpoint(settings: &mut AppSettings) -> bool {
+    let openai_account = crate::secret_store::account_assistant_tts("openai");
+    // Read before the move: afterwards the openai slot no longer exists, so
+    // hydration would never look at this account again.
+    let secret = crate::secret_store::get(&openai_account).filter(|s| !s.is_empty());
+    if !move_openai_compatible_tts_to_custom(settings) {
+        return false;
+    }
+    if let Some(secret) = secret {
+        let custom_account = crate::secret_store::account_assistant_tts("custom");
+        if crate::secret_store::set(&custom_account, &secret) {
+            if !crate::secret_store::delete(&openai_account) {
+                warn!("Could not delete the moved OpenAI voice credential");
+            }
+        } else {
+            // Keychain write failed: keep the key usable rather than losing it,
+            // exactly as every other key falls back when the keychain refuses.
+            settings
+                .assistant_tts_api_keys
+                .insert("custom".to_string(), secret);
+        }
+    }
+    info!("Moved the self-hosted OpenAI-compatible voice setup to the Custom engine");
+    true
+}
+
 /// Re-fill the in-memory secret fields from the OS keychain. No-op when the
 /// keychain is unavailable, which leaves any plaintext fallback values from the
 /// store in place.
@@ -4505,6 +4731,13 @@ pub fn load_or_create_app_settings(app: &AppHandle) -> AppSettings {
         | ensure_assistant_defaults(&mut settings)
         | ensure_cloud_stt_defaults(&mut settings)
     {
+        store.set("settings", serde_json::to_value(&settings).unwrap());
+    }
+
+    // "OpenAI-compatible" used to be the only way to reach a self-hosted voice
+    // server; that job belongs to the Custom engine now. Startup-only because
+    // it moves a keychain credential.
+    if migrate_openai_tts_endpoint(&mut settings) {
         store.set("settings", serde_json::to_value(&settings).unwrap());
     }
 
@@ -5366,6 +5599,68 @@ mod tests {
     }
 
     #[test]
+    fn meetings_prefer_the_assistant_over_the_cleanup_model() {
+        let mut settings = get_default_settings();
+        configure_target(&mut settings, "openai", "cleanup-model", "secret");
+        settings.assistant_provider_id = "azure_openai".to_string();
+        settings
+            .assistant_models
+            .insert("azure_openai".to_string(), "gpt-6-luna".to_string());
+        settings
+            .post_process_api_keys
+            .insert("azure_openai".to_string(), "k".to_string());
+
+        let (provider, model, _, source) = resolve_meeting_brain(&settings).expect("resolves");
+        assert_eq!(provider.id, "azure_openai");
+        assert_eq!(model, "gpt-6-luna");
+        assert_eq!(source, MeetingBrainSource::Assistant);
+    }
+
+    /// The reported configuration: SpeakoFlow Mini for cleanup, a real model for
+    /// the assistant. The meeting must never reach Mini.
+    #[test]
+    fn meetings_never_use_a_cleanup_specialist() {
+        let mut settings = get_default_settings();
+        configure_target(
+            &mut settings,
+            "builtin",
+            crate::managers::model::SPEAKOFLOW_MINI_MODEL_ID,
+            "",
+        );
+        // Assistant incomplete: no key for a keyed provider.
+        settings.assistant_provider_id = "openai".to_string();
+        settings
+            .assistant_models
+            .insert("openai".to_string(), "gpt-x".to_string());
+        settings.post_process_api_keys.remove("openai");
+
+        let error = resolve_meeting_brain(&settings).expect_err("Mini is not a meeting model");
+        assert!(error.contains("dictation-cleanup model"), "{error}");
+
+        // Once the assistant is usable it wins, and the specialist is ignored.
+        settings
+            .post_process_api_keys
+            .insert("openai".to_string(), "k".to_string());
+        let (_, model, _, source) = resolve_meeting_brain(&settings).expect("resolves");
+        assert_eq!(model, "gpt-x");
+        assert_eq!(source, MeetingBrainSource::Assistant);
+    }
+
+    #[test]
+    fn meetings_fall_back_to_a_general_cleanup_model() {
+        let mut settings = get_default_settings();
+        configure_target(&mut settings, "openai", "gpt-general", "secret");
+        settings.assistant_provider_id = "openai".to_string();
+        settings
+            .assistant_models
+            .insert("openai".to_string(), String::new());
+
+        let (_, model, _, source) = resolve_meeting_brain(&settings).expect("resolves");
+        assert_eq!(model, "gpt-general");
+        assert_eq!(source, MeetingBrainSource::Cleanup);
+    }
+
+    #[test]
     fn resolver_prefers_valid_dedicated_selection_and_trims_model() {
         let mut settings = get_default_settings();
         configure_target(&mut settings, "openai", "  cleanup-model  ", "secret");
@@ -5529,6 +5824,110 @@ mod tests {
         assert_eq!(settings.assistant_tts_api_key.0, "real-openrouter-key");
     }
 
+    /// Older builds reached a self-hosted voice server through the "openai"
+    /// engine's editable URL. OpenAI is a fixed hosted engine now, so that setup
+    /// has to become the Custom engine — endpoint, model, voice and key together
+    /// — or an upgrade would start sending the user's text to api.openai.com.
+    #[test]
+    fn a_self_hosted_openai_voice_setup_moves_to_custom() {
+        let mut settings = get_default_settings();
+        settings.assistant_tts_engine = "openai".to_string();
+        settings
+            .assistant_tts_base_urls
+            .insert("openai".to_string(), "http://localhost:8880/v1".to_string());
+        settings
+            .assistant_tts_models
+            .insert("openai".to_string(), "kokoro".to_string());
+        settings
+            .assistant_tts_remote_voices
+            .insert("openai".to_string(), "af_heart".to_string());
+        settings
+            .assistant_tts_api_keys
+            .insert("openai".to_string(), "local-key".to_string());
+
+        assert!(move_openai_compatible_tts_to_custom(&mut settings));
+        assert_eq!(settings.assistant_tts_engine, "custom");
+        assert!(!settings.assistant_tts_base_urls.contains_key("openai"));
+        assert!(!settings.assistant_tts_api_keys.contains_key("openai"));
+        settings.sync_active_tts_fields();
+        assert_eq!(settings.assistant_tts_base_url, "http://localhost:8880/v1");
+        assert_eq!(settings.assistant_tts_model, "kokoro");
+        assert_eq!(settings.assistant_tts_remote_voice, "af_heart");
+        assert_eq!(settings.assistant_tts_api_key.0, "local-key");
+
+        // Runs once: nothing left to move.
+        assert!(!move_openai_compatible_tts_to_custom(&mut settings));
+    }
+
+    #[test]
+    fn a_real_openai_voice_setup_stays_on_openai() {
+        let mut settings = get_default_settings();
+        settings.assistant_tts_engine = "openai".to_string();
+        settings.assistant_tts_base_urls.insert(
+            "openai".to_string(),
+            "https://api.openai.com/v1".to_string(),
+        );
+        settings
+            .assistant_tts_api_keys
+            .insert("openai".to_string(), "sk-real".to_string());
+        assert!(!move_openai_compatible_tts_to_custom(&mut settings));
+        assert_eq!(settings.assistant_tts_engine, "openai");
+
+        // A server the user moved elsewhere is moved without switching the
+        // engine they are using now.
+        let mut other = get_default_settings();
+        other.assistant_tts_engine = "elevenlabs".to_string();
+        other.assistant_tts_base_urls.insert(
+            "openai".to_string(),
+            "https://my-res.openai.azure.com/openai/v1".to_string(),
+        );
+        assert!(move_openai_compatible_tts_to_custom(&mut other));
+        assert_eq!(other.assistant_tts_engine, "elevenlabs");
+        assert_eq!(
+            other
+                .assistant_tts_base_urls
+                .get("custom")
+                .map(String::as_str),
+            Some("https://my-res.openai.azure.com/openai/v1")
+        );
+    }
+
+    /// Hosted engines always resolve to their own endpoint, and the engines the
+    /// user points somewhere themselves never inherit OpenAI's.
+    #[test]
+    fn the_tts_url_mirror_follows_the_registry() {
+        let mut settings = get_default_settings();
+        settings.assistant_tts_engine = "deepgram".to_string();
+        settings
+            .assistant_tts_base_urls
+            .insert("deepgram".to_string(), "https://stale.example".to_string());
+        settings.sync_active_tts_fields();
+        assert_eq!(settings.assistant_tts_base_url, "https://api.deepgram.com");
+
+        for engine in ["custom", "azure"] {
+            let mut settings = get_default_settings();
+            settings.assistant_tts_engine = engine.to_string();
+            settings.assistant_tts_base_url = String::new();
+            ensure_assistant_defaults(&mut settings);
+            settings.sync_active_tts_fields();
+            assert_eq!(settings.assistant_tts_base_url, "", "{engine}");
+        }
+    }
+
+    #[test]
+    fn every_registered_voice_engine_survives_repair() {
+        for provider in crate::tts::TTS_PROVIDERS {
+            let mut settings = get_default_settings();
+            settings.assistant_tts_engine = provider.id.to_string();
+            ensure_assistant_defaults(&mut settings);
+            assert_eq!(settings.assistant_tts_engine, provider.id);
+        }
+        let mut settings = get_default_settings();
+        settings.assistant_tts_engine = "retired-engine".to_string();
+        ensure_assistant_defaults(&mut settings);
+        assert_eq!(settings.assistant_tts_engine, "kokoro");
+    }
+
     /// The retired incognito switch becomes "memory off" instead of lingering as
     /// an invisible reason memory does nothing, and a store without it is left
     /// exactly as it was.
@@ -5651,6 +6050,25 @@ mod tests {
                 OverlayStyle::Minimal
             );
         }
+    }
+
+    /// An install from before the linger choice existed keeps the 3-second
+    /// linger it always had, and each choice is strictly longer than the last.
+    #[test]
+    fn overlay_linger_defaults_to_the_old_behaviour() {
+        let stored: OverlayLinger = serde_json::from_str("\"long\"").unwrap();
+        assert_eq!(stored, OverlayLinger::Long);
+        assert_eq!(
+            get_default_settings().overlay_linger.duration(),
+            std::time::Duration::from_secs(3)
+        );
+        let order = [
+            OverlayLinger::Quick,
+            OverlayLinger::Standard,
+            OverlayLinger::Long,
+            OverlayLinger::Extended,
+        ];
+        assert!(order.windows(2).all(|w| w[0].duration() < w[1].duration()));
     }
 
     /// Every field must survive a partial store: a missing key must never fail

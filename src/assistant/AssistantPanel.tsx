@@ -19,7 +19,6 @@ import {
   Check,
   Copy,
   CornerDownLeft,
-  Expand,
   FileText,
   Globe,
   ImagePlus,
@@ -27,10 +26,7 @@ import {
   Lock,
   Maximize2,
   Mic,
-  Minimize2,
-  RotateCcw,
   Scissors,
-  Shrink,
   Sparkles,
   Square,
   TextSelect,
@@ -45,7 +41,8 @@ import { useKokoroTts } from "./useKokoroTts";
 import { localTtsActive } from "./localTts";
 import { usePanelHitRegion, useSuppressContextMenu } from "./hitRegion";
 import { useVoiceConversation } from "./useVoiceConversation";
-import { ConversationView, ConversationPill } from "./ConversationView";
+import { CallSurface } from "./CallBar";
+import { useCallForm } from "./useCallForm";
 import { AssistantProfilePicker } from "./AssistantProfilePicker";
 import AskBar, { type AskBarPhase } from "./AskBar";
 import AskCard from "./AskCard";
@@ -579,7 +576,6 @@ const AssistantPanel: React.FC = () => {
   // Only surface a local-Kokoro load failure once per failure.
   const kokoroErrorRef = useRef(false);
   const localVoiceRef = useRef<ReturnType<typeof useKokoroTts> | null>(null);
-  const [showVoiceTranscript, setShowVoiceTranscript] = useState(false);
   // Hanging up needs `hidePanel`, which is declared below because it needs
   // `voice`. The indirection breaks that cycle; the ref is pointed at the real
   // thing further down, on every render.
@@ -596,43 +592,43 @@ const AssistantPanel: React.FC = () => {
     // The assistant's own voice volume, not the feedback-beep slider — see
     // `assistant_tts_volume` in settings.rs.
     volume: settings?.assistant_tts_volume,
-    pace: settings?.assistant_conversation_pace,
-    // Persisted, so the value comes back through `assistant-settings-changed`
-    // rather than from local state — one source of truth for a dial that has to
-    // outlive the call it was changed in.
-    onPaceChange: (pace) => {
-      void commands.setAssistantConversationPace(pace);
+    // No pace: the call always waits the middle length of pause before ending
+    // a turn. The "time to finish speaking" dial it came from is gone — see
+    // `CallOptions` — and a value someone saved with it must not keep applying
+    // with no control left to change it.
+    pace: null,
+    onPaceChange: () => {},
+    sensitivity: settings?.assistant_conversation_sensitivity,
+    onSensitivityChange: (sensitivity) => {
+      void commands.setAssistantConversationSensitivity(sensitivity);
     },
+    // Where the call's speaker switch starts. The switch itself is per call.
+    speakerOn: settings?.assistant_tts_enabled ?? true,
     onHangUp: () => hangUpRef.current(),
   });
 
-  // The conversation view has two forms — the orb alone, and the orb strip
-  // above the transcript — and the window size belongs to the form, not to a
-  // separate "zoom" of its own. Holding them as one state is what makes the
-  // control reversible: the button that grows the window shrinks it back.
-  // Rust owns the geometry (see `assistant::set_conversation_expanded`), so it
-  // stays right when the same session is resized, collapsed, or ended.
-  const setVoiceTranscript = useCallback((show: boolean) => {
-    setShowVoiceTranscript(show);
-    void commands.assistantConversationSetExpanded(show);
-  }, []);
-
-  // A finished conversation leaves no transcript form behind: the next one
-  // opens on the orb again, matching the window size Rust restores.
-  useEffect(() => {
-    if (!voice.open) setShowVoiceTranscript(false);
-  }, [voice.open]);
+  // The call has two forms — the floating bar, and the bar under the open
+  // conversation — and the window size belongs to the form. `useCallForm`
+  // sequences the change so the window resizes while nothing is on screen and
+  // the new form animates in once its window exists. Rust owns the geometry
+  // (see `assistant::set_conversation_expanded`). A call that ends leaves no
+  // expanded form behind: the next one opens as the bar again.
+  const callForm = useCallForm(voice.open);
+  const callExpanded = callForm.expanded;
+  const resetCallFormRef = useRef(callForm.reset);
+  resetCallFormRef.current = callForm.reset;
 
   // Speaking belongs to the call and nothing else. A quick text answer is read,
-  // not listened to, and `run_assistant_turn_inner` decides it the same way: the
-  // setting only applies to a turn that carries a voice ticket. Keeping the old
-  // `|| settings.assistant_tts_enabled` here would have loaded Kokoro's ~310 MB of
-  // weights for a user who never starts a call, to synthesize audio the backend no
-  // longer sends.
+  // not listened to, and `run_assistant_turn_inner` decides it the same way: only
+  // a turn that carries a voice ticket is spoken. The local voice stays loaded
+  // while the call's speaker is on, or while the setting says replies are spoken
+  // at all — so flipping the speaker off and on again mid-call does not unload
+  // and reload ~310 MB of weights, while someone who never asked for spoken
+  // replies does not load them just by starting a call.
   const ttsEnabled =
     voice.open &&
     voice.phase !== "error" &&
-    (settings?.assistant_tts_enabled ?? true);
+    (!voice.speakerOff || (settings?.assistant_tts_enabled ?? true));
   const ttsEngine = settings?.assistant_tts_engine ?? "kokoro";
   const ttsVoice = settings?.assistant_tts_voice ?? "af_heart";
   const ttsDtype = settings?.assistant_tts_kokoro_dtype ?? "fp32";
@@ -766,7 +762,7 @@ const AssistantPanel: React.FC = () => {
     prevHistoryLenRef.current = history.length;
     if (grew && lastIsUser) stickToBottomRef.current = true;
     if (stickToBottomRef.current) el.scrollTop = el.scrollHeight;
-  }, [history, stream, state, error, notice]);
+  }, [history, stream, state, error, notice, callExpanded]);
 
   // Re-pin after the browser has actually laid the content out.
   //
@@ -790,7 +786,15 @@ const AssistantPanel: React.FC = () => {
     observer.observe(el);
     for (const child of Array.from(el.children)) observer.observe(child);
     return () => observer.disconnect();
-  }, [history.length]);
+    // `callExpanded`: the call's transcript is only mounted in the expanded
+    // form, so opening it is when there is first something to observe.
+  }, [history.length, callExpanded]);
+
+  // Opening the call's conversation is a fresh look at it too: start at the
+  // newest message rather than wherever the list last scrolled to.
+  useEffect(() => {
+    if (callExpanded) stickToBottomRef.current = true;
+  }, [callExpanded]);
 
   // Showing the panel always returns to the newest message. Re-opening a chat is
   // a fresh look at it, so an old scroll position (or a stale "user scrolled up"
@@ -1087,7 +1091,7 @@ const AssistantPanel: React.FC = () => {
         await listen("assistant-start-conversation", () => {
           if (voiceRef.current.open && voiceRef.current.phase !== "error")
             return;
-          setShowVoiceTranscript(false);
+          resetCallFormRef.current();
           void voiceRef.current.start();
         }),
       );
@@ -1501,6 +1505,13 @@ const AssistantPanel: React.FC = () => {
     setCollapsed(value);
   }, []);
 
+  // A call has no collapsed form (its resting form is the floating bar), and a
+  // collapsed window is not focusable — the call's text field could never take
+  // the keyboard. If the window is ever collapsed during a call, undo it.
+  useEffect(() => {
+    if (voice.open && collapsed) void collapse(false);
+  }, [voice.open, collapsed, collapse]);
+
   /**
    * Escape dismisses the card.
    *
@@ -1737,16 +1748,172 @@ const AssistantPanel: React.FC = () => {
     />
   );
 
-  if (collapsed && voice.open) {
+  // ---- The live call: a floating bar, or the bar under the conversation -----
+  //
+  // A call owns the window for as long as it runs, whatever the collapsed flag
+  // says: its resting form already is the small floating bar, so there is no
+  // separate pill for it to collapse into.
+  if (voice.open) {
+    const last = history[history.length - 1];
+    const reply =
+      stream || (last?.role === "assistant" ? (last.content ?? "") : "");
+    const transcript = (
+      <div
+        className="assistant-messages"
+        ref={listRef}
+        onScroll={handleMessagesScroll}
+      >
+        {history.length === 0 && stream === "" && (
+          <div className="assistant-empty">
+            <p>
+              {activeCharacter?.greeting?.trim()
+                ? activeCharacter.greeting
+                : t("assistant.empty")}
+            </p>
+          </div>
+        )}
+        {history.map((message, i) => (
+          <div key={i} className={`assistant-message ${message.role}`}>
+            <div className="assistant-message-content">
+              {message.role === "assistant" ? (
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  components={MD_COMPONENTS}
+                >
+                  {message.content}
+                </ReactMarkdown>
+              ) : (
+                message.content
+              )}
+            </div>
+            {message.thumbnails ? (
+              <MessageThumbnails
+                urls={message.thumbnails}
+                hasScreen={message.screenshot}
+                screenLabel={t("assistant.screenAttached")}
+              />
+            ) : (
+              <>
+                {message.screenshot && (
+                  <span className="screen-chip">
+                    <Camera size={11} />
+                    {t("assistant.screenAttached")}
+                  </span>
+                )}
+                {(message.images ?? 0) > 0 && (
+                  <span className="screen-chip">
+                    <ImagePlus size={11} />
+                    {t("assistant.attach.imageCount", {
+                      count: message.images,
+                    })}
+                  </span>
+                )}
+              </>
+            )}
+            {message.files?.map((name) => (
+              <span className="screen-chip" key={name}>
+                <FileText size={11} />
+                {name}
+              </span>
+            ))}
+            {(message.selectionChars ?? 0) > 0 && (
+              <span className="screen-chip">
+                <TextSelect size={11} />
+                {t("assistant.selectionAttached", {
+                  count: message.selectionChars,
+                })}
+              </span>
+            )}
+            {message.role === "assistant" && (
+              <CopyButton
+                content={message.content}
+                title={t("assistant.copy")}
+              />
+            )}
+            {message.role === "assistant" && (
+              <InsertButton
+                content={message.content}
+                title={
+                  selectionChars > 0
+                    ? t("assistant.insertReplace")
+                    : t("assistant.insert")
+                }
+              />
+            )}
+          </div>
+        ))}
+        {notice && (
+          <div className="assistant-notice" role="status">
+            <Globe size={12} strokeWidth={2} />
+            {noticeText(notice)}
+          </div>
+        )}
+        {summarizing && (
+          <div className="assistant-notice" role="status">
+            <Loader2 size={12} strokeWidth={2} className="apill-spin" />
+            {t("assistant.summarizing")}
+          </div>
+        )}
+        {engineSetupActive && (
+          <div className="assistant-notice" role="status" aria-live="polite">
+            <Loader2 size={12} strokeWidth={2} className="apill-spin" />
+            {engineSetupLabel}
+          </div>
+        )}
+        {stream !== "" && (
+          <div className="assistant-message assistant">
+            <div className="assistant-message-content">
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={MD_COMPONENTS}
+              >
+                {stream}
+              </ReactMarkdown>
+            </div>
+          </div>
+        )}
+        {toolLabel && (
+          <div className="assistant-tool-chip" aria-live="polite">
+            <Loader2 className="apill-spin" size={12} aria-hidden="true" />
+            <span className="assistant-tool-text">{toolLabel}</span>
+            {toolElapsed >= 3 && (
+              <span className="assistant-tool-elapsed">
+                {t("assistant.tool.elapsed", { seconds: toolElapsed })}
+              </span>
+            )}
+          </div>
+        )}
+        {showTypingDots && (
+          <div className="assistant-message assistant typing">
+            <span className="typing-dot" />
+            <span className="typing-dot" />
+            <span className="typing-dot" />
+          </div>
+        )}
+      </div>
+    );
     return (
       <div className={shellClass}>
-        <ConversationPill
+        <CallSurface
           voice={voice}
-          name={activeCharacter?.name ?? t("assistant.title")}
-          onExpand={() => void collapse(false)}
+          form={callForm.form}
+          onExpand={callForm.expand}
+          onCollapse={callForm.collapse}
           onEnd={endCall}
+          name={activeCharacter?.name ?? t("assistant.title")}
+          profilePicker={profilePicker}
+          transcript={transcript}
+          resizeHandles={callExpanded ? <ResizeHandles /> : null}
+          hasConversation={history.length > 0}
+          activity={
+            toolLabel ??
+            (engineSetupActive
+              ? engineSetupLabel || t("assistant.engineSetup.short")
+              : null)
+          }
           voiceLoading={tts.status === "loading" ? tts.progress : null}
           voiceFault={voiceFault}
+          onDismissFault={() => setError(null)}
         />
       </div>
     );
@@ -2159,477 +2326,184 @@ const AssistantPanel: React.FC = () => {
   // width, *before* it is shown — that is what the measurement in
   // `useLayoutEffect` above reads, and the height it reports is what buys the
   // window the room to unfold into.
-  if (!voice.open) {
-    const followUpBusy = busy || ttsActive;
-    return (
-      <div className={shellClass}>
-        <div
-          className={`ask-stage ${askStage}`}
-          style={{ "--ask-h": `${askFrameHeight}px` } as React.CSSProperties}
-        >
-          <div className="ask-surface">
-            {/* Width only. Height belongs to the answer, so a vertical grip
+  const followUpBusy = busy || ttsActive;
+  return (
+    <div className={shellClass}>
+      <div
+        className={`ask-stage ${askStage}`}
+        style={{ "--ask-h": `${askFrameHeight}px` } as React.CSSProperties}
+      >
+        <div className="ask-surface">
+          {/* Width only. Height belongs to the answer, so a vertical grip
                 would be a control the next reply silently overrules. */}
-            <ResizeHandles axis="horizontal" />
+          <ResizeHandles axis="horizontal" />
 
-            <div className="ask-layer pill" aria-hidden={askStage !== "pill"}>
-              <AskBar
-                phase={askBarPhase}
-                active={askStage === "pill" && !askAnswerReady}
-                state={state}
-                status={askStatus}
-                levels={isListening ? micLevels : undefined}
-                error={error && !busy ? errorShort(error) : null}
-                input={input}
-                onInputChange={(value) => {
-                  setInput(value);
-                  if (error) setError(null);
-                }}
-                onSubmit={() => void sendText()}
-                onClose={hidePanel}
-                onCancel={dismissAsk}
-                stopDrag={stopDrag}
-              />
-            </div>
+          <div className="ask-layer pill" aria-hidden={askStage !== "pill"}>
+            <AskBar
+              phase={askBarPhase}
+              active={askStage === "pill" && !askAnswerReady}
+              state={state}
+              status={askStatus}
+              levels={isListening ? micLevels : undefined}
+              error={error && !busy ? errorShort(error) : null}
+              input={input}
+              onInputChange={(value) => {
+                setInput(value);
+                if (error) setError(null);
+              }}
+              onSubmit={() => void sendText()}
+              onClose={hidePanel}
+              onCancel={dismissAsk}
+              stopDrag={stopDrag}
+            />
+          </div>
 
-            <div
-              className="ask-layer card"
-              ref={askCardRef}
-              aria-hidden={askStage !== "card"}
-            >
-              <AskCard
-                question={lastQuestion}
-                answer={stream || lastAnswer}
-                busy={busy}
-                status={askStatus}
-                capturing={askCapturing}
-                levels={isListening ? micLevels : undefined}
-                error={error ? errorPrimary(error) : null}
-                notice={notice ? noticeText(notice) : null}
-                selectionChars={askSelectionChars}
-                markdown={MD_COMPONENTS}
-                onClose={hidePanel}
-                stopDrag={stopDrag}
-              />
+          <div
+            className="ask-layer card"
+            ref={askCardRef}
+            aria-hidden={askStage !== "card"}
+          >
+            <AskCard
+              question={lastQuestion}
+              answer={stream || lastAnswer}
+              busy={busy}
+              status={askStatus}
+              capturing={askCapturing}
+              levels={isListening ? micLevels : undefined}
+              error={error ? errorPrimary(error) : null}
+              notice={notice ? noticeText(notice) : null}
+              selectionChars={askSelectionChars}
+              markdown={MD_COMPONENTS}
+              onClose={hidePanel}
+              stopDrag={stopDrag}
+            />
 
-              {pendingImages.length > 0 && (
-                <div className="assistant-attachments">
-                  {pendingImages.map((image) => (
-                    <span className="attachment-chip" key={image.id}>
-                      <img src={image.dataUrl} alt="" />
-                      <span className="chip-name">
-                        {t("assistant.attach.image")}
-                      </span>
-                      <button
-                        className="chip-remove"
-                        onClick={() =>
-                          setPendingImages((prev) =>
-                            prev.filter((i) => i.id !== image.id),
-                          )
-                        }
-                        title={t("assistant.attach.remove")}
-                      >
-                        <X size={11} strokeWidth={2.5} />
-                      </button>
+            {pendingImages.length > 0 && (
+              <div className="assistant-attachments">
+                {pendingImages.map((image) => (
+                  <span className="attachment-chip" key={image.id}>
+                    <img src={image.dataUrl} alt="" />
+                    <span className="chip-name">
+                      {t("assistant.attach.image")}
                     </span>
-                  ))}
-                </div>
-              )}
+                    <button
+                      className="chip-remove"
+                      onClick={() =>
+                        setPendingImages((prev) =>
+                          prev.filter((i) => i.id !== image.id),
+                        )
+                      }
+                      title={t("assistant.attach.remove")}
+                    >
+                      <X size={11} strokeWidth={2.5} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
 
-              {/* Ask again, about the answer above. Whether the assistant may
+            {/* Ask again, about the answer above. Whether the assistant may
                   search the web is a preference, not a per-question decision, so
                   its switch lives in Settings → Assistant with the rest of the
                   search configuration — the model decides when to actually use
                   it. */}
-              <div className="assistant-input-row">
-                {manualScreenAccess && (
-                  <button
-                    className={`assistant-attach-button${attachScreen ? " armed" : ""}`}
-                    onClick={() => void toggleScreen()}
-                    onMouseDown={stopDrag}
-                    disabled={askStage !== "card"}
-                    title={
-                      attachScreen
-                        ? t("assistant.detachScreen")
-                        : t("assistant.attachScreen")
-                    }
-                  >
-                    <Camera size={15} />
-                  </button>
-                )}
-                {manualScreenAccess && (
-                  <button
-                    className="assistant-attach-button"
-                    onClick={beginSnip}
-                    onMouseDown={stopDrag}
-                    disabled={askStage !== "card"}
-                    title={t("assistant.attach.snip")}
-                  >
-                    <Scissors size={15} />
-                  </button>
-                )}
-                <input
-                  className="assistant-input"
-                  type="text"
-                  value={input}
-                  // The bar carries the same field while it is on screen; two
-                  // live inputs over one value would fight for the caret.
-                  disabled={askStage !== "card"}
-                  placeholder={
-                    attachScreen
-                      ? t("assistant.inputPlaceholderScreen")
-                      : t("assistant.followUpPlaceholder")
-                  }
-                  onChange={(e) => {
-                    setInput(e.target.value);
-                    // Typing a new message clears any lingering error so the user
-                    // isn't blocked by (or waiting out) a stale failure notice.
-                    if (error) setError(null);
-                  }}
+            <div className="assistant-input-row">
+              {manualScreenAccess && (
+                <button
+                  className={`assistant-attach-button${attachScreen ? " armed" : ""}`}
+                  onClick={() => void toggleScreen()}
                   onMouseDown={stopDrag}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.repeat) {
-                      void sendText();
-                    }
-                  }}
-                />
-                {(isListening || state === "transcribing") && (
-                  <button
-                    className="assistant-send-button ghost"
-                    onClick={cancelVoice}
-                    onMouseDown={stopDrag}
-                    title={t("assistant.cancel")}
-                    aria-label={t("assistant.cancel")}
-                  >
-                    <X size={16} strokeWidth={2.75} />
-                  </button>
-                )}
-                {state !== "transcribing" && (
-                  <button
-                    className="assistant-send-button"
-                    onClick={
-                      isListening
-                        ? finishVoice
-                        : followUpBusy
-                          ? stopTurn
-                          : sendText
-                    }
-                    onMouseDown={stopDrag}
-                    disabled={
-                      askStage !== "card" ||
-                      (!isListening && !followUpBusy && !input.trim())
-                    }
-                    title={
-                      isListening
-                        ? t("assistant.finish")
-                        : followUpBusy
-                          ? t("assistant.stop")
-                          : t("assistant.send")
-                    }
-                  >
-                    {isListening ? (
-                      <Check size={16} strokeWidth={2.75} />
-                    ) : followUpBusy ? (
-                      <Square size={15} strokeWidth={2.5} />
-                    ) : (
-                      <ArrowUp size={16} strokeWidth={2.5} />
-                    )}
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className={shellClass}>
-      <div className="assistant-panel">
-        <ResizeHandles />
-        {/* The whole bar is the handle, which is what its `cursor: grab` has always
-            claimed. The two inner regions stay marked because the ancestor match is
-            a superset of them, not a replacement — and because an explicit handle on
-            the spacer is what keeps the bar draggable if the header ever stops being
-            one. `useSafeWindowDrag` excludes the buttons on the right. */}
-        <div
-          className="assistant-header conversation-header"
-          data-tauri-drag-region
-        >
-          <span className="conversation-header-title" data-tauri-drag-region>
-            {t("assistant.conversation.title")}
-          </span>
-          <div
-            className="assistant-header-drag"
-            data-tauri-drag-region
-            aria-hidden="true"
-          />
-          <div className="assistant-header-actions">
-            {/* A running conversation needs its own two controls — read the
-                transcript, and park it as a pill — because it is a surface you
-                keep around. The quick ask has neither: it is one job with one
-                answer, and it draws its own close button on the card. */}
-            <button
-              type="button"
-              className="assistant-icon-button"
-              onMouseDown={stopDrag}
-              disabled={voice.phase === "error"}
-              aria-pressed={showVoiceTranscript}
-              aria-label={t(
-                showVoiceTranscript
-                  ? "assistant.conversation.shrink"
-                  : "assistant.conversation.expand",
-              )}
-              title={t(
-                showVoiceTranscript
-                  ? "assistant.conversation.shrink"
-                  : "assistant.conversation.expand",
-              )}
-              onClick={() => setVoiceTranscript(!showVoiceTranscript)}
-            >
-              {showVoiceTranscript ? (
-                <Shrink size={14} />
-              ) : (
-                <Expand size={14} />
-              )}
-            </button>
-            <button
-              type="button"
-              className="assistant-icon-button"
-              onClick={() => collapse(true)}
-              onMouseDown={stopDrag}
-              title={t("assistant.pill.collapse")}
-            >
-              <Minimize2 size={14} />
-            </button>
-            <button
-              type="button"
-              className="assistant-icon-button close"
-              onClick={hidePanel}
-              onMouseDown={stopDrag}
-              title={t("assistant.hide")}
-            >
-              <X size={15} />
-            </button>
-          </div>
-        </div>
-
-        {voice.open && (
-          <ConversationView
-            voice={voice}
-            profilePicker={profilePicker}
-            answer={
-              stream ||
-              (history[history.length - 1]?.role === "assistant"
-                ? (history[history.length - 1]?.content ?? "")
-                : "")
-            }
-            showTranscript={showVoiceTranscript}
-            onToggleTranscript={() => setVoiceTranscript(!showVoiceTranscript)}
-            onEnd={endCall}
-            voiceLoading={tts.status === "loading" ? tts.progress : null}
-            voiceFault={voiceFault}
-          />
-        )}
-        {/* The call's transcript, and only that. The quick ask has its own
-            surface above and never reaches this branch. */}
-        <div
-          className={`assistant-messages${
-            voice.open && showVoiceTranscript ? "" : " conversation-hidden"
-          }`}
-          ref={listRef}
-          onScroll={handleMessagesScroll}
-        >
-          {history.length === 0 && state === "idle" && !error && (
-            <div className="assistant-empty">
-              <p>
-                {activeCharacter?.greeting?.trim()
-                  ? activeCharacter.greeting
-                  : t("assistant.empty")}
-              </p>
-            </div>
-          )}
-          {voice.open &&
-            showVoiceTranscript &&
-            history.map((message, i) => (
-              <div key={i} className={`assistant-message ${message.role}`}>
-                <div className="assistant-message-content">
-                  {message.role === "assistant" ? (
-                    <ReactMarkdown
-                      remarkPlugins={[remarkGfm]}
-                      components={MD_COMPONENTS}
-                    >
-                      {message.content}
-                    </ReactMarkdown>
-                  ) : (
-                    message.content
-                  )}
-                </div>
-                {message.thumbnails ? (
-                  <MessageThumbnails
-                    urls={message.thumbnails}
-                    hasScreen={message.screenshot}
-                    screenLabel={t("assistant.screenAttached")}
-                  />
-                ) : (
-                  <>
-                    {message.screenshot && (
-                      <span className="screen-chip">
-                        <Camera size={11} />
-                        {t("assistant.screenAttached")}
-                      </span>
-                    )}
-                    {(message.images ?? 0) > 0 && (
-                      <span className="screen-chip">
-                        <ImagePlus size={11} />
-                        {t("assistant.attach.imageCount", {
-                          count: message.images,
-                        })}
-                      </span>
-                    )}
-                  </>
-                )}
-                {message.files?.map((name) => (
-                  <span className="screen-chip" key={name}>
-                    <FileText size={11} />
-                    {name}
-                  </span>
-                ))}
-                {(message.selectionChars ?? 0) > 0 && (
-                  <span className="screen-chip">
-                    <TextSelect size={11} />
-                    {t("assistant.selectionAttached", {
-                      count: message.selectionChars,
-                    })}
-                  </span>
-                )}
-                {message.role === "assistant" && (
-                  <CopyButton
-                    content={message.content}
-                    title={t("assistant.copy")}
-                  />
-                )}
-                {message.role === "assistant" && (
-                  <InsertButton
-                    content={message.content}
-                    title={
-                      selectionChars > 0
-                        ? t("assistant.insertReplace")
-                        : t("assistant.insert")
-                    }
-                  />
-                )}
-                {message.role === "assistant" &&
-                  i === history.length - 1 &&
-                  !busy &&
-                  // Regenerate ends the live call before re-running the turn,
-                  // and it deletes the exchange it is replacing first — so
-                  // during a conversation the small ↻ hung up with no warning
-                  // and, if the cancelled turn still held the busy guard, threw
-                  // the question and answer away without producing a new one.
-                  !voice.open &&
-                  stream === "" && (
-                    <div className="assistant-last-actions">
-                      <button
-                        onClick={() => void commands.assistantRegenerate()}
-                        title={t("assistant.regenerate")}
-                        aria-label={t("assistant.regenerate")}
-                      >
-                        <RotateCcw size={12.5} />
-                      </button>
-                    </div>
-                  )}
-              </div>
-            ))}
-          {notice && (
-            <div className="assistant-notice" role="status">
-              <Globe size={12} strokeWidth={2} />
-              {noticeText(notice)}
-            </div>
-          )}
-          {summarizing && (
-            <div className="assistant-notice" role="status">
-              <Loader2 size={12} strokeWidth={2} className="apill-spin" />
-              {t("assistant.summarizing")}
-            </div>
-          )}
-          {engineSetupActive && (
-            <div className="assistant-notice" role="status" aria-live="polite">
-              <Loader2 size={12} strokeWidth={2} className="apill-spin" />
-              {engineSetupLabel}
-            </div>
-          )}
-          {voice.open && showVoiceTranscript && stream !== "" && (
-            <div className="assistant-message assistant">
-              <div className="assistant-message-content">
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
-                  components={MD_COMPONENTS}
+                  disabled={askStage !== "card"}
+                  title={
+                    attachScreen
+                      ? t("assistant.detachScreen")
+                      : t("assistant.attachScreen")
+                  }
                 >
-                  {stream}
-                </ReactMarkdown>
-              </div>
-            </div>
-          )}
-          {(state === "listening" || state === "transcribing") && (
-            <div className={`assistant-listening ${state}`}>
-              <AudioWaveform
-                levels={micLevels}
-                size="md"
-                barCount={16}
-                active={state === "listening"}
+                  <Camera size={15} />
+                </button>
+              )}
+              {manualScreenAccess && (
+                <button
+                  className="assistant-attach-button"
+                  onClick={beginSnip}
+                  onMouseDown={stopDrag}
+                  disabled={askStage !== "card"}
+                  title={t("assistant.attach.snip")}
+                >
+                  <Scissors size={15} />
+                </button>
+              )}
+              <input
+                className="assistant-input"
+                type="text"
+                value={input}
+                // The bar carries the same field while it is on screen; two
+                // live inputs over one value would fight for the caret.
+                disabled={askStage !== "card"}
+                placeholder={
+                  attachScreen
+                    ? t("assistant.inputPlaceholderScreen")
+                    : t("assistant.followUpPlaceholder")
+                }
+                onChange={(e) => {
+                  setInput(e.target.value);
+                  // Typing a new message clears any lingering error so the user
+                  // isn't blocked by (or waiting out) a stale failure notice.
+                  if (error) setError(null);
+                }}
+                onMouseDown={stopDrag}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.repeat) {
+                    void sendText();
+                  }
+                }}
               />
-              <span className="listening-label">
-                {screenActive && (
-                  <Camera size={13} strokeWidth={2} className="listening-cam" />
-                )}
-                {state === "listening" && locked && (
-                  <Lock size={13} strokeWidth={2} className="listening-lock" />
-                )}
-                {state === "listening" && locked
-                  ? t("assistant.status.locked")
-                  : t(`assistant.status.${state}`)}
-              </span>
-            </div>
-          )}
-          {toolLabel && (
-            <div className="assistant-tool-chip" aria-live="polite">
-              <Loader2 className="apill-spin" size={12} aria-hidden="true" />
-              <span className="assistant-tool-text">{toolLabel}</span>
-              {toolElapsed >= 3 && (
-                <span className="assistant-tool-elapsed">
-                  {t("assistant.tool.elapsed", { seconds: toolElapsed })}
-                </span>
+              {(isListening || state === "transcribing") && (
+                <button
+                  className="assistant-send-button ghost"
+                  onClick={cancelVoice}
+                  onMouseDown={stopDrag}
+                  title={t("assistant.cancel")}
+                  aria-label={t("assistant.cancel")}
+                >
+                  <X size={16} strokeWidth={2.75} />
+                </button>
+              )}
+              {state !== "transcribing" && (
+                <button
+                  className="assistant-send-button"
+                  onClick={
+                    isListening
+                      ? finishVoice
+                      : followUpBusy
+                        ? stopTurn
+                        : sendText
+                  }
+                  onMouseDown={stopDrag}
+                  disabled={
+                    askStage !== "card" ||
+                    (!isListening && !followUpBusy && !input.trim())
+                  }
+                  title={
+                    isListening
+                      ? t("assistant.finish")
+                      : followUpBusy
+                        ? t("assistant.stop")
+                        : t("assistant.send")
+                  }
+                >
+                  {isListening ? (
+                    <Check size={16} strokeWidth={2.75} />
+                  ) : followUpBusy ? (
+                    <Square size={15} strokeWidth={2.5} />
+                  ) : (
+                    <ArrowUp size={16} strokeWidth={2.5} />
+                  )}
+                </button>
               )}
             </div>
-          )}
-          {showTypingDots && (
-            <div className="assistant-message assistant typing">
-              <span className="typing-dot" />
-              <span className="typing-dot" />
-              <span className="typing-dot" />
-            </div>
-          )}
-          {error && (
-            <div className="assistant-message error" role="alert">
-              <AlertCircle size={14} className="assistant-error-icon" />
-              <div className="assistant-error-body">
-                <div>{errorPrimary(error)}</div>
-                {error.detail && error.detail !== errorPrimary(error) && (
-                  <div className="assistant-error-detail">{error.detail}</div>
-                )}
-              </div>
-              <button
-                className="assistant-error-dismiss"
-                onClick={() => setError(null)}
-                title={t("assistant.pill.dismiss")}
-                aria-label={t("assistant.pill.dismiss")}
-              >
-                <X size={13} strokeWidth={2.5} />
-              </button>
-            </div>
-          )}
+          </div>
         </div>
       </div>
     </div>

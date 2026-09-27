@@ -35,6 +35,9 @@ impl OverlayLifecycle {
             self.wake.notify_waiters();
         }
     }
+    pub fn is_hovered(&self) -> bool {
+        self.hovered.load(Ordering::SeqCst)
+    }
     /// Returns true once the current card may be hidden; false when superseded.
     /// The callback starts or reverses the fade without dropping the transcript.
     pub async fn wait_for_dismissal(

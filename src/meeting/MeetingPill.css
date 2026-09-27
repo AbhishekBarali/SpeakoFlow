@@ -7,18 +7,23 @@
  * layout on every rule. The design tokens below are copied deliberately so the
  * two windows read as the same application.
  *
- * Two rules here are load-bearing rather than cosmetic:
+ * Three rules here are load-bearing rather than cosmetic:
  *
  *  - No outer drop shadow. Semi-transparent shadow pixels render as a milky grey
  *    band on Windows transparent windows, so depth comes from a hairline plus an
  *    inner highlight, exactly as the recording overlay does.
- *  - Only `.pill-transcript` scrolls. The window's height is whatever this
- *    content measures, so a scroll container anywhere above it would feed the
- *    measurement back into itself and grow the window until it filled the screen.
+ *  - Only `.pill-transcript` (and the answer above the input) scroll. The
+ *    window's height is whatever this content measures, so a scroll container
+ *    anywhere above it would feed the measurement back into itself and grow the
+ *    window until it filled the screen.
+ *  - The collapsed pill never changes width. Hover swaps what is inside it;
+ *    a pill that grew on hover would resize the window under the pointer, and
+ *    the resize would end the hover that caused it.
  */
 
 :root {
   --mp-surface: rgba(21, 19, 17, 0.96);
+  --mp-surface-hover: rgba(30, 27, 24, 0.97);
   --mp-surface-raised: rgba(255, 255, 255, 0.075);
   --mp-surface-raised-strong: rgba(255, 255, 255, 0.13);
   --mp-inset: rgba(0, 0, 0, 0.3);
@@ -34,6 +39,8 @@
   --mp-live: #e5484d;
   --mp-accent: #2dd4bf;
   --mp-warn: #fbbf24;
+  --mp-ease-out: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --mp-ease-zoom: cubic-bezier(0.2, 0.9, 0.25, 1);
   --mp-font:
     "Inter Variable", -apple-system, BlinkMacSystemFont,
     "Segoe UI Variable Text", "Segoe UI", Roboto, sans-serif;
@@ -57,55 +64,19 @@
   overflow: hidden;
 }
 
-/* ---------- collapsed ---------- */
-
-.pill-bar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 6px 8px;
-  border-radius: 999px;
-  background: var(--mp-surface);
-  border: 1px solid var(--mp-hairline);
-  box-shadow: var(--mp-inner);
-  /* The bar is the window's drag handle, so it advertises that and not a press:
-   * it used to be one big expand button, which is precisely why this window could
-   * not be moved. Text inside it must still not be selectable, or a drag that
-   * starts on the clock begins a drag-select instead of moving the window. */
-  cursor: grab;
-  user-select: none;
-}
-
-.pill-bar:active {
-  cursor: grabbing;
-}
-
-.pill-bar:hover {
-  border-color: var(--mp-hairline-strong);
-}
-
-/* The expanded card's header is the same handle for the same reason. */
-.pill-head {
-  cursor: grab;
-  user-select: none;
-}
-
-.pill-head:active {
-  cursor: grabbing;
-}
+/* ---------- the recording dot ---------- */
 
 .pill-dot {
   flex: none;
   width: 8px;
   height: 8px;
-  margin-inline-start: 4px;
   border-radius: 50%;
   background: var(--mp-live);
+  transition: background 160ms ease;
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .pill-dot[data-live="true"] {
+  .pill-dot[data-state="live"] {
     animation: pill-breathe 2s ease-in-out infinite;
   }
 }
@@ -120,65 +91,134 @@
   }
 }
 
-.pill-dot[data-live="false"] {
+/* Recording, but only the user's own microphone. */
+.pill-dot[data-state="mic-only"] {
   background: var(--mp-warn);
-  animation: none;
 }
 
-.pill-clock {
+.pill-dot[data-state="paused"] {
+  background: var(--mp-faint);
+}
+
+/* ---------- collapsed: the compact pill ---------- */
+
+/* Dot, clock, and a small waveform at the trailing edge — the dictation
+ * overlay's compact pill in a meeting's colours. The whole pill is the way in
+ * (click) and the handle (drag); pause and stop take the waveform's place under
+ * the pointer. */
+.mpill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 36px;
+  padding: 0 5px 0 13px;
+  border-radius: 999px;
+  background: var(--mp-surface);
+  border: 1px solid var(--mp-hairline);
+  box-shadow: var(--mp-inner);
+  cursor: pointer;
+  /* A drag that starts on the clock must move the window, not select text. */
+  user-select: none;
+  transition:
+    border-color 140ms ease,
+    background 140ms ease,
+    transform 120ms var(--mp-ease-out);
+  animation: mpill-settle 280ms var(--mp-ease-out) backwards;
+}
+
+.mpill:hover {
+  background: var(--mp-surface-hover);
+  border-color: var(--mp-hairline-strong);
+}
+
+/* A press gives before it opens, so the zoom that follows reads as the result
+ * of the click rather than as something that happened to it. Not while the
+ * press is on pause or stop, which are their own targets. */
+.mpill:active:not(:has(.pill-action:active)) {
+  transform: scale(0.96);
+}
+
+/* Arriving back from the card: a small settle rather than a pop. */
+@keyframes mpill-settle {
+  from {
+    opacity: 0;
+    transform: scale(1.08);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.mpill-clock {
   flex: none;
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 500;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.01em;
   color: var(--mp-ink);
+  transition: color 160ms ease;
 }
 
-/* ---------- the two-stream meter ---------- */
-
-/* Two rows of bars, mic above and system below, because which of the two is
- * moving is the actual diagnostic: a flat bottom row means the other
- * participants are not being captured, which is this feature's most common and
- * most silent failure. One combined meter would hide exactly that. */
-.pill-meter {
-  flex: 1 1 auto;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding-inline: 2px;
+.mpill[data-paused="true"] .mpill-clock {
+  color: var(--mp-muted);
 }
 
-.pill-meter-row {
+/* The trailing slot: the waveform at rest, pause and stop under the pointer.
+ * Both occupy the same box, so the swap never moves anything else. */
+.mpill-end {
+  position: relative;
+  flex: none;
+  width: 54px;
+  height: 26px;
+  margin-inline-start: auto;
+}
+
+.mpill-wave,
+.mpill-controls {
+  position: absolute;
+  inset: 0;
   display: flex;
   align-items: center;
-  gap: 2px;
-  height: 9px;
-}
-
-.pill-meter-bar {
-  flex: 1 1 0;
-  min-width: 0;
-  border-radius: 1px;
-  background: currentColor;
-  /* Scaled rather than height-animated: transform does not trigger layout, and
-   * this runs 15 times a second for hours. */
-  transform-origin: center;
   transition:
-    transform 90ms linear,
-    opacity 90ms linear;
+    opacity 150ms ease,
+    transform 180ms var(--mp-ease-out);
 }
 
-.pill-meter-row[data-stream="mic"] {
-  color: var(--mp-accent);
+.mpill-wave {
+  justify-content: center;
+  padding-inline-end: 6px;
 }
 
-.pill-meter-row[data-stream="system"] {
-  color: #a78bfa;
+.mpill-wave .audio-waveform {
+  width: 40px;
 }
 
-.pill-meter-row[data-silent="true"] {
-  color: var(--mp-faint);
+.mpill-controls {
+  justify-content: flex-end;
+  gap: 3px;
+  opacity: 0;
+  transform: translateX(6px);
+  pointer-events: none;
+}
+
+.mpill:hover .mpill-wave,
+.mpill:focus-within .mpill-wave {
+  opacity: 0;
+  transform: scale(0.8);
+}
+
+.mpill:hover .mpill-controls,
+.mpill:focus-within .mpill-controls {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+.mpill .pill-action {
+  width: 24px;
+  height: 24px;
 }
 
 /* ---------- buttons ---------- */
@@ -198,12 +238,17 @@
   cursor: pointer;
   transition:
     background 120ms ease,
-    color 120ms ease;
+    color 120ms ease,
+    transform 120ms ease;
 }
 
 .pill-action:hover {
   background: var(--mp-surface-raised-strong);
   color: var(--mp-ink);
+}
+
+.pill-action:active {
+  transform: scale(0.92);
 }
 
 .pill-action:focus-visible {
@@ -217,7 +262,7 @@
 }
 
 .pill-action[data-variant="stop"]:hover {
-  background: rgba(229, 72, 77, 0.28);
+  background: rgba(229, 72, 77, 0.3);
   color: #fff;
 }
 
@@ -226,27 +271,33 @@
   cursor: default;
 }
 
-/* The call offer reuses `.pill-bar`, but it is a card to read rather than a
- * control to click through, so it takes the pointer normally and does not
+/* ---------- the call offer ---------- */
+
+/* A card to read rather than a control to click through, so it does not
  * advertise itself as pressable. It stays a drag handle, because an unprompted
  * card in the way is exactly the one you want to move. */
-.pill-bar[data-offer="true"] {
-  cursor: grab;
-  padding-inline-start: 12px;
+.pill-offer {
+  display: flex;
   align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 8px 8px 12px;
   border-radius: 14px;
+  background: var(--mp-surface);
+  border: 1px solid var(--mp-hairline);
+  box-shadow: var(--mp-inner);
+  cursor: grab;
+  user-select: none;
+  animation: mpill-settle 280ms var(--mp-ease-out) backwards;
 }
 
-.pill-bar[data-offer="true"]:active {
+.pill-offer:active {
   cursor: grabbing;
 }
 
 /* A hollow, static ring — deliberately a shape the live recorder can never take.
- *
- * This was `.pill-dot[data-live="true"]`: a filled red dot breathing on a 2s loop,
- * i.e. the universal "capturing now" signal, on a card that appears unprompted six
- * to nine seconds into a call and has started nothing. Being correct in the code did
- * not stop it reading as "this app began recording my call by itself". */
+ * A filled breathing red dot here read as "this app began recording my call by
+ * itself" on a card that has started nothing. */
 .pill-offer-ring {
   flex: none;
   width: 9px;
@@ -294,7 +345,12 @@
 
 /* ---------- expanded card ---------- */
 
+/* Zooms out of the corner the pill occupied. Rust keeps that corner fixed when
+ * it grows the window (`pill::corner_for`), so the card appears to open out of
+ * the pill that was clicked rather than replacing it. */
 .pill-card {
+  --origin-x: right;
+  --origin-y: bottom;
   display: flex;
   flex-direction: column;
   width: 100%;
@@ -305,6 +361,47 @@
   border: 1px solid var(--mp-hairline);
   box-shadow: var(--mp-inner);
   overflow: hidden;
+  transform-origin: var(--origin-x) var(--origin-y);
+  animation: card-zoom 300ms var(--mp-ease-zoom) backwards;
+}
+
+.pill-card[data-origin-x="left"] {
+  --origin-x: left;
+}
+
+.pill-card[data-origin-y="top"] {
+  --origin-y: top;
+}
+
+.pill-card > * {
+  animation: card-content 340ms var(--mp-ease-out) 70ms backwards;
+}
+
+@keyframes card-zoom {
+  from {
+    opacity: 0;
+    transform: scale(0.42);
+    border-radius: 999px;
+  }
+  55% {
+    opacity: 1;
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+    border-radius: 16px;
+  }
+}
+
+@keyframes card-content {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .pill-head {
@@ -312,20 +409,29 @@
   align-items: center;
   gap: 8px;
   flex: none;
-  padding: 8px 10px;
+  padding: 8px 8px 8px 12px;
   border-bottom: 1px solid var(--mp-hairline);
+  cursor: grab;
+  user-select: none;
 }
 
-.pill-head-meta {
-  min-width: 0;
-  flex: 1 1 auto;
-  display: flex;
-  align-items: center;
-  gap: 7px;
+.pill-head:active {
+  cursor: grabbing;
+}
+
+.pill-clock {
+  flex: none;
+  font-size: 12.5px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+  color: var(--mp-ink);
 }
 
 .pill-head-label {
-  font-size: 11px;
+  flex: 0 1 auto;
+  min-width: 0;
+  font-size: 10.5px;
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -335,9 +441,69 @@
   text-overflow: ellipsis;
 }
 
+.pill-head-spacer {
+  flex: 1 1 auto;
+}
+
+/* ---------- which side is audible ---------- */
+
+.pill-head-sides {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-inline-start: 2px;
+}
+
+.pill-side {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 20px;
+  padding: 0 8px 0 7px;
+  border-radius: 999px;
+  background: var(--mp-surface-raised);
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--mp-muted);
+  white-space: nowrap;
+  transition: color 120ms ease;
+}
+
+.pill-side-light {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--mp-faint);
+  transition:
+    background 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.pill-side[data-active="true"] {
+  color: var(--mp-body);
+}
+
+.pill-side[data-active="true"] .pill-side-light {
+  background: var(--mp-accent);
+  box-shadow: 0 0 0 2px rgba(45, 212, 191, 0.2);
+}
+
+/* Not being recorded at all — different from quiet, and it must look it. */
+.pill-side[data-captured="false"] {
+  color: #fcd34d;
+  text-decoration: line-through;
+  text-decoration-color: rgba(252, 211, 77, 0.6);
+}
+
+.pill-side[data-captured="false"] .pill-side-light {
+  background: var(--mp-warn);
+}
+
 .pill-notice {
   flex: none;
-  padding: 6px 10px;
+  margin: 0;
+  padding: 6px 12px;
   font-size: 11.5px;
   line-height: 1.45;
   color: #fcd34d;
@@ -352,10 +518,10 @@
   max-height: 260px;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 8px 10px;
+  padding: 10px 12px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 9px;
   scrollbar-width: thin;
   scrollbar-color: var(--mp-hairline-strong) transparent;
 }
@@ -427,7 +593,7 @@
   max-height: 132px;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 8px 10px;
+  padding: 8px 12px;
   border-top: 1px solid var(--mp-hairline);
   background: rgba(45, 212, 191, 0.05);
   scrollbar-width: thin;
@@ -489,4 +655,23 @@
 
 .pill-ask-input:disabled {
   opacity: 0.5;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mpill,
+  .pill-offer,
+  .pill-card,
+  .pill-card > * {
+    animation: none;
+  }
+  .mpill,
+  .mpill-wave,
+  .mpill-controls,
+  .pill-action {
+    transition: none;
+  }
+  .mpill:active:not(:has(.pill-action:active)),
+  .pill-action:active {
+    transform: none;
+  }
 }

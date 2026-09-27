@@ -59,12 +59,16 @@ mock.module("@ricky0123/vad-web", () => ({
   },
 }));
 const { useVoiceConversation } = await import("./useVoiceConversation");
-const { TURN_PAUSE_MS } = await import("./conversationPolicy");
+const { TURN_PAUSE_MS, VAD_SENSITIVITY, VAD_FRAME_MS } = await import(
+  "./conversationPolicy"
+);
 let voice: ReturnType<typeof useVoiceConversation>;
 let renderer: ReactTestRenderer;
 /** The persisted pace the harness feeds the hook, and what it asked to save. */
 let settingsPace: "quick" | "natural" | "patient" | null = null;
 let paceWrites: string[] = [];
+let settingsSensitivity: "low" | "normal" | "high" | null = null;
+let settingsSpeakerOn: boolean | undefined;
 /** The persisted voice volume, and every gain node the session created. */
 let settingsVolume: number | undefined;
 const gains: { gain: { value: number } }[] = [];
@@ -79,6 +83,9 @@ function Harness() {
     volume: settingsVolume,
     pace: settingsPace,
     onPaceChange: (pace) => paceWrites.push(pace),
+    sensitivity: settingsSensitivity,
+    onSensitivityChange() {},
+    speakerOn: settingsSpeakerOn,
   });
   return null;
 }
@@ -107,6 +114,8 @@ beforeEach(async () => {
   microphone = null;
   settingsPace = null;
   paceWrites = [];
+  settingsSensitivity = null;
+  settingsSpeakerOn = undefined;
   settingsVolume = undefined;
   gains.length = 0;
   events.clear();
@@ -165,6 +174,38 @@ const speak = async () => {
     vadOptions.onSpeechEnd(new Float32Array(16_000));
   });
 };
+/** Feed the detector `count` frames, each speech or not. */
+const frames = async (count: number, speech: (index: number) => boolean) => {
+  await act(async () => {
+    for (let i = 0; i < count; i++)
+      vadOptions.onFrameProcessed(
+        {
+          isSpeech: speech(i) ? 0.95 : 0.05,
+          notSpeech: speech(i) ? 0.05 : 0.95,
+        },
+        new Float32Array(512),
+      );
+  });
+};
+const commandCount = (command: string) =>
+  calls.filter((call) => call.command === command).length;
+/** Get the assistant talking: one answered turn whose reply is playing. */
+const replyPlaying = async () => {
+  await act(async () => voice.start());
+  await speak();
+  await emit("assistant-conversation-audio-begin", {
+    ticket: { session: 1, turn: 1 },
+    epoch: 7,
+  });
+  await emit("assistant-conversation-audio", {
+    ticket: { session: 1, turn: 1 },
+    epoch: 7,
+    audio: "AAAAAA==",
+  });
+  // Let the queued decode run.
+  await act(async () => {});
+  expect(voice.phase).toBe("speaking");
+};
 
 describe("hands-free session lifecycle", () => {
   /**
@@ -214,6 +255,55 @@ describe("hands-free session lifecycle", () => {
     ).toBe(1);
     expect(voice.phase).toBe("listening");
   });
+  /**
+   * The reported bug. On Normal the detector only starts a segment once a frame
+   * scores 0.75, and a soft first word never gets there — so everything before
+   * the frame that did was lost past a fixed 320 ms. The lead-in puts it back.
+   */
+  test("a quiet first word before the detector's decision reaches the turn", async () => {
+    const { SPEECH_LEAD } = await import("./conversationPolicy");
+    await act(async () => voice.start());
+    const probability = async (count: number, isSpeech: number) => {
+      await act(async () => {
+        for (let i = 0; i < count; i++)
+          vadOptions.onFrameProcessed(
+            { isSpeech, notSpeech: 1 - isSpeech },
+            new Float32Array(512).fill(0.01),
+          );
+      });
+    };
+    await probability(20, 0.02); // room tone
+    await probability(25, 0.4); // "hey, can you" — under Normal's threshold
+    await probability(1, 0.9); // the frame the detector starts on
+    await act(async () => vadOptions.onSpeechStart());
+    await act(async () => vadOptions.onSpeechRealStart());
+    await act(async () => vadOptions.onSpeechEnd(new Float32Array(16_000)));
+    const sent = calls.filter(
+      (call) => call.command === "assistant_conversation_audio",
+    );
+    expect(sent).toHaveLength(1);
+    const samples = (sent[0].args as ArrayBuffer).byteLength / 4;
+    const margin = Math.round(SPEECH_LEAD.marginMs / VAD_FRAME_MS);
+    // All 25 quiet frames, the margin before them, then the library's audio.
+    expect(samples).toBe((25 + margin) * 512 + 16_000);
+    expect(vadOptions.preSpeechPadMs).toBe(0);
+  });
+  test("a lead-in never repeats audio from the utterance before it", async () => {
+    await act(async () => voice.start());
+    await frames(30, () => true);
+    await act(async () => vadOptions.onSpeechStart());
+    await act(async () => vadOptions.onSpeechRealStart());
+    await act(async () => vadOptions.onSpeechEnd(new Float32Array(16_000)));
+    // Straight into the next utterance: nothing heard before it remains.
+    await frames(1, () => true);
+    await act(async () => vadOptions.onSpeechStart());
+    await act(async () => vadOptions.onSpeechRealStart());
+    await act(async () => vadOptions.onSpeechEnd(new Float32Array(16_000)));
+    const sent = calls.filter(
+      (call) => call.command === "assistant_conversation_audio",
+    );
+    expect((sent.at(-1)?.args as ArrayBuffer).byteLength / 4).toBe(16_000);
+  });
   test("end while microphone permission is pending releases late tracks", async () => {
     const mic = deferred<MediaStream>();
     microphone = mic.promise;
@@ -254,10 +344,9 @@ describe("hands-free session lifecycle", () => {
     expect(voice.open).toBe(false);
   });
   /**
-   * The bug this pair of tests exists for: mute used to mean both directions at
-   * once, so muting your microphone to stop the assistant hearing the room also
-   * cut off the answer it was already reading out. Mute is now the input side
-   * alone, and the headphones switch is the one that silences everything.
+   * Mute used to mean both directions at once, so muting your microphone to
+   * stop the assistant hearing the room also cut off the answer it was already
+   * reading out. Mute is the input side alone; the speaker is the output side.
    */
   test("mute stops capture but the reply is still spoken", async () => {
     const pending = deferred<unknown>();
@@ -267,7 +356,7 @@ describe("hands-free session lifecycle", () => {
     await act(async () => voice.toggleMute());
     expect(tracks.every((track) => track.stopped)).toBe(true);
     expect(voice.muted).toBe(true);
-    expect(voice.deafened).toBe(false);
+    expect(voice.speakerOff).toBe(false);
     // The turn in flight is untouched, so the phase still reports what the
     // assistant is doing rather than masking it with "muted".
     expect(voice.phase).toBe("responding");
@@ -296,61 +385,156 @@ describe("hands-free session lifecycle", () => {
         .length,
     ).toBe(1);
   });
-  test("the headphones switch silences both directions and cancels the reply", async () => {
+  /**
+   * The speaker switch is output only. It replaced a "sound off" switch that
+   * also closed the microphone, which made the control you reach for in a
+   * shared room stop the call from hearing you as well.
+   */
+  test("speaker off stops the reading but keeps the microphone and the reply", async () => {
     const pending = deferred<unknown>();
     audioTurn = pending.promise;
     await act(async () => voice.start());
     await speak();
-    await act(async () => voice.toggleDeafen());
-    expect(tracks.every((track) => track.stopped)).toBe(true);
-    expect(voice.deafened).toBe(true);
-    expect(voice.phase).toBe("deafened");
-    // Nothing can be heard, so the reply in flight is cancelled like a barge-in.
+    await act(async () => voice.toggleSpeaker());
+    expect(voice.speakerOff).toBe(true);
     expect(
-      calls.filter(
-        (call) => call.command === "assistant_conversation_interrupt",
-      ).length,
-    ).toBe(2);
-    await emit("assistant-conversation-local", {
-      ticket: { session: 1, turn: 1 },
-      epoch: 7,
-      kind: "begin",
-    });
+      calls.some(
+        (call) =>
+          call.command === "assistant_conversation_set_speaker" &&
+          (call.args as { on: boolean }).on === false,
+      ),
+    ).toBe(true);
+    // The reply is not cancelled: it carries on as text.
+    expect(commandCount("assistant_conversation_interrupt")).toBe(1);
+    expect(voice.phase).toBe("responding");
+    // And nothing more is played.
     await emit("assistant-conversation-audio", {
       ticket: { session: 1, turn: 1 },
       epoch: 7,
       audio: "AAAAAA==",
     });
     await act(async () => pending.resolve(undefined));
-    expect(callbackBegins).toBe(0);
     expect(sourceStarts).toBe(0);
-    expect(voice.phase).toBe("deafened");
+    // The microphone never closed.
+    expect(tracks.every((track) => !track.stopped)).toBe(true);
+    await speak();
+    expect(commandCount("assistant_conversation_audio")).toBe(2);
+  });
+  test("a call opened with spoken replies off starts with its speaker off", async () => {
+    settingsSpeakerOn = false;
+    await act(async () => renderer.update(<Harness />));
+    await act(async () => voice.start());
+    expect(voice.speakerOff).toBe(true);
+    const push = calls.find(
+      (call) => call.command === "assistant_conversation_set_speaker",
+    );
+    expect(push?.args).toEqual({ session: 1, on: false });
   });
   /**
-   * Deafening holds the microphone shut on its own, so turning it off must hand
-   * the microphone back to whatever the mute switch says — not unmute for you.
+   * The echo guard. The assistant's own voice leaks back through the speakers,
+   * and it used to start a turn — which cut the answer off mid-sentence, over
+   * and over, until the call felt like it never finished anything.
    */
-  test("un-deafening restores the microphone switch rather than overriding it", async () => {
+  test("patchy speech over a playing reply is dropped, not answered", async () => {
+    await replyPlaying();
+    await act(async () => vadOptions.onSpeechRealStart());
+    // Still talking: nothing has interrupted it yet.
+    expect(voice.phase).toBe("speaking");
+    expect(commandCount("assistant_conversation_interrupt")).toBe(1);
+    await frames(40, (i) => i % 3 === 0);
+    expect(commandCount("assistant_conversation_interrupt")).toBe(1);
+    await act(async () => vadOptions.onSpeechEnd(new Float32Array(16_000)));
+    expect(commandCount("assistant_conversation_audio")).toBe(1);
+    expect(voice.phase).toBe("speaking");
+  });
+  test("sustained speech over a playing reply interrupts it", async () => {
+    await replyPlaying();
+    await act(async () => vadOptions.onSpeechRealStart());
+    const window = Math.round(VAD_SENSITIVITY.normal.bargeInMs / VAD_FRAME_MS);
+    await frames(window - 1, () => true);
+    expect(commandCount("assistant_conversation_interrupt")).toBe(1);
+    await frames(1, () => true);
+    expect(commandCount("assistant_conversation_interrupt")).toBe(2);
+    expect(voice.phase).toBe("hearing");
+    await act(async () => vadOptions.onSpeechEnd(new Float32Array(16_000)));
+    expect(commandCount("assistant_conversation_audio")).toBe(2);
+  });
+  test("speech into silence starts a turn without waiting", async () => {
     await act(async () => voice.start());
-    await act(async () => voice.toggleMute());
-    await act(async () => voice.toggleDeafen());
-    await act(async () => voice.toggleDeafen());
-    expect(voice.deafened).toBe(false);
-    expect(voice.muted).toBe(true);
-    expect(voice.phase).toBe("muted");
-    await speak();
-    expect(
-      calls.filter((call) => call.command === "assistant_conversation_audio")
-        .length,
-    ).toBe(0);
-    // Only the mute switch reopens it.
-    await act(async () => voice.toggleMute());
+    await act(async () => vadOptions.onSpeechRealStart());
+    expect(voice.phase).toBe("hearing");
+    expect(commandCount("assistant_conversation_interrupt")).toBe(1);
+  });
+  test("the saved sensitivity decides how readily speech is detected", async () => {
+    settingsSensitivity = "low";
+    await act(async () => renderer.update(<Harness />));
+    await act(async () => voice.start());
+    expect(voice.sensitivity).toBe("low");
+    expect(vadOptions.positiveSpeechThreshold).toBe(
+      VAD_SENSITIVITY.low.positiveSpeechThreshold,
+    );
+    expect(vadOptions.minSpeechMs).toBe(VAD_SENSITIVITY.low.minSpeechMs);
+  });
+  test("a typed message is its own turn and cuts a spoken reply off", async () => {
+    await replyPlaying();
+    let sent!: boolean;
+    await act(async () => {
+      sent = await voice.sendText("  and in Nepali?  ");
+    });
+    expect(sent).toBe(true);
+    expect(commandCount("assistant_conversation_interrupt")).toBe(2);
+    const text = calls.find(
+      (call) => call.command === "assistant_conversation_text",
+    );
+    expect(text?.args).toEqual({ session: 1, turn: 2, text: "and in Nepali?" });
     expect(voice.phase).toBe("listening");
+  });
+  test("speech in progress when a message is sent is not also sent", async () => {
+    await act(async () => voice.start());
+    await act(async () => vadOptions.onSpeechRealStart());
+    await act(async () => {
+      await voice.sendText("hello");
+    });
+    await act(async () => vadOptions.onSpeechEnd(new Float32Array(16_000)));
+    expect(commandCount("assistant_conversation_audio")).toBe(0);
+    expect(commandCount("assistant_conversation_text")).toBe(1);
+  });
+  test("keyboard noise while a message is written does not start a turn", async () => {
+    await replyPlaying();
+    await act(async () => voice.setComposing(true));
     await speak();
+    expect(commandCount("assistant_conversation_interrupt")).toBe(1);
+    expect(commandCount("assistant_conversation_audio")).toBe(1);
+    expect(voice.phase).toBe("speaking");
+  });
+  test("opening a saved conversation keeps the call and drops what was in flight", async () => {
+    await replyPlaying();
+    let opened!: boolean;
+    await act(async () => {
+      opened = await voice.loadConversation(12);
+    });
+    expect(opened).toBe(true);
     expect(
-      calls.filter((call) => call.command === "assistant_conversation_audio")
-        .length,
-    ).toBe(1);
+      calls.find((call) => call.command === "assistant_conversation_load")
+        ?.args,
+    ).toEqual({ session: 1, id: 12 });
+    expect(voice.open).toBe(true);
+    expect(voice.phase).toBe("listening");
+    expect(tracks.every((track) => !track.stopped)).toBe(true);
+    // A reply from the old conversation cannot start playing afterwards.
+    await emit("assistant-conversation-audio", {
+      ticket: { session: 1, turn: 1 },
+      epoch: 8,
+      audio: "AAAAAA==",
+    });
+    expect(sourceStarts).toBe(1);
+  });
+  test("stopping the reply keeps the call listening", async () => {
+    await replyPlaying();
+    await act(async () => voice.stopReply());
+    expect(commandCount("assistant_conversation_interrupt")).toBe(2);
+    expect(voice.phase).toBe("listening");
+    expect(voice.open).toBe(true);
   });
   test("speech onset interrupts a reply and old completion cannot reset the new turn", async () => {
     const pending = deferred<unknown>();

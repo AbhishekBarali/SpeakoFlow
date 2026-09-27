@@ -131,7 +131,7 @@ test("failed clipboard access offers retry without claiming success", async () =
   expect(button.props["aria-label"]).toBe("overlay.copied");
 });
 
-test("transcription and cleanup share an indeterminate bar, then finish on success", async () => {
+test("transcription and cleanup share an indeterminate bar, then a check replaces it on success", async () => {
   await fire("show-overlay", { state: "recording", streamingWindow: true });
   await fire("stream-text", {
     committed: "Keep these words visible.",
@@ -150,25 +150,45 @@ test("transcription and cleanup share an indeterminate bar, then finish on succe
     ).toBe(false);
   }
   await fire("finish-overlay", { epoch: 9, text: "Keep these words visible." });
+  // The working bar does not "complete" into a solid line; it is replaced.
+  expect(renderer.root.findAllByProps({ role: "progressbar" })).toHaveLength(0);
+  const mark = renderer.root.findByProps({ className: "completion-mark" });
+  expect(mark.props["aria-label"]).toBe("overlay.done");
   expect(
-    renderer.root.findByProps({ role: "progressbar" }).props["aria-valuenow"],
-  ).toBe(100);
+    renderer.root.findByProps({ className: "card-label" }).props.children,
+  ).toBe("overlay.done");
   expect(renderer.root.findByType("button")).toBeDefined();
 });
 
+test("a completion straight from recording shows the same mark", async () => {
+  // Streaming engines can finish without ever showing a transcribing state.
+  await fire("show-overlay", { state: "recording", streamingWindow: true });
+  await fire("stream-text", { committed: "Short one.", tentative: "" });
+  await fire("finish-overlay", { epoch: 11, text: "Short one." });
+  expect(
+    renderer.root.findAllByProps({ className: "completion-mark" }),
+  ).toHaveLength(1);
+  expect(
+    renderer.root
+      .findAllByType("svg")
+      .some((node) => node.props.className?.includes("audio-waveform")),
+  ).toBe(false);
+});
+
 test("a quick compact result completes during hide; cancellation never claims completion", async () => {
+  const marks = () =>
+    renderer.root.findAllByProps({ className: "completion-mark" });
   await fire("show-overlay", { state: "transcribing", streamingWindow: false });
   await fire("hide-overlay");
-  expect(
-    renderer.root.findByProps({ role: "progressbar" }).props["aria-valuenow"],
-  ).toBeUndefined();
+  expect(marks()).toHaveLength(0);
+  expect(renderer.root.findAllByProps({ role: "progressbar" })).toHaveLength(1);
   await fire("show-overlay", { state: "transcribing", streamingWindow: false });
   await fire("finish-overlay", { epoch: 10, text: "" });
   await fire("hide-overlay");
   expect(rootClass()).toContain("native-window-hidden");
-  expect(
-    renderer.root.findByProps({ role: "progressbar" }).props["aria-valuenow"],
-  ).toBe(100);
+  expect(marks()).toHaveLength(1);
+  expect(marks()[0].props["aria-label"]).toBe("overlay.done");
   await fire("show-overlay", { state: "recording", streamingWindow: false });
+  expect(marks()).toHaveLength(0);
   expect(renderer.root.findAllByProps({ role: "progressbar" })).toHaveLength(0);
 });

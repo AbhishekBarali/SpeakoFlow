@@ -77,6 +77,16 @@ struct ChatCompletionRequest {
     /// well under a second.
     #[serde(skip_serializing_if = "Option::is_none")]
     max_tokens: Option<u32>,
+    /// The same ceiling under the name OpenAI's reasoning models require.
+    ///
+    /// Never set by a caller. [`adapt_request_to_rejections`] moves
+    /// `max_tokens` here for an endpoint that has answered
+    /// `'max_tokens' is not supported with this model. Use
+    /// 'max_completion_tokens' instead.` (Azure's GPT-6 deployments do). The two
+    /// are not interchangeable everywhere — most gateways and llama.cpp only know
+    /// `max_tokens` — so the rename is learned per endpoint, never assumed.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    max_completion_tokens: Option<u32>,
     /// llama.cpp-specific template options. Sent only to the built-in engine.
     #[serde(skip_serializing_if = "Option::is_none")]
     chat_template_kwargs: Option<Value>,
@@ -146,6 +156,7 @@ fn build_chat_completion_request(
         reasoning: options.reasoning,
         temperature: options.temperature,
         max_tokens: options.max_tokens,
+        max_completion_tokens: None,
         chat_template_kwargs: builtin_chat_template_kwargs(provider),
         stream: options.stream,
         tools: options.tools,
@@ -607,7 +618,7 @@ pub(crate) async fn send_chat_completion_with_schema_typed(
     }
     messages.push(serde_json::json!({"role": "user", "content": user_content}));
 
-    let request_body = build_chat_completion_request(
+    let mut request_body = build_chat_completion_request(
         provider,
         model,
         messages,
@@ -622,34 +633,185 @@ pub(crate) async fn send_chat_completion_with_schema_typed(
         },
     );
 
-    let response = client
-        .post(&url)
-        .json(&request_body)
-        .send()
-        .await
-        .map_err(|error| ChatCompletionError::Transport(error.to_string()))?;
+    let memo_key = format!("{url}|{}", request_body.model);
+    let mut adaptations = known_param_adaptations(&memo_key);
+    adapt_request_to_rejections(&mut request_body, adaptations);
 
-    let status = response.status();
-    if !status.is_success() {
-        let error_text = response
-            .text()
+    // One round per distinct parameter a model can refuse, plus the original.
+    // Each retry changes the body, so this cannot loop on the same 400.
+    for _ in 0..=ParamAdaptations::MAX_ROUNDS {
+        let response = client
+            .post(&url)
+            .json(&request_body)
+            .send()
             .await
-            .unwrap_or_else(|_| "Failed to read error response".to_string());
-        return Err(ChatCompletionError::HttpStatus {
-            status: status.as_u16(),
-            detail: error_text,
-        });
+            .map_err(|error| ChatCompletionError::Transport(error.to_string()))?;
+
+        let status = response.status();
+        if !status.is_success() {
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Failed to read error response".to_string());
+            if status.as_u16() == 400 {
+                if let Some(rejected) = rejected_request_parameter(&error_text) {
+                    let learned = adaptations.with(rejected);
+                    if learned != adaptations && adapt_would_change(&request_body, rejected) {
+                        warn!(
+                            "Model '{}' refused the '{}' parameter; adapting the request and retrying",
+                            request_body.model,
+                            rejected.name()
+                        );
+                        adaptations = learned;
+                        remember_param_adaptations(&memo_key, adaptations);
+                        adapt_request_to_rejections(&mut request_body, adaptations);
+                        continue;
+                    }
+                }
+            }
+            return Err(ChatCompletionError::HttpStatus {
+                status: status.as_u16(),
+                detail: error_text,
+            });
+        }
+
+        let completion: ChatCompletionResponse = response
+            .json()
+            .await
+            .map_err(|error| ChatCompletionError::ResponseDecode(error.to_string()))?;
+
+        return Ok(completion
+            .choices
+            .first()
+            .and_then(|choice| choice.message.content.clone()));
     }
 
-    let completion: ChatCompletionResponse = response
-        .json()
-        .await
-        .map_err(|error| ChatCompletionError::ResponseDecode(error.to_string()))?;
+    Err(ChatCompletionError::RequestBuild(
+        "the provider kept rejecting request parameters".to_string(),
+    ))
+}
 
-    Ok(completion
-        .choices
-        .first()
-        .and_then(|choice| choice.message.content.clone()))
+/// An optional request parameter a model refused with HTTP 400.
+///
+/// Only parameters the app can *repair* are listed. A rejected `reasoning_effort`
+/// is deliberately absent: cleanup has its own step-down ladder for it
+/// (`none` → `low` → nothing) because dropping it silently changes which effort
+/// the model runs at, and that is a decision the caller has to make.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum RejectedParam {
+    /// "Use 'max_completion_tokens' instead." — OpenAI reasoning models.
+    MaxTokens,
+    /// "'temperature' does not support 0 with this model. Only the default (1)
+    /// value is supported." — the same models; any explicit value is refused.
+    Temperature,
+}
+
+impl RejectedParam {
+    fn name(self) -> &'static str {
+        match self {
+            Self::MaxTokens => "max_tokens",
+            Self::Temperature => "temperature",
+        }
+    }
+}
+
+/// What has been learned about an endpoint+model's parameter rules.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+struct ParamAdaptations {
+    max_tokens_renamed: bool,
+    temperature_dropped: bool,
+}
+
+impl ParamAdaptations {
+    const MAX_ROUNDS: usize = 2;
+
+    fn with(mut self, rejected: RejectedParam) -> Self {
+        match rejected {
+            RejectedParam::MaxTokens => self.max_tokens_renamed = true,
+            RejectedParam::Temperature => self.temperature_dropped = true,
+        }
+        self
+    }
+}
+
+/// Endpoint+model → what it refused. Remembered for the life of the run so the
+/// 400 costs one extra round trip per model rather than one per dictation —
+/// cleanup is on the interactive path and a doubled round trip is felt.
+static PARAM_ADAPTATIONS: Lazy<Mutex<HashMap<String, ParamAdaptations>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
+
+fn known_param_adaptations(key: &str) -> ParamAdaptations {
+    PARAM_ADAPTATIONS
+        .lock()
+        .ok()
+        .and_then(|map| map.get(key).copied())
+        .unwrap_or_default()
+}
+
+fn remember_param_adaptations(key: &str, adaptations: ParamAdaptations) {
+    if let Ok(mut map) = PARAM_ADAPTATIONS.lock() {
+        map.insert(key.to_string(), adaptations);
+    }
+}
+
+fn adapt_request_to_rejections(body: &mut ChatCompletionRequest, adaptations: ParamAdaptations) {
+    if adaptations.max_tokens_renamed {
+        if let Some(limit) = body.max_tokens.take() {
+            body.max_completion_tokens = Some(limit);
+        }
+    }
+    if adaptations.temperature_dropped {
+        body.temperature = None;
+    }
+}
+
+/// Whether adapting for `rejected` would change the body at all. Without this a
+/// provider that names a parameter we did not send would be retried with an
+/// identical request.
+fn adapt_would_change(body: &ChatCompletionRequest, rejected: RejectedParam) -> bool {
+    match rejected {
+        RejectedParam::MaxTokens => body.max_tokens.is_some(),
+        RejectedParam::Temperature => body.temperature.is_some(),
+    }
+}
+
+/// Which repairable parameter a 400 body is complaining about, if any.
+///
+/// Reads the structured `error.param` first (OpenAI and Azure both send it), and
+/// falls back to the quoted parameter name in the message for gateways that
+/// forward only the text. The fallback requires the *quoted* name next to an
+/// "unsupported" phrase, so a message that merely mentions temperature in
+/// passing cannot trigger a retry.
+pub(crate) fn rejected_request_parameter(detail: &str) -> Option<RejectedParam> {
+    let from_param = serde_json::from_str::<Value>(detail).ok().and_then(|json| {
+        json.get("error")
+            .and_then(|error| error.get("param"))
+            .and_then(Value::as_str)
+            .map(str::to_ascii_lowercase)
+    });
+    let classify = |name: &str| match name {
+        "max_tokens" => Some(RejectedParam::MaxTokens),
+        "temperature" => Some(RejectedParam::Temperature),
+        _ => None,
+    };
+    if let Some(param) = from_param.as_deref() {
+        return classify(param);
+    }
+
+    let text = detail.to_ascii_lowercase();
+    let unsupported = text.contains("unsupported")
+        || text.contains("not supported")
+        || text.contains("does not support");
+    if !unsupported {
+        return None;
+    }
+    if text.contains("'max_tokens'") || text.contains("max_completion_tokens") {
+        return Some(RejectedParam::MaxTokens);
+    }
+    if text.contains("'temperature'") {
+        return Some(RejectedParam::Temperature);
+    }
+    None
 }
 
 /// Send a chat completion request with structured output support.
@@ -1430,6 +1592,94 @@ mod tests {
             models_endpoint: Some("/models".to_string()),
             supports_structured_output: true,
         }
+    }
+
+    /* ─────────────── parameter rejections (Azure GPT-6 bodies) ─────────────── */
+
+    /// Verbatim shape of what Azure's `gpt-6-luna` deployment answers when a
+    /// cleanup request carries `max_tokens`.
+    const AZURE_MAX_TOKENS_400: &str = r#"{"error":{"message":"Unsupported parameter: 'max_tokens' is not supported with this model. Use 'max_completion_tokens' instead.","type":"invalid_request_error","param":"max_tokens","code":"unsupported_parameter"}}"#;
+    const AZURE_TEMPERATURE_400: &str = r#"{"error":{"message":"Unsupported value: 'temperature' does not support 0 with this model. Only the default (1) value is supported.","type":"invalid_request_error","param":"temperature","code":"unsupported_value"}}"#;
+    const AZURE_EFFORT_400: &str = r#"{"error":{"message":"Unsupported value: 'reasoning_effort' does not support 'minimal' with this model.","type":"invalid_request_error","param":"reasoning_effort","code":"unsupported_value"}}"#;
+
+    #[test]
+    fn azure_parameter_rejections_are_recognised() {
+        assert_eq!(
+            rejected_request_parameter(AZURE_MAX_TOKENS_400),
+            Some(RejectedParam::MaxTokens)
+        );
+        assert_eq!(
+            rejected_request_parameter(AZURE_TEMPERATURE_400),
+            Some(RejectedParam::Temperature)
+        );
+    }
+
+    /// Effort has its own ladder in cleanup; silently dropping it here would run
+    /// the model at its default effort, which is the bug that ladder prevents.
+    #[test]
+    fn a_rejected_reasoning_effort_is_left_to_the_caller() {
+        assert_eq!(rejected_request_parameter(AZURE_EFFORT_400), None);
+    }
+
+    #[test]
+    fn a_plain_text_rejection_is_recognised_without_json() {
+        assert_eq!(
+            rejected_request_parameter(
+                "Unsupported parameter: 'max_tokens' is not supported with this model."
+            ),
+            Some(RejectedParam::MaxTokens)
+        );
+        // Mentioning a parameter is not refusing it.
+        assert_eq!(
+            rejected_request_parameter("temperature must be between 0 and 2"),
+            None
+        );
+        assert_eq!(rejected_request_parameter("model not found"), None);
+    }
+
+    #[test]
+    fn adaptations_rename_max_tokens_and_drop_temperature() {
+        let mut body = build_chat_completion_request(
+            &provider("azure_openai", "https://x.openai.azure.com/openai/v1"),
+            "gpt-6-luna",
+            vec![json!({"role": "user", "content": "hi"})],
+            ChatRequestOptions {
+                temperature: Some(0.0),
+                max_tokens: Some(512),
+                ..Default::default()
+            },
+        );
+        assert!(adapt_would_change(&body, RejectedParam::MaxTokens));
+        let adaptations = ParamAdaptations::default()
+            .with(RejectedParam::MaxTokens)
+            .with(RejectedParam::Temperature);
+        adapt_request_to_rejections(&mut body, adaptations);
+
+        let value = serde_json::to_value(&body).unwrap();
+        assert_eq!(value["max_completion_tokens"], 512);
+        assert!(value.get("max_tokens").is_none());
+        assert!(value.get("temperature").is_none());
+        // Nothing left to adapt, so a repeat 400 is returned instead of looping.
+        assert!(!adapt_would_change(&body, RejectedParam::MaxTokens));
+        assert!(!adapt_would_change(&body, RejectedParam::Temperature));
+    }
+
+    /// Other providers must keep receiving `max_tokens`: most gateways and
+    /// llama.cpp do not know the newer name.
+    #[test]
+    fn max_completion_tokens_is_never_sent_unprompted() {
+        let body = build_chat_completion_request(
+            &provider("groq", "https://api.groq.com/openai/v1"),
+            "openai/gpt-oss-120b",
+            vec![json!({"role": "user", "content": "hi"})],
+            ChatRequestOptions {
+                max_tokens: Some(64),
+                ..Default::default()
+            },
+        );
+        let value = serde_json::to_value(&body).unwrap();
+        assert_eq!(value["max_tokens"], 64);
+        assert!(value.get("max_completion_tokens").is_none());
     }
 
     use std::io::{Read, Write};

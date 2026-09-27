@@ -1,0 +1,63 @@
+/* ── Completion mark ─────────────────────────────────────────────────────────
+ * Two beats: the disc settles in from slightly small, then the check draws
+ * across it. Short enough to finish inside the compact pill's exit, and eased
+ * out so it lands softly instead of snapping. The accent is the same warm tone
+ * the working indicator used, so the colour carries over from "busy" to "done"
+ * while the shape changes. */
+.completion-mark {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  color: #e5c99b;
+}
+.completion-mark svg {
+  display: block;
+  overflow: visible;
+}
+.completion-disc {
+  fill: rgba(229, 201, 155, 0.16);
+  stroke: rgba(229, 201, 155, 0.55);
+  stroke-width: 1;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: completion-disc-in 300ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.completion-check {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  /* `pathLength="1"` makes the dash maths independent of the glyph's size. */
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: completion-check-draw 300ms cubic-bezier(0.65, 0, 0.35, 1) 110ms
+    forwards;
+}
+@keyframes completion-disc-in {
+  from {
+    opacity: 0;
+    transform: scale(0.55);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes completion-check-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .completion-disc {
+    animation: none;
+  }
+  .completion-check {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+}

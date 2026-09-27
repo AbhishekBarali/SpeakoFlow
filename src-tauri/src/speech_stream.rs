@@ -109,6 +109,29 @@ impl Default for ChunkPolicy {
     }
 }
 
+impl ChunkPolicy {
+    /// The default pacing, scaled down for an engine that accepts less text per
+    /// request than a default chunk (Groq's Orpheus takes 200 characters).
+    ///
+    /// Only the ceiling and the steady-state minimum move; the fast opener is
+    /// what keeps first-audio latency low, and it is already far below any
+    /// engine's limit. Engines that accept more than a default chunk get the
+    /// default unchanged, because larger chunks would only delay speech.
+    pub fn for_engine_limit(limit: usize) -> Self {
+        let default = Self::default();
+        if limit >= default.max_chars {
+            return default;
+        }
+        let max_chars = limit.max(default.first_min_chars * 2);
+        Self {
+            max_chars,
+            min_chars: default.min_chars.min(max_chars * 7 / 10),
+            first_clause_chars: default.first_clause_chars.min(max_chars / 2),
+            ..default
+        }
+    }
+}
+
 /// Abbreviations whose trailing period is not a sentence end. Compared
 /// lowercased with interior dots removed, so "e.g." matches as "eg" and
 /// "U.S." as "us".
@@ -586,6 +609,10 @@ enum Delivery {
     /// that outlives the turn if playback is still catching up.
     Remote {
         tx: tokio::sync::mpsc::UnboundedSender<String>,
+        /// The engine's per-request text limit. A chunk the chunker could not
+        /// keep under it (one long sentence delivered in a single token burst)
+        /// is split again here rather than rejected by the provider.
+        max_chars: usize,
     },
     /// The reply is closed; further chunks are ignored.
     Closed,
@@ -650,10 +677,13 @@ impl SpeechPipeline {
         } else {
             Delivery::Remote {
                 tx: spawn_remote_synthesis(app.clone(), settings.clone(), epoch, voice_ticket),
+                max_chars: crate::tts::max_chars_for(settings),
             }
         };
         Self {
-            chunker: SpeechChunker::new(),
+            chunker: SpeechChunker::with_policy(ChunkPolicy::for_engine_limit(
+                crate::tts::max_chars_for(settings),
+            )),
             delivery,
             epoch,
             spoke: false,
@@ -728,11 +758,13 @@ impl SpeechPipeline {
                 }
                 self.spoke = true;
             }
-            Delivery::Remote { tx } => {
+            Delivery::Remote { tx, max_chars } => {
                 // A closed channel means synthesis already stopped (error or
                 // cancellation); dropping the chunk is the correct response.
-                if tx.send(chunk).is_ok() {
-                    self.spoke = true;
+                for piece in crate::tts::split_to_limit(&chunk, *max_chars) {
+                    if tx.send(piece).is_ok() {
+                        self.spoke = true;
+                    }
                 }
             }
             Delivery::Closed => {}
@@ -1387,6 +1419,32 @@ mod tests {
         let joined = stream_chars(text, eager()).join(" ");
         for word in ["First", "Second", "detail", "1.2", "Dr.", "Smith"] {
             assert!(joined.contains(word), "{word:?} missing from {joined:?}");
+        }
+    }
+
+    /// An engine with a small per-request limit gets chunks that fit it, with
+    /// the fast opener untouched; roomy engines keep the default pacing.
+    #[test]
+    fn chunk_policy_shrinks_to_a_small_engine_limit() {
+        let default = ChunkPolicy::default();
+        assert_eq!(
+            ChunkPolicy::for_engine_limit(4096).max_chars,
+            default.max_chars
+        );
+        assert_eq!(
+            ChunkPolicy::for_engine_limit(usize::MAX).min_chars,
+            default.min_chars
+        );
+
+        let groq = ChunkPolicy::for_engine_limit(200);
+        assert_eq!(groq.max_chars, 200);
+        assert!(groq.min_chars < groq.max_chars);
+        assert!(groq.first_clause_chars <= groq.max_chars);
+        assert_eq!(groq.first_min_chars, default.first_min_chars);
+
+        let prose = "This is a fairly ordinary sentence about nothing much. ".repeat(12);
+        for chunk in stream_chars(&prose, groq) {
+            assert!(chunk.chars().count() <= 200, "{chunk:?} is over the limit");
         }
     }
 }

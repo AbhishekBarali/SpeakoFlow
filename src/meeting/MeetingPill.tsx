@@ -1,14 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import {
-  ChevronDown,
-  ChevronUp,
-  Mic,
-  Pause,
-  Play,
-  Square,
-  X,
-} from "lucide-react";
+import { Minimize2, Mic, Pause, Play, Square, X } from "lucide-react";
 import {
   acceptCallOffer,
   dismissCallOffer,
@@ -27,48 +19,71 @@ import {
   speakerTone,
   type SpeakerTurn,
 } from "@/components/settings/meetings/speakers";
+import AudioWaveform from "@/components/shared/AudioWaveform";
 import { TONE_HEX } from "./tones";
 import { useMeetingPill } from "./useMeetingPill";
 import { MeetingAsk } from "./MeetingAsk";
 import { useSafeWindowDrag } from "@/lib/useSafeWindowDrag";
 import "./MeetingPill.css";
 
-/** Bars in each row of the level meter. */
-const METER_BARS = 22;
-
-/** Below this a stream counts as silent and its row greys out. */
+/** Below this a stream counts as silent. */
 const SILENT_LEVEL = 0.02;
 
+/** Pointer travel, in screen pixels, past which a press was a drag rather than
+ *  a click. Matches `useSafeWindowDrag`'s threshold. */
+const CLICK_SLOP_PX = 4;
+
+/** Which corner the card grows out of, so the zoom starts at the pill. */
+type Origin = { right: boolean; bottom: boolean };
+
 /**
- * The floating meeting pill.
+ * Where the pill sits on its display, read at the moment it is clicked.
  *
- * Collapsed it answers one question continuously: *is this still capturing, and
- * is it hearing both sides?* Expanded it shows the live transcript and takes a
- * question about it.
+ * Rust keeps the window's corner fixed when it grows (`pill::corner_for`), and
+ * this answers the same question from inside the webview so the zoom animates
+ * out of the pill rather than out of the card's centre. `availLeft`/`availTop`
+ * are Chromium extensions that place a secondary display correctly; without
+ * them the primary display's origin is assumed.
+ */
+const originNow = (): Origin => {
+  const display = screen as Screen & { availLeft?: number; availTop?: number };
+  const left = display.availLeft ?? 0;
+  const top = display.availTop ?? 0;
+  return {
+    right:
+      window.screenX + window.innerWidth / 2 >= left + screen.availWidth / 2,
+    bottom:
+      window.screenY + window.innerHeight / 2 >= top + screen.availHeight / 2,
+  };
+};
+
+/**
+ * The floating meeting indicator.
+ *
+ * Collapsed it is the dictation overlay's compact pill in a meeting's colours: a
+ * recording dot, the clock, and a small waveform — nothing to read, nothing to
+ * decide. It replaced a 276px strip with a two-row level meter and three
+ * permanent buttons, which put more on screen during a call than the call app
+ * itself did.
+ *
+ * - **Clicking the pill opens it.** The card zooms out of the pill's corner, so
+ *   there is no separate expand button to aim for; the pill *is* the way in.
+ * - **Pause and stop only appear under the pointer**, in place of the waveform
+ *   at the pill's trailing edge. The width does not change, so the window never
+ *   resizes under a hovering cursor and nothing flickers.
+ * - **The pill is still the drag handle.** A press that travels is a move, one
+ *   that does not is a click — the same threshold `useSafeWindowDrag` uses.
  *
  * Two things about this component are constraints rather than choices:
  *
  * - **The measured node must not scroll.** The window's height is whatever the
  *   outer element reports, so a scroll container above `.pill-transcript` would
- *   feed the measurement back into itself and grow the window until it filled the
- *   display. The transcript's `max-height` in CSS is what bounds it.
- * - **The ask input is blurred before collapsing.** On Windows the collapsed pill
- *   is unfocusable so it can never take the caret from the app the user is
- *   working in, and the platform will not remove focusability from a window that
- *   currently holds focus.
- *
- * ## Why the bar no longer expands on click
- *
- * It used to, and that was the whole reason this window could not be moved: an
- * always-on-top strip parked at the bottom centre of the display, over whatever the
- * user was reading, with no way to shift it. This was the only floating window in the
- * app with no drag region at all — the permission for it (`core:window:allow-start-
- * dragging`) was already granted and simply unused.
- *
- * So the bar is now the window handle and the chevron is the expand control. That is
- * also the arrangement the expanded card already had, where a chevron collapses it,
- * so the two forms finally agree instead of one being click-anywhere and the other
- * having a button. The bar keeps its keyboard affordance for the same gesture.
+ *   feed the measurement back into itself and grow the window until it filled
+ *   the display. The transcript's `max-height` in CSS is what bounds it.
+ * - **The ask input is blurred before collapsing.** On Windows the collapsed
+ *   pill is unfocusable so it can never take the caret from the app the user is
+ *   working in, and the platform will not remove focusability from a window
+ *   that currently holds focus.
  */
 const MeetingPill: React.FC = () => {
   const { t } = useTranslation();
@@ -88,8 +103,10 @@ const MeetingPill: React.FC = () => {
 
   const rootRef = useRef<HTMLDivElement>(null);
   const askRef = useRef<HTMLInputElement>(null);
+  const pressRef = useRef<{ x: number; y: number } | null>(null);
   const [busy, setBusy] = useState(false);
   const [speakers, setSpeakers] = useState<MeetingSpeaker[]>([]);
+  const [origin, setOrigin] = useState<Origin>({ right: true, bottom: true });
 
   const meetingId = state.meeting_id;
 
@@ -109,7 +126,7 @@ const MeetingPill: React.FC = () => {
     const observer = new ResizeObserver(report);
     observer.observe(node);
     return () => observer.disconnect();
-  }, [expanded]);
+  }, [expanded, recording, offer]);
 
   /* ── speakers ── */
 
@@ -147,11 +164,19 @@ const MeetingPill: React.FC = () => {
     if (node) node.scrollTop = node.scrollHeight;
   }, [turnCount, expanded]);
 
+  /* ── the waveform ── */
+
+  // One combined activity signal, because the pill only answers "is it hearing
+  // anyone". Which side is audible is the card's job, and a far side that is not
+  // being captured at all turns the dot amber here as well. Memoised on the
+  // values so a clock tick does not look like fresh audio to the waveform.
+  const loudest = paused ? 0 : Math.max(levels.mic, levels.system);
+  const waveLevels = useMemo(() => (loudest > 0 ? [loudest] : []), [loudest]);
+
   /* ── actions ── */
 
   const togglePause = () => {
-    const next = !paused;
-    void setMeetingPaused(next).catch(() => {});
+    void setMeetingPaused(!paused).catch(() => {});
   };
 
   const stop = () => {
@@ -162,12 +187,29 @@ const MeetingPill: React.FC = () => {
     void stopMeeting().catch(() => setBusy(false));
   };
 
+  const open = () => {
+    setOrigin(originNow());
+    setExpanded(true);
+  };
+
   const collapse = () => {
     // Before the mode change, not after: `set_focusable(false)` is not honoured
     // for a window that holds focus, and a pill left focusable steals the caret.
     askRef.current?.blur();
     setExpanded(false);
   };
+
+  // Escape folds the card back into the pill. The ask field consumes its own
+  // Escape first (clearing a half-typed question), so this never eats one.
+  useEffect(() => {
+    if (!expanded) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !event.defaultPrevented) collapse();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // `collapse` only touches a ref and a stable setter, so it is not a dep.
+  }, [expanded]);
 
   if (!recording) {
     // An offer to record a call the detector noticed. Shown in the same window the
@@ -186,15 +228,22 @@ const MeetingPill: React.FC = () => {
   }
 
   const clock = formatClock(elapsedMs);
-  const meter = (
-    <LevelMeter mic={levels.mic} system={levels.system} paused={paused} />
-  );
+  // Amber, not red, when the far side is not being captured: the recording is
+  // running but it is only hearing one person, and that is worth noticing
+  // before the call ends rather than after.
+  const dotState = paused ? "paused" : state.system_audio ? "live" : "mic-only";
+  const statusLabel = paused
+    ? t("meetings.recorder.paused")
+    : t("meetings.recorder.recording");
 
   const pauseButton = (
     <button
       type="button"
       className="pill-action"
-      onClick={togglePause}
+      onClick={(event) => {
+        event.stopPropagation();
+        togglePause();
+      }}
       disabled={busy}
       title={
         paused ? t("meetings.recorder.resume") : t("meetings.recorder.pause")
@@ -203,7 +252,7 @@ const MeetingPill: React.FC = () => {
         paused ? t("meetings.recorder.resume") : t("meetings.recorder.pause")
       }
     >
-      {paused ? <Play size={12} /> : <Pause size={12} />}
+      {paused ? <Play size={11} /> : <Pause size={11} />}
     </button>
   );
 
@@ -212,46 +261,62 @@ const MeetingPill: React.FC = () => {
       type="button"
       className="pill-action"
       data-variant="stop"
-      onClick={stop}
+      onClick={(event) => {
+        event.stopPropagation();
+        stop();
+      }}
       disabled={busy}
-      title={t("meetings.recorder.stop")}
-      aria-label={t("meetings.recorder.stop")}
+      title={t("meetings.pill.stop")}
+      aria-label={t("meetings.pill.stop")}
     >
-      <Square size={11} />
+      <Square size={10} />
     </button>
   );
 
   if (!expanded) {
     return (
       <div ref={rootRef} className="pill-shell">
-        <div className="pill-bar" data-tauri-drag-region>
-          <span
-            className="pill-dot"
-            // Amber, not red, when the far side is not being captured: the
-            // recording is running but it is only hearing one person, and that is
-            // worth noticing before the call ends rather than after.
-            data-live={paused ? "false" : String(state.system_audio)}
-            aria-hidden="true"
-          />
-          <span className="pill-clock" data-tauri-drag-region>
-            {clock}
-          </span>
-          {meter}
-          <span
-            className="pill-controls"
-            style={{ display: "flex", gap: 6, flex: "none" }}
-          >
-            {pauseButton}
-            {stopButton}
-            <button
-              type="button"
-              className="pill-action"
-              onClick={() => setExpanded(true)}
-              title={t("meetings.pill.expand")}
-              aria-label={t("meetings.pill.expand")}
-            >
-              <ChevronUp size={13} />
-            </button>
+        <div
+          className="mpill"
+          data-paused={String(paused)}
+          data-tauri-drag-region
+          // A group, not a button: `role="button"` is on the never-draggable
+          // list in `useSafeWindowDrag`, and the pill has to stay the handle.
+          role="group"
+          title={t("meetings.pill.expand")}
+          aria-label={`${statusLabel} ${clock}. ${t("meetings.pill.expand")}`}
+          onPointerDown={(event) => {
+            pressRef.current = { x: event.screenX, y: event.screenY };
+          }}
+          onClick={(event) => {
+            const press = pressRef.current;
+            pressRef.current = null;
+            // A press that travelled moved the window; it was not a click.
+            if (
+              press &&
+              (Math.abs(event.screenX - press.x) > CLICK_SLOP_PX ||
+                Math.abs(event.screenY - press.y) > CLICK_SLOP_PX)
+            )
+              return;
+            open();
+          }}
+        >
+          <span className="pill-dot" data-state={dotState} aria-hidden="true" />
+          <span className="mpill-clock">{clock}</span>
+          <span className="mpill-end">
+            <span className="mpill-wave" aria-hidden="true">
+              <AudioWaveform
+                barCount={9}
+                levels={waveLevels}
+                size="sm"
+                active={!paused}
+                mode="reactive"
+              />
+            </span>
+            <span className="mpill-controls">
+              {pauseButton}
+              {stopButton}
+            </span>
           </span>
         </div>
       </div>
@@ -260,23 +325,28 @@ const MeetingPill: React.FC = () => {
 
   return (
     <div ref={rootRef} className="pill-shell">
-      <div className="pill-card">
+      <div
+        className="pill-card"
+        data-origin-x={origin.right ? "right" : "left"}
+        data-origin-y={origin.bottom ? "bottom" : "top"}
+      >
         <div className="pill-head" data-tauri-drag-region>
-          <span
-            className="pill-dot"
-            data-live={paused ? "false" : String(state.system_audio)}
-            aria-hidden="true"
-          />
-          <span className="pill-clock" data-tauri-drag-region>
-            {clock}
+          <span className="pill-dot" data-state={dotState} aria-hidden="true" />
+          <span className="pill-clock">{clock}</span>
+          <span className="pill-head-label">{statusLabel}</span>
+          <span className="pill-head-sides" aria-hidden="true">
+            <SideChip
+              label={t("meetings.speakers.me")}
+              level={paused ? 0 : levels.mic}
+              captured
+            />
+            <SideChip
+              label={t("meetings.speakers.others")}
+              level={paused ? 0 : levels.system}
+              captured={state.system_audio}
+            />
           </span>
-          <span className="pill-head-meta" data-tauri-drag-region>
-            <span className="pill-head-label">
-              {paused
-                ? t("meetings.recorder.paused")
-                : t("meetings.recorder.recording")}
-            </span>
-          </span>
+          <span className="pill-head-spacer" />
           {pauseButton}
           {stopButton}
           <button
@@ -286,7 +356,7 @@ const MeetingPill: React.FC = () => {
             title={t("meetings.pill.collapse")}
             aria-label={t("meetings.pill.collapse")}
           >
-            <ChevronDown size={13} />
+            <Minimize2 size={12} />
           </button>
         </div>
 
@@ -315,6 +385,30 @@ const MeetingPill: React.FC = () => {
   );
 };
 
+/**
+ * "You" / "Others" with a light that is on while that side is audible.
+ *
+ * This is what the old two-row meter was for — a far side that is not being
+ * captured is the feature's most common failure — reduced to the one bit it
+ * actually carried. A side that is not captured at all is struck through
+ * rather than merely dark, because "quiet" and "not recorded" must not look
+ * alike.
+ */
+const SideChip: React.FC<{
+  label: string;
+  level: number;
+  captured: boolean;
+}> = ({ label, level, captured }) => (
+  <span
+    className="pill-side"
+    data-captured={String(captured)}
+    data-active={String(captured && level >= SILENT_LEVEL)}
+  >
+    <span className="pill-side-light" />
+    {label}
+  </span>
+);
+
 interface OfferCardProps {
   /** The capturing app's name, when it could be read. */
   app: string | null;
@@ -332,18 +426,13 @@ interface OfferCardProps {
  *
  * ## Why it must not look like the recorder
  *
- * It did, and that was the single most alarming thing in this feature. The card
- * reused `.pill-bar` *and* the live recorder's `pill-dot` with `data-live="true"` —
- * a filled red dot, breathing on a 2s loop, which is the universal "capturing now"
- * signal. It arrives six to nine seconds into a call (`POLL_INTERVAL` plus
- * `SUSTAINED_FOR`), unprompted, in the same place and the same shape the live
- * indicator uses. So a user who glanced at it read "SpeakoFlow started recording my
- * call by itself, at some moment I did not choose" — and nothing had started.
- *
- * Being right in the code is not the same as being readable on screen. The indicator
- * is now a hollow, static ring in the accent colour, which is not a state the live
- * recorder can ever be in, and the card says "Not recording" in as many words. That
- * sentence is redundant next to "Record it?" and it stays anyway: this is the one
+ * It did, and that was the single most alarming thing in this feature: the card
+ * reused the live recorder's breathing red dot — the universal "capturing now"
+ * signal — on a card that arrives unprompted six to nine seconds into a call. A
+ * user who glanced at it read "SpeakoFlow started recording my call by itself".
+ * The indicator is a hollow, static ring in the accent colour, which is not a
+ * state the live recorder can ever be in, and the card says "Not recording" in as
+ * many words. Redundant next to "Record it?", and kept anyway: this is the one
  * card in the app where a misreading costs the user's trust rather than a click.
  *
  * The title is composed here rather than in Rust so its default is localised, which
@@ -373,9 +462,9 @@ const OfferCard: React.FC<OfferCardProps> = ({ app, onDone }) => {
   };
 
   return (
-    <div className="pill-bar" data-offer="true" data-tauri-drag-region>
+    <div className="pill-offer" data-tauri-drag-region>
       <span className="pill-offer-ring" aria-hidden="true" />
-      <span className="pill-offer-body" data-tauri-drag-region>
+      <span className="pill-offer-body">
         <span className="pill-offer-text">
           {app
             ? t("meetings.offer.detectedApp", { app: friendlyAppName(app) })
@@ -433,64 +522,5 @@ const TurnRow: React.FC<TurnRowProps> = ({ turn, name, color }) => (
     <p className="pill-turn-text">{turn.text}</p>
   </div>
 );
-
-interface LevelMeterProps {
-  mic: number;
-  system: number;
-  paused: boolean;
-}
-
-/**
- * Two rows of bars: the user above, everyone else below.
- *
- * Split rather than combined because *which* row is moving is the diagnostic. A
- * flat bottom row means the other participants are not being captured, which is
- * this feature's most common failure and is otherwise completely silent until the
- * transcript comes back half empty.
- */
-const LevelMeter: React.FC<LevelMeterProps> = ({ mic, system, paused }) => (
-  <span className="pill-meter" aria-hidden="true">
-    <MeterRow stream="mic" level={paused ? 0 : mic} />
-    <MeterRow stream="system" level={paused ? 0 : system} />
-  </span>
-);
-
-const MeterRow: React.FC<{ stream: "mic" | "system"; level: number }> = ({
-  stream,
-  level,
-}) => (
-  <span
-    className="pill-meter-row"
-    data-stream={stream}
-    data-silent={String(level < SILENT_LEVEL)}
-  >
-    {Array.from({ length: METER_BARS }, (_, index) => (
-      <span
-        key={index}
-        className="pill-meter-bar"
-        style={barStyle(level, index)}
-      />
-    ))}
-  </span>
-);
-
-/**
- * Height and opacity for one bar.
- *
- * The envelope is a raised cosine across the row, so a level reads as a shape
- * centred in the meter rather than as a flat block that is either on or off —
- * which is what makes a quiet voice visibly different from silence instead of
- * both rendering as "nothing".
- */
-const barStyle = (level: number, index: number): React.CSSProperties => {
-  const centred = (index - (METER_BARS - 1) / 2) / ((METER_BARS - 1) / 2);
-  const envelope = 0.35 + 0.65 * Math.cos((centred * Math.PI) / 2) ** 2;
-  const scale = Math.max(0.08, Math.min(1, level * envelope));
-  return {
-    transform: `scaleY(${scale})`,
-    height: "100%",
-    opacity: level < SILENT_LEVEL ? 0.3 : 0.55 + 0.45 * scale,
-  };
-};
 
 export default MeetingPill;

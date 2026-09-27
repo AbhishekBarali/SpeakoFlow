@@ -43,7 +43,11 @@ import { AudioFeedback } from "@/components/settings/AudioFeedback";
 import { SoundPicker } from "@/components/settings/SoundPicker";
 import { OutputDeviceSelector } from "@/components/settings/OutputDeviceSelector";
 import { VolumeSlider } from "@/components/settings/VolumeSlider";
-import { OverlayStyle } from "@/components/settings/OverlayStyle";
+import {
+  OverlayStyle,
+  useResolvedOverlayStyle,
+} from "@/components/settings/OverlayStyle";
+import { OverlayLinger } from "@/components/settings/OverlayLinger";
 import { ShowOverlay } from "@/components/settings/ShowOverlay";
 import { PasteMethodSetting } from "@/components/settings/PasteMethod";
 import { TypingToolSetting } from "@/components/settings/TypingTool";
@@ -72,7 +76,6 @@ import { ClamshellMicrophoneSelector } from "@/components/settings/ClamshellMicr
  * (AI cleanup, the assistant, dictionary) and the models behind them live on
  * their own pages in the sidebar; nothing here should be needed to get started.
  */
-
 
 export const GeneralTab: React.FC = () => {
   const { t } = useTranslation();
@@ -201,6 +204,9 @@ export const ShortcutsTab: React.FC = () => {
 export const AudioTab: React.FC = () => {
   const { t } = useTranslation();
   const { audioFeedbackEnabled } = useSettings();
+  // Only the Live card lingers after a dictation, so its linger is only a
+  // choice while Live is the overlay in use.
+  const liveOverlay = useResolvedOverlayStyle() === "live";
   return (
     <>
       <SettingsGroup title={t("settingsDialog.audio.microphone")}>
@@ -232,6 +238,9 @@ export const AudioTab: React.FC = () => {
         description={t("settingsDialog.audio.overlayHint")}
       >
         <OverlayStyle descriptionMode="tooltip" grouped={true} />
+        {liveOverlay && (
+          <OverlayLinger descriptionMode="tooltip" grouped={true} />
+        )}
         <ShowOverlay descriptionMode="tooltip" grouped={true} />
       </SettingsGroup>
     </>

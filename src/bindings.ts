@@ -595,6 +595,18 @@ async changeAssistantOverlayStyleSetting(style: string) : Promise<Result<null, s
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * Set how long the finished live-transcription card stays on screen. Read at
+ * the moment a dictation completes, so the next one uses it with no restart.
+ */
+async changeOverlayLingerSetting(linger: OverlayLinger) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("change_overlay_linger_setting", { linger }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async changeAppLanguageSetting(language: string) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("change_app_language_setting", { language }) };
@@ -2024,6 +2036,18 @@ async setAssistantConversationPace(pace: ConversationPace) : Promise<Result<null
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * How readily a hands-free call treats a sound as the user speaking. Persisted
+ * for the same reason as the pace: a noisy room is noisy in every call.
+ */
+async setAssistantConversationSensitivity(sensitivity: ConversationSensitivity) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_assistant_conversation_sensitivity", { sensitivity }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async setAssistantPanelOpacity(opacity: number) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("set_assistant_panel_opacity", { opacity }) };
@@ -2181,10 +2205,10 @@ async assistantListAzureVoices() : Promise<Result<AzureVoice[], string>> {
 }
 },
 /**
- * List selectable voices for the currently-configured remote TTS engine
- * (OpenAI-compatible, ElevenLabs, or Azure), so the settings UI can offer a
- * searchable voice picker instead of a raw text field. Returns an error string
- * for inline display when the lookup fails (bad key, unreachable endpoint).
+ * List selectable voices for the currently-configured remote TTS engine, so
+ * the settings UI can offer a searchable voice picker instead of a raw text
+ * field. Returns an error string for inline display when the lookup fails
+ * (bad key, unreachable endpoint).
  */
 async assistantListTtsVoices() : Promise<Result<TtsVoice[], string>> {
     try {
@@ -2195,9 +2219,8 @@ async assistantListTtsVoices() : Promise<Result<TtsVoice[], string>> {
 }
 },
 /**
- * List selectable models for the currently-configured remote TTS engine
- * (OpenAI-compatible `/models`, or ElevenLabs text-to-speech models). Azure and
- * Kokoro don't expose a model list and return an error the UI shows inline.
+ * List selectable models for the currently-configured remote TTS engine.
+ * Engines whose voice implies the model return an error the UI shows inline.
  */
 async assistantListTtsModels() : Promise<Result<string[], string>> {
     try {
@@ -2330,6 +2353,71 @@ async assistantConversationSetExpanded(expanded: boolean) : Promise<void> {
 async assistantConversationInterrupt(session: number, interruptedReply: boolean) : Promise<Result<VoiceTicket, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("assistant_conversation_interrupt", { session, interruptedReply }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * A typed message in a live call.
+ * 
+ * Same turn discipline as speech: the frontend opens the turn with
+ * `assistant_conversation_interrupt` first, so a reply in flight is cut off
+ * exactly as if the user had started talking, and the reply to this message is
+ * spoken or not by the same speaker switch. Nothing is carried in front of it —
+ * a sentence abandoned mid-air is not part of something the user chose to type.
+ */
+async assistantConversationText(session: number, turn: number, text: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("assistant_conversation_text", { session, turn, text }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Start a new conversation without hanging up (the call bar's New chat).
+ * 
+ * The one that just finished is saved and distilled like any other ended
+ * conversation; the microphone, the speaker switch and the window stay as
+ * they are.
+ */
+async assistantConversationNew(session: number) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("assistant_conversation_new", { session }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Continue a saved conversation inside the live call.
+ * 
+ * This is what makes history reachable from a call at all. The only way back
+ * to an old conversation used to be History → Continue, which hung the call up
+ * first and then reopened the thread as a quick-ask card showing one exchange.
+ * Here the thread replaces the call's conversation in place, the next thing
+ * said is appended to it, and later turns keep updating the same History row.
+ */
+async assistantConversationLoad(session: number, id: number) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("assistant_conversation_load", { session, id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * The call bar's speaker switch.
+ * 
+ * Off stops what is being read out right now but lets the reply finish as
+ * text, and later replies are not synthesized at all. The microphone is not
+ * touched: that is the mute button's job, and the two used to be tangled into
+ * one "sound off" switch that closed the microphone as well.
+ */
+async assistantConversationSetSpeaker(session: number, on: boolean) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("assistant_conversation_set_speaker", { session, on }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -2822,6 +2910,16 @@ async generateMeetingNotes(meetingId: number, template: NotesTemplate | null) : 
 }
 },
 /**
+ * Whether notes are being written for a meeting right now.
+ * 
+ * Asked once when a detail page opens: progress arrives as events, and a page
+ * opened after `Started` was emitted would otherwise not know a job is running
+ * and offer to start a second one.
+ */
+async isMeetingNotesRunning(meetingId: number) : Promise<boolean> {
+    return await TAURI_INVOKE("is_meeting_notes_running", { meetingId });
+},
+/**
  * Delete a meeting, its transcript, and its recorded audio.
  * 
  * The store commits the row deletion and returns the audio paths *without*
@@ -3024,6 +3122,49 @@ async getCallDetectionStatus() : Promise<Result<CallDetectionStatus, string>> {
 async setMeetingAutoDetect(enabled: boolean) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("set_meeting_auto_detect", { enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Whether the floating indicator is shown while a meeting records.
+ */
+async getMeetingIndicator() : Promise<Result<boolean, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_meeting_indicator") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Show or hide the floating indicator, including for a meeting already
+ * recording — a switch that only applied to the next meeting would read as
+ * broken to someone who turned it off because the pill was in their way now.
+ * 
+ * On the blocking pool because showing may build the pill's webview, which has
+ * to happen inline on a thread that is not the main one (see
+ * `pill::ensure_pill_window`).
+ */
+async setMeetingIndicator(enabled: boolean) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_meeting_indicator", { enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Save an edit to the generated notes, such as a ticked next step.
+ * 
+ * Refuses while a notes job is writing the same row: the job's result would
+ * land a moment later and silently discard the edit, which is worse than
+ * telling the user to wait.
+ */
+async setMeetingNotes(meetingId: number, notes: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_meeting_notes", { meetingId, notes }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -3238,7 +3379,11 @@ overlay_style?: OverlayStyle;
  * Assistant overlay style: Auto/None/Minimal/Live. Live shows the running
  * transcript plus the streamed reply as readable text; Minimal is the pill.
  */
-assistant_overlay_style?: OverlayStyle; debug_mode?: boolean; log_level?: LogLevel; custom_words?: string[]; 
+assistant_overlay_style?: OverlayStyle; 
+/**
+ * How long the finished live-transcription card stays up before leaving.
+ */
+overlay_linger?: OverlayLinger; debug_mode?: boolean; log_level?: LogLevel; custom_words?: string[]; 
 /**
  * Offer to record when a call appears to be in progress.
  * 
@@ -3249,6 +3394,16 @@ assistant_overlay_style?: OverlayStyle; debug_mode?: boolean; log_level?: LogLev
  * wrong the cost is one dismissed card.
  */
 meeting_auto_detect?: boolean; 
+/**
+ * Show the small floating indicator while a meeting records.
+ * 
+ * On by default, because a recording nobody can see is indistinguishable
+ * from one that silently stopped. Off is for people who find any floating
+ * window during a call distracting — the recording then lives only in
+ * Settings → Meetings, which is where it is stopped. Other note takers were
+ * asked for exactly this switch.
+ */
+meeting_show_indicator?: boolean; 
 /**
  * Learn a spelling when the user corrects a dictated word.
  * 
@@ -3424,7 +3579,11 @@ assistant_tts_volume?: number;
 /**
  * How long a hands-free conversation waits for you to finish speaking.
  */
-assistant_conversation_pace?: ConversationPace; assistant_max_history_messages?: number; 
+assistant_conversation_pace?: ConversationPace; 
+/**
+ * How readily a hands-free call treats a sound as the user speaking.
+ */
+assistant_conversation_sensitivity?: ConversationSensitivity; assistant_max_history_messages?: number; 
 /**
  * When on, once a conversation grows past the model's context window the
  * assistant folds older turns into a rolling summary (kept in context)
@@ -3952,6 +4111,30 @@ export type ConversationPace =
  */
 "patient"
 /**
+ * How readily a hands-free call decides that a sound is the user speaking.
+ * 
+ * The pace above is about *when a turn ends*; this is about *whether a turn
+ * starts at all*. They were one fixed tuning before, and it was tuned for a
+ * quiet room: a keyboard, a chair, a fan or the assistant's own voice coming
+ * back through the speakers was enough to start a turn — and a turn that starts
+ * while the assistant is talking cuts the answer off. The frontend maps each
+ * level to the voice detector's thresholds and to how long speech has to last
+ * before it is allowed to interrupt a reply (`conversationPolicy.ts`).
+ */
+export type ConversationSensitivity = 
+/**
+ * Only clear, sustained speech. For a noisy room or open speakers.
+ */
+"low" | 
+/**
+ * The default: ignores clicks, coughs and short noises.
+ */
+"normal" | 
+/**
+ * Picks up quiet speech quickly. Best with headphones in a quiet room.
+ */
+"high"
+/**
  * A user-created writing style for cleanup. It is deliberately separate from
  * `LLMPrompt`: cleanup prompts define what corrections happen; tone presets
  * define how the resulting wording should sound.
@@ -4420,6 +4603,22 @@ export type NotesTemplate =
  */
 "action_items"
 export type OrtAcceleratorSetting = "auto" | "cpu" | "cuda" | "directml" | "rocm"
+/**
+ * How long the finished live-transcription card stays on screen before it
+ * leaves. Only the Live card lingers — the compact pill dismisses as soon as
+ * the paste lands — so this is the window in which the final text can be read
+ * and copied. Hovering the card holds it regardless of the choice, so a short
+ * linger never takes the copy button away mid-reach.
+ */
+export type OverlayLinger = 
+/**
+ * Gone almost at once: a glance, then out of the way.
+ */
+"quick" | 
+/**
+ * The long-standing behaviour.
+ */
+"standard" | "long" | "extended"
 export type OverlayPosition = "none" | "top" | "bottom"
 /**
  * How the recording / assistant overlay presents itself while active.

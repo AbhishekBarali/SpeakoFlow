@@ -512,11 +512,44 @@ where
     }
 }
 
+/// Every process descended from `root`, including `root` itself.
+///
+/// `pairs` is `(pid, parent_pid)` for every process on the machine. Pure so the
+/// walk can be tested without a process table.
+///
+/// # Why this exists
+///
+/// Excluding our own pid was not enough to keep the detector from seeing
+/// ourselves. The assistant's voice call listens through the webview's
+/// `getUserMedia`, and WebView2 runs that capture in a `msedgewebview2.exe`
+/// **child** process — a different pid. So a hands-free call with the assistant
+/// looked exactly like a call in another app, and six seconds in the meeting
+/// card appeared on top of the call asking to record "msedgewebview2". Matching
+/// on that name would be wrong (the new Microsoft Teams is itself a WebView2
+/// app); asking whether the process is one of ours is the question that is
+/// actually meant.
+///
+/// A parent pid can outlive its process and be reused, so a stale entry could in
+/// principle adopt an unrelated process into our tree. The consequence is one
+/// missed offer, and the `visited` set keeps a reuse cycle from looping.
+pub fn process_family(root: u32, pairs: &[(u32, u32)]) -> std::collections::HashSet<u32> {
+    let mut family = std::collections::HashSet::from([root]);
+    let mut frontier = vec![root];
+    while let Some(parent) = frontier.pop() {
+        for &(pid, parent_pid) in pairs {
+            if parent_pid == parent && pid != parent && family.insert(pid) {
+                frontier.push(pid);
+            }
+        }
+    }
+    family
+}
+
 /* ───────────────────────────── Windows ───────────────────────────── */
 
 #[cfg(target_os = "windows")]
 mod windows_impl {
-    use super::{AudioProcess, CallObservation};
+    use super::{process_family, AudioProcess, CallObservation};
     use windows::core::Interface;
     use windows::Win32::Foundation::S_OK;
     use windows::Win32::Media::Audio::{
@@ -527,6 +560,8 @@ mod windows_impl {
         CoCreateInstance, CoInitializeEx, CoUninitialize, CLSCTX_ALL, COINIT_MULTITHREADED,
     };
     use windows::Win32::System::Threading::GetCurrentProcessId;
+
+    use std::collections::HashSet;
 
     pub fn observe() -> CallObservation {
         unsafe {
@@ -565,11 +600,21 @@ mod windows_impl {
         let enumerator: IMMDeviceEnumerator =
             CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)?;
 
+        // Taken lazily and at most once per poll: the process table is only
+        // needed when some other pid is actually holding an active session.
+        let mut family: Option<HashSet<u32>> = None;
+        let mut is_ours = |pid: u32| -> bool {
+            pid == own_pid
+                || family
+                    .get_or_insert_with(|| own_family(own_pid))
+                    .contains(&pid)
+        };
+
         // Capture first: it is the only thing the decision depends on, so if it
         // is absent the render scan is work nobody reads.
-        let capturing = first_foreign_active_session(&enumerator, eCapture, own_pid);
+        let capturing = first_foreign_active_session(&enumerator, eCapture, &mut is_ours);
         let rendering = if capturing.is_some() {
-            first_foreign_active_session(&enumerator, eRender, own_pid).is_some()
+            first_foreign_active_session(&enumerator, eRender, &mut is_ours).is_some()
         } else {
             false
         };
@@ -591,7 +636,7 @@ mod windows_impl {
     unsafe fn first_foreign_active_session(
         enumerator: &IMMDeviceEnumerator,
         flow: EDataFlow,
-        own_pid: u32,
+        is_ours: &mut dyn FnMut(u32) -> bool,
     ) -> Option<AudioProcess> {
         // `DEVICE_STATE_ACTIVE` only: an unplugged or disabled endpoint cannot
         // be carrying a call, and enumerating it costs an activation that fails.
@@ -646,11 +691,14 @@ mod windows_impl {
                 }
 
                 let pid = control.GetProcessId().unwrap_or(0);
-                // pid 0 is the audio engine rather than an application, and our
-                // own pid is us: dictation holds a capture session, and meeting
-                // loopback holds a render one. Offering to record because we can
-                // see ourselves recording would be a loop.
-                if pid == 0 || pid == own_pid {
+                // pid 0 is the audio engine rather than an application. Anything
+                // in our own process tree is us: dictation holds a capture
+                // session in this process, meeting loopback a render one, and the
+                // assistant's voice call captures from a WebView2 child process.
+                // Offering to record because we can see ourselves listening
+                // would be a loop — and during a call with the assistant it put
+                // a "record this call?" card on top of the conversation.
+                if pid == 0 {
                     continue;
                 }
 
@@ -661,6 +709,12 @@ mod windows_impl {
                     _ => continue,
                 }
 
+                // After the state check, so the process table is only read for
+                // a session that would otherwise count.
+                if is_ours(pid) {
+                    continue;
+                }
+
                 return Some(AudioProcess {
                     pid,
                     name: process_file_name(pid),
@@ -668,6 +722,41 @@ mod windows_impl {
             }
         }
         None
+    }
+
+    /// Our own process and every process it started, directly or not.
+    ///
+    /// An empty snapshot degrades to "just us", which is the behaviour this had
+    /// before the tree existed — never to excluding nothing.
+    unsafe fn own_family(own_pid: u32) -> HashSet<u32> {
+        use windows::Win32::Foundation::CloseHandle;
+        use windows::Win32::System::Diagnostics::ToolHelp::{
+            CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W,
+            TH32CS_SNAPPROCESS,
+        };
+
+        let snapshot = match CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) {
+            Ok(handle) => handle,
+            Err(e) => {
+                log::debug!("Could not snapshot the process table: {e}");
+                return HashSet::from([own_pid]);
+            }
+        };
+        let mut pairs = Vec::with_capacity(256);
+        let mut entry = PROCESSENTRY32W {
+            dwSize: std::mem::size_of::<PROCESSENTRY32W>() as u32,
+            ..Default::default()
+        };
+        if Process32FirstW(snapshot, &mut entry).is_ok() {
+            loop {
+                pairs.push((entry.th32ProcessID, entry.th32ParentProcessID));
+                if Process32NextW(snapshot, &mut entry).is_err() {
+                    break;
+                }
+            }
+        }
+        let _ = CloseHandle(snapshot);
+        process_family(own_pid, &pairs)
     }
 
     /// The executable's file name, for the wording of the prompt only.
@@ -1072,5 +1161,36 @@ mod tests {
             assert!(observe().is_none());
         }
         assert_eq!(detection_supported(), cfg!(target_os = "windows"));
+    }
+
+    /// The assistant's voice call captures from a WebView2 renderer, which is a
+    /// grandchild of the app: browser process under us, renderer under that.
+    #[test]
+    fn a_webview_grandchild_is_part_of_our_family() {
+        let pairs = [
+            (100, 4),   // us, started by explorer
+            (200, 100), // msedgewebview2 browser process
+            (300, 200), // its renderer / audio utility process
+            (900, 4),   // Zoom, started by explorer
+        ];
+        let family = process_family(100, &pairs);
+        assert!(family.contains(&100));
+        assert!(family.contains(&200));
+        assert!(family.contains(&300), "the capturing grandchild is ours");
+        assert!(!family.contains(&900), "an unrelated call app is not");
+        assert!(!family.contains(&4), "our parent is not our child");
+    }
+
+    /// A reused parent pid can form a cycle; the walk must still end.
+    #[test]
+    fn a_parent_cycle_does_not_loop() {
+        let pairs = [(100, 200), (200, 100)];
+        let family = process_family(100, &pairs);
+        assert_eq!(family.len(), 2);
+    }
+
+    #[test]
+    fn an_empty_process_table_is_just_us() {
+        assert_eq!(process_family(7, &[]), std::collections::HashSet::from([7]));
     }
 }

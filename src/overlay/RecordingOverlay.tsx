@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { Check, Copy } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import AudioWaveform from "../components/shared/AudioWaveform";
+import CompletionMark from "./CompletionMark";
 import OverlayProgress from "./OverlayProgress";
 import { voiceEnergy } from "../components/shared/waveformSignal";
 import i18n, { syncLanguageFromSettings } from "@/i18n";
@@ -247,18 +248,19 @@ const RecordingOverlay: React.FC = () => {
     state === "notice"
       ? t(`overlay.notices.${notice ?? "flowFailed"}`)
       : t(`overlay.${state}`);
+  const doneLabel = notice ? t(`overlay.notices.${notice}`) : t("overlay.done");
   // The pill has nowhere to put a second line, so its one label is the invitation
   // to speak. The card keeps the state word in its header and lets the body hold
   // the "Listening…" placeholder, so the two never say the same thing twice.
-  const pillLabel = isRecording
-    ? live
-      ? t("overlay.listening")
-      : t("overlay.preparing")
-    : busyLabel;
+  const pillLabel = completed
+    ? doneLabel
+    : isRecording
+      ? live
+        ? t("overlay.listening")
+        : t("overlay.preparing")
+      : busyLabel;
   const cardLabel = completed
-    ? notice
-      ? t(`overlay.notices.${notice}`)
-      : t("overlay.done")
+    ? doneLabel
     : isRecording
       ? live
         ? t("overlay.recording")
@@ -321,18 +323,16 @@ const RecordingOverlay: React.FC = () => {
     </span>
   );
   const indicator = (barCount: number) =>
-    working ? (
-      <OverlayProgress
-        label={completed ? t("overlay.done") : busyLabel}
-        completed={completed}
-        active={isVisible}
-      />
+    completed ? (
+      <CompletionMark label={cardLabel} />
+    ) : working ? (
+      <OverlayProgress label={busyLabel} active={isVisible} />
     ) : (
       <AudioWaveform
         barCount={barCount}
         levels={live ? levels : EMPTY_LEVELS}
         size="sm"
-        active={isVisible && !completed}
+        active={isVisible}
         mode="reactive"
       />
     );
@@ -355,14 +355,13 @@ const RecordingOverlay: React.FC = () => {
         >
           <div className="card-header">
             <div className="card-status" role="status">
-              <div className={`card-wave${working ? " is-progress" : ""}`}>
-                {completed && !working ? (
-                  <Check size={14} strokeWidth={1.8} />
-                ) : (
-                  indicator(14)
-                )}
-              </div>
-              <span className="card-label">{cardLabel}</span>
+              <div className="card-wave">{indicator(14)}</div>
+              {/* Keyed so a change of state (Recording → Transcribing → Done)
+                  arrives with a short fade instead of the word swapping in
+                  place. */}
+              <span key={cardLabel} className="card-label">
+                {cardLabel}
+              </span>
             </div>
             <div className="card-actions">
               {hasLiveText && (

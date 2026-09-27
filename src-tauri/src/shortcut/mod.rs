@@ -1652,6 +1652,20 @@ pub fn change_assistant_overlay_style_setting(app: AppHandle, style: String) -> 
     Ok(())
 }
 
+/// Set how long the finished live-transcription card stays on screen. Read at
+/// the moment a dictation completes, so the next one uses it with no restart.
+#[tauri::command]
+#[specta::specta]
+pub fn change_overlay_linger_setting(
+    app: AppHandle,
+    linger: settings::OverlayLinger,
+) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    settings.overlay_linger = linger;
+    settings::write_settings(&app, settings);
+    Ok(())
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn change_app_language_setting(app: AppHandle, language: String) -> Result<(), String> {

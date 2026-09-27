@@ -11,6 +11,7 @@
  *            &tab=stt|cleanup|assistant|voice   &settings=<tab>
  *            &stt=device|cloud   &theme=light|dark   &fresh=1 (no history)
  *            &memory=on (assistant memory switched on)
+ *            &voice=<engine id> (the voice engine in use; default elevenlabs)
  */
 import {
   mockConvertFileSrc,
@@ -21,6 +22,8 @@ import { emit } from "@tauri-apps/api/event";
 
 const params = new URLSearchParams(window.location.search);
 const fresh = params.get("fresh") === "1";
+const voiceEngine = params.get("voice") ?? "elevenlabs";
+const onEleven = voiceEngine === "elevenlabs";
 
 (window as unknown as Record<string, unknown>).__TAURI_OS_PLUGIN_INTERNALS__ = {
   platform: "windows",
@@ -343,11 +346,11 @@ const settings: Json = {
   assistant_web_search_enabled: true,
   assistant_web_search_provider: "tinyfish",
   assistant_tts_enabled: true,
-  assistant_tts_engine: "elevenlabs",
-  assistant_tts_model: "eleven_v3_conversational",
-  assistant_tts_api_key: "xi-preview",
+  assistant_tts_engine: voiceEngine,
+  assistant_tts_model: onEleven ? "eleven_v3_conversational" : "",
+  assistant_tts_api_key: onEleven ? "xi-preview" : "",
   assistant_tts_api_keys: { elevenlabs: "xi-preview" },
-  assistant_tts_remote_voice: "JBFqnCBsd6RMkjVDRZzb",
+  assistant_tts_remote_voice: onEleven ? "JBFqnCBsd6RMkjVDRZzb" : "",
   assistant_tts_remote_voices: { elevenlabs: "JBFqnCBsd6RMkjVDRZzb" },
   assistant_tts_models: { elevenlabs: "eleven_v3_conversational" },
   assistant_tts_base_urls: {},
@@ -772,9 +775,8 @@ const handlers: Record<string, (args: Json) => unknown> = {
     settings.assistant_tts_api_key = from("assistant_tts_api_keys");
     settings.assistant_tts_remote_voice = from("assistant_tts_remote_voices");
     settings.assistant_tts_model = from("assistant_tts_models");
-    settings.assistant_tts_base_url =
-      from("assistant_tts_base_urls") ||
-      (id === "openai" ? "https://api.openai.com/v1" : "");
+    // Hosted engines have a fixed endpoint; only Azure and Custom keep one.
+    settings.assistant_tts_base_url = from("assistant_tts_base_urls");
     return null;
   },
   // The per-engine TTS setters write the live field and the engine's own slot.

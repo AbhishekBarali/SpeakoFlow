@@ -222,6 +222,10 @@ windows = { version = "0.61.3", features = [
   # is killed on crash/force-kill (orphan-process cleanup, see local_llm.rs).
   "Win32_System_JobObjects",
   "Win32_Security",
+  # Process snapshots (see meetings/call_detect.rs): our own WebView2 children
+  # hold the microphone during an assistant voice call, and the call detector
+  # has to recognise them as ours rather than offering to record them.
+  "Win32_System_Diagnostics_ToolHelp",
   # Selection capture (see selection.rs): `GetClipboardSequenceNumber` proves a
   # synthetic copy actually landed, so a copy the target app ignored can never be
   # mistaken for the user's stale clipboard contents.
