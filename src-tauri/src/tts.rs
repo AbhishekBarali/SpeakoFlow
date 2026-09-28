@@ -20,7 +20,10 @@
 //! asks for one.
 //!
 //! The "kokoro" engine runs fully locally in the panel webview
-//! (kokoro-js, WebGPU) and never reaches this module.
+//! (kokoro-js, WebGPU) and never reaches this module — unless
+//! [`crate::native_tts::route`] sends it to the processor, in which case it is
+//! synthesized by `native_tts.rs` and played here exactly like a remote engine.
+//! "kitten" always takes that native path.
 
 use crate::settings::{AppSettings, OPENROUTER_TTS_BASE_URL};
 use log::{debug, error};
@@ -41,8 +44,11 @@ use tauri::AppHandle;
 /// wire format; see the module docs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum TtsProtocol {
-    /// Kokoro, synthesized inside the assistant webview.
+    /// Kokoro. Synthesized inside the assistant webview, or by `native_tts.rs`
+    /// on the processor when [`crate::native_tts::route`] says so.
     Local,
+    /// A voice that only runs natively (`native_tts.rs`, sherpa-onnx): Kitten.
+    Native,
     /// `POST {base}/audio/speech` with `{model, input, voice, response_format, speed}`.
     OpenAiCompatible,
     /// `POST /v1/text-to-speech/{voice_id}` with an `xi-api-key` header.
@@ -120,6 +126,20 @@ pub(crate) const TTS_PROVIDERS: &[TtsProvider] = &[
         models: &[],
         requires_key: false,
         max_chars: usize::MAX,
+        speed_range: Some((0.25, 4.0)),
+        response_format: "",
+        auth: TtsAuth::Bearer,
+    },
+    TtsProvider {
+        id: "kitten",
+        label: "Kitten",
+        protocol: TtsProtocol::Native,
+        base_url: None,
+        default_model: "",
+        default_voice: crate::native_tts::DEFAULT_KITTEN_VOICE,
+        models: &[],
+        requires_key: false,
+        max_chars: crate::native_tts::MAX_CHARS,
         speed_range: Some((0.25, 4.0)),
         response_format: "",
         auth: TtsAuth::Bearer,
@@ -333,6 +353,12 @@ pub fn fixed_base_url(engine: &str) -> Option<&'static str> {
 
 /// Longest text one request to the active engine may carry.
 pub(crate) fn max_chars_for(settings: &AppSettings) -> usize {
+    // Kokoro's registry entry is unlimited because the webview splits its own
+    // text; on the processor it goes through the native engine, which needs
+    // pieces below its token window.
+    if crate::native_tts::route(settings) == crate::native_tts::VoiceRoute::Native {
+        return crate::native_tts::MAX_CHARS;
+    }
     provider(&settings.assistant_tts_engine)
         .map(|p| p.max_chars)
         .unwrap_or(usize::MAX)
@@ -563,6 +589,10 @@ pub fn voice_engine_blocker(settings: &AppSettings) -> Option<String> {
     // The in-webview engine needs nothing configured.
     if engine.is_empty() || engine == "kokoro" {
         return None;
+    }
+    // Local voices that run natively need their download, not a key.
+    if provider(engine).is_some_and(|p| p.protocol == TtsProtocol::Native) {
+        return crate::native_tts::blocker(settings);
     }
     let Some(provider) = provider(engine) else {
         return Some(format!(
@@ -921,8 +951,19 @@ pub(crate) async fn synthesize_speech(
     };
     let text = request.text;
     match provider.protocol {
-        TtsProtocol::Local => {
-            Err("Kokoro speaks inside the assistant panel, not through this path".to_string())
+        TtsProtocol::Local | TtsProtocol::Native => {
+            let Some(native) = crate::native_tts::NativeRequest::from_settings(settings) else {
+                return Err(
+                    "Kokoro speaks inside the assistant panel, not through this path".to_string(),
+                );
+            };
+            let text = text.to_string();
+            tauri::async_runtime::spawn_blocking(move || {
+                crate::native_tts::synthesize_wav(&native, &text)
+            })
+            .await
+            .map_err(|e| format!("The local voice stopped unexpectedly: {e}"))?
+            .map(plain)
         }
         TtsProtocol::OpenAiCompatible => fetch_openai_speech(settings, provider, text)
             .await
@@ -1428,7 +1469,12 @@ fn parse_pcm_rate(content_type: &str) -> Option<u32> {
 /// Wrap raw little-endian PCM samples in a canonical 44-byte WAV header so a
 /// container-based decoder (rodio) can play them. Assumes `bits_per_sample` is
 /// a multiple of 8 (16 for all current OpenAI-compatible pcm output).
-fn pcm_to_wav(pcm: &[u8], sample_rate: u32, channels: u16, bits_per_sample: u16) -> Vec<u8> {
+pub(crate) fn pcm_to_wav(
+    pcm: &[u8],
+    sample_rate: u32,
+    channels: u16,
+    bits_per_sample: u16,
+) -> Vec<u8> {
     let bytes_per_sample = (bits_per_sample / 8) as u32;
     let byte_rate = sample_rate * channels as u32 * bytes_per_sample;
     let block_align = channels * (bits_per_sample / 8);
@@ -1863,6 +1909,13 @@ pub async fn list_tts_voices(settings: &AppSettings) -> Result<Vec<TtsVoice>, St
     let provider = active_provider(settings)?;
     match provider.protocol {
         TtsProtocol::Local => Err("Kokoro's voices are built in".to_string()),
+        TtsProtocol::Native => Ok(crate::native_tts::KITTEN_VOICES
+            .iter()
+            .map(|(name, _)| TtsVoice {
+                id: name.to_string(),
+                label: name.to_string(),
+            })
+            .collect()),
         TtsProtocol::OpenAiCompatible => list_openai_tts_voices(settings, provider).await,
         TtsProtocol::ElevenLabs => list_elevenlabs_voices(settings).await,
         TtsProtocol::AzureSpeech => {
@@ -2918,7 +2971,11 @@ mod tests {
     fn a_configured_or_on_device_voice_does_not_block_a_call() {
         assert!(voice_engine_blocker(&with_voice("kokoro", "", "")).is_none());
         assert!(voice_engine_blocker(&get_default_settings()).is_none());
-        for provider in super::TTS_PROVIDERS {
+        // Native voices are gated on their download, not a key (tested below).
+        for provider in super::TTS_PROVIDERS
+            .iter()
+            .filter(|p| p.protocol != super::TtsProtocol::Native)
+        {
             assert!(
                 voice_engine_blocker(&with_voice(
                     provider.id,
@@ -2930,6 +2987,21 @@ mod tests {
                 provider.id
             );
         }
+    }
+
+    /// Kitten runs only on this computer, so what it can lack is its download.
+    /// A call must say so up front rather than failing on every reply; Kokoro
+    /// never blocks, because without its processor pack it speaks in the panel.
+    #[test]
+    fn a_native_voice_that_is_not_downloaded_blocks_a_call() {
+        let blocker = voice_engine_blocker(&with_voice("kitten", "", ""));
+        assert!(
+            blocker.as_deref().is_some_and(|m| m.contains("Kitten")),
+            "an undownloaded Kitten should block a call, got {blocker:?}"
+        );
+        let mut on_processor = with_voice("kokoro", "", "");
+        on_processor.assistant_tts_kokoro_device = "cpu".into();
+        assert!(voice_engine_blocker(&on_processor).is_none());
     }
 
     /// A self-hosted speech server legitimately needs no key; refusing it would

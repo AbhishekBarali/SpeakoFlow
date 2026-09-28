@@ -5,6 +5,14 @@ import {
   idleUnloadDelayMs,
   isSpeechInFlight,
 } from "./localTts";
+import {
+  audioLooksBroken,
+  clearGpuBroken,
+  gpuMarkedBroken,
+  markGpuBroken,
+  reportWebGpu,
+  type KokoroDevice,
+} from "./localVoice";
 
 export type TtsStatus = "off" | "loading" | "ready" | "speaking" | "error";
 
@@ -14,8 +22,19 @@ export type TtsStatus = "off" | "loading" | "ready" | "speaking" | "error";
  *  - `synthesis` — the model loaded but couldn't turn text into audio.
  *  - `blocked`   — the system blocked auto-play (needs a user gesture); the
  *                  clip is kept queued so a later click can replay it.
- *  - `playback`  — the audio element failed to play (output device issue). */
-export type KokoroErrorReason = "load" | "synthesis" | "blocked" | "playback";
+ *  - `playback`  — the audio element failed to play (output device issue).
+ *  - `gpu`       — the graphics card produced audio that is not speech; it was
+ *                  muted and the graphics card is no longer used for the voice. */
+export type KokoroErrorReason =
+  | "load"
+  | "synthesis"
+  | "blocked"
+  | "playback"
+  | "gpu";
+
+/** How a spoken reply ended: synthesized in full, stopped or superseded, muted
+ *  because the graphics card produced broken audio, or failed outright. */
+export type SpeakOutcome = "done" | "stopped" | "gpu" | "failed";
 export interface KokoroError {
   reason: KokoroErrorReason;
 }
@@ -31,7 +50,14 @@ interface KokoroModel {
   stream(
     splitter: TextSplitter,
     options: { voice?: string; speed?: number },
-  ): AsyncIterable<{ text: string; audio: { toBlob(): Blob } }>;
+  ): AsyncIterable<{ text: string; audio: KokoroAudio }>;
+}
+
+/** kokoro-js's RawAudio: a WAV encoder over the raw samples it also exposes. */
+interface KokoroAudio {
+  toBlob(): Blob;
+  audio?: Float32Array;
+  sampling_rate?: number;
 }
 
 interface TextSplitter {
@@ -93,12 +119,21 @@ export function useKokoroTts(
   speed: number = 1,
   preload: boolean = true,
   browserSink?: BrowserSpeechSink,
+  /** Where Kokoro may run in this WebView: "cpu" keeps it off WebGPU entirely,
+   *  "gpu" always tries WebGPU, "auto" tries it unless this machine's graphics
+   *  card was caught garbling the voice before. */
+  device: KokoroDevice = "auto",
 ) {
   const browserSinkRef = useRef(browserSink);
   browserSinkRef.current = browserSink;
   const modelRef = useRef<KokoroModel | null>(null);
   const loadingRef = useRef<Promise<KokoroModel> | null>(null);
   const dtypeRef = useRef(dtype);
+  const deviceRef = useRef(device);
+  /** The loaded model runs on WebGPU, so its first clips are checked. */
+  const loadedOnGpuRef = useRef(false);
+  /** Clean clips still to see before WebGPU counts as proven on this load. */
+  const gpuChecksLeftRef = useRef(0);
   // Latest speaking speed, read when a reply starts streaming so a change
   // applies to the next reply without re-creating the playback callbacks.
   const speedRef = useRef(speed);
@@ -251,7 +286,16 @@ export function useKokoroTts(
         // because it is only reported broken on specific GPUs, and the "-cpu"
         // suffix stays as the manual escape hatch for those.
         const quantizedOnGpu = ["q8", "q4", "q4f16"].includes(baseDtype);
-        const useGpu = hasWebGpu() && !forceCpu && !quantizedOnGpu;
+        // The device setting and this machine's history decide whether WebGPU
+        // is tried at all: "cpu" never, "gpu" always, and Automatic unless the
+        // graphics card was caught producing broken audio (remembered across
+        // launches, because it is a property of the GPU and its driver).
+        const device = deviceRef.current;
+        const gpuAllowed =
+          device === "gpu" || (device === "auto" && !gpuMarkedBroken());
+        const useGpu =
+          hasWebGpu() && gpuAllowed && !forceCpu && !quantizedOnGpu;
+        if (!hasWebGpu()) reportWebGpu(false);
         // WebKitGTK commonly has no WebGPU. Loading the 325 MB fp32 graph into
         // WASM can appear to hang after the text answer is already visible;
         // use the cached 92 MB q8 graph directly on CPU instead of waiting for
@@ -272,6 +316,7 @@ export function useKokoroTts(
         };
         type LoadOptions = Parameters<typeof KokoroTTS.from_pretrained>[1];
         let model: unknown;
+        let onGpu = useGpu;
         try {
           model = await KokoroTTS.from_pretrained(KOKORO_MODEL_ID, {
             dtype: chosenDtype,
@@ -284,6 +329,7 @@ export function useKokoroTts(
         } catch (gpuErr) {
           // WebGPU init can fail (driver/feature limits). Fall back to wasm.
           // fp32/fp16 are too heavy for CPU, so drop to q8 there.
+          onGpu = false;
           const fallbackDtype =
             chosenDtype === "fp32" || chosenDtype === "fp16"
               ? "q8"
@@ -294,6 +340,8 @@ export function useKokoroTts(
                 "which is much slower. Synthesis will not use the GPU:",
               gpuErr,
             );
+            // Automatic can move the voice to the processor engine instead.
+            reportWebGpu(false);
           }
           model = await KokoroTTS.from_pretrained(KOKORO_MODEL_ID, {
             dtype: fallbackDtype,
@@ -304,6 +352,10 @@ export function useKokoroTts(
             `[Kokoro TTS] loaded on wasm/CPU (${fallbackDtype}) fallback`,
           );
         }
+        // A WebGPU session's first clips are checked for broken audio before
+        // they reach a speaker (see `consume`).
+        loadedOnGpuRef.current = onGpu;
+        gpuChecksLeftRef.current = onGpu ? 2 : 0;
         modelRef.current = model as KokoroModel;
         loadInFlightRef.current = false;
         setStatus("ready");
@@ -409,14 +461,15 @@ export function useKokoroTts(
     [teardown],
   );
 
-  // When the dtype (precision) changes, drop the cached model so the next
-  // synthesis reloads at the new precision.
+  // When the dtype (precision) or the device changes, drop the cached model so
+  // the next synthesis reloads with the new choice.
   useEffect(() => {
-    if (dtypeRef.current === dtype) return;
+    if (dtypeRef.current === dtype && deviceRef.current === device) return;
     dtypeRef.current = dtype;
+    deviceRef.current = device;
     stop();
-    // Release the old-precision session before dropping the ref, or its
-    // ONNX/WebGPU memory leaks on every precision change.
+    // Release the old session before dropping the ref, or its ONNX/WebGPU
+    // memory leaks on every change.
     void disposeModel(modelRef.current);
     modelRef.current = null;
     loadingRef.current = null;
@@ -424,7 +477,36 @@ export function useKokoroTts(
     if (enabled && preload) {
       ensureLoaded().catch(() => {});
     }
-  }, [dtype, enabled, preload, ensureLoaded, stop]);
+  }, [dtype, device, enabled, preload, ensureLoaded, stop]);
+
+  /**
+   * The graphics card returned audio that is not speech. Nothing of it reaches
+   * a speaker: this reply stops (its remaining clips would be the same), the
+   * session is released, and Rust is told, so Automatic speaks the next reply on
+   * the processor. Under Automatic the verdict is also remembered, so the next
+   * launch does not try the graphics card again.
+   */
+  const handleGpuBroken = useCallback(() => {
+    console.warn(
+      "[Kokoro TTS] WebGPU produced audio that is not speech; muting it and " +
+        "not using the graphics card for the voice",
+    );
+    if (deviceRef.current === "auto") markGpuBroken();
+    reportWebGpu(false);
+    // A call plays through the browser sink and waits for its end; the reply
+    // it was waiting for is over.
+    browserSinkRef.current?.finish(streamEpochRef.current);
+    const model = modelRef.current;
+    modelRef.current = null;
+    loadingRef.current = null;
+    loadedOnGpuRef.current = false;
+    gpuChecksLeftRef.current = 0;
+    stop();
+    void disposeModel(model);
+    // After `stop()`, which clears the error.
+    setError({ reason: "gpu" });
+    setStatus("error");
+  }, [stop]);
 
   // Release the model + audio when the hook unmounts (e.g. the panel window is
   // torn down). The ONNX session and its WebGPU buffers are hundreds of MB;
@@ -603,12 +685,36 @@ export function useKokoroTts(
    *  one-shot and streaming paths, which differ only in how text gets in. */
   const consume = useCallback(
     async (
-      stream: AsyncIterable<{ audio: { toBlob(): Blob } }>,
+      stream: AsyncIterable<{ audio: KokoroAudio }>,
       generation: number,
-    ) => {
+    ): Promise<SpeakOutcome> => {
       let started = false;
       for await (const { audio } of stream) {
-        if (generation !== generationRef.current) return; // superseded
+        if (generation !== generationRef.current) return "stopped"; // superseded
+        // A GPU that corrupts Kokoro throws nothing; the samples are the only
+        // evidence, so the first clips of a WebGPU session are checked before
+        // anyone hears them.
+        if (
+          loadedOnGpuRef.current &&
+          gpuChecksLeftRef.current > 0 &&
+          audio.audio &&
+          audio.sampling_rate
+        ) {
+          const broken = audioLooksBroken(audio.audio, audio.sampling_rate);
+          if (broken === true) {
+            handleGpuBroken();
+            return "gpu";
+          }
+          if (broken === false) {
+            gpuChecksLeftRef.current -= 1;
+            if (gpuChecksLeftRef.current === 0) {
+              reportWebGpu(true);
+              // A deliberate "Graphics card" retry that works lifts the old
+              // verdict, e.g. after a driver update.
+              if (deviceRef.current === "gpu") clearGpuBroken();
+            }
+          }
+        }
         queueRef.current.push(audio.toBlob());
         if (!started) {
           started = true;
@@ -617,8 +723,9 @@ export function useKokoroTts(
           pump(generation); // queue drained while synthesizing; resume
         }
       }
+      return "done";
     },
-    [pump],
+    [pump, handleGpuBroken],
   );
 
   /** Mark synthesis complete for `generation`, and release the native sink now
@@ -730,8 +837,8 @@ export function useKokoroTts(
   }, []);
 
   const speak = useCallback(
-    async (text: string, force = false) => {
-      if ((!enabled && !force) || !text.trim()) return;
+    async (text: string, force = false): Promise<SpeakOutcome> => {
+      if ((!enabled && !force) || !text.trim()) return "stopped";
       setError(null);
       try {
         const model = await ensureLoaded();
@@ -746,8 +853,9 @@ export function useKokoroTts(
         splitter.push(text);
         splitter.close();
 
-        await consume(stream, generation);
+        const outcome = await consume(stream, generation);
         finishSynthesis(generation);
+        return outcome;
       } catch (e) {
         console.error("Kokoro TTS failed:", e);
         synthDoneRef.current = true;
@@ -755,6 +863,7 @@ export function useKokoroTts(
         // model was loaded but generating audio threw.
         setError((prev) => prev ?? { reason: "synthesis" });
         setStatus("error");
+        return "failed";
       }
     },
     [enabled, voice, ensureLoaded, stop, consume, finishSynthesis],

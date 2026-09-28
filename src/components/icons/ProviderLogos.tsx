@@ -2,6 +2,7 @@ import React from "react";
 import {
   AudioLines,
   AudioWaveform,
+  Cat,
   Cpu,
   Earth,
   Fish,
@@ -383,6 +384,7 @@ const E = {
   custom: { glyph: lucide(Plug), tile: "generic" },
   customMic: { glyph: lucide(Mic), tile: "generic" },
   kokoro: { glyph: lucide(AudioLines), tile: "ours" },
+  kitten: { glyph: lucide(Cat), tile: "ours" },
   search: { glyph: lucide(Search), tile: "generic" },
   searchApi: { glyph: lucide(SearchCode), tile: "generic" },
   fish: { glyph: lucide(Fish), tile: "generic" },
@@ -418,6 +420,7 @@ const EXACT: Record<string, Entry> = {
   deepgram: E.deepgram,
   // TTS engines
   kokoro: E.kokoro,
+  kitten: E.kitten,
   azure: E.azure,
   cartesia: E.cartesia,
   inworld: E.inworld,

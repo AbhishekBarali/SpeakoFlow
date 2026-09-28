@@ -8,19 +8,14 @@ import {
   Loader2,
   AudioLines,
   Volume2,
-  ArrowUp,
-  Copy,
-  CornerDownLeft,
   Download,
   Globe,
   Keyboard,
-  Mic,
   Sparkles,
   Monitor,
   PanelTop,
   Power,
   PlugZap,
-  Square,
 } from "lucide-react";
 import {
   commands,
@@ -58,12 +53,25 @@ import { useSettings } from "../../../hooks/useSettings";
 import { useKokoroTts } from "../../../assistant/useKokoroTts";
 import { localTtsActive } from "../../../assistant/localTts";
 import {
+  KITTEN_MODEL_ID,
+  KOKORO_NATIVE_MODEL_ID,
+  parseKokoroDevice,
+  useLocalVoiceStatus,
+} from "../../../assistant/localVoice";
+import { NativeVoicePackRow } from "./NativeVoicePack";
+import { useModelStore } from "@/stores/modelStore";
+import {
   TTS_ENGINES,
   hostOf,
   ttsEngineSpec,
   ttsNeedsSetup,
 } from "@/lib/ttsEngines";
 import { FONT_SIZES } from "../../../assistant/appearance";
+import QuickAsk from "../../../assistant/QuickAsk";
+import {
+  askDisplayOptions,
+  askDisplayValue,
+} from "@/components/pages/assistant/panelGeometry";
 import "../../../assistant/AssistantPanel.css";
 import { useLocalLlmEngineStatus } from "@/hooks/useLocalLlmEngineStatus";
 import ScreenRecordingPermission from "@/components/ScreenRecordingPermission";
@@ -77,8 +85,19 @@ const KOKORO_DTYPES = [
   { value: "q8", label: "q8 (8-bit, fast on CPU)" },
   { value: "q4", label: "q4 (4-bit, fastest)" },
   { value: "q4f16", label: "q4f16 (4-bit mixed)" },
-  { value: "q8-cpu", label: "q8 on CPU (fixes garbled audio)" },
 ];
+
+/** Kitten's eight speakers (`native_tts::KITTEN_VOICES`). */
+const KITTEN_VOICES = [
+  "Bella",
+  "Luna",
+  "Rosie",
+  "Kiki",
+  "Jasper",
+  "Bruno",
+  "Hugo",
+  "Leo",
+].map((name) => ({ value: name, label: name }));
 
 const KOKORO_VOICES = [
   { value: "af_heart", label: "Heart (US female)" },
@@ -118,19 +137,33 @@ const randomTestPhrase = (): string =>
  *  never drift. Aliased here to keep the existing call sites unchanged. */
 const LoadableSelect = ModelCombo;
 
-/** Live preview of the assistant panel. Renders the REAL panel classes from
- *  AssistantPanel.css (dark-only, like the STT overlay), so the preview and
- *  the actual panel share one stylesheet and can never drift. */
+/** Live preview of the quick ask. Renders the REAL surface component with
+ *  sample content, from the panel's own stylesheet, so the preview and the
+ *  panel cannot drift. */
 export const PanelPreview: React.FC<{
   fontSize: string;
   opacity: number;
 }> = ({ fontSize, opacity }) => {
   const { t } = useTranslation();
   const fs = FONT_SIZES[fontSize] ?? FONT_SIZES.medium;
+  const inert = {
+    input: "",
+    onInputChange: noop,
+    onSubmit: noop,
+    onClose: noop,
+    onCancel: noop,
+    onStop: noop,
+    onRetry: noop,
+    onInsert: async () => false,
+    notice: null,
+    error: null,
+    screen: false,
+  };
 
   return (
     <div
       className="assistant-scope assistant-preview"
+      aria-hidden="true"
       style={
         {
           "--as-msg-font": fs,
@@ -138,64 +171,35 @@ export const PanelPreview: React.FC<{
         } as React.CSSProperties
       }
     >
+      {/* The two shapes the surface takes, in the order they happen: the pill a
+          question opens in, and the card the answer unfolds into. */}
       <div className="assistant-preview-stack">
-        {/* The two shapes the surface actually takes, in the order they happen:
-            the small pill a question opens, and the card the answer fades in as.
-            A preview that shows chrome the panel does not have is worse than no
-            preview, which is why the old title bar and message list are gone from
-            here too. */}
-        <div className="assistant-preview-surface pill">
-          <div className="ask-pill labeled">
-            <span className="ask-pill-mark">
-              <Sparkles size={13} strokeWidth={1.9} />
-            </span>
-            <span className="ask-pill-label">
-              {t("assistant.status.thinking")}
-            </span>
-          </div>
-        </div>
-
-        <div className="assistant-preview-surface">
-          <div className="ask-card">
-            <div className="ask-head">
-              <Mic className="ask-head-icon" size={12} />
-              <p className="ask-question-text">
-                {t("settings.assistant.appearance.previewUser")}
-              </p>
-              <div className="ask-head-actions">
-                <span className="ask-action">
-                  <Copy size={13} />
-                </span>
-                <span className="ask-action labelled">
-                  <CornerDownLeft size={13} />
-                  <span>{t("assistant.insertShort")}</span>
-                </span>
-              </div>
-            </div>
-            <div className="ask-answer-body">
-              {t("settings.assistant.appearance.previewAssistant")}
-            </div>
-            <div className="assistant-input-row">
-              <div
-                className="assistant-input"
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  color: "var(--as-faint)",
-                }}
-              >
-                {t("assistant.followUpPlaceholder")}
-              </div>
-              <span className="assistant-send-button">
-                <ArrowUp size={15} strokeWidth={2.5} />
-              </span>
-            </div>
-          </div>
-        </div>
+        <QuickAsk
+          {...inert}
+          phase="listening"
+          status={t("assistant.status.listening")}
+          levels={PREVIEW_LEVELS}
+          question=""
+          answer=""
+          selectionChars={0}
+          canRetry={false}
+        />
+        <QuickAsk
+          {...inert}
+          phase="done"
+          status=""
+          question={t("settings.assistant.appearance.previewUser")}
+          answer={t("settings.assistant.appearance.previewAssistant")}
+          selectionChars={0}
+          canRetry={false}
+        />
       </div>
     </div>
   );
 };
+
+const noop = () => {};
+const PREVIEW_LEVELS = [0.3, 0.6, 0.4, 0.8, 0.5, 0.3, 0.7, 0.4, 0.55, 0.3];
 
 /** A block of the assistant's settings. Pages render the ones they own: the
  *  Models page shows `brain` and `voice`, the Assistant page opens each of the
@@ -275,15 +279,6 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
    * comes straight back to this panel to point the assistant at it.
    */
   const [displays, setDisplays] = useState<DisplayChoice[]>([]);
-  /**
-   * Which screen the panel would open on right now, 1-based, or 0 when the backend
-   * could not tell. Used to label the "where I last used it" option with the screen
-   * it currently means.
-   */
-  const currentDisplayNumber = useMemo(
-    () => displays.findIndex((display) => display.is_current) + 1,
-    [displays],
-  );
   useEffect(() => {
     let active = true;
     const load = () => {
@@ -536,10 +531,84 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
   };
   /** Master switch. Default on, matching the backend's `default_true`. */
   const assistantEnabled = settings?.assistant_enabled ?? true;
+  const kokoroDevice = parseKokoroDevice(settings?.assistant_tts_kokoro_device);
+  // Where the local voice actually speaks is Rust's decision (the graphics card
+  // in the panel, or the processor engine). Probing WebGPU here costs no model
+  // load and lets Automatic say where it will speak before any call.
+  const localVoiceShown =
+    assistantEnabled &&
+    ttsEnabled &&
+    (ttsEngine === "kokoro" || ttsEngine === "kitten");
+  const localVoice = useLocalVoiceStatus({
+    enabled: localVoiceShown,
+    probe: localVoiceShown && ttsEngine === "kokoro" && kokoroDevice === "auto",
+  });
+  const kokoroOnProcessor =
+    ttsEngine === "kokoro" && localVoice?.route === "native";
+  const kittenDownloaded = useModelStore(
+    (state) =>
+      state.models.find((m) => m.id === KITTEN_MODEL_ID)?.is_downloaded ??
+      false,
+  );
+  // The processor voice is a 350 MB download, so it is offered only where it
+  // helps: Kokoro set to the processor, a graphics card that can't run it, or a
+  // pack already on disk (or on its way) that may need removing.
+  const kokoroNativePresent = useModelStore((state) => {
+    const id = KOKORO_NATIVE_MODEL_ID;
+    return (
+      !!state.models.find((m) => m.id === id)?.is_downloaded ||
+      id in state.downloadingModels ||
+      id in state.verifyingModels ||
+      id in state.extractingModels
+    );
+  });
+  const offerProcessorVoice =
+    kokoroDevice === "cpu" ||
+    localVoice?.webgpu === "unusable" ||
+    kokoroNativePresent;
+  // One plain sentence for where Kokoro is speaking right now, and why.
+  const runsOnStatus = (() => {
+    const status = "settings.assistant.tts.runsOnStatus";
+    if (!localVoice) return t(`${status}.checking`);
+    if (localVoice.route === "native") {
+      return kokoroDevice === "auto"
+        ? t(`${status}.gpuUnusable`)
+        : t(`${status}.processor`);
+    }
+    if (kokoroDevice === "gpu") return t(`${status}.gpu`);
+    // Downloaded but refused to start (e.g. macOS library validation): don't
+    // ask for a download that is already there.
+    if (localVoice.native_load_failed) return t(`${status}.loadFailed`);
+    if (kokoroDevice === "cpu") {
+      return localVoice.native_supported
+        ? t(`${status}.cpuNeedsPack`)
+        : t(`${status}.processor`);
+    }
+    if (localVoice.webgpu === "usable") return t(`${status}.gpu`);
+    if (localVoice.webgpu === "unusable" && localVoice.native_supported) {
+      return t(`${status}.needsPack`);
+    }
+    return t(`${status}.checking`);
+  })();
+  // Kokoro on a small processor is slow even natively (4 logical cores run it
+  // on 2 threads). Offer the lighter voice there, only when the processor is
+  // what speaks, and never when the graphics card works.
+  const smallProcessor =
+    typeof navigator !== "undefined" &&
+    (navigator.hardwareConcurrency ?? 8) <= 4;
+  const suggestKitten =
+    ttsEngine === "kokoro" &&
+    smallProcessor &&
+    !!localVoice?.native_supported &&
+    (kokoroDevice === "cpu" ||
+      (kokoroDevice === "auto" && localVoice.webgpu === "unusable"));
   // Local speech only makes sense when the assistant is on AND the local engine
   // is the selected one — otherwise this page must not hold the weights at all.
+  // Nor when Kokoro is routed to the processor engine, which is not this page.
   const kokoroEnabled =
-    assistantEnabled && localTtsActive(ttsEnabled, ttsEngine);
+    assistantEnabled &&
+    localTtsActive(ttsEnabled, ttsEngine) &&
+    !kokoroOnProcessor;
   // Settings must never download Kokoro just because this page mounted. The
   // live assistant still loads on an actual spoken reply; here, only Setup or
   // Test voice may call prepare/speak.
@@ -549,6 +618,8 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
     ttsDtype,
     ttsSpeed,
     false,
+    undefined,
+    kokoroDevice,
   );
   const {
     status: kokoroStatus,
@@ -629,10 +700,21 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
     setTestError(null);
     const phrase = randomTestPhrase();
     try {
-      if (ttsEngine === "kokoro") {
+      if (ttsEngine === "kokoro" && !kokoroOnProcessor) {
         await kokoroTest.prepare();
         rememberKokoroReady();
-        await kokoroTest.speak(phrase, true);
+        const outcome = await kokoroTest.speak(phrase, true);
+        if (outcome === "gpu" || outcome === "failed") {
+          setTestState("error");
+          setTestError(
+            outcome === "failed"
+              ? t("settings.assistant.tts.testFailed")
+              : kokoroDevice === "gpu"
+                ? t("settings.assistant.tts.testGpuForced")
+                : t("settings.assistant.tts.testGpuMoved"),
+          );
+          return;
+        }
       } else {
         await queueTtsTask(persistRemoteTtsDraft);
         const res = await commands.assistantTestTts(phrase);
@@ -1391,7 +1473,9 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
                     hint: t(`voiceEngines.${engine.id}`),
                     title: t(`settings.assistant.tts.engines.${engine.id}`),
                     ready:
-                      !!engine.local || !ttsNeedsSetup(settings, engine.id),
+                      engine.id === "kitten"
+                        ? kittenDownloaded
+                        : !!engine.local || !ttsNeedsSetup(settings, engine.id),
                     icon: <ProviderTile id={engine.id} kind="tts" size="md" />,
                   }))}
                   value={settings?.assistant_tts_engine ?? "kokoro"}
@@ -1409,61 +1493,132 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
               {(settings?.assistant_tts_engine ?? "kokoro") === "kokoro" && (
                 <>
                   <SettingContainer
-                    title={t("settings.assistant.tts.kokoroSetupLabel")}
-                    description={t(
-                      "settings.assistant.tts.kokoroSetupDescription",
-                    )}
+                    title={t("settings.assistant.tts.runsOnLabel")}
+                    description={runsOnStatus}
                     descriptionMode="inline"
                     layout="horizontal"
                     grouped={true}
                   >
-                    <div className="flex min-w-[340px] justify-end">
-                      {kokoroStatus === "loading" ? (
-                        <div className="w-full max-w-[260px] space-y-1.5">
-                          <div className="flex items-center justify-between gap-3 text-xs text-muted">
-                            <span className="inline-flex items-center gap-1.5">
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                              {t("settings.assistant.tts.kokoroDownloading")}
-                            </span>
-                            <span className="tabular-nums">
-                              {kokoroProgress}%
-                            </span>
-                          </div>
-                          <div className="h-1.5 overflow-hidden rounded-full bg-hairline-strong">
-                            <div
-                              className="h-full rounded-full bg-accent transition-[width] duration-200"
-                              style={{ width: `${kokoroProgress}%` }}
-                            />
-                          </div>
-                        </div>
-                      ) : kokoroPrepared ||
-                        kokoroStatus === "ready" ||
-                        kokoroStatus === "speaking" ? (
-                        <span className="inline-flex items-center gap-1.5 text-[13px] font-medium text-accent">
-                          <Check className="h-4 w-4" />
-                          {t("settings.assistant.tts.kokoroReady")}
-                        </span>
-                      ) : (
-                        <div className="flex flex-col items-end gap-1.5">
-                          <Button
-                            variant={kokoroError ? "secondary" : "primary-soft"}
-                            size="sm"
-                            onClick={() => void handlePrepareKokoro()}
-                          >
-                            <Download className="h-3.5 w-3.5" />
-                            {kokoroError
-                              ? t("settings.assistant.tts.kokoroRetry")
-                              : t("settings.assistant.tts.kokoroDownload")}
-                          </Button>
-                          {kokoroError && (
-                            <span className="text-xs text-error">
-                              {t("settings.assistant.tts.downloadError")}
-                            </span>
-                          )}
-                        </div>
+                    <Dropdown
+                      options={(["auto", "gpu", "cpu"] as const).map(
+                        (device) => ({
+                          value: device,
+                          label: t(`settings.assistant.tts.runsOn.${device}`),
+                        }),
                       )}
-                    </div>
+                      selectedValue={kokoroDevice}
+                      onSelect={(device) =>
+                        setAndRefresh(
+                          commands.setAssistantTtsKokoroDevice(device),
+                        )
+                      }
+                      disabled={!settings?.assistant_tts_enabled}
+                      className="min-w-[340px]"
+                    />
                   </SettingContainer>
+
+                  {offerProcessorVoice && (
+                    <NativeVoicePackRow
+                      modelId={KOKORO_NATIVE_MODEL_ID}
+                      title={t("settings.assistant.tts.kokoroNativeLabel")}
+                      description={(size) =>
+                        t("settings.assistant.tts.kokoroNativeDescription", {
+                          size,
+                        })
+                      }
+                      unsupported={
+                        localVoice ? !localVoice.native_supported : false
+                      }
+                      disabled={!settings?.assistant_tts_enabled}
+                    />
+                  )}
+
+                  {suggestKitten && (
+                    <SettingContainer
+                      title={t("settings.assistant.tts.kittenSuggestLabel")}
+                      description={t(
+                        "settings.assistant.tts.kittenSuggestDescription",
+                      )}
+                      descriptionMode="inline"
+                      layout="horizontal"
+                      grouped={true}
+                    >
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => {
+                          void queueTtsTask(async () => {
+                            await setAndRefresh(
+                              commands.setAssistantTtsEngine("kitten"),
+                            );
+                          });
+                        }}
+                      >
+                        {t("settings.assistant.tts.kittenSuggestButton")}
+                      </Button>
+                    </SettingContainer>
+                  )}
+
+                  {!kokoroOnProcessor && (
+                    <SettingContainer
+                      title={t("settings.assistant.tts.kokoroSetupLabel")}
+                      description={t(
+                        "settings.assistant.tts.kokoroSetupDescription",
+                      )}
+                      descriptionMode="inline"
+                      layout="horizontal"
+                      grouped={true}
+                    >
+                      <div className="flex min-w-[340px] justify-end">
+                        {kokoroStatus === "loading" ? (
+                          <div className="w-full max-w-[260px] space-y-1.5">
+                            <div className="flex items-center justify-between gap-3 text-xs text-muted">
+                              <span className="inline-flex items-center gap-1.5">
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                {t("settings.assistant.tts.kokoroDownloading")}
+                              </span>
+                              <span className="tabular-nums">
+                                {kokoroProgress}%
+                              </span>
+                            </div>
+                            <div className="h-1.5 overflow-hidden rounded-full bg-hairline-strong">
+                              <div
+                                className="h-full rounded-full bg-accent transition-[width] duration-200"
+                                style={{ width: `${kokoroProgress}%` }}
+                              />
+                            </div>
+                          </div>
+                        ) : kokoroPrepared ||
+                          kokoroStatus === "ready" ||
+                          kokoroStatus === "speaking" ? (
+                          <span className="inline-flex items-center gap-1.5 text-[13px] font-medium text-accent">
+                            <Check className="h-4 w-4" />
+                            {t("settings.assistant.tts.kokoroReady")}
+                          </span>
+                        ) : (
+                          <div className="flex flex-col items-end gap-1.5">
+                            <Button
+                              variant={
+                                kokoroError ? "secondary" : "primary-soft"
+                              }
+                              size="sm"
+                              onClick={() => void handlePrepareKokoro()}
+                            >
+                              <Download className="h-3.5 w-3.5" />
+                              {kokoroError
+                                ? t("settings.assistant.tts.kokoroRetry")
+                                : t("settings.assistant.tts.kokoroDownload")}
+                            </Button>
+                            {kokoroError && (
+                              <span className="text-xs text-error">
+                                {t("settings.assistant.tts.downloadError")}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </SettingContainer>
+                  )}
 
                   <SettingContainer
                     title={t("settings.assistant.tts.voiceLabel")}
@@ -1477,6 +1632,48 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
                       }
                       onSelect={(voice) =>
                         setAndRefresh(commands.setAssistantTtsVoice(voice))
+                      }
+                      disabled={!settings?.assistant_tts_enabled}
+                      className="min-w-[340px]"
+                    />
+                  </SettingContainer>
+                </>
+              )}
+
+              {ttsEngine === "kitten" && (
+                <>
+                  <NativeVoicePackRow
+                    modelId={KITTEN_MODEL_ID}
+                    title={t("settings.assistant.tts.kittenPackLabel")}
+                    description={(size) =>
+                      t("settings.assistant.tts.kittenPackDescription", {
+                        size,
+                      })
+                    }
+                    unsupported={
+                      localVoice ? !localVoice.native_supported : false
+                    }
+                    disabled={!settings?.assistant_tts_enabled}
+                  />
+                  <SettingContainer
+                    title={t("settings.assistant.tts.voiceLabel")}
+                    layout="horizontal"
+                    grouped={true}
+                  >
+                    <Dropdown
+                      options={KITTEN_VOICES}
+                      selectedValue={
+                        KITTEN_VOICES.some(
+                          (v) =>
+                            v.value === settings?.assistant_tts_remote_voice,
+                        )
+                          ? (settings?.assistant_tts_remote_voice ?? "Bella")
+                          : "Bella"
+                      }
+                      onSelect={(voice) =>
+                        setAndRefresh(
+                          commands.setAssistantTtsRemoteVoice(voice),
+                        )
                       }
                       disabled={!settings?.assistant_tts_enabled}
                       className="min-w-[340px]"
@@ -1739,25 +1936,28 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
                 label={t("settings.assistant.tts.stopOnDictationLabel")}
                 grouped={true}
               />
-              {(settings?.assistant_tts_engine ?? "kokoro") === "kokoro" && (
-                <SettingContainer
-                  title={t("settings.assistant.tts.dtypeLabel")}
-                  info={t("settings.assistant.tts.dtypeDescription")}
-                  layout="horizontal"
-                  grouped={true}
-                >
-                  <Dropdown
-                    options={KOKORO_DTYPES}
-                    selectedValue={
-                      settings?.assistant_tts_kokoro_dtype ?? "fp32"
-                    }
-                    onSelect={(dtype) =>
-                      setAndRefresh(commands.setAssistantTtsKokoroDtype(dtype))
-                    }
-                    disabled={!settings?.assistant_tts_enabled}
-                  />
-                </SettingContainer>
-              )}
+              {(settings?.assistant_tts_engine ?? "kokoro") === "kokoro" &&
+                !kokoroOnProcessor && (
+                  <SettingContainer
+                    title={t("settings.assistant.tts.dtypeLabel")}
+                    info={t("settings.assistant.tts.dtypeDescription")}
+                    layout="horizontal"
+                    grouped={true}
+                  >
+                    <Dropdown
+                      options={KOKORO_DTYPES}
+                      selectedValue={
+                        settings?.assistant_tts_kokoro_dtype ?? "fp32"
+                      }
+                      onSelect={(dtype) =>
+                        setAndRefresh(
+                          commands.setAssistantTtsKokoroDtype(dtype),
+                        )
+                      }
+                      disabled={!settings?.assistant_tts_enabled}
+                    />
+                  </SettingContainer>
+                )}
             </>
           )}
         </SettingsGroup>
@@ -2120,50 +2320,8 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
               grouped={true}
             >
               <Dropdown
-                options={[
-                  {
-                    value: "last_used",
-                    // Naming the screen it currently resolves to is what makes this
-                    // option usable. On its own it is a policy with no visible
-                    // consequence, and working out which physical monitor is which is
-                    // the hardest part of any display picker.
-                    label: currentDisplayNumber
-                      ? t(
-                          "settings.assistant.appearance.askDisplays.lastUsedOn",
-                          {
-                            number: currentDisplayNumber,
-                          },
-                        )
-                      : t("settings.assistant.appearance.askDisplays.lastUsed"),
-                  },
-                  {
-                    value: "cursor",
-                    label: t(
-                      "settings.assistant.appearance.askDisplays.cursor",
-                    ),
-                  },
-                  ...displays.map((display, index) => ({
-                    value: display.id,
-                    // Numbered by position in the list, because a raw device name
-                    // ("\\.\DISPLAY2") means nothing to anyone. The resolution is what
-                    // people actually recognise their screens by, so it carries the
-                    // label rather than sitting in a tooltip.
-                    label: t(
-                      "settings.assistant.appearance.askDisplays.numbered",
-                      {
-                        number: index + 1,
-                        width: display.width,
-                        height: display.height,
-                        suffix: display.is_primary
-                          ? t(
-                              "settings.assistant.appearance.askDisplays.mainSuffix",
-                            )
-                          : "",
-                      },
-                    ),
-                  })),
-                ]}
-                selectedValue={settings?.assistant_ask_display ?? "last_used"}
+                options={askDisplayOptions(displays, t)}
+                selectedValue={askDisplayValue(settings?.assistant_ask_display)}
                 onSelect={(display) =>
                   setAndRefresh(commands.setAssistantAskDisplay(display))
                 }
@@ -2198,12 +2356,9 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
                   value: "right",
                   label: t("settings.assistant.appearance.askAnchors.right"),
                 },
-                // "Where I left it" is deliberately absent. Dragging used to set it,
-                // which meant the one gesture available on the surface permanently
-                // switched off the zone that shapes it — and left a stale coordinate
-                // behind that every later open obeyed, so the panel opened off-centre
-                // for no visible reason. A drop now picks a zone instead, and a stored
-                // `custom` from before reads as Centre (see `default_position_for`).
+                // "Where I left it" is deliberately absent: the quick ask opens at
+                // its dock zone every time, and a stored `custom` from an older
+                // version reads as Centre.
               ]}
               selectedValue={
                 settings?.assistant_ask_anchor === "custom"

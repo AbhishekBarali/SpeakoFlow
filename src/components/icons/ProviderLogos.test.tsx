@@ -44,6 +44,7 @@ const IDS: Record<ProviderKind, string[]> = {
   ],
   tts: [
     "kokoro",
+    "kitten",
     "openai",
     "elevenlabs",
     "openrouter",
@@ -68,6 +69,7 @@ const LUCIDE: Record<string, string> = {
   builtin: "lucide-cpu",
   custom: "lucide-plug",
   kokoro: "lucide-audio-lines",
+  kitten: "lucide-cat",
   cartesia: "lucide-audio-waveform",
   inworld: "lucide-earth",
   serper: "lucide-search",

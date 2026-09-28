@@ -179,6 +179,13 @@ tar = "0.4.44"
 flate2 = "1.0"
 zip = "2"
 sha2 = "0.10"
+# Native local voice (native_tts.rs). sherpa-onnx is downloaded with the first
+# voice pack and loaded at runtime rather than linked, because the app already
+# links ONNX Runtime statically through `ort`. Both crates are already in the
+# graph (libloading via transitive deps, bzip2 via `zip`), so they add no new
+# native build; pinned to the versions the lockfile already resolves.
+libloading = "=0.8.9"
+bzip2 = "=0.5.2"
 transcribe-rs = { version = "0.3.11", features = ["whisper-cpp", "onnx"] }
 # transcribe.cpp (ggml/GGUF) engine — added side-by-side with transcribe-rs
 # (N2: additive; transcribe-rs 0.3.11 + its features stay untouched). This base
@@ -211,6 +218,10 @@ transcribe-rs = { version = "0.3.11", features = ["whisper-vulkan", "ort-directm
 # Secure API-key storage via the Windows Credential Manager. `windows-native`
 # uses windows-sys (no extra C/system build dependency).
 keyring = { version = "3", features = ["windows-native"] }
+# Reaches ICoreWebView2Settings3 through each webview's controller, to switch
+# off WebView2's browser accelerator keys (lib.rs). Must stay on the version
+# wry links against, or the COM types differ and the cast will not compile.
+webview2-com = "0.38.2"
 windows = { version = "0.61.3", features = [
   "Win32_Media_Audio_Endpoints",
   "Win32_System_Com_StructuredStorage",

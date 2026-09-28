@@ -11,6 +11,7 @@ import { useSettings } from "@/hooks/useSettings";
 import { useModelStore } from "@/stores/modelStore";
 import { getTranslatedModelName } from "@/lib/utils/modelTranslation";
 import { ttsEngineSpec, ttsNeedsSetup, ttsValues } from "@/lib/ttsEngines";
+import { KITTEN_MODEL_ID } from "@/assistant/localVoice";
 import {
   prettyModelName,
   splitLocalModelName,
@@ -227,12 +228,19 @@ export const summarizeCleanup = (
 export const summarizeVoice = (
   settings: AppSettings | null,
   t: TFunction,
+  models: ModelInfo[] = [],
 ): SlotSummary => {
   const engine = settings?.assistant_tts_engine ?? "kokoro";
   const spec = ttsEngineSpec(engine);
-  const isDevice = engine === "kokoro";
+  const isDevice = !!spec?.local;
   const values = ttsValues(settings, engine);
-  const ready = !ttsNeedsSetup(settings, engine);
+  // Kitten needs nothing configured, only its voice pack on disk.
+  const kittenPack =
+    engine === "kitten" ? findLocal(models, KITTEN_MODEL_ID) : null;
+  const ready =
+    engine === "kitten"
+      ? !!kittenPack?.is_downloaded
+      : !ttsNeedsSetup(settings, engine);
   const model = values.model || null;
   // A custom server on this machine runs on this computer too.
   const onThisComputer =
@@ -249,15 +257,23 @@ export const summarizeVoice = (
     providerLabel: t(`settings.assistant.tts.engines.${engine}`, {
       defaultValue: engine,
     }),
-    modelLabel: isDevice
-      ? t("modelsHub.voice.kokoroModel")
-      : prettyModelName(model) || null,
-    modelId: isDevice ? "kokoro" : model,
+    modelLabel:
+      engine === "kokoro"
+        ? t("modelsHub.voice.kokoroModel")
+        : engine === "kitten"
+          ? t("modelsHub.voice.kittenModel")
+          : prettyModelName(model) || null,
+    modelId: isDevice ? engine : model,
     localModel: null,
     borrowsAssistant: false,
     // "Add a key" only when a key is what's missing; an address or a voice
     // still reads as "Needs setup" without pointing at the wrong field.
-    issue: !ready && spec?.key === "required" && !values.key ? "no_key" : null,
+    issue:
+      engine === "kitten" && !ready
+        ? "not_downloaded"
+        : !ready && spec?.key === "required" && !values.key
+          ? "no_key"
+          : null,
   };
 };
 
@@ -283,7 +299,7 @@ export const useModelSlots = (): Record<ModelSlot, SlotSummary> => {
       ),
       cleanup: summarizeCleanup(settings, models, postProcessReadiness, t),
       assistant: summarizeAssistant(settings, models, t),
-      voice: summarizeVoice(settings, t),
+      voice: summarizeVoice(settings, t, models),
     }),
     [
       settings,

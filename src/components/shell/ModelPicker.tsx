@@ -390,7 +390,7 @@ export const VoicePicker: React.FC<{ className?: string }> = ({
     value: engine,
     label: t(`settings.assistant.tts.engines.${engine}`),
     hint:
-      engine === "kokoro"
+      engine === "kokoro" || engine === "kitten"
         ? t("modelsHub.where.device")
         : ttsNeedsSetup(settings, engine)
           ? t("pickers.needsSetup")

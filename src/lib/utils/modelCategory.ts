@@ -3,7 +3,7 @@ import type { ModelInfo } from "@/bindings";
 /**
  * High-level grouping for the Models tab. Mirrors the backend `EngineType`:
  * transcription engines map to "stt", the bundled llama.cpp engine to "llm",
- * and Kokoro to "tts".
+ * and the voices (Kokoro, and the native voice packs) to "tts".
  */
 export type ModelCategory = "stt" | "llm" | "tts";
 
@@ -13,6 +13,7 @@ export const getModelCategory = (model: ModelInfo): ModelCategory => {
     case "LlamaCpp":
       return "llm";
     case "Kokoro":
+    case "NativeTts":
       return "tts";
     default:
       return "stt";

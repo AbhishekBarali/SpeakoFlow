@@ -1,12 +1,12 @@
 ---
 title: "Voice output (TTS)"
-description: "Have the SpeakoFlow assistant read its replies aloud, free and local with Kokoro or through OpenAI-compatible, OpenRouter, ElevenLabs, or Azure AI Speech voices. Covers voices, precision, and playback speed."
+description: "Have the SpeakoFlow assistant read its replies aloud during a call, free and local with Kokoro or Kitten, or through OpenAI-compatible, OpenRouter, ElevenLabs, or Azure AI Speech voices. Covers where the local voice runs, voices, precision, and playback speed."
 icon: "volume-high"
 ---
 
-Off by default. Turn on _Speak responses aloud_ in _Settings → Assistant → Voice output_ and the assistant reads its replies out loud.
+Only a hands-free call speaks. A quick ask always answers in text, because you read that answer and dismiss it. _Speak responses aloud_ in _Settings → Assistant → Voice output_ sets whether a new call starts with its speaker on, and the headphones button in the call changes it for that call.
 
-It runs locally and free with Kokoro, or through a cloud voice with your own key. With it on, the assistant is also told to write speech-friendly prose: short sentences, no tables or headings, because a Markdown table read aloud is gibberish.
+It runs locally and free with Kokoro or Kitten, or through a cloud voice with your own key. With speech on, the assistant is also told to write speech-friendly prose: short sentences, no tables or headings, because a Markdown table read aloud is gibberish.
 
 ## Hands-free conversation
 
@@ -29,25 +29,54 @@ The turn-taking work draws on the public [OpenAI voice-activity detection guide]
 
 ## Engines
 
-| Engine                | Runs            | Needs                                                      |
-| --------------------- | --------------- | ---------------------------------------------------------- |
-| **Kokoro** (default)  | On your machine | A one-time voice model download, then fully private. Free. |
-| **OpenAI-compatible** | Cloud           | Base URL, API key, model, voice.                           |
-| **OpenRouter**        | Cloud           | Your OpenRouter key. Base URL is fixed.                    |
-| **ElevenLabs**        | Cloud           | API key, model, voice ID.                                  |
-| **Azure AI Speech**   | Cloud           | Speech URL, key, voice.                                    |
+| Engine                | Runs            | Needs                                                                    |
+| --------------------- | --------------- | ------------------------------------------------------------------------ |
+| **Kokoro** (default)  | On your machine | A one-time voice model download, then fully private. Free.               |
+| **Kitten**            | On your machine | A 64 MB download. Lighter and less natural than Kokoro, fast on any CPU. |
+| **OpenAI-compatible** | Cloud           | Base URL, API key, model, voice.                                         |
+| **OpenRouter**        | Cloud           | Your OpenRouter key. Base URL is fixed.                                  |
+| **ElevenLabs**        | Cloud           | API key, model, voice ID.                                                |
+| **Azure AI Speech**   | Cloud           | Speech URL, key, voice.                                                  |
 
 Each engine keeps its own endpoint, model, voice, and API key. Switching engines cannot overwrite or wipe the values you already entered for another one, and an OpenAI voice name cannot leak onto ElevenLabs and fail as `voice_not_found`.
 
 The voice-output API key is separate from your [assistant provider's key](/assistant/providers), even when both point at the same company.
 
+## Where Kokoro runs
+
+Kokoro can speak from your graphics card or from your processor. _Runs on_ picks between them.
+
+| Runs on             | What it does                                                                                                   |
+| ------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Automatic (default) | Uses the graphics card when it works, and switches to the processor when it doesn't.                           |
+| Graphics card       | Always uses the graphics card. Pick this to try it again after a driver update.                                |
+| Processor           | Never touches the graphics card. Pick this if replies come out garbled, silent, or slow on your graphics card. |
+
+On a graphics card with working WebGPU, Kokoro starts speaking almost at once. Some machines don't have that. Linux usually doesn't, and some graphics drivers turn the voice into noise. Inside the app, Kokoro then falls back to a single processor thread, which takes around ten seconds per reply.
+
+The processor voice fixes that. It is a separate 350 MB download under _Runs on_, and it runs Kokoro natively on every core. On an 8-core desktop it writes a second of speech in about 0.2 seconds, and the first sentence starts playing about 0.3 seconds after the reply arrives.
+
+Automatic moves you to the processor voice on its own once it is downloaded. It does that when there is no graphics card it can use, when the card fails to start the voice, or when the first sentence comes back as noise or silence. That bad sentence is muted, so you never hear it, and the app remembers the result for the next launch. Picking _Graphics card_ clears it.
+
+On a processor with four threads or fewer, Settings suggests Kitten instead, because Kokoro is slow there even with the processor voice.
+
+The processor voice and Kitten share one voice engine. It downloads with the first of them, about 8 MB, and goes away when you remove the last one. Nothing loads until a voice speaks, and it unloads after three minutes of quiet. Kokoro on the processor holds about 400 MB of memory while loaded, Kitten about 80 MB.
+
+<Note>
+  The processor engine has been tested on Windows only. On macOS it may refuse
+  to load, because the app isn't signed by Apple. If that happens, Voice
+  settings says so and Kokoro keeps running inside the app. Kitten needs the
+  same engine, so it can't speak there either.
+</Note>
+
 ## Playback and quality
 
-| Setting                           | Default | Options                   |
-| --------------------------------- | ------- | ------------------------- |
-| Playback speed                    | `1x`    | 0.25x to 4x               |
-| Kokoro precision                  | `fp32`  | fp32, fp16, q8, q4, q4f16 |
-| Stop speech when dictation starts | `Off`   | On, Off                   |
+| Setting                           | Default     | Options                             |
+| --------------------------------- | ----------- | ----------------------------------- |
+| Playback speed                    | `1x`        | 0.25x to 4x                         |
+| Kokoro runs on                    | `Automatic` | Automatic, Graphics card, Processor |
+| Kokoro precision                  | `fp32`      | fp32, fp16, q8, q4, q4f16           |
+| Stop speech when dictation starts | `Off`       | On, Off                             |
 
 _Test voice_ plays a short sample with the current settings. It is the fastest way to catch a bad key, a wrong voice name, or an output device pointed somewhere you are not listening.
 
@@ -60,6 +89,8 @@ _Test voice_ plays a short sample with the current settings. It is the fastest w
 <AccordionGroup>
   <Accordion title="Choosing a voice">
     Kokoro ships eight built-in voices, with **Heart** as the default: Heart, Bella, Nicole, and Sky (US female), Adam and Michael (US male), Emma and George (UK).
+
+    Kitten has eight of its own, with **Bella** as the default: Bella, Luna, Rosie, Kiki, Jasper, Bruno, Hugo, and Leo.
 
     Cloud engines let you load and pick from their own lists.
 
@@ -79,10 +110,11 @@ _Test voice_ plays a short sample with the current settings. It is the fastest w
   </Accordion>
 
 <Accordion title="Picking a Kokoro precision">
-  `fp32` is the highest quality and the right choice when WebGPU is available.
-  If you have a weak GPU or none, a quantized option is dramatically faster on
-  CPU. `q8` is the usual pick, `q4` the fastest. Changing this reloads the
-  model.
+  Precision only applies while Kokoro runs inside the app, so Settings hides it
+  when the processor voice is speaking. `fp32` is the highest quality and the
+  right choice on a graphics card. `q8` is a smaller download. If the voice is
+  slow or garbled, change _Runs on_ rather than the precision. Changing this
+  reloads the model.
 </Accordion>
 
 <Accordion title="Playback speed limits">

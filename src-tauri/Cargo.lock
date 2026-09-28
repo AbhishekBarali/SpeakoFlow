@@ -6773,6 +6773,7 @@ version = "1.5.0"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
+ "bzip2",
  "chrono",
  "clap",
  "cpal",
@@ -6788,6 +6789,7 @@ dependencies = [
  "image",
  "keyring",
  "kodama",
+ "libloading 0.8.9",
  "log",
  "natural",
  "ndarray",
@@ -6832,6 +6834,7 @@ dependencies = [
  "transcribe-cpp",
  "transcribe-rs",
  "vad-rs",
+ "webview2-com",
  "windows 0.61.3",
  "winreg 0.55.0",
  "xcap",

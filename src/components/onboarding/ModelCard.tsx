@@ -40,14 +40,15 @@ const getLanguageDisplayText = (
 /**
  * A "legacy" transcription model runs on the older transcribe-rs (ONNX /
  * whisper.cpp) engine rather than the native transcribe.cpp (GGUF) engine.
- * LLM ("LlamaCpp") and TTS ("Kokoro") models are never "legacy". Exported so
+ * LLM ("LlamaCpp") and TTS ("Kokoro", "NativeTts") models are never "legacy". Exported so
  * the Models settings page can group these under a quiet "Older models"
  * section (PLAN.md Session 6) without duplicating the rule.
  */
 export const isLegacyModel = (model: ModelInfo): boolean =>
   model.engine_type !== "TranscribeCpp" &&
   model.engine_type !== "LlamaCpp" &&
-  model.engine_type !== "Kokoro";
+  model.engine_type !== "Kokoro" &&
+  model.engine_type !== "NativeTts";
 
 export type ModelCardStatus =
   | "downloadable"

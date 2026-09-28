@@ -66,6 +66,74 @@ const PARALLEL_DOWNLOAD_MIN_BYTES: u64 = 16 * 1024 * 1024;
 /// is not one unbuffered `write` syscall.
 const DOWNLOAD_WRITE_BUFFER: usize = 4 * 1024 * 1024;
 
+/// How long a download may go without receiving a single byte (or, before the
+/// body starts, without response headers) before the attempt is abandoned and
+/// retried.
+///
+/// The client only had a *connect* timeout, so a connection that opened and
+/// then went silent — a wedged CDN edge, a captive portal, a laptop resuming
+/// onto a different network — left the transfer waiting forever: a progress
+/// bar frozen at the same percentage with no error and no retry. Sixty seconds
+/// is long enough that a merely slow link never trips it (any byte resets it)
+/// and short enough that a dead one is noticed. Backport of Handy #1773.
+const DOWNLOAD_STALL_TIMEOUT: Duration = Duration::from_secs(60);
+
+/// Parallel attempts per URL before the retry loop switches to one stream.
+///
+/// Some networks and proxies cannot sustain eight concurrent range requests
+/// (Handy #1579); retrying in parallel there fails identically every time. A
+/// parallel retry is cheap because completed chunks are kept, so it gets a
+/// second chance before falling back — and the single-stream attempt resumes
+/// from the parallel file's completed prefix rather than starting over.
+const PARALLEL_ATTEMPTS_PER_URL: u32 = 2;
+
+/// The error for a transfer that went quiet for [`DOWNLOAD_STALL_TIMEOUT`].
+/// A transport-level failure, so the retry loop treats it as retryable.
+fn download_stalled_error() -> anyhow::Error {
+    anyhow::anyhow!(
+        "download stalled: no data received for {}s",
+        DOWNLOAD_STALL_TIMEOUT.as_secs()
+    )
+}
+
+/// Send a request, failing if response headers do not arrive within
+/// [`DOWNLOAD_STALL_TIMEOUT`].
+async fn send_with_stall_timeout(request: reqwest::RequestBuilder) -> Result<reqwest::Response> {
+    match tokio::time::timeout(DOWNLOAD_STALL_TIMEOUT, request.send()).await {
+        Ok(result) => Ok(result?),
+        Err(_) => Err(download_stalled_error()),
+    }
+}
+
+/// Next body chunk, failing if none arrives within [`DOWNLOAD_STALL_TIMEOUT`].
+async fn next_chunk_or_stall<S, B>(stream: &mut S) -> Result<Option<B>>
+where
+    S: futures_util::Stream<Item = reqwest::Result<B>> + Unpin,
+{
+    next_chunk_within(stream, DOWNLOAD_STALL_TIMEOUT).await
+}
+
+async fn next_chunk_within<S, B>(stream: &mut S, stall_timeout: Duration) -> Result<Option<B>>
+where
+    S: futures_util::Stream<Item = reqwest::Result<B>> + Unpin,
+{
+    match tokio::time::timeout(stall_timeout, stream.next()).await {
+        Ok(Some(Ok(chunk))) => Ok(Some(chunk)),
+        Ok(Some(Err(e))) => Err(e.into()),
+        Ok(None) => Ok(None),
+        Err(_) => Err(download_stalled_error()),
+    }
+}
+
+/// Bytes at the start of a parallel `.partial` that are known to be real: the
+/// run of completed chunks from chunk 0 in its `.parts` record. Lets a
+/// single-stream retry resume where the parallel attempt left a contiguous
+/// prefix, instead of discarding everything the parallel attempt fetched.
+fn contiguous_parallel_prefix(parts_record: &[u8], file_len: u64) -> u64 {
+    let chunks = parts_record.iter().take_while(|b| **b == 1).count() as u64;
+    (chunks * DOWNLOAD_CHUNK_SIZE).min(file_len)
+}
+
 /// HTTP client for model downloads.
 ///
 /// **HTTP/1.1 only, deliberately.** hyper's HTTP/2 flow-control window defaults
@@ -216,6 +284,10 @@ pub enum EngineType {
     /// Local text-to-speech engine (Kokoro, runs in the assistant webview).
     /// Not a transcription engine.
     Kokoro,
+    /// A downloadable voice pack for the native speech engine
+    /// (`native_tts.rs`, sherpa-onnx): Kokoro for the processor, and Kitten.
+    /// Not a transcription engine.
+    NativeTts,
 }
 
 impl EngineType {
@@ -223,7 +295,10 @@ impl EngineType {
     /// engines are eligible to be the "active" model used by the recording
     /// pipeline; LLM and TTS engines are managed independently.
     pub fn is_transcription(&self) -> bool {
-        !matches!(self, EngineType::LlamaCpp | EngineType::Kokoro)
+        !matches!(
+            self,
+            EngineType::LlamaCpp | EngineType::Kokoro | EngineType::NativeTts
+        )
     }
 }
 
@@ -551,6 +626,11 @@ pub struct ModelManager {
 }
 
 impl ModelManager {
+    /// The folder every managed model lives under (`<app data>/models`).
+    pub fn models_dir(&self) -> &Path {
+        &self.models_dir
+    }
+
     pub fn new(app_handle: &AppHandle) -> Result<Self> {
         // Create models directory in app data
         let models_dir = crate::portable::app_data_dir(app_handle)
@@ -1568,6 +1648,53 @@ id: "gemma-3-4b".to_string(),
             },
         );
 
+        // Native voice packs (`native_tts.rs`): Kokoro for the processor, used
+        // when the WebView cannot run it on the graphics card, and Kitten, the
+        // light voice. Hidden from the model lists (their category is "tts") and
+        // downloaded from the Voice settings. The engine library they need is
+        // fetched with the first one.
+        for pack in crate::native_tts::PACKS {
+            let (name, description) = match pack.family {
+                crate::native_tts::VoiceFamily::Kokoro => (
+                    "Kokoro (processor)",
+                    "Kokoro running on your processor, for computers where the graphics card can't run the voice.",
+                ),
+                crate::native_tts::VoiceFamily::Kitten => (
+                    "Kitten",
+                    "A small, fast English voice that runs on your processor.",
+                ),
+            };
+            available_models.insert(
+                pack.model_id.to_string(),
+                ModelInfo {
+                    id: pack.model_id.to_string(),
+                    name: name.to_string(),
+                    description: description.to_string(),
+                    filename: pack.dir.to_string(),
+                    url: Some(pack.archive_url.to_string()),
+                    sha256: Some(pack.sha256.to_string()),
+                    size_mb: pack.download_bytes.div_ceil(1_000_000),
+                    is_downloaded: false,
+                    is_downloading: false,
+                    partial_size: 0,
+                    is_directory: true,
+                    engine_type: EngineType::NativeTts,
+                    accuracy_score: 0.0,
+                    speed_score: 0.0,
+                    supports_translation: false,
+                    supports_streaming: false,
+                    is_recommended: false,
+                    recommended_rank: None,
+                    supported_languages: vec!["en".to_string()],
+                    supports_language_selection: false,
+                    is_custom: false,
+                    local_path: None,
+                    local_folder: None,
+                    is_cleanup_specialist: false,
+                },
+            );
+        }
+
         // Auto-discover custom Whisper models (.bin files) in the models directory
         if let Err(e) = Self::discover_custom_whisper_models(&models_dir, &mut available_models) {
             warn!("Failed to discover custom models: {}", e);
@@ -1954,6 +2081,12 @@ id: "gemma-3-4b".to_string(),
 
                 model.is_downloaded =
                     model_path.exists() && model_path.is_dir() && projector_ready(&model.id);
+                // A native voice pack is only usable with the engine library it
+                // runs on, which is installed alongside the first pack.
+                if model.engine_type == EngineType::NativeTts {
+                    model.is_downloaded = model.is_downloaded
+                        && crate::native_tts::runtime_installed_in(&self.models_dir);
+                }
                 model.is_downloading = false;
 
                 // Get partial file size if it exists (for the .tar.gz being downloaded)
@@ -2962,7 +3095,7 @@ id: "gemma-3-4b".to_string(),
         let tmp = self.models_dir.join(format!("{}.partial", file_name));
 
         let client = download_client()?;
-        let response = client.get(url).send().await?;
+        let response = send_with_stall_timeout(client.get(url)).await?;
         if !response.status().is_success() {
             return Err(anyhow::anyhow!(
                 "Failed to download projector: HTTP {}",
@@ -2974,13 +3107,21 @@ id: "gemma-3-4b".to_string(),
         let mut stream = response.bytes_stream();
         let mut file = std::fs::File::create(&tmp)?;
         let mut last_emit = Instant::now();
-        while let Some(chunk) = stream.next().await {
+        loop {
+            let chunk = match next_chunk_or_stall(&mut stream).await {
+                Ok(Some(chunk)) => chunk,
+                Ok(None) => break,
+                Err(e) => {
+                    drop(file);
+                    let _ = fs::remove_file(&tmp);
+                    return Err(e);
+                }
+            };
             if cancel_flag.load(Ordering::Relaxed) {
                 drop(file);
                 let _ = fs::remove_file(&tmp);
                 return Err(anyhow::anyhow!(DOWNLOAD_CANCELLED_ERROR));
             }
-            let chunk = chunk?;
             file.write_all(&chunk)?;
             downloaded += chunk.len() as u64;
             if last_emit.elapsed() >= Duration::from_millis(100) {
@@ -3164,22 +3305,22 @@ id: "gemma-3-4b".to_string(),
                     // mid-flight from running ahead of what actually landed.
                     let mut credited = 0u64;
                     let outcome: Result<()> = async {
-                        let response = client
-                            .get(&url)
-                            .header(reqwest::header::RANGE, format!("bytes={start}-{end}"))
-                            .send()
-                            .await?;
+                        let response = send_with_stall_timeout(
+                            client
+                                .get(&url)
+                                .header(reqwest::header::RANGE, format!("bytes={start}-{end}")),
+                        )
+                        .await?;
                         let status = response.status();
                         if status != reqwest::StatusCode::PARTIAL_CONTENT {
                             return Err(HttpStatusError { status }.into());
                         }
                         let mut buffer = Vec::with_capacity(expected);
                         let mut stream = response.bytes_stream();
-                        while let Some(part) = stream.next().await {
+                        while let Some(part) = next_chunk_or_stall(&mut stream).await? {
                             if cancel_flag.load(Ordering::Relaxed) {
                                 return Ok(());
                             }
-                            let part = part?;
                             // Credit bytes as they arrive rather than when the
                             // chunk completes. Crediting whole chunks made the
                             // counter move in 8 MiB steps, and because eight
@@ -3316,11 +3457,32 @@ id: "gemma-3-4b".to_string(),
         // A `.parts` record means this `.partial` was preallocated to full size
         // by the parallel path, so its length says nothing about how much is
         // real. Appending to it would splice fresh bytes onto a file full of
-        // holes, producing something that looks complete and cannot be. Start
-        // clean instead.
+        // holes, producing something that looks complete and cannot be. Keep
+        // only the contiguous run of completed chunks from the start (which is
+        // real), truncate the rest away, and resume from there — so falling back
+        // to one stream after a parallel failure doesn't throw away what the
+        // parallel attempt already fetched.
         let parts_path = parts_path_for(partial_path);
         if parts_path.exists() {
-            remove_partial(partial_path);
+            let prefix = match (fs::read(&parts_path), partial_path.metadata()) {
+                (Ok(record), Ok(meta)) => contiguous_parallel_prefix(&record, meta.len()),
+                _ => 0,
+            };
+            let kept = prefix > 0
+                && std::fs::OpenOptions::new()
+                    .write(true)
+                    .open(partial_path)
+                    .and_then(|f| f.set_len(prefix))
+                    .is_ok();
+            let _ = fs::remove_file(&parts_path);
+            if kept {
+                info!(
+                    "Resuming {} on one stream from the {} bytes the parallel attempt completed",
+                    model_id, prefix
+                );
+            } else {
+                remove_partial(partial_path);
+            }
         }
         let mut resume_from = if partial_path.exists() {
             partial_path.metadata()?.len()
@@ -3337,19 +3499,34 @@ id: "gemma-3-4b".to_string(),
         if resume_from > 0 {
             request = request.header("Range", format!("bytes={}-", resume_from));
         }
-        let mut response = request.send().await?;
+        let mut response = send_with_stall_timeout(request).await?;
 
-        // Asked to resume but got 200 (not 206): the server ignored the Range,
-        // so restart fresh to avoid appending a full body onto the partial.
-        if resume_from > 0 && response.status() == reqwest::StatusCode::OK {
-            warn!(
-                "Server ignored range request for model {}, restarting download",
-                model_id
-            );
-            drop(response);
-            let _ = fs::remove_file(partial_path);
-            resume_from = 0;
-            response = client.get(url).send().await?;
+        // Asked to resume, but the server did not honour the range: a 200 (it
+        // ignored the Range header), a 416 (the partial is not a prefix of the
+        // current file — e.g. the upstream file changed), or a 206 that starts
+        // somewhere other than where we asked. Appending any of those to the
+        // partial would corrupt it, so restart from zero.
+        if resume_from > 0 {
+            let status = response.status();
+            let range_start_ok = status == reqwest::StatusCode::PARTIAL_CONTENT
+                && response
+                    .headers()
+                    .get(reqwest::header::CONTENT_RANGE)
+                    .and_then(|v| v.to_str().ok())
+                    .and_then(|v| v.strip_prefix("bytes "))
+                    .and_then(|v| v.split('-').next())
+                    .and_then(|v| v.trim().parse::<u64>().ok())
+                    .is_none_or(|start| start == resume_from);
+            if !range_start_ok {
+                warn!(
+                    "Server did not resume model {} at byte {} (HTTP {}); restarting download",
+                    model_id, resume_from, status
+                );
+                drop(response);
+                let _ = fs::remove_file(partial_path);
+                resume_from = 0;
+                response = send_with_stall_timeout(client.get(url)).await?;
+            }
         }
 
         let status = response.status();
@@ -3402,7 +3579,10 @@ id: "gemma-3-4b".to_string(),
         let mut last_emit = Instant::now();
         let throttle_duration = Duration::from_millis(100);
 
-        while let Some(chunk) = stream.next().await {
+        while let Some(chunk) = next_chunk_or_stall(&mut stream).await.inspect_err(|_| {
+            // Flush what was accepted so the retry resumes from the real offset.
+            let _ = file.flush();
+        })? {
             if cancel_flag.load(Ordering::Relaxed) {
                 // Flush before giving up so the bytes already accepted are on
                 // disk and a later resume picks up from the real offset rather
@@ -3412,7 +3592,6 @@ id: "gemma-3-4b".to_string(),
                 info!("Download cancelled for: {}", model_id);
                 return Ok(AttemptOutcome::Cancelled);
             }
-            let chunk = chunk?;
             file.write_all(&chunk)?;
             downloaded += chunk.len() as u64;
             if last_emit.elapsed() >= throttle_duration {
@@ -3437,6 +3616,95 @@ id: "gemma-3-4b".to_string(),
         }
 
         Ok(AttemptOutcome::Completed)
+    }
+
+    /// Download, verify and unpack the native voice engine (`native_tts.rs`) for
+    /// this platform. Retries transient failures and resumes the partial file
+    /// like a model download; progress is reported under `model_id`, the voice
+    /// pack that needed it. Serialized, so two packs downloading at once cannot
+    /// both write the same partial file.
+    async fn install_tts_runtime(
+        &self,
+        model_id: &str,
+        cancel_flag: &Arc<AtomicBool>,
+    ) -> Result<()> {
+        static INSTALL: once_cell::sync::Lazy<tokio::sync::Mutex<()>> =
+            once_cell::sync::Lazy::new(|| tokio::sync::Mutex::new(()));
+        let _installing = INSTALL.lock().await;
+        if crate::native_tts::runtime_installed_in(&self.models_dir) {
+            return Ok(());
+        }
+        let asset = crate::native_tts::runtime_asset().ok_or_else(|| {
+            anyhow::anyhow!(
+                "Voices that run on the processor aren't available for this computer yet."
+            )
+        })?;
+        let staging = self.models_dir.join("tts-runtime");
+        fs::create_dir_all(&staging)?;
+        let partial = staging.join(format!("{}.partial", asset.archive));
+        let url = asset.url();
+        info!("Downloading the native voice engine from {}", url);
+
+        const ATTEMPTS: u32 = 4;
+        let mut last_error: Option<anyhow::Error> = None;
+        for attempt in 1..=ATTEMPTS {
+            if cancel_flag.load(Ordering::Relaxed) {
+                return Err(anyhow::anyhow!(DOWNLOAD_CANCELLED_ERROR));
+            }
+            match self
+                .attempt_download(model_id, &url, &partial, cancel_flag)
+                .await
+            {
+                Ok(AttemptOutcome::Completed) => {
+                    last_error = None;
+                    break;
+                }
+                Ok(AttemptOutcome::Cancelled) => {
+                    return Err(anyhow::anyhow!(DOWNLOAD_CANCELLED_ERROR));
+                }
+                Err(error) => {
+                    let permanent = error.downcast_ref::<HttpStatusError>().is_some_and(|e| {
+                        e.status.is_client_error()
+                            && e.status != reqwest::StatusCode::REQUEST_TIMEOUT
+                            && e.status != reqwest::StatusCode::TOO_MANY_REQUESTS
+                    });
+                    warn!(
+                        "Voice engine download attempt {}/{} failed: {}",
+                        attempt, ATTEMPTS, error
+                    );
+                    last_error = Some(error);
+                    if permanent {
+                        break;
+                    }
+                    if attempt < ATTEMPTS {
+                        tokio::time::sleep(Duration::from_secs(1u64 << (attempt - 1))).await;
+                    }
+                }
+            }
+        }
+        if let Some(error) = last_error {
+            return Err(anyhow::anyhow!(
+                "Couldn't download the voice engine: {}",
+                error
+            ));
+        }
+
+        let verify_path = partial.clone();
+        let expected = asset.sha256;
+        tokio::task::spawn_blocking(move || {
+            Self::verify_sha256(&verify_path, Some(expected), "voice engine")
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!("Voice engine check failed: {}", e))??;
+
+        let models_dir = self.models_dir.clone();
+        tokio::task::spawn_blocking(move || {
+            crate::native_tts::install_runtime_archive(&partial, &models_dir)
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!("Voice engine install failed: {}", e))?
+        .map_err(|e| anyhow::anyhow!(e))?;
+        Ok(())
     }
 
     pub async fn download_model(&self, model_id: &str) -> Result<()> {
@@ -3502,6 +3770,14 @@ id: "gemma-3-4b".to_string(),
                     self.download_companion(model_id, &mmproj_url, &mmproj_path, &cancel_flag)
                         .await?;
                 }
+            }
+
+            // A voice pack whose engine download failed or was removed last
+            // time: fetch just the engine.
+            if model_info.engine_type == EngineType::NativeTts
+                && !crate::native_tts::runtime_installed_in(&self.models_dir)
+            {
+                self.install_tts_runtime(model_id, &cancel_flag).await?;
             }
 
             {
@@ -3592,17 +3868,30 @@ id: "gemma-3-4b".to_string(),
                 }
 
                 // Prefer concurrent range requests; fall back to one stream when
-                // the host will not serve ranges or the file is small.
-                let attempt_result = match self
-                    .attempt_parallel_download(model_id, url, &partial_path, &cancel_flag)
-                    .await
-                {
-                    Ok(Some(outcome)) => Ok(outcome),
-                    Ok(None) => {
-                        self.attempt_download(model_id, url, &partial_path, &cancel_flag)
-                            .await
+                // the host will not serve ranges, the file is small, or parallel
+                // attempts have already failed on this URL (some networks and
+                // proxies cannot sustain eight connections — Handy #1579).
+                let attempt_result = if attempt > PARALLEL_ATTEMPTS_PER_URL {
+                    if attempt == PARALLEL_ATTEMPTS_PER_URL + 1 {
+                        info!(
+                            "Parallel download of {} failed {} times; retrying on one stream",
+                            model_id, PARALLEL_ATTEMPTS_PER_URL
+                        );
                     }
-                    Err(error) => Err(error),
+                    self.attempt_download(model_id, url, &partial_path, &cancel_flag)
+                        .await
+                } else {
+                    match self
+                        .attempt_parallel_download(model_id, url, &partial_path, &cancel_flag)
+                        .await
+                    {
+                        Ok(Some(outcome)) => Ok(outcome),
+                        Ok(None) => {
+                            self.attempt_download(model_id, url, &partial_path, &cancel_flag)
+                                .await
+                        }
+                        Err(error) => Err(error),
+                    }
                 };
 
                 match attempt_result {
@@ -3706,13 +3995,32 @@ id: "gemma-3-4b".to_string(),
             // Create temporary extraction directory
             fs::create_dir_all(&temp_extract_dir)?;
 
-            // Open the downloaded tar.gz file
-            let tar_gz = File::open(&partial_path)?;
-            let tar = GzDecoder::new(tar_gz);
-            let mut archive = Archive::new(tar);
+            // Open the downloaded archive. Transcription models ship as .tar.gz;
+            // the sherpa-onnx voice packs as .tar.bz2, whose decompression is
+            // slow enough (a 350 MB pack takes seconds) to keep off the async
+            // runtime's workers.
+            let is_bz2 = model_info
+                .url
+                .as_deref()
+                .is_some_and(|url| url.ends_with(".tar.bz2"));
+            let unpack_source = partial_path.clone();
+            let unpack_dest = temp_extract_dir.clone();
+            let unpacked = tokio::task::spawn_blocking(move || -> std::io::Result<()> {
+                let file = File::open(&unpack_source)?;
+                let decoder: Box<dyn Read> = if is_bz2 {
+                    Box::new(bzip2::read::MultiBzDecoder::new(std::io::BufReader::new(
+                        file,
+                    )))
+                } else {
+                    Box::new(GzDecoder::new(file))
+                };
+                Archive::new(decoder).unpack(&unpack_dest)
+            })
+            .await
+            .unwrap_or_else(|e| Err(std::io::Error::other(e.to_string())));
 
             // Extract to the temporary directory first
-            archive.unpack(&temp_extract_dir).map_err(|e| {
+            unpacked.map_err(|e| {
                 let error_msg = format!("Failed to extract archive: {}", e);
                 // Clean up failed extraction
                 let _ = fs::remove_dir_all(&temp_extract_dir);
@@ -3774,6 +4082,14 @@ id: "gemma-3-4b".to_string(),
         }
         if cancel_flag.load(Ordering::Relaxed) {
             return Err(anyhow::anyhow!(DOWNLOAD_CANCELLED_ERROR));
+        }
+
+        // A native voice pack also needs the engine library it runs on, shared
+        // by every pack and fetched with the first one.
+        if model_info.engine_type == EngineType::NativeTts
+            && !crate::native_tts::runtime_installed_in(&self.models_dir)
+        {
+            self.install_tts_runtime(model_id, &cancel_flag).await?;
         }
 
         // For vision LLMs, fetch the companion multimodal projector now that
@@ -3898,6 +4214,12 @@ id: "gemma-3-4b".to_string(),
 
         let mut deleted_something = false;
 
+        // A native voice pack may be loaded right now; its model file cannot
+        // be removed from under the engine (Windows refuses outright).
+        if model_info.engine_type == EngineType::NativeTts {
+            crate::native_tts::release(Some(model_id));
+        }
+
         if model_info.is_directory {
             // Delete complete model directory if it exists
             if model_path.exists() && model_path.is_dir() {
@@ -3938,6 +4260,10 @@ id: "gemma-3-4b".to_string(),
                 fs::remove_file(&mmproj_partial)?;
                 deleted_something = true;
             }
+        }
+
+        if model_info.engine_type == EngineType::NativeTts {
+            crate::native_tts::remove_runtime_if_unused(&self.models_dir);
         }
 
         if model_info.is_custom {
@@ -4077,6 +4403,41 @@ mod tests {
     use super::*;
     use std::io::Write;
     use tempfile::TempDir;
+
+    #[test]
+    fn parallel_prefix_counts_only_the_leading_run_of_chunks() {
+        let chunk = DOWNLOAD_CHUNK_SIZE;
+        let total = chunk * 4;
+        assert_eq!(contiguous_parallel_prefix(&[0, 1, 1, 1], total), 0);
+        assert_eq!(contiguous_parallel_prefix(&[1, 1, 0, 1], total), 2 * chunk);
+        assert_eq!(contiguous_parallel_prefix(&[1, 1, 1, 1], total), total);
+        // A short last chunk: the prefix never exceeds the file.
+        assert_eq!(contiguous_parallel_prefix(&[1, 1], chunk + 10), chunk + 10);
+    }
+
+    #[tokio::test]
+    async fn a_silent_stream_is_reported_as_stalled() {
+        // A body that never yields: before the stall timeout this hung forever.
+        let mut stream = futures_util::stream::pending::<reqwest::Result<Vec<u8>>>();
+        let err = next_chunk_within(&mut stream, Duration::from_millis(20))
+            .await
+            .expect_err("a stream that never yields must time out");
+        assert!(err.to_string().contains("stalled"), "{err}");
+
+        let mut live = futures_util::stream::iter(vec![Ok::<_, reqwest::Error>(vec![1u8])]);
+        assert_eq!(
+            next_chunk_within(&mut live, Duration::from_millis(20))
+                .await
+                .unwrap(),
+            Some(vec![1u8])
+        );
+        assert_eq!(
+            next_chunk_within(&mut live, Duration::from_millis(20))
+                .await
+                .unwrap(),
+            None
+        );
+    }
 
     /// The primitive the whole parallel path rests on: eight workers writing at
     /// their own offsets into one preallocated file, in whatever order they

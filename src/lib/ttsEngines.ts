@@ -37,6 +37,15 @@ export const TTS_ENGINES: readonly TtsEngineSpec[] = [
     speed: [0.25, 4],
   },
   {
+    // The small voice: runs on the processor through the native engine
+    // (native_tts.rs), a 64 MB download.
+    id: "kitten",
+    local: true,
+    key: "none",
+    voice: { required: false, example: "Bella" },
+    speed: [0.25, 4],
+  },
+  {
     id: "openai",
     key: "required",
     keyUrl: "https://platform.openai.com/api-keys",
