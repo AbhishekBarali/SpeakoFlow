@@ -598,9 +598,11 @@ fn clean_chunk(raw: &str) -> Option<String> {
 
 /// Where finished chunks are sent for synthesis.
 enum Delivery {
-    /// The local Kokoro model runs in the panel webview (kokoro-js/WebGPU), so
+    /// Kokoro in the panel webview (kokoro-js/WebGPU), so
     /// chunks are forwarded as events and the webview streams them into a
-    /// splitter that stays open for the whole reply.
+    /// splitter that stays open for the whole reply. Only used while
+    /// [`crate::native_tts::route`] is `Webview`; Kokoro on the processor and
+    /// Kitten are synthesized in Rust and delivered like a remote engine.
     Local {
         app: tauri::AppHandle,
         voice_ticket: Option<crate::voice_conversation::VoiceTicket>,
@@ -654,7 +656,7 @@ impl SpeechPipeline {
                 serde_json::json!({ "ticket": ticket, "epoch": epoch }),
             );
         }
-        let delivery = if settings.assistant_tts_engine == "kokoro" {
+        let delivery = if crate::native_tts::uses_webview(settings) {
             use tauri::Emitter;
             // Tells the webview to open a splitter for this reply. The hook
             // ignores it when speech is disabled. The epoch rides along so every
@@ -846,9 +848,16 @@ fn spawn_remote_synthesis(
         let device = settings.selected_output_device.clone();
         let volume = settings.assistant_tts_volume;
         let stitching = settings.assistant_tts_engine == "elevenlabs";
+        // A native voice synthesizes on this machine's cores behind one lock, so
+        // a second request in flight would only wait for the first.
+        let native = crate::native_tts::route(&settings) == crate::native_tts::VoiceRoute::Native;
         // Shared with every synthesis task rather than cloned per chunk.
         let settings = std::sync::Arc::new(settings);
-        let lookahead = if stitching { 1 } else { SYNTH_LOOKAHEAD };
+        let lookahead = if stitching || native {
+            1
+        } else {
+            SYNTH_LOOKAHEAD
+        };
 
         let mut stitch_ids: Vec<String> = Vec::new();
         let mut inflight: std::collections::VecDeque<

@@ -667,7 +667,7 @@ impl TranscriptionManager {
             // Not transcription engines — these are handled by their own
             // subsystems (LocalLlmManager / the assistant webview) and must
             // never be loaded as the active recording model.
-            EngineType::LlamaCpp | EngineType::Kokoro => {
+            EngineType::LlamaCpp | EngineType::Kokoro | EngineType::NativeTts => {
                 let error_msg = format!(
                     "Model {} is not a transcription model and cannot be loaded for recording",
                     model_id
@@ -859,6 +859,7 @@ impl TranscriptionManager {
                             biased_upstream,
                             settings.cloud_stt_no_verbatim,
                             false,
+                            &[],
                         );
                         return Ok(finished);
                     }
@@ -1153,13 +1154,24 @@ impl TranscriptionManager {
         // Translation is only claimed when the loaded model can actually do it:
         // the whisper path passes the flag through, but Parakeet and friends
         // ignore it, so the setting alone never proved anything happened.
+        let model_info = self.model_manager.get_model_info(&settings.selected_model);
         let translated = settings.translate_to_english
-            && self
-                .model_manager
-                .get_model_info(&settings.selected_model)
+            && model_info
+                .as_ref()
                 .map(|info| info.supports_translation)
                 .unwrap_or(false);
-        Ok(self.finish_transcription(&settings, result, st, is_whisper, true, translated))
+        let engine_languages = model_info
+            .map(|info| info.supported_languages)
+            .unwrap_or_default();
+        Ok(self.finish_transcription(
+            &settings,
+            result,
+            st,
+            is_whisper,
+            true,
+            translated,
+            &engine_languages,
+        ))
     }
 
     /// Shared tail of every batch transcription: fuzzy custom-word correction,
@@ -1184,6 +1196,7 @@ impl TranscriptionManager {
     /// don't even implement. One switch now decides the outcome regardless of
     /// which provider is answering. The local engines keep filtering
     /// unconditionally, as they always have.
+    #[allow(clippy::too_many_arguments)]
     fn finish_transcription(
         &self,
         settings: &crate::settings::AppSettings,
@@ -1192,24 +1205,28 @@ impl TranscriptionManager {
         skip_word_correction: bool,
         remove_fillers: bool,
         translated: bool,
+        engine_languages: &[String],
     ) -> String {
         let recognition_hints = recognition_words(settings);
-        let corrected_result = if !recognition_hints.is_empty() && !skip_word_correction {
-            apply_custom_words(&raw, &recognition_hints, settings.word_correction_threshold)
-        } else {
-            raw
-        };
+        let spoken_language = spoken_language_for_fillers(settings, translated, engine_languages);
+        let filtered_result = fail_open_text_transform(raw, |raw| {
+            let corrected_result = if !recognition_hints.is_empty() && !skip_word_correction {
+                apply_custom_words(&raw, &recognition_hints, settings.word_correction_threshold)
+            } else {
+                raw
+            };
 
-        // Filter out filler words and hallucinations
-        let filtered_result = if remove_fillers {
-            filter_transcription_output(
-                &corrected_result,
-                &settings.app_language,
-                &settings.custom_filler_words,
-            )
-        } else {
-            corrected_result
-        };
+            // Filter out filler words and hallucinations
+            if remove_fillers {
+                filter_transcription_output(
+                    &corrected_result,
+                    &spoken_language,
+                    &settings.custom_filler_words,
+                )
+            } else {
+                corrected_result
+            }
+        });
 
         let et = std::time::Instant::now();
         // Only claim a translation the engine actually performed. The setting
@@ -1228,7 +1245,10 @@ impl TranscriptionManager {
         if final_result.is_empty() {
             info!("Transcription result is empty");
         } else {
-            info!("Transcription result: {}", final_result);
+            info!(
+                "Transcription result: {}",
+                crate::utils::redact_text(&final_result)
+            );
         }
 
         self.maybe_unload_immediately("transcription");
@@ -1863,7 +1883,25 @@ impl TranscriptionManager {
         }
         drop(tx); // no further commands for this session
 
+        // The worker answers Finalize only after it has worked through every frame
+        // queued ahead of it, and it keeps the model leased until then — so if it
+        // is behind, the batch fallback cannot run either: `transcribe()` finds no
+        // engine and the whole recording is lost. Giving up at the first deadline
+        // is therefore never better than waiting. The first dictation after launch
+        // is the usual way to get here (every frame queues while the model loads),
+        // and so is a slow CPU. A disconnect, by contrast, means the worker is gone
+        // and waiting is pointless.
         let raw = match reply_rx.recv_timeout(Duration::from_secs(30)) {
+            Err(mpsc::RecvTimeoutError::Timeout) => {
+                warn!(
+                    "Live transcription is still working through its backlog after 30s; \
+                     waiting for it rather than losing the recording"
+                );
+                reply_rx.recv_timeout(Duration::from_secs(120))
+            }
+            other => other,
+        };
+        let raw = match raw {
             Ok(Some(text)) => {
                 if dropped > 0 {
                     // The machine couldn't keep up with real-time streaming and
@@ -1908,22 +1946,39 @@ impl TranscriptionManager {
             Some(_) => settings.cloud_stt_no_verbatim,
             None => true,
         };
+        // Filler words follow the language that was spoken, not the UI language.
+        let (translated, engine_languages) = match cloud.as_ref() {
+            Some(_) => (false, Vec::new()),
+            None => self
+                .model_manager
+                .get_model_info(&settings.selected_model)
+                .map(|info| {
+                    (
+                        settings.translate_to_english && info.supports_translation,
+                        info.supported_languages,
+                    )
+                })
+                .unwrap_or_default(),
+        };
+        let spoken_language = spoken_language_for_fillers(&settings, translated, &engine_languages);
 
         let recognition_hints = recognition_words(&settings);
-        let corrected = if !recognition_hints.is_empty() && !biased_upstream {
-            apply_custom_words(&raw, &recognition_hints, settings.word_correction_threshold)
-        } else {
-            raw
-        };
-        let filtered = if remove_fillers {
-            filter_transcription_output(
-                &corrected,
-                &settings.app_language,
-                &settings.custom_filler_words,
-            )
-        } else {
-            corrected
-        };
+        let filtered = fail_open_text_transform(raw, |raw| {
+            let corrected = if !recognition_hints.is_empty() && !biased_upstream {
+                apply_custom_words(&raw, &recognition_hints, settings.word_correction_threshold)
+            } else {
+                raw
+            };
+            if remove_fillers {
+                filter_transcription_output(
+                    &corrected,
+                    &spoken_language,
+                    &settings.custom_filler_words,
+                )
+            } else {
+                corrected
+            }
+        });
 
         if filtered.trim().is_empty() {
             return Ok(None);
@@ -2037,6 +2092,64 @@ fn recognition_prompt_words(settings: &crate::settings::AppSettings) -> Vec<Stri
     words
 }
 
+/// The language that was **spoken**, for choosing which filler words are safe
+/// to remove. Deliberately not `app_language`: the UI language defaults to the
+/// OS locale, so a Portuguese speaker on an English UI had every "um" ("a")
+/// deleted. Evidence, strongest first: a translation to English, the user's
+/// chosen transcription language, a model that only speaks one language.
+/// Otherwise `"auto"`, which makes the filter detect it from the text and, if
+/// the text is not conclusive, remove only fillers that are a word nowhere.
+fn spoken_language_for_fillers(
+    settings: &crate::settings::AppSettings,
+    translated: bool,
+    engine_languages: &[String],
+) -> String {
+    if translated {
+        return "en".to_string();
+    }
+    let selected = settings.selected_language.trim();
+    if !selected.is_empty() && selected != "auto" {
+        return selected.to_string();
+    }
+    if let [only] = engine_languages {
+        return only.clone();
+    }
+    "auto".to_string()
+}
+
+fn panic_payload_message(payload: &(dyn std::any::Any + Send)) -> String {
+    if let Some(message) = payload.downcast_ref::<&str>() {
+        (*message).to_string()
+    } else if let Some(message) = payload.downcast_ref::<String>() {
+        message.clone()
+    } else {
+        "unknown panic".to_string()
+    }
+}
+
+/// Optional text cleanup (custom-word correction, filler removal) must never
+/// discard a successful transcription. The transform is pure and owns its
+/// input, so recovering the untouched text is safe even if a bug in it unwinds.
+/// Before this, a panic there killed the dictation task: the overlay went away,
+/// nothing was pasted, and no history entry was written. Backport of Handy
+/// 2203a826.
+fn fail_open_text_transform<F>(raw: String, transform: F) -> String
+where
+    F: FnOnce(String) -> String,
+{
+    let fallback = raw.clone();
+    match catch_unwind(AssertUnwindSafe(|| transform(raw))) {
+        Ok(processed) => processed,
+        Err(payload) => {
+            error!(
+                "Optional transcription text post-processing panicked: {}; using the raw transcription",
+                panic_payload_message(payload.as_ref())
+            );
+            fallback
+        }
+    }
+}
+
 /// Cosmetic pass for the LIVE overlay text: the same safe custom-word /
 /// recognition-hint correction the final transcript receives, plus — when
 /// Flow is on — an exact rewrite of the leading activation phrase to its
@@ -2053,7 +2166,9 @@ fn correct_live_display(
     let mut out = if text.is_empty() || hints.is_empty() {
         text.to_string()
     } else {
-        apply_custom_words(text, hints, threshold)
+        fail_open_text_transform(text.to_string(), |text| {
+            apply_custom_words(&text, hints, threshold)
+        })
     };
     if let Some(phrase) = flow_phrase {
         if let Some(fixed) = crate::flow::canonicalize_leading_phrase(&out, phrase) {
@@ -2526,6 +2641,39 @@ impl Drop for TranscriptionManager {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn optional_text_transform_falls_back_to_raw_text_after_panic() {
+        let raw = "原始轉錄。".to_string();
+        let result = fail_open_text_transform(raw.clone(), |_| {
+            panic!("simulated optional cleanup failure")
+        });
+        assert_eq!(result, raw);
+    }
+
+    #[test]
+    fn filler_language_follows_the_spoken_language_not_the_ui() {
+        let mut settings = crate::settings::AppSettings {
+            app_language: "en".to_string(),
+            selected_language: "pt".to_string(),
+            ..Default::default()
+        };
+        assert_eq!(spoken_language_for_fillers(&settings, false, &[]), "pt");
+
+        settings.selected_language = "auto".to_string();
+        assert_eq!(spoken_language_for_fillers(&settings, false, &[]), "auto");
+        assert_eq!(
+            spoken_language_for_fillers(&settings, false, &["en".to_string()]),
+            "en"
+        );
+        assert_eq!(
+            spoken_language_for_fillers(&settings, false, &["en".to_string(), "de".to_string()]),
+            "auto"
+        );
+        // Translated output is English whatever was spoken.
+        settings.selected_language = "ja".to_string();
+        assert_eq!(spoken_language_for_fillers(&settings, true, &[]), "en");
+    }
     use transcribe_cpp::{Capabilities, Task, TimestampKind};
 
     /// The child's device list must survive a round trip through stdout, and any

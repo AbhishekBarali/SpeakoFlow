@@ -7,6 +7,12 @@ use speakoflow_app_lib::CliArgs;
 fn main() {
     let cli_args = CliArgs::parse();
 
+    // Must run before anything initializes a GPU backend — including the
+    // `--list-devices` / `--probe-devices` probes just below, which load the
+    // Vulkan/Metal ggml backends themselves. Child processes (the llama.cpp
+    // sidecar, the device probe) inherit these variables.
+    apply_gpu_environment_defaults();
+
     // `--list-devices` is a headless probe: initialize the transcribe.cpp
     // backends, print the compute devices, and exit WITHOUT launching Tauri.
     // Handled here (before any window/single-instance setup) so it stays a
@@ -37,6 +43,43 @@ fn main() {
     prefer_xwayland_for_overlay_on_gnome_wayland();
 
     speakoflow_app_lib::run(cli_args)
+}
+
+/// Process-wide GPU runtime defaults that protect the speech and LLM engines
+/// from the machine around them. Each respects a value the user already set.
+fn apply_gpu_environment_defaults() {
+    // Windows: disable *implicit* Vulkan layers. Overlay and capture tools
+    // (Steam, OBS, RTSS/MSI Afterburner, Discord, Epic, NVIDIA/AMD overlays)
+    // install implicit layers that inject into every Vulkan process; several of
+    // them crash inside a compute-only ggml context, taking the app down at
+    // model load or GPU enumeration (Handy #2049). Explicit layers still load.
+    // An existing VK_LOADER_LAYERS_DISABLE wins, and
+    // SPEAKOFLOW_KEEP_VULKAN_IMPLICIT_LAYERS=1 opts out. Backport of Handy #2053.
+    #[cfg(target_os = "windows")]
+    {
+        let keep_layers = std::env::var("SPEAKOFLOW_KEEP_VULKAN_IMPLICIT_LAYERS")
+            .map(|v| matches!(v.trim(), "1" | "true" | "yes" | "on"))
+            .unwrap_or(false);
+        if std::env::var_os("VK_LOADER_LAYERS_DISABLE").is_none() && !keep_layers {
+            std::env::set_var("VK_LOADER_LAYERS_DISABLE", "~implicit~");
+        }
+    }
+
+    // macOS: turn off ggml-metal residency sets. Their teardown asserts when a
+    // native engine outlives Tauri's shutdown sequence, which produced a crash
+    // report on quit (Handy #1902). This build links two Metal ggml copies
+    // (whisper-rs and transcribe-cpp), so it is more exposed than upstream.
+    // ggml treats the variable as presence-based, so opting back in
+    // (SPEAKOFLOW_METAL_RESIDENCY=1) removes an inherited value too. Backport
+    // of Handy 98a4d80c.
+    #[cfg(target_os = "macos")]
+    {
+        if std::env::var("SPEAKOFLOW_METAL_RESIDENCY").as_deref() == Ok("1") {
+            std::env::remove_var("GGML_METAL_NO_RESIDENCY");
+        } else {
+            std::env::set_var("GGML_METAL_NO_RESIDENCY", "1");
+        }
+    }
 }
 
 /// Prefer XWayland on GNOME/Wayland so the recording overlay can stay above

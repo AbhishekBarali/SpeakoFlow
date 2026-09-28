@@ -3,7 +3,7 @@ use crate::helpers::clamshell;
 use crate::managers::transcription::StreamRouter;
 use crate::settings::{get_settings, AppSettings};
 use crate::utils;
-use log::{debug, error, info};
+use log::{debug, error, info, trace, warn};
 use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
@@ -301,8 +301,30 @@ impl AudioRecordingManager {
     pub fn start_microphone_stream(&self) -> Result<(), anyhow::Error> {
         let mut open_flag = self.is_open.lock().unwrap();
         if *open_flag {
-            debug!("Microphone stream already active");
-            return Ok(());
+            // `is_open` only records that a stream was opened at some point,
+            // not that it still captures. If cpal has since reported a stream
+            // error (mic unplugged, USB/Bluetooth dropout), rebuild it before
+            // the next recording instead of handing the caller a stalled
+            // recorder that returns silent, empty dictations. Backport of
+            // Handy PRs #1838 / #1874.
+            let needs_reopen = self
+                .recorder
+                .lock()
+                .unwrap()
+                .as_ref()
+                .is_some_and(|rec| rec.needs_reopen());
+            if !needs_reopen {
+                trace!("Microphone stream already active");
+                return Ok(());
+            }
+            warn!("Microphone stream failed; reopening it");
+            if let Some(rec) = self.recorder.lock().unwrap().as_mut() {
+                let _ = rec.close();
+            }
+            *self.is_recording.lock().unwrap() = false;
+            *open_flag = false;
+            // Fall through: re-resolve the device (the selected one may be gone,
+            // in which case the system default is used) and open fresh.
         }
 
         let start_time = Instant::now();
@@ -332,8 +354,17 @@ impl AudioRecordingManager {
 
         let mut recorder_opt = self.recorder.lock().unwrap();
         if let Some(rec) = recorder_opt.as_mut() {
-            rec.open(selected_device)
-                .map_err(|e| anyhow::anyhow!("Failed to open recorder: {}", e))?;
+            if let Err(first_err) = rec.open(selected_device) {
+                // The device or its cached config may have gone stale (unplugged,
+                // Bluetooth profile switch, sample rate changed in the OS). The
+                // recorder drops its config cache on a failed open, so
+                // re-resolve the device and retry once before surfacing the
+                // error. Backport of Handy PR #1582's cache-clear-and-retry.
+                warn!("Recorder open failed ({first_err}); re-resolving device and retrying once");
+                let fresh_device = self.get_effective_microphone_device(&settings);
+                rec.open(fresh_device)
+                    .map_err(|e| anyhow::anyhow!("Failed to open recorder: {}", e))?;
+            }
         }
 
         *open_flag = true;
@@ -403,15 +434,18 @@ impl AudioRecordingManager {
         let mut state = self.state.lock().unwrap();
 
         if let RecordingState::Idle = *state {
-            // Ensure microphone is open in on-demand mode
+            // Ensure the microphone is open (on-demand mode) and still healthy
+            // (both modes: an always-on stream can die when the device is
+            // unplugged, and start_microphone_stream rebuilds it). A healthy
+            // open stream returns immediately.
             if matches!(*self.mode.lock().unwrap(), MicrophoneMode::OnDemand) {
                 // Cancel any pending lazy close
                 self.close_generation.fetch_add(1, Ordering::SeqCst);
-                if let Err(e) = self.start_microphone_stream() {
-                    let msg = format!("{e}");
-                    error!("Failed to open microphone stream: {msg}");
-                    return Err(msg);
-                }
+            }
+            if let Err(e) = self.start_microphone_stream() {
+                let msg = format!("{e}");
+                error!("Failed to open microphone stream: {msg}");
+                return Err(msg);
             }
 
             if let Some(rec) = self.recorder.lock().unwrap().as_ref() {

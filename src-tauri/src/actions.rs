@@ -1023,7 +1023,7 @@ Check whether the selected cleanup prompt asks the model to expand, add headings
             cleaned.chars().count(),
             budget,
             transcription.chars().count(),
-            preview
+            crate::utils::redact_text(&preview)
         );
         return Err(PostProcessFailureKind::MalformedResponse);
     }
@@ -2306,6 +2306,13 @@ impl ShortcutAction for TranscribeAction {
             // Revert UI state so we don't stay stuck in the recording overlay.
             utils::hide_recording_overlay(app);
             change_tray_icon(app, TrayIconState::Idle);
+            // The live-transcription worker was started above, before the mic
+            // was tried, and nothing else will release it: this recording never
+            // reaches the pipeline whose `FinishGuard` normally does. Left open
+            // it holds the model leased (so `transcribe()` reports no model and
+            // the next load loads a second copy) and swallows the next
+            // recording's audio.
+            tm.cancel_stream();
             if let Some(err) = recording_error {
                 let error_type = if is_microphone_access_denied(&err) {
                     "microphone_permission_denied"
@@ -2431,7 +2438,7 @@ impl ShortcutAction for TranscribeAction {
                             debug!(
                                 "Transcription completed in {:?}: '{}'",
                                 transcription_time.elapsed(),
-                                transcription
+                                crate::utils::redact_text(&transcription)
                             );
 
                             if crate::flow::is_generation_cancelled(flow_cancel_generation) {

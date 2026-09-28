@@ -127,12 +127,159 @@ pub(crate) struct CloudStreamSession {
     sink: LiveTextSink,
     /// Samples not yet sent, held until a full [`CHUNK_MS`] chunk is available.
     pending: Vec<f32>,
-    /// Stable text the provider has committed, in order.
-    committed: String,
-    /// The current revisable tail.
-    tentative: String,
+    /// The running committed + tentative transcript.
+    transcript: LiveTranscript,
     /// Set once the socket has failed, so later calls stop trying.
     failed: bool,
+}
+
+/// The running transcript of one session: an append-only committed prefix plus
+/// the revisable tail after it.
+///
+/// Separate from the socket so its rules can be tested without one, and the rule
+/// that most needs it is the replayed partial. ElevenLabs can deliver a
+/// `partial_transcript` for a segment *after* the `committed_transcript` that
+/// closed it. Taken at face value that draft becomes the new tail, so the overlay
+/// shows the sentence twice — and at the end of a recording `text()` appends the
+/// tail as the last thing the user said, which pasted two consecutive dictations
+/// as the whole transcript twice over, the second copy ending in an earlier guess
+/// ("…satisfying our" after "…satisfying or good.").
+#[derive(Default)]
+struct LiveTranscript {
+    committed: String,
+    tentative: String,
+    /// Words of the segment committed last, kept until the first partial that is
+    /// clearly the start of a new segment rather than a replay of this one.
+    last_segment: Option<Vec<String>>,
+}
+
+impl LiveTranscript {
+    /// Take a new tail. Returns whether the visible transcript changed.
+    fn apply_partial(&mut self, text: String) -> bool {
+        let words = transcript_words(&text);
+        if let Some(segment) = &self.last_segment {
+            if is_replay_of(segment, &words) {
+                debug!(
+                    "Realtime cloud STT: dropped a partial that repeats the segment just committed"
+                );
+                return false;
+            }
+            // An empty partial says nothing about which segment it belongs to,
+            // so only real words end the watch for a replay.
+            if !words.is_empty() {
+                self.last_segment = None;
+            }
+        }
+        if self.tentative == text {
+            return false;
+        }
+        self.tentative = text;
+        true
+    }
+
+    /// Close a segment. Returns whether the visible transcript changed.
+    ///
+    /// Commits are never de-duplicated, only partials: someone who says the same
+    /// sentence twice means it twice, and dropping a commit loses their words
+    /// where dropping a replayed partial only delays a preview.
+    fn apply_commit(&mut self, text: &str) -> bool {
+        let text = text.trim();
+        let had_tail = !self.tentative.is_empty();
+        self.tentative.clear();
+        if text.is_empty() {
+            return had_tail;
+        }
+        if !self.committed.is_empty() && !self.committed.ends_with(' ') {
+            self.committed.push(' ');
+        }
+        self.committed.push_str(text);
+        self.last_segment = Some(transcript_words(text));
+        true
+    }
+
+    /// The tail as the overlay draws it: immediately after `committed`, with no
+    /// separator of its own. A new segment's partial does not start with a
+    /// space, so without one the overlay ran two sentences together
+    /// ("…right now.and then") while `text()` joined them correctly.
+    fn display_tentative(&self) -> std::borrow::Cow<'_, str> {
+        let needs_space = !self.committed.is_empty()
+            && !self.committed.ends_with(char::is_whitespace)
+            && !self.tentative.is_empty()
+            && !self.tentative.starts_with(char::is_whitespace);
+        if needs_space {
+            std::borrow::Cow::Owned(format!(" {}", self.tentative))
+        } else {
+            std::borrow::Cow::Borrowed(&self.tentative)
+        }
+    }
+
+    /// The whole transcript, or `None` when nothing was recognised.
+    fn text(&self) -> Option<String> {
+        let mut text = self.committed.clone();
+        // The tail is unstable, but at the end of a recording it is the last
+        // thing the user said; dropping it would silently truncate them.
+        if !self.tentative.trim().is_empty() {
+            if !text.is_empty() && !text.ends_with(' ') {
+                text.push(' ');
+            }
+            text.push_str(self.tentative.trim());
+        }
+        let text = text.trim().to_string();
+        if text.is_empty() {
+            None
+        } else {
+            Some(text)
+        }
+    }
+}
+
+/// Lowercased words with punctuation removed, so a draft ("satisfying our") and
+/// its commit ("satisfying, or good.") compare on what was said.
+fn transcript_words(text: &str) -> Vec<String> {
+    text.split_whitespace()
+        .map(|word| {
+            word.chars()
+                .filter(|c| c.is_alphanumeric())
+                .flat_map(char::to_lowercase)
+                .collect::<String>()
+        })
+        .filter(|word| !word.is_empty())
+        .collect()
+}
+
+/// Whether `partial` is a draft of `segment` arriving late, rather than the
+/// opening of the next segment.
+///
+/// A replay is a draft of the same sentence, so nearly all of its words appear
+/// in the committed segment in the same order; the order-aware overlap (longest
+/// common subsequence) tolerates the words a draft got wrong. A short partial is
+/// only a replay when it *is* the segment, because a new segment can reasonably
+/// open with the same word or two as the last one ("and then… and then").
+fn is_replay_of(segment: &[String], partial: &[String]) -> bool {
+    if partial.is_empty() || segment.is_empty() {
+        return false;
+    }
+    if partial.len() < 3 {
+        return partial == segment;
+    }
+    common_subsequence_len(segment, partial) * 5 >= partial.len() * 4
+}
+
+/// Length of the longest common subsequence of two word lists.
+fn common_subsequence_len(a: &[String], b: &[String]) -> usize {
+    let mut previous = vec![0usize; b.len() + 1];
+    let mut current = vec![0usize; b.len() + 1];
+    for x in a {
+        for (j, y) in b.iter().enumerate() {
+            current[j + 1] = if x == y {
+                previous[j] + 1
+            } else {
+                previous[j + 1].max(current[j])
+            };
+        }
+        std::mem::swap(&mut previous, &mut current);
+    }
+    previous[b.len()]
 }
 
 type WebSocket =
@@ -207,8 +354,7 @@ impl CloudStreamSession {
             protocol,
             sink,
             pending: Vec::with_capacity(CHUNK_SAMPLES * 2),
-            committed: String::new(),
-            tentative: String::new(),
+            transcript: LiveTranscript::default(),
             failed: false,
         };
 
@@ -377,7 +523,7 @@ impl CloudStreamSession {
             warn!("Realtime cloud STT failed during finalize; using the complete batch result");
             return None;
         }
-        self.text_so_far()
+        self.transcript.text()
     }
 
     /// Abandon the session without producing a result (the user cancelled).
@@ -393,24 +539,6 @@ impl CloudStreamSession {
         let _ = self
             .runtime
             .block_on(async { tokio::time::timeout(CLOSE_TIMEOUT, socket.close(None)).await });
-    }
-
-    fn text_so_far(&self) -> Option<String> {
-        let mut text = self.committed.clone();
-        // The tail is unstable, but at the end of a recording it is the last
-        // thing the user said; dropping it would silently truncate them.
-        if !self.tentative.trim().is_empty() {
-            if !text.is_empty() && !text.ends_with(' ') {
-                text.push(' ');
-            }
-            text.push_str(self.tentative.trim());
-        }
-        let text = text.trim().to_string();
-        if text.is_empty() {
-            None
-        } else {
-            Some(text)
-        }
     }
 
     /// Encode and send one audio chunk. `commit` asks the provider to close the
@@ -504,27 +632,10 @@ impl CloudStreamSession {
     /// Fold an event into the running transcript and push it to the overlay.
     /// Returns whether this event committed text.
     fn apply(&mut self, event: ServerEvent) -> bool {
-        let mut did_commit = false;
-        match event {
+        let (changed, did_commit) = match event {
             ServerEvent::SessionStarted => return false,
-            ServerEvent::Partial(text) => {
-                if self.tentative == text {
-                    return false;
-                }
-                self.tentative = text;
-            }
-            ServerEvent::Committed(text) => {
-                let text = text.trim();
-                did_commit = true;
-                self.tentative.clear();
-                if text.is_empty() {
-                    return did_commit;
-                }
-                if !self.committed.is_empty() && !self.committed.ends_with(' ') {
-                    self.committed.push(' ');
-                }
-                self.committed.push_str(text);
-            }
+            ServerEvent::Partial(text) => (self.transcript.apply_partial(text), false),
+            ServerEvent::Committed(text) => (self.transcript.apply_commit(&text), true),
             ServerEvent::Error(message) => {
                 // Errors here are terminal for the socket but not for the
                 // dictation: mark the session dead and let the caller batch.
@@ -532,8 +643,10 @@ impl CloudStreamSession {
                 self.failed = true;
                 return false;
             }
+        };
+        if changed {
+            self.emit();
         }
-        self.emit();
         did_commit
     }
 
@@ -541,7 +654,8 @@ impl CloudStreamSession {
     /// `stream-text` event the local streaming engines use, so the overlay needs
     /// no cloud-specific handling.
     fn emit(&self) {
-        (self.sink)(&self.committed, &self.tentative);
+        let tentative = self.transcript.display_tentative();
+        (self.sink)(&self.transcript.committed, &tentative);
     }
 }
 
@@ -872,5 +986,125 @@ mod tests {
     #[test]
     fn chunking_targets_100ms_at_the_capture_rate() {
         assert_eq!(CHUNK_SAMPLES, 1600);
+    }
+
+    fn folded(events: &[(&str, &str)]) -> LiveTranscript {
+        let mut transcript = LiveTranscript::default();
+        for (kind, text) in events {
+            match *kind {
+                "partial" => {
+                    transcript.apply_partial(text.to_string());
+                }
+                "commit" => {
+                    transcript.apply_commit(text);
+                }
+                other => panic!("unknown event {other}"),
+            }
+        }
+        transcript
+    }
+
+    #[test]
+    fn a_partial_replayed_after_its_commit_is_not_pasted_twice() {
+        // Both sequences are from real dictations, where the pasted text came
+        // back as the whole transcript twice.
+        let exact = folded(&[
+            ("partial", "Yeah, so this is the new window"),
+            (
+                "commit",
+                "Yeah, so this is the new window, and I still don't like the colors.",
+            ),
+            (
+                "partial",
+                "Yeah, so this is the new window, and I still don't like the colors",
+            ),
+        ]);
+        assert_eq!(
+            exact.text().as_deref(),
+            Some("Yeah, so this is the new window, and I still don't like the colors.")
+        );
+        let earlier_draft = folded(&[
+            (
+                "commit",
+                "The colors are not something that's satisfying or good.",
+            ),
+            (
+                "partial",
+                "The colors are not something that's satisfying our",
+            ),
+        ]);
+        assert_eq!(
+            earlier_draft.text().as_deref(),
+            Some("The colors are not something that's satisfying or good.")
+        );
+        assert!(earlier_draft.tentative.is_empty());
+    }
+
+    #[test]
+    fn the_next_segment_is_still_shown_and_kept() {
+        let transcript = folded(&[
+            ("commit", "Thank you."),
+            ("partial", ""),
+            ("partial", "and then I left"),
+        ]);
+        assert_eq!(transcript.tentative, "and then I left");
+        // Drawn straight after the committed text, so it carries the space.
+        assert_eq!(transcript.display_tentative(), " and then I left");
+        assert_eq!(
+            transcript.text().as_deref(),
+            Some("Thank you. and then I left")
+        );
+        // A new segment may open with the last one's first word.
+        let echo = folded(&[("commit", "Okay."), ("partial", "okay so")]);
+        assert_eq!(echo.tentative, "okay so");
+    }
+
+    #[test]
+    fn once_a_new_segment_starts_a_repeated_sentence_is_kept() {
+        // Only the window straight after a commit is watched; saying the same
+        // thing twice on purpose must survive.
+        let transcript = folded(&[
+            ("commit", "Testing one two three."),
+            ("partial", "hello"),
+            ("partial", "testing one two three"),
+            ("commit", "Testing one two three."),
+        ]);
+        assert_eq!(
+            transcript.text().as_deref(),
+            Some("Testing one two three. Testing one two three.")
+        );
+    }
+
+    #[test]
+    fn the_tail_is_spaced_once_from_the_committed_text() {
+        let mut transcript = LiveTranscript::default();
+        transcript.apply_partial("hello".to_string());
+        // Nothing committed yet, so nothing to separate it from.
+        assert_eq!(transcript.display_tentative(), "hello");
+        transcript.apply_commit("Hello.");
+        transcript.apply_partial(" again".to_string());
+        assert_eq!(transcript.display_tentative(), " again");
+    }
+
+    #[test]
+    fn replay_detection_needs_most_of_the_words_in_order() {
+        let segment = transcript_words("So this is going to be how it looks.");
+        assert!(is_replay_of(
+            &segment,
+            &transcript_words("so this is going to be")
+        ));
+        assert!(!is_replay_of(
+            &segment,
+            &transcript_words("and something else entirely")
+        ));
+        assert!(is_replay_of(
+            &transcript_words("Thank you."),
+            &transcript_words("thank you")
+        ));
+        assert!(!is_replay_of(
+            &transcript_words("Thank you."),
+            &transcript_words("thank")
+        ));
+        assert!(!is_replay_of(&segment, &[]));
     }
 }

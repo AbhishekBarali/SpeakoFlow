@@ -53,8 +53,18 @@ pub struct AudioRecorder {
     /// device's supported configs is a slow syscall on some platforms and, in
     /// on-demand microphone mode, `open()` runs on every recording start.
     /// Reusing the resolved config for the same device removes that cost from
-    /// the hot path. Backport of Handy PR #1582 (faster mic initialization).
+    /// the hot path. Only stored once the device has *accepted* the config,
+    /// and cleared whenever an open fails, so a stale rate/format (Bluetooth
+    /// profile switch, sample rate changed in the OS) self-heals on the
+    /// caller's retry instead of failing every open until restart.
+    /// Backport of Handy PR #1582 (faster mic initialization).
     config_cache: Option<(String, cpal::SupportedStreamConfig)>,
+    /// Set by cpal's error callback when the active input stream can no longer
+    /// capture (device unplugged, USB/Bluetooth dropout). The consumer thread
+    /// never exits on its own here — commands share the sample queue — so this
+    /// flag is the only signal that the stream must be rebuilt.
+    /// Backport of Handy PRs #1874 / #1838.
+    stream_error: Arc<AtomicBool>,
 }
 
 impl AudioRecorder {
@@ -68,6 +78,7 @@ impl AudioRecorder {
             frame_cb: None,
             capture_ready: Arc::new((Mutex::new(false), Condvar::new())),
             config_cache: None,
+            stream_error: Arc::new(AtomicBool::new(false)),
         })
     }
 
@@ -97,8 +108,14 @@ impl AudioRecorder {
 
     pub fn open(&mut self, device: Option<Device>) -> Result<(), Box<dyn std::error::Error>> {
         if self.worker_handle.is_some() {
-            return Ok(()); // already open
+            if !self.needs_reopen() {
+                return Ok(()); // already open
+            }
+            log::warn!("Capture stream failed; rebuilding microphone stream");
+            let _ = self.close();
         }
+
+        self.stream_error.store(false, Ordering::Relaxed);
 
         let (sample_tx, sample_rx) = mpsc::channel::<RecorderEvent>();
         let cmd_tx = sample_tx.clone();
@@ -132,17 +149,15 @@ impl AudioRecorder {
                 log::debug!("Reusing cached input config for '{device_name}'");
                 cfg
             }
-            None => {
-                let cfg = AudioRecorder::get_preferred_config(&device).map_err(|e| {
-                    Error::new(
-                        std::io::ErrorKind::Other,
-                        format!("Failed to fetch preferred config: {e}"),
-                    )
-                })?;
-                self.config_cache = Some((device_name, cfg.clone()));
-                cfg
-            }
+            None => AudioRecorder::get_preferred_config(&device).map_err(|e| {
+                Error::new(
+                    std::io::ErrorKind::Other,
+                    format!("Failed to fetch preferred config: {e}"),
+                )
+            })?,
         };
+        // Cached only after the device accepts it (see the init result below).
+        let config_to_cache = (!device_name.is_empty()).then(|| (device_name, config.clone()));
 
         let thread_device = device.clone();
         let vad = self.vad.clone();
@@ -151,6 +166,7 @@ impl AudioRecorder {
         // Move the optional raw-frame callback into the worker thread (streaming)
         let frame_cb = self.frame_cb.clone();
         let capture_ready = self.capture_ready.clone();
+        let stream_error = self.stream_error.clone();
 
         let worker = std::thread::spawn(move || {
             let stop_flag = Arc::new(AtomicBool::new(false));
@@ -177,6 +193,7 @@ impl AudioRecorder {
                         sample_tx,
                         channels,
                         stop_flag_for_stream,
+                        stream_error.clone(),
                     )
                     .map_err(|e| format!("Failed to build input stream: {e}"))?,
                     cpal::SampleFormat::I8 => AudioRecorder::build_stream::<i8>(
@@ -185,6 +202,7 @@ impl AudioRecorder {
                         sample_tx,
                         channels,
                         stop_flag_for_stream,
+                        stream_error.clone(),
                     )
                     .map_err(|e| format!("Failed to build input stream: {e}"))?,
                     cpal::SampleFormat::I16 => AudioRecorder::build_stream::<i16>(
@@ -193,6 +211,7 @@ impl AudioRecorder {
                         sample_tx,
                         channels,
                         stop_flag_for_stream,
+                        stream_error.clone(),
                     )
                     .map_err(|e| format!("Failed to build input stream: {e}"))?,
                     cpal::SampleFormat::I32 => AudioRecorder::build_stream::<i32>(
@@ -201,6 +220,7 @@ impl AudioRecorder {
                         sample_tx,
                         channels,
                         stop_flag_for_stream,
+                        stream_error.clone(),
                     )
                     .map_err(|e| format!("Failed to build input stream: {e}"))?,
                     cpal::SampleFormat::F32 => AudioRecorder::build_stream::<f32>(
@@ -209,6 +229,7 @@ impl AudioRecorder {
                         sample_tx,
                         channels,
                         stop_flag_for_stream,
+                        stream_error.clone(),
                     )
                     .map_err(|e| format!("Failed to build input stream: {e}"))?,
                     sample_format => {
@@ -247,6 +268,9 @@ impl AudioRecorder {
 
         match init_rx.recv() {
             Ok(Ok(())) => {
+                if let Some(entry) = config_to_cache {
+                    self.config_cache = Some(entry);
+                }
                 self.device = Some(device);
                 self.cmd_tx = Some(cmd_tx);
                 self.worker_handle = Some(worker);
@@ -254,6 +278,10 @@ impl AudioRecorder {
             }
             Ok(Err(error_message)) => {
                 let _ = worker.join();
+                // A failed open may mean the cached config went stale (device
+                // re-plugged, rate/format changed in the OS). Drop it so the
+                // caller's retry re-queries the device.
+                self.config_cache = None;
                 let kind = if is_microphone_access_denied(&error_message) {
                     std::io::ErrorKind::PermissionDenied
                 } else {
@@ -263,6 +291,7 @@ impl AudioRecorder {
             }
             Err(recv_error) => {
                 let _ = worker.join();
+                self.config_cache = None;
                 Err(Box::new(Error::new(
                     std::io::ErrorKind::Other,
                     format!("Failed to initialize microphone worker: {recv_error}"),
@@ -301,6 +330,19 @@ impl AudioRecorder {
         Ok(resp_rx.recv()?) // wait for the samples
     }
 
+    /// True when the active capture stream must be rebuilt before the next
+    /// recording: cpal reported a stream error (device unplugged, USB or
+    /// Bluetooth dropout), or the worker thread has exited. Without this an
+    /// always-on or lazily-closed stream kept handing back silent, empty
+    /// recordings until the app was restarted.
+    pub fn needs_reopen(&self) -> bool {
+        self.stream_error.load(Ordering::Relaxed)
+            || self
+                .worker_handle
+                .as_ref()
+                .is_some_and(|handle| handle.is_finished())
+    }
+
     pub fn close(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         if let Some(tx) = self.cmd_tx.take() {
             let _ = tx.send(RecorderEvent::Command(Cmd::Shutdown));
@@ -318,6 +360,7 @@ impl AudioRecorder {
         sample_tx: mpsc::Sender<RecorderEvent>,
         channels: usize,
         stop_flag: Arc<AtomicBool>,
+        stream_error: Arc<AtomicBool>,
     ) -> Result<cpal::Stream, cpal::BuildStreamError>
     where
         T: Sample + SizedSample + Send + 'static,
@@ -327,45 +370,23 @@ impl AudioRecorder {
         let mut eos_sent = false;
 
         let stream_cb = move |data: &[T], _: &cpal::InputCallbackInfo| {
-            if stop_flag.load(Ordering::Relaxed) {
-                if !eos_sent {
-                    let _ = sample_tx.send(RecorderEvent::EndOfStream);
-                    eos_sent = true;
-                }
-                return;
-            }
-            eos_sent = false;
-
-            output_buffer.clear();
-
-            if channels == 1 {
-                output_buffer.extend(data.iter().map(|&sample| sample.to_sample::<f32>()));
-            } else {
-                let frame_count = data.len() / channels;
-                output_buffer.reserve(frame_count);
-
-                for frame in data.chunks_exact(channels) {
-                    let mono_sample = frame
-                        .iter()
-                        .map(|&sample| sample.to_sample::<f32>())
-                        .sum::<f32>()
-                        / channels as f32;
-                    output_buffer.push(mono_sample);
-                }
-            }
-
-            if sample_tx
-                .send(RecorderEvent::Samples(output_buffer.clone()))
-                .is_err()
-            {
-                log::error!("Failed to send samples");
-            }
+            handle_input_block(
+                data,
+                channels,
+                &stop_flag,
+                &mut eos_sent,
+                &mut output_buffer,
+                &sample_tx,
+            );
         };
 
         device.build_input_stream(
             &config.clone().into(),
             stream_cb,
-            |err| log::error!("Stream error: {}", err),
+            move |err| {
+                log::error!("Stream error: {}", err);
+                stream_error.store(true, Ordering::Relaxed);
+            },
             None,
         )
     }
@@ -426,6 +447,68 @@ impl AudioRecorder {
     }
 }
 
+/// Body of the cpal input callback, extracted so it can be tested without a
+/// device. Converts the block to mono and forwards it.
+///
+/// The block that first observes the stop flag was captured *before* the stop,
+/// so it is still forwarded, followed by the end-of-stream sentinel. Dropping
+/// it (as this callback used to) lost up to one callback period of tail audio
+/// on every recording — 10-100 ms, worst on Bluetooth — which is the clipped
+/// last syllable on a push-to-talk release. Later blocks are dropped until the
+/// flag clears. Backport of Handy PR #1958.
+fn handle_input_block<T>(
+    data: &[T],
+    channels: usize,
+    stop_flag: &AtomicBool,
+    eos_sent: &mut bool,
+    output_buffer: &mut Vec<f32>,
+    sample_tx: &mpsc::Sender<RecorderEvent>,
+) where
+    T: Sample,
+    f32: cpal::FromSample<T>,
+{
+    let stopping = stop_flag.load(Ordering::Relaxed);
+    if stopping && *eos_sent {
+        return;
+    }
+
+    output_buffer.clear();
+
+    if channels == 1 {
+        output_buffer.extend(data.iter().map(|&sample| sample.to_sample::<f32>()));
+    } else {
+        let frame_count = data.len() / channels;
+        output_buffer.reserve(frame_count);
+
+        for frame in data.chunks_exact(channels) {
+            let mono_sample = frame
+                .iter()
+                .map(|&sample| sample.to_sample::<f32>())
+                .sum::<f32>()
+                / channels as f32;
+            output_buffer.push(mono_sample);
+        }
+    }
+
+    // A failed send means the consumer thread is gone. During shutdown that is
+    // expected (the consumer exits before the stream is dropped), so only
+    // report it when capture was supposed to be live.
+    if sample_tx
+        .send(RecorderEvent::Samples(output_buffer.clone()))
+        .is_err()
+        && !stopping
+    {
+        log::error!("Failed to send samples");
+    }
+
+    if stopping {
+        let _ = sample_tx.send(RecorderEvent::EndOfStream);
+        *eos_sent = true;
+    } else {
+        *eos_sent = false;
+    }
+}
+
 pub fn is_microphone_access_denied(error_message: &str) -> bool {
     let normalized = error_message.to_lowercase();
     normalized.contains("access is denied")
@@ -479,6 +562,54 @@ mod tests {
     #[test]
     fn stopping_an_unopened_microphone_returns_an_error() {
         assert!(AudioRecorder::new().unwrap().stop().is_err());
+    }
+
+    #[test]
+    fn unopened_recorder_does_not_need_reopen() {
+        // No worker has been spawned yet, so there is nothing to rebuild.
+        // Guards against every first open() taking the rebuild path.
+        let recorder = AudioRecorder::new().expect("recorder");
+        assert!(!recorder.needs_reopen());
+    }
+
+    #[test]
+    fn stream_error_requires_reopen() {
+        let recorder = AudioRecorder::new().expect("recorder");
+        recorder.stream_error.store(true, Ordering::Relaxed);
+        assert!(recorder.needs_reopen());
+    }
+
+    #[test]
+    fn boundary_block_forwarded_before_eos() {
+        let (tx, rx) = mpsc::channel();
+        let stop_flag = AtomicBool::new(false);
+        let mut eos_sent = false;
+        let mut scratch = Vec::new();
+        let mut push = |flag: &AtomicBool, eos: &mut bool, block: &[f32]| {
+            handle_input_block::<f32>(block, 1, flag, eos, &mut scratch, &tx)
+        };
+
+        // Running: blocks forwarded, no sentinel.
+        push(&stop_flag, &mut eos_sent, &[0.1]);
+        assert!(matches!(rx.try_recv(), Ok(RecorderEvent::Samples(_))));
+        assert!(rx.try_recv().is_err());
+
+        // The block observing the stop flag is still forwarded, then EOS.
+        stop_flag.store(true, Ordering::Relaxed);
+        push(&stop_flag, &mut eos_sent, &[0.5, 0.5]);
+        match rx.try_recv() {
+            Ok(RecorderEvent::Samples(samples)) => assert_eq!(samples, vec![0.5, 0.5]),
+            _ => panic!("boundary block must be forwarded, not dropped"),
+        }
+        assert!(matches!(rx.try_recv(), Ok(RecorderEvent::EndOfStream)));
+
+        // Later blocks are dropped until the flag clears, then capture resumes.
+        push(&stop_flag, &mut eos_sent, &[0.9]);
+        assert!(rx.try_recv().is_err(), "blocks after EOS must be dropped");
+        stop_flag.store(false, Ordering::Relaxed);
+        push(&stop_flag, &mut eos_sent, &[0.2]);
+        assert!(matches!(rx.try_recv(), Ok(RecorderEvent::Samples(_))));
+        assert!(rx.try_recv().is_err(), "no sentinel while running");
     }
 
     #[test]
