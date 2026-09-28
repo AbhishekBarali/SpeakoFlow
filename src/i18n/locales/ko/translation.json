@@ -1430,7 +1430,7 @@
           "large": "크게"
         },
         "panelSizeLabel": "패널 크기",
-        "panelSizeDescription": "플로팅 어시스턴트 패널의 전체 크기입니다. 가장자리를 끌어서 크기를 조절할 수도 있습니다.",
+        "panelSizeDescription": "플로팅 어시스턴트 패널의 전체 크기입니다.",
         "panelSizes": {
           "mini": "작게",
           "compact": "컴팩트",
@@ -1541,14 +1541,11 @@
     },
     "empty": "어시스턴트 단축키로 음성으로 물어보거나,\n아래에 입력하세요.",
     "inputPlaceholder": "메시지…",
-    "inputPlaceholderScreen": "화면에 대해 물어보세요…",
     "queuedUntilReady": "대기 중 — 이 답변이 끝나면 바로 보냅니다.",
     "send": "보내기",
     "stop": "정지",
     "cancel": "취소",
-    "finish": "끝내고 보내기",
     "clear": "대화 지우기",
-    "hide": "패널 숨기기",
     "copy": "복사",
     "copyCode": "코드 복사",
     "regenerate": "답변 다시 생성 (기존 답변은 히스토리에 남습니다)",
@@ -1559,7 +1556,6 @@
     "attach": {
       "file": "이미지 또는 파일 첨부",
       "snip": "화면 영역 잘라내기",
-      "image": "이미지",
       "imageCount": "이미지 {{count}}개",
       "imageCount_other": "이미지 {{count}}개",
       "remove": "첨부 제거",
@@ -1575,21 +1571,7 @@
     "tts": {
       "enable": "음성 요약 켜기",
       "disable": "음성 요약 끄기",
-      "loading": "Kokoro 음성 모델 로딩 중...",
-      "loadingShort": "음성 모델 {{progress}}%"
-    },
-    "pill": {
-      "talk": "클릭해서 말하기",
-      "stop": "정지하고 보내기",
-      "idle": "어시스턴트",
-      "expand": "패널 펼치기",
-      "collapse": "알약 모양으로 접기",
-      "close": "어시스턴트 닫기",
-      "cancel": "보내지 않고 취소",
-      "cancelTurn": "취소",
-      "dismiss": "닫기",
-      "disarmScreen": "화면 인식이 켜져 있습니다 — 클릭하면 끕니다",
-      "armScreen": "화면 인식이 꺼져 있습니다 — 클릭하면 켭니다"
+      "loading": "Kokoro 음성 모델 로딩 중..."
     },
     "status": {
       "listening": "듣고 있습니다…",
@@ -1652,6 +1634,10 @@
       "preparing": "로컬 엔진 설정 중 (첫 실행)…",
       "extracting": "로컬 엔진 설치 중…",
       "short": "엔진 설정 중…"
+    },
+    "quick": {
+      "selection": "선택 영역",
+      "copied": "복사됨"
     }
   },
   "voiceEngines": {

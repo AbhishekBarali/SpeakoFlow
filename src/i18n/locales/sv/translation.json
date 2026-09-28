@@ -1430,7 +1430,7 @@
           "large": "Stor"
         },
         "panelSizeLabel": "Panelstorlek",
-        "panelSizeDescription": "Den flytande assistentpanelens övergripande storlek. Du kan också dra i kanterna för att ändra storlek.",
+        "panelSizeDescription": "Den flytande assistentpanelens övergripande storlek.",
         "panelSizes": {
           "mini": "Liten",
           "compact": "Kompakt",
@@ -1541,14 +1541,11 @@
     },
     "empty": "Fråga med röst via ditt assistentkortkommando,\neller skriv nedan.",
     "inputPlaceholder": "Meddelande…",
-    "inputPlaceholderScreen": "Fråga om din skärm…",
     "queuedUntilReady": "I kö — skickas så snart det här svaret är klart.",
     "send": "Skicka",
     "stop": "Stoppa",
     "cancel": "Avbryt",
-    "finish": "Avsluta och skicka",
     "clear": "Rensa konversationen",
-    "hide": "Dölj panelen",
     "copy": "Kopiera",
     "copyCode": "Kopiera koden",
     "regenerate": "Skapa svaret på nytt (det gamla finns kvar i Historik)",
@@ -1559,7 +1556,6 @@
     "attach": {
       "file": "Bifoga en bild eller fil",
       "snip": "Klipp ut ett område av skärmen",
-      "image": "Bild",
       "imageCount": "{{count}} bild",
       "imageCount_other": "{{count}} bilder",
       "remove": "Ta bort bilagan",
@@ -1575,21 +1571,7 @@
     "tts": {
       "enable": "Aktivera talade sammanfattningar",
       "disable": "Inaktivera talade sammanfattningar",
-      "loading": "Laddar Kokoro-röstmodellen...",
-      "loadingShort": "Röstmodell {{progress}}%"
-    },
-    "pill": {
-      "talk": "Klicka för att tala",
-      "stop": "Stoppa och skicka",
-      "idle": "Assistent",
-      "expand": "Fäll ut panelen",
-      "collapse": "Fäll in till kompakt läge",
-      "close": "Stäng assistenten",
-      "cancel": "Avbryt utan att skicka",
-      "cancelTurn": "Avbryt",
-      "dismiss": "Avvisa",
-      "disarmScreen": "Skärmvisning är på — klicka för att stänga av",
-      "armScreen": "Skärmvisning är av — klicka för att slå på"
+      "loading": "Laddar Kokoro-röstmodellen..."
     },
     "status": {
       "listening": "Lyssnar…",
@@ -1652,6 +1634,10 @@
       "preparing": "Ställer in den lokala motorn (första körningen)…",
       "extracting": "Installerar den lokala motorn…",
       "short": "Ställer in motorn…"
+    },
+    "quick": {
+      "selection": "Markering",
+      "copied": "Kopierat"
     }
   },
   "voiceEngines": {

@@ -9,6 +9,7 @@ mod catalog;
 pub mod cli;
 mod clipboard;
 mod commands;
+mod feedback;
 mod flow;
 mod helpers;
 mod huggingface;
@@ -17,6 +18,7 @@ mod llm_client;
 mod managers;
 mod meetings;
 mod memory;
+mod native_tts;
 mod overlay;
 mod overlay_follow;
 mod overlay_lifecycle;
@@ -39,11 +41,13 @@ mod transcription_coordinator;
 mod tray;
 mod tray_i18n;
 mod tts;
+mod updates;
 mod utils;
 mod voice_conversation;
 mod web_search;
 #[cfg(any(windows, test))]
 mod webview_prefs;
+mod window_drag;
 
 pub use cli::CliArgs;
 
@@ -75,10 +79,6 @@ use managers::audio::AudioRecordingManager;
 use managers::history::HistoryManager;
 use managers::model::ModelManager;
 use managers::transcription::TranscriptionManager;
-#[cfg(unix)]
-use signal_hook::consts::{SIGUSR1, SIGUSR2};
-#[cfg(unix)]
-use signal_hook::iterator::Signals;
 use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::Arc;
 use tauri::image::Image;
@@ -231,6 +231,13 @@ fn initialize_core_logic(app_handle: &AppHandle) {
     );
     let model_manager =
         Arc::new(ModelManager::new(app_handle).expect("Failed to initialize model manager"));
+    // The native voice engine finds its packs through the model manager's
+    // folder, and tidies an engine download no voice pack uses any more.
+    native_tts::init(model_manager.models_dir().to_path_buf());
+    {
+        let app = app_handle.clone();
+        native_tts::set_status_listener(move || commands::assistant::emit_local_voice_status(&app));
+    }
     let transcription_manager = Arc::new(
         TranscriptionManager::new(app_handle, model_manager.clone(), stream_router.clone())
             .expect("Failed to initialize transcription manager"),
@@ -429,11 +436,11 @@ fn initialize_core_logic(app_handle: &AppHandle) {
     // after permissions are confirmed (on macOS) or after onboarding completes.
     // This matches the pattern used for Enigo initialization.
 
+    // Set up signal handlers for toggling transcription. On Linux, SIGUSR1 is
+    // deliberately not handled — it belongs to WebKitGTK's garbage collector —
+    // see signal_handle.rs.
     #[cfg(unix)]
-    let signals = Signals::new(&[SIGUSR1, SIGUSR2]).unwrap();
-    // Set up signal handlers for toggling transcription
-    #[cfg(unix)]
-    signal_handle::setup_signal_handler(app_handle.clone(), signals);
+    signal_handle::setup_signal_handler(app_handle.clone());
 
     // Apply macOS Accessory policy if starting hidden and tray is available.
     // If the tray icon is disabled, keep the dock icon so the user can reopen.
@@ -475,11 +482,13 @@ fn initialize_core_logic(app_handle: &AppHandle) {
                 assistant::open_assistant_panel(app);
             }
             "check_updates" => {
-                let settings = settings::get_settings(app);
-                if settings.update_checks_enabled {
-                    show_main_window(app);
-                    let _ = app.emit("check-for-updates", ());
-                }
+                // Always honoured: the setting governs background checks only.
+                show_main_window(app);
+                let _ = app.emit("check-for-updates", ());
+            }
+            "send_feedback" => {
+                show_main_window(app);
+                let _ = app.emit("open-feedback", ());
             }
             "copy_last_transcript" => {
                 tray::copy_last_transcript(app);
@@ -538,10 +547,11 @@ fn initialize_core_logic(app_handle: &AppHandle) {
         tray::set_tray_visibility(app_handle, false);
     }
 
-    // Refresh tray menu when model state changes
+    // Refresh tray menu when model state changes. For the state the tray is in,
+    // not Idle: a model finishing its load mid-recording must not take Cancel away.
     let app_handle_for_listener = app_handle.clone();
     app_handle.listen("model-state-changed", move |_| {
-        tray::update_tray_menu(&app_handle_for_listener, &tray::TrayIconState::Idle, None);
+        tray::refresh_tray_menu(&app_handle_for_listener, None);
     });
 
     // Pointer transitions wake the completed-card dismissal task; no polling.
@@ -549,25 +559,17 @@ fn initialize_core_logic(app_handle: &AppHandle) {
         overlay::set_overlay_hovered(event.payload().trim() == "true");
     });
 
-    // The quick-ask card is sized to the answer it is showing, and only the
-    // webview can measure that. An event rather than a command on purpose: the
-    // panel reports a height, it does not ask for a window operation, and the
-    // clamp against the display belongs on this side either way (see
-    // `assistant::fit_ask_card`).
-    let app_handle_for_ask_fit = app_handle.clone();
-    app_handle.listen("assistant-ask-fit", move |event| {
+    // The quick ask's frame is fixed while it is on screen, so the one thing the
+    // webview has to ask for is the keyboard: the panel does not take it when it
+    // appears (see `assistant::set_panel_keyboard`), and the text field needs it.
+    let app_handle_for_ask_keyboard = app_handle.clone();
+    app_handle.listen("assistant-ask-keyboard", move |event| {
         let payload = event.payload();
-        let height = serde_json::from_str::<serde_json::Value>(payload)
+        let want = serde_json::from_str::<serde_json::Value>(payload)
             .ok()
-            .and_then(|value| value.get("height").and_then(|h| h.as_f64()))
-            // A bare number is accepted too, so a caller that forgets the
-            // envelope still resizes instead of silently doing nothing.
-            .or_else(|| payload.trim().parse::<f64>().ok());
-        if let Some(height) = height {
-            assistant::fit_ask_card(&app_handle_for_ask_fit, height);
-        } else {
-            log::debug!("Ignoring assistant-ask-fit with no usable height: {payload}");
-        }
+            .and_then(|value| value.get("want").and_then(|w| w.as_bool()))
+            .unwrap_or_else(|| payload.trim() == "true");
+        assistant::set_panel_keyboard(&app_handle_for_ask_keyboard, want);
     });
 
     // Which part of the panel window is actually drawn, so the rest of it can pass
@@ -636,10 +638,8 @@ fn initialize_core_logic(app_handle: &AppHandle) {
 #[tauri::command]
 #[specta::specta]
 fn trigger_update_check(app: AppHandle) -> Result<(), String> {
-    let settings = settings::get_settings(&app);
-    if !settings.update_checks_enabled {
-        return Ok(());
-    }
+    // A requested check always runs; `update_checks_enabled` only stops the
+    // app from checking on its own.
     app.emit("check-for-updates", ())
         .map_err(|e| e.to_string())?;
     Ok(())
@@ -737,6 +737,36 @@ pub fn print_device_probe_json() {
         Ok(json) => println!("{json}"),
         Err(error) => eprintln!("device probe serialization failed: {error}"),
     }
+}
+
+/// Turn off WebView2's built-in browser accelerator keys for one webview.
+///
+/// WebView2 handles browser shortcuts itself, before page JS can see or
+/// `preventDefault()` them: F5 / Ctrl+R reload the app window, Ctrl+F opens a
+/// find bar, Ctrl+P a print dialog, F7 toggles caret browsing, and F6 focus
+/// cycling was reported to turn the whole window white when assigned as a
+/// dictation shortcut (Handy #1940). None of them belong in an app window.
+/// Text-editing keys (Ctrl+C/V/X/A, arrows, Home/End) are not affected.
+/// Backport of Handy #2060, applied to every window rather than only the main
+/// one, since the assistant panel and reminder popup are just as exposed.
+#[cfg(target_os = "windows")]
+fn disable_webview2_browser_accelerators<R: tauri::Runtime>(webview: &tauri::Webview<R>) {
+    let label = webview.label().to_string();
+    let _ = webview.with_webview(move |platform| unsafe {
+        use webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2Settings3;
+        use windows::core::Interface;
+
+        let result = platform
+            .controller()
+            .CoreWebView2()
+            .and_then(|core| core.Settings())
+            .and_then(|settings| settings.cast::<ICoreWebView2Settings3>())
+            .and_then(|settings| settings.SetAreBrowserAcceleratorKeysEnabled(false));
+
+        if let Err(error) = result {
+            log::warn!("Failed to disable WebView2 browser accelerators for '{label}': {error}");
+        }
+    });
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -854,6 +884,12 @@ pub fn run(cli_args: CliArgs) {
             shortcut::handy_keys::stop_handy_keys_recording,
             trigger_update_check,
             show_main_window_command,
+            updates::get_update_support,
+            updates::download_update_installer,
+            updates::open_update_installer,
+            updates::reveal_update_installer,
+            feedback::get_feedback_system_info,
+            feedback::send_feedback,
             commands::cancel_operation,
             commands::copy_overlay_transcript,
             commands::commit_recording,
@@ -981,6 +1017,9 @@ pub fn run(cli_args: CliArgs) {
             commands::assistant::set_assistant_tts_model,
             commands::assistant::set_assistant_tts_remote_voice,
             commands::assistant::set_assistant_tts_kokoro_dtype,
+            commands::assistant::set_assistant_tts_kokoro_device,
+            commands::assistant::get_local_voice_status,
+            commands::assistant::assistant_report_webgpu,
             commands::assistant::set_assistant_tts_speed,
             commands::assistant::set_assistant_tts_volume,
             commands::assistant::set_assistant_conversation_pace,
@@ -990,8 +1029,6 @@ pub fn run(cli_args: CliArgs) {
             commands::assistant::set_assistant_tts_stop_on_dictation,
             commands::assistant::assistant_set_pending_attachments,
             commands::assistant::redirect_transcription_to_assistant,
-            commands::assistant::set_assistant_panel_collapsed,
-            commands::assistant::get_assistant_panel_collapsed,
             commands::assistant::assistant_finish_local_tts,
             commands::assistant::assistant_stop_local_tts,
             commands::assistant::set_assistant_screen_armed,
@@ -1018,6 +1055,7 @@ pub fn run(cli_args: CliArgs) {
             voice_conversation::assistant_conversation_text,
             voice_conversation::assistant_conversation_new,
             voice_conversation::assistant_conversation_load,
+            voice_conversation::assistant_conversation_branch,
             voice_conversation::assistant_conversation_set_speaker,
             commands::assistant::set_assistant_max_history_messages,
             commands::assistant::set_assistant_auto_summarize,
@@ -1079,6 +1117,8 @@ pub fn run(cli_args: CliArgs) {
             commands::autolearn::set_learned_words,
             commands::autolearn::keep_learned_word,
             helpers::clamshell::is_laptop,
+            window_drag::start_window_drag,
+            window_drag::start_window_resize,
         ])
         .events(collect_events![managers::history::HistoryUpdatePayload,]);
 
@@ -1158,6 +1198,18 @@ pub fn run(cli_args: CliArgs) {
         builder = builder.plugin(tauri_nspanel::init());
     }
 
+    // Every webview in the app (settings, assistant panel, overlay, reminder
+    // popup, meeting pill, live transcript) gets WebView2's browser accelerator
+    // keys turned off as it loads. See `disable_webview2_browser_accelerators`.
+    #[cfg(target_os = "windows")]
+    {
+        builder = builder.on_page_load(|webview, payload| {
+            if matches!(payload.event(), tauri::webview::PageLoadEvent::Started) {
+                disable_webview2_browser_accelerators(webview);
+            }
+        });
+    }
+
     builder
         .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
             if args.iter().any(|a| a == "--toggle-transcription") {
@@ -1187,6 +1239,19 @@ pub fn run(cli_args: CliArgs) {
         ))
         .manage(cli_args.clone())
         .setup(move |app| {
+            // Record the GPU environment policy main() applied, so a crash
+            // report can tell whether an overlay layer could have been involved.
+            #[cfg(target_os = "windows")]
+            log::info!(
+                "Vulkan layer policy: VK_LOADER_LAYERS_DISABLE={:?}",
+                std::env::var_os("VK_LOADER_LAYERS_DISABLE")
+            );
+            #[cfg(target_os = "macos")]
+            log::info!(
+                "Metal residency sets disabled: {}",
+                std::env::var_os("GGML_METAL_NO_RESIDENCY").is_some()
+            );
+
             specta_builder.mount_events(app);
 
             // Undo a caret browsing mode switched on by a stray F7 before any

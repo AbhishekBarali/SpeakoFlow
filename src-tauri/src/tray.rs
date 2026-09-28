@@ -19,6 +19,24 @@ pub enum TrayIconState {
     Transcribing,
 }
 
+/// The state the tray was last put in (see [`change_tray_icon`]).
+///
+/// The menu is rebuilt for reasons that have nothing to do with the recording —
+/// a model finishing its load, the language changing — and those rebuilds used
+/// to assume Idle. The model load is the one that bit: the first dictation after
+/// the model idled out loads it *during* the recording, so the menu reverted to
+/// Idle mid-recording, with Cancel gone and the model switcher live again.
+static TRAY_STATE: std::sync::Mutex<TrayIconState> = std::sync::Mutex::new(TrayIconState::Idle);
+
+/// Rebuild the tray menu for the state the tray is actually in.
+pub fn refresh_tray_menu(app: &AppHandle, locale: Option<&str>) {
+    let state = TRAY_STATE
+        .lock()
+        .map(|state| state.clone())
+        .unwrap_or(TrayIconState::Idle);
+    update_tray_menu(app, &state, locale);
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum AppTheme {
     Dark,
@@ -182,6 +200,9 @@ fn blank_caption_icon_keep_taskbar(window: &tauri::webview::WebviewWindow) {
 }
 
 pub fn change_tray_icon(app: &AppHandle, icon: TrayIconState) {
+    if let Ok(mut state) = TRAY_STATE.lock() {
+        *state = icon.clone();
+    }
     let tray = app.state::<TrayIcon>();
     let theme = get_current_theme(app);
 
@@ -263,10 +284,21 @@ pub fn update_tray_menu(app: &AppHandle, state: &TrayIconState, locale: Option<&
         app,
         "check_updates",
         &strings.check_updates,
-        settings.update_checks_enabled,
+        // A manual check is always allowed. The setting only controls whether
+        // the app looks on its own; greying this out left anyone who had
+        // turned background checks off with no way to ask at all.
+        true,
         None::<&str>,
     )
     .expect("failed to create check updates item");
+    let send_feedback_i = MenuItem::with_id(
+        app,
+        "send_feedback",
+        &strings.send_feedback,
+        true,
+        None::<&str>,
+    )
+    .expect("failed to create send feedback item");
     let copy_last_transcript_i = MenuItem::with_id(
         app,
         "copy_last_transcript",
@@ -335,6 +367,7 @@ pub fn update_tray_menu(app: &AppHandle, state: &TrayIconState, locale: Option<&
                     &open_assistant_i,
                     &home_i,
                     &check_updates_i,
+                    &send_feedback_i,
                     &separator(),
                     &quit_i,
                 ],
@@ -354,6 +387,7 @@ pub fn update_tray_menu(app: &AppHandle, state: &TrayIconState, locale: Option<&
                 &open_assistant_i,
                 &home_i,
                 &check_updates_i,
+                &send_feedback_i,
                 &separator(),
                 &quit_i,
             ],

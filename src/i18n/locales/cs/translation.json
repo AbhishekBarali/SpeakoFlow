@@ -1430,7 +1430,7 @@
           "large": "Velká"
         },
         "panelSizeLabel": "Velikost panelu",
-        "panelSizeDescription": "Celková velikost plovoucího panelu asistenta. Velikost můžete měnit i tažením za jeho okraje.",
+        "panelSizeDescription": "Celková velikost plovoucího panelu asistenta.",
         "panelSizes": {
           "mini": "Malý",
           "compact": "Kompaktní",
@@ -1541,14 +1541,11 @@
     },
     "empty": "Zeptejte se hlasem pomocí zkratky asistenta,\nnebo pište níže.",
     "inputPlaceholder": "Zpráva…",
-    "inputPlaceholderScreen": "Zeptejte se na svou obrazovku…",
     "queuedUntilReady": "Ve frontě — odešle se, jakmile tato odpověď skončí.",
     "send": "Odeslat",
     "stop": "Zastavit",
     "cancel": "Zrušit",
-    "finish": "Dokončit a odeslat",
     "clear": "Vymazat konverzaci",
-    "hide": "Skrýt panel",
     "copy": "Kopírovat",
     "copyCode": "Kopírovat kód",
     "regenerate": "Vygenerovat odpověď znovu (původní zůstane v Historii)",
@@ -1559,7 +1556,6 @@
     "attach": {
       "file": "Přiložit obrázek nebo soubor",
       "snip": "Vystřihnout část obrazovky",
-      "image": "Obrázek",
       "imageCount": "{{count}} obrázek",
       "imageCount_other": "{{count}} obrázků",
       "remove": "Odebrat přílohu",
@@ -1575,21 +1571,7 @@
     "tts": {
       "enable": "Zapnout hlasová shrnutí",
       "disable": "Vypnout hlasová shrnutí",
-      "loading": "Načítám hlasový model Kokoro...",
-      "loadingShort": "Hlasový model {{progress}}%"
-    },
-    "pill": {
-      "talk": "Kliknutím začnete mluvit",
-      "stop": "Zastavit a odeslat",
-      "idle": "Asistent",
-      "expand": "Rozbalit panel",
-      "collapse": "Sbalit do lišty",
-      "close": "Zavřít asistenta",
-      "cancel": "Zrušit bez odeslání",
-      "cancelTurn": "Zrušit",
-      "dismiss": "Zavřít",
-      "disarmScreen": "Zobrazení obrazovky je zapnuté — kliknutím ho vypnete",
-      "armScreen": "Zobrazení obrazovky je vypnuté — kliknutím ho zapnete"
+      "loading": "Načítám hlasový model Kokoro..."
     },
     "status": {
       "listening": "Poslouchám…",
@@ -1652,6 +1634,10 @@
       "preparing": "Nastavuji místní jádro (první spuštění)…",
       "extracting": "Instaluji místní jádro…",
       "short": "Nastavuji jádro…"
+    },
+    "quick": {
+      "selection": "Výběr",
+      "copied": "Zkopírováno"
     }
   },
   "voiceEngines": {

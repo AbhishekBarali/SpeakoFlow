@@ -1430,7 +1430,7 @@
           "large": "Grande"
         },
         "panelSizeLabel": "Taille du panneau",
-        "panelSizeDescription": "Taille globale du panneau flottant de l'assistant. Vous pouvez aussi faire glisser ses bords pour le redimensionner.",
+        "panelSizeDescription": "Taille globale du panneau flottant de l'assistant.",
         "panelSizes": {
           "mini": "Petit",
           "compact": "Compact",
@@ -1541,14 +1541,11 @@
     },
     "empty": "Posez votre question à la voix avec le raccourci de l'assistant,\nou écrivez ci-dessous.",
     "inputPlaceholder": "Message…",
-    "inputPlaceholderScreen": "Posez une question sur votre écran…",
     "queuedUntilReady": "En file d'attente — envoi dès la fin de cette réponse.",
     "send": "Envoyer",
     "stop": "Arrêter",
     "cancel": "Annuler",
-    "finish": "Terminer et envoyer",
     "clear": "Effacer la conversation",
-    "hide": "Masquer le panneau",
     "copy": "Copier",
     "copyCode": "Copier le code",
     "regenerate": "Régénérer la réponse (l'ancienne reste dans l'Historique)",
@@ -1559,7 +1556,6 @@
     "attach": {
       "file": "Joindre une image ou un fichier",
       "snip": "Capturer une zone de l'écran",
-      "image": "Image",
       "imageCount": "{{count}} image",
       "imageCount_other": "{{count}} images",
       "remove": "Supprimer la pièce jointe",
@@ -1575,21 +1571,7 @@
     "tts": {
       "enable": "Activer les résumés vocaux",
       "disable": "Désactiver les résumés vocaux",
-      "loading": "Chargement du modèle de voix Kokoro...",
-      "loadingShort": "Modèle de voix {{progress}} %"
-    },
-    "pill": {
-      "talk": "Cliquez pour parler",
-      "stop": "Arrêter et envoyer",
-      "idle": "Assistant",
-      "expand": "Développer le panneau",
-      "collapse": "Réduire en pastille",
-      "close": "Fermer l'assistant",
-      "cancel": "Annuler sans envoyer",
-      "cancelTurn": "Annuler",
-      "dismiss": "Ignorer",
-      "disarmScreen": "La vision d'écran est activée — cliquez pour la désactiver",
-      "armScreen": "La vision d'écran est désactivée — cliquez pour l'activer"
+      "loading": "Chargement du modèle de voix Kokoro..."
     },
     "status": {
       "listening": "À l'écoute…",
@@ -1652,6 +1634,10 @@
       "preparing": "Configuration du moteur local (premier lancement)…",
       "extracting": "Installation du moteur local…",
       "short": "Configuration du moteur…"
+    },
+    "quick": {
+      "selection": "Sélection",
+      "copied": "Copié"
     }
   },
   "voiceEngines": {

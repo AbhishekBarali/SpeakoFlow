@@ -1430,7 +1430,7 @@
           "large": "Lớn"
         },
         "panelSizeLabel": "Kích thước bảng",
-        "panelSizeDescription": "Kích thước tổng thể của bảng trợ lý nổi. Bạn cũng có thể kéo các cạnh của nó để thay đổi kích thước.",
+        "panelSizeDescription": "Kích thước tổng thể của bảng trợ lý nổi.",
         "panelSizes": {
           "mini": "Nhỏ",
           "compact": "Gọn",
@@ -1541,14 +1541,11 @@
     },
     "empty": "Hỏi bằng giọng nói với phím tắt trợ lý,\nhoặc gõ bên dưới.",
     "inputPlaceholder": "Tin nhắn…",
-    "inputPlaceholderScreen": "Hỏi về màn hình của bạn…",
     "queuedUntilReady": "Đã xếp hàng — sẽ gửi ngay khi câu trả lời này xong.",
     "send": "Gửi",
     "stop": "Dừng",
     "cancel": "Hủy",
-    "finish": "Xong và gửi",
     "clear": "Xóa cuộc trò chuyện",
-    "hide": "Ẩn bảng",
     "copy": "Sao chép",
     "copyCode": "Sao chép mã",
     "regenerate": "Tạo lại câu trả lời (câu cũ vẫn còn trong Lịch sử)",
@@ -1559,7 +1556,6 @@
     "attach": {
       "file": "Gửi kèm hình ảnh hoặc tệp",
       "snip": "Cắt một vùng của màn hình",
-      "image": "Hình ảnh",
       "imageCount": "{{count}} hình ảnh",
       "imageCount_other": "{{count}} hình ảnh",
       "remove": "Bỏ tệp gửi kèm",
@@ -1575,21 +1571,7 @@
     "tts": {
       "enable": "Bật tóm tắt bằng giọng nói",
       "disable": "Tắt tóm tắt bằng giọng nói",
-      "loading": "Đang nạp mô hình giọng nói Kokoro...",
-      "loadingShort": "Mô hình giọng nói {{progress}}%"
-    },
-    "pill": {
-      "talk": "Nhấn để nói",
-      "stop": "Dừng và gửi",
-      "idle": "Trợ lý",
-      "expand": "Mở rộng bảng",
-      "collapse": "Thu về dạng viên",
-      "close": "Đóng trợ lý",
-      "cancel": "Hủy mà không gửi",
-      "cancelTurn": "Hủy",
-      "dismiss": "Bỏ qua",
-      "disarmScreen": "Xem màn hình đang bật — nhấn để tắt",
-      "armScreen": "Xem màn hình đang tắt — nhấn để bật"
+      "loading": "Đang nạp mô hình giọng nói Kokoro..."
     },
     "status": {
       "listening": "Đang lắng nghe…",
@@ -1652,6 +1634,10 @@
       "preparing": "Đang thiết lập công cụ cục bộ (lần chạy đầu)…",
       "extracting": "Đang cài đặt công cụ cục bộ…",
       "short": "Đang thiết lập công cụ…"
+    },
+    "quick": {
+      "selection": "Vùng chọn",
+      "copied": "Đã sao chép"
     }
   },
   "voiceEngines": {

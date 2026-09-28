@@ -1430,7 +1430,7 @@
           "large": "大"
         },
         "panelSizeLabel": "面板大小",
-        "panelSizeDescription": "助理浮動面板的整體大小。您也可以拖曳邊緣來調整大小。",
+        "panelSizeDescription": "助理浮動面板的整體大小。",
         "panelSizes": {
           "mini": "小",
           "compact": "精簡",
@@ -1541,14 +1541,11 @@
     },
     "empty": "用助理快捷鍵以語音提問，\n或在下方輸入文字。",
     "inputPlaceholder": "訊息…",
-    "inputPlaceholderScreen": "詢問您的螢幕內容…",
     "queuedUntilReady": "已排入佇列——這則回覆結束後立即傳送。",
     "send": "送出",
     "stop": "停止",
     "cancel": "取消",
-    "finish": "結束並送出",
     "clear": "清除對話",
-    "hide": "隱藏面板",
     "copy": "複製",
     "copyCode": "複製程式碼",
     "regenerate": "重新生成回答（舊的會保留在歷史紀錄中）",
@@ -1559,7 +1556,6 @@
     "attach": {
       "file": "附加圖片或檔案",
       "snip": "擷取螢幕的某個範圍",
-      "image": "圖片",
       "imageCount": "{{count}} 張圖片",
       "imageCount_other": "{{count}} 張圖片",
       "remove": "移除附件",
@@ -1575,21 +1571,7 @@
     "tts": {
       "enable": "啟用語音摘要",
       "disable": "停用語音摘要",
-      "loading": "正在載入 Kokoro 語音模型...",
-      "loadingShort": "語音模型 {{progress}}%"
-    },
-    "pill": {
-      "talk": "點選開始說話",
-      "stop": "停止並送出",
-      "idle": "助理",
-      "expand": "展開面板",
-      "collapse": "收合為膠囊",
-      "close": "關閉助理",
-      "cancel": "取消且不送出",
-      "cancelTurn": "取消",
-      "dismiss": "關閉",
-      "disarmScreen": "螢幕視覺已開啟——點選即可關閉",
-      "armScreen": "螢幕視覺已關閉——點選即可開啟"
+      "loading": "正在載入 Kokoro 語音模型..."
     },
     "status": {
       "listening": "正在聆聽…",
@@ -1652,6 +1634,10 @@
       "preparing": "正在設定本機引擎（首次執行）…",
       "extracting": "正在安裝本機引擎…",
       "short": "正在設定引擎…"
+    },
+    "quick": {
+      "selection": "選取內容",
+      "copied": "已複製"
     }
   },
   "voiceEngines": {

@@ -1430,7 +1430,7 @@
           "large": "Grande"
         },
         "panelSizeLabel": "Tamanho do painel",
-        "panelSizeDescription": "Tamanho geral do painel flutuante do assistente. Você também pode arrastar as bordas para redimensionar.",
+        "panelSizeDescription": "Tamanho geral do painel flutuante do assistente.",
         "panelSizes": {
           "mini": "Pequeno",
           "compact": "Compacto",
@@ -1541,14 +1541,11 @@
     },
     "empty": "Pergunte por voz com o atalho do assistente\nou digite abaixo.",
     "inputPlaceholder": "Mensagem…",
-    "inputPlaceholderScreen": "Pergunte sobre sua tela…",
     "queuedUntilReady": "Na fila — envio assim que esta resposta terminar.",
     "send": "Enviar",
     "stop": "Parar",
     "cancel": "Cancelar",
-    "finish": "Finalizar e enviar",
     "clear": "Limpar conversa",
-    "hide": "Ocultar painel",
     "copy": "Copiar",
     "copyCode": "Copiar código",
     "regenerate": "Gerar a resposta novamente (a antiga fica no Histórico)",
@@ -1559,7 +1556,6 @@
     "attach": {
       "file": "Anexar uma imagem ou arquivo",
       "snip": "Recortar uma região da tela",
-      "image": "Imagem",
       "imageCount": "{{count}} imagem",
       "imageCount_other": "{{count}} imagens",
       "remove": "Remover anexo",
@@ -1575,21 +1571,7 @@
     "tts": {
       "enable": "Ativar os resumos por voz",
       "disable": "Desativar os resumos por voz",
-      "loading": "Carregando o modelo de voz Kokoro...",
-      "loadingShort": "Modelo de voz {{progress}}%"
-    },
-    "pill": {
-      "talk": "Clique para falar",
-      "stop": "Parar e enviar",
-      "idle": "Assistente",
-      "expand": "Expandir painel",
-      "collapse": "Recolher em pílula",
-      "close": "Fechar o assistente",
-      "cancel": "Cancelar sem enviar",
-      "cancelTurn": "Cancelar",
-      "dismiss": "Descartar",
-      "disarmScreen": "A visão de tela está ativada — clique para desativar",
-      "armScreen": "A visão de tela está desativada — clique para ativar"
+      "loading": "Carregando o modelo de voz Kokoro..."
     },
     "status": {
       "listening": "Ouvindo…",
@@ -1652,6 +1634,10 @@
       "preparing": "Configurando o motor local (primeira execução)…",
       "extracting": "Instalando o motor local…",
       "short": "Configurando o motor…"
+    },
+    "quick": {
+      "selection": "Seleção",
+      "copied": "Copiado"
     }
   },
   "voiceEngines": {

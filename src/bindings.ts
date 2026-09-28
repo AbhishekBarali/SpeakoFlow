@@ -738,6 +738,56 @@ async showMainWindowCommand() : Promise<Result<null, string>> {
     else return { status: "error", error: e  as any };
 }
 },
+async getUpdateSupport() : Promise<UpdateSupport> {
+    return await TAURI_INVOKE("get_update_support");
+},
+/**
+ * Download the full installer for this machine into the Downloads folder.
+ * 
+ * Written to a `.part` file and renamed on completion, so a cancelled or
+ * failed download never leaves something that looks like a finished
+ * installer.
+ */
+async downloadUpdateInstaller() : Promise<Result<DownloadedInstaller, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("download_update_installer") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Start the installer (Windows .exe/.msi, macOS .dmg, Linux .deb opens in
+ * the software centre). An AppImage is made executable and shown in its
+ * folder, since "opening" it is not something every desktop does.
+ */
+async openUpdateInstaller(path: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("open_update_installer", { path }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async revealUpdateInstaller(path: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("reveal_update_installer", { path }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async getFeedbackSystemInfo() : Promise<FeedbackSystemInfo> {
+    return await TAURI_INVOKE("get_feedback_system_info");
+},
+async sendFeedback(request: FeedbackRequest) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("send_feedback", { request }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async cancelOperation() : Promise<void> {
     await TAURI_INVOKE("cancel_operation");
 },
@@ -1506,6 +1556,9 @@ async getUsageStats() : Promise<Result<UsageStats, string>> {
 },
 /**
  * Send a typed message to the assistant (keyboard alternative to voice).
+ * 
+ * A typed quick ask is one job, exactly like a spoken one, so it starts from an
+ * empty conversation (a no-op during a call, which owns the conversation).
  */
 async assistantSendText(text: string) : Promise<Result<null, string>> {
     try {
@@ -1614,8 +1667,11 @@ async assistantSummarize() : Promise<Result<null, string>> {
 }
 },
 /**
- * Load a past conversation from History into the panel and open it, so the
- * user can continue where they left off. Future turns update that same row.
+ * Carry on a past conversation from History.
+ * 
+ * A conversation is what the call is for — the quick ask is one question and one
+ * answer, with nothing to continue it from — so this opens the call with the
+ * saved thread loaded. Future turns update that same History row.
  */
 async assistantResumeSession(id: number) : Promise<Result<null, string>> {
     try {
@@ -1646,13 +1702,11 @@ async hideAssistantPanel() : Promise<Result<null, string>> {
  * 
  * The thread up to and including `message_index` is adopted and everything after
  * it is left behind, so the user can take a conversation they liked and try a
- * different direction from the middle of it.
+ * different direction from the middle of it. Opens in the call, like resuming.
  * 
  * **The original is never modified.** The branch is loaded with no session id, so
  * the next turn writes a fresh History row and the conversation being forked stays
- * exactly as it was. That is what makes this safe to reach for — there is no
- * version of this that loses the thread you branched from, and so no need for a
- * history tree to protect it.
+ * exactly as it was.
  */
 async assistantBranchSession(id: number, messageIndex: number) : Promise<Result<null, string>> {
     try {
@@ -1663,11 +1717,7 @@ async assistantBranchSession(id: number, messageIndex: number) : Promise<Result<
 }
 },
 /**
- * Choose where the Ask card opens.
- * 
- * Picking any anchor other than `Custom` also discards the remembered dragged
- * position, so the choice takes effect on the very next open instead of being
- * quietly overridden by wherever the card was last dropped.
+ * Choose where the quick ask opens.
  */
 async setAssistantAskAnchor(anchor: AskAnchor) : Promise<Result<null, string>> {
     try {
@@ -1678,13 +1728,8 @@ async setAssistantAskAnchor(anchor: AskAnchor) : Promise<Result<null, string>> {
 }
 },
 /**
- * Choose which display the Ask surface opens on.
- * 
- * Like the anchor, this discards the remembered dragged position: a coordinate on
- * the screen you just moved away from is meaningless, and keeping it would make the
- * new choice appear to do nothing on the very next open. The stored display pin goes
- * too, so `last_used` starts from a clean slate rather than from the screen the user
- * is trying to get away from.
+ * Choose which display the quick ask opens on: `cursor`, `primary`, or a
+ * monitor id from `list_assistant_displays`.
  */
 async setAssistantAskDisplay(display: string) : Promise<Result<null, string>> {
     try {
@@ -1999,6 +2044,34 @@ async setAssistantTtsKokoroDtype(dtype: string) : Promise<Result<null, string>> 
 }
 },
 /**
+ * Where Kokoro runs: "auto" (the graphics card when the panel's WebView can use
+ * it, the processor otherwise), "gpu" (always the WebView), or "cpu" (the
+ * native engine, once its voice pack is downloaded).
+ */
+async setAssistantTtsKokoroDevice(device: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_assistant_tts_kokoro_device", { device }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Where local speech is produced right now and which native voices are
+ * installed: what the Voice settings need to explain Automatic.
+ */
+async getLocalVoiceStatus() : Promise<LocalVoiceStatus> {
+    return await TAURI_INVOKE("get_local_voice_status");
+},
+/**
+ * The assistant panel's WebView reports whether it can run Kokoro on the
+ * graphics card: an adapter exists, it started, and its audio was not caught
+ * garbled. Automatic moves Kokoro to the processor when it cannot.
+ */
+async assistantReportWebgpu(usable: boolean) : Promise<void> {
+    await TAURI_INVOKE("assistant_report_webgpu", { usable });
+},
+/**
  * Playback speed multiplier for spoken summaries (0.25x–4x). Clamped to that
  * range so a stray manual entry can't request an unusable rate. The change
  * takes effect on the next spoken clip rather than interrupting the current
@@ -2057,8 +2130,8 @@ async setAssistantPanelOpacity(opacity: number) : Promise<Result<null, string>> 
 }
 },
 /**
- * Set the expanded panel size preset ("compact", "standard", or "large") and
- * resize the live panel window to match when it's currently expanded.
+ * Set the panel size preset ("mini", "compact", "standard", or "large") and
+ * re-shape the live panel window to match when it is on screen.
  */
 async setAssistantPanelSize(size: string) : Promise<Result<null, string>> {
     try {
@@ -2104,22 +2177,6 @@ async redirectTranscriptionToAssistant() : Promise<Result<null, string>> {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
-},
-async setAssistantPanelCollapsed(collapsed: boolean) : Promise<Result<null, string>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("set_assistant_panel_collapsed", { collapsed }) };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
-/**
- * Current pill/expanded state of the assistant panel. The webview queries this
- * on mount so a fresh or reloaded panel renders the right layout instead of
- * showing the full panel header inside the collapsed pill window.
- */
-async getAssistantPanelCollapsed() : Promise<boolean> {
-    return await TAURI_INVOKE("get_assistant_panel_collapsed");
 },
 /**
  * Signal that the reply identified by `epoch` has no more chunks, so the sink
@@ -2402,6 +2459,19 @@ async assistantConversationNew(session: number) : Promise<Result<null, string>> 
 async assistantConversationLoad(session: number, id: number) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("assistant_conversation_load", { session, id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Continue a saved conversation inside the live call from one chosen message, as
+ * a new branch (History → "Continue from here"). The original row is never
+ * modified: the branch has no History id, so its next turn saves a new one.
+ */
+async assistantConversationBranch(session: number, id: number, messageIndex: number) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("assistant_conversation_branch", { session, id, messageIndex }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -3236,6 +3306,45 @@ async isLaptop() : Promise<Result<boolean, string>> {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+/**
+ * Start moving the calling window with the cursor, for as long as the primary
+ * mouse button stays down.
+ * 
+ * Called by the webview once a press on a drag region has travelled far enough
+ * to be a drag (see `src/lib/useSafeWindowDrag.ts`). On macOS and Linux the
+ * system drag has none of the Windows problems, so it is used there as before.
+ * 
+ * `system` asks for the system move loop anyway, for the main window, which
+ * people expect to snap to screen edges. On Windows it is only entered while the
+ * button is still physically down: the request crosses the IPC boundary after
+ * the webview saw the press, and a flick that is over by then used to start a
+ * loop with nothing left to end it.
+ */
+async startWindowDrag(system: boolean | null) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("start_window_drag", { system }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Start the system resize loop from one of the calling window's resize grips,
+ * if the button that pressed the grip is still down.
+ * 
+ * The same guard as a system move, for the same reason: a resize loop entered
+ * after the release has nothing to end it, and resizes the window with the
+ * cursor — holding the mouse — until the next click. Windows only; everywhere
+ * else the webview's own `startResizeDragging` is used and this is never called.
+ */
+async startWindowResize(direction: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("start_window_resize", { direction }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 }
 }
 
@@ -3560,6 +3669,12 @@ assistant_vision_capture_timing?: VisionCaptureTiming; assistant_tts_enabled?: b
  */
 assistant_tts_base_urls?: Partial<{ [key in string]: string }>; assistant_tts_models?: Partial<{ [key in string]: string }>; assistant_tts_remote_voices?: Partial<{ [key in string]: string }>; assistant_tts_api_keys?: SecretMap; assistant_tts_kokoro_dtype?: string; 
 /**
+ * Where Kokoro runs: "auto" (the graphics card when the panel's WebView can
+ * use it, the processor otherwise), "gpu" (always the WebView), or "cpu"
+ * (the native engine in `native_tts.rs`, once its pack is downloaded).
+ */
+assistant_tts_kokoro_device?: string; 
+/**
  * Playback speed multiplier for spoken assistant summaries. 1.0 is normal;
  * 0.5 is half speed, 2.0 is double, etc. Applied locally for Kokoro (via
  * the webview audio element) and natively for remote engines where the
@@ -3640,36 +3755,30 @@ assistant_memory_incognito?: boolean; assistant_font_size?: string;
  */
 assistant_panel_opacity?: number; 
 /**
- * Overall size of the expanded floating assistant panel: "compact",
- * "standard" (default), or "large". Chosen in Panel Appearance settings and
- * applied as the window's logical width/height. A manual drag-resize still
- * overrides it for the current session.
+ * Size preset of the floating assistant: "mini", "compact", "standard"
+ * (default), or "large". A multiplier on the display-derived size of the
+ * quick ask's frame and of the expanded call.
  */
 assistant_panel_size?: string; 
 /**
- * Where the Ask card opens. Centre by default — the card is transient and
- * meant to be read, so it appears in front of the user rather than in a
- * corner they have to hunt for. Dragging the card to an edge snaps it and
- * switches this to `Custom`, which uses the remembered position instead.
+ * Where the quick ask opens. Centre by default. `Custom` is a legacy value
+ * from when dragging remembered a position; it reads as `Center`.
  */
 assistant_ask_anchor?: AskAnchor; 
 /**
- * Which display the Ask surface opens on.
+ * Which display the quick ask opens on.
  * 
  * A free-form string rather than an enum, because the interesting values are
  * the names of monitors that only exist at runtime:
  * 
- * * `"last_used"` (default) — the display it was last dragged to.
- * * `"cursor"` — whichever display the mouse is on. This used to be the only
- * behaviour and was not a choice: on a landscape-plus-portrait desk it made
- * the panel change both its place and its shape depending on where the
- * pointer happened to be resting, which reads as the panel wandering.
+ * * `"cursor"` (default) — whichever display the mouse is on.
  * * `"primary"` — always the primary display.
  * * anything else — a monitor name (`\\.\DISPLAY2` on Windows), matched by
- * name first so the choice follows the physical screen if the desktop is
- * rearranged, with the stored origin as a fallback.
+ * name so the choice follows the physical screen if the desktop is
+ * rearranged.
  * 
- * An unresolvable value degrades to `last_used` rather than failing, so
+ * `"last_used"`, the old default, is migrated to `"cursor"` on load. An
+ * unresolvable value degrades to the cursor's display rather than failing, so
  * unplugging the chosen screen leaves the panel reachable.
  */
 assistant_ask_display?: string; 
@@ -4189,10 +4298,10 @@ id: string;
  */
 name: string; width: number; height: number; is_primary: boolean; 
 /**
- * True for the display the panel would open on right now, so the UI can say
- * which screen "last used" currently resolves to.
+ * True for the display the panel would open on right now.
  */
 is_current: boolean }
+export type DownloadedInstaller = { path: string; version: string }
 export type EngineType = "Whisper" | "Parakeet" | "Moonshine" | "MoonshineStreaming" | "SenseVoice" | "GigaAM" | "Canary" | "Cohere" | 
 /**
  * Native transcribe.cpp (ggml/GGUF) engine, added side-by-side with
@@ -4209,7 +4318,20 @@ export type EngineType = "Whisper" | "Parakeet" | "Moonshine" | "MoonshineStream
  * Local text-to-speech engine (Kokoro, runs in the assistant webview).
  * Not a transcription engine.
  */
-"Kokoro"
+"Kokoro" | 
+/**
+ * A downloadable voice pack for the native speech engine
+ * (`native_tts.rs`, sherpa-onnx): Kokoro for the processor, and Kitten.
+ * Not a transcription engine.
+ */
+"NativeTts"
+export type FeedbackKind = "bug" | "idea" | "question"
+export type FeedbackRequest = { kind: FeedbackKind; message: string; email: string | null; include_system_info: boolean }
+/**
+ * The optional "about this install" block, shown verbatim in the dialog
+ * before it is sent.
+ */
+export type FeedbackSystemInfo = { app_version: string; os: string; arch: string; install: string }
 /**
  * A text-like file attached to a turn as context (content extracted in the
  * webview or by `assistant_read_file`).
@@ -4345,6 +4467,18 @@ message: string }
  * what landed and what didn't.
  */
 export type LocalModelImport = { added: ModelInfo[]; failed: LocalModelFailure[] }
+/**
+ * Everything the Voice settings need to explain the current state.
+ */
+export type LocalVoiceStatus = { route: VoiceRoute; webgpu: WebGpuState; 
+/**
+ * This platform has a native engine build.
+ */
+native_supported: boolean; 
+/**
+ * The downloaded engine refused to load this session.
+ */
+native_load_failed: boolean; kokoro_native_ready: boolean; kitten_ready: boolean }
 export type LogLevel = "trace" | "debug" | "info" | "warn" | "error"
 /**
  * A meeting record without its transcript.
@@ -4885,6 +5019,31 @@ export type TypingTool = "auto" | "wtype" | "kwtype" | "dotool" | "ydotool" | "x
  */
 export type UiTextSize = "small" | "default" | "large" | "extra_large"
 /**
+ * How this particular install gets a new version.
+ */
+export type UpdateInstallMode = 
+/**
+ * The updater plugin can replace this install where it is.
+ */
+"in_app" | 
+/**
+ * No safe in-place path, but the full installer will work: download it
+ * and run it (a dev build, an extracted AppImage, a Debian-family system
+ * with no way to ask for the admin password).
+ */
+"download" | 
+/**
+ * The Windows portable build. Its installer would install a second,
+ * non-portable copy, so the honest answer is the release page.
+ */
+"portable" | 
+/**
+ * Something else owns these files: the AUR, a from-source install, an
+ * .rpm. Updating behind its back would desynchronise it.
+ */
+"package_manager"
+export type UpdateSupport = { mode: UpdateInstallMode; release_page: string }
+/**
  * One local calendar day of dictation usage, as shown in the recent-activity
  * chart.
  */
@@ -4951,7 +5110,39 @@ export type VisionCaptureTiming =
  * and it transcribes). The original behaviour.
  */
 "on_send"
+/**
+ * Where the selected engine's speech is produced right now.
+ */
+export type VoiceRoute = 
+/**
+ * Kokoro inside the assistant panel (kokoro-js, WebGPU or WebAssembly).
+ */
+"webview" | 
+/**
+ * This module (sherpa-onnx on the processor).
+ */
+"native" | 
+/**
+ * A cloud or self-hosted engine, spoken by `tts.rs`.
+ */
+"remote"
 export type VoiceTicket = { session: number; turn: number }
+/**
+ * What the WebView reported about WebGPU on this machine.
+ */
+export type WebGpuState = 
+/**
+ * Nothing reported yet this session.
+ */
+"unknown" | 
+/**
+ * An adapter exists and has not been caught producing broken audio.
+ */
+"usable" | 
+/**
+ * No adapter, it failed to start, or its audio was garbled.
+ */
+"unusable"
 export type WhisperAcceleratorSetting = "auto" | "cpu" | "gpu"
 export type WindowsMicrophonePermissionStatus = { supported: boolean; overall_access: PermissionAccess; device_access: PermissionAccess; app_access: PermissionAccess; desktop_app_access: PermissionAccess }
 

@@ -1430,7 +1430,7 @@
           "large": "Duży"
         },
         "panelSizeLabel": "Rozmiar panelu",
-        "panelSizeDescription": "Ogólny rozmiar pływającego panelu asystenta. Możesz go też zmienić, przeciągając krawędzie.",
+        "panelSizeDescription": "Ogólny rozmiar pływającego panelu asystenta.",
         "panelSizes": {
           "mini": "Mały",
           "compact": "Kompaktowy",
@@ -1541,14 +1541,11 @@
     },
     "empty": "Zapytaj głosem skrótem asystenta\nalbo napisz poniżej.",
     "inputPlaceholder": "Wiadomość…",
-    "inputPlaceholderScreen": "Zapytaj o swój ekran…",
     "queuedUntilReady": "W kolejce — wyślę, gdy tylko ta odpowiedź się skończy.",
     "send": "Wyślij",
     "stop": "Zatrzymaj",
     "cancel": "Anuluj",
-    "finish": "Zakończ i wyślij",
     "clear": "Wyczyść rozmowę",
-    "hide": "Ukryj panel",
     "copy": "Kopiuj",
     "copyCode": "Kopiuj kod",
     "regenerate": "Wygeneruj odpowiedź ponownie (stara zostaje w Historii)",
@@ -1559,7 +1556,6 @@
     "attach": {
       "file": "Dołącz obraz lub plik",
       "snip": "Wytnij fragment ekranu",
-      "image": "Obraz",
       "imageCount": "{{count}} obraz",
       "imageCount_other": "{{count}} obrazów",
       "remove": "Usuń załącznik",
@@ -1575,21 +1571,7 @@
     "tts": {
       "enable": "Włącz podsumowania głosowe",
       "disable": "Wyłącz podsumowania głosowe",
-      "loading": "Wczytywanie modelu głosu Kokoro...",
-      "loadingShort": "Model głosu {{progress}}%"
-    },
-    "pill": {
-      "talk": "Kliknij, aby mówić",
-      "stop": "Zatrzymaj i wyślij",
-      "idle": "Asystent",
-      "expand": "Rozwiń panel",
-      "collapse": "Zwiń do paska",
-      "close": "Zamknij asystenta",
-      "cancel": "Anuluj bez wysyłania",
-      "cancelTurn": "Anuluj",
-      "dismiss": "Odrzuć",
-      "disarmScreen": "Podgląd ekranu jest włączony — kliknij, aby wyłączyć",
-      "armScreen": "Podgląd ekranu jest wyłączony — kliknij, aby włączyć"
+      "loading": "Wczytywanie modelu głosu Kokoro..."
     },
     "status": {
       "listening": "Słucham…",
@@ -1652,6 +1634,10 @@
       "preparing": "Konfigurowanie lokalnego silnika (pierwsze uruchomienie)…",
       "extracting": "Instalowanie lokalnego silnika…",
       "short": "Konfigurowanie silnika…"
+    },
+    "quick": {
+      "selection": "Zaznaczenie",
+      "copied": "Skopiowano"
     }
   },
   "voiceEngines": {

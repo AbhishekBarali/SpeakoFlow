@@ -1430,7 +1430,7 @@
           "large": "大"
         },
         "panelSizeLabel": "パネルのサイズ",
-        "panelSizeDescription": "フローティングのアシスタントパネル全体の大きさ。端をドラッグしてサイズを変えることもできます。",
+        "panelSizeDescription": "フローティングのアシスタントパネル全体の大きさ。",
         "panelSizes": {
           "mini": "小",
           "compact": "コンパクト",
@@ -1541,14 +1541,11 @@
     },
     "empty": "アシスタントのショートカットで音声で質問するか、\n下に入力してください。",
     "inputPlaceholder": "メッセージ…",
-    "inputPlaceholderScreen": "画面について質問…",
     "queuedUntilReady": "順番待ち — この返信が終わり次第、送信します。",
     "send": "送信",
     "stop": "停止",
     "cancel": "キャンセル",
-    "finish": "終了して送信",
     "clear": "会話をクリア",
-    "hide": "パネルを隠す",
     "copy": "コピー",
     "copyCode": "コードをコピー",
     "regenerate": "回答を再生成（元の回答は履歴に残ります）",
@@ -1559,7 +1556,6 @@
     "attach": {
       "file": "画像またはファイルを添付",
       "snip": "画面の範囲を切り取る",
-      "image": "画像",
       "imageCount": "{{count}}枚の画像",
       "imageCount_other": "{{count}}枚の画像",
       "remove": "添付を削除",
@@ -1575,21 +1571,7 @@
     "tts": {
       "enable": "音声要約を有効にする",
       "disable": "音声要約を無効にする",
-      "loading": "Kokoro音声モデルを読み込み中...",
-      "loadingShort": "音声モデル {{progress}}%"
-    },
-    "pill": {
-      "talk": "クリックして話す",
-      "stop": "停止して送信",
-      "idle": "アシスタント",
-      "expand": "パネルを展開",
-      "collapse": "ピルに折りたたむ",
-      "close": "アシスタントを閉じる",
-      "cancel": "送信せずにキャンセル",
-      "cancelTurn": "キャンセル",
-      "dismiss": "閉じる",
-      "disarmScreen": "画面認識はオンです — クリックしてオフにします",
-      "armScreen": "画面認識はオフです — クリックしてオンにします"
+      "loading": "Kokoro音声モデルを読み込み中..."
     },
     "status": {
       "listening": "聞いています…",
@@ -1652,6 +1634,10 @@
       "preparing": "ローカルエンジンを準備中（初回のみ）…",
       "extracting": "ローカルエンジンをインストール中…",
       "short": "エンジンを準備中…"
+    },
+    "quick": {
+      "selection": "選択範囲",
+      "copied": "コピーしました"
     }
   },
   "voiceEngines": {

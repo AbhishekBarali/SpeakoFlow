@@ -16,11 +16,93 @@
     "home": "Home",
     "openAssistant": "Open assistant",
     "checkUpdates": "Check for updates…",
+    "sendFeedback": "Send feedback…",
     "copyLastTranscript": "Copy last transcript",
     "unloadModel": "Unload model",
     "model": "Model",
     "quit": "Quit",
     "cancel": "Cancel"
+  },
+  "updates": {
+    "check": "Check for updates",
+    "checking": "Checking…",
+    "upToDate": "You're on the latest version",
+    "checkFailed": "Couldn't check for updates. Check your connection and try again.",
+    "noBuild": "The new version isn't available for this system yet.",
+    "available": "Version {{version}} is available",
+    "availableShort": "Update available",
+    "installNow": "Update now",
+    "downloading": "Downloading… {{progress}}%",
+    "downloadingUnknown": "Downloading…",
+    "installing": "Installing…",
+    "restart": "Restart now",
+    "readyToRestart": "The update is installed. Restart SpeakoFlow to start using it.",
+    "installFailed": "The update didn't install. You can try again, or download the installer and run it yourself.",
+    "downloadFailed": "The download didn't finish. Check your connection and try again.",
+    "downloadInstaller": "Download installer",
+    "downloadInstead": "Download installer instead",
+    "downloadNewVersion": "Download new version",
+    "installerSaved": "The installer is in your Downloads folder",
+    "openInstaller": "Run installer",
+    "showInFolder": "Show in folder",
+    "viewRelease": "View on GitHub",
+    "hint": {
+      "windows": "SpeakoFlow closes, installs the update, and opens again. Nothing else to click.",
+      "macos": "SpeakoFlow restarts on the new version. macOS may ask you to allow Microphone and Accessibility again afterwards.",
+      "linux": "SpeakoFlow restarts on the new version. A .deb install asks for your password first."
+    },
+    "modes": {
+      "portable": "This is the portable build, which can't replace itself. Download the new version and copy your Data folder into it.",
+      "packageManager": "Your package manager installed SpeakoFlow, so update it there, for example with yay -Syu speakoflow-bin.",
+      "download": "This copy can't update itself in place. Download the installer and run it to get the new version."
+    },
+    "pill": {
+      "available": "Update available",
+      "version": "Version {{version}}",
+      "progress": "Updating… {{progress}}%",
+      "working": "Updating…",
+      "restart": "Restart to update",
+      "installerReady": "Installer downloaded"
+    }
+  },
+  "feedback": {
+    "button": "Send feedback",
+    "title": "Send feedback",
+    "description": "Found a bug, have an idea, or a question? It goes straight to the developer.",
+    "kind": {
+      "label": "Kind of feedback",
+      "bug": "Bug",
+      "idea": "Idea",
+      "question": "Question"
+    },
+    "placeholder": {
+      "bug": "What happened, and what did you expect instead?",
+      "idea": "What would make SpeakoFlow better for you?",
+      "question": "What would you like to know?"
+    },
+    "messageLabel": "Message",
+    "emailLabel": "Email",
+    "emailOptional": "optional",
+    "emailPlaceholder": "you@example.com",
+    "emailHint": "Only if you'd like a reply.",
+    "emailInvalid": "That email address doesn't look right.",
+    "includeSystem": "Include app version and system",
+    "remaining": "{{count}} characters left",
+    "privacy": "Only what's shown here is sent.",
+    "send": "Send",
+    "sending": "Sending…",
+    "sentTitle": "Thanks, it's on its way",
+    "sentBody": "Your feedback reached the developer.",
+    "sentWithEmail": "If there's something to follow up on, you'll hear back at {{email}}.",
+    "sendAnother": "Send another",
+    "errors": {
+      "generic": "Couldn't send your feedback. Your message is saved here, so try again in a moment."
+    },
+    "aboutRow": {
+      "title": "Feedback",
+      "description": "Report a bug, suggest an idea, or ask a question.",
+      "button": "Send feedback"
+    }
   },
   "sidebar": {
     "general": "General",
@@ -1100,8 +1182,8 @@
         "description": ""
       },
       "updateChecks": {
-        "label": "Check for updates",
-        "description": ""
+        "label": "Check for updates automatically",
+        "description": "Looks for a new version when SpeakoFlow starts and every 12 hours. You can always check by hand."
       },
       "soundTheme": {
         "label": "Sound theme",
@@ -1454,15 +1536,45 @@
         "stopOnDictationLabel": "Stop speech when dictation starts",
         "stopOnDictationDescription": "Stop any reply that's still playing when you start dictating.",
         "engineLabel": "Engine",
-        "engineDescription": "Kokoro runs on this PC for free. Cloud engines use an API key from that provider. Custom connects to a speech server you run yourself.",
+        "engineDescription": "Kokoro and Kitten run on this PC for free. Cloud engines use an API key from that provider. Custom connects to a speech server you run yourself.",
         "kokoroSetupLabel": "Kokoro voice model",
         "kokoroSetupDescription": "Download it once, then spoken replies run privately on this device.",
         "kokoroDownload": "Download Kokoro",
         "kokoroDownloading": "Downloading Kokoro",
         "kokoroReady": "Ready on this device",
         "kokoroRetry": "Try download again",
+        "runsOnLabel": "Runs on",
+        "runsOn": {
+          "auto": "Automatic",
+          "gpu": "Graphics card",
+          "cpu": "Processor"
+        },
+        "runsOnStatus": {
+          "checking": "Uses the graphics card when it works, and the processor when it doesn't.",
+          "gpu": "Speaking on the graphics card.",
+          "processor": "Speaking on the processor.",
+          "gpuUnusable": "Speaking on the processor, because the graphics card can't run the voice on this computer.",
+          "needsPack": "The graphics card can't run the voice on this computer. Download the processor voice below for fast replies.",
+          "cpuNeedsPack": "Download the processor voice below. Until then Kokoro runs inside the app, which is slow.",
+          "loadFailed": "The processor voice couldn't start on this computer, so Kokoro runs inside the app for now."
+        },
+        "kokoroNativeLabel": "Processor voice",
+        "kokoroNativeDescription": "Lets Kokoro speak fast on the processor when the graphics card can't. {{size}} download.",
+        "kittenPackLabel": "Kitten voice",
+        "kittenPackDescription": "A small voice that runs on the processor. {{size}} download.",
+        "packSize": "{{size}} MB",
+        "packDownload": "Download ({{size}})",
+        "packDownloading": "Downloading",
+        "packInstalling": "Setting up",
+        "packCancel": "Cancel download",
+        "packRemove": "Remove",
+        "packUnsupported": "Not available on this system",
+        "kittenSuggestLabel": "Try Kitten",
+        "kittenSuggestDescription": "This computer has a small processor. Kitten is a lighter voice that replies faster here.",
+        "kittenSuggestButton": "Use Kitten",
         "engines": {
           "kokoro": "Kokoro (local, free)",
+          "kitten": "Kitten (local, light)",
           "openai": "OpenAI",
           "elevenlabs": "ElevenLabs",
           "openrouter": "OpenRouter",
@@ -1479,7 +1591,7 @@
         "voiceLabel": "Voice",
         "voiceDescription": "Kokoro voice for spoken replies.",
         "dtypeLabel": "Kokoro precision",
-        "dtypeDescription": "fp32 is highest quality; q8 is faster on CPU. Changing this reloads the model. If the voice comes out garbled or like noise instead of speech, choose \"q8 on CPU\" — some graphics drivers corrupt audio generated on the GPU.",
+        "dtypeDescription": "Only for Kokoro running inside the app. fp32 is highest quality; q8 is smaller. Changing this reloads the model. If the voice sounds garbled, set Runs on to Processor.",
         "speedLabel": "Playback speed",
         "speedDescription": "1× is normal.",
         "speedRange": "{{engine}} supports {{min}}× to {{max}}×; other speeds use the nearest limit.",
@@ -1493,6 +1605,9 @@
         "testButton": "Test voice",
         "testing": "Testing…",
         "testOk": "Played ✓",
+        "testFailed": "Kokoro couldn't make the sample. Try again, or set Runs on to Processor.",
+        "testGpuMoved": "Your graphics card garbled the sample, so it was muted. Kokoro now uses the processor, so test again to hear it.",
+        "testGpuForced": "Your graphics card garbled the sample, so it was muted. Set Runs on to Automatic or Processor.",
         "testPhrase": "Hi! This is a test of SpeakoFlow's voice output.",
         "downloadStart": "Downloading Kokoro voice…",
         "downloadProgress": "Downloading Kokoro voice… {{progress}}%",
@@ -1541,7 +1656,7 @@
           "extraLarge": "Extra large"
         },
         "panelSizeLabel": "Panel size",
-        "panelSizeDescription": "How large the assistant card is, relative to your screen. A bigger display gets a bigger card. You can also drag its edges to resize.",
+        "panelSizeDescription": "How large the assistant is, relative to your screen. A bigger display gets a bigger card.",
         "panelSizes": {
           "mini": "Small",
           "compact": "Compact",
@@ -1549,23 +1664,20 @@
           "large": "Large"
         },
         "askDisplayLabel": "Which screen",
-        "askDisplayDescription": "The screen the assistant opens on. It stays there until you move it, so it can't wander between monitors.",
+        "askDisplayDescription": "The screen the assistant opens on. By default, the one your mouse is on.",
         "askDisplays": {
-          "lastUsed": "Where I last used it",
-          "lastUsedOn": "Where I last used it (screen {{number}})",
           "cursor": "Screen my mouse is on",
           "numbered": "Screen {{number}} ({{width}}×{{height}}){{suffix}}",
           "mainSuffix": " · main"
         },
         "askAnchorLabel": "Where it opens",
-        "askAnchorDescription": "Where the panel opens. Drag it near a spot and it snaps there.",
+        "askAnchorDescription": "Where the assistant opens, every time.",
         "askAnchors": {
           "center": "Middle of the screen",
           "top": "Top",
           "bottom": "Bottom",
           "left": "Left side",
-          "right": "Right side",
-          "custom": "Where I left it"
+          "right": "Right side"
         },
         "opacityLabel": "Panel opacity",
         "opacityDescription": "How opaque the floating panel is. 100% is fully solid; lower values let the desktop blur through."
@@ -1958,19 +2070,14 @@
     },
     "empty": "Ask by voice with your assistant shortcut,\nor type below.",
     "inputPlaceholder": "Message…",
-    "followUpPlaceholder": "Ask a follow-up…",
-    "inputPlaceholderScreen": "Ask about your screen…",
     "bar": {
       "placeholder": "Ask anything…"
     },
     "send": "Send",
     "stop": "Stop",
     "cancel": "Cancel",
-    "finish": "Finish & send",
-    "hide": "Hide panel",
     "copy": "Copy",
     "copyCode": "Copy code",
-    "askHint": "Ask by voice with your shortcut, or type below.",
     "insert": "Insert this where you were typing",
     "insertShort": "Insert",
     "insertReplace": "Replace your selected text with this",
@@ -1985,7 +2092,6 @@
     "attach": {
       "file": "Attach an image or file",
       "snip": "Snip a region of the screen",
-      "image": "Image",
       "imageCount": "{{count}} image",
       "imageCount_other": "{{count}} images",
       "remove": "Remove attachment",
@@ -2001,33 +2107,19 @@
     "tts": {
       "enable": "Enable voice summaries",
       "disable": "Disable voice summaries",
-      "loading": "Loading Kokoro voice model...",
-      "loadingShort": "Voice model {{progress}}%"
-    },
-    "pill": {
-      "talk": "Click to talk",
-      "stop": "Stop and send",
-      "idle": "Assistant",
-      "expand": "Expand panel",
-      "collapse": "Collapse to pill",
-      "close": "Close assistant",
-      "cancel": "Cancel without sending",
-      "cancelTurn": "Cancel",
-      "dismiss": "Dismiss",
-      "disarmScreen": "Screen vision is on — click to turn it off",
-      "armScreen": "Screen vision is off — click to turn it on"
+      "loading": "Loading Kokoro voice model..."
     },
     "status": {
       "listening": "Listening…",
       "locked": "Listening",
       "transcribing": "Transcribing…",
-      "searching": "Searching the web...",
-      "thinking": "Thinking...",
-      "speaking": "Speaking..."
+      "searching": "Searching the web…",
+      "thinking": "Thinking…",
+      "speaking": "Speaking…"
     },
     "tool": {
       "search": "Searching the web",
-      "screen": "Looking at your screen",
+      "screen": "Looking at your screen…",
       "working": "Working on it",
       "elapsed": "{{seconds}}s"
     },
@@ -2060,6 +2152,12 @@
       "tts_blockedShort": "Tap the panel to hear it",
       "tts_playback": "Couldn't play the voice on your output device. Check your speaker/output settings, then try again.",
       "tts_playbackShort": "Voice playback failed",
+      "tts_gpu": "Your graphics card garbled the voice, so it was muted. The next reply uses the processor voice instead.",
+      "tts_gpuShort": "Voice muted: graphics card garbled it",
+      "tts_gpu_slow": "Your graphics card garbled the voice, so it was muted. Replies now run on the processor, which is slow until you download the processor voice in Settings → Voice.",
+      "tts_gpu_slowShort": "Voice muted: graphics card garbled it",
+      "tts_gpu_forced": "Your graphics card garbled the voice, so it was muted. Set Runs on to Automatic or Processor in Settings → Voice.",
+      "tts_gpu_forcedShort": "Voice muted: graphics card garbled it",
       "mic_denied": "Microphone access is blocked. Allow it in your system privacy settings.",
       "mic_deniedShort": "Mic access blocked",
       "mic_unavailable": "No microphone was found. Connect one and try again.",
@@ -2080,6 +2178,10 @@
       "preparing": "Setting up the local engine (first run)…",
       "extracting": "Installing the local engine…",
       "short": "Setting up engine…"
+    },
+    "quick": {
+      "selection": "Selection",
+      "copied": "Copied"
     }
   },
   "nav": {
@@ -2285,7 +2387,8 @@
       "noKey": "Add an API key"
     },
     "voice": {
-      "kokoroModel": "Kokoro voice"
+      "kokoroModel": "Kokoro voice",
+      "kittenModel": "Kitten voice"
     },
     "usedBy": {
       "label": "Used by",
@@ -2597,7 +2700,7 @@
       "summarize": "Condenses long chats so it doesn't forget the start.",
       "panelSize": "How much of your screen it takes.",
       "opacity": "Lower lets your desktop show through.",
-      "position": "Click a spot on the screen. You can also drag the panel there.",
+      "position": "Click a spot on the screen.",
       "display": "The screen the panel opens on."
     },
     "memory": {
@@ -2832,6 +2935,7 @@
   },
   "voiceEngines": {
     "kokoro": "Free, on this PC",
+    "kitten": "Light, on this PC",
     "openai": "GPT voices",
     "elevenlabs": "Most natural",
     "openrouter": "Many voices",
@@ -2846,6 +2950,7 @@
     "custom": "Your own server",
     "names": {
       "kokoro": "Kokoro",
+      "kitten": "Kitten",
       "openai": "OpenAI",
       "elevenlabs": "ElevenLabs",
       "openrouter": "OpenRouter",

@@ -1430,7 +1430,7 @@
           "large": "Groß"
         },
         "panelSizeLabel": "Panel-Größe",
-        "panelSizeDescription": "Gesamtgröße des schwebenden Assistenten-Panels. Du kannst die Ränder auch mit der Maus ziehen.",
+        "panelSizeDescription": "Gesamtgröße des schwebenden Assistenten-Panels.",
         "panelSizes": {
           "mini": "Klein",
           "compact": "Kompakt",
@@ -1541,14 +1541,11 @@
     },
     "empty": "Frage per Stimme mit deinem Assistenten-Tastenkürzel\noder tippe unten.",
     "inputPlaceholder": "Nachricht…",
-    "inputPlaceholderScreen": "Frag zu deinem Bildschirm…",
     "queuedUntilReady": "In der Warteschlange — wird gesendet, sobald diese Antwort fertig ist.",
     "send": "Senden",
     "stop": "Stoppen",
     "cancel": "Abbrechen",
-    "finish": "Fertig & senden",
     "clear": "Gespräch löschen",
-    "hide": "Panel ausblenden",
     "copy": "Kopieren",
     "copyCode": "Code kopieren",
     "regenerate": "Antwort neu generieren (die alte bleibt im Verlauf)",
@@ -1559,7 +1556,6 @@
     "attach": {
       "file": "Bild oder Datei anhängen",
       "snip": "Einen Bildschirmbereich ausschneiden",
-      "image": "Bild",
       "imageCount": "{{count}} Bild",
       "imageCount_other": "{{count}} Bilder",
       "remove": "Anhang entfernen",
@@ -1575,21 +1571,7 @@
     "tts": {
       "enable": "Gesprochene Zusammenfassungen aktivieren",
       "disable": "Gesprochene Zusammenfassungen deaktivieren",
-      "loading": "Kokoro-Sprachmodell wird geladen...",
-      "loadingShort": "Sprachmodell {{progress}}%"
-    },
-    "pill": {
-      "talk": "Zum Sprechen klicken",
-      "stop": "Stoppen und senden",
-      "idle": "Assistent",
-      "expand": "Panel ausklappen",
-      "collapse": "Zur Pille einklappen",
-      "close": "Assistenten schließen",
-      "cancel": "Abbrechen, ohne zu senden",
-      "cancelTurn": "Abbrechen",
-      "dismiss": "Schließen",
-      "disarmScreen": "Bildschirmansicht ist an — klicken, um sie auszuschalten",
-      "armScreen": "Bildschirmansicht ist aus — klicken, um sie einzuschalten"
+      "loading": "Kokoro-Sprachmodell wird geladen..."
     },
     "status": {
       "listening": "Hört zu…",
@@ -1652,6 +1634,10 @@
       "preparing": "Lokale Engine wird eingerichtet (erster Start)…",
       "extracting": "Lokale Engine wird installiert…",
       "short": "Engine wird eingerichtet…"
+    },
+    "quick": {
+      "selection": "Auswahl",
+      "copied": "Kopiert"
     }
   },
   "voiceEngines": {

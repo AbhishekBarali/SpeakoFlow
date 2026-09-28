@@ -1574,6 +1574,11 @@ pub struct AppSettings {
     pub assistant_tts_api_keys: SecretMap,
     #[serde(default = "default_assistant_tts_kokoro_dtype")]
     pub assistant_tts_kokoro_dtype: String,
+    /// Where Kokoro runs: "auto" (the graphics card when the panel's WebView can
+    /// use it, the processor otherwise), "gpu" (always the WebView), or "cpu"
+    /// (the native engine in `native_tts.rs`, once its pack is downloaded).
+    #[serde(default = "default_assistant_tts_kokoro_device")]
+    pub assistant_tts_kokoro_device: String,
     /// Playback speed multiplier for spoken assistant summaries. 1.0 is normal;
     /// 0.5 is half speed, 2.0 is double, etc. Applied locally for Kokoro (via
     /// the webview audio element) and natively for remote engines where the
@@ -1647,34 +1652,28 @@ pub struct AppSettings {
     /// settings.
     #[serde(default = "default_assistant_panel_opacity")]
     pub assistant_panel_opacity: f64,
-    /// Overall size of the expanded floating assistant panel: "compact",
-    /// "standard" (default), or "large". Chosen in Panel Appearance settings and
-    /// applied as the window's logical width/height. A manual drag-resize still
-    /// overrides it for the current session.
+    /// Size preset of the floating assistant: "mini", "compact", "standard"
+    /// (default), or "large". A multiplier on the display-derived size of the
+    /// quick ask's frame and of the expanded call.
     #[serde(default = "default_assistant_panel_size")]
     pub assistant_panel_size: String,
-    /// Where the Ask card opens. Centre by default — the card is transient and
-    /// meant to be read, so it appears in front of the user rather than in a
-    /// corner they have to hunt for. Dragging the card to an edge snaps it and
-    /// switches this to `Custom`, which uses the remembered position instead.
+    /// Where the quick ask opens. Centre by default. `Custom` is a legacy value
+    /// from when dragging remembered a position; it reads as `Center`.
     #[serde(default = "default_ask_anchor")]
     pub assistant_ask_anchor: AskAnchor,
-    /// Which display the Ask surface opens on.
+    /// Which display the quick ask opens on.
     ///
     /// A free-form string rather than an enum, because the interesting values are
     /// the names of monitors that only exist at runtime:
     ///
-    /// * `"last_used"` (default) — the display it was last dragged to.
-    /// * `"cursor"` — whichever display the mouse is on. This used to be the only
-    ///   behaviour and was not a choice: on a landscape-plus-portrait desk it made
-    ///   the panel change both its place and its shape depending on where the
-    ///   pointer happened to be resting, which reads as the panel wandering.
+    /// * `"cursor"` (default) — whichever display the mouse is on.
     /// * `"primary"` — always the primary display.
     /// * anything else — a monitor name (`\\.\DISPLAY2` on Windows), matched by
-    ///   name first so the choice follows the physical screen if the desktop is
-    ///   rearranged, with the stored origin as a fallback.
+    ///   name so the choice follows the physical screen if the desktop is
+    ///   rearranged.
     ///
-    /// An unresolvable value degrades to `last_used` rather than failing, so
+    /// `"last_used"`, the old default, is migrated to `"cursor"` on load. An
+    /// unresolvable value degrades to the cursor's display rather than failing, so
     /// unplugging the chosen screen leaves the panel reachable.
     #[serde(default = "default_ask_display")]
     pub assistant_ask_display: String,
@@ -1800,11 +1799,11 @@ fn default_ask_anchor() -> AskAnchor {
     AskAnchor::Center
 }
 
-/// The display the panel was last put on, which on a single-monitor machine is the
-/// only display and on a multi-monitor one is the answer that needs no setting.
-/// Naming a screen is for people who want it somewhere specific regardless.
+/// The quick ask opens on the display the cursor is on — the screen the user is
+/// working on — which is also where the dictation overlay appears. Naming a
+/// screen is for people who want it somewhere specific regardless.
 pub fn default_ask_display() -> String {
-    "last_used".to_string()
+    "cursor".to_string()
 }
 
 /// Overlay style defaults to `Auto` (follow the model's live-streaming support)
@@ -2915,6 +2914,10 @@ fn default_assistant_tts_kokoro_dtype() -> String {
     "fp32".to_string()
 }
 
+fn default_assistant_tts_kokoro_device() -> String {
+    "auto".to_string()
+}
+
 fn default_assistant_tts_speed() -> f64 {
     // Normal speaking rate. The UI offers presets (0.5x–3x) and free entry;
     // values are clamped to a sane range when persisted.
@@ -2964,6 +2967,12 @@ fn default_assistant_panel_opacity() -> f64 {
 
 fn default_assistant_panel_size() -> String {
     "standard".to_string()
+}
+
+/// The panel size presets Settings offers. "mini" was offered in the UI and
+/// rejected here, so picking it failed and a stored "mini" was reset on load.
+pub fn is_assistant_panel_size(size: &str) -> bool {
+    matches!(size, "mini" | "compact" | "standard" | "large")
 }
 
 fn default_tap_to_lock() -> bool {
@@ -3202,6 +3211,22 @@ fn ensure_assistant_defaults(settings: &mut AppSettings) -> bool {
         settings.assistant_tts_kokoro_dtype = default_assistant_tts_kokoro_dtype();
         changed = true;
     }
+    if !matches!(
+        settings.assistant_tts_kokoro_device.as_str(),
+        "auto" | "gpu" | "cpu"
+    ) {
+        settings.assistant_tts_kokoro_device = default_assistant_tts_kokoro_device();
+        changed = true;
+    }
+    // "q8 on CPU" was the escape hatch for GPUs that garble Kokoro. It was a
+    // precision rather than a place to run, so it now becomes what it meant:
+    // run on the processor. Until the processor voice is downloaded the panel
+    // honours that by keeping Kokoro off WebGPU, exactly as "q8-cpu" did.
+    if settings.assistant_tts_kokoro_dtype == "q8-cpu" {
+        settings.assistant_tts_kokoro_dtype = "q8".to_string();
+        settings.assistant_tts_kokoro_device = "cpu".to_string();
+        changed = true;
+    }
     // Keep conversation memory in a sane range (0 = no memory, 200 hard cap).
     if settings.assistant_max_history_messages > 200 {
         settings.assistant_max_history_messages = 200;
@@ -3222,11 +3247,14 @@ fn ensure_assistant_defaults(settings: &mut AppSettings) -> bool {
         settings.assistant_tts_volume = default_assistant_tts_volume();
         changed = true;
     }
-    if !matches!(
-        settings.assistant_panel_size.as_str(),
-        "compact" | "standard" | "large"
-    ) {
+    if !is_assistant_panel_size(&settings.assistant_panel_size) {
         settings.assistant_panel_size = default_assistant_panel_size();
+        changed = true;
+    }
+    // "last_used" meant "the display I last dragged it to", a remembered position
+    // that no longer exists. The quick ask follows the cursor instead.
+    if settings.assistant_ask_display == "last_used" {
+        settings.assistant_ask_display = default_ask_display();
         changed = true;
     }
     // Web search: validate provider and backfill API-key slots for keyed
@@ -3695,6 +3723,7 @@ pub fn get_default_settings() -> AppSettings {
         assistant_tts_remote_voices: HashMap::new(),
         assistant_tts_api_keys: SecretMap::default(),
         assistant_tts_kokoro_dtype: default_assistant_tts_kokoro_dtype(),
+        assistant_tts_kokoro_device: default_assistant_tts_kokoro_device(),
         assistant_tts_speed: default_assistant_tts_speed(),
         assistant_tts_volume: default_assistant_tts_volume(),
         assistant_conversation_pace: ConversationPace::default(),
@@ -4645,7 +4674,15 @@ pub fn load_or_create_app_settings(app: &AppHandle) -> AppSettings {
         // salvage every individually-valid field instead of wiping the store
         // (Handy #1631) — one bad field must never reset the user's config.
         let (mut settings, mut updated) = deserialize_settings_value(settings_value.clone());
-        debug!("Found existing settings: {:?}", settings);
+        // The full dump includes personal memory ("About You" and notes), custom
+        // and learned words, text replacements, prompts and profiles — none of it
+        // belongs in a log file that persists on disk in a shipped build. API
+        // keys are already redacted by `SecretMap`'s Debug impl.
+        if cfg!(debug_assertions) {
+            debug!("Found existing settings: {:?}", settings);
+        } else {
+            debug!("Found existing settings (contents not logged in release builds)");
+        }
 
         let default_settings = get_default_settings();
 
@@ -5946,6 +5983,29 @@ mod tests {
         ensure_assistant_defaults(&mut on);
         assert!(on.assistant_memory_enabled);
         assert!(!retire_memory_incognito(&mut on));
+    }
+
+    /// "q8 on CPU" used to be a precision; it meant "run on the processor", and
+    /// it becomes exactly that. An unknown device falls back to Automatic.
+    #[test]
+    fn ensure_assistant_defaults_moves_q8_cpu_to_the_processor_device() {
+        let mut legacy = get_default_settings();
+        legacy.assistant_tts_kokoro_dtype = "q8-cpu".to_string();
+        legacy.assistant_tts_kokoro_device = "auto".to_string();
+        assert!(ensure_assistant_defaults(&mut legacy));
+        assert_eq!(legacy.assistant_tts_kokoro_dtype, "q8");
+        assert_eq!(legacy.assistant_tts_kokoro_device, "cpu");
+        // Settled: a second pass changes nothing.
+        assert!(!ensure_assistant_defaults(&mut legacy));
+
+        let mut unknown = get_default_settings();
+        unknown.assistant_tts_kokoro_device = "npu".to_string();
+        assert!(ensure_assistant_defaults(&mut unknown));
+        assert_eq!(unknown.assistant_tts_kokoro_device, "auto");
+
+        let fresh = get_default_settings();
+        assert_eq!(fresh.assistant_tts_kokoro_device, "auto");
+        assert_eq!(fresh.assistant_tts_kokoro_dtype, "fp32");
     }
 
     #[test]

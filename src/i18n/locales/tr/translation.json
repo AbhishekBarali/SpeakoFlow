@@ -1430,7 +1430,7 @@
           "large": "Büyük"
         },
         "panelSizeLabel": "Panel boyutu",
-        "panelSizeDescription": "Yüzen asistan panelinin genel boyutu. Yeniden boyutlandırmak için kenarlarından da sürükleyebilirsiniz.",
+        "panelSizeDescription": "Yüzen asistan panelinin genel boyutu.",
         "panelSizes": {
           "mini": "Küçük",
           "compact": "Kompakt",
@@ -1541,14 +1541,11 @@
     },
     "empty": "Asistan kısayolunuzla sesle sorun,\nya da aşağıya yazın.",
     "inputPlaceholder": "Mesaj…",
-    "inputPlaceholderScreen": "Ekranınız hakkında sorun…",
     "queuedUntilReady": "Sırada — bu yanıt biter bitmez gönderilecek.",
     "send": "Gönder",
     "stop": "Durdur",
     "cancel": "İptal",
-    "finish": "Bitir ve gönder",
     "clear": "Konuşmayı temizle",
-    "hide": "Paneli gizle",
     "copy": "Kopyala",
     "copyCode": "Kodu kopyala",
     "regenerate": "Yanıtı yeniden oluştur (eskisi Geçmiş'te kalır)",
@@ -1559,7 +1556,6 @@
     "attach": {
       "file": "Bir görüntü veya dosya ekle",
       "snip": "Ekranın bir bölgesini kırp",
-      "image": "Görüntü",
       "imageCount": "{{count}} görüntü",
       "imageCount_other": "{{count}} görüntü",
       "remove": "Eki kaldır",
@@ -1575,21 +1571,7 @@
     "tts": {
       "enable": "Sesli özetleri etkinleştir",
       "disable": "Sesli özetleri devre dışı bırak",
-      "loading": "Kokoro ses modeli yükleniyor...",
-      "loadingShort": "Ses modeli %{{progress}}"
-    },
-    "pill": {
-      "talk": "Konuşmak için tıklayın",
-      "stop": "Durdur ve gönder",
-      "idle": "Asistan",
-      "expand": "Paneli genişlet",
-      "collapse": "Kapsüle daralt",
-      "close": "Asistanı kapat",
-      "cancel": "Göndermeden iptal et",
-      "cancelTurn": "İptal",
-      "dismiss": "Yoksay",
-      "disarmScreen": "Ekran görüşü açık — kapatmak için tıklayın",
-      "armScreen": "Ekran görüşü kapalı — açmak için tıklayın"
+      "loading": "Kokoro ses modeli yükleniyor..."
     },
     "status": {
       "listening": "Dinleniyor…",
@@ -1652,6 +1634,10 @@
       "preparing": "Yerel motor hazırlanıyor (ilk çalıştırma)…",
       "extracting": "Yerel motor kuruluyor…",
       "short": "Motor hazırlanıyor…"
+    },
+    "quick": {
+      "selection": "Seçim",
+      "copied": "Kopyalandı"
     }
   },
   "voiceEngines": {
