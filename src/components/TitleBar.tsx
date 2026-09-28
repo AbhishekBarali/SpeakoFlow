@@ -20,11 +20,14 @@ import Wordmark from "./Wordmark";
  */
 export const TitleBar: React.FC = () => {
   const { t } = useTranslation();
+  const isMac = platform() === "macos";
   // Same Windows move-loop hazard as the assistant pill: a click on the drag
   // region can leave the window stuck to the cursor and the desktop
-  // unclickable (see useSafeWindowDrag).
-  useSafeWindowDrag();
-  const isMac = platform() === "macos";
+  // unclickable (see useSafeWindowDrag). This is a real application window, so
+  // it keeps the system move loop and its edge snapping. Double-click maximize
+  // is handled below on Windows/Linux; only macOS leaves it to Tauri, whose
+  // handler maximizes on mouseup there.
+  useSafeWindowDrag({ systemMove: true, maximizeOnDoubleClick: isMac });
   const appWindow = React.useMemo(() => getCurrentWindow(), []);
   const [isMaximized, setIsMaximized] = useState(false);
 

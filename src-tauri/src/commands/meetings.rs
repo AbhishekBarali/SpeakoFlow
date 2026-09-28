@@ -563,9 +563,11 @@ pub async fn set_meeting_auto_detect(app: AppHandle, enabled: bool) -> Result<()
     settings.meeting_auto_detect = enabled;
     crate::settings::write_settings(&app, settings);
     // Turning it off should also take down an offer already on screen, rather than
-    // leaving a card the setting says cannot appear.
+    // leaving a card the setting says cannot appear. Only an offer: the same window
+    // is the indicator of a meeting being recorded, and hiding it unconditionally
+    // took that indicator away mid-meeting.
     if !enabled {
-        crate::meetings::pill::hide_call_offer(&app);
+        crate::meetings::pill::withdraw_call_offer(&app);
     }
     Ok(())
 }

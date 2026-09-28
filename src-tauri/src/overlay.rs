@@ -1,12 +1,13 @@
 use crate::input;
 use crate::overlay_follow::{
-    placement_on, Edge, MonitorBounds, OverlayFollower, Point, FOLLOW_FRAME, FOLLOW_POLL,
+    display_under, placement_on, rect_contains, DisplayFollower, Edge, MonitorBounds, Point,
+    FOLLOW_POLL,
 };
 use crate::overlay_lifecycle::OverlayLifecycle;
 use crate::settings;
 use crate::settings::OverlayPosition;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize};
+use tauri::{AppHandle, Emitter, Manager, PhysicalPosition};
 
 /// Bumped on every overlay state change. The delayed hide behind a brief
 /// notice only fires when nothing newer (e.g. a fresh recording) replaced it.
@@ -65,6 +66,51 @@ const OVERLAY_LABEL_HEIGHT: f64 = 60.0;
 const OVERLAY_STREAM_WIDTH: f64 = 400.0;
 const OVERLAY_STREAM_HEIGHT: f64 = 120.0;
 
+/// Windows accessibility text size (Settings → Accessibility → Text size).
+///
+/// A separate axis from display scaling: WebView2 applies it as a document zoom
+/// *inside* the window, while the window itself is sized only by DPI. The
+/// overlay's frame is kept tight around the pill (see `OVERLAY_WIDTH`), so at
+/// 125% text the pill and card were larger than their window and got clipped on
+/// every dictation. The value is absent until the slider is moved off 100%, and
+/// is stored as a percentage. Backport of Handy #2059.
+#[cfg(target_os = "windows")]
+fn windows_text_scale_factor() -> f64 {
+    winreg::RegKey::predef(winreg::enums::HKEY_CURRENT_USER)
+        .open_subkey(r"Software\Microsoft\Accessibility")
+        .and_then(|key| key.get_value::<u32, _>("TextScaleFactor"))
+        .map(|percent| clamp_text_scale(percent as f64 / 100.0))
+        .unwrap_or(1.0)
+}
+
+/// Windows allows 100%–225%; anything outside that is a corrupt value.
+fn clamp_text_scale(scale: f64) -> f64 {
+    if scale.is_finite() {
+        scale.clamp(1.0, 2.25)
+    } else {
+        1.0
+    }
+}
+
+/// Content zoom the overlay's webview renders at, beyond display scaling.
+fn overlay_text_scale() -> f64 {
+    #[cfg(target_os = "windows")]
+    {
+        windows_text_scale_factor()
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        1.0
+    }
+}
+
+/// A logical overlay size grown by the text scale, so the zoomed content fits.
+/// Placement offsets are not scaled: the overlay keeps its distance from the
+/// screen edge and grows away from it.
+fn scale_overlay_size((width, height): (f64, f64), text_scale: f64) -> (f64, f64) {
+    (width * text_scale, height * text_scale)
+}
+
 /// Only completed live cards linger. All waiting is event-driven.
 ///
 /// The card holds still at full opacity for the whole linger — that is the
@@ -93,8 +139,40 @@ pub fn set_overlay_hovered(hovered: bool) {
 struct ShowOverlayPayload {
     state: String,
     streaming_window: bool,
+    /// Whether the card takes the pointer in this state (see
+    /// [`live_card_takes_pointer`]). The webview only offers the copy button and
+    /// text selection when it does, so it never shows a control that a
+    /// click-through window would pass straight to the app underneath.
+    interactive: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     notice: Option<String>,
+}
+
+/// Whether the live card can take the pointer mid-recording without being able
+/// to take keyboard focus.
+///
+/// The pointer is what makes live text worth showing — scrolling back through
+/// it, selecting a phrase, the copy button — and a click-through card showed all
+/// of that and let none of it work: the cursor over it was the app's underneath.
+/// But the overlay must never become the window a paste lands in (see
+/// `create_recording_overlay`), so input is only enabled where the window is
+/// structurally unable to take focus: Windows sets `WS_EX_NOACTIVATE`, macOS
+/// uses a panel that can never become key, and a GTK layer surface is created
+/// with `KeyboardMode::None`. An ordinary X11 window has none of these — a click
+/// focuses it — so there the card stays click-through until the paste is done.
+fn live_card_takes_pointer() -> bool {
+    #[cfg(any(target_os = "windows", target_os = "macos"))]
+    {
+        true
+    }
+    #[cfg(target_os = "linux")]
+    {
+        LAYER_SHELL_ACTIVE.load(Ordering::SeqCst)
+    }
+    #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+    {
+        false
+    }
 }
 
 #[cfg(target_os = "macos")]
@@ -355,66 +433,15 @@ pub(crate) fn get_monitor_with_cursor(app_handle: &AppHandle) -> Option<tauri::M
 /// The monitor under the cursor, with **no** fallback. Cursor following needs
 /// the difference: "the cursor can't be located" (Wayland, a locked session)
 /// must leave the overlay where it is, not send it to the primary display.
+///
+/// The hit test itself (physical space first, logical second, and why) is
+/// `overlay_follow::display_under`, shared with the follower's cached list.
 fn monitor_under_cursor(app_handle: &AppHandle) -> Option<tauri::Monitor> {
-    let mouse_location = input::get_cursor_position(app_handle)?;
+    let (x, y) = input::get_cursor_position(app_handle)?;
     let monitors = app_handle.available_monitors().ok()?;
-    // Tauri reports monitor bounds in physical pixels; enigo's cursor is
-    // physical on Windows and X11 (`GetCursorPos` / `XQueryPointer` under a
-    // DPI-aware process) but logical points on macOS
-    // (`NSEvent::mouseLocation`). So the hit test runs twice, in each space,
-    // instead of guessing which one this platform is in.
-    //
-    // Physical first, because it is the only reading that is correct on a
-    // scaled multi-monitor Windows desktop: pre-scaling the monitor bounds down
-    // to logical while the cursor stays physical made every monitor look
-    // smaller than it is, so a cursor in the right half of a 150% display
-    // matched nothing and placement silently fell back to the primary monitor.
-    if let Some(monitor) = monitors
-        .iter()
-        .find(|m| is_mouse_within_monitor(mouse_location, m.position(), m.size()))
-    {
-        return Some(monitor.clone());
-    }
-
-    // Logical fallback (macOS, and any platform whose cursor turns out not to
-    // be physical). A no-op on an unscaled display, where the two spaces are
-    // identical.
-    monitors
-        .iter()
-        .find(|m| {
-            let scale = m.scale_factor();
-            let pos = PhysicalPosition::new(
-                (m.position().x as f64 / scale) as i32,
-                (m.position().y as f64 / scale) as i32,
-            );
-            let size = PhysicalSize::new(
-                (m.size().width as f64 / scale) as u32,
-                (m.size().height as f64 / scale) as u32,
-            );
-            is_mouse_within_monitor(mouse_location, &pos, &size)
-        })
-        .cloned()
-}
-
-fn is_mouse_within_monitor(
-    mouse_pos: (i32, i32),
-    monitor_pos: &PhysicalPosition<i32>,
-    monitor_size: &PhysicalSize<u32>,
-) -> bool {
-    let (mouse_x, mouse_y) = mouse_pos;
-    let PhysicalPosition {
-        x: monitor_x,
-        y: monitor_y,
-    } = *monitor_pos;
-    let PhysicalSize {
-        width: monitor_width,
-        height: monitor_height,
-    } = *monitor_size;
-
-    mouse_x >= monitor_x
-        && mouse_x < (monitor_x + monitor_width as i32)
-        && mouse_y >= monitor_y
-        && mouse_y < (monitor_y + monitor_height as i32)
+    let displays: Vec<MonitorBounds> = monitors.iter().map(monitor_bounds).collect();
+    let hit = display_under(&displays, (x as f64, y as f64))?;
+    monitors.into_iter().find(|m| monitor_bounds(m) == hit)
 }
 
 /// Overlay positions are computed and applied in the platform's native window
@@ -476,77 +503,110 @@ fn set_overlay_placement(window: &tauri::webview::WebviewWindow, (x, y): Point) 
     let _ = window.set_position(position);
 }
 
-/// Where the overlay window is now, in the native placement space.
-fn overlay_placement(window: &tauri::webview::WebviewWindow) -> Option<Point> {
-    let position = window.outer_position().ok()?;
-    if PLACE_IN_PHYSICAL {
-        Some((position.x as f64, position.y as f64))
-    } else {
-        let scale = window.scale_factor().ok()?;
-        Some((position.x as f64 / scale, position.y as f64 / scale))
-    }
-}
-
 /// Generation of the running cursor follower. Starting bumps it (retiring any
 /// previous follower), and every hide bumps it again, so nothing keeps moving a
 /// window that is deliberately down — the same lifecycle as the topmost guard.
 static OVERLAY_FOLLOW: AtomicU64 = AtomicU64::new(0);
 
+/// Whether the cursor and the overlay's placement are in the same coordinate
+/// space, so "is the pointer on the card?" can be answered from our own numbers.
+/// True on Windows (both physical) and macOS (both logical points). Not on
+/// Linux, where X11 reports a physical cursor while GTK places in logical pixels.
+const CURSOR_SHARES_PLACEMENT_SPACE: bool = cfg!(any(target_os = "windows", target_os = "macos"));
+
+/// A hover the webview reported but the cursor contradicts, for this long, is
+/// dropped. The completed card holds itself open while hovered and takes the
+/// pointer while it does; a `mouseleave` that never arrived used to hold it —
+/// and the clicks landing on it — for as long as the app ran.
+const STALE_HOVER_AFTER: std::time::Duration = std::time::Duration::from_millis(400);
+
 /// Keep the overlay on the display the cursor is on for as long as it is up.
 ///
-/// The decisions — wait for the cursor to settle, then glide — are
-/// `overlay_follow::OverlayFollower`; this is only the loop that samples the
-/// cursor and applies what it says. Sampling runs at `FOLLOW_POLL` while
-/// nothing is moving and at frame rate only during a glide, so an overlay
-/// sitting still costs one cursor read per poll.
-fn start_overlay_follow(app_handle: &AppHandle) {
+/// The decision — wait for the cursor to settle on another display, then move
+/// there in one step — is `overlay_follow::DisplayFollower`; this is only the loop
+/// that samples the cursor and applies what it says.
+///
+/// Everything the loop needs is captured when the overlay is shown: the display
+/// it was placed on, its size, and one enumeration of the displays. Asking the
+/// window instead (position, size, scale, monitors) cost four round trips
+/// through the event loop on every poll, and those stall exactly when the main
+/// thread is busy — which is what made following feel laggy. What is left per
+/// poll is one cursor read, which does not touch the event loop at all.
+fn start_overlay_follow(
+    app_handle: &AppHandle,
+    placed_on: Option<tauri::Monitor>,
+    size: (f64, f64),
+) {
     let generation = OVERLAY_FOLLOW.fetch_add(1, Ordering::SeqCst) + 1;
     #[cfg(target_os = "linux")]
     if LAYER_SHELL_ACTIVE.load(Ordering::SeqCst) {
         return;
     }
-    let position = settings::get_settings(app_handle).overlay_position;
+    // Nowhere to follow from: the overlay could not be placed on any display.
+    let Some(placed_on) = placed_on else {
+        return;
+    };
+    let edge = overlay_edge(settings::get_settings(app_handle).overlay_position);
     let app = app_handle.clone();
     std::thread::spawn(move || {
         let alive = || OVERLAY_FOLLOW.load(Ordering::SeqCst) == generation;
-        let mut follower = OverlayFollower::default();
-        // Where the overlay belongs for the cursor's display, re-probed at poll
-        // cadence even mid-glide: enumerating monitors every frame buys nothing.
-        let mut target: Option<Point> = None;
-        let mut probed_at: Option<std::time::Instant> = None;
+        // Once per overlay lifetime. A display plugged in mid-dictation is picked
+        // up by the next show, which is at most one state change away.
+        let displays: Vec<MonitorBounds> = match app.available_monitors() {
+            Ok(monitors) => monitors.iter().map(monitor_bounds).collect(),
+            Err(_) => return,
+        };
+        let mut current = monitor_bounds(&placed_on);
+        let mut follower = DisplayFollower::default();
+        let mut stale_hover_since: Option<std::time::Instant> = None;
         while alive() {
-            std::thread::sleep(if follower.is_gliding() {
-                FOLLOW_FRAME
-            } else {
-                FOLLOW_POLL
-            });
-            if !alive() || follower.given_up() {
+            std::thread::sleep(FOLLOW_POLL);
+            if !alive() {
                 break;
             }
-            let Some(window) = app.get_webview_window("recording_overlay") else {
-                break;
-            };
-            // The pointer is on the completed card, reaching for its copy
-            // button. Never pull the card out from under it.
-            if OVERLAY_LIFECYCLE.is_hovered() && !follower.is_gliding() {
-                continue;
-            }
-            let Some(current) = overlay_placement(&window) else {
+            let Some((x, y)) = input::get_cursor_position(&app) else {
                 continue;
             };
+            let cursor = (x as f64, y as f64);
             let now = std::time::Instant::now();
-            if probed_at.is_none_or(|at| now.duration_since(at) >= FOLLOW_POLL) {
-                probed_at = Some(now);
-                let (width, height) = current_overlay_logical_size(&window);
-                target = monitor_under_cursor(&app)
-                    .map(|monitor| placement_for(&monitor, width, height, position));
+
+            // The pointer is on the completed card, reaching for its copy button:
+            // never pull the card out from under it. But check the claim — the
+            // hover comes from the webview's `mouseenter`/`mouseleave`, and one
+            // missed `mouseleave` would otherwise keep a clickable card on screen
+            // indefinitely.
+            if OVERLAY_LIFECYCLE.is_hovered() {
+                if CURSOR_SHARES_PLACEMENT_SPACE {
+                    let origin = placement_on(current, size, edge, PLACE_IN_PHYSICAL);
+                    let extent = if PLACE_IN_PHYSICAL {
+                        (size.0 * current.scale, size.1 * current.scale)
+                    } else {
+                        size
+                    };
+                    if rect_contains(origin, extent, 6.0, cursor) {
+                        stale_hover_since = None;
+                    } else if now.saturating_duration_since(*stale_hover_since.get_or_insert(now))
+                        >= STALE_HOVER_AFTER
+                    {
+                        log::debug!("Overlay hover outlived the pointer; releasing it");
+                        stale_hover_since = None;
+                        set_overlay_hovered(false);
+                    }
+                }
+                continue;
             }
-            if let Some(next) = follower.step(current, target, now) {
+            stale_hover_since = None;
+
+            if let Some(target) = follower.step(current, display_under(&displays, cursor), now) {
                 // A hide or a new state may have landed while this tick ran.
                 if !alive() {
                     break;
                 }
-                set_overlay_placement(&window, next);
+                let Some(window) = app.get_webview_window("recording_overlay") else {
+                    break;
+                };
+                set_overlay_placement(&window, placement_on(target, size, edge, PLACE_IN_PHYSICAL));
+                current = target;
             }
         }
     });
@@ -621,7 +681,10 @@ pub fn create_recording_overlay(app_handle: &AppHandle) {
     .additional_browser_args(crate::WEBVIEW2_BROWSER_ARGS)
     .title("Recording")
     .resizable(false)
-    .inner_size(OVERLAY_WIDTH, OVERLAY_HEIGHT)
+    .inner_size(
+        OVERLAY_WIDTH * overlay_text_scale(),
+        OVERLAY_HEIGHT * overlay_text_scale(),
+    )
     .shadow(false)
     .maximizable(false)
     .minimizable(false)
@@ -647,10 +710,11 @@ pub fn create_recording_overlay(app_handle: &AppHandle) {
             // landed on it. Worse, a click that reached the overlay *activated*
             // it, which moved keyboard focus off the field being dictated into —
             // and the synthetic Ctrl+V then pasted the transcript into the
-            // overlay's own webview, where it went nowhere. Recording is
-            // click-through by default; `finish_recording_overlay` re-enables
-            // input only for the completed card, which is the one state with
-            // something to click (the copy button).
+            // overlay's own webview, where it went nowhere. So the window is
+            // click-through by default; `show_overlay_state_with_notice` gives
+            // the live card the pointer only where it cannot take focus (see
+            // `live_card_takes_pointer`), and `finish_recording_overlay` gives it
+            // back everywhere once the paste has happened.
             let _ = window.set_ignore_cursor_events(true);
 
             // Belt and braces on Windows: WS_EX_NOACTIVATE means even a click
@@ -773,15 +837,19 @@ fn show_overlay_state_with_notice(app_handle: &AppHandle, state: &str, notice: O
     } else {
         (OVERLAY_WIDTH, OVERLAY_HEIGHT)
     };
+    // Read per show, so a text-size change applies to the next dictation.
+    let (width, height) = scale_overlay_size((width, height), overlay_text_scale());
 
     // Size the overlay for the current mode, then re-center for that exact
     // size, BEFORE showing it — so it never flashes at the wrong size/position.
+    let mut placed_on = None;
     if let Some(overlay_window) = app_handle.get_webview_window("recording_overlay") {
         // Already on screen means this is a state change mid-dictation
         // (recording → transcribing → cleanup). It re-centres for the new size
         // on the display the overlay is *on*; if the cursor has since moved to
-        // another display, the follower glides it there. Snapping it across on
-        // a state change would be the very teleport following exists to avoid.
+        // another display, the follower moves it there once the cursor settles.
+        // Snapping it across on every state change would move it while the user
+        // is sweeping past, which is what the dwell exists to prevent.
         let on_screen = overlay_window.is_visible().unwrap_or(false);
         let _ = overlay_window.set_size(tauri::Size::Logical(tauri::LogicalSize { width, height }));
         let monitor = if on_screen {
@@ -789,14 +857,15 @@ fn show_overlay_state_with_notice(app_handle: &AppHandle, state: &str, notice: O
         } else {
             None
         };
-        place_overlay_on(app_handle, &overlay_window, width, height, monitor);
+        placed_on = place_overlay_on(app_handle, &overlay_window, width, height, monitor);
     }
 
     if let Some(overlay_window) = app_handle.get_webview_window("recording_overlay") {
-        // Every state reached through here is a state the user cannot interact
-        // with, so the overlay must not intercept the pointer. Only the completed
-        // card takes input back (see `finish_recording_overlay`).
-        let _ = overlay_window.set_ignore_cursor_events(true);
+        // The compact pill has nothing to act on, so it never intercepts the
+        // pointer. The live card takes it wherever that cannot cost the paste
+        // target its focus; elsewhere it waits for `finish_recording_overlay`.
+        let interactive = streaming_window && live_card_takes_pointer();
+        let _ = overlay_window.set_ignore_cursor_events(!interactive);
         let _ = overlay_window.show();
 
         // On Windows, aggressively re-assert "topmost" in the native Z-order after showing
@@ -810,7 +879,7 @@ fn show_overlay_state_with_notice(app_handle: &AppHandle, state: &str, notice: O
         start_overlay_topmost_guard(app_handle);
 
         // Follow the cursor to whichever display the user is working on.
-        start_overlay_follow(app_handle);
+        start_overlay_follow(app_handle, placed_on, (width, height));
 
         // On Linux, re-assert the keep-above hint after showing (for the
         // non-layer-shell fallback on X11/Xorg). No-op under layer shell and
@@ -823,6 +892,7 @@ fn show_overlay_state_with_notice(app_handle: &AppHandle, state: &str, notice: O
             ShowOverlayPayload {
                 state: state.to_string(),
                 streaming_window,
+                interactive,
                 notice,
             },
         );
@@ -885,32 +955,32 @@ pub fn update_overlay_position(app_handle: &AppHandle) {
 /// both re-center correctly on the monitor under the cursor.
 fn update_overlay_position_sized(app_handle: &AppHandle, width: f64, height: f64) {
     if let Some(overlay_window) = app_handle.get_webview_window("recording_overlay") {
-        place_overlay_on(app_handle, &overlay_window, width, height, None);
+        let _ = place_overlay_on(app_handle, &overlay_window, width, height, None);
     }
 }
 
 /// Centres the overlay on `monitor` for the given logical size, or on the
-/// monitor under the cursor when `monitor` is `None`.
+/// monitor under the cursor when `monitor` is `None`. Returns the monitor it
+/// was placed on, which is where the cursor follower starts from.
 fn place_overlay_on(
     app_handle: &AppHandle,
     overlay_window: &tauri::webview::WebviewWindow,
     width: f64,
     height: f64,
     monitor: Option<tauri::Monitor>,
-) {
+) -> Option<tauri::Monitor> {
     #[cfg(target_os = "linux")]
     {
         update_gtk_layer_shell_anchors(overlay_window);
     }
 
-    let Some(monitor) = monitor.or_else(|| get_monitor_with_cursor(app_handle)) else {
-        return;
-    };
+    let monitor = monitor.or_else(|| get_monitor_with_cursor(app_handle))?;
     let position = settings::get_settings(app_handle).overlay_position;
     set_overlay_placement(
         overlay_window,
         placement_for(&monitor, width, height, position),
     );
+    Some(monitor)
 }
 
 /// A successful dictation leaves its final (including cleaned-up) text available
@@ -941,9 +1011,10 @@ pub fn finish_recording_overlay(app: &AppHandle, text: &str, notice: Option<&str
     let Some(window) = app.get_webview_window("recording_overlay") else {
         return;
     };
-    // The completed card is the one overlay state with a target in it — the copy
-    // button — and its hover also holds the linger open, so this is where the
-    // pointer is handed back after a click-through recording.
+    // The paste has happened, so the card can take the pointer on every platform
+    // now — including an X11 window, which had to stay click-through while a
+    // click could still have moved focus off the paste target. Its hover also
+    // holds the linger open.
     let _ = window.set_ignore_cursor_events(false);
     let _ = window.emit(
         "finish-overlay",
@@ -1042,4 +1113,26 @@ pub fn emit_levels(app_handle: &AppHandle, levels: &Vec<f32>) {
     // in windows without one. This replaces the old pair of `.emit()` calls that
     // delivered the event to the overlay twice per frame.
     let _ = app_handle.emit("mic-level", levels);
+}
+
+#[cfg(test)]
+mod text_scale_tests {
+    use super::{clamp_text_scale, scale_overlay_size, OVERLAY_HEIGHT, OVERLAY_WIDTH};
+
+    #[test]
+    fn the_overlay_grows_with_the_windows_text_size() {
+        assert_eq!(
+            scale_overlay_size((OVERLAY_WIDTH, OVERLAY_HEIGHT), 1.0),
+            (OVERLAY_WIDTH, OVERLAY_HEIGHT)
+        );
+        assert_eq!(scale_overlay_size((400.0, 120.0), 1.5), (600.0, 180.0));
+    }
+
+    #[test]
+    fn a_corrupt_text_scale_is_clamped_to_what_windows_allows() {
+        assert_eq!(clamp_text_scale(0.5), 1.0);
+        assert_eq!(clamp_text_scale(1.25), 1.25);
+        assert_eq!(clamp_text_scale(9.0), 2.25);
+        assert_eq!(clamp_text_scale(f64::NAN), 1.0);
+    }
 }

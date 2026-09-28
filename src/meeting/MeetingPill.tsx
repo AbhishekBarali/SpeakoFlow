@@ -24,6 +24,7 @@ import { TONE_HEX } from "./tones";
 import { useMeetingPill } from "./useMeetingPill";
 import { MeetingAsk } from "./MeetingAsk";
 import { useSafeWindowDrag } from "@/lib/useSafeWindowDrag";
+import { preventBrowserContextMenu } from "@/lib/contextMenu";
 import "./MeetingPill.css";
 
 /** Below this a stream counts as silent. */
@@ -216,7 +217,11 @@ const MeetingPill: React.FC = () => {
     // recording indicator uses, so accepting is visually continuous.
     if (offer) {
       return (
-        <div ref={rootRef} className="pill-shell">
+        <div
+          ref={rootRef}
+          className="pill-shell"
+          onContextMenu={preventBrowserContextMenu}
+        >
           <OfferCard app={offer.app} onDone={clearOffer} />
         </div>
       );
@@ -275,7 +280,11 @@ const MeetingPill: React.FC = () => {
 
   if (!expanded) {
     return (
-      <div ref={rootRef} className="pill-shell">
+      <div
+        ref={rootRef}
+        className="pill-shell"
+        onContextMenu={preventBrowserContextMenu}
+      >
         <div
           className="mpill"
           data-paused={String(paused)}
@@ -324,7 +333,11 @@ const MeetingPill: React.FC = () => {
   }
 
   return (
-    <div ref={rootRef} className="pill-shell">
+    <div
+      ref={rootRef}
+      className="pill-shell"
+      onContextMenu={preventBrowserContextMenu}
+    >
       <div
         className="pill-card"
         data-origin-x={origin.right ? "right" : "left"}

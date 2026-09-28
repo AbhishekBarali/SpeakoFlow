@@ -104,8 +104,7 @@ const MIN_HEIGHT: f64 = 30.0;
 ///
 /// The clamp lives here rather than in CSS because the webview cannot see the
 /// display: its own `100vh` is only ever the window it is already in, so a
-/// transcript that keeps growing would keep growing the window. Same reasoning as
-/// `assistant::fit_ask_card`.
+/// transcript that keeps growing would keep growing the window.
 const MAX_HEIGHT_FRACTION: f64 = 0.62;
 
 /// Gap between the pill and the display edge it first docks against.
@@ -300,6 +299,8 @@ pub fn show_pill(app: &AppHandle) {
         // Size first, then position for that exact size, then show — otherwise it
         // flashes at the wrong geometry before settling.
         apply_geometry(&app_main, &window);
+        // Collapsed, like the geometry just applied (see `hide_pill`).
+        let _ = app_main.emit_to(PILL_LABEL, PILL_MODE_EVENT, false);
         let _ = window.show();
         // Re-assert after showing: `always_on_top` at build time is a request,
         // and another process may already hold the topmost slot.
@@ -332,6 +333,11 @@ pub fn hide_pill(app: &AppHandle) {
         // Remembered before it goes, while the position is still the one the
         // user can see.
         save_position(&app_main, &window);
+        // The webview keeps its own `expanded` state and only hears about a mode
+        // change from `set_pill_expanded`. Collapsing here without telling it
+        // left the next meeting's pill rendering the full card inside the
+        // collapsed-size, unfocusable window: squeezed, clipped and untypeable.
+        let _ = app_main.emit_to(PILL_LABEL, PILL_MODE_EVENT, false);
         let _ = window.hide();
         // Back to unfocusable, so the next show cannot arrive able to steal the
         // caret. Safe here precisely because the window is now hidden and holds

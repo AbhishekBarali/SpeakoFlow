@@ -19,6 +19,10 @@ export interface AudioWaveformProps {
   active?: boolean;
   mode?: WaveMode;
   size?: "sm" | "md";
+  /** Distance between bar centres, in viewBox units (the box is 24 high). */
+  pitch?: number;
+  /** Bar thickness, in the same units. */
+  barWidth?: number;
   className?: string;
 }
 
@@ -30,6 +34,8 @@ const AudioWaveform: React.FC<AudioWaveformProps> = ({
   active = true,
   mode = "reactive",
   size = "sm",
+  pitch = 4,
+  barWidth = 2,
   className = "",
 }) => {
   const count = Math.max(
@@ -127,7 +133,7 @@ const AudioWaveform: React.FC<AudioWaveformProps> = ({
 
   const display =
     mode === "reactive" ? heights : waveTargets(WORKING_LEVELS, count);
-  const width = (count - 1) * 4 + 2;
+  const width = (count - 1) * pitch + barWidth;
   return (
     <svg
       ref={svgRef}
@@ -158,12 +164,12 @@ const AudioWaveform: React.FC<AudioWaveformProps> = ({
           <line
             key={index}
             className="wave-bar"
-            x1={1 + index * 4}
-            x2={1 + index * 4}
+            x1={barWidth / 2 + index * pitch}
+            x2={barWidth / 2 + index * pitch}
             y1={12 - height * 10}
             y2={12 + height * 10}
             stroke={`url(#${gradient})`}
-            strokeWidth="2"
+            strokeWidth={barWidth}
             strokeLinecap="round"
             vectorEffect="non-scaling-stroke"
             style={{ "--phase": `${index * -0.085}s` } as React.CSSProperties}
