@@ -953,8 +953,12 @@ pub(crate) async fn synthesize_speech(
     match provider.protocol {
         TtsProtocol::Local | TtsProtocol::Native => {
             let Some(native) = crate::native_tts::NativeRequest::from_settings(settings) else {
+                // Kokoro was moved off the processor mid-reply (its voice pack
+                // was removed, or it refused to start). The next reply is
+                // spoken in the assistant panel instead.
                 return Err(
-                    "Kokoro speaks inside the assistant panel, not through this path".to_string(),
+                    "The processor voice stopped mid-reply. The next reply uses the in-app voice."
+                        .to_string(),
                 );
             };
             let text = text.to_string();

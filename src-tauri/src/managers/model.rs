@@ -3774,10 +3774,11 @@ id: "gemma-3-4b".to_string(),
 
             // A voice pack whose engine download failed or was removed last
             // time: fetch just the engine.
-            if model_info.engine_type == EngineType::NativeTts
-                && !crate::native_tts::runtime_installed_in(&self.models_dir)
-            {
-                self.install_tts_runtime(model_id, &cancel_flag).await?;
+            if model_info.engine_type == EngineType::NativeTts {
+                if !crate::native_tts::runtime_installed_in(&self.models_dir) {
+                    self.install_tts_runtime(model_id, &cancel_flag).await?;
+                }
+                crate::native_tts::after_install(model_id);
             }
 
             {
@@ -4086,10 +4087,11 @@ id: "gemma-3-4b".to_string(),
 
         // A native voice pack also needs the engine library it runs on, shared
         // by every pack and fetched with the first one.
-        if model_info.engine_type == EngineType::NativeTts
-            && !crate::native_tts::runtime_installed_in(&self.models_dir)
-        {
-            self.install_tts_runtime(model_id, &cancel_flag).await?;
+        if model_info.engine_type == EngineType::NativeTts {
+            if !crate::native_tts::runtime_installed_in(&self.models_dir) {
+                self.install_tts_runtime(model_id, &cancel_flag).await?;
+            }
+            crate::native_tts::after_install(model_id);
         }
 
         // For vision LLMs, fetch the companion multimodal projector now that
@@ -4214,17 +4216,20 @@ id: "gemma-3-4b".to_string(),
 
         let mut deleted_something = false;
 
-        // A native voice pack may be loaded right now; its model file cannot
-        // be removed from under the engine (Windows refuses outright).
-        if model_info.engine_type == EngineType::NativeTts {
-            crate::native_tts::release(Some(model_id));
-        }
-
         if model_info.is_directory {
             // Delete complete model directory if it exists
             if model_path.exists() && model_path.is_dir() {
                 info!("Deleting model directory at: {:?}", model_path);
-                fs::remove_dir_all(&model_path)?;
+                if model_info.engine_type == EngineType::NativeTts {
+                    // A native voice pack may be loaded, or about to be. Its
+                    // files cannot go from under the engine (Windows refuses
+                    // outright), so the engine stays unloaded while they go.
+                    crate::native_tts::with_pack_unloaded(model_id, || {
+                        fs::remove_dir_all(&model_path)
+                    })?;
+                } else {
+                    fs::remove_dir_all(&model_path)?;
+                }
                 info!("Model directory deleted successfully");
                 deleted_something = true;
             }

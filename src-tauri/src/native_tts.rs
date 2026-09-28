@@ -227,6 +227,52 @@ fn notify_status() {
     }
 }
 
+/// Packs whose engine refused to start this session (the library loaded, but
+/// creating the voice from these files failed). Like [`LOAD_FAILED`], a pack
+/// listed here reads as not ready, so Kokoro falls back to the WebView instead
+/// of failing every reply. Cleared when the pack is removed or reinstalled.
+static PACK_FAILED: Lazy<Mutex<Vec<&'static str>>> = Lazy::new(|| Mutex::new(Vec::new()));
+
+fn pack_failed(pack: &VoicePack) -> bool {
+    PACK_FAILED
+        .lock()
+        .map(|failed| failed.contains(&pack.model_id))
+        .unwrap_or(false)
+}
+
+/// Remember that `pack` cannot start; `true` the first time.
+fn set_pack_failed(pack: &'static VoicePack) -> bool {
+    PACK_FAILED.lock().is_ok_and(|mut failed| {
+        if failed.contains(&pack.model_id) {
+            false
+        } else {
+            failed.push(pack.model_id);
+            true
+        }
+    })
+}
+
+fn forget_pack_failure(model_id: &str) {
+    if let Ok(mut failed) = PACK_FAILED.lock() {
+        failed.retain(|id| *id != model_id);
+    }
+}
+
+/// A voice pack finished installing: give it a fresh start, and check in the
+/// background that the engine library loads here, so a machine that refuses it
+/// (macOS library validation) says so in Settings now rather than on the first
+/// reply. Loading the library maps it into the process; no voice is loaded.
+pub fn after_install(model_id: &str) {
+    forget_pack_failure(model_id);
+    let _ = std::thread::Builder::new()
+        .name("native-voice-verify".into())
+        .spawn(|| {
+            if let Err(e) = runtime() {
+                debug!("Native voice engine check after install failed: {e}");
+            }
+        });
+}
+
 #[cfg(target_os = "windows")]
 const ORT_LIB: &str = "onnxruntime.dll";
 #[cfg(target_os = "windows")]
@@ -380,6 +426,7 @@ fn models_dir() -> Option<&'static Path> {
 /// Whether a pack and the runtime it needs are both installed.
 pub fn pack_ready(pack: &VoicePack) -> bool {
     !load_failed()
+        && !pack_failed(pack)
         && models_dir().is_some_and(|dir| {
             native_supported() && runtime_installed_in(dir) && pack_installed_in(dir, pack)
         })
@@ -538,6 +585,12 @@ pub fn blocker(settings: &AppSettings) -> Option<String> {
                 .to_string(),
         );
     }
+    if pack_failed(&KITTEN_PACK) {
+        return Some(
+            "Kitten couldn't start on this computer. Remove it in Models → Voice and download it again, or switch the voice to Kokoro."
+                .to_string(),
+        );
+    }
     if !pack_ready(&KITTEN_PACK) {
         return Some(
             "The assistant's voice is set to Kitten, which isn't downloaded yet. Download it in Models → Voice, or switch the voice to Kokoro."
@@ -554,7 +607,8 @@ pub struct LocalVoiceStatus {
     pub webgpu: WebGpuState,
     /// This platform has a native engine build.
     pub native_supported: bool,
-    /// The downloaded engine refused to load this session.
+    /// The processor voice is downloaded but couldn't start this session: the
+    /// engine library refused to load, or the Kokoro pack refused to start.
     pub native_load_failed: bool,
     pub kokoro_native_ready: bool,
     pub kitten_ready: bool,
@@ -565,7 +619,7 @@ pub fn status(settings: &AppSettings) -> LocalVoiceStatus {
         route: route(settings),
         webgpu: webgpu_state(),
         native_supported: native_supported(),
-        native_load_failed: load_failed(),
+        native_load_failed: load_failed() || pack_failed(&KOKORO_PACK),
         kokoro_native_ready: pack_ready(&KOKORO_PACK),
         kitten_ready: pack_ready(&KITTEN_PACK),
     }
@@ -927,6 +981,10 @@ fn runtime() -> Result<Arc<Runtime>, String> {
     info!("Native voice engine loaded (sherpa-onnx {SHERPA_VERSION})");
     let runtime = Arc::new(runtime);
     *guard = Some(runtime.clone());
+    drop(guard);
+    if LOAD_FAILED.swap(false, Ordering::Relaxed) {
+        notify_status();
+    }
     Ok(runtime)
 }
 
@@ -1041,6 +1099,10 @@ struct Loaded {
 
 static ENGINE: Lazy<Mutex<Option<Loaded>>> = Lazy::new(|| Mutex::new(None));
 static WATCHER_STARTED: AtomicBool = AtomicBool::new(false);
+/// A [`release`] that arrived while a synthesis held the engine. It cannot wait
+/// (its callers run on the main thread), so whoever holds the engine next
+/// drops it: the synthesis on its way out, or the idle watcher.
+static RELEASE_PENDING: AtomicBool = AtomicBool::new(false);
 
 /// Release the engine after [`IDLE_UNLOAD`] without use. `try_lock` so the
 /// watcher never waits behind a synthesis in progress, which is use anyway.
@@ -1053,11 +1115,15 @@ fn ensure_idle_watcher() {
         .spawn(|| loop {
             std::thread::sleep(Duration::from_secs(15));
             if let Ok(mut guard) = ENGINE.try_lock() {
-                if guard
+                let pending = RELEASE_PENDING.swap(false, Ordering::SeqCst);
+                let idle = guard
                     .as_ref()
-                    .is_some_and(|loaded| loaded.last_used.elapsed() >= IDLE_UNLOAD)
-                {
-                    info!("Native voice idle; releasing its memory");
+                    .is_some_and(|loaded| loaded.last_used.elapsed() >= IDLE_UNLOAD);
+                if guard.is_some() && (pending || idle) {
+                    info!(
+                        "Native voice {}; releasing its memory",
+                        if idle { "idle" } else { "no longer used" }
+                    );
                     *guard = None;
                 }
             }
@@ -1126,6 +1192,15 @@ fn create_engine(
     // after this call; the engine copies what it keeps.
     let handle = unsafe { (runtime.api.create)(&config) };
     if handle.is_null() {
+        // The library loaded but refused these files. Retrying on every reply
+        // cannot help, so the pack reads as not ready until it is reinstalled
+        // and Kokoro falls back to the WebView.
+        if set_pack_failed(pack) {
+            warn!(
+                "Native voice {} failed to start; not using it this session",
+                pack.model_id
+            );
+        }
         return Err(
             "The local voice couldn't start. Try downloading it again in Models → Voice."
                 .to_string(),
@@ -1194,27 +1269,53 @@ fn synthesize_pcm(request: &NativeRequest, text: &str) -> Result<Option<(Vec<f32
     }
     let epoch = crate::tts::current_epoch();
     let runtime = runtime()?;
+    let failed_before = pack_failed(request.pack);
+    let result = {
+        let mut guard = ENGINE
+            .lock()
+            .map_err(|_| "The voice engine lock was poisoned".to_string())?;
+        let result = synthesize_locked(&mut guard, &runtime, request, &text, epoch);
+        // A release asked for while this held the engine (a voice switch, or
+        // Runs on changing) could not wait on its caller's thread; honour it
+        // now that the work is done.
+        if RELEASE_PENDING.swap(false, Ordering::SeqCst) {
+            *guard = None;
+        }
+        result
+    };
+    if !failed_before && pack_failed(request.pack) {
+        // This pack just refused to start: tell the windows, so the next reply
+        // is routed back to the WebView.
+        notify_status();
+    }
+    result
+}
+
+/// The part of [`synthesize_pcm`] that runs with the engine slot locked.
+fn synthesize_locked(
+    slot: &mut Option<Loaded>,
+    runtime: &Arc<Runtime>,
+    request: &NativeRequest,
+    text: &str,
+    epoch: u64,
+) -> Result<Option<(Vec<f32>, u32)>, String> {
     let family = request.pack.family;
     let key = EngineKey {
         pack: request.pack.model_id,
         threads: threads_for(family, logical_cpus()),
     };
-
-    let mut guard = ENGINE
-        .lock()
-        .map_err(|_| "The voice engine lock was poisoned".to_string())?;
-    if guard.as_ref().is_none_or(|loaded| loaded.engine.key != key) {
+    if slot.as_ref().is_none_or(|loaded| loaded.engine.key != key) {
         // Drop the old engine before creating the next, so two are never
         // resident at once.
-        *guard = None;
-        let engine = create_engine(&runtime, request.pack, key.threads)?;
-        *guard = Some(Loaded {
+        *slot = None;
+        let engine = create_engine(runtime, request.pack, key.threads)?;
+        *slot = Some(Loaded {
             engine,
             last_used: Instant::now(),
         });
         ensure_idle_watcher();
     }
-    let loaded = guard.as_mut().expect("engine loaded above");
+    let loaded = slot.as_mut().expect("engine loaded above");
 
     let (sid, extra) = match family {
         VoiceFamily::Kokoro => (
@@ -1324,17 +1425,47 @@ pub fn prewarm(settings: &AppSettings) {
         });
 }
 
-/// Release the engine now if it belongs to `model_id` (before its files are
-/// deleted), or unconditionally when `model_id` is `None`.
+/// Release the engine now if it belongs to `model_id`, or unconditionally when
+/// `model_id` is `None`. Never waits: callers run on the main thread, and a
+/// synthesis can hold the engine for a second or more (loading it cannot be
+/// interrupted), so a busy engine is dropped by that synthesis when it ends.
 pub fn release(model_id: Option<&str>) {
-    if let Ok(mut guard) = ENGINE.lock() {
-        if guard
-            .as_ref()
-            .is_some_and(|loaded| model_id.is_none_or(|id| loaded.engine.key.pack == id))
-        {
-            *guard = None;
+    match ENGINE.try_lock() {
+        Ok(mut guard) => {
+            if guard
+                .as_ref()
+                .is_some_and(|loaded| model_id.is_none_or(|id| loaded.engine.key.pack == id))
+            {
+                *guard = None;
+            }
+        }
+        Err(std::sync::TryLockError::WouldBlock) => {
+            RELEASE_PENDING.store(true, Ordering::SeqCst);
+        }
+        Err(std::sync::TryLockError::Poisoned(poisoned)) => {
+            *poisoned.into_inner() = None;
         }
     }
+}
+
+/// Run `remove` (deleting `model_id`'s files) with the engine slot held and that
+/// pack unloaded, so no synthesis can start loading it from files that are
+/// going away. Waits for a synthesis in progress (one sentence or one engine
+/// load at most), so call it off the main thread.
+pub fn with_pack_unloaded<T>(model_id: &str, remove: impl FnOnce() -> T) -> T {
+    let mut guard = ENGINE
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    if guard
+        .as_ref()
+        .is_some_and(|loaded| loaded.engine.key.pack == model_id)
+    {
+        *guard = None;
+    }
+    let result = remove();
+    forget_pack_failure(model_id);
+    drop(guard);
+    result
 }
 
 #[cfg(test)]
@@ -1358,6 +1489,20 @@ mod tests {
         };
         assert!(error.contains(ORT_LIB), "{error}");
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// A pack whose engine refused to start stays out of the route until it is
+    /// reinstalled or removed, and is reported once.
+    #[test]
+    fn a_pack_that_failed_to_start_is_not_ready_until_reinstalled() {
+        assert!(!pack_failed(&KOKORO_PACK));
+        assert!(set_pack_failed(&KOKORO_PACK), "first failure is new");
+        assert!(!set_pack_failed(&KOKORO_PACK), "and only reported once");
+        assert!(pack_failed(&KOKORO_PACK));
+        assert!(!pack_ready(&KOKORO_PACK));
+        assert!(!pack_failed(&KITTEN_PACK), "other packs are unaffected");
+        forget_pack_failure(KOKORO_PACK.model_id);
+        assert!(!pack_failed(&KOKORO_PACK));
     }
 
     /// The whole point of Automatic: the graphics card is used whenever the

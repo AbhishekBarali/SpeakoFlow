@@ -33,8 +33,10 @@ export type KokoroErrorReason =
   | "gpu";
 
 /** How a spoken reply ended: synthesized in full, stopped or superseded, muted
- *  because the graphics card produced broken audio, or failed outright. */
-export type SpeakOutcome = "done" | "stopped" | "gpu" | "failed";
+ *  because the graphics card produced broken audio (the card is no longer used
+ *  for the voice), withheld because a clip looked broken and nothing after it
+ *  proved the card fine, or failed outright. */
+export type SpeakOutcome = "done" | "stopped" | "gpu" | "muted" | "failed";
 export interface KokoroError {
   reason: KokoroErrorReason;
 }
@@ -80,6 +82,14 @@ interface ProgressEvent {
 
 function hasWebGpu(): boolean {
   return typeof navigator !== "undefined" && "gpu" in navigator;
+}
+
+/** A load that finished after its model was dropped; it was released, and a
+ *  caller waiting on it simply stops. */
+class SupersededLoad extends Error {
+  constructor() {
+    super("The voice was switched while it was loading.");
+  }
 }
 
 /** Best-effort release of the kokoro-js model's ONNX session + WebGPU buffers.
@@ -134,6 +144,12 @@ export function useKokoroTts(
   const loadedOnGpuRef = useRef(false);
   /** Clean clips still to see before WebGPU counts as proven on this load. */
   const gpuChecksLeftRef = useRef(0);
+  /** Broken clips since the last clean one. One can be a false alarm (it is
+   *  muted and the next clip decides); two mean the card garbles the voice. */
+  const gpuStrikesRef = useRef(0);
+  /** Bumped whenever the model is dropped, so a load that finishes after being
+   *  dropped releases what it loaded instead of pinning it. */
+  const loadEpochRef = useRef(0);
   // Latest speaking speed, read when a reply starts streaming so a change
   // applies to the next reply without re-creating the playback callbacks.
   const speedRef = useRef(speed);
@@ -259,6 +275,7 @@ export function useKokoroTts(
       setStatus("loading");
       setProgress(0);
       loadInFlightRef.current = true;
+      const loadEpoch = loadEpochRef.current;
       loadingRef.current = (async () => {
         const { KokoroTTS } = await import("kokoro-js");
         const requestedDtype = dtypeRef.current;
@@ -340,7 +357,10 @@ export function useKokoroTts(
                 "which is much slower. Synthesis will not use the GPU:",
               gpuErr,
             );
-            // Automatic can move the voice to the processor engine instead.
+            // Automatic can move the voice to the processor engine instead,
+            // and remembers it: a card that cannot start the session fails
+            // the same way next launch.
+            if (deviceRef.current === "auto") markGpuBroken();
             reportWebGpu(false);
           }
           model = await KokoroTTS.from_pretrained(KOKORO_MODEL_ID, {
@@ -352,6 +372,12 @@ export function useKokoroTts(
             `[Kokoro TTS] loaded on wasm/CPU (${fallbackDtype}) fallback`,
           );
         }
+        // Dropped while loading (turned off, or another precision or device
+        // was picked): release it rather than pin memory nothing will free.
+        if (loadEpoch !== loadEpochRef.current) {
+          void disposeModel(model as KokoroModel);
+          throw new SupersededLoad();
+        }
         // A WebGPU session's first clips are checked for broken audio before
         // they reach a speaker (see `consume`).
         loadedOnGpuRef.current = onGpu;
@@ -361,6 +387,15 @@ export function useKokoroTts(
         setStatus("ready");
         return modelRef.current;
       })().catch((e: unknown) => {
+        if (e instanceof SupersededLoad) {
+          // Whatever dropped it already reset the state; only a load that
+          // nothing replaced leaves the flags to tidy.
+          if (loadingRef.current === null) {
+            loadInFlightRef.current = false;
+            setStatus((s) => (s === "loading" ? "off" : s));
+          }
+          throw e;
+        }
         loadingRef.current = null;
         loadInFlightRef.current = false;
         setStatus("error");
@@ -384,6 +419,7 @@ export function useKokoroTts(
       // Turned off: free the model so its ONNX/WebGPU memory isn't pinned for
       // the WebView's lifetime. It reloads on demand if re-enabled.
       cancelIdleUnload();
+      loadEpochRef.current += 1;
       void disposeModel(modelRef.current);
       modelRef.current = null;
       loadingRef.current = null;
@@ -470,6 +506,7 @@ export function useKokoroTts(
     stop();
     // Release the old session before dropping the ref, or its ONNX/WebGPU
     // memory leaks on every change.
+    loadEpochRef.current += 1;
     void disposeModel(modelRef.current);
     modelRef.current = null;
     loadingRef.current = null;
@@ -497,6 +534,7 @@ export function useKokoroTts(
     // it was waiting for is over.
     browserSinkRef.current?.finish(streamEpochRef.current);
     const model = modelRef.current;
+    loadEpochRef.current += 1;
     modelRef.current = null;
     loadingRef.current = null;
     loadedOnGpuRef.current = false;
@@ -537,6 +575,7 @@ export function useKokoroTts(
         }
         playingRef.current = null;
       }
+      loadEpochRef.current += 1;
       void disposeModel(modelRef.current);
       modelRef.current = null;
       loadingRef.current = null;
@@ -689,6 +728,8 @@ export function useKokoroTts(
       generation: number,
     ): Promise<SpeakOutcome> => {
       let started = false;
+      let played = 0;
+      let withheld = 0;
       for await (const { audio } of stream) {
         if (generation !== generationRef.current) return "stopped"; // superseded
         // A GPU that corrupts Kokoro throws nothing; the samples are the only
@@ -702,10 +743,19 @@ export function useKokoroTts(
         ) {
           const broken = audioLooksBroken(audio.audio, audio.sampling_rate);
           if (broken === true) {
-            handleGpuBroken();
-            return "gpu";
+            gpuStrikesRef.current += 1;
+            // One odd clip may be a false alarm: it is muted and the next one
+            // decides. A second means the card garbles the voice.
+            if (gpuStrikesRef.current >= 2) {
+              gpuStrikesRef.current = 0;
+              handleGpuBroken();
+              return "gpu";
+            }
+            withheld += 1;
+            continue;
           }
           if (broken === false) {
+            gpuStrikesRef.current = 0;
             gpuChecksLeftRef.current -= 1;
             if (gpuChecksLeftRef.current === 0) {
               reportWebGpu(true);
@@ -713,8 +763,14 @@ export function useKokoroTts(
               // verdict, e.g. after a driver update.
               if (deviceRef.current === "gpu") clearGpuBroken();
             }
+          } else if (gpuStrikesRef.current > 0) {
+            // Too short to judge, while the card is under suspicion: nothing
+            // unverified reaches the speaker.
+            withheld += 1;
+            continue;
           }
         }
+        played += 1;
         queueRef.current.push(audio.toBlob());
         if (!started) {
           started = true;
@@ -723,7 +779,10 @@ export function useKokoroTts(
           pump(generation); // queue drained while synthesizing; resume
         }
       }
-      return "done";
+      // Nothing was queued (every clip withheld), so no drain will end the
+      // "speaking" state for us.
+      if (!started) setStatus((s) => (s === "speaking" ? "ready" : s));
+      return played === 0 && withheld > 0 ? "muted" : "done";
     },
     [pump, handleGpuBroken],
   );
@@ -801,6 +860,11 @@ export function useKokoroTts(
         await consume(stream, generation);
         finishSynthesis(generation);
       } catch (e) {
+        if (e instanceof SupersededLoad) {
+          // The voice moved elsewhere while loading; end this reply quietly.
+          finishSynthesis(generation);
+          return;
+        }
         console.error("Kokoro TTS stream failed:", e);
         finishSynthesis(generation);
         setError((prev) => prev ?? { reason: "synthesis" });
@@ -857,6 +921,7 @@ export function useKokoroTts(
         finishSynthesis(generation);
         return outcome;
       } catch (e) {
+        if (e instanceof SupersededLoad) return "stopped";
         console.error("Kokoro TTS failed:", e);
         synthDoneRef.current = true;
         // A load failure already set reason "load"; only mark synthesis when the

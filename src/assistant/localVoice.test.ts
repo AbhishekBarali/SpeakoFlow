@@ -24,13 +24,27 @@ const noise = (seconds: number, amplitude = 0.3) => {
 };
 
 describe("audioLooksBroken", () => {
-  test("a clip shorter than half a second is not judged", () => {
+  test("a clip shorter than half a second is not judged on its statistics", () => {
     expect(audioLooksBroken(noise(0.3), RATE)).toBeNull();
     expect(audioLooksBroken(voiced(0.2), RATE)).toBeNull();
+    expect(audioLooksBroken(new Float32Array(RATE * 0.3), RATE)).toBeNull();
+  });
+
+  test("a clip too short to hold a word is never judged", () => {
+    const blip = voiced(0.05);
+    blip[10] = Number.NaN;
+    expect(audioLooksBroken(blip, RATE)).toBeNull();
   });
 
   test("a voice-like clip passes", () => {
     expect(audioLooksBroken(voiced(1.5), RATE)).toBe(false);
+  });
+
+  test("quiet hiss between words does not read as noise", () => {
+    const speech = voiced(1.5);
+    const hiss = noise(1.5, 0.004);
+    const clip = speech.map((value, i) => value + hiss[i]);
+    expect(audioLooksBroken(clip, RATE)).toBe(false);
   });
 
   test("noise instead of speech is flagged", () => {
@@ -39,17 +53,29 @@ describe("audioLooksBroken", () => {
 
   test("silence where a sentence should be is flagged", () => {
     expect(audioLooksBroken(new Float32Array(RATE), RATE)).toBe(true);
+    // Barely audible, far below the quietest real speech (RMS 0.06).
+    expect(
+      audioLooksBroken(
+        voiced(1).map((v) => v / 20),
+        RATE,
+      ),
+    ).toBe(true);
   });
 
   test("non-finite samples are flagged", () => {
     const clip = voiced(1);
     clip[100] = Number.NaN;
     expect(audioLooksBroken(clip, RATE)).toBe(true);
+    const short = voiced(0.3);
+    short[100] = Number.POSITIVE_INFINITY;
+    expect(audioLooksBroken(short, RATE)).toBe(true);
   });
 
-  test("a clip pinned at full scale is flagged", () => {
-    const clip = voiced(1).map((v) => (v >= 0 ? 1 : -1) * 0.995);
-    expect(audioLooksBroken(clip, RATE)).toBe(true);
+  test("a clip pinned at full scale is flagged, even a short one", () => {
+    const pin = (clip: Float32Array) =>
+      clip.map((v) => (v >= 0 ? 1 : -1) * 0.995);
+    expect(audioLooksBroken(pin(voiced(1)), RATE)).toBe(true);
+    expect(audioLooksBroken(pin(voiced(0.3)), RATE)).toBe(true);
   });
 });
 
