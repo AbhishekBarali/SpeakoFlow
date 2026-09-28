@@ -1,0 +1,67 @@
+name: "Updater manifest"
+
+# Writes latest.json, the file every installed SpeakoFlow polls at
+#   https://github.com/AbhishekBarali/SpeakoFlow/releases/latest/download/latest.json
+# and attaches it to a release. Runs once, after every platform has built, from
+# the signatures that are actually on the release (see
+# scripts/ci/updater-manifest.ts for why tauri-action's own copy is not used).
+#
+# Every signature is verified against the public key in tauri.conf.json using
+# the published bytes, so a manifest that an installed app would reject is
+# never published.
+#
+# Called at the end of release-unsigned.yml and release.yml. Can also be run by
+# hand against an existing draft, e.g. after re-running a single failed
+# platform, because the manifest is rebuilt from whatever the release holds:
+#
+#   gh workflow run updater-manifest.yml -f release-id=<id>
+#
+# GitHub only serves releases/latest/... from the newest PUBLISHED, non-
+# prerelease release. A draft's latest.json does nothing until you click
+# Publish, and a beta (prerelease) is never offered to installed apps.
+
+on:
+  workflow_call:
+    inputs:
+      release-id:
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      release-id:
+        description: "Release ID to build latest.json for (gh release view <tag> --json id --jq .id)"
+        required: true
+        type: string
+
+jobs:
+  manifest:
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      # The generator's own tests are fast and include a real signature made
+      # with the SpeakoFlow key, so a verifier regression cannot wave a bad
+      # manifest through.
+      - name: Test the manifest generator
+        run: bun test scripts/ci/updater-manifest.test.ts
+
+      - name: Build, verify and upload latest.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_ID: ${{ inputs.release-id }}
+        run: >-
+          bun scripts/ci/updater-manifest.ts
+          --release-id "$RELEASE_ID"
+          --conf src-tauri/tauri.conf.json
+          --out latest.json
+          --upload
+
+      - name: Show latest.json
+        if: always()
+        run: cat latest.json 2>/dev/null || echo "(not written)"

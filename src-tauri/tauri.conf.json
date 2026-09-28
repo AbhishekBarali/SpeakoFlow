@@ -66,7 +66,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEJBQjcyMDk1MjA2NjAxRjkKUldUNUFXWWdsU0MzdXRRZi8zYzhqV2FaNUVDbDd2Rk5VM1IvWWowVXdmRFNKQ1BrMXF5RFFsLy8K",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDczRDFGREZGODc3ODAzODEKUldTQkEzaUgvLzNSYzRMakMrcU5PNGRWOHZZTFJzZUx1dWE0Wi9kNjViRUZheWhSU2pOcnRIeVMK",
       "endpoints": [
         "https://github.com/AbhishekBarali/SpeakoFlow/releases/latest/download/latest.json"
       ]

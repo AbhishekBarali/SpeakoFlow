@@ -2,21 +2,28 @@ name: "Release (unsigned)"
 
 # Manually-triggered UNSIGNED release. Creates a DRAFT GitHub Release and builds
 # the mainstream desktop targets via the reusable build.yml with
-# sign-binaries: false — so it needs NO Apple/Azure certificates and NO Tauri
-# updater key (build.yml auto-neutralizes the signCommand + createUpdaterArtifacts
-# for unsigned builds). The installers attach to the draft release; a maintainer
+# sign-binaries: false — so it needs NO Apple/Azure certificates (build.yml
+# neutralizes the signCommand for unsigned builds). It DOES use the Tauri
+# updater key (TAURI_SIGNING_PRIVATE_KEY / _PASSWORD secrets), which is free,
+# ours, and unrelated to code signing: it signs the update bundles so
+# installed apps can update themselves. The installers attach to the draft
+# release, updater-manifest.yml writes latest.json last, and a maintainer
 # reviews and clicks "Publish".
 #
 # Trade-offs of an unsigned release (intentional, for an early build):
-#   * Windows SmartScreen warns ("unknown publisher").
+#   * Windows SmartScreen warns ("unknown publisher") on a browser download.
+#     An in-app update downloads the installer itself, so it carries no
+#     Mark-of-the-Web and is not stopped by SmartScreen.
 #   * macOS Gatekeeper reports "SpeakoFlow is damaged and can't be opened" — the
 #     app is fine; an unsigned bundle carrying the download quarantine flag has
 #     no Apple-recognized signature, and macOS 15/26 offers no GUI override for
 #     that case. Users clear it once per installed version with
 #     `xattr -dr com.apple.quarantine /Applications/SpeakoFlow.app`.
-#     See the macOS section of README.md — keep the two in sync.
-#   * Auto-update is disabled (no signed updater artifacts), so every platform
-#     ships its full installer here and users update by downloading again.
+#     See the macOS section of README.md — keep the two in sync. An in-app
+#     update is downloaded by the app, not a browser, so it is not quarantined.
+#   * Installed apps from 1.5.0 onward update in place. 1.0-1.4 trusted
+#     upstream Handy's updater key and can only be reached by a manual
+#     reinstall.
 # Use the signed release.yml once signing secrets are configured
 # (Apple Developer ID + notarization, Azure Trusted Signing, updater key).
 #
@@ -240,4 +247,19 @@ jobs:
       release-id: ${{ needs.create-release.outputs.release-id }}
       # Releases always build from scratch — never restore a possibly-stale cache.
       no-cache: true
+    secrets: inherit
+
+  # latest.json is what makes this release reach people who already have the
+  # app. It runs even when one platform failed, so the others still update;
+  # a platform missing from the manifest simply sees no update. Re-running the
+  # failed platform re-runs this job too, which rebuilds the manifest from
+  # everything the release now holds.
+  updater-manifest:
+    permissions:
+      contents: write
+    needs: [create-release, publish]
+    if: ${{ !cancelled() && needs.create-release.result == 'success' }}
+    uses: ./.github/workflows/updater-manifest.yml
+    with:
+      release-id: ${{ needs.create-release.outputs.release-id }}
     secrets: inherit

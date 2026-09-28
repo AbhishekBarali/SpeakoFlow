@@ -91,3 +91,14 @@ jobs:
       # stale cached native lib can never be linked into a shipped artifact.
       no-cache: true
     secrets: inherit
+
+  # See release-unsigned.yml: one manifest, written after every platform.
+  updater-manifest:
+    permissions:
+      contents: write
+    needs: [create-release, publish]
+    if: ${{ !cancelled() && needs.create-release.result == 'success' }}
+    uses: ./.github/workflows/updater-manifest.yml
+    with:
+      release-id: ${{ needs.create-release.outputs.release-id }}
+    secrets: inherit
