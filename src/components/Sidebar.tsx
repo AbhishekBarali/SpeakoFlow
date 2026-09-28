@@ -5,6 +5,7 @@ import {
   ChartColumn,
   ChevronsLeft,
   ChevronsRight,
+  CircleQuestionMark,
   Cloud,
   Cpu,
   History,
@@ -15,9 +16,11 @@ import {
   Wand2,
 } from "lucide-react";
 import DownloadIndicator from "./model-selector/DownloadIndicator";
+import { useFeedbackDialog } from "./feedback/feedbackStore";
 import { useNavigation, type PageId } from "./shell/navigation";
 import { useModelSlots } from "./shell/useModelSlots";
 import { useSttLoadState } from "./shell/useSttStatus";
+import { UpdatePill } from "./update-checker/UpdatePill";
 
 type NavIcon = React.ComponentType<{
   className?: string;
@@ -160,6 +163,7 @@ const ListeningStatus: React.FC<{ collapsed: boolean }> = ({ collapsed }) => {
 export const Sidebar: React.FC = () => {
   const { t } = useTranslation();
   const { page, navigateRoot, openSettings, settingsTab } = useNavigation();
+  const showFeedback = useFeedbackDialog((s) => s.show);
   // Opens expanded every launch; collapsing is a per-session choice.
   const [collapsed, setCollapsed] = useState(false);
   const toggleLabel = collapsed ? t("sidebar.expand") : t("sidebar.collapse");
@@ -190,6 +194,7 @@ export const Sidebar: React.FC = () => {
       </nav>
 
       <div className="mt-auto flex flex-col gap-1">
+        <UpdatePill collapsed={collapsed} />
         <div className={collapsed ? "flex justify-center pb-1" : "px-1 pb-1"}>
           <DownloadIndicator placement="start" compact={collapsed} />
         </div>
@@ -218,6 +223,20 @@ export const Sidebar: React.FC = () => {
                 {t("nav.settings")}
               </span>
             )}
+          </button>
+          {/* Feedback sits beside Settings as a quiet "?", the way help does in
+              most apps: always one click away, never in the way. */}
+          <button
+            type="button"
+            onClick={() => showFeedback()}
+            aria-haspopup="dialog"
+            aria-label={t("feedback.button")}
+            title={t("feedback.button")}
+            className={`grid h-9 shrink-0 cursor-pointer place-items-center rounded-lg text-muted-soft transition-colors hover:bg-ink/[0.045] hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 ${
+              collapsed ? "w-full" : "w-9"
+            }`}
+          >
+            <CircleQuestionMark className="h-4 w-4" />
           </button>
           <button
             type="button"

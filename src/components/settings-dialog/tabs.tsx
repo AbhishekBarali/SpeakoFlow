@@ -2,7 +2,6 @@ import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { type } from "@tauri-apps/plugin-os";
 import { getVersion } from "@tauri-apps/api/app";
-import { emit } from "@tauri-apps/api/event";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { toast } from "sonner";
 import {
@@ -12,6 +11,7 @@ import {
   FolderOpen,
   Github,
   MessageCircle,
+  MessageSquareText,
   Mic,
   PhoneCall,
   Scale,
@@ -34,6 +34,12 @@ import { StartHidden } from "@/components/settings/StartHidden";
 import { ShowTrayIcon } from "@/components/settings/ShowTrayIcon";
 import { QuitOnClose } from "@/components/settings/QuitOnClose";
 import { UpdateChecksToggle } from "@/components/settings/UpdateChecksToggle";
+import {
+  UpdateDetails,
+  UpdateHeaderAction,
+  UpdateStatusLine,
+} from "@/components/update-checker/UpdatePanel";
+import { useFeedbackDialog } from "@/components/feedback/feedbackStore";
 import { ShortcutInput } from "@/components/settings/ShortcutInput";
 import { PushToTalk } from "@/components/settings/PushToTalk";
 import { MicrophoneSelector } from "@/components/settings/MicrophoneSelector";
@@ -345,10 +351,8 @@ const REPO_URL = "https://github.com/AbhishekBarali/SpeakoFlow";
 
 export const AboutTab: React.FC = () => {
   const { t } = useTranslation();
-  const { getSetting } = useSettings();
+  const openFeedback = useFeedbackDialog((s) => s.show);
   const [version, setVersion] = useState("");
-  const updateChecksEnabled =
-    (getSetting("update_checks_enabled") as boolean | undefined) ?? true;
 
   useEffect(() => {
     getVersion()
@@ -374,22 +378,29 @@ export const AboutTab: React.FC = () => {
               ? t("settingsDialog.about.version", { version })
               : t("common.loading")}
           </p>
+          <UpdateStatusLine />
         </div>
-        <Button
-          variant="secondary"
-          size="sm"
-          disabled={!updateChecksEnabled}
-          onClick={() => void emit("check-for-updates")}
-        >
-          {t("settings.about.updates.button")}
-        </Button>
+        <UpdateHeaderAction />
       </div>
+
+      <UpdateDetails />
 
       <SettingsGroup title={t("settings.general.groups.updates")}>
         <UpdateChecksToggle descriptionMode="tooltip" grouped={true} />
       </SettingsGroup>
 
       <SettingsGroup title={t("settingsDialog.about.project")}>
+        <SettingContainer
+          title={t("feedback.aboutRow.title")}
+          description={t("feedback.aboutRow.description")}
+          descriptionMode="inline"
+          grouped={true}
+        >
+          <Button variant="secondary" size="sm" onClick={() => openFeedback()}>
+            <MessageSquareText className="h-3.5 w-3.5" aria-hidden="true" />
+            {t("feedback.aboutRow.button")}
+          </Button>
+        </SettingContainer>
         <SettingContainer
           title={t("settings.about.sourceCode.title")}
           description={t("settings.about.sourceCode.description")}

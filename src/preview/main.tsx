@@ -21,8 +21,18 @@ import { watchScreenScale } from "@/lib/screenScale";
 import { useModelStore } from "@/stores/modelStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { suppressCaretBrowsing } from "@/lib/caretBrowsing";
+import { useUpdateStore } from "@/components/update-checker/updateStore";
+import { useFeedbackDialog } from "@/components/feedback/feedbackStore";
 
 suppressCaretBrowsing();
+
+// Screenshots should not wait out the real 8-second first check.
+if (previewParams.get("update") === "1") {
+  void useUpdateStore.getState().check();
+}
+if (previewParams.get("feedback") === "1") {
+  useFeedbackDialog.getState().show();
+}
 
 document.documentElement.dataset.platform = "windows";
 applyThemePreference(

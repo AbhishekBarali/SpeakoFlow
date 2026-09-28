@@ -1,0 +1,59 @@
+# SpeakoFlow feedback Worker: the in-app "Send feedback" form posts here, and
+# each message becomes an issue in a private GitHub repository.
+#
+# One-time setup (from this folder):
+#
+#   1. bun install
+#   2. bunx wrangler login
+#   3. Give the Worker a GitHub credential. Pick ONE:
+#
+#      a) GitHub App (recommended: issues are opened by "<app>[bot]", so GitHub
+#         emails you about each one like any other new issue).
+#         github.com/settings/apps/new → no webhook, Repository permissions:
+#         Issues = Read and write, "Only on this account". Generate a private
+#         key, then install the app on the feedback repository only.
+#           bunx wrangler secret put GITHUB_APP_ID
+#           bunx wrangler secret put GITHUB_APP_PRIVATE_KEY   < the-downloaded.pem
+#
+#      b) Fine-grained personal access token, limited to the feedback
+#         repository with Issues = Read and write.
+#           bunx wrangler secret put GITHUB_TOKEN
+#         Issues are then opened as you, and GitHub does not email you about
+#         your own activity unless Settings → Notifications → "Include your own
+#         updates" is on.
+#
+#   4. bunx wrangler deploy
+#   5. curl https://feedback.speakoflow.com/health   → ok
+#
+# The app sends to https://feedback.speakoflow.com/v1/feedback
+# (FEEDBACK_ENDPOINT in src-tauri/src/feedback.rs). Change both together.
+
+name = "speakoflow-feedback"
+main = "src/index.ts"
+compatibility_date = "2026-09-01"
+workers_dev = false
+
+# speakoflow.com is a zone on the same Cloudflare account, so deploying creates
+# the DNS record and certificate for this hostname. It does not touch the
+# apex, www, or the Zoho MX records.
+routes = [{ pattern = "feedback.speakoflow.com", custom_domain = true }]
+
+[vars]
+FEEDBACK_REPO = "AbhishekBarali/speakoflow-feedback"
+
+# Per client address: a person reporting several things in a row is fine, a
+# loop is not. Counted per Cloudflare location, which is plenty here.
+[[ratelimits]]
+name = "PER_CLIENT_LIMIT"
+namespace_id = "7301"
+simple = { limit = 5, period = 60 }
+
+# Everyone together: keeps a flood well inside GitHub's API quota and stops a
+# burst from burying real reports.
+[[ratelimits]]
+name = "GLOBAL_LIMIT"
+namespace_id = "7302"
+simple = { limit = 60, period = 60 }
+
+[observability]
+enabled = true

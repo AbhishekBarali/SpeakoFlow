@@ -12,6 +12,7 @@
  *            &stt=device|cloud   &theme=light|dark   &fresh=1 (no history)
  *            &memory=on (assistant memory switched on)
  *            &voice=<engine id> (the voice engine in use; default elevenlabs)
+ *            &update=1 (a newer version is available)   &feedback=1 (dialog open)
  */
 import {
   mockConvertFileSrc,
@@ -714,7 +715,29 @@ const handlers: Record<string, (args: Json) => unknown> = {
   "plugin:app|version": () => "1.5.0",
   "plugin:window|is_maximized": () => false,
   "plugin:os|locale": () => "en-US",
-  "plugin:updater|check": () => null,
+  "plugin:updater|check": () =>
+    params.get("update") === "1"
+      ? {
+          rid: 1,
+          currentVersion: "1.5.0",
+          version: "1.6.0",
+          date: "2026-10-12T09:00:00Z",
+          body: "## What's new\n\n- **Updates install themselves.** No more downloading every version by hand.\n- Send feedback from the **?** next to Settings.\n- Fixed the overlay hiding behind full-screen apps.",
+          rawJson: {},
+        }
+      : null,
+  get_update_support: () => ({
+    mode: "in_app",
+    release_page:
+      "https://github.com/AbhishekBarali/SpeakoFlow/releases/latest",
+  }),
+  get_feedback_system_info: () => ({
+    app_version: "1.5.0",
+    os: "Windows 10.0.26100",
+    arch: "x86_64",
+    install: "nsis",
+  }),
+  send_feedback: () => null,
 
   // Setters that change what the pages show.
   set_stt_engine_mode: ({ mode }) => {
@@ -868,6 +891,7 @@ const handlers: Record<string, (args: Json) => unknown> = {
         ["set_assistant_panel_size", "size", "assistant_panel_size"],
         ["set_assistant_panel_opacity", "opacity", "assistant_panel_opacity"],
         ["set_assistant_ask_anchor", "anchor", "assistant_ask_anchor"],
+        ["set_assistant_ask_display", "display", "assistant_ask_display"],
         [
           "set_assistant_active_character",
           "id",

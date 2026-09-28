@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import AccessibilityPermissions from "@/components/AccessibilityPermissions";
 import { Sidebar } from "@/components/Sidebar";
 import UpdateChecker from "@/components/update-checker";
+import { FeedbackHost } from "@/components/feedback/FeedbackDialog";
 import { SettingsDialog } from "@/components/settings-dialog/SettingsDialog";
 import {
   INITIAL_NAVIGATION,
@@ -47,9 +48,10 @@ export const MainShell: React.FC<{ initialNavigation?: NavigationState }> = ({
         </main>
       </div>
       <SettingsDialog />
-      {/* Keeps the startup and tray-triggered update checks (and the portable
-          build's update dialog) alive now that the footer is gone. */}
-      <UpdateChecker className="hidden" />
+      <FeedbackHost />
+      {/* Background update checks and the tray's "Check for updates…". What
+          they find is shown by the sidebar's UpdatePill and Settings → About. */}
+      <UpdateChecker />
     </NavigationProvider>
   );
 };
