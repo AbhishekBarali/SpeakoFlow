@@ -1569,20 +1569,6 @@ async assistantSendText(text: string) : Promise<Result<null, string>> {
 }
 },
 /**
- * Send a typed message with everything the composer collected: attached
- * images (data URLs, already downscaled), text-like files, and — when screen
- * vision is armed — a fresh screenshot. A capture failure surfaces as an
- * error but doesn't sink the turn (it proceeds without the screen).
- */
-async assistantSendComposed(text: string, images: string[], files: FileAttachment[], includeScreen: boolean) : Promise<Result<null, string>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("assistant_send_composed", { text, images, files, includeScreen }) };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
-/**
  * Read a text-like file (code, markdown, logs, csv…) for attachment as
  * assistant context. Rejects binaries and (for now) PDFs with a clear error.
  */
@@ -1600,34 +1586,6 @@ async assistantReadFile(path: string) : Promise<Result<FileAttachment, string>> 
 async assistantReadImage(path: string) : Promise<Result<string, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("assistant_read_image", { path }) };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
-/**
- * Start the draw-a-box region screenshot flow: freeze the screen (off the
- * main thread), then open the selection overlay on the cursor's monitor.
- * Async on purpose — async commands run on a worker thread, from which Tauri
- * can create windows safely; doing it inline on the main thread inside a
- * sync command deadlocks/crashes WebView2 on Windows.
- */
-async assistantBeginRegionSnip() : Promise<Result<null, string>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("assistant_begin_region_snip") };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
-/**
- * Finish (or cancel, with `rect: None`) the region snip. Called by the snip
- * overlay webview; the cropped image reaches the panel via the
- * `assistant-region-captured` event.
- */
-async assistantFinishRegionSnip(rect: SnipRect | null) : Promise<Result<null, string>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("assistant_finish_region_snip", { rect }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -1931,21 +1889,24 @@ async setAssistantEnabled(enabled: boolean) : Promise<Result<null, string>> {
     else return { status: "error", error: e  as any };
 }
 },
-async setAssistantScreenAccessMode(mode: AssistantScreenAccessMode) : Promise<Result<null, string>> {
+/**
+ * Let the quick ask look at the screen when a question needs it. On offers the
+ * model the `capture_screen` tool; it still decides per question.
+ */
+async setAssistantAskScreenAccess(enabled: boolean) : Promise<Result<null, string>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("set_assistant_screen_access_mode", { mode }) };
+    return { status: "ok", data: await TAURI_INVOKE("set_assistant_ask_screen_access", { enabled }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
 },
 /**
- * Compatibility command for older webviews/configuration callers. Enabling
- * always means Manual and can never preserve or enter Agent decides.
+ * The same switch for a hands-free call.
  */
-async setAssistantScreenshotEnabled(enabled: boolean) : Promise<Result<null, string>> {
+async setAssistantCallScreenAccess(enabled: boolean) : Promise<Result<null, string>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("set_assistant_screenshot_enabled", { enabled }) };
+    return { status: "ok", data: await TAURI_INVOKE("set_assistant_call_screen_access", { enabled }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -2153,18 +2114,6 @@ async setAssistantTtsStopOnDictation(enabled: boolean) : Promise<Result<null, st
 }
 },
 /**
- * Mirror the panel's staged attachment chips into the backend so voice turns
- * (pill mic / hotkey) send them too.
- */
-async assistantSetPendingAttachments(images: string[], files: FileAttachment[]) : Promise<Result<null, string>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("assistant_set_pending_attachments", { images, files }) };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
-/**
  * Route the dictation currently being recorded to the assistant (the STT
  * overlay's Ask-Assistant button), then commit it like a normal finish. A no-op
  * while the assistant is switched off, so the transcript is pasted as usual
@@ -2193,24 +2142,6 @@ async assistantFinishLocalTts(epoch: number | null) : Promise<void> {
  */
 async assistantStopLocalTts() : Promise<void> {
     await TAURI_INVOKE("assistant_stop_local_tts");
-},
-/**
- * Arm or disarm sticky Manual screen capture. Disarming is always accepted for
- * cleanup; arming is rejected unless the persisted mode is Manual.
- */
-async setAssistantScreenArmed(armed: boolean) : Promise<Result<null, string>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("set_assistant_screen_armed", { armed }) };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
-/**
- * Restore the session-only Manual arm after a panel webview reload.
- */
-async getAssistantScreenArmed() : Promise<boolean> {
-    return await TAURI_INVOKE("get_assistant_screen_armed");
 },
 /**
  * Start/stop assistant voice recording programmatically (pill mic button).
@@ -3644,15 +3575,19 @@ assistant_enabled?: boolean; assistant_provider_id?: string;
  */
 assistant_last_cloud_provider_id?: string | null; assistant_models?: Partial<{ [key in string]: string }>; assistant_system_prompt?: string; 
 /**
- * Controls whether screen capture is off, user-triggered, or agent-decided.
+ * Whether the quick ask may look at the screen. On does not mean every
+ * question captures: the model is offered a `capture_screen` tool and
+ * decides per question, guided by the prompt in `tools_system_section`.
+ * Off means the tool is never offered. Off by default, because a screenshot
+ * goes to whichever provider the user chose.
  */
-assistant_screen_access_mode?: AssistantScreenAccessMode; 
+assistant_ask_screen_access?: boolean; 
 /**
- * Compatibility mirror for code that still consumes the former boolean.
- * Derived from `assistant_screen_access_mode` whenever settings are repaired
- * or written: only `Off` maps to false.
+ * The same switch for a hands-free call. Separate because a call turns
+ * every sentence into a question, so someone who is happy for a one-off
+ * ask to look may not want the screen in reach for a whole conversation.
  */
-assistant_screenshot_enabled?: boolean; 
+assistant_call_screen_access?: boolean; 
 /**
  * When a screen capture is taken for a voice turn (immediate vs at-send).
  */
@@ -3967,22 +3902,6 @@ export type AssistantResponseLength =
  * No length directive — use the system prompt as-is.
  */
 "default" | "short" | "medium" | "long"
-/**
- * Controls who may initiate screen capture for assistant turns.
- */
-export type AssistantScreenAccessMode = 
-/**
- * Screen capture is disabled.
- */
-"off" | 
-/**
- * The user explicitly attaches or requests each capture.
- */
-"manual" | 
-/**
- * The assistant may decide when the current turn needs a capture.
- */
-"agent_decides"
 /**
  * How thorough a web search should be. This is the single dial that replaces
  * the old raw "max results" number: it controls how many queries run, how many
@@ -4476,7 +4395,8 @@ export type LocalVoiceStatus = { route: VoiceRoute; webgpu: WebGpuState;
  */
 native_supported: boolean; 
 /**
- * The downloaded engine refused to load this session.
+ * The processor voice is downloaded but couldn't start this session: the
+ * engine library refused to load, or the Kokoro pack refused to start.
  */
 native_load_failed: boolean; kokoro_native_ready: boolean; kitten_ready: boolean }
 export type LogLevel = "trace" | "debug" | "info" | "warn" | "error"
@@ -4925,10 +4845,6 @@ export type SkipReason =
  * The model is installed but would not load.
  */
 "model_unusable"
-/**
- * Rectangle chosen in the snip overlay, in that window's logical pixels.
- */
-export type SnipRect = { x: number; y: number; width: number; height: number }
 export type SoundTheme = 
 /**
  * SpeakoFlow's own start/stop cues — the default. Ships a matching lock
@@ -5085,16 +5001,17 @@ about_you?: string;
  */
 notes?: MemoryNote[] }
 /**
- * When a screen capture is taken for an assistant turn.
+ * When the frame an assistant turn might look at is grabbed.
  * 
- * This only changes the timing for **voice** questions (where there's a real
- * gap between starting and finishing the question); typed messages always
- * capture at send, since the panel is already on screen either way.
+ * Screen access is always the model's decision (see
+ * `assistant_ask_screen_access`): it calls `capture_screen` when a question
+ * needs the screen. This setting only changes when the frame is *taken*, never
+ * whether it is sent — a frame grabbed early is held on this machine and is
+ * dropped at the end of the turn unless the model asks for it.
  * 
- * It applies to both ways a capture can happen: a Manual capture the user
- * armed, and an Agent-decides capture the model asks for mid-turn. In the agent
- * case `Immediate` is purely a speed setting — the frame is held locally and is
- * only ever sent if the model actually calls the screen tool.
+ * It matters only for a spoken quick ask, where there is a real gap between
+ * starting and finishing the question. Typed asks capture at send, and a call
+ * captures on demand.
  */
 export type VisionCaptureTiming = 
 /**

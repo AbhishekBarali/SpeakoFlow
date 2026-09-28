@@ -1273,26 +1273,8 @@
         }
       },
       "vision": {
-        "title": "Xem màn hình",
-        "modeLabel": "Truy cập màn hình",
-        "modes": {
-          "off": "Tắt",
-          "manual": "Thủ công",
-          "agentDecides": "AI tự quyết",
-          "descriptions": {
-            "off": "Chụp màn hình đã tắt. Các điều khiển máy ảnh và chọn vùng bị ẩn.",
-            "manual": "Bạn chọn khi nào gửi kèm toàn màn hình hoặc một vùng. Thời điểm chụp cho câu hỏi bằng giọng nói vẫn được áp dụng.",
-            "agent_decides": "Mô hình có thể yêu cầu chụp màn hình khi nó cần ngữ cảnh hình ảnh hiện tại. Mọi ảnh màn hình được gửi đều hiện trong cuộc trò chuyện."
-          }
-        },
         "timing": {
-          "label": "Chụp khi nào",
-          "description": "Với câu hỏi bằng giọng nói: chụp ngay lúc bạn bắt đầu hỏi, hoặc chờ đến khi tin nhắn được gửi. Tin nhắn gõ tay luôn chụp lúc gửi.",
-          "descriptionAgent": "Cả hai tùy chọn đều chuẩn bị ảnh màn hình trước, nên trợ lý không bao giờ để bạn phải chờ. Khác biệt nằm ở nội dung ảnh: “Khi tôi bắt đầu hỏi” lấy màn hình như lúc bạn bắt đầu nói, “Khi tin nhắn được gửi” lấy màn hình như hiện tại. Dù chọn cách nào, ảnh vẫn ở trên máy của bạn và chỉ được gửi đi nếu trợ lý thực sự cần xem.",
-          "options": {
-            "immediate": "Khi tôi bắt đầu hỏi",
-            "on_send": "Khi tin nhắn được gửi"
-          }
+          "label": "Chụp khi nào"
         },
         "screenRecording": {
           "description": "Khả năng xem màn hình cần quyền Ghi màn hình của macOS. Hãy cấp quyền trong Cài đặt Hệ thống, rồi khởi động lại SpeakoFlow để có hiệu lực.",
@@ -1551,18 +1533,11 @@
     "regenerate": "Tạo lại câu trả lời (câu cũ vẫn còn trong Lịch sử)",
     "summarizing": "Đang tóm tắt các tin nhắn trước đó…",
     "screenAttached": "Màn hình",
-    "attachScreen": "Xem màn hình — gửi kèm màn hình của bạn vào mỗi tin nhắn cho đến khi tắt",
-    "detachScreen": "Tắt khả năng xem màn hình",
     "attach": {
       "file": "Gửi kèm hình ảnh hoặc tệp",
-      "snip": "Cắt một vùng của màn hình",
       "imageCount": "{{count}} hình ảnh",
       "imageCount_other": "{{count}} hình ảnh",
-      "remove": "Bỏ tệp gửi kèm",
       "dropHint": "Thả để gửi kèm"
-    },
-    "snip": {
-      "hint": "Kéo để cắt một vùng — Esc để hủy"
     },
     "webSearch": {
       "enable": "Bật tìm kiếm web",

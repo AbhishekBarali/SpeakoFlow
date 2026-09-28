@@ -12,7 +12,6 @@ import {
   Globe,
   Keyboard,
   Sparkles,
-  Monitor,
   PanelTop,
   Power,
   PlugZap,
@@ -23,13 +22,11 @@ import {
   type Result,
   type LocalLlmStatus,
   type AssistantResponseLength,
-  type AssistantScreenAccessMode,
   type AssistantSearchDepth,
   type AskAnchor,
   type DisplayChoice,
   type ModelChoice,
   type ModelUnloadTimeout,
-  type VisionCaptureTiming,
 } from "@/bindings";
 import {
   Dropdown,
@@ -74,7 +71,6 @@ import {
 } from "@/components/pages/assistant/panelGeometry";
 import "../../../assistant/AssistantPanel.css";
 import { useLocalLlmEngineStatus } from "@/hooks/useLocalLlmEngineStatus";
-import ScreenRecordingPermission from "@/components/ScreenRecordingPermission";
 
 /** The built-in (local) llama.cpp provider id, mirrored from the backend. */
 const BUILTIN_PROVIDER_ID = "builtin";
@@ -209,7 +205,6 @@ export type AssistantSettingsSection =
   | "shortcuts"
   | "brain"
   | "voice"
-  | "vision"
   | "webSearch"
   | "reminders"
   | "appearance"
@@ -575,7 +570,11 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
         ? t(`${status}.gpuUnusable`)
         : t(`${status}.processor`);
     }
-    if (kokoroDevice === "gpu") return t(`${status}.gpu`);
+    if (kokoroDevice === "gpu") {
+      return localVoice.webgpu === "unusable"
+        ? t(`${status}.gpuForcedUnusable`)
+        : t(`${status}.gpu`);
+    }
     // Downloaded but refused to start (e.g. macOS library validation): don't
     // ask for a download that is already there.
     if (localVoice.native_load_failed) return t(`${status}.loadFailed`);
@@ -585,8 +584,10 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
         : t(`${status}.processor`);
     }
     if (localVoice.webgpu === "usable") return t(`${status}.gpu`);
-    if (localVoice.webgpu === "unusable" && localVoice.native_supported) {
-      return t(`${status}.needsPack`);
+    if (localVoice.webgpu === "unusable") {
+      return localVoice.native_supported
+        ? t(`${status}.needsPack`)
+        : t(`${status}.noNativeSlow`);
     }
     return t(`${status}.checking`);
   })();
@@ -704,14 +705,16 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
         await kokoroTest.prepare();
         rememberKokoroReady();
         const outcome = await kokoroTest.speak(phrase, true);
-        if (outcome === "gpu" || outcome === "failed") {
+        if (outcome === "gpu" || outcome === "muted" || outcome === "failed") {
           setTestState("error");
           setTestError(
             outcome === "failed"
               ? t("settings.assistant.tts.testFailed")
-              : kokoroDevice === "gpu"
-                ? t("settings.assistant.tts.testGpuForced")
-                : t("settings.assistant.tts.testGpuMoved"),
+              : outcome === "muted"
+                ? t("settings.assistant.tts.testGpuSuspect")
+                : kokoroDevice === "gpu"
+                  ? t("settings.assistant.tts.testGpuForced")
+                  : t("settings.assistant.tts.testGpuMoved"),
           );
           return;
         }
@@ -1135,12 +1138,6 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
       setWebSearchTestMsg(String(e));
     }
   };
-
-  const screenAccessMode = settings?.assistant_screen_access_mode ?? "manual";
-  const manualScreenAccess = screenAccessMode === "manual";
-  const screenAccessDescription = t(
-    `settings.assistant.vision.modes.descriptions.${screenAccessMode}`,
-  );
 
   // Cloud provider form (Provider → Base URL where needed → API key → Model),
   // per the §4.0 consistency contract. Shared shape with Dictation's AI-cleanup.
@@ -1960,86 +1957,6 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
                 )}
             </>
           )}
-        </SettingsGroup>
-      )}
-
-      {/* Screen vision ---------------------------------------------------- */}
-      {show("vision") && (
-        <SettingsGroup
-          title={groupTitle(t("settings.assistant.vision.title"))}
-          icon={Monitor}
-        >
-          <SettingContainer
-            title={t("settings.assistant.vision.modeLabel")}
-            info={screenAccessDescription}
-            layout="horizontal"
-            grouped={true}
-          >
-            <Dropdown
-              options={[
-                {
-                  value: "off",
-                  label: t("settings.assistant.vision.modes.off"),
-                },
-                {
-                  value: "manual",
-                  label: t("settings.assistant.vision.modes.manual"),
-                },
-                {
-                  value: "agent_decides",
-                  label: t("settings.assistant.vision.modes.agentDecides"),
-                },
-              ]}
-              selectedValue={screenAccessMode}
-              onSelect={(mode) =>
-                setAndRefresh(
-                  commands.setAssistantScreenAccessMode(
-                    mode as AssistantScreenAccessMode,
-                  ),
-                )
-              }
-            />
-          </SettingContainer>
-          {screenAccessMode !== "off" && (
-            <SettingContainer
-              title={t("settings.assistant.vision.timing.label")}
-              info={t(
-                screenAccessMode === "agent_decides"
-                  ? "settings.assistant.vision.timing.descriptionAgent"
-                  : "settings.assistant.vision.timing.description",
-              )}
-              layout="horizontal"
-              grouped={true}
-            >
-              <Dropdown
-                options={[
-                  {
-                    value: "immediate",
-                    label: t(
-                      "settings.assistant.vision.timing.options.immediate",
-                    ),
-                  },
-                  {
-                    value: "on_send",
-                    label: t(
-                      "settings.assistant.vision.timing.options.on_send",
-                    ),
-                  },
-                ]}
-                selectedValue={
-                  settings?.assistant_vision_capture_timing ?? "immediate"
-                }
-                onSelect={(value) =>
-                  setAndRefresh(
-                    commands.setAssistantVisionCaptureTiming(
-                      value as VisionCaptureTiming,
-                    ),
-                  )
-                }
-              />
-            </SettingContainer>
-          )}
-          {screenAccessMode !== "off" && <ScreenRecordingPermission />}
         </SettingsGroup>
       )}
 

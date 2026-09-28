@@ -5,26 +5,9 @@ use crate::llm_client::ChatMessage;
 use crate::managers::local_llm::LocalLlmManager;
 use crate::settings::{
     assistant_provider_is_supported, get_settings, write_settings, AssistantCharacter,
-    AssistantScreenAccessMode,
 };
 use std::sync::Arc;
 use tauri::{AppHandle, Manager};
-
-fn require_manual_screen_access(mode: AssistantScreenAccessMode) -> Result<(), String> {
-    if assistant::manual_screen_access_allowed(mode) {
-        Ok(())
-    } else {
-        Err("Manual screen capture is unavailable in the current screen access mode".to_string())
-    }
-}
-
-fn legacy_screen_access_mode(enabled: bool) -> AssistantScreenAccessMode {
-    if enabled {
-        AssistantScreenAccessMode::Manual
-    } else {
-        AssistantScreenAccessMode::Off
-    }
-}
 
 /// Send a typed message to the assistant (keyboard alternative to voice).
 ///
@@ -34,65 +17,7 @@ fn legacy_screen_access_mode(enabled: bool) -> AssistantScreenAccessMode {
 #[specta::specta]
 pub async fn assistant_send_text(app: AppHandle, text: String) -> Result<(), String> {
     assistant::begin_quick_ask_exchange(&app);
-    assistant::run_assistant_turn(app, text, None, Vec::new(), Vec::new(), None).await;
-    Ok(())
-}
-
-/// Send a typed message with everything the composer collected: attached
-/// images (data URLs, already downscaled), text-like files, and — when screen
-/// vision is armed — a fresh screenshot. A capture failure surfaces as an
-/// error but doesn't sink the turn (it proceeds without the screen).
-#[tauri::command]
-#[specta::specta]
-pub async fn assistant_send_composed(
-    app: AppHandle,
-    text: String,
-    images: Vec<String>,
-    files: Vec<FileAttachment>,
-    include_screen: bool,
-) -> Result<(), String> {
-    let settings = get_settings(&app);
-    let manual_screen_token = if include_screen {
-        require_manual_screen_access(settings.assistant_screen_access_mode)?;
-        Some(assistant::authorize_manual_screen_operation(&app)?)
-    } else {
-        None
-    };
-    let include_screen = assistant::manual_composed_capture_allowed(
-        include_screen,
-        settings.assistant_screen_access_mode,
-        settings.active_character_is_cat(),
-    );
-    let screenshot = if include_screen {
-        // Tiny body only for Azure's gateway; loopback (built-in/local engine)
-        // gets a balanced image, cloud gets the sharp one.
-        let profile = settings
-            .active_assistant_provider()
-            .map(|p| crate::screenshot::CaptureProfile::for_base_url(&p.base_url))
-            .unwrap_or(crate::screenshot::CaptureProfile::Generous);
-        // Capture the monitor the mouse cursor is on (falls back to primary),
-        // so multi-monitor users get the screen they're actually working on.
-        match tauri::async_runtime::spawn_blocking(move || {
-            crate::screenshot::capture_screen_data_url_at(None, profile)
-        })
-        .await
-        {
-            Ok(Ok(url)) => Some(url),
-            Ok(Err(e)) => {
-                assistant::emit_error(&app, "screen_capture", e);
-                None
-            }
-            Err(e) => {
-                assistant::emit_error(&app, "screen_capture", e.to_string());
-                None
-            }
-        }
-    } else {
-        None
-    };
-    let manual_screen_token = screenshot.as_ref().and(manual_screen_token);
-    assistant::begin_quick_ask_exchange(&app);
-    assistant::run_assistant_turn(app, text, screenshot, images, files, manual_screen_token).await;
+    assistant::run_assistant_turn(app, text, Vec::new(), Vec::new()).await;
     Ok(())
 }
 
@@ -142,62 +67,6 @@ pub async fn assistant_read_image(path: String) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || crate::screenshot::image_file_to_data_url(&path))
         .await
         .map_err(|e| e.to_string())?
-}
-
-/// Start the draw-a-box region screenshot flow: freeze the screen (off the
-/// main thread), then open the selection overlay on the cursor's monitor.
-/// Async on purpose — async commands run on a worker thread, from which Tauri
-/// can create windows safely; doing it inline on the main thread inside a
-/// sync command deadlocks/crashes WebView2 on Windows.
-#[tauri::command]
-#[specta::specta]
-pub async fn assistant_begin_region_snip(app: AppHandle) -> Result<(), String> {
-    let authorization = assistant::begin_region_snip(&app)?;
-
-    // Pick the monitor under the cursor from Tauri's monitor list (the same
-    // multi-monitor-safe detector the recording overlay uses), capture THAT
-    // monitor, then open the overlay over it. Capturing the chosen monitor
-    // (rather than letting the capture pick its own) guarantees the frozen
-    // frame and the selection overlay line up on multi-monitor setups.
-    let monitor = crate::overlay::get_monitor_with_cursor(&app)
-        .ok_or_else(|| "No monitor available for region snip".to_string())?;
-    let center_x = monitor.position().x + (monitor.size().width as i32) / 2;
-    let center_y = monitor.position().y + (monitor.size().height as i32) / 2;
-    let frame = tauri::async_runtime::spawn_blocking(move || {
-        crate::screenshot::capture_monitor_at(center_x, center_y)
-    })
-    .await
-    .map_err(|e| e.to_string())??;
-    assistant::open_snip_overlay(&app, authorization, frame, monitor)
-}
-
-/// Rectangle chosen in the snip overlay, in that window's logical pixels.
-#[derive(serde::Deserialize, specta::Type)]
-pub struct SnipRect {
-    pub x: f64,
-    pub y: f64,
-    pub width: f64,
-    pub height: f64,
-}
-
-/// Finish (or cancel, with `rect: None`) the region snip. Called by the snip
-/// overlay webview; the cropped image reaches the panel via the
-/// `assistant-region-captured` event.
-#[tauri::command]
-#[specta::specta]
-pub fn assistant_finish_region_snip(app: AppHandle, rect: Option<SnipRect>) -> Result<(), String> {
-    // The snip surface covers the whole display and takes every click, so it has
-    // to come down whatever happens next. Returning early here used to leave it
-    // up — and its Esc and right-click both call back into this same command, so
-    // they failed the same way and the screen stayed dead.
-    let allowed = require_manual_screen_access(get_settings(&app).assistant_screen_access_mode)
-        .and_then(|_| assistant::authorize_manual_screen_operation(&app).map(|_| ()));
-    if let Err(e) = allowed {
-        assistant::finish_region_snip(&app, None);
-        return Err(e);
-    }
-    assistant::finish_region_snip(&app, rect.map(|r| (r.x, r.y, r.width, r.height)));
-    Ok(())
 }
 
 #[tauri::command]
@@ -533,31 +402,31 @@ fn emit_settings_changed(app: &AppHandle) {
     let _ = app.emit("assistant-settings-changed", ());
 }
 
+/// Let the quick ask look at the screen when a question needs it. On offers the
+/// model the `capture_screen` tool; it still decides per question.
 #[tauri::command]
 #[specta::specta]
-pub fn set_assistant_screen_access_mode(
-    app: AppHandle,
-    mode: AssistantScreenAccessMode,
-) -> Result<(), String> {
-    // Agent decides exposes a `capture_screen` tool to the model instead of
-    // manual controls. The helper orders persistence and Manual token
-    // invalidation atomically relative to arm, snip, Immediate, and
-    // composed-screen authorization.
-    assistant::apply_screen_access_mode(&app, mode)?;
-
-    if mode != AssistantScreenAccessMode::Manual {
-        assistant::emit_screen_armed(&app, false);
+pub fn set_assistant_ask_screen_access(app: AppHandle, enabled: bool) -> Result<(), String> {
+    let mut settings = get_settings(&app);
+    settings.assistant_ask_screen_access = enabled;
+    write_settings(&app, settings);
+    // A frame parked for an ask in progress must not outlive the switch.
+    if !enabled {
+        assistant::clear_agent_capture();
     }
     emit_settings_changed(&app);
     Ok(())
 }
 
-/// Compatibility command for older webviews/configuration callers. Enabling
-/// always means Manual and can never preserve or enter Agent decides.
+/// The same switch for a hands-free call.
 #[tauri::command]
 #[specta::specta]
-pub fn set_assistant_screenshot_enabled(app: AppHandle, enabled: bool) -> Result<(), String> {
-    set_assistant_screen_access_mode(app, legacy_screen_access_mode(enabled))
+pub fn set_assistant_call_screen_access(app: AppHandle, enabled: bool) -> Result<(), String> {
+    let mut settings = get_settings(&app);
+    settings.assistant_call_screen_access = enabled;
+    write_settings(&app, settings);
+    emit_settings_changed(&app);
+    Ok(())
 }
 
 /// Choose when a screen capture is taken for a voice turn: `Immediate` (the
@@ -876,18 +745,6 @@ pub fn set_assistant_tts_stop_on_dictation(app: AppHandle, enabled: bool) -> Res
     Ok(())
 }
 
-/// Mirror the panel's staged attachment chips into the backend so voice turns
-/// (pill mic / hotkey) send them too.
-#[tauri::command]
-#[specta::specta]
-pub fn assistant_set_pending_attachments(
-    images: Vec<String>,
-    files: Vec<FileAttachment>,
-) -> Result<(), String> {
-    assistant::set_pending_attachments(images, files);
-    Ok(())
-}
-
 /// Route the dictation currently being recorded to the assistant (the STT
 /// overlay's Ask-Assistant button), then commit it like a normal finish. A no-op
 /// while the assistant is switched off, so the transcript is pasted as usual
@@ -900,21 +757,6 @@ pub fn redirect_transcription_to_assistant(app: AppHandle) -> Result<(), String>
     }
     assistant::set_transcribe_redirect();
     Ok(())
-}
-
-/// Arm or disarm sticky Manual screen capture. Disarming is always accepted for
-/// cleanup; arming is rejected unless the persisted mode is Manual.
-#[tauri::command]
-#[specta::specta]
-pub fn set_assistant_screen_armed(app: AppHandle, armed: bool) -> Result<(), String> {
-    assistant::set_screen_armed_for_current_mode(&app, armed)
-}
-
-/// Restore the session-only Manual arm after a panel webview reload.
-#[tauri::command]
-#[specta::specta]
-pub fn get_assistant_screen_armed(app: AppHandle) -> bool {
-    assistant::screen_armed_for_current_mode(&app)
 }
 
 /// Start/stop assistant voice recording programmatically (pill mic button).
@@ -1728,25 +1570,6 @@ fn new_character_id() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn legacy_screenshot_setter_maps_only_to_off_or_manual() {
-        assert_eq!(
-            legacy_screen_access_mode(false),
-            AssistantScreenAccessMode::Off
-        );
-        assert_eq!(
-            legacy_screen_access_mode(true),
-            AssistantScreenAccessMode::Manual
-        );
-    }
-
-    #[test]
-    fn direct_manual_screen_actions_reject_off_and_agent_modes() {
-        assert!(require_manual_screen_access(AssistantScreenAccessMode::Manual).is_ok());
-        assert!(require_manual_screen_access(AssistantScreenAccessMode::Off).is_err());
-        assert!(require_manual_screen_access(AssistantScreenAccessMode::AgentDecides).is_err());
-    }
 
     #[test]
     fn local_tts_chunk_reads_a_raw_body_with_the_epoch_header() {

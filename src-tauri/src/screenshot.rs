@@ -190,40 +190,6 @@ pub fn capture_screen_data_url_at(
     result
 }
 
-/// Capture a SPECIFIC monitor — the one containing the physical point (x, y) —
-/// into a raw image (no scaling/encoding), for the region-snip flow: grab the
-/// frame BEFORE the selection overlay opens, then crop the user's rectangle out
-/// of it afterwards. Capturing the caller-chosen monitor (rather than letting
-/// the capture pick its own) keeps the frozen frame aligned with the selection
-/// overlay on multi-monitor setups. Falls back to the monitor under the cursor,
-/// then the primary.
-pub fn capture_monitor_at(x: i32, y: i32) -> Result<DynamicImage, String> {
-    let monitor = Monitor::from_point(x, y).or_else(|_| pick_monitor())?;
-    let rgba = monitor
-        .capture_image()
-        .map_err(|e| format!("Screen capture failed: {}", e))?;
-    Ok(DynamicImage::ImageRgba8(rgba))
-}
-
-/// Crop a physical-pixel region out of a captured frame and encode it as a
-/// `data:image/jpeg;base64,...` URL on the ladder for the given profile.
-pub fn encode_region_data_url(
-    img: &DynamicImage,
-    profile: CaptureProfile,
-    x: u32,
-    y: u32,
-    w: u32,
-    h: u32,
-) -> Result<String, String> {
-    let (iw, ih) = (img.width(), img.height());
-    let x = x.min(iw.saturating_sub(1));
-    let y = y.min(ih.saturating_sub(1));
-    let w = w.clamp(1, iw - x);
-    let h = h.clamp(1, ih - y);
-    let crop = img.crop_imm(x, y, w, h);
-    encode_provider_data_url(&crop, profile, "region")
-}
-
 /// Load an image file from disk, downscale it to a provider-friendly size, and
 /// return it as a `data:image/jpeg;base64,...` URL (used for image attachments
 /// picked or dropped into the assistant panel).

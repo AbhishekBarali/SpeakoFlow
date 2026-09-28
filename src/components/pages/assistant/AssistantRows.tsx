@@ -7,7 +7,6 @@ import {
   commands,
   type AssistantCharacter,
   type AssistantResponseLength,
-  type AssistantScreenAccessMode,
   type AssistantSearchDepth,
   type Reminder,
   type VisionCaptureTiming,
@@ -35,45 +34,39 @@ import { MemoryManager } from "@/components/settings/assistant/MemorySettings";
 
 /* ─────────────────────────────── vision ─────────────────────────────── */
 
-const VISION_MODES: AssistantScreenAccessMode[] = [
-  "off",
-  "manual",
-  "agent_decides",
-];
-const VISION_KEYS: Record<AssistantScreenAccessMode, string> = {
-  off: "off",
-  manual: "manual",
-  agent_decides: "agentDecides",
-};
-
+/**
+ * Two switches, one per surface. On means the assistant *may* look — it
+ * decides per question and looks only when the question is about the screen —
+ * not that every question captures. Off by default: a screenshot goes to the
+ * provider the user picked, so seeing the screen is something they turn on.
+ *
+ * Capture timing only changes a spoken quick ask (a call captures on demand),
+ * so it appears under the quick-ask switch and nowhere else.
+ */
 export const VisionRows: React.FC = () => {
   const { t } = useTranslation();
   const { settings } = useSettings();
   const run = useSettingCommand();
-  const mode = settings?.assistant_screen_access_mode ?? "manual";
+  const ask = settings?.assistant_ask_screen_access ?? false;
+  const call = settings?.assistant_call_screen_access ?? false;
   const timing = settings?.assistant_vision_capture_timing ?? "immediate";
 
   return (
     <>
       <SettingContainer
-        title={t("settings.assistant.vision.title")}
-        description={t("assistantPage.tips.vision")}
+        title={t("assistantPage.rows.screen.ask")}
+        description={t("assistantPage.tips.screenAsk")}
         grouped
       >
-        <Segmented
-          size="sm"
-          label={t("settings.assistant.vision.modeLabel")}
-          value={mode}
-          onChange={(next) =>
-            void run(commands.setAssistantScreenAccessMode(next))
+        <Switch
+          checked={ask}
+          onChange={(value) =>
+            void run(commands.setAssistantAskScreenAccess(value))
           }
-          options={VISION_MODES.map((value) => ({
-            value,
-            label: t(`assistantPage.cards.vision.modes.${VISION_KEYS[value]}`),
-          }))}
+          label={t("assistantPage.rows.screen.ask")}
         />
       </SettingContainer>
-      {mode !== "off" && (
+      {ask && (
         <SettingContainer
           title={t("settings.assistant.vision.timing.label")}
           description={t("assistantPage.tips.captureTiming")}
@@ -99,8 +92,21 @@ export const VisionRows: React.FC = () => {
           />
         </SettingContainer>
       )}
+      <SettingContainer
+        title={t("assistantPage.rows.screen.call")}
+        description={t("assistantPage.tips.screenCall")}
+        grouped
+      >
+        <Switch
+          checked={call}
+          onChange={(value) =>
+            void run(commands.setAssistantCallScreenAccess(value))
+          }
+          label={t("assistantPage.rows.screen.call")}
+        />
+      </SettingContainer>
       {/* macOS only; renders nothing elsewhere or once granted. */}
-      {mode !== "off" && <ScreenRecordingPermission />}
+      {(ask || call) && <ScreenRecordingPermission />}
     </>
   );
 };

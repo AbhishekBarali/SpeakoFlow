@@ -1273,26 +1273,8 @@
         }
       },
       "vision": {
-        "title": "Visión de pantalla",
-        "modeLabel": "Acceso a la pantalla",
-        "modes": {
-          "off": "Desactivado",
-          "manual": "Manual",
-          "agentDecides": "Lo decide el agente",
-          "descriptions": {
-            "off": "La captura de pantalla está desactivada. Los controles de cámara y de región están ocultos.",
-            "manual": "Tú eliges cuándo adjuntar la pantalla completa o una región. Se aplica el momento de captura por voz.",
-            "agent_decides": "El modelo puede pedir una captura de pantalla cuando necesite contexto visual actual. Cada captura enviada se muestra en la conversación."
-          }
-        },
         "timing": {
-          "label": "Cuándo capturar",
-          "description": "Para las preguntas por voz: capturar en el momento en que empiezas a preguntar o esperar hasta que se envíe el mensaje. Los mensajes escritos capturan siempre al enviarse.",
-          "descriptionAgent": "Las dos opciones preparan la captura por adelantado, así que el asistente nunca te hace esperar por ella. La diferencia es lo que muestra la imagen: «Cuando pregunto» captura la pantalla tal como estaba cuando empezaste a hablar y «Cuando se envía el mensaje» la captura tal como está ahora. En ambos casos la imagen se queda en tu dispositivo y solo se envía si el asistente pide verla.",
-          "options": {
-            "immediate": "Cuando pregunto",
-            "on_send": "Cuando se envía el mensaje"
-          }
+          "label": "Cuándo capturar"
         },
         "screenRecording": {
           "description": "La visión de pantalla necesita el permiso de Grabación de pantalla de macOS. Concédelo en Ajustes del Sistema y luego reinicia SpeakoFlow para que surta efecto.",
@@ -1551,18 +1533,11 @@
     "regenerate": "Regenerar la respuesta (la anterior se conserva en el Historial)",
     "summarizing": "Resumiendo los mensajes anteriores…",
     "screenAttached": "Pantalla",
-    "attachScreen": "Visión de pantalla: adjunta tu pantalla a cada mensaje hasta que la desactives",
-    "detachScreen": "Desactivar la visión de pantalla",
     "attach": {
       "file": "Adjuntar una imagen o un archivo",
-      "snip": "Recortar una región de la pantalla",
       "imageCount": "{{count}} imagen",
       "imageCount_other": "{{count}} imágenes",
-      "remove": "Quitar el adjunto",
       "dropHint": "Suelta para adjuntar"
-    },
-    "snip": {
-      "hint": "Arrastra para recortar una región — Esc para cancelar"
     },
     "webSearch": {
       "enable": "Activar la búsqueda web",

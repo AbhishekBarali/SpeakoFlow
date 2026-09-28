@@ -1,14 +1,12 @@
 import React from "react";
 import {
   ArrowUp,
-  Camera,
   Check,
   Copy,
   CornerDownLeft,
   Eye,
   Loader2,
   RotateCcw,
-  Scissors,
   Square,
   TextSelect,
   X,
@@ -45,11 +43,6 @@ import { quickAskShape, type QuickAskPhase } from "./quickAskState";
  * render exactly what the panel renders.
  */
 
-export interface PendingImage {
-  id: string;
-  dataUrl: string;
-}
-
 export interface QuickAskProps {
   phase: QuickAskPhase;
   /** What the assistant is doing, in a few words, for the waiting pill. */
@@ -85,12 +78,6 @@ export interface QuickAskProps {
    * is where it asks for it.
    */
   onRequestKeyboard?: () => void;
-  /** Screen-vision toggle for the prompt, when screen access is manual. */
-  screenToggle?: { armed: boolean; onToggle: () => void } | null;
-  /** Snip a region of the screen, when screen access is manual. */
-  onSnip?: (() => void) | null;
-  pendingImages?: PendingImage[];
-  onRemoveImage?: (id: string) => void;
 
   /** Put the surface away (nothing in flight). */
   onClose: () => void;
@@ -166,10 +153,6 @@ const QuickAsk: React.FC<QuickAskProps> = ({
   onSubmit,
   autoFocus = false,
   onRequestKeyboard,
-  screenToggle,
-  onSnip,
-  pendingImages = [],
-  onRemoveImage,
   onClose,
   onCancel,
   onStop,
@@ -252,23 +235,6 @@ const QuickAsk: React.FC<QuickAskProps> = ({
       <div className="qa-row" data-tauri-drag-region>
         {phase === "prompt" ? (
           <>
-            {pendingImages.length > 0 && (
-              <span className="qa-thumbs">
-                {pendingImages.map((image) => (
-                  <button
-                    key={image.id}
-                    type="button"
-                    className="qa-thumb"
-                    onClick={() => onRemoveImage?.(image.id)}
-                    onMouseDown={stopDrag}
-                    title={t("assistant.attach.remove")}
-                    aria-label={t("assistant.attach.remove")}
-                  >
-                    <img src={image.dataUrl} alt="" draggable={false} />
-                  </button>
-                ))}
-              </span>
-            )}
             <input
               ref={inputRef}
               className="qa-input"
@@ -285,39 +251,6 @@ const QuickAsk: React.FC<QuickAskProps> = ({
                   onSubmit();
               }}
             />
-            {screenToggle && (
-              <button
-                type="button"
-                className={`qa-icon-btn${screenToggle.armed ? " is-on" : ""}`}
-                onClick={screenToggle.onToggle}
-                onMouseDown={stopDrag}
-                aria-pressed={screenToggle.armed}
-                title={
-                  screenToggle.armed
-                    ? t("assistant.detachScreen")
-                    : t("assistant.attachScreen")
-                }
-                aria-label={
-                  screenToggle.armed
-                    ? t("assistant.detachScreen")
-                    : t("assistant.attachScreen")
-                }
-              >
-                <Camera size={15} strokeWidth={2} />
-              </button>
-            )}
-            {onSnip && (
-              <button
-                type="button"
-                className="qa-icon-btn"
-                onClick={onSnip}
-                onMouseDown={stopDrag}
-                title={t("assistant.attach.snip")}
-                aria-label={t("assistant.attach.snip")}
-              >
-                <Scissors size={15} strokeWidth={2} />
-              </button>
-            )}
             <button
               type="button"
               className="qa-send"

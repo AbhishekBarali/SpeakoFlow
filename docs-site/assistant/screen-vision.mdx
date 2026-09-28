@@ -1,22 +1,31 @@
 ---
 title: "Screen vision"
-description: "Ask the SpeakoFlow assistant about what is on your screen. Covers the three screen access modes, when the frame is captured, image quality per provider, and the macOS Screen Recording permission."
+description: "Ask the SpeakoFlow assistant about what is on your screen. Covers the two screen switches, how the assistant decides when to look, when the frame is captured, image quality per provider, and the macOS Screen Recording permission."
 icon: "eye"
 ---
 
 Ask about what is on your screen and the assistant answers with that context. It only looks when you let it.
 
-Set it up in _Settings → Assistant → Screen vision_. You need a vision-capable model. Most curated local models qualify (the catalog marks them "Vision"), as do the mainstream cloud multimodal models.
+Set it up on the _Assistant_ page, under _What it can do_. You need a vision-capable model. Most curated local models qualify (the catalog marks them "Vision"), as do the mainstream cloud multimodal models.
 
-## Screen access
+## Two switches
 
-| Mode                 | What happens                                                                                                                                                                                     |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Off**              | Screen capture is disabled. The panel's camera and region controls are hidden.                                                                                                                   |
-| **Manual** (default) | You decide. Click the camera in the panel and your screen is attached to every message until you turn it off again, or snip just a region.                                                       |
-| **Agent decides**    | The model gets a `capture_screen` tool and may take one screenshot per message when your question clearly refers to something on screen. It is told not to capture for self-contained questions. |
+| Switch                          | What it covers                                     |
+| ------------------------------- | -------------------------------------------------- |
+| **Screen vision for questions** | The quick ask: one question from the ask shortcut. |
+| **Screen vision for calls**     | A hands-free call, for its whole length.           |
 
-Every screenshot that goes to the model is shown in the conversation, in both active modes, so there is always a visible record of when the assistant looked.
+Both are **off** until you turn them on. They are separate because a call turns every sentence into a question, so you may be happy for a one-off question to look but not want the screen in reach for a whole conversation.
+
+## How the assistant decides to look
+
+Turning a switch on does not mean every question takes a screenshot. It means the assistant _may_ look, and it decides per message:
+
+- **It looks** when you ask it to ("look at my screen", "can you see this?"), or when your question is about something on screen it has not been given as text, such as "what's this error?" or "reply to this email".
+- **It does not look** for anything it can answer without seeing: general knowledge, writing, translation, maths, the time, reminders, or a follow-up about something already in the conversation.
+- **Selected text counts as "this".** Select a sentence and ask "what does this mean?", and it answers from the selection instead of taking a screenshot. Ask it to look at the screen as well and it will.
+
+It looks at most once per message. Every screenshot that goes to the model is shown in the conversation, so there is always a visible record of when the assistant looked.
 
 <Warning>
   **macOS.** Screen vision needs macOS Screen Recording permission. Grant it in
@@ -32,14 +41,14 @@ Only a compact thumbnail is stored in the conversation and in [History](/persona
 
 <AccordionGroup>
   <Accordion title="When the frame is grabbed for a voice question">
-    *When I ask, When the message sends. Default: When I ask. Shown in Manual mode only.*
+    *When I start, When I send. Default: When I start. Shown when screen vision for questions is on.*
 
-    This changes the timing for voice questions only, where there is a real gap between starting to ask and finishing.
+    This only changes *when* the frame is taken, never whether it is sent. The frame waits on your machine, and is dropped at the end of the question if the assistant does not ask to look.
 
-    - **When I ask** (default). Grabs the frame the moment you press the hotkey, so it captures what you were looking at when you started talking, not whatever is on screen after you finish.
-    - **When the message sends**. Grabs it after you stop talking and the speech is transcribed.
+    - **When I start** (default). Grabs the frame the moment you press the hotkey, so it shows what you were looking at when you started talking. It also means that when the assistant does decide to look, the screenshot is already there.
+    - **When I send**. Grabs it once you stop talking, so it shows the screen as it is when the question goes out.
 
-    Typed messages always capture on send, since the panel is already in front of you either way.
+    Typed questions capture when they are sent. A call captures only at the moment the assistant asks to look.
 
   </Accordion>
 

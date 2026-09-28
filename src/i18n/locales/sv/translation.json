@@ -1273,26 +1273,8 @@
         }
       },
       "vision": {
-        "title": "Skärmvisning",
-        "modeLabel": "Skärmåtkomst",
-        "modes": {
-          "off": "Av",
-          "manual": "Manuell",
-          "agentDecides": "Agenten avgör",
-          "descriptions": {
-            "off": "Skärmbilder är avstängda. Kamera- och områdeskontrollerna är dolda.",
-            "manual": "Du väljer när hela skärmen eller ett område ska bifogas. Inställningen för när skärmen fångas gäller vid röstfrågor.",
-            "agent_decides": "Modellen kan begära en skärmbild när den behöver aktuell visuell kontext. Varje skärmbild som skickas visas i konversationen."
-          }
-        },
         "timing": {
-          "label": "När skärmen fångas",
-          "description": "För röstfrågor: fånga skärmen i samma stund som du börjar fråga, eller vänta till meddelandet skickas. Skrivna meddelanden fångar alltid skärmen när de skickas.",
-          "descriptionAgent": "Båda alternativen förbereder skärmbilden i förväg, så assistenten låter dig aldrig vänta på en. Skillnaden är vad bilden visar: ”När jag frågar” tar skärmen som den såg ut när du började tala, ”När meddelandet skickas” tar den som den ser ut nu. Oavsett vilket stannar bilden på din enhet och skickas bara om assistenten faktiskt ber om att få se den.",
-          "options": {
-            "immediate": "När jag frågar",
-            "on_send": "När meddelandet skickas"
-          }
+          "label": "När skärmen fångas"
         },
         "screenRecording": {
           "description": "Skärmvisning kräver behörigheten Skärminspelning i macOS. Bevilja den i Systeminställningar och starta sedan om SpeakoFlow för att den ska börja gälla.",
@@ -1551,18 +1533,11 @@
     "regenerate": "Skapa svaret på nytt (det gamla finns kvar i Historik)",
     "summarizing": "Sammanfattar tidigare meddelanden…",
     "screenAttached": "Skärm",
-    "attachScreen": "Skärmvisning — bifoga din skärm till varje meddelande tills det stängs av",
-    "detachScreen": "Stäng av skärmvisning",
     "attach": {
       "file": "Bifoga en bild eller fil",
-      "snip": "Klipp ut ett område av skärmen",
       "imageCount": "{{count}} bild",
       "imageCount_other": "{{count}} bilder",
-      "remove": "Ta bort bilagan",
       "dropHint": "Släpp för att bifoga"
-    },
-    "snip": {
-      "hint": "Dra för att klippa ut ett område — Esc för att avbryta"
     },
     "webSearch": {
       "enable": "Aktivera webbsökning",

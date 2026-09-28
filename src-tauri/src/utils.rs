@@ -69,7 +69,7 @@ pub fn cancel_current_operation(app: &AppHandle) {
 
     // Drop any screen frame grabbed at the start of a voice question (Immediate
     // vision timing) so a cancelled capture never rides along with a later turn.
-    crate::assistant::clear_immediate_capture();
+    crate::assistant::clear_agent_capture();
 
     // Same reasoning for a captured text selection: a recording the user
     // abandoned must not donate its selection to the next question they ask. That

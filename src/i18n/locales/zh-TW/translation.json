@@ -1273,26 +1273,8 @@
         }
       },
       "vision": {
-        "title": "螢幕視覺",
-        "modeLabel": "螢幕存取",
-        "modes": {
-          "off": "關閉",
-          "manual": "手動",
-          "agentDecides": "由代理決定",
-          "descriptions": {
-            "off": "已停用螢幕擷取。相機與範圍選取控制項會隱藏。",
-            "manual": "由您決定何時附上整個螢幕或某個範圍。語音擷取時機的設定同樣適用。",
-            "agent_decides": "模型在需要目前的視覺脈絡時，可能會要求擷取螢幕。送出的每張截圖都會顯示在對話中。"
-          }
-        },
         "timing": {
-          "label": "擷取時機",
-          "description": "語音提問時：在您開始提問的那一刻擷取，或等到訊息送出時再擷取。以文字輸入的訊息一律在送出時擷取。",
-          "descriptionAgent": "兩個選項都會事先準備好螢幕截圖，因此助理絕不會讓您等待。差別在於圖片的內容：「開始提問時」擷取的是您開始說話時的螢幕，「訊息送出時」擷取的是目前的螢幕。無論選哪一個，圖片都留在您的裝置上，只有助理確實要求查看時才會傳送。",
-          "options": {
-            "immediate": "開始提問時",
-            "on_send": "訊息送出時"
-          }
+          "label": "擷取時機"
         },
         "screenRecording": {
           "description": "螢幕視覺需要 macOS 的「螢幕錄製」權限。請在「系統設定」中授予權限，然後重新啟動 SpeakoFlow 才會生效。",
@@ -1551,18 +1533,11 @@
     "regenerate": "重新生成回答（舊的會保留在歷史紀錄中）",
     "summarizing": "正在摘要先前的訊息…",
     "screenAttached": "螢幕",
-    "attachScreen": "螢幕視覺——在關閉之前，每則訊息都會附上您的螢幕畫面",
-    "detachScreen": "關閉螢幕視覺",
     "attach": {
       "file": "附加圖片或檔案",
-      "snip": "擷取螢幕的某個範圍",
       "imageCount": "{{count}} 張圖片",
       "imageCount_other": "{{count}} 張圖片",
-      "remove": "移除附件",
       "dropHint": "放開即可附加"
-    },
-    "snip": {
-      "hint": "拖曳以擷取範圍——按 Esc 取消"
     },
     "webSearch": {
       "enable": "啟用網路搜尋",

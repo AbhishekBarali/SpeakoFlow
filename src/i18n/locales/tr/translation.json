@@ -1273,26 +1273,8 @@
         }
       },
       "vision": {
-        "title": "Ekran görüşü",
-        "modeLabel": "Ekran erişimi",
-        "modes": {
-          "off": "Kapalı",
-          "manual": "Elle",
-          "agentDecides": "Aracı karar verir",
-          "descriptions": {
-            "off": "Ekran yakalama devre dışı. Kamera ve bölge denetimleri gizlenir.",
-            "manual": "Tam ekranı ya da bir bölgeyi ne zaman ekleyeceğinizi siz seçersiniz. Sesli yakalama zamanlaması geçerlidir.",
-            "agent_decides": "Model, güncel görsel bağlama ihtiyaç duyduğunda ekran yakalama isteyebilir. Gönderilen her ekran görüntüsü konuşmada gösterilir."
-          }
-        },
         "timing": {
-          "label": "Ne zaman yakalanacak",
-          "description": "Sesli sorular için: sormaya başladığınız anı yakalayın ya da mesaj gönderilene kadar bekleyin. Yazılan mesajlar her zaman gönderim anında yakalar.",
-          "descriptionAgent": "Her iki seçenek de ekran görüntüsünü önceden hazırlar; böylece asistan sizi asla bekletmez. Fark, görüntünün neyi gösterdiğidir: “Sorduğum anda”, konuşmaya başladığınız andaki ekranı alır; “Mesaj gönderildiğinde” ise ekranı şu anki hâliyle alır. Her durumda görüntü cihazınızda kalır ve yalnızca asistan gerçekten görmek isterse gönderilir.",
-          "options": {
-            "immediate": "Sorduğum anda",
-            "on_send": "Mesaj gönderildiğinde"
-          }
+          "label": "Ne zaman yakalanacak"
         },
         "screenRecording": {
           "description": "Ekran görüşü, macOS Ekran Kaydı iznine ihtiyaç duyar. İzni Sistem Ayarları'ndan verin, ardından etkili olması için SpeakoFlow'u yeniden başlatın.",
@@ -1551,18 +1533,11 @@
     "regenerate": "Yanıtı yeniden oluştur (eskisi Geçmiş'te kalır)",
     "summarizing": "Önceki mesajlar özetleniyor…",
     "screenAttached": "Ekran",
-    "attachScreen": "Ekran görüşü — kapatılana kadar her mesaja ekranınızı ekler",
-    "detachScreen": "Ekran görüşünü kapat",
     "attach": {
       "file": "Bir görüntü veya dosya ekle",
-      "snip": "Ekranın bir bölgesini kırp",
       "imageCount": "{{count}} görüntü",
       "imageCount_other": "{{count}} görüntü",
-      "remove": "Eki kaldır",
       "dropHint": "Eklemek için bırakın"
-    },
-    "snip": {
-      "hint": "Bir bölgeyi kırpmak için sürükleyin — iptal için Esc"
     },
     "webSearch": {
       "enable": "Web aramasını etkinleştir",

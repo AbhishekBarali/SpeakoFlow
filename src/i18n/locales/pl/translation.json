@@ -1273,26 +1273,8 @@
         }
       },
       "vision": {
-        "title": "Podgląd ekranu",
-        "modeLabel": "Dostęp do ekranu",
-        "modes": {
-          "off": "Wyłączony",
-          "manual": "Ręczny",
-          "agentDecides": "Decyduje asystent",
-          "descriptions": {
-            "off": "Przechwytywanie ekranu jest wyłączone. Przyciski kamery i wyboru obszaru są ukryte.",
-            "manual": "Sam decydujesz, kiedy dołączyć cały ekran lub jego fragment. Obowiązuje ustawienie momentu przechwycenia dla pytań głosowych.",
-            "agent_decides": "Model może sam poprosić o zrzut ekranu, gdy potrzebuje aktualnego kontekstu wizualnego. Każdy wysłany zrzut jest widoczny w rozmowie."
-          }
-        },
         "timing": {
-          "label": "Kiedy przechwytywać",
-          "description": "Przy pytaniach głosowych: przechwyć ekran w chwili, gdy zaczynasz pytać, albo poczekaj do wysłania wiadomości. Wpisywane wiadomości zawsze przechwytują ekran przy wysłaniu.",
-          "descriptionAgent": "Obie opcje przygotowują zrzut ekranu z wyprzedzeniem, więc asystent nigdy nie każe Ci na niego czekać. Różnica jest w tym, co widać na obrazie: „Gdy zadaję pytanie” zapisuje ekran z chwili, gdy zaczynasz mówić, a „Gdy wiadomość jest wysyłana” — taki, jaki jest teraz. W obu przypadkach obraz zostaje na Twoim urządzeniu i jest wysyłany tylko wtedy, gdy asystent naprawdę poprosi, aby go zobaczyć.",
-          "options": {
-            "immediate": "Gdy zadaję pytanie",
-            "on_send": "Gdy wiadomość jest wysyłana"
-          }
+          "label": "Kiedy przechwytywać"
         },
         "screenRecording": {
           "description": "Podgląd ekranu wymaga uprawnienia macOS do nagrywania ekranu. Przyznaj je w Ustawieniach systemowych, a potem uruchom SpeakoFlow ponownie, aby zaczęło działać.",
@@ -1551,18 +1533,11 @@
     "regenerate": "Wygeneruj odpowiedź ponownie (stara zostaje w Historii)",
     "summarizing": "Streszczanie wcześniejszych wiadomości…",
     "screenAttached": "Ekran",
-    "attachScreen": "Podgląd ekranu — dołączaj ekran do każdej wiadomości, dopóki nie wyłączysz",
-    "detachScreen": "Wyłącz podgląd ekranu",
     "attach": {
       "file": "Dołącz obraz lub plik",
-      "snip": "Wytnij fragment ekranu",
       "imageCount": "{{count}} obraz",
       "imageCount_other": "{{count}} obrazów",
-      "remove": "Usuń załącznik",
       "dropHint": "Upuść, aby dołączyć"
-    },
-    "snip": {
-      "hint": "Przeciągnij, aby wyciąć fragment — Esc anuluje"
     },
     "webSearch": {
       "enable": "Włącz wyszukiwanie w sieci",

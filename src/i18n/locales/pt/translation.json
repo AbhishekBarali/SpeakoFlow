@@ -1273,26 +1273,8 @@
         }
       },
       "vision": {
-        "title": "Visão de tela",
-        "modeLabel": "Acesso à tela",
-        "modes": {
-          "off": "Desativado",
-          "manual": "Manual",
-          "agentDecides": "O agente decide",
-          "descriptions": {
-            "off": "A captura de tela está desativada. Os controles de câmera e de região ficam ocultos.",
-            "manual": "Você escolhe quando anexar a tela inteira ou uma região. O momento da captura por voz é respeitado.",
-            "agent_decides": "O modelo pode pedir uma captura de tela quando precisar do contexto visual atual. Toda captura enviada é mostrada na conversa."
-          }
-        },
         "timing": {
-          "label": "Quando capturar",
-          "description": "Para perguntas por voz: capturar no momento em que você começa a perguntar ou esperar até a mensagem ser enviada. Mensagens digitadas sempre capturam no envio.",
-          "descriptionAgent": "As duas opções preparam a captura de tela com antecedência, então o assistente nunca te deixa esperando por ela. A diferença é o que a imagem mostra: “Quando eu pergunto” pega a tela como ela estava quando você começou a falar; “Quando a mensagem é enviada” pega como ela está agora. Nos dois casos a imagem fica no seu dispositivo e só é enviada se o assistente realmente pedir para vê-la.",
-          "options": {
-            "immediate": "Quando eu pergunto",
-            "on_send": "Quando a mensagem é enviada"
-          }
+          "label": "Quando capturar"
         },
         "screenRecording": {
           "description": "A visão de tela precisa da permissão de Gravação de Tela do macOS. Conceda nas Configurações do Sistema e reinicie o SpeakoFlow para que ela tenha efeito.",
@@ -1551,18 +1533,11 @@
     "regenerate": "Gerar a resposta novamente (a antiga fica no Histórico)",
     "summarizing": "Resumindo as mensagens anteriores…",
     "screenAttached": "Tela",
-    "attachScreen": "Visão de tela — anexa sua tela a cada mensagem até ser desativada",
-    "detachScreen": "Desativar a visão de tela",
     "attach": {
       "file": "Anexar uma imagem ou arquivo",
-      "snip": "Recortar uma região da tela",
       "imageCount": "{{count}} imagem",
       "imageCount_other": "{{count}} imagens",
-      "remove": "Remover anexo",
       "dropHint": "Solte para anexar"
-    },
-    "snip": {
-      "hint": "Arraste para recortar uma região — Esc para cancelar"
     },
     "webSearch": {
       "enable": "Ativar a busca na web",

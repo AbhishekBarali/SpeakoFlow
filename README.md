@@ -98,7 +98,8 @@ don't do.
 Ask a question about whatever you're looking at and the assistant answers with that
 context: the error in your terminal, the contract in your browser, the chart in your
 spreadsheet. Combined with Generate with Flow, it can write a reply based on what's
-on screen rather than on what you dictate. It only captures when you ask it to, the
+on screen rather than on what you dictate. It's off until you turn it on, and even
+then it only looks when a question is about your screen or you ask it to. The
 capture goes only to the model provider you chose, and only a small thumbnail is
 kept locally.
 

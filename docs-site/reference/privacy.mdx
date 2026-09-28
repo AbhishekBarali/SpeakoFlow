@@ -17,7 +17,7 @@ Four things are true no matter how you configure SpeakoFlow.
 | --------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- | ---------------------------------------- |
 | Assistant, [AI cleanup](/writing/ai-cleanup), [Generate with Flow](/writing/generate-with-flow), spoken answers | Only when you use them, and only if you configured a remote provider         | The provider you chose, and nowhere else |
 | [Web search](/assistant/web-search)                                                                             | Off by default. When on, only when the assistant decides a search would help | Your chosen search backend               |
-| Screen captures                                                                                                 | Only when you ask for them                                                   | The provider you chose                   |
+| Screen captures                                                                                                 | Off by default. When on, only when the assistant decides it needs to look    | The provider you chose                   |
 | Model downloads                                                                                                 | When you download a transcription or local assistant model                   | The model host                           |
 | Update checks                                                                                                   | **On by default.** Toggle in _Settings → General_                            | This project's GitHub releases page      |
 
@@ -27,7 +27,7 @@ Pick a local provider for the first three rows and the app never opens a connect
 
 <AccordionGroup>
   <Accordion title="Screen captures">
-    Screen vision captures nothing unless you ask it to, and then only the monitor under your mouse cursor.
+    Screen vision is off until you turn it on. Once it is on, the assistant looks only when a question needs the screen, and then only at the monitor under your mouse cursor.
 
     The full-resolution frame is sent once to the model provider you chose and is not kept. What persists locally is a small thumbnail attached to the message, so you can see later what the assistant was looking at. Details in [Screen vision](/assistant/screen-vision).
 

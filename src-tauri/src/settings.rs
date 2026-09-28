@@ -792,29 +792,17 @@ impl AssistantResponseLength {
     }
 }
 
-/// Controls who may initiate screen capture for assistant turns.
-#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default, Type)]
-#[serde(rename_all = "snake_case")]
-pub enum AssistantScreenAccessMode {
-    /// Screen capture is disabled.
-    Off,
-    /// The user explicitly attaches or requests each capture.
-    #[default]
-    Manual,
-    /// The assistant may decide when the current turn needs a capture.
-    AgentDecides,
-}
-
-/// When a screen capture is taken for an assistant turn.
+/// When the frame an assistant turn might look at is grabbed.
 ///
-/// This only changes the timing for **voice** questions (where there's a real
-/// gap between starting and finishing the question); typed messages always
-/// capture at send, since the panel is already on screen either way.
+/// Screen access is always the model's decision (see
+/// `assistant_ask_screen_access`): it calls `capture_screen` when a question
+/// needs the screen. This setting only changes when the frame is *taken*, never
+/// whether it is sent — a frame grabbed early is held on this machine and is
+/// dropped at the end of the turn unless the model asks for it.
 ///
-/// It applies to both ways a capture can happen: a Manual capture the user
-/// armed, and an Agent-decides capture the model asks for mid-turn. In the agent
-/// case `Immediate` is purely a speed setting — the frame is held locally and is
-/// only ever sent if the model actually calls the screen tool.
+/// It matters only for a spoken quick ask, where there is a real gap between
+/// starting and finishing the question. Typed asks capture at send, and a call
+/// captures on demand.
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default, Type)]
 #[serde(rename_all = "snake_case")]
 pub enum VisionCaptureTiming {
@@ -1531,14 +1519,18 @@ pub struct AppSettings {
     pub assistant_models: HashMap<String, String>,
     #[serde(default = "default_assistant_system_prompt")]
     pub assistant_system_prompt: String,
-    /// Controls whether screen capture is off, user-triggered, or agent-decided.
+    /// Whether the quick ask may look at the screen. On does not mean every
+    /// question captures: the model is offered a `capture_screen` tool and
+    /// decides per question, guided by the prompt in `tools_system_section`.
+    /// Off means the tool is never offered. Off by default, because a screenshot
+    /// goes to whichever provider the user chose.
     #[serde(default)]
-    pub assistant_screen_access_mode: AssistantScreenAccessMode,
-    /// Compatibility mirror for code that still consumes the former boolean.
-    /// Derived from `assistant_screen_access_mode` whenever settings are repaired
-    /// or written: only `Off` maps to false.
-    #[serde(default = "default_assistant_screenshot_enabled")]
-    pub assistant_screenshot_enabled: bool,
+    pub assistant_ask_screen_access: bool,
+    /// The same switch for a hands-free call. Separate because a call turns
+    /// every sentence into a question, so someone who is happy for a one-off
+    /// ask to look may not want the screen in reach for a whole conversation.
+    #[serde(default)]
+    pub assistant_call_screen_access: bool,
     /// When a screen capture is taken for a voice turn (immediate vs at-send).
     #[serde(default)]
     pub assistant_vision_capture_timing: VisionCaptureTiming,
@@ -2775,10 +2767,6 @@ fn default_assistant_system_prompt() -> String {
     "You are a helpful voice assistant. The user talks to you by speaking; their speech is transcribed and sent to you, so expect occasional transcription errors and infer the intended meaning. Be concise and direct. Use plain text formatting suitable for a small chat panel. When a screenshot of the user's screen is attached, describe or use what you actually see in it.".to_string()
 }
 
-fn default_assistant_screenshot_enabled() -> bool {
-    true
-}
-
 fn default_active_character_id() -> String {
     "default".to_string()
 }
@@ -3039,19 +3027,6 @@ fn default_web_search_api_keys() -> SecretMap {
     SecretMap(map)
 }
 
-fn sync_assistant_screen_access_compat(settings: &mut AppSettings) -> bool {
-    let screenshot_enabled = !matches!(
-        settings.assistant_screen_access_mode,
-        AssistantScreenAccessMode::Off
-    );
-    if settings.assistant_screenshot_enabled == screenshot_enabled {
-        return false;
-    }
-
-    settings.assistant_screenshot_enabled = screenshot_enabled;
-    true
-}
-
 /// Fold the retired "Incognito chat" switch into the memory switch.
 ///
 /// Incognito was a second, persisted switch beside "Memory" that meant "don't
@@ -3070,8 +3045,7 @@ fn retire_memory_incognito(settings: &mut AppSettings) -> bool {
 }
 
 fn ensure_assistant_defaults(settings: &mut AppSettings) -> bool {
-    let mut changed = sync_assistant_screen_access_compat(settings);
-    changed |= retire_memory_incognito(settings);
+    let mut changed = retire_memory_incognito(settings);
     for provider in default_post_process_providers() {
         if !settings.assistant_models.contains_key(&provider.id) {
             settings
@@ -3586,8 +3560,8 @@ pub fn get_default_settings() -> AppSettings {
 
     // Note: there's intentionally no dedicated "Assistant + Screen" shortcut.
     // Ctrl/Cmd+Alt+Shift+Space is reserved as the assistant's hands-free (lock)
-    // variant. Attach a screenshot from the assistant panel's camera button
-    // instead; a dedicated screen shortcut may return later on a free combo.
+    // variant. With screen access on, the assistant looks when a question needs
+    // it, so a key that forces a screenshot has nothing left to add.
 
     bindings.insert(
         "assistant_call".to_string(),
@@ -3708,8 +3682,8 @@ pub fn get_default_settings() -> AppSettings {
             map
         },
         assistant_system_prompt: default_assistant_system_prompt(),
-        assistant_screen_access_mode: AssistantScreenAccessMode::default(),
-        assistant_screenshot_enabled: default_assistant_screenshot_enabled(),
+        assistant_ask_screen_access: false,
+        assistant_call_screen_access: false,
         assistant_vision_capture_timing: VisionCaptureTiming::default(),
         assistant_tts_enabled: false,
         assistant_tts_engine: default_assistant_tts_engine(),
@@ -4576,29 +4550,43 @@ fn hydrate_secrets(settings: &mut AppSettings) {
 
 /// Normalizes settings JSON before deserializing the complete object.
 ///
-/// Stores created before `assistant_screen_access_mode` only have the legacy
-/// boolean. Preserve an explicit mode, otherwise migrate false to `Off` and
-/// true (or a missing boolean) to the default `Manual` mode. The migration is
-/// deliberately idempotent so callers can safely apply it at every boundary.
+/// Screen access used to be one three-way setting (`assistant_screen_access_mode`:
+/// off / manual / agent_decides), and before that a single boolean
+/// (`assistant_screenshot_enabled`). It is now two switches, one per surface,
+/// both meaning "the model may decide to look". The mapping is deliberately
+/// conservative: only `agent_decides` — someone who already let the model
+/// decide — turns them on. Manual (the old default, which meant "only when I
+/// press the camera button") turns them off, because switching it on would
+/// start sending screenshots to a provider the user never agreed to send them
+/// to. Idempotent: once either new key exists, nothing is rewritten.
 fn normalize_settings_json(mut raw: serde_json::Value) -> (serde_json::Value, bool) {
     let Some(settings) = raw.as_object_mut() else {
         return (raw, false);
     };
-    if settings.contains_key("assistant_screen_access_mode") {
+    const LEGACY_KEYS: [&str; 2] = [
+        "assistant_screen_access_mode",
+        "assistant_screenshot_enabled",
+    ];
+    let migrated = settings.contains_key("assistant_ask_screen_access")
+        || settings.contains_key("assistant_call_screen_access");
+    let has_legacy = LEGACY_KEYS.iter().any(|key| settings.contains_key(*key));
+    if migrated || !has_legacy {
         return (raw, false);
     }
 
-    let mode = match settings
-        .get("assistant_screenshot_enabled")
-        .and_then(serde_json::Value::as_bool)
-    {
-        Some(false) => "off",
-        Some(true) | None => "manual",
-    };
-    settings.insert(
-        "assistant_screen_access_mode".to_string(),
-        serde_json::Value::String(mode.to_string()),
-    );
+    let agent_decided = settings
+        .get("assistant_screen_access_mode")
+        .and_then(serde_json::Value::as_str)
+        == Some("agent_decides");
+    for key in LEGACY_KEYS {
+        settings.remove(key);
+    }
+    for key in [
+        "assistant_ask_screen_access",
+        "assistant_call_screen_access",
+    ] {
+        settings.insert(key.to_string(), serde_json::Value::Bool(agent_decided));
+    }
     (raw, true)
 }
 
@@ -4734,8 +4722,8 @@ pub fn load_or_create_app_settings(app: &AppHandle) -> AppSettings {
         //  - transcribe_toggle: the main shortcuts now lock hands-free
         //    via their Shift variant, so the standalone toggle is gone.
         //  - assistant_vision: Ctrl/Cmd+Alt+Shift+Space is now the
-        //    assistant's hands-free variant; screenshots come from the
-        //    panel's camera button instead.
+        //    assistant's hands-free variant; the assistant looks at the
+        //    screen itself when a question needs it.
         //  - assistant_panel_toggle: show/hide-the-panel described a window
         //    that no longer works that way. The panel is a quick-ask card the
         //    ask key opens and closing ends, or a call the call key opens and
@@ -4889,10 +4877,6 @@ pub fn write_settings(app: &AppHandle, mut settings: AppSettings) {
         .store(crate::portable::store_path(SETTINGS_STORE_PATH))
         .expect("Failed to initialize store");
 
-    // The enum is the source of truth. Keep the former boolean synchronized for
-    // compatibility with capture paths that have not migrated yet.
-    sync_assistant_screen_access_compat(&mut settings);
-
     // Keep API keys in the OS keychain, never in the on-disk store. Each key is
     // blanked from the serialized copy only after the keychain confirms it holds
     // it; a failed keychain write leaves the key on disk (fallback) rather than
@@ -5027,164 +5011,110 @@ mod tests {
     }
 
     #[test]
-    fn screen_access_normalization_migrates_legacy_true_false_and_missing() {
-        for (raw, expected_mode, expected_enabled) in [
+    fn only_agent_decides_turns_screen_access_on_when_migrating() {
+        // (stored value, expected state of both new switches)
+        for (raw, expected) in [
             (
-                serde_json::json!({ "assistant_screenshot_enabled": false }),
-                AssistantScreenAccessMode::Off,
+                serde_json::json!({ "assistant_screen_access_mode": "agent_decides" }),
+                true,
+            ),
+            // Manual was the old default and meant "only when I press the
+            // camera". Turning it into "the model may look" would start sending
+            // screenshots nobody agreed to send.
+            (
+                serde_json::json!({
+                    "assistant_screen_access_mode": "manual",
+                    "assistant_screenshot_enabled": true
+                }),
                 false,
             ),
             (
-                serde_json::json!({ "assistant_screenshot_enabled": true }),
-                AssistantScreenAccessMode::Manual,
-                true,
+                serde_json::json!({ "assistant_screen_access_mode": "off" }),
+                false,
             ),
+            // Older still: only the boolean.
             (
-                serde_json::json!({}),
-                AssistantScreenAccessMode::Manual,
-                true,
+                serde_json::json!({ "assistant_screenshot_enabled": true }),
+                false,
             ),
         ] {
             let (normalized, changed) = normalize_settings_json(raw);
             assert!(changed);
-            assert_eq!(
-                normalized["assistant_screen_access_mode"],
-                serde_json::to_value(expected_mode).unwrap()
-            );
+            let map = normalized.as_object().unwrap();
+            assert!(!map.contains_key("assistant_screen_access_mode"));
+            assert!(!map.contains_key("assistant_screenshot_enabled"));
 
             let settings: AppSettings = serde_json::from_value(normalized).unwrap();
-            assert_eq!(settings.assistant_screen_access_mode, expected_mode);
-            assert_eq!(settings.assistant_screenshot_enabled, expected_enabled);
+            assert_eq!(settings.assistant_ask_screen_access, expected);
+            assert_eq!(settings.assistant_call_screen_access, expected);
         }
     }
 
     #[test]
-    fn startup_and_defensive_get_share_screen_mode_migration_boundary() {
-        for (raw, expected) in [
-            (
-                serde_json::json!({ "assistant_screenshot_enabled": false }),
-                AssistantScreenAccessMode::Off,
-            ),
-            (
-                serde_json::json!({ "assistant_screenshot_enabled": true }),
-                AssistantScreenAccessMode::Manual,
-            ),
-            (serde_json::json!({}), AssistantScreenAccessMode::Manual),
-        ] {
-            let (settings, updated) = deserialize_settings_value(raw);
-            assert!(updated);
-            assert_eq!(settings.assistant_screen_access_mode, expected);
-        }
-
-        let (agent, updated) = deserialize_settings_value(serde_json::json!({
-            "assistant_screen_access_mode": "agent_decides",
-            "assistant_screenshot_enabled": false
+    fn screen_access_migration_is_idempotent_and_leaves_new_stores_alone() {
+        let (once, first) = normalize_settings_json(serde_json::json!({
+            "assistant_screen_access_mode": "agent_decides"
         }));
-        assert!(!updated);
-        assert_eq!(
-            agent.assistant_screen_access_mode,
-            AssistantScreenAccessMode::AgentDecides
-        );
+        let (twice, second) = normalize_settings_json(once.clone());
+        assert!(first);
+        assert!(!second);
+        assert_eq!(twice, once);
 
-        let (salvaged, updated) = deserialize_settings_value(serde_json::json!({
-            "assistant_screenshot_enabled": false,
-            "sound_theme": "invalid-neighbor"
+        // A store already on the switches is never rewritten, even if a stale
+        // legacy key is somehow still there.
+        let current = serde_json::json!({
+            "assistant_ask_screen_access": true,
+            "assistant_call_screen_access": false,
+            "assistant_screen_access_mode": "off"
+        });
+        let (normalized, changed) = normalize_settings_json(current.clone());
+        assert!(!changed);
+        assert_eq!(normalized, current);
+
+        // Nothing to migrate: an empty store is not reported as changed.
+        let (_, changed) = normalize_settings_json(serde_json::json!({}));
+        assert!(!changed);
+    }
+
+    #[test]
+    fn startup_and_salvage_share_the_screen_access_migration() {
+        let (settings, updated) = deserialize_settings_value(serde_json::json!({
+            "assistant_screen_access_mode": "agent_decides"
         }));
         assert!(updated);
-        assert_eq!(
-            salvaged.assistant_screen_access_mode,
-            AssistantScreenAccessMode::Off
-        );
-    }
+        assert!(settings.assistant_ask_screen_access);
+        assert!(settings.assistant_call_screen_access);
 
-    #[test]
-    fn screen_access_normalization_preserves_existing_agent_mode() {
+        // A broken neighbouring field sends the store through salvage, which must
+        // still migrate rather than fall back to the defaults.
         let raw = serde_json::json!({
             "assistant_screen_access_mode": "agent_decides",
-            "assistant_screenshot_enabled": false
-        });
-        let original = raw.clone();
-
-        let (normalized, changed) = normalize_settings_json(raw);
-        assert!(!changed);
-        assert_eq!(normalized, original);
-
-        let mut settings: AppSettings = serde_json::from_value(normalized).unwrap();
-        assert_eq!(
-            settings.assistant_screen_access_mode,
-            AssistantScreenAccessMode::AgentDecides
-        );
-        assert!(sync_assistant_screen_access_compat(&mut settings));
-        assert!(settings.assistant_screenshot_enabled);
-        assert_eq!(
-            settings.assistant_screen_access_mode,
-            AssistantScreenAccessMode::AgentDecides
-        );
-    }
-
-    #[test]
-    fn screen_access_normalization_is_idempotent() {
-        let raw = serde_json::json!({ "assistant_screenshot_enabled": false });
-        let (once, first_changed) = normalize_settings_json(raw);
-        let (twice, second_changed) = normalize_settings_json(once.clone());
-
-        assert!(first_changed);
-        assert!(!second_changed);
-        assert_eq!(twice, once);
-    }
-
-    #[test]
-    fn salvage_keeps_migrated_off_mode_when_neighboring_field_is_invalid() {
-        let raw = serde_json::json!({
-            "assistant_screenshot_enabled": false,
             "selected_model": "keep-this-model",
             "sound_theme": "theremin"
         });
-        let (normalized, _) = normalize_settings_json(raw.clone());
-        assert!(serde_json::from_value::<AppSettings>(normalized).is_err());
-
         let salvaged = salvage_settings(&raw);
-        assert_eq!(
-            salvaged.assistant_screen_access_mode,
-            AssistantScreenAccessMode::Off
-        );
-        assert!(!salvaged.assistant_screenshot_enabled);
+        assert!(salvaged.assistant_ask_screen_access);
+        assert!(salvaged.assistant_call_screen_access);
         assert_eq!(salvaged.selected_model, "keep-this-model");
         assert_eq!(salvaged.sound_theme, default_sound_theme());
     }
 
     #[test]
-    fn unrelated_write_equivalent_round_trip_preserves_screen_access_mode() {
-        for (mode, expected_enabled) in [
-            (AssistantScreenAccessMode::Off, false),
-            (AssistantScreenAccessMode::Manual, true),
-            (AssistantScreenAccessMode::AgentDecides, true),
-        ] {
-            let mut settings = get_default_settings();
-            settings.assistant_screen_access_mode = mode;
-            settings.assistant_screenshot_enabled = !expected_enabled;
-            settings.history_limit = 37;
+    fn screen_access_switches_round_trip_and_default_off() {
+        let fresh = get_default_settings();
+        assert!(!fresh.assistant_ask_screen_access);
+        assert!(!fresh.assistant_call_screen_access);
 
-            assert!(sync_assistant_screen_access_compat(&mut settings));
-            let serialized = serde_json::to_value(settings).unwrap();
-            let (normalized, changed) = normalize_settings_json(serialized);
-            assert!(!changed);
-
-            let round_trip: AppSettings = serde_json::from_value(normalized).unwrap();
-            assert_eq!(round_trip.assistant_screen_access_mode, mode);
-            assert_eq!(round_trip.assistant_screenshot_enabled, expected_enabled);
-            assert_eq!(round_trip.history_limit, 37);
-        }
-    }
-
-    #[test]
-    fn fresh_defaults_use_manual_screen_access() {
-        let settings = get_default_settings();
-        assert_eq!(
-            settings.assistant_screen_access_mode,
-            AssistantScreenAccessMode::Manual
-        );
-        assert!(settings.assistant_screenshot_enabled);
+        let mut settings = get_default_settings();
+        settings.assistant_ask_screen_access = true;
+        settings.history_limit = 37;
+        let serialized = serde_json::to_value(settings).unwrap();
+        let (normalized, changed) = normalize_settings_json(serialized);
+        assert!(!changed);
+        let round_trip: AppSettings = serde_json::from_value(normalized).unwrap();
+        assert!(round_trip.assistant_ask_screen_access);
+        assert!(!round_trip.assistant_call_screen_access);
+        assert_eq!(round_trip.history_limit, 37);
     }
 
     fn custom_prompt(id: &str, prompt: &str) -> LLMPrompt {

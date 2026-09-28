@@ -1273,26 +1273,8 @@
         }
       },
       "vision": {
-        "title": "Bildschirmansicht",
-        "modeLabel": "Bildschirmzugriff",
-        "modes": {
-          "off": "Aus",
-          "manual": "Manuell",
-          "agentDecides": "Agent entscheidet",
-          "descriptions": {
-            "off": "Die Bildschirmaufnahme ist deaktiviert. Die Bedienelemente für Kamera und Bereich sind ausgeblendet.",
-            "manual": "Du entscheidest, wann der ganze Bildschirm oder ein Bereich angehängt wird. Der Aufnahmezeitpunkt für Sprachfragen gilt weiterhin.",
-            "agent_decides": "Das Modell darf eine Bildschirmaufnahme anfordern, wenn es aktuellen visuellen Kontext braucht. Jeder gesendete Screenshot wird im Gespräch angezeigt."
-          }
-        },
         "timing": {
-          "label": "Wann aufgenommen wird",
-          "description": "Bei Sprachfragen: in dem Moment aufnehmen, in dem du zu fragen beginnst, oder warten, bis die Nachricht gesendet wird. Getippte Nachrichten nehmen immer beim Senden auf.",
-          "descriptionAgent": "Beide Optionen bereiten den Screenshot im Voraus vor, damit der Assistent dich nie darauf warten lässt. Der Unterschied ist, was das Bild zeigt: „Wenn ich frage“ nimmt den Bildschirm so auf, wie er beim Sprechbeginn aussah, „Wenn die Nachricht gesendet wird“ nimmt ihn so auf, wie er jetzt aussieht. In beiden Fällen bleibt das Bild auf deinem Gerät und wird nur gesendet, wenn der Assistent es tatsächlich sehen will.",
-          "options": {
-            "immediate": "Wenn ich frage",
-            "on_send": "Wenn die Nachricht gesendet wird"
-          }
+          "label": "Wann aufgenommen wird"
         },
         "screenRecording": {
           "description": "Die Bildschirmansicht benötigt unter macOS die Berechtigung zur Bildschirmaufnahme. Erteile sie in den Systemeinstellungen und starte SpeakoFlow dann neu, damit sie wirksam wird.",
@@ -1551,18 +1533,11 @@
     "regenerate": "Antwort neu generieren (die alte bleibt im Verlauf)",
     "summarizing": "Frühere Nachrichten werden zusammengefasst…",
     "screenAttached": "Bildschirm",
-    "attachScreen": "Bildschirmansicht — hängt deinen Bildschirm an jede Nachricht an, bis du sie ausschaltest",
-    "detachScreen": "Bildschirmansicht ausschalten",
     "attach": {
       "file": "Bild oder Datei anhängen",
-      "snip": "Einen Bildschirmbereich ausschneiden",
       "imageCount": "{{count}} Bild",
       "imageCount_other": "{{count}} Bilder",
-      "remove": "Anhang entfernen",
       "dropHint": "Zum Anhängen hier ablegen"
-    },
-    "snip": {
-      "hint": "Ziehen, um einen Bereich auszuschneiden — Esc zum Abbrechen"
     },
     "webSearch": {
       "enable": "Websuche aktivieren",

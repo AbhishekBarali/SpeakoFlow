@@ -1273,26 +1273,8 @@
         }
       },
       "vision": {
-        "title": "Zobrazení obrazovky",
-        "modeLabel": "Přístup k obrazovce",
-        "modes": {
-          "off": "Vypnuto",
-          "manual": "Ručně",
-          "agentDecides": "Rozhodne agent",
-          "descriptions": {
-            "off": "Snímání obrazovky je vypnuté. Ovládání kamery a výběru oblasti je skryté.",
-            "manual": "Sami si zvolíte, kdy přiložit celou obrazovku nebo její část. Platí načasování snímání u hlasu.",
-            "agent_decides": "Model si může vyžádat snímek obrazovky, když potřebuje aktuální vizuální kontext. Každý odeslaný snímek se zobrazí v konverzaci."
-          }
-        },
         "timing": {
-          "label": "Kdy snímat",
-          "description": "U hlasových dotazů: sejmout obrazovku ve chvíli, kdy se začnete ptát, nebo počkat na odeslání zprávy. Napsané zprávy snímají obrazovku vždy při odeslání.",
-          "descriptionAgent": "Obě možnosti připraví snímek obrazovky předem, takže vás asistent nikdy nenechá čekat. Rozdíl je v tom, co obrázek zachycuje: „Když se začnu ptát“ vezme obrazovku tak, jak vypadala, když jste začali mluvit, „Při odeslání zprávy“ ji vezme tak, jak vypadá teď. V obou případech obrázek zůstává na vašem zařízení a odešle se jen tehdy, když si ho asistent skutečně vyžádá.",
-          "options": {
-            "immediate": "Když se začnu ptát",
-            "on_send": "Při odeslání zprávy"
-          }
+          "label": "Kdy snímat"
         },
         "screenRecording": {
           "description": "Zobrazení obrazovky vyžaduje na macOS oprávnění k nahrávání obrazovky. Udělte ho v Nastavení systému a pak SpeakoFlow restartujte, aby se změna projevila.",
@@ -1551,18 +1533,11 @@
     "regenerate": "Vygenerovat odpověď znovu (původní zůstane v Historii)",
     "summarizing": "Shrnuji předchozí zprávy…",
     "screenAttached": "Obrazovka",
-    "attachScreen": "Zobrazení obrazovky — přikládat vaši obrazovku ke každé zprávě, dokud to nevypnete",
-    "detachScreen": "Vypnout zobrazení obrazovky",
     "attach": {
       "file": "Přiložit obrázek nebo soubor",
-      "snip": "Vystřihnout část obrazovky",
       "imageCount": "{{count}} obrázek",
       "imageCount_other": "{{count}} obrázků",
-      "remove": "Odebrat přílohu",
       "dropHint": "Přetažením přiložíte"
-    },
-    "snip": {
-      "hint": "Tažením vyberte oblast — Esc zruší"
     },
     "webSearch": {
       "enable": "Zapnout vyhledávání na webu",

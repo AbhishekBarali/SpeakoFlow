@@ -1058,35 +1058,6 @@
   color: var(--as-placeholder);
 }
 
-.qa-thumbs {
-  flex: none;
-  display: flex;
-  gap: 4px;
-  margin-inline-end: 6px;
-}
-
-.qa-thumb {
-  width: 26px;
-  height: 26px;
-  padding: 0;
-  overflow: hidden;
-  border: 1px solid var(--as-hairline-strong);
-  border-radius: 7px;
-  background: none;
-  cursor: pointer;
-}
-
-.qa-thumb img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.qa-thumb:hover {
-  border-color: var(--as-error);
-}
-
 /* ---------- Buttons ---------- */
 
 /* Round and borderless, like `.call-icon`. */
@@ -1115,11 +1086,6 @@
 
 .qa-icon-btn:active {
   transform: scale(0.93);
-}
-
-.qa-icon-btn.is-on {
-  background: var(--as-raise-strong);
-  color: var(--as-ink);
 }
 
 /* The way out. Quiet in the pill — the call bubble's dismiss — so the words,

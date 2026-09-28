@@ -1273,26 +1273,8 @@
         }
       },
       "vision": {
-        "title": "屏幕视觉",
-        "modeLabel": "屏幕访问",
-        "modes": {
-          "off": "关闭",
-          "manual": "手动",
-          "agentDecides": "由助手决定",
-          "descriptions": {
-            "off": "屏幕捕获已禁用。相机和区域选择控件将被隐藏。",
-            "manual": "由您决定何时附上整个屏幕或某个区域。语音捕获时机设置同样生效。",
-            "agent_decides": "当模型需要当前的画面信息时，可以主动请求捕获屏幕。每一张发送的截图都会显示在对话中。"
-          }
-        },
         "timing": {
-          "label": "捕获时机",
-          "description": "对于语音提问：在您开始提问的那一刻捕获，或等到消息发送时再捕获。输入的消息始终在发送时捕获。",
-          "descriptionAgent": "两个选项都会提前准备好屏幕截图，因此助手绝不会让您等待。区别在于图片的内容：“提问时”截取的是您开始说话时的屏幕，“消息发送时”截取的是当前的屏幕。无论选哪个，图片都留在您的设备上，只有助手确实要求查看时才会发送。",
-          "options": {
-            "immediate": "提问时",
-            "on_send": "消息发送时"
-          }
+          "label": "捕获时机"
         },
         "screenRecording": {
           "description": "屏幕视觉需要 macOS 的屏幕录制权限。请在“系统设置”中授予，然后重启 SpeakoFlow 使其生效。",
@@ -1551,18 +1533,11 @@
     "regenerate": "重新生成回答（原回答仍保留在历史记录中）",
     "summarizing": "正在总结较早的消息…",
     "screenAttached": "屏幕",
-    "attachScreen": "屏幕视觉——在关闭之前，为每条消息附上您的屏幕",
-    "detachScreen": "关闭屏幕视觉",
     "attach": {
       "file": "附加图片或文件",
-      "snip": "截取屏幕的一部分",
       "imageCount": "{{count}} 张图片",
       "imageCount_other": "{{count}} 张图片",
-      "remove": "移除附件",
       "dropHint": "拖放到此处附加"
-    },
-    "snip": {
-      "hint": "拖动以截取区域——按 Esc 取消"
     },
     "webSearch": {
       "enable": "开启网络搜索",

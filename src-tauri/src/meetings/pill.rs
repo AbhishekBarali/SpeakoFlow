@@ -39,8 +39,8 @@
 //! # Lifecycle
 //!
 //! Built lazily on the first meeting, then hidden and reused — never destroyed
-//! while the app runs. The build happens **inline on the calling thread**,
-//! mirroring [`crate::assistant::open_snip_overlay`]: dispatching a webview build
+//! while the app runs. The build happens **inline on the calling thread**:
+//! dispatching a webview build
 //! to the main thread from inside a Tauri command's call stack deadlocks WebView2
 //! on Windows. Everything *after* the build — show, hide, size, position,
 //! focusability — is queued onto the main thread, because those are ordinary
@@ -191,8 +191,7 @@ pub fn is_expanded() -> bool {
 ///
 /// **Builds inline on the calling thread on purpose.** Queuing a webview build
 /// onto the main thread from inside a Tauri command's call stack deadlocks
-/// WebView2 on Windows; `assistant::open_snip_overlay` carries the same note and
-/// the same treatment. Call this from a `spawn_blocking` closure or a background
+/// WebView2 on Windows. Call this from a `spawn_blocking` closure or a background
 /// thread, never by dispatching it to the main thread.
 ///
 /// Idempotent, and never destroys: the pill is rebuilt at most once per app run,

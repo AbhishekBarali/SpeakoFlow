@@ -343,7 +343,8 @@ const settings: Json = {
     groq: "openai/gpt-oss-120b",
     openrouter: "google/gemini-2.5-flash",
   },
-  assistant_screen_access_mode: "agent_decides",
+  assistant_ask_screen_access: true,
+  assistant_call_screen_access: false,
   assistant_web_search_enabled: true,
   assistant_web_search_provider: "tinyfish",
   assistant_tts_enabled: true,
@@ -849,9 +850,14 @@ const handlers: Record<string, (args: Json) => unknown> = {
     (
       [
         [
-          "set_assistant_screen_access_mode",
-          "mode",
-          "assistant_screen_access_mode",
+          "set_assistant_ask_screen_access",
+          "enabled",
+          "assistant_ask_screen_access",
+        ],
+        [
+          "set_assistant_call_screen_access",
+          "enabled",
+          "assistant_call_screen_access",
         ],
         [
           "set_assistant_vision_capture_timing",

@@ -2864,46 +2864,21 @@ impl ShortcutAction for AssistantAction {
         // had no idea where it was meant to land.
         crate::input::remember_paste_target();
 
-        // Manual Immediate timing captures at recording start. Beginning every
-        // recording advances the epoch even when no capture is allowed, so a
-        // worker from an older/cancelled recording cannot populate this turn.
+        // Quick-ask screen access with Immediate timing: grab a frame now, while
+        // the user is still talking, so that if the model does call
+        // `capture_screen` the tool has it in hand instead of spending a few
+        // seconds of the user's silence on a screenshot. With On-send timing
+        // the capture starts at the beginning of the turn instead (see
+        // `ensure_agent_capture_started`). The frame stays on this machine and
+        // is dropped at the end of the turn if the model never asks. Every
+        // recording advances the capture generation, even when nothing is
+        // captured, so a frame from an abandoned recording is never adopted.
         {
             let settings = get_settings(app);
             let profile = settings
                 .active_assistant_provider()
                 .map(|p| crate::screenshot::CaptureProfile::for_base_url(&p.base_url))
                 .unwrap_or(crate::screenshot::CaptureProfile::Generous);
-            let capture_requested = settings.assistant_screen_access_mode
-                == crate::settings::AssistantScreenAccessMode::Manual
-                && settings.assistant_vision_capture_timing
-                    == crate::settings::VisionCaptureTiming::Immediate
-                && !settings.active_character_is_cat();
-            if let Some((manual_token, immediate_epoch)) =
-                crate::assistant::begin_immediate_capture(app, capture_requested)
-            {
-                let app_for_capture = app.clone();
-                std::thread::spawn(move || {
-                    match crate::screenshot::capture_screen_data_url_at(None, profile) {
-                        Ok(url) => {
-                            crate::assistant::stash_immediate_capture(
-                                &app_for_capture,
-                                manual_token,
-                                immediate_epoch,
-                                url,
-                            );
-                        }
-                        Err(e) => debug!("Immediate vision capture failed: {}", e),
-                    }
-                });
-            }
-
-            // Agent-decides mode with Immediate timing: grab a frame now, while
-            // the user is still talking, so that if the model does call
-            // `capture_screen` the tool has it in hand instead of spending a few
-            // seconds of the user's silence on a screenshot. With On-send timing
-            // the capture starts at the beginning of the turn instead (see
-            // `ensure_agent_capture_started`). The frame stays on this machine
-            // and is dropped at the end of the turn if the model never asks.
             if let Some(ticket) = crate::assistant::begin_agent_capture(&settings, profile) {
                 std::thread::spawn(move || {
                     ticket.fulfill(crate::screenshot::capture_screen_data_url_at(None, profile));
@@ -2959,10 +2934,6 @@ impl ShortcutAction for AssistantAction {
         // sees the listening state without opening the full assistant window.
         crate::assistant::show_assistant_voice_overlay(app);
         crate::assistant::emit_state(app, "listening");
-        // Tell the floating panel whether this turn will capture the screen
-        // so it can show a "vision" indicator. The actual capture decision is
-        // re-evaluated at stop, but the dedicated vision binding always does.
-        let _ = app.emit("assistant-vision-active", binding_id == "assistant_vision");
 
         // The assistant panel renders its own listening/transcribing state, so
         // we intentionally do NOT show the STT recording lozenge here — that
@@ -3050,16 +3021,12 @@ impl ShortcutAction for AssistantAction {
                 }
             };
 
-            // Vision: the dedicated vision binding always captures; the
-            // normal binding captures when the question clearly refers to
-            // the screen ("what's on my display..."). Capture happens after
-            // transcription so we know the intent — the screen content is
-            // unchanged in those ~150ms.
+            // Whether to look at the screen is the model's call, inside the
+            // turn (`capture_screen`), so nothing is decided here.
             match tm.transcribe(samples) {
                 Ok(transcription) => {
                     change_tray_icon(&ah, TrayIconState::Idle);
-                    // Screen decision + staged attachments + turn, shared with
-                    // the STT overlay's Ask-Assistant redirect.
+                    // Shared with the STT overlay's Ask-Assistant redirect.
                     crate::assistant::run_voice_turn(ah.clone(), transcription).await;
                 }
                 Err(err) => {

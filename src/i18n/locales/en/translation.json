@@ -1463,26 +1463,8 @@
         }
       },
       "vision": {
-        "title": "Screen vision",
-        "modeLabel": "Screen access",
-        "modes": {
-          "off": "Off",
-          "manual": "When I attach it",
-          "agentDecides": "Assistant decides",
-          "descriptions": {
-            "off": "Screen capture is disabled. Camera and region controls are hidden.",
-            "manual": "You choose when to attach the full screen or a region. Voice capture timing applies.",
-            "agent_decides": "The model may request a screen capture when it needs current visual context. Every screenshot sent is shown in the conversation."
-          }
-        },
         "timing": {
-          "label": "Capture timing",
-          "description": "For voice questions: capture the moment you start asking, or wait until the message is sent. Typed messages always capture on send.",
-          "descriptionAgent": "When I start grabs the screen as you began asking; When I send grabs it as it is now. The image is only sent if the assistant asks to see it.",
-          "options": {
-            "immediate": "When I start speaking",
-            "on_send": "When I send"
-          }
+          "label": "Capture timing"
         },
         "screenRecording": {
           "description": "Screen vision needs macOS Screen Recording permission. Grant it in System Settings, then restart SpeakoFlow for it to take effect.",
@@ -1556,7 +1538,9 @@
           "gpuUnusable": "Speaking on the processor, because the graphics card can't run the voice on this computer.",
           "needsPack": "The graphics card can't run the voice on this computer. Download the processor voice below for fast replies.",
           "cpuNeedsPack": "Download the processor voice below. Until then Kokoro runs inside the app, which is slow.",
-          "loadFailed": "The processor voice couldn't start on this computer, so Kokoro runs inside the app for now."
+          "loadFailed": "The processor voice couldn't start on this computer, so Kokoro runs inside the app for now.",
+          "noNativeSlow": "The graphics card can't run the voice on this computer, so Kokoro runs slowly inside the app. A cloud voice would be faster.",
+          "gpuForcedUnusable": "The graphics card can't run the voice properly on this computer. Set Runs on to Automatic or Processor."
         },
         "kokoroNativeLabel": "Processor voice",
         "kokoroNativeDescription": "Lets Kokoro speak fast on the processor when the graphics card can't. {{size}} download.",
@@ -1608,6 +1592,7 @@
         "testFailed": "Kokoro couldn't make the sample. Try again, or set Runs on to Processor.",
         "testGpuMoved": "Your graphics card garbled the sample, so it was muted. Kokoro now uses the processor, so test again to hear it.",
         "testGpuForced": "Your graphics card garbled the sample, so it was muted. Set Runs on to Automatic or Processor.",
+        "testGpuSuspect": "The sample came out garbled, so it was muted. Test again to check your graphics card.",
         "testPhrase": "Hi! This is a test of SpeakoFlow's voice output.",
         "downloadStart": "Downloading Kokoro voice…",
         "downloadProgress": "Downloading Kokoro voice… {{progress}}%",
@@ -2087,18 +2072,11 @@
     "regenerate": "Regenerate answer (the old one stays in History)",
     "summarizing": "Summarizing earlier messages…",
     "screenAttached": "Screen",
-    "attachScreen": "Screen vision — attach your screen to each message until turned off",
-    "detachScreen": "Turn off screen vision",
     "attach": {
       "file": "Attach an image or file",
-      "snip": "Snip a region of the screen",
       "imageCount": "{{count}} image",
       "imageCount_other": "{{count}} images",
-      "remove": "Remove attachment",
       "dropHint": "Drop to attach"
-    },
-    "snip": {
-      "hint": "Drag to snip a region — Esc to cancel"
     },
     "webSearch": {
       "enable": "Enable web search",
@@ -2154,9 +2132,9 @@
       "tts_playbackShort": "Voice playback failed",
       "tts_gpu": "Your graphics card garbled the voice, so it was muted. The next reply uses the processor voice instead.",
       "tts_gpuShort": "Voice muted: graphics card garbled it",
-      "tts_gpu_slow": "Your graphics card garbled the voice, so it was muted. Replies now run on the processor, which is slow until you download the processor voice in Settings → Voice.",
+      "tts_gpu_slow": "Your graphics card garbled the voice, so it was muted. Replies now run on the processor, which is slow until you download the processor voice in Models → Voice.",
       "tts_gpu_slowShort": "Voice muted: graphics card garbled it",
-      "tts_gpu_forced": "Your graphics card garbled the voice, so it was muted. Set Runs on to Automatic or Processor in Settings → Voice.",
+      "tts_gpu_forced": "Your graphics card garbled the voice, so it was muted. Set Runs on to Automatic or Processor in Models → Voice.",
       "tts_gpu_forcedShort": "Voice muted: graphics card garbled it",
       "mic_denied": "Microphone access is blocked. Allow it in your system privacy settings.",
       "mic_deniedShort": "Mic access blocked",
@@ -2590,11 +2568,6 @@
       "keySaved": "Key saved",
       "vision": {
         "description": "Let it look at your screen to answer questions about what you see.",
-        "modes": {
-          "off": "Off",
-          "manual": "When I attach",
-          "agentDecides": "When needed"
-        },
         "timing": {
           "immediate": "When I start",
           "onSend": "When I send"
@@ -2681,12 +2654,17 @@
       },
       "profiles": {
         "manage": "Manage"
+      },
+      "screen": {
+        "ask": "Screen vision for questions",
+        "call": "Screen vision for calls"
       }
     },
     "tips": {
       "thinksWith": "The model that answers you. AI cleanup and meeting notes use it too when they have none of their own.",
       "speaks": "Reads replies aloud during a call.",
-      "vision": "Lets the assistant see your screen. \"When needed\" lets it decide; every capture is shown in the chat.",
+      "screenAsk": "Lets the assistant look when a question is about your screen, or when you ask it to. Questions about selected text are answered from the text. Screenshots go only to your AI provider.",
+      "screenCall": "Lets the assistant look during a call when you ask it to, or when you're talking about something on your screen.",
       "captureTiming": "Grab the screen as it was when you started asking, or when you send.",
       "webSearch": "Looks things up online when a question needs current facts.",
       "depth": "Quick for simple facts, Deep for hard questions.",

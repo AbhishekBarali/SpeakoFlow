@@ -1273,26 +1273,8 @@
         }
       },
       "vision": {
-        "title": "Visione dello schermo",
-        "modeLabel": "Accesso allo schermo",
-        "modes": {
-          "off": "Disattivato",
-          "manual": "Manuale",
-          "agentDecides": "Decide l'agente",
-          "descriptions": {
-            "off": "L'acquisizione dello schermo è disattivata. I comandi di acquisizione e di selezione dell'area sono nascosti.",
-            "manual": "Scegli tu quando allegare l'intero schermo o un'area. Si applica il momento di acquisizione impostato per la voce.",
-            "agent_decides": "Il modello può richiedere un'acquisizione dello schermo quando gli serve il contesto visivo attuale. Ogni schermata inviata viene mostrata nella conversazione."
-          }
-        },
         "timing": {
-          "label": "Quando acquisire",
-          "description": "Per le domande vocali: acquisisci nel momento in cui inizi a chiedere, oppure attendi l'invio del messaggio. I messaggi digitati acquisiscono sempre all'invio.",
-          "descriptionAgent": "Entrambe le opzioni preparano l'acquisizione in anticipo, così l'assistente non ti fa mai aspettare. La differenza è ciò che mostra l'immagine: «Quando chiedo» acquisisce lo schermo com'era quando hai iniziato a parlare, «All'invio del messaggio» lo acquisisce com'è adesso. In entrambi i casi l'immagine resta sul tuo dispositivo e viene inviata solo se l'assistente chiede davvero di vederla.",
-          "options": {
-            "immediate": "Quando chiedo",
-            "on_send": "All'invio del messaggio"
-          }
+          "label": "Quando acquisire"
         },
         "screenRecording": {
           "description": "La visione dello schermo richiede l'autorizzazione Registrazione schermo di macOS. Concedila in Impostazioni di Sistema, poi riavvia SpeakoFlow perché abbia effetto.",
@@ -1551,18 +1533,11 @@
     "regenerate": "Rigenera la risposta (quella precedente resta nella Cronologia)",
     "summarizing": "Riassunto dei messaggi precedenti…",
     "screenAttached": "Schermo",
-    "attachScreen": "Visione dello schermo — allega il tuo schermo a ogni messaggio fino alla disattivazione",
-    "detachScreen": "Disattiva la visione dello schermo",
     "attach": {
       "file": "Allega un'immagine o un file",
-      "snip": "Cattura un'area dello schermo",
       "imageCount": "{{count}} immagine",
       "imageCount_other": "{{count}} immagini",
-      "remove": "Rimuovi l'allegato",
       "dropHint": "Rilascia per allegare"
-    },
-    "snip": {
-      "hint": "Trascina per catturare un'area — Esc per annullare"
     },
     "webSearch": {
       "enable": "Attiva la ricerca web",

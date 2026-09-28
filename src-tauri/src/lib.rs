@@ -976,11 +976,8 @@ pub fn run(cli_args: CliArgs) {
             commands::history::delete_assistant_history_entry,
             commands::history::get_usage_stats,
             commands::assistant::assistant_send_text,
-            commands::assistant::assistant_send_composed,
             commands::assistant::assistant_read_file,
             commands::assistant::assistant_read_image,
-            commands::assistant::assistant_begin_region_snip,
-            commands::assistant::assistant_finish_region_snip,
             commands::assistant::assistant_get_conversation,
             commands::assistant::assistant_regenerate,
             commands::assistant::assistant_summarize,
@@ -1004,8 +1001,8 @@ pub fn run(cli_args: CliArgs) {
             commands::assistant::assistant_restore_builtin_character,
             commands::assistant::assistant_restore_missing_builtins,
             commands::assistant::set_assistant_enabled,
-            commands::assistant::set_assistant_screen_access_mode,
-            commands::assistant::set_assistant_screenshot_enabled,
+            commands::assistant::set_assistant_ask_screen_access,
+            commands::assistant::set_assistant_call_screen_access,
             commands::assistant::set_assistant_vision_capture_timing,
             commands::assistant::set_assistant_tts_enabled,
             commands::assistant::set_assistant_tts_voice,
@@ -1027,12 +1024,9 @@ pub fn run(cli_args: CliArgs) {
             commands::assistant::set_assistant_panel_opacity,
             commands::assistant::set_assistant_panel_size,
             commands::assistant::set_assistant_tts_stop_on_dictation,
-            commands::assistant::assistant_set_pending_attachments,
             commands::assistant::redirect_transcription_to_assistant,
             commands::assistant::assistant_finish_local_tts,
             commands::assistant::assistant_stop_local_tts,
-            commands::assistant::set_assistant_screen_armed,
-            commands::assistant::get_assistant_screen_armed,
             commands::assistant::assistant_toggle_voice,
             commands::assistant::assistant_speak,
             commands::assistant::assistant_test_tts,
@@ -1523,6 +1517,10 @@ pub fn run(cli_args: CliArgs) {
                 if let Some(cleanup) = app.try_state::<managers::local_llm::CleanupLlm>() {
                     cleanup.0.stop();
                 }
+                // Destroy the native voice (if loaded) while ONNX Runtime is
+                // still intact, rather than leaving its session to the
+                // library's own teardown at process exit.
+                native_tts::release(None);
             }
             let _ = (app, event); // suppress unused warnings on non-macOS
         });

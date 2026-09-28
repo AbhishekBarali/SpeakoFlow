@@ -1273,26 +1273,8 @@
         }
       },
       "vision": {
-        "title": "Vision d'écran",
-        "modeLabel": "Accès à l'écran",
-        "modes": {
-          "off": "Désactivé",
-          "manual": "Manuel",
-          "agentDecides": "L'agent décide",
-          "descriptions": {
-            "off": "La capture d'écran est désactivée. Les commandes d'appareil photo et de région sont masquées.",
-            "manual": "Vous choisissez quand joindre l'écran entier ou une région. Le moment de la capture vocale s'applique.",
-            "agent_decides": "Le modèle peut demander une capture d'écran lorsqu'il a besoin du contexte visuel actuel. Chaque capture envoyée est affichée dans la conversation."
-          }
-        },
         "timing": {
-          "label": "Quand capturer",
-          "description": "Pour les questions vocales : capturer au moment où vous commencez à parler, ou attendre l'envoi du message. Les messages tapés sont toujours capturés à l'envoi.",
-          "descriptionAgent": "Les deux options préparent la capture à l'avance, l'assistant ne vous fait donc jamais attendre. La différence est ce que montre l'image : « Quand je pose la question » capture l'écran tel qu'il était quand vous avez commencé à parler, « À l'envoi du message » le capture tel qu'il est maintenant. Dans les deux cas, l'image reste sur votre appareil et n'est envoyée que si l'assistant demande vraiment à la voir.",
-          "options": {
-            "immediate": "Quand je pose la question",
-            "on_send": "À l'envoi du message"
-          }
+          "label": "Quand capturer"
         },
         "screenRecording": {
           "description": "La vision d'écran nécessite l'autorisation d'enregistrement de l'écran sur macOS. Accordez-la dans les Réglages du système, puis redémarrez SpeakoFlow pour qu'elle prenne effet.",
@@ -1551,18 +1533,11 @@
     "regenerate": "Régénérer la réponse (l'ancienne reste dans l'Historique)",
     "summarizing": "Résumé des messages précédents…",
     "screenAttached": "Écran",
-    "attachScreen": "Vision d'écran — joindre votre écran à chaque message jusqu'à désactivation",
-    "detachScreen": "Désactiver la vision d'écran",
     "attach": {
       "file": "Joindre une image ou un fichier",
-      "snip": "Capturer une zone de l'écran",
       "imageCount": "{{count}} image",
       "imageCount_other": "{{count}} images",
-      "remove": "Supprimer la pièce jointe",
       "dropHint": "Déposez pour joindre"
-    },
-    "snip": {
-      "hint": "Faites glisser pour capturer une zone — Esc pour annuler"
     },
     "webSearch": {
       "enable": "Activer la recherche web",

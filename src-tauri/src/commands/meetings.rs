@@ -140,9 +140,8 @@ pub async fn start_meeting(
         // Deliberately inside the blocking closure, not in the async body above.
         // `ensure_pill_window` builds the webview inline on the calling thread,
         // and dispatching a webview build to the main thread from inside a
-        // command's call stack deadlocks WebView2 on Windows — the same reason
-        // `assistant::open_snip_overlay` builds inline. A blocking-pool thread is
-        // the safe place for it.
+        // command's call stack deadlocks WebView2 on Windows. A blocking-pool
+        // thread is the safe place for it.
         //
         // After the recorder has already started, so a failure to put the pill on
         // screen costs an indicator rather than the recording.

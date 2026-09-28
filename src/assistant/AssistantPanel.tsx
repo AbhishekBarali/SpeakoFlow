@@ -33,7 +33,7 @@ import { useVoiceConversation } from "./useVoiceConversation";
 import { CallSurface } from "./CallBar";
 import { useCallForm } from "./useCallForm";
 import { AssistantProfilePicker } from "./AssistantProfilePicker";
-import QuickAsk, { type PendingImage } from "./QuickAsk";
+import QuickAsk from "./QuickAsk";
 import {
   DEFAULT_LAYOUT,
   parseLayout,
@@ -94,11 +94,6 @@ const SELECTION_CLOSE = "</selected_text>";
 const SELECTION_LEAD_IN =
   "The user has this text selected in another application:";
 const SELECTION_REQUEST_PREFIX = "Their request about it: ";
-
-const MAX_PENDING_IMAGES = 4;
-
-let attachmentSeq = 0;
-const nextAttachmentId = (): string => `att-${++attachmentSeq}`;
 
 /**
  * How long a voice-opened quick ask that ended up with nothing to show waits
@@ -396,7 +391,6 @@ const AssistantPanel: React.FC = () => {
   // Background rolling-summary pass (long calls).
   const [summarizing, setSummarizing] = useState(false);
   const [input, setInput] = useState("");
-  const [attachScreen, setAttachScreen] = useState(false);
   // Is the panel window actually on screen? It is built hidden at launch and
   // only shown on a hotkey/turn, so anything expensive (the local TTS weights)
   // waits for this rather than loading into a window nobody has opened.
@@ -410,10 +404,8 @@ const AssistantPanel: React.FC = () => {
   const [ttsPlaying, setTtsPlaying] = useState(false);
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [micLevels, setMicLevels] = useState<number[]>([]);
-  const [visionActive, setVisionActive] = useState(false);
   const [tool, setTool] = useState<ToolActivity | null>(null);
   const [toolElapsed, setToolElapsed] = useState(0);
-  const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
   const [layout, setLayout] = useState<QuickAskLayout>(DEFAULT_LAYOUT);
   // The pointer is on the quick-ask surface, which holds back the error timeout.
   const [hovered, setHovered] = useState(false);
@@ -515,8 +507,6 @@ const AssistantPanel: React.FC = () => {
     !isTauri() ||
     (localVoice !== null &&
       !(kokoroDevice === "auto" && localVoice.webgpu === "unknown"));
-  const screenAccessMode = settings?.assistant_screen_access_mode ?? "manual";
-  const manualScreenAccess = screenAccessMode === "manual";
   const characters = settings?.assistant_characters ?? [];
   const activeCharacterId =
     settings?.assistant_active_character_id ?? "default";
@@ -559,10 +549,6 @@ const AssistantPanel: React.FC = () => {
       active = false;
     };
   }, []);
-
-  useEffect(() => {
-    if (!manualScreenAccess) setAttachScreen(false);
-  }, [manualScreenAccess]);
 
   const refreshSettings = useCallback(async () => {
     try {
@@ -659,13 +645,6 @@ const AssistantPanel: React.FC = () => {
       await syncLanguageFromSettings();
       await refreshSettings();
 
-      try {
-        const armed = await commands.getAssistantScreenArmed();
-        if (!cancelled) setAttachScreen(armed);
-      } catch {
-        // bindings not ready yet; the arm event will synchronize later
-      }
-
       // Restore the conversation (the window can be recreated mid-call).
       try {
         const result = await commands.assistantGetConversation();
@@ -691,10 +670,7 @@ const AssistantPanel: React.FC = () => {
             setError(null);
             suppressTtsRef.current = false;
           }
-          if (next === "idle") {
-            setVisionActive(false);
-            setTool(null);
-          }
+          if (next === "idle") setTool(null);
         }),
       );
 
@@ -724,20 +700,8 @@ const AssistantPanel: React.FC = () => {
       );
 
       track(
-        await listen<boolean>("assistant-screen-armed", (e) => {
-          setAttachScreen(e.payload);
-        }),
-      );
-
-      track(
         await listen<boolean>("assistant-summarizing", (e) => {
           setSummarizing(e.payload);
-        }),
-      );
-
-      track(
-        await listen<boolean>("assistant-vision-active", (e) => {
-          setVisionActive(e.payload);
         }),
       );
 
@@ -897,7 +861,6 @@ const AssistantPanel: React.FC = () => {
           setNotice(null);
           setInput("");
           setSelectionCaptured(0);
-          setPendingImages([]);
           setHovered(false);
           resetStream();
         }),
@@ -906,24 +869,6 @@ const AssistantPanel: React.FC = () => {
       track(
         await listen("assistant-settings-changed", () => {
           void refreshSettings();
-        }),
-      );
-
-      // A snipped screen region arrives as a ready-to-send image attachment.
-      track(
-        await listen<string>("assistant-region-captured", (e) => {
-          setPendingImages((prev) =>
-            prev.length >= MAX_PENDING_IMAGES
-              ? prev
-              : [...prev, { id: nextAttachmentId(), dataUrl: e.payload }],
-          );
-        }),
-      );
-
-      // A voice turn consumed the staged attachments.
-      track(
-        await listen("assistant-attachments-consumed", () => {
-          setPendingImages([]);
         }),
       );
     };
@@ -1008,27 +953,6 @@ const AssistantPanel: React.FC = () => {
     return tool.detail ? `${action} · ${tool.detail}` : action;
   }, [tool, t]);
 
-  // Mirror the staged screen snips into the backend so voice asks (which run
-  // entirely in Rust) send them too.
-  useEffect(() => {
-    void commands
-      .assistantSetPendingAttachments(
-        pendingImages.map((image) => image.dataUrl),
-        [],
-      )
-      .catch(() => {
-        // bindings not ready — the next change re-syncs
-      });
-  }, [pendingImages]);
-
-  const beginSnip = useCallback(async () => {
-    try {
-      await commands.assistantBeginRegionSnip();
-    } catch (err) {
-      setError({ code: "screen_capture", detail: String(err) });
-    }
-  }, []);
-
   const ttsAudible = ttsPlaying || tts.status === "speaking";
 
   // The backend parks a spoken turn in "speaking"; we own the end of that phase.
@@ -1050,26 +974,16 @@ const AssistantPanel: React.FC = () => {
     return () => window.clearTimeout(timer);
   }, [state, ttsAudible, tts.status]);
 
-  const dispatchText = useCallback(
-    async (text: string) => {
-      sendingRef.current = true;
-      const withScreen = attachScreen && manualScreenAccess;
-      const images = pendingImages.map((image) => image.dataUrl);
-      try {
-        if (images.length > 0 || withScreen) {
-          await commands.assistantSendComposed(text, images, [], withScreen);
-          setPendingImages([]);
-        } else {
-          await commands.assistantSendText(text);
-        }
-      } catch (err) {
-        setError({ code: null, detail: String(err) });
-      } finally {
-        sendingRef.current = false;
-      }
-    },
-    [attachScreen, manualScreenAccess, pendingImages],
-  );
+  const dispatchText = useCallback(async (text: string) => {
+    sendingRef.current = true;
+    try {
+      await commands.assistantSendText(text);
+    } catch (err) {
+      setError({ code: null, detail: String(err) });
+    } finally {
+      sendingRef.current = false;
+    }
+  }, []);
 
   const sendText = useCallback(async () => {
     const text = input.trim();
@@ -1118,12 +1032,6 @@ const AssistantPanel: React.FC = () => {
   const stopDrag = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
   }, []);
-
-  const toggleScreen = useCallback(async () => {
-    const next = !attachScreen;
-    setAttachScreen(next);
-    await commands.setAssistantScreenArmed(next);
-  }, [attachScreen]);
 
   /** Localized message for a structured error (falls back to the raw detail). */
   const errorPrimary = useCallback(
@@ -1426,10 +1334,10 @@ const AssistantPanel: React.FC = () => {
           answer={stream || finishedAnswer}
           markdown={MD_COMPONENTS}
           selectionChars={selectionChars}
+          // The model looked, or is looking: the tool is running, or the
+          // question already carries the screenshot marker it left behind.
           screen={
-            visionActive ||
-            tool?.name === "capture_screen" ||
-            (manualScreenAccess && attachScreen && phase !== "prompt")
+            tool?.name === "capture_screen" || !!lastUserMessage?.screenshot
           }
           error={error ? errorPrimary(error) : null}
           notice={notice ? noticeText(notice) : null}
@@ -1442,16 +1350,6 @@ const AssistantPanel: React.FC = () => {
           onSubmit={() => void sendText()}
           autoFocus
           onRequestKeyboard={requestKeyboard}
-          screenToggle={
-            manualScreenAccess
-              ? { armed: attachScreen, onToggle: () => void toggleScreen() }
-              : null
-          }
-          onSnip={manualScreenAccess ? () => void beginSnip() : null}
-          pendingImages={pendingImages}
-          onRemoveImage={(id) =>
-            setPendingImages((prev) => prev.filter((i) => i.id !== id))
-          }
           onClose={() => void hidePanel()}
           onCancel={() => void dismissAsk()}
           onStop={() => void stopTurn()}
