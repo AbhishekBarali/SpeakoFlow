@@ -3,14 +3,14 @@ use crate::input::{self, EnigoState};
 use crate::settings::TypingTool;
 use crate::settings::{get_settings, AutoSubmitKey, ClipboardHandling, PasteMethod};
 use enigo::{Direction, Enigo, Key, Keyboard};
-use log::info;
+use log::{debug, info};
 use std::process::Command;
 use std::time::Duration;
 use tauri::{AppHandle, Manager};
 use tauri_plugin_clipboard_manager::ClipboardExt;
 
 #[cfg(target_os = "linux")]
-use crate::utils::{is_kde_wayland, is_wayland};
+use crate::utils::{is_gnome_wayland, is_kde_wayland, is_wayland};
 
 /// Pastes text using the clipboard: saves current content, writes text, sends paste keystroke, restores clipboard.
 /// Put `text` on the system clipboard.
@@ -102,45 +102,73 @@ fn paste_via_clipboard(
     paste_delay_ms: u64,
 ) -> Result<(), String> {
     let clipboard = app_handle.clipboard();
-    let clipboard_content = clipboard.read_text().unwrap_or_default();
+    // Paste-and-restore used to save only text, so a clipboard holding a
+    // screenshot came back as an empty string: the image was silently destroyed
+    // by dictating. Save the image too, but only probe for one when there is no
+    // text to restore — reading an image decodes the full bitmap, so the common
+    // text path stays exactly as cheap as it was. Backport of Handy #1231.
+    let saved_text = clipboard.read_text().ok().filter(|t| !t.is_empty());
+    let saved_image = if saved_text.is_none() {
+        clipboard.read_image().ok().map(|image| image.to_owned())
+    } else {
+        None
+    };
 
     // Write text to clipboard first
     write_clipboard_text(app_handle, text)?;
 
     std::thread::sleep(Duration::from_millis(paste_delay_ms));
 
-    // Send paste key combo
-    #[cfg(target_os = "linux")]
-    let key_combo_sent = try_send_key_combo_linux(paste_method)?;
+    // Send the paste key combo. The result is held rather than returned with
+    // `?` so a failed keystroke still restores the user's clipboard below;
+    // returning early left the transcript on the clipboard and whatever the user
+    // had copied was gone (part of Handy #1756).
+    let send_result = (|| -> Result<(), String> {
+        #[cfg(target_os = "linux")]
+        let key_combo_sent = try_send_key_combo_linux(paste_method)?;
 
-    #[cfg(not(target_os = "linux"))]
-    let key_combo_sent = false;
+        #[cfg(not(target_os = "linux"))]
+        let key_combo_sent = false;
 
-    // Fall back to enigo if no native tool handled it
-    if !key_combo_sent {
-        match paste_method {
-            PasteMethod::CtrlV => input::send_paste_ctrl_v(enigo)?,
-            PasteMethod::CtrlShiftV => input::send_paste_ctrl_shift_v(enigo)?,
-            PasteMethod::ShiftInsert => input::send_paste_shift_insert(enigo)?,
-            _ => return Err("Invalid paste method for clipboard paste".into()),
+        // Fall back to enigo if no native tool handled it
+        if !key_combo_sent {
+            match paste_method {
+                PasteMethod::CtrlV => input::send_paste_ctrl_v(enigo)?,
+                PasteMethod::CtrlShiftV => input::send_paste_ctrl_shift_v(enigo)?,
+                PasteMethod::ShiftInsert => input::send_paste_shift_insert(enigo)?,
+                _ => return Err("Invalid paste method for clipboard paste".into()),
+            }
         }
-    }
+        Ok(())
+    })();
 
     std::thread::sleep(std::time::Duration::from_millis(50));
 
-    // Restore original clipboard content
-    // On Wayland, prefer wl-copy for better compatibility
-    #[cfg(target_os = "linux")]
-    if is_wayland() && is_wl_copy_available() {
-        let _ = write_clipboard_via_wl_copy(&clipboard_content);
-    } else {
+    // Restore the original clipboard content. Text takes priority, so this path
+    // is identical to before; an image is restored only when the clipboard held
+    // no text at all, and an empty clipboard is cleared rather than left holding
+    // the transcript.
+    if let Some(clipboard_content) = saved_text {
+        // On Wayland, prefer wl-copy for better compatibility
+        #[cfg(target_os = "linux")]
+        if is_wayland() && is_wl_copy_available() {
+            let _ = write_clipboard_via_wl_copy(&clipboard_content);
+        } else {
+            let _ = clipboard.write_text(&clipboard_content);
+        }
+
+        #[cfg(not(target_os = "linux"))]
         let _ = clipboard.write_text(&clipboard_content);
+    } else if let Some(image) = saved_image {
+        debug!("Restoring image to clipboard");
+        if let Err(e) = clipboard.write_image(&image) {
+            log::warn!("Could not restore the clipboard image after pasting: {e}");
+        }
+    } else {
+        let _ = clipboard.clear();
     }
 
-    #[cfg(not(target_os = "linux"))]
-    let _ = clipboard.write_text(&clipboard_content);
-
-    Ok(())
+    send_result
 }
 
 /// Attempts to send a key combination using Linux-native tools.
@@ -148,9 +176,13 @@ fn paste_via_clipboard(
 #[cfg(target_os = "linux")]
 fn try_send_key_combo_linux(paste_method: &PasteMethod) -> Result<bool, String> {
     if is_wayland() {
-        // Wayland: prefer wtype (but not on KDE), then dotool, then ydotool
-        // Note: wtype doesn't work on KDE (no zwp_virtual_keyboard_manager_v1 support)
-        if !is_kde_wayland() && is_wtype_available() {
+        // Wayland: prefer wtype (but not on KDE or GNOME), then dotool, then ydotool.
+        // wtype needs the zwp_virtual_keyboard_manager_v1 protocol, which KWin
+        // and Mutter (GNOME) deliberately don't implement. On GNOME wtype was
+        // picked anyway, failed, and the `?` stopped the fallback, so every
+        // Ctrl+V / Ctrl+Shift+V / Shift+Insert paste failed there. dotool (the
+        // RemoteDesktop portal) and ydotool (uinput) work. Backport of Handy #1276.
+        if !is_kde_wayland() && !is_gnome_wayland() && is_wtype_available() {
             info!("Using wtype for key combo");
             send_key_combo_via_wtype(paste_method)?;
             return Ok(true);
@@ -230,8 +262,9 @@ fn try_direct_typing_linux(text: &str, preferred_tool: TypingTool) -> Result<boo
             return Ok(true);
         }
         // Wayland: prefer wtype, then dotool, then ydotool
-        // Note: wtype doesn't work on KDE (no zwp_virtual_keyboard_manager_v1 support)
-        if !is_kde_wayland() && is_wtype_available() {
+        // Note: wtype doesn't work on KDE or GNOME (no zwp_virtual_keyboard_manager_v1
+        // support in KWin or Mutter) — see try_send_key_combo_linux.
+        if !is_kde_wayland() && !is_gnome_wayland() && is_wtype_available() {
             info!("Using wtype for direct text input");
             type_text_via_wtype(text)?;
             return Ok(true);

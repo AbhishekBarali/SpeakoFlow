@@ -1,5 +1,6 @@
 //! macOS keyboard listener using CGEventTap
 
+use std::cell::Cell;
 use std::ffi::c_void;
 use std::ptr::NonNull;
 use std::sync::atomic::AtomicBool;
@@ -21,12 +22,46 @@ use crate::types::{Key, KeyEvent, Modifiers};
 use super::keycode::{flags_have_alpha_shift, flags_have_fn, keycode_to_key, keycode_to_modifier};
 use super::permissions::check_accessibility;
 
+/// The tap thread's run loop, handed back to the public listener so Drop can
+/// stop it. CFRunLoop is one of the documented thread-safe CF types; objc2
+/// doesn't mark it Send, hence the wrapper.
+pub(crate) struct TapRunLoop(CFRetained<CFRunLoop>);
+
+unsafe impl Send for TapRunLoop {}
+
+impl TapRunLoop {
+    /// Stop the tap thread's run loop. Callable from any thread.
+    ///
+    /// A bare CFRunLoopStop only affects a loop that is currently between
+    /// entry and exit — the stop flag lives in per-run data that is reset on
+    /// every entry — so a stop landing in the gap between the `running` check
+    /// and CFRunLoopRun entering would be lost and the tap thread would park
+    /// forever. Enqueue the stop as a run-loop block instead: the block queue
+    /// persists across entries, so the request executes either right away
+    /// (after the wake-up) or at the next entry.
+    pub(crate) fn stop(&self) {
+        let block = block2::StackBlock::new(|| {
+            if let Some(rl) = CFRunLoop::current() {
+                rl.stop();
+            }
+        });
+        unsafe {
+            self.0.perform_block(
+                objc2_core_foundation::kCFRunLoopCommonModes.map(|m| m.as_ref()),
+                Some(&block),
+            );
+        }
+        self.0.wake_up();
+    }
+}
+
 /// Internal listener state returned to KeyboardListener
 pub(crate) struct MacOSListenerState {
     pub event_receiver: Receiver<KeyEvent>,
     pub thread_handle: Option<JoinHandle<()>>,
     pub running: Arc<AtomicBool>,
     pub blocking_hotkeys: Option<BlockingHotkeys>,
+    pub run_loop: TapRunLoop,
 }
 
 /// Spawn a macOS keyboard listener using CGEventTap
@@ -39,8 +74,9 @@ pub(crate) fn spawn(blocking_hotkeys: Option<BlockingHotkeys>) -> Result<MacOSLi
     let state = Arc::new(Mutex::new(ListenerState::new(tx, blocking_hotkeys.clone())));
     let running = Arc::new(AtomicBool::new(true));
 
-    // Channel to communicate event tap creation success/failure
-    let (init_tx, init_rx) = mpsc::channel::<std::result::Result<(), String>>();
+    // Channel reporting event tap creation: the tap thread's run loop on
+    // success (needed to stop it later), or an error message.
+    let (init_tx, init_rx) = mpsc::channel::<std::result::Result<TapRunLoop, String>>();
 
     let thread_state = Arc::clone(&state);
     let thread_running = Arc::clone(&running);
@@ -50,10 +86,8 @@ pub(crate) fn spawn(blocking_hotkeys: Option<BlockingHotkeys>) -> Result<MacOSLi
     });
 
     // Wait for the event tap to be created
-    match init_rx.recv() {
-        Ok(Ok(())) => {
-            // Event tap created successfully
-        }
+    let run_loop = match init_rx.recv() {
+        Ok(Ok(run_loop)) => run_loop,
         Ok(Err(msg)) => {
             return Err(Error::EventTapCreationFailed(msg));
         }
@@ -62,13 +96,14 @@ pub(crate) fn spawn(blocking_hotkeys: Option<BlockingHotkeys>) -> Result<MacOSLi
                 "Event tap thread terminated unexpectedly".to_string(),
             ));
         }
-    }
+    };
 
     Ok(MacOSListenerState {
         event_receiver: rx,
         thread_handle: Some(handle),
         running,
         blocking_hotkeys,
+        run_loop,
     })
 }
 
@@ -109,6 +144,16 @@ fn reconcile_modifiers(current: &mut Modifiers, flags: CGEventFlags) {
     }
 }
 
+/// Context handed to the event tap callback through the refcon pointer.
+///
+/// `tap` is filled in right after `CGEventTapCreate` returns. The callback and
+/// `run_event_tap` execute on the same thread (callbacks only fire while that
+/// thread runs its run loop), so a plain `Cell` is sound.
+struct CallbackCtx {
+    state: Arc<Mutex<ListenerState>>,
+    tap: Cell<Option<NonNull<CFMachPort>>>,
+}
+
 /// The callback function for the event tap
 ///
 /// Returns NULL to block the event, or the event pointer to pass it through.
@@ -118,15 +163,39 @@ unsafe extern "C-unwind" fn event_tap_callback(
     event: NonNull<CGEvent>,
     user_info: *mut c_void,
 ) -> *mut CGEvent {
-    // Safety: user_info is our state pointer
-    let state = &*(user_info as *const Mutex<ListenerState>);
+    // Safety: user_info is the CallbackCtx owned by run_event_tap
+    let ctx = &*(user_info as *const CallbackCtx);
+
+    // Handle tap-disable pseudo-events before touching the state lock: macOS
+    // stops delivering real events until the tap is re-enabled, so recovery
+    // must not depend on the mutex being healthy. Re-enabling from the
+    // callback (rather than polling CGEventTapIsEnabled from the run loop) is
+    // the Apple-documented pattern and avoids recurring WindowServer RPCs —
+    // those leak kernel IPC vouchers and eventually kernel-panic the machine
+    // (cjpais/Handy#1827). Port of upstream handy-keys #31.
+    if matches!(
+        event_type,
+        CGEventType::TapDisabledByTimeout | CGEventType::TapDisabledByUserInput
+    ) {
+        if let Some(tap) = ctx.tap.get() {
+            CGEvent::tap_enable(tap.as_ref(), true);
+        }
+        // Reconcile modifiers: we may have missed events while disabled.
+        if let Ok(mut state) = ctx.state.lock() {
+            reconcile_modifiers(
+                &mut state.current_modifiers,
+                CGEventSource::flags_state(CGEventSourceStateID::CombinedSessionState),
+            );
+        }
+        return event.as_ptr();
+    }
 
     let cg_event = event.as_ref();
     let flags = CGEvent::flags(Some(cg_event));
 
     let mut should_block = false;
 
-    if let Ok(mut state) = state.lock() {
+    if let Ok(mut state) = ctx.state.lock() {
         // Reconcile tracked modifiers against OS flags for non-FlagsChanged events.
         // On FlagsChanged, flags reflect the state *after* the current change, so
         // reconciling would fight with the toggle logic.
@@ -243,7 +312,7 @@ unsafe extern "C-unwind" fn event_tap_callback(
                         modifiers: new_modifiers,
                         key: None,
                         is_key_down,
-                        changed_modifier: changed_modifier,
+                        changed_modifier,
                     });
                 } else if keycode == 0x3F {
                     // FN key itself — tracked via flags, not keycode state
@@ -348,15 +417,8 @@ unsafe extern "C-unwind" fn event_tap_callback(
                     });
                 }
             }
-            CGEventType::TapDisabledByTimeout | CGEventType::TapDisabledByUserInput => {
-                // macOS disabled the tap (callback latency or user input).
-                // The run loop thread will re-enable it; reconcile modifiers
-                // now since we may have missed events while disabled.
-                reconcile_modifiers(
-                    &mut state.current_modifiers,
-                    CGEventSource::flags_state(CGEventSourceStateID::CombinedSessionState),
-                );
-            }
+            // TapDisabledByTimeout/TapDisabledByUserInput are handled (and
+            // returned from) before the state lock above.
             _ => {}
         }
     }
@@ -374,7 +436,7 @@ unsafe extern "C-unwind" fn event_tap_callback(
 fn run_event_tap(
     state: Arc<Mutex<ListenerState>>,
     running: Arc<AtomicBool>,
-    init_tx: Sender<std::result::Result<(), String>>,
+    init_tx: Sender<std::result::Result<TapRunLoop, String>>,
 ) {
     // Event types we want to monitor
     let event_mask: CGEventMask = (1 << CGEventType::KeyDown.0)
@@ -388,8 +450,11 @@ fn run_event_tap(
         | (1 << CGEventType::OtherMouseDown.0)
         | (1 << CGEventType::OtherMouseUp.0);
 
-    // Store state in a raw pointer for the callback
-    let state_ptr = Arc::into_raw(Arc::clone(&state)) as *mut c_void;
+    // Callback context, handed to the tap as a raw refcon pointer
+    let ctx_ptr = Box::into_raw(Box::new(CallbackCtx {
+        state: Arc::clone(&state),
+        tap: Cell::new(None),
+    }));
 
     let callback: CGEventTapCallBack = Some(event_tap_callback);
 
@@ -401,7 +466,7 @@ fn run_event_tap(
             CGEventTapOptions::Default,
             event_mask,
             callback,
-            state_ptr,
+            ctx_ptr as *mut c_void,
         )
     };
 
@@ -410,7 +475,7 @@ fn run_event_tap(
         None => {
             // Cleanup
             unsafe {
-                let _ = Arc::from_raw(state_ptr as *const Mutex<ListenerState>);
+                drop(Box::from_raw(ctx_ptr));
             }
             let _ = init_tx.send(Err(
                 "Failed to create event tap. Your terminal app may need accessibility permission in System Settings > Privacy & Security > Accessibility".to_string()
@@ -418,6 +483,11 @@ fn run_event_tap(
             return;
         }
     };
+
+    // Give the callback the tap port so it can re-enable on TapDisabledBy*
+    // pseudo-events. No race: callbacks only run on this thread's run loop,
+    // which hasn't started yet.
+    unsafe { (*ctx_ptr).tap.set(Some(NonNull::from(&*tap))) };
 
     // Create run loop source
     let source: Option<CFRetained<CFRunLoopSource>> =
@@ -428,7 +498,7 @@ fn run_event_tap(
         None => {
             unsafe {
                 CFMachPort::invalidate(&tap);
-                let _ = Arc::from_raw(state_ptr as *const Mutex<ListenerState>);
+                drop(Box::from_raw(ctx_ptr));
             }
             let _ = init_tx.send(Err("Failed to create run loop source".to_string()));
             return;
@@ -444,7 +514,7 @@ fn run_event_tap(
         None => {
             unsafe {
                 CFMachPort::invalidate(&tap);
-                let _ = Arc::from_raw(state_ptr as *const Mutex<ListenerState>);
+                drop(Box::from_raw(ctx_ptr));
             }
             let _ = init_tx.send(Err("Failed to get current run loop".to_string()));
             return;
@@ -456,21 +526,24 @@ fn run_event_tap(
     });
     CGEvent::tap_enable(&tap, true);
 
-    // Signal successful initialization
-    let _ = init_tx.send(Ok(()));
+    // Signal successful initialization, handing back this thread's run loop
+    // so KeyboardListener::drop can stop it.
+    let _ = init_tx.send(Ok(TapRunLoop(run_loop.clone())));
 
-    // Run the loop
+    // Park in the run loop: no periodic wakeups, no watchdog. The previous
+    // loop cycled CFRunLoopRunInMode every 100ms and polled
+    // CGEventTapIsEnabled on each pass; that RPC leaked kernel IPC vouchers
+    // until macOS panicked with "Cannot grow ipc space beyond
+    // IVAC_ENTRIES_MAX" (cjpais/Handy#1827). Tap recovery is event-driven in
+    // event_tap_callback; shutdown goes through TapRunLoop::stop. Guarded by
+    // `running` in case the loop returns without a stop request, and bails out
+    // if the tap's port died (e.g. accessibility permission revoked) so it
+    // doesn't spin on a dead source.
     while running.load(std::sync::atomic::Ordering::SeqCst) {
-        // Run for a short interval, then check if we should stop
-        CFRunLoop::run_in_mode(
-            unsafe { objc2_core_foundation::kCFRunLoopDefaultMode },
-            0.1, // 100ms timeout
-            true,
-        );
+        CFRunLoop::run();
 
-        // Re-enable tap if macOS disabled it due to callback latency
-        if !CGEvent::tap_is_enabled(&tap) {
-            CGEvent::tap_enable(&tap, true);
+        if !CFMachPort::is_valid(&tap) {
+            break;
         }
     }
 
@@ -481,6 +554,69 @@ fn run_event_tap(
     CGEvent::tap_enable(&tap, false);
     CFMachPort::invalidate(&tap);
     unsafe {
-        let _ = Arc::from_raw(state_ptr as *const Mutex<ListenerState>);
+        drop(Box::from_raw(ctx_ptr));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::{Duration, Instant};
+
+    use objc2_core_foundation::CFRunLoopTimer;
+
+    unsafe extern "C-unwind" fn noop_timer(_timer: *mut CFRunLoopTimer, _info: *mut c_void) {}
+
+    /// The stop request must survive being issued before the run loop has been
+    /// entered. A bare CFRunLoopStop is lost in that window, which would park
+    /// the tap thread forever and hang KeyboardListener::drop. Needs no
+    /// accessibility permission, so it runs in CI. Port of upstream #31.
+    #[test]
+    fn stop_requested_before_run_entry_is_not_lost() {
+        let (tx, rx) = mpsc::channel();
+        let handle = thread::spawn(move || {
+            let rl = CFRunLoop::current().expect("thread has a run loop");
+
+            // A far-future timer keeps the mode non-empty so run_in_mode
+            // actually blocks instead of returning Finished immediately.
+            let timer = unsafe {
+                CFRunLoopTimer::new(
+                    None,
+                    objc2_core_foundation::CFAbsoluteTimeGetCurrent() + 3600.0,
+                    0.0,
+                    0,
+                    0,
+                    Some(noop_timer),
+                    std::ptr::null_mut(),
+                )
+            }
+            .expect("create timer");
+            rl.add_timer(Some(&timer), unsafe {
+                objc2_core_foundation::kCFRunLoopDefaultMode
+            });
+
+            tx.send(TapRunLoop(rl.clone())).unwrap();
+
+            // Guarantee the main thread's stop lands while this thread is
+            // provably outside the run loop.
+            thread::sleep(Duration::from_millis(200));
+
+            let started = Instant::now();
+            CFRunLoop::run_in_mode(
+                unsafe { objc2_core_foundation::kCFRunLoopDefaultMode },
+                5.0,
+                false,
+            );
+            started.elapsed()
+        });
+
+        let run_loop = rx.recv().expect("run loop handle");
+        run_loop.stop(); // lands before the thread enters the run loop
+
+        let elapsed = handle.join().expect("tap thread panicked");
+        assert!(
+            elapsed < Duration::from_secs(2),
+            "stop issued before run-loop entry was lost; loop ran for {elapsed:?}"
+        );
     }
 }

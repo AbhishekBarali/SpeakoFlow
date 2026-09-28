@@ -56,7 +56,14 @@ pub fn handle_shortcut_event(
         // Every recording shortcut explicitly takes the microphone back from
         // a call. In particular, Assistant must remain a quick ask during a call.
         if is_pressed && crate::voice_conversation::is_active(app) {
-            crate::voice_conversation::end(app);
+            if crate::assistant::is_assistant_binding(base_id) {
+                // The quick ask that follows takes the window over.
+                crate::voice_conversation::end(app);
+            } else {
+                // Dictation takes the microphone, and a call's window without
+                // the call is nothing: hanging up closes the panel.
+                crate::assistant::hide_assistant_panel(app);
+            }
         }
         if let Some(coordinator) = app.try_state::<TranscriptionCoordinator>() {
             // Every recording shortcut — dictation, dictation + post-processing,

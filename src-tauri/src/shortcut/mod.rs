@@ -177,20 +177,24 @@ pub fn change_binding(
         }
     }
 
-    // Unregister the existing binding
-    if let Err(e) = unregister_shortcut(&app, binding_to_modify.clone()) {
-        let error_msg = format!("Failed to unregister shortcut: {}", e);
-        error!("change_binding error: {}", error_msg);
-    }
-
-    // Validate the new shortcut for the current keyboard implementation
+    // Validate the new shortcut before touching the old one. A validation failure
+    // used to happen *after* the unregister and return without undoing it, so a
+    // rejected combo — including Reset to a default this engine cannot register —
+    // left the action with no hotkey at all while Settings still showed one.
     if let Err(e) = validate_shortcut_for_implementation(&binding, settings.keyboard_implementation)
     {
         warn!("change_binding validation error: {}", e);
         return Err(e);
     }
 
+    // Unregister the existing binding
+    if let Err(e) = unregister_shortcut(&app, binding_to_modify.clone()) {
+        let error_msg = format!("Failed to unregister shortcut: {}", e);
+        error!("change_binding error: {}", error_msg);
+    }
+
     // Create an updated binding
+    let previous_binding = binding_to_modify.clone();
     let mut updated_binding = binding_to_modify;
     updated_binding.current_binding = binding;
 
@@ -198,6 +202,14 @@ pub fn change_binding(
     if let Err(e) = register_shortcut(&app, updated_binding.clone()) {
         let error_msg = format!("Failed to register shortcut: {}", e);
         error!("change_binding error: {}", error_msg);
+        // Put the old one back, for the same reason as the validation above: the
+        // settings still hold it, so it has to keep working.
+        if let Err(restore) = register_shortcut(&app, previous_binding) {
+            warn!(
+                "change_binding could not restore the previous shortcut: {}",
+                restore
+            );
+        }
         return Ok(BindingResponse {
             success: false,
             binding: None,
@@ -1674,7 +1686,7 @@ pub fn change_app_language_setting(app: AppHandle, language: String) -> Result<(
     settings::write_settings(&app, settings);
 
     // Refresh the tray menu with the new language
-    tray::update_tray_menu(&app, &tray::TrayIconState::Idle, Some(&language));
+    tray::refresh_tray_menu(&app, Some(&language));
 
     Ok(())
 }

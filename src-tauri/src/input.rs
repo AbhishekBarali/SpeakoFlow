@@ -1,6 +1,10 @@
-use enigo::{Enigo, Key, Keyboard, Mouse, Settings};
+#[cfg(not(target_os = "windows"))]
+use enigo::Mouse;
+use enigo::{Enigo, Key, Keyboard, Settings};
 use std::sync::Mutex;
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
+#[cfg(not(target_os = "windows"))]
+use tauri::Manager;
 
 /// Wrapper for Enigo to store in Tauri's managed state.
 /// Enigo is wrapped in a Mutex since it requires mutable access.
@@ -16,6 +20,22 @@ impl EnigoState {
 
 /// Get the current mouse cursor position using the managed Enigo instance.
 /// Returns None if the state is not available or if getting the location fails.
+///
+/// On Windows this asks the OS directly. It is the same `GetCursorPos` enigo
+/// makes, minus two things that matter for a caller polling at 20 Hz: enigo's
+/// mutex, and the `DEBUG` line enigo writes for every call, which flooded the
+/// rotating log file until it held only the last few minutes of the session.
+#[cfg(target_os = "windows")]
+pub fn get_cursor_position(_app_handle: &AppHandle) -> Option<(i32, i32)> {
+    use windows::Win32::Foundation::POINT;
+    use windows::Win32::UI::WindowsAndMessaging::GetCursorPos;
+    let mut point = POINT::default();
+    // Physical pixels: the process is per-monitor DPI aware.
+    unsafe { GetCursorPos(&mut point) }.ok()?;
+    Some((point.x, point.y))
+}
+
+#[cfg(not(target_os = "windows"))]
 pub fn get_cursor_position(app_handle: &AppHandle) -> Option<(i32, i32)> {
     let enigo_state = app_handle.try_state::<EnigoState>()?;
     let enigo = enigo_state.0.lock().ok()?;

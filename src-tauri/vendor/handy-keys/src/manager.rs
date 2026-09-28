@@ -52,13 +52,20 @@ impl ManagerState {
             }
         } else {
             // Check for hotkeys that should be released
-            // A hotkey is released when either its key is released or its modifiers change
+            // A hotkey is released when its key is released, or — for modifier
+            // events — when the modifiers no longer match. A modifier event
+            // (key == None) whose modifiers still match must not release a
+            // modifier-only hotkey: `hotkey.key == event.key` is true when both
+            // are None, so tapping Shift (or our own injected Ctrl key-up)
+            // while Ctrl+Win was held used to end the recording. Both Windows
+            // defaults (Ctrl+Win dictation, Ctrl+Alt assistant) are
+            // modifier-only. Port of upstream handy-keys #23.
             let to_release: Vec<HotkeyId> = self
                 .hotkeys
                 .iter()
                 .filter(|(&id, hotkey)| {
                     self.pressed_hotkeys.contains(&id)
-                        && (hotkey.key == event.key
+                        && ((event.key.is_some() && hotkey.key == event.key)
                             || (event.key.is_none() && !hotkey.modifiers.matches(event.modifiers)))
                 })
                 .map(|(&id, _)| id)
@@ -415,6 +422,130 @@ mod tests {
 
     mod manager_state {
         use super::*;
+
+        // ---- Port of upstream handy-keys #23 ------------------------------
+
+        #[test]
+        fn modifier_only_hotkey_not_released_by_unrelated_modifier() {
+            let mut state = ManagerState::new();
+            let hotkey = Hotkey::new(Modifiers::CMD, None).unwrap();
+            let id = HotkeyId(0);
+            state.hotkeys.insert(id, hotkey);
+
+            // Cmd down — hotkey pressed
+            let event = make_modifier_event(Modifiers::CMD_LEFT, true, Modifiers::CMD_LEFT);
+            let results = state.process_event(&event);
+            assert_eq!(results.len(), 1);
+            assert_eq!(results[0].state, HotkeyState::Pressed);
+
+            // Shift down while Cmd held — no state change
+            let event = make_modifier_event(
+                Modifiers::CMD_LEFT | Modifiers::SHIFT_LEFT,
+                true,
+                Modifiers::SHIFT_LEFT,
+            );
+            assert_eq!(state.process_event(&event).len(), 0);
+
+            // Shift up — Cmd is still held and still matches, so the hotkey
+            // must NOT be released
+            let event = make_modifier_event(Modifiers::CMD_LEFT, false, Modifiers::SHIFT_LEFT);
+            assert_eq!(state.process_event(&event).len(), 0);
+            assert!(state.pressed_hotkeys.contains(&id));
+
+            // Cmd up — now it releases
+            let event = make_modifier_event(Modifiers::empty(), false, Modifiers::CMD_LEFT);
+            let results = state.process_event(&event);
+            assert_eq!(results.len(), 1);
+            assert_eq!(results[0].state, HotkeyState::Released);
+            assert!(!state.pressed_hotkeys.contains(&id));
+        }
+
+        #[test]
+        fn windows_default_ctrl_win_survives_an_unrelated_modifier_tap() {
+            // The SpeakoFlow Windows dictation default is ctrl_left+super.
+            let mut state = ManagerState::new();
+            let hotkey = Hotkey::new(Modifiers::CTRL_LEFT | Modifiers::CMD_LEFT, None).unwrap();
+            let id = HotkeyId(0);
+            state.hotkeys.insert(id, hotkey);
+
+            let held = Modifiers::CTRL_LEFT | Modifiers::CMD_LEFT;
+            state.process_event(&make_modifier_event(
+                Modifiers::CTRL_LEFT,
+                true,
+                Modifiers::CTRL_LEFT,
+            ));
+            let pressed =
+                state.process_event(&make_modifier_event(held, true, Modifiers::CMD_LEFT));
+            assert_eq!(pressed.len(), 1);
+
+            // Alt tapped and released while still holding Ctrl+Win.
+            state.process_event(&make_modifier_event(
+                held | Modifiers::OPT_LEFT,
+                true,
+                Modifiers::OPT_LEFT,
+            ));
+            assert!(state
+                .process_event(&make_modifier_event(held, false, Modifiers::OPT_LEFT))
+                .is_empty());
+            assert!(state.pressed_hotkeys.contains(&id));
+        }
+
+        #[test]
+        fn modifier_only_hotkey_releases_on_own_modifier_release() {
+            let mut state = ManagerState::new();
+            let hotkey = Hotkey::new(Modifiers::CMD, None).unwrap();
+            let id = HotkeyId(0);
+            state.hotkeys.insert(id, hotkey);
+
+            let event = make_modifier_event(Modifiers::CMD_LEFT, true, Modifiers::CMD_LEFT);
+            state.process_event(&event);
+            assert!(state.pressed_hotkeys.contains(&id));
+
+            let event = make_modifier_event(Modifiers::empty(), false, Modifiers::CMD_LEFT);
+            let results = state.process_event(&event);
+            assert_eq!(results.len(), 1);
+            assert_eq!(results[0].state, HotkeyState::Released);
+        }
+
+        #[test]
+        fn compound_modifier_only_hotkey_releases_on_partial_release() {
+            let mut state = ManagerState::new();
+            let hotkey = Hotkey::new(Modifiers::CMD | Modifiers::SHIFT, None).unwrap();
+            let id = HotkeyId(0);
+            state.hotkeys.insert(id, hotkey);
+
+            let event = make_modifier_event(Modifiers::CMD_LEFT, true, Modifiers::CMD_LEFT);
+            assert_eq!(state.process_event(&event).len(), 0);
+            let event = make_modifier_event(
+                Modifiers::CMD_LEFT | Modifiers::SHIFT_LEFT,
+                true,
+                Modifiers::SHIFT_LEFT,
+            );
+            let results = state.process_event(&event);
+            assert_eq!(results.len(), 1);
+            assert_eq!(results[0].state, HotkeyState::Pressed);
+
+            let event = make_modifier_event(Modifiers::SHIFT_LEFT, false, Modifiers::CMD_LEFT);
+            let results = state.process_event(&event);
+            assert_eq!(results.len(), 1);
+            assert_eq!(results[0].state, HotkeyState::Released);
+        }
+
+        #[test]
+        fn keyed_hotkey_not_released_by_unrelated_key_release() {
+            let mut state = ManagerState::new();
+            let hotkey = Hotkey::new(Modifiers::CMD, Key::K).unwrap();
+            let id = HotkeyId(0);
+            state.hotkeys.insert(id, hotkey);
+
+            let event = make_key_event(Modifiers::CMD_LEFT, Some(Key::K), true);
+            state.process_event(&event);
+            assert!(state.pressed_hotkeys.contains(&id));
+
+            let event = make_key_event(Modifiers::CMD_LEFT, Some(Key::J), false);
+            assert_eq!(state.process_event(&event).len(), 0);
+            assert!(state.pressed_hotkeys.contains(&id));
+        }
 
         #[test]
         fn register_and_lookup_hotkey() {

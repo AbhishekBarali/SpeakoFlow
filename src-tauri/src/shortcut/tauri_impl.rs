@@ -219,8 +219,15 @@ pub fn unregister_shortcut(app: &AppHandle, binding: ShortcutBinding) -> Result<
 }
 
 /// Unregister a single hotkey from Tauri's global-shortcut plugin.
+///
+/// Parsed through the same `normalize_for_tauri` as `register_one`. Parsing the
+/// raw string failed for every side-specific binding (`ctrl_left+…`, which the
+/// handy-keys editor produces and which survives a switch of engines), so the
+/// hotkey registered under its normalized form could never be removed: a changed
+/// shortcut kept firing alongside its replacement.
 fn unregister_one(app: &AppHandle, hotkey: &str) -> Result<(), String> {
-    let shortcut = match hotkey.parse::<Shortcut>() {
+    let normalized = normalize_for_tauri(hotkey);
+    let shortcut = match normalized.parse::<Shortcut>() {
         Ok(s) => s,
         Err(e) => {
             let error_msg = format!(

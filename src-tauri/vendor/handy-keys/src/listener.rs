@@ -32,6 +32,10 @@ pub struct KeyboardListener {
     blocking_hotkeys: Option<BlockingHotkeys>,
     #[cfg(target_os = "windows")]
     shutdown_event: Arc<std::os::windows::io::OwnedHandle>,
+    /// macOS parks its listener thread in a CFRunLoop with no periodic wakeups
+    /// (see `run_event_tap`), so Drop must stop that loop explicitly.
+    #[cfg(target_os = "macos")]
+    run_loop: crate::platform::macos::listener::TapRunLoop,
 }
 
 impl KeyboardListener {
@@ -70,6 +74,7 @@ impl KeyboardListener {
                 _thread_handle: state.thread_handle,
                 running: state.running,
                 blocking_hotkeys: state.blocking_hotkeys,
+                run_loop: state.run_loop,
             })
         }
 
@@ -151,6 +156,10 @@ impl Drop for KeyboardListener {
                 let _ = SetEvent(HANDLE(self.shutdown_event.as_raw_handle()));
             }
         }
+
+        // macOS: the tap thread parks in CFRunLoopRun; stop it before joining.
+        #[cfg(target_os = "macos")]
+        self.run_loop.stop();
 
         // On macOS and Windows, we can join the thread for clean shutdown.
         // On Linux (rdev), the thread continues running but becomes idle
