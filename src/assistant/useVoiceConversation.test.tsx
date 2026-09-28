@@ -556,9 +556,9 @@ describe("hands-free session lifecycle", () => {
     });
     expect(sourceStarts).toBe(0);
   });
-  test("a collapsed panel keeps listening until the call is ended", async () => {
+  test("an unrelated panel event keeps the call listening", async () => {
     await act(async () => voice.start());
-    await emit("assistant-collapsed", true);
+    await emit("assistant-settings-changed", null);
     expect(tracks.every((track) => !track.stopped)).toBe(true);
     expect(voice.open).toBe(true);
     await speak();

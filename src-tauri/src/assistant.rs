@@ -6,7 +6,7 @@
 //! system prompt first, then append-only history, newest user message last.
 
 use crate::llm_client::{self, ChatMessage};
-use crate::settings::{get_settings, write_settings, AssistantScreenAccessMode, OverlayStyle};
+use crate::settings::{get_settings, write_settings, AssistantScreenAccessMode};
 use crate::web_search;
 use log::{debug, error, warn};
 use serde::Serialize;
@@ -30,45 +30,21 @@ pub fn is_assistant_binding(binding_id: &str) -> bool {
     ASSISTANT_BINDINGS.contains(&binding_id)
 }
 const PANEL_MARGIN: f64 = 24.0;
-/// Where the PILL last sat (legacy key — keeps existing stored positions).
-const PANEL_POSITION_KEY: &str = "assistant_panel_position";
-/// Where the EXPANDED panel last sat. Each form remembers its own place, so
-/// expanding never dumps the panel wherever the pill happened to be dragged.
-const PANEL_POSITION_EXPANDED_KEY: &str = "assistant_panel_position_expanded";
 
-/// Which display the panel belongs to, stored as that display's logical origin.
+/// Window positions the panel's earlier designs remembered, deleted on launch.
 ///
-/// The panel used to be placed on **whichever display the mouse cursor was on**
-/// at the moment it opened, and its size derived from that display too. On one
-/// screen that is invisible. On two it is the whole bug: measured on a 2560x1440
-/// landscape primary at (0,0) beside a 1440x2560 portrait secondary at
-/// (-1440,-510), the same `Center` anchor produced a 669x583 card near (946,404)
-/// or a 380x634 card near (-910,445) depending on nothing but where the pointer
-/// happened to be resting. Two shapes, two places, no gesture from the user — and
-/// the more different the two displays are, the further apart the two answers.
-///
-/// So the display is a remembered property of the panel, not a function of the
-/// cursor. It is stored as an origin rather than a monitor name because names are
-/// reassigned across reconnects and driver updates while the desktop origin is
-/// stable, and because matching an origin lets us return the display's *current*
-/// bounds — so changing a resolution re-shapes the card instead of stranding it.
-const PANEL_DISPLAY_KEY: &str = "assistant_panel_display";
-
-/// Where the user DRAGGED the quick-ask surface to, if they ever did.
-///
-/// Deliberately not [`PANEL_POSITION_EXPANDED_KEY`], which `save_position` writes
-/// from every hide, resize and programmatic placement and therefore cannot answer
-/// "did the user choose this?". This key is written in exactly one place
-/// ([`snap_and_remember`], after a settled drag) and cleared in exactly one place
-/// (`forget_dragged_position`, when an anchor is picked in Settings). That is what
-/// makes a drag durable without making every window operation look like a
-/// preference.
-const PANEL_DRAGGED_KEY: &str = "assistant_panel_dragged";
-
-/// Collapsed "pill" mode: a small transparent window in which the chip floats
-/// and hugs its content, like the STT recording overlay (128×40 there).
-const PILL_WIDTH: f64 = 240.0;
-const PILL_HEIGHT: f64 = 44.0;
+/// The quick ask used to keep four of them: where the collapsed pill sat, where
+/// the expanded card sat, which display it was last dragged to, and where it was
+/// last dropped. Every open consulted some of them before the dock zone the user
+/// had picked, then clamped the winner onto whichever display the cursor was on.
+/// That is what "it opens in a random place" was. The panel now opens at its dock
+/// zone on the chosen display every time, so these can only ever be stale.
+const LEGACY_POSITION_KEYS: [&str; 4] = [
+    "assistant_panel_position",
+    "assistant_panel_position_expanded",
+    "assistant_panel_display",
+    "assistant_panel_dragged",
+];
 
 /// The live call's resting form: a small floating bar — type, microphone, the
 /// orb that hangs up, speaker — drawn small and grown on hover, with a status
@@ -89,46 +65,6 @@ const CALL_BAR_FRAME_HEIGHT: f64 = 200.0;
 /// on the taskbar's edge.
 const CALL_BAR_BOTTOM_GAP: f64 = 12.0;
 
-/// Readable voice HUD used by the assistant's `Live` overlay style. It stays
-/// much smaller than the full chat panel while leaving enough room for the
-/// recognized question and streamed answer.
-const LIVE_WIDTH: f64 = 560.0;
-const LIVE_HEIGHT: f64 = 188.0;
-
-/// The collapsed form of a live call. A call no longer has a separate collapsed
-/// chip: its resting form already *is* the small floating bar, so a collapse that
-/// arrives mid-call (an old webview, a stray command) lands on the same frame
-/// instead of on a third shape.
-fn collapsed_size(app: &AppHandle) -> (f64, f64) {
-    if crate::voice_conversation::is_active(app) {
-        return (CALL_BAR_FRAME_WIDTH, CALL_BAR_FRAME_HEIGHT);
-    }
-    match get_settings(app).assistant_overlay_style {
-        OverlayStyle::Live => (LIVE_WIDTH, LIVE_HEIGHT),
-        _ => (PILL_WIDTH, PILL_HEIGHT),
-    }
-}
-
-/// The default expanded panel size (the "standard" preset — a comfortable
-/// middle size). The window stays user-resizable; the size preset chosen in
-/// Panel Appearance settings picks the base dimensions, and a manual resize is
-/// remembered for the session (below) so collapse → expand round-trips keep it.
-const PANEL_WIDTH: f64 = 390.0;
-const PANEL_HEIGHT: f64 = 500.0;
-
-/// Resize floor for the EXPANDED quick-ask surface's WIDTH. This used to be the
-/// pill's 240px, which is not a floor at all for a window an answer has to wrap
-/// inside: dragging the panel down to 241px was allowed, that width was then
-/// filed as the remembered expanded width, and every later expand produced a
-/// transparent sliver. The pill floor belongs to the pill (see
-/// [`panel_min_size`]).
-///
-/// Kept at or below the smallest shipped preset (`mini`, 300px wide) so every
-/// preset remains applicable, while still leaving room to drag a little tighter
-/// than `mini` for anyone who wants it. There is no matching height floor: the
-/// height is the content's (see [`ASK_PILL_HEIGHT`] and [`ask_card_height`]).
-const PANEL_MIN_WIDTH: f64 = 300.0;
-
 /// How much of a window's top-left corner must land inside a monitor for the
 /// window to count as reachable. A few pixels are not enough: the user has to be
 /// able to see and grab the header.
@@ -137,123 +73,38 @@ const MIN_VISIBLE_EDGE: f64 = 80.0;
 /// Clearance left below the panel so it never sits under a taskbar/dock.
 const TASKBAR_CLEARANCE: f64 = 40.0;
 
-/// Logical width/height for each panel-size preset. Unknown/legacy values fall
-/// back to the "standard" default. Presets are further clamped to the current
-/// monitor (see `clamp_to_monitor`) so they always fit the screen.
+/// The quick ask's frame, as a band of logical sizes.
 ///
-/// Retained only as the resize floor reference (`mini` is the smallest shipped
-/// size). Actual sizing now comes from the display — see [`ask_size_for_display`].
-fn panel_preset_size(size: &str) -> (f64, f64) {
-    match size {
-        "mini" => (300.0, 380.0),
-        "compact" => (340.0, 430.0),
-        "large" => (470.0, 620.0),
-        _ => (PANEL_WIDTH, PANEL_HEIGHT),
-    }
-}
-
-/// How much of the display's width the Ask card takes at the standard size
-/// preset, and how tall it is allowed to grow.
-///
-/// Fixed pixel presets gave a 4K monitor and a 13" laptop the same 390x500 card:
-/// postage-stamp on one, cramped on the other. The card is a fraction of the
-/// display instead, clamped at both ends so it can neither shrink to a strip nor
-/// sprawl across a huge screen, and the size preset became a multiplier on top.
-/// The fractions themselves come from the dock zone — see
-/// [`ask_shape_for_anchor`].
-///
-/// The height is a **ceiling**, not a size: the card is sized to its answer (see
-/// [`fit_ask_card`]) and only reaches this when the answer is long enough to
-/// scroll.
+/// The frame is the largest the answer card may grow to. It is a fraction of the
+/// display (see [`ask_shape_for_anchor`]), clamped at both ends so it can neither
+/// shrink to a strip nor sprawl across a huge screen, and the size preset is a
+/// multiplier on top.
 const ASK_MIN_WIDTH: f64 = 380.0;
 const ASK_MAX_WIDTH: f64 = 760.0;
 const ASK_MIN_HEIGHT: f64 = 340.0;
 const ASK_MAX_HEIGHT: f64 = 720.0;
 
-/// How the answer card is shaped for the edge it is docked to, as fractions of
-/// the display.
+/// The smallest frame a display is ever asked to hold, however small the
+/// display. Below this the pill itself would not fit.
+const ASK_FRAME_FLOOR_WIDTH: f64 = 320.0;
+const ASK_FRAME_FLOOR_HEIGHT: f64 = 160.0;
+
+/// How the frame is shaped for the edge it is docked to, as fractions of the
+/// display.
 ///
-/// A card docked left or right has the whole height of the screen available and
-/// only wants a slice of its width: a reply read in a narrow column beside your
-/// work is easier to follow than one stretched across it, and it leaves the
-/// middle of the screen — where the work is — alone. Docked to the top or bottom
-/// the trade runs the other way, so it becomes a wide, shallow banner. Centred,
-/// with nothing to sit beside, it is balanced. This is what it means for the dock
-/// zones to be "optimised for that direction": the zone picks the proportions,
-/// not just the coordinates.
-///
-/// Pure, so each zone's proportions can be checked against real screen sizes.
+/// Docked left or right, the card has the screen's height to use and wants only a
+/// slice of its width: a column beside your work. Docked to the top or bottom it
+/// becomes a wide, shallow banner. Centred, it is balanced.
 fn ask_shape_for_anchor(anchor: crate::settings::AskAnchor) -> (f64, f64) {
     use crate::settings::AskAnchor;
     match anchor {
-        // Tall rail down one side.
         AskAnchor::Left | AskAnchor::Right => (0.25, 0.70),
-        // Wide banner along one edge.
         AskAnchor::TopCenter | AskAnchor::BottomCenter => (0.42, 0.34),
-        // Balanced, and the default.
         AskAnchor::Center | AskAnchor::Custom => (0.30, 0.46),
     }
 }
 
-/// The talking pill's transparent frame: the shape every quick ask opens in.
-///
-/// This was the full width of the answer card, on the theory that a bar sharing
-/// the card's width and top-left corner turns the transition into a single
-/// downward `set_size` with no reposition to tear. It worked, and it was the
-/// wrong trade: it put a 650px slab on screen to hold the word "Listening",
-/// which is the opposite of the small, quiet thing a voice prompt should be.
-///
-/// The morph is a cross-fade now (see [`AskStage`]), and a cross-fade does not
-/// care whether the window moved underneath it — so the pill is free to be pill
-/// sized. It is deliberately the dictation overlay's pill, because to the user it
-/// is the same gesture: press, speak, release.
-///
-/// These are the **frame**, not the pill. The pill itself hugs its content and
-/// floats centred inside this transparent rectangle, exactly as the recording
-/// overlay's does, which is what lets "Listening", "Thinking" and "Searching the
-/// web" be different widths with no window resize between them. So the frame is
-/// sized for the longest of those states and the surplus simply never draws.
-///
-/// Keep in sync with `--ask-pill-h` in `AssistantPanel.css`, and with
-/// `.overlay-pill` in `RecordingOverlay.css`, which this mirrors.
-const ASK_PILL_WIDTH: f64 = 340.0;
-const ASK_PILL_HEIGHT: f64 = 56.0;
-
-/// The shortest the answer card may be. A one-line answer still needs its
-/// question line, a readable body and the follow-up row underneath it.
-const ASK_CARD_MIN_HEIGHT: f64 = 168.0;
-
-/// The height the card opens at before the webview has measured its own content
-/// — only ever seen if a fit report is lost.
-const ASK_CARD_FALLBACK_HEIGHT: f64 = 320.0;
-
-/// How long the webview's height morph runs, after which the window can be
-/// trimmed back to the surface it is actually drawing.
-///
-/// The window is transparent, so it is free to be *larger* than the card for the
-/// length of the animation and clips nothing; it must never be smaller, which is
-/// the only reason this is a shared constant rather than a CSS detail. Keep in
-/// sync with the `--ask-morph` duration in `AssistantPanel.css`, with a little
-/// slack so the trim always lands after the last frame.
-const ASK_MORPH_SETTLE_MS: u64 = 460;
-
-/// How long the pill is given to fade out before the window is resized and moved
-/// under it.
-///
-/// This delay is the whole reason the pill can be small. Resizing and moving a
-/// window while it still has something drawn in it is what reads as a glitch, so
-/// the order is: tell the webview to fade the pill out, wait for it to finish,
-/// *then* change the geometry — against an empty transparent window, where there
-/// is nothing left to jump — and only then let the card fade in. Geometry moves
-/// while nothing is visible, so no dock zone and no answer length can produce a
-/// tear.
-///
-/// Keep in sync with `--ask-pill-exit` in `AssistantPanel.css`, with slack, so the
-/// window never changes shape before the last frame of the fade.
-const ASK_PILL_EXIT_MS: u64 = 150;
-
-/// The size preset as a multiplier on the display-derived size, so the user's
-/// choice still means something without reintroducing a table of magic numbers.
+/// The size preset as a multiplier on the display-derived size.
 fn ask_preset_scale(size: &str) -> f64 {
     match size {
         "mini" => 0.78,
@@ -263,14 +114,12 @@ fn ask_preset_scale(size: &str) -> f64 {
     }
 }
 
-/// The Ask card's width and maximum height on a display of the given logical
-/// dimensions, for the zone it is docked to.
+/// The quick ask's frame size on a display of the given logical dimensions.
 ///
-/// Pure, so the rule that decides whether the card is readable can be tested
-/// against real screen sizes without a monitor attached. Order matters: shape to
-/// the zone, scale to the display, clamp to the comfortable band, then make sure
-/// it still physically fits — a small screen wins over the minimum, because a card
-/// larger than the display cannot be dragged back into view.
+/// Pure, so it can be checked against real screen sizes without a monitor. Order
+/// matters: shape to the zone, scale to the display, clamp to the comfortable
+/// band, then make sure it still physically fits — a small screen wins over the
+/// minimum, because a frame larger than the display puts the card off screen.
 fn ask_size_for_display(
     mon_w: f64,
     mon_h: f64,
@@ -279,38 +128,18 @@ fn ask_size_for_display(
 ) -> (f64, f64) {
     let scale = ask_preset_scale(preset);
     let (width_fraction, height_fraction) = ask_shape_for_anchor(anchor);
-    // The cap scales with the preset too. With a fixed cap, every preset above
-    // "mini" saturated it on a 1440p or 4K display — so "large" and "compact"
-    // produced an identical card and the setting silently stopped meaning
-    // anything on exactly the screens where it matters most.
+    // The cap scales with the preset too, or every preset above "mini" saturates
+    // it on a 1440p display and the setting stops meaning anything.
     let w = (mon_w * width_fraction * scale).clamp(ASK_MIN_WIDTH, ASK_MAX_WIDTH * scale);
     let h = (mon_h * height_fraction * scale).clamp(ASK_MIN_HEIGHT, ASK_MAX_HEIGHT * scale);
-    // Leave a margin either side, and clearance for a taskbar at the bottom.
-    let max_w = (mon_w - 2.0 * PANEL_MARGIN).max(ASK_PILL_WIDTH);
-    let max_h = (mon_h - 2.0 * PANEL_MARGIN - TASKBAR_CLEARANCE).max(ASK_PILL_HEIGHT);
+    let max_w = (mon_w - 2.0 * PANEL_MARGIN).max(ASK_FRAME_FLOOR_WIDTH);
+    let max_h = (mon_h - 2.0 * PANEL_MARGIN - TASKBAR_CLEARANCE).max(ASK_FRAME_FLOOR_HEIGHT);
     (w.min(max_w), h.min(max_h))
 }
 
-/// Resolve a height the webview asked for into one the window may actually take.
-///
-/// Pure and separate from the window call for the reason every other geometry
-/// helper here is: a fit report arrives from the webview on every answer, and
-/// "does a two-line reply get a two-line card, and does a 4000-word one stop at
-/// the screen" is a question worth answering in a test rather than by talking to
-/// the assistant repeatedly.
-fn clamp_ask_fit(requested: f64, max_height: f64) -> f64 {
-    // A cap below the floor is possible on a very small display, and there the
-    // screen has to win — a card taller than the display cannot be read.
-    let floor = ASK_CARD_MIN_HEIGHT.min(max_height);
-    requested.clamp(floor, max_height.max(floor))
-}
-
-/// Clamp a desired logical panel size so it never exceeds the monitor it's on.
-/// This makes the panel screen-adaptive: on a small display the preset (or a
-/// remembered manual resize) shrinks to fit; on a large display it keeps its
-/// full size. A margin is left so the panel never covers the whole screen or
-/// sits under the taskbar. Falls back to the requested size if the monitor
-/// can't be read (e.g. the window doesn't exist yet at first creation).
+/// Clamp a desired logical size so it never exceeds the monitor it's on, leaving
+/// a margin so the window never covers the whole screen or the taskbar. Falls
+/// back to the requested size if the monitor can't be read.
 fn clamp_to_monitor(app: &AppHandle, w: f64, h: f64) -> (f64, f64) {
     if let Some(window) = app.get_webview_window(PANEL_LABEL) {
         if let Ok(Some(monitor)) = window.current_monitor() {
@@ -318,8 +147,8 @@ fn clamp_to_monitor(app: &AppHandle, w: f64, h: f64) -> (f64, f64) {
             let size = monitor.size();
             let mon_w = size.width as f64 / scale;
             let mon_h = size.height as f64 / scale;
-            let max_w = (mon_w * 0.92).max(PILL_WIDTH);
-            let max_h = (mon_h * 0.85).max(PILL_HEIGHT);
+            let max_w = (mon_w * 0.92).max(CALL_BAR_FRAME_WIDTH);
+            let max_h = (mon_h * 0.85).max(CALL_BAR_FRAME_HEIGHT);
             return (w.min(max_w), h.min(max_h));
         }
     }
@@ -328,10 +157,8 @@ fn clamp_to_monitor(app: &AppHandle, w: f64, h: f64) -> (f64, f64) {
 
 /// A display's logical bounds.
 ///
-/// Grouped rather than passed as four loose `f64`s. The geometry helpers below took
-/// eight positional arguments between them, and nothing stopped a caller
-/// transposing width and height — a mistake that places the card plausibly but
-/// wrongly, which is the hardest kind to spot.
+/// Grouped rather than passed as four loose `f64`s, so nothing can transpose
+/// width and height — a mistake that places the card plausibly but wrongly.
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct DisplayBounds {
     x: f64,
@@ -339,6 +166,14 @@ struct DisplayBounds {
     width: f64,
     height: f64,
 }
+
+/// Used when no display can be read at all, so the frame still has a sane shape.
+const FALLBACK_DISPLAY: DisplayBounds = DisplayBounds {
+    x: 0.0,
+    y: 0.0,
+    width: 1920.0,
+    height: 1080.0,
+};
 
 /// Place a window of the given size at an anchor within a display.
 ///
@@ -358,8 +193,9 @@ fn anchor_position(
     } = display;
     use crate::settings::AskAnchor;
     let centre_x = mon_x + (mon_w - w) / 2.0;
-    // Vertical centre sits slightly above true centre: the card grows downward as
-    // an answer streams in, and true centre would push the tail below the fold.
+    // Slightly above true centre: the pill sits at the top of a centred frame and
+    // the card grows downward from it, so the pill lands about a quarter of the way
+    // down the screen, where a command bar is expected.
     let centre_y = mon_y + (mon_h - h) / 2.0 - 24.0;
     let left_x = mon_x + PANEL_MARGIN;
     let right_x = mon_x + mon_w - w - PANEL_MARGIN;
@@ -373,8 +209,7 @@ fn anchor_position(
         AskAnchor::Left => (left_x, centre_y),
         AskAnchor::Right => (right_x, centre_y),
     };
-    // Never let an anchor push the card off its own display, which a large card on
-    // a small screen otherwise would.
+    // Never let an anchor push the frame off its own display.
     (
         x.clamp(
             mon_x + PANEL_MARGIN,
@@ -387,44 +222,113 @@ fn anchor_position(
     )
 }
 
-/// Session memory of the last expanded WIDTH (logical px), so collapsing to the
-/// pill and expanding again restores a manual resize. 0 = never resized this
-/// session — fall back to the user's size preset. Not persisted: a fresh app
-/// start uses the preset from settings.
-///
-/// Width only. The quick ask's height belongs to its content now (see
-/// [`ask_stage_height`]), so there is nothing for a remembered height to mean:
-/// the next answer would overrule it on arrival, which reads as the app ignoring
-/// a resize the user just made. Dragging the card taller is instead a request the
-/// *next* fit report answers properly.
-static EXPANDED_W: AtomicU32 = AtomicU32::new(0);
+/// Which edge of its frame the quick-ask surface is pinned to.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
+enum AskEdge {
+    /// The pill sits at the top and the card grows downward.
+    Top,
+    /// The pill sits at the bottom and the card grows upward.
+    Bottom,
+}
 
-/// Whether the quick ask is showing its answer card (`true`) or the small
-/// talking pill it opens in (`false`).
-///
-/// The two are one window in two shapes, not two windows. They no longer share a
-/// footprint: the pill is pill sized and the card is card sized, each placed by
-/// the same dock zone, and the transition between them is a cross-fade rather
-/// than a geometric unfold. The earlier arrangement made the pill as wide as the
-/// card so growth was one downward `set_size` with nothing to reposition — the
-/// motion was clean and the resting shape was a 650px slab holding one word,
-/// which is not a trade worth making. A cross-fade is indifferent to whether the
-/// window moved, so the shapes are free to be the right shapes (see
-/// [`ASK_PILL_EXIT_MS`] for the ordering that makes the geometry change
-/// invisible).
-static ASK_STAGE_CARD: AtomicBool = AtomicBool::new(false);
+/// Where across its frame the quick-ask surface sits.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
+enum AskSide {
+    Start,
+    Center,
+    End,
+}
 
-/// The card height the webview last measured for its own content, in logical px.
-/// 0 = nothing measured yet.
-static ASK_CARD_HEIGHT: AtomicU32 = AtomicU32::new(0);
+/// How the webview lays the surface out inside the frame, sent as
+/// `assistant-ask-layout`. Derived from the same anchor as the frame's position,
+/// so the pill always hugs the edge of the screen the user docked it to.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+struct AskLayout {
+    align: AskEdge,
+    justify: AskSide,
+}
 
-/// Rising counter identifying the most recent pill-to-card transition.
+/// The layout for a dock zone. Pure, so the "pill hugs the chosen edge" rule is
+/// a test rather than a screenshot.
+fn ask_layout_for_anchor(anchor: crate::settings::AskAnchor) -> AskLayout {
+    use crate::settings::AskAnchor;
+    match anchor {
+        AskAnchor::BottomCenter => AskLayout {
+            align: AskEdge::Bottom,
+            justify: AskSide::Center,
+        },
+        AskAnchor::Left => AskLayout {
+            align: AskEdge::Top,
+            justify: AskSide::Start,
+        },
+        AskAnchor::Right => AskLayout {
+            align: AskEdge::Top,
+            justify: AskSide::End,
+        },
+        AskAnchor::Center | AskAnchor::TopCenter | AskAnchor::Custom => AskLayout {
+            align: AskEdge::Top,
+            justify: AskSide::Center,
+        },
+    }
+}
+
+/// The quick ask's whole geometry: one fixed, transparent frame.
 ///
-/// The card arrives on a delay (the pill's fade-out), and in that gap the user
-/// can cancel, close, or start speaking again. Each transition takes a ticket and
-/// the delayed half refuses to run unless its ticket is still the current one, so
-/// a superseded morph cannot resize a window that has moved on.
-static ASK_MORPH_TICKET: AtomicU32 = AtomicU32::new(0);
+/// The frame is placed once per show and then never moves or resizes while the
+/// ask runs. The pill and the card are both drawn inside it; the webview morphs
+/// one into the other, and cursor pass-through (see `hitRegion.ts`) keeps the
+/// undrawn part of the frame from blocking the desktop.
+///
+/// The window used to be resized between those two shapes, which needed a fade
+/// out, a wait for the fade, a resize-and-move against an empty window, a height
+/// measurement round trip and a fade back in — so an answer could not appear until
+/// it had finished and been measured, and the pill and the card each landed at
+/// their own coordinates. A fixed frame removes every step of that.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct AskPlacement {
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+    layout: AskLayout,
+}
+
+/// The quick ask's frame on a display, for a preset and dock zone. Pure.
+fn ask_placement_on(
+    display: DisplayBounds,
+    preset: &str,
+    anchor: crate::settings::AskAnchor,
+) -> AskPlacement {
+    use crate::settings::AskAnchor;
+    // `Custom` is the legacy value written by an old drag handler; there is no
+    // remembered position any more, so it reads as the default.
+    let anchor = match anchor {
+        AskAnchor::Custom => AskAnchor::Center,
+        anchor => anchor,
+    };
+    let (width, height) = ask_size_for_display(display.width, display.height, preset, anchor);
+    let (x, y) = anchor_position(anchor, display, width, height);
+    AskPlacement {
+        x,
+        y,
+        width,
+        height,
+        layout: ask_layout_for_anchor(anchor),
+    }
+}
+
+/// The quick ask's frame for the current settings and display.
+fn ask_placement(app: &AppHandle) -> AskPlacement {
+    let settings = get_settings(app);
+    let display = active_display_bounds(app).unwrap_or(FALLBACK_DISPLAY);
+    ask_placement_on(
+        display,
+        &settings.assistant_panel_size,
+        settings.assistant_ask_anchor,
+    )
+}
 
 /// A monitor's bounds in logical points.
 fn display_bounds_of(monitor: &tauri::Monitor) -> DisplayBounds {
@@ -438,99 +342,7 @@ fn display_bounds_of(monitor: &tauri::Monitor) -> DisplayBounds {
 }
 
 /// How far two logical origins may differ and still count as the same display.
-///
-/// Not zero: an origin makes a round trip through the store as an `f64` and back
-/// through a scale-factor division, and a display whose resolution changed keeps
-/// its origin but not necessarily to the pixel.
 const DISPLAY_MATCH_TOLERANCE: f64 = 2.0;
-
-/// Read back the display the panel was pinned to, if it is still connected.
-///
-/// Returns the monitor's bounds **as they are now** rather than the ones that were
-/// stored, so a resolution or orientation change re-shapes the card instead of
-/// placing it against a screen that no longer exists at that size.
-fn pinned_display_bounds(app: &AppHandle) -> Option<DisplayBounds> {
-    let store = app
-        .store(crate::portable::store_path(
-            crate::settings::SETTINGS_STORE_PATH,
-        ))
-        .ok()?;
-    let value = store.get(PANEL_DISPLAY_KEY)?;
-    let x = value.get("x")?.as_f64()?;
-    let y = value.get("y")?.as_f64()?;
-    let monitors = app.available_monitors().ok()?;
-    monitors
-        .iter()
-        .map(display_bounds_of)
-        .find(|bounds| {
-            (bounds.x - x).abs() <= DISPLAY_MATCH_TOLERANCE
-                && (bounds.y - y).abs() <= DISPLAY_MATCH_TOLERANCE
-        })
-        .or_else(|| {
-            // Debug rather than warn: this is consulted on every fit report and every
-            // stage change, so a genuinely unplugged display would otherwise fill the
-            // log with the same line hundreds of times per answer.
-            debug!(
-                "The assistant panel's display at ({:.0}, {:.0}) is not connected; \
-                 falling back to the display it is currently on.",
-                x, y
-            );
-            None
-        })
-}
-
-/// Pin the panel to the display it is currently sitting on.
-///
-/// Called after a drag settles, which is the only gesture that means "I want it over
-/// here". Everything else — a show, a resize, a stage change — must leave the choice
-/// alone, or the panel is back to picking its own screen.
-///
-/// When the user has **named** a display in Settings and then drags the panel to a
-/// different one, the setting is updated to match. This is deliberately unlike the
-/// dock zone, which a drag must never rewrite: a zone has to be guessed from a
-/// coordinate and guessed wrong constantly, whereas the display a window's corner
-/// sits on is a fact. Leaving the setting behind would mean the panel snapped back
-/// on the next open with the dropdown still naming the screen it refused to stay on.
-fn remember_panel_display(app: &AppHandle) {
-    let Some(window) = app.get_webview_window(PANEL_LABEL) else {
-        return;
-    };
-    let Ok(Some(monitor)) = window.current_monitor() else {
-        return;
-    };
-    let bounds = display_bounds_of(&monitor);
-    if let Ok(store) = app.store(crate::portable::store_path(
-        crate::settings::SETTINGS_STORE_PATH,
-    )) {
-        store.set(
-            PANEL_DISPLAY_KEY,
-            serde_json::json!({ "x": bounds.x, "y": bounds.y }),
-        );
-    }
-    let mut settings = get_settings(app);
-    let named = display_choice_is_named(&settings.assistant_ask_display);
-    let landed_on = display_id(&monitor);
-    if named && settings.assistant_ask_display != landed_on {
-        debug!(
-            "The assistant panel was dragged to '{landed_on}'; updating the chosen display \
-             from '{}'.",
-            settings.assistant_ask_display
-        );
-        settings.assistant_ask_display = landed_on;
-        crate::settings::write_settings(app, settings);
-    }
-}
-
-/// Is this `assistant_ask_display` value the name of a specific screen, rather than
-/// one of the policies?
-///
-/// Pure, because it is what decides whether dragging the panel to another monitor
-/// rewrites the setting. Getting it wrong in the permissive direction would rewrite
-/// "follow my mouse" into a fixed screen the first time the panel was nudged, which
-/// is the same class of mistake the dock zone used to make.
-fn display_choice_is_named(choice: &str) -> bool {
-    !matches!(choice, "last_used" | "cursor" | "primary")
-}
 
 /// A connected display, as the settings dropdown needs to describe it.
 #[derive(Clone, serde::Serialize, serde::Deserialize, specta::Type)]
@@ -543,8 +355,7 @@ pub struct DisplayChoice {
     pub width: u32,
     pub height: u32,
     pub is_primary: bool,
-    /// True for the display the panel would open on right now, so the UI can say
-    /// which screen "last used" currently resolves to.
+    /// True for the display the panel would open on right now.
     pub is_current: bool,
 }
 
@@ -599,135 +410,66 @@ pub fn list_displays(app: &AppHandle) -> Vec<DisplayChoice> {
 /// The display the user explicitly named, if it is still connected.
 fn chosen_display_bounds(app: &AppHandle, choice: &str) -> Option<DisplayBounds> {
     let monitors = app.available_monitors().ok()?;
-    // By name first, then by the origin encoded in a nameless id. Name first so the
-    // choice follows the physical screen when the desktop is rearranged, which is
-    // what "the screen on my left" means to the person who picked it.
     monitors
         .iter()
         .find(|monitor| display_id(monitor) == choice)
         .map(display_bounds_of)
 }
 
-/// The display the cursor is on.
+/// The display the cursor is on, using the same detector as the recording
+/// overlay, so the assistant and dictation always agree about which screen the
+/// user is working on.
 fn cursor_display_bounds(app: &AppHandle) -> Option<DisplayBounds> {
-    let pos = app.cursor_position().ok()?;
-    let monitor = app.monitor_from_point(pos.x, pos.y).ok().flatten()?;
-    Some(display_bounds_of(&monitor))
+    crate::overlay::get_monitor_with_cursor(app).map(|m| display_bounds_of(&m))
 }
 
-/// The logical bounds of the display the Ask surface belongs to.
+/// Does this `assistant_ask_display` value follow the cursor?
 ///
-/// The `assistant_ask_display` setting decides, and its default (`last_used`) is
-/// the display the panel was last dragged to. The cursor is only consulted when the
-/// user asked for it or when nothing else is known — see [`PANEL_DISPLAY_KEY`] for
-/// what consulting it unconditionally cost. A hotkey press is not a statement about
-/// which screen the panel lives on; dragging it there, or naming it in Settings, is.
+/// `last_used` is included because it was the old default and meant "wherever I
+/// last dragged it" — a remembered position that no longer exists. Pure, because
+/// it decides which screen a stored setting from an older version opens on.
+fn display_choice_follows_cursor(choice: &str) -> bool {
+    matches!(choice, "cursor" | "last_used" | "")
+}
+
+/// The logical bounds of the display the quick ask opens on.
 ///
-/// Every branch falls through rather than failing, so a chosen display that has been
-/// unplugged leaves the panel reachable instead of parked in dead space.
+/// The `assistant_ask_display` setting decides: the screen the cursor is on (the
+/// default), the primary screen, or a named one. Every branch falls through rather
+/// than failing, so a chosen display that has been unplugged leaves the panel
+/// reachable instead of parked in dead space.
 fn active_display_bounds(app: &AppHandle) -> Option<DisplayBounds> {
     let choice = get_settings(app).assistant_ask_display;
-    match choice.as_str() {
-        "cursor" => {
-            if let Some(display) = cursor_display_bounds(app) {
-                return Some(display);
-            }
-        }
-        "primary" => {
-            if let Ok(Some(monitor)) = app.primary_monitor() {
-                return Some(display_bounds_of(&monitor));
-            }
-        }
-        "last_used" => {
-            if let Some(display) = pinned_display_bounds(app) {
-                return Some(display);
-            }
-        }
-        named => {
-            if let Some(display) = chosen_display_bounds(app, named) {
-                return Some(display);
-            }
+    let chosen = if display_choice_follows_cursor(&choice) {
+        None
+    } else if choice == "primary" {
+        app.primary_monitor()
+            .ok()
+            .flatten()
+            .map(|m| display_bounds_of(&m))
+    } else {
+        let named = chosen_display_bounds(app, &choice);
+        if named.is_none() {
             debug!(
-                "The assistant panel's chosen display '{named}' is not connected; \
-                 falling back to the display it is currently on."
+                "The assistant's chosen display '{choice}' is not connected; using the cursor's"
             );
         }
-    }
-    let monitor = app
-        .get_webview_window(PANEL_LABEL)
-        .and_then(|w| w.current_monitor().ok().flatten())
-        .or_else(|| {
-            app.cursor_position()
-                .ok()
-                .and_then(|pos| app.monitor_from_point(pos.x, pos.y).ok().flatten())
-        })
-        .or_else(|| app.primary_monitor().ok().flatten())?;
-    Some(display_bounds_of(&monitor))
-}
-
-/// The Ask card's width and its height ceiling for the current dock zone.
-fn ask_bounds(app: &AppHandle) -> (f64, f64) {
-    let settings = get_settings(app);
-    let preset = settings.assistant_panel_size;
-    let anchor = settings.assistant_ask_anchor;
-    let (mut width, max_height) = match active_display_bounds(app) {
-        Some(display) => ask_size_for_display(display.width, display.height, &preset, anchor),
-        // No readable display: fall back to the old fixed preset rather than
-        // guessing a fraction of an unknown screen.
-        None => panel_preset_size(&preset),
+        named
     };
-    // A deliberate manual resize this session wins over the computed width.
-    let remembered = EXPANDED_W.load(Ordering::SeqCst);
-    if remembered != 0 {
-        width = clamp_to_monitor(app, remembered as f64, max_height).0;
-    }
-    (width, max_height)
+    chosen.or_else(|| cursor_display_bounds(app)).or_else(|| {
+        app.get_webview_window(PANEL_LABEL)
+            .and_then(|w| w.current_monitor().ok().flatten())
+            .or_else(|| app.primary_monitor().ok().flatten())
+            .map(|m| display_bounds_of(&m))
+    })
 }
 
-/// The height the card takes for the content the webview measured.
-fn ask_card_height(max_height: f64) -> f64 {
-    let measured = ASK_CARD_HEIGHT.load(Ordering::SeqCst);
-    let requested = if measured == 0 {
-        ASK_CARD_FALLBACK_HEIGHT
-    } else {
-        measured as f64
-    };
-    clamp_ask_fit(requested, max_height)
-}
-
-/// The size the window takes for the current ask stage: the pill, or the card
-/// sized to its measured content.
-fn expanded_size(app: &AppHandle) -> (f64, f64) {
-    if !ASK_STAGE_CARD.load(Ordering::SeqCst) {
-        return (ASK_PILL_WIDTH, ASK_PILL_HEIGHT);
-    }
-    let (width, max_height) = ask_bounds(app);
-    (width, ask_card_height(max_height))
-}
-
-/// The footprint the dock zone should place: whichever stage is on screen.
-///
-/// This used to always report the card's, so the pill was positioned as if it
-/// were the card — deliberately, because the two shared a footprint and the pill
-/// occupied the card's top-left corner. Now that each stage is its own size, each
-/// is placed on its own: a pill centred in its zone, and a card centred in the
-/// same zone, with the move happening while the pill has already faded out.
-fn ask_anchor_size(app: &AppHandle) -> (f64, f64) {
-    expanded_size(app)
-}
-
-/// A live call has two forms, and neither is the chat panel.
+/// A live call has two forms, and neither is the quick ask.
 ///
 /// At rest it is the floating call bar (see [`CALL_BAR_FRAME_WIDTH`]). Expanded,
 /// it is the same bar with the conversation above it — the transcript, the saved
 /// conversations to go back to, and the call's options — in a window the user
-/// can resize. The expanded size gets its own lane (base sizes and a session
-/// memory of a manual resize, below) so a resize made for the call is never
-/// written back over the chat panel's remembered size.
-///
-/// The old orb view needed height for a 156px sphere and a status line; nothing
-/// in it was text, which is why a call used to run with no visible reply at all
-/// below 440x600. The expanded form is mostly text, so these read as a panel.
+/// can resize.
 fn conversation_preset_size(size: &str) -> (f64, f64) {
     match size {
         "mini" => (400.0, 520.0),
@@ -744,8 +486,7 @@ const CONVERSATION_MIN_WIDTH: f64 = 400.0;
 const CONVERSATION_MIN_HEIGHT: f64 = 420.0;
 
 /// Session memory of a manual resize of the expanded call. The bar form is a
-/// fixed frame and has nothing to remember. Kept apart from `EXPANDED_W` so
-/// neither mode can silently rewrite the other's size.
+/// fixed frame and has nothing to remember.
 static CONVERSATION_W: AtomicU32 = AtomicU32::new(0);
 static CONVERSATION_H: AtomicU32 = AtomicU32::new(0);
 
@@ -758,9 +499,7 @@ static CONVERSATION_EXPANDED: AtomicBool = AtomicBool::new(false);
 ///
 /// Bottom-centre rather than top-left because that is the point the two forms
 /// share: expanding grows the window upward and outward around it, so the bar
-/// stays exactly where the user's eye already is. It is deliberately separate
-/// from the quick ask's dragged position — parking the call bar at the bottom of
-/// the screen must not make the next quick ask open there too.
+/// stays exactly where the user's eye already is.
 static CALL_BAR_ANCHOR: Mutex<Option<(f64, f64)>> = Mutex::new(None);
 
 fn conversation_size(app: &AppHandle) -> (f64, f64) {
@@ -798,8 +537,7 @@ fn bottom_anchored_position(
 }
 
 /// Where the call bar opens when it has not been moved this session: centred
-/// at the bottom of the display, clear of the taskbar — where ChatGPT's own
-/// floating voice bar sits, and where a thing you talk to while working belongs.
+/// at the bottom of the display, clear of the taskbar.
 fn default_call_bar_anchor(display: DisplayBounds) -> (f64, f64) {
     (
         display.x + display.width / 2.0,
@@ -827,33 +565,11 @@ fn remember_call_anchor(window: &tauri::WebviewWindow) {
     }
 }
 
-/// Which of the two size lanes a remembered resize belongs to.
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum SizeLane {
-    /// The text chat panel.
-    Panel,
-    /// The expanded voice call.
-    Conversation,
-}
-
-fn current_size_lane(app: &AppHandle) -> SizeLane {
-    if crate::voice_conversation::is_active(app) {
-        SizeLane::Conversation
-    } else {
-        SizeLane::Panel
-    }
-}
-
-/// File the window's current size into one lane, so a manual drag-resize
-/// survives collapsing to the pill and switching between chat and voice.
-/// Degenerate (pill-sized) values are ignored, so a stray double-collapse can
-/// never shrink a remembered size.
-fn remember_size_in_lane(app: &AppHandle, lane: SizeLane) {
-    if PILL_MODE.load(Ordering::SeqCst) {
-        return;
-    }
-    // The call bar is a fixed frame; only the expanded call is the user's to size.
-    if lane == SizeLane::Conversation && !CONVERSATION_EXPANDED.load(Ordering::SeqCst) {
+/// File a manual resize of the expanded call so it survives switching forms.
+/// Anything below the call's own floor is ignored, so a stray degenerate size
+/// can never become the remembered one.
+fn remember_call_size(app: &AppHandle) {
+    if !CONVERSATION_EXPANDED.load(Ordering::SeqCst) {
         return;
     }
     let Some(window) = app.get_webview_window(PANEL_LABEL) else {
@@ -870,104 +586,67 @@ fn remember_size_in_lane(app: &AppHandle, lane: SizeLane) {
     };
     let w = size.width as f64 / scale;
     let h = size.height as f64 / scale;
-    // Never file a size the form in question cannot actually render. This guard
-    // used to be the pill's 240x44, so a 241x45 drag of the expanded panel was
-    // filed happily and then reproduced on every later expand for the rest of
-    // the session. Each lane is held to its own floor instead.
-    // Against the card's floor, not the pill's: the pill is a fixed shape the
-    // user cannot usefully drag, so any resize worth remembering was made on the
-    // card.
-    let form = match lane {
-        SizeLane::Panel => PanelForm::AskCard,
-        SizeLane::Conversation => PanelForm::CallExpanded,
-    };
-    let (min_w, min_h) = panel_min_size(form);
-    if w < min_w || h < min_h {
+    if w < CONVERSATION_MIN_WIDTH || h < CONVERSATION_MIN_HEIGHT {
         return;
     }
-    match lane {
-        SizeLane::Panel => {
-            // Width only: the quick ask's height is its answer's (see
-            // `ask_stage_height`).
-            EXPANDED_W.store(w.round() as u32, Ordering::SeqCst);
-        }
-        SizeLane::Conversation => {
-            CONVERSATION_W.store(w.round() as u32, Ordering::SeqCst);
-            CONVERSATION_H.store(h.round() as u32, Ordering::SeqCst);
-        }
-    }
+    CONVERSATION_W.store(w.round() as u32, Ordering::SeqCst);
+    CONVERSATION_H.store(h.round() as u32, Ordering::SeqCst);
 }
 
-/// Every shape the panel window takes. Each has its own resize floor, and a
-/// floor left over from the previous shape refuses the next one outright — the
-/// 240x44 pill cannot be entered while a 400x420 floor is in force.
+/// Every shape the panel window takes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum PanelForm {
-    /// The collapsed quick-ask pill (or the Live overlay).
-    Pill,
-    /// The quick ask's talking bar.
-    AskBar,
-    /// The quick ask's answer card.
-    AskCard,
+    /// The quick ask: a fixed frame the pill and the card are drawn inside.
+    Ask,
     /// A live call at rest: the floating bar and its status bubble.
     CallBar,
     /// A live call with its conversation open above the bar.
     CallExpanded,
 }
 
-/// The form the window is in, read from the three flags that decide it.
-fn panel_form(collapsed: bool, call_active: bool, call_expanded: bool, card: bool) -> PanelForm {
-    if call_active {
-        // A call's collapsed form is its bar (see `collapsed_size`).
-        if call_expanded && !collapsed {
-            PanelForm::CallExpanded
-        } else {
-            PanelForm::CallBar
-        }
-    } else if collapsed {
-        PanelForm::Pill
-    } else if card {
-        PanelForm::AskCard
-    } else {
-        PanelForm::AskBar
+/// The form the window is in, from the two flags that decide it.
+fn panel_form(call_active: bool, call_expanded: bool) -> PanelForm {
+    match (call_active, call_expanded) {
+        (true, true) => PanelForm::CallExpanded,
+        (true, false) => PanelForm::CallBar,
+        (false, _) => PanelForm::Ask,
     }
 }
 
-/// The resize floor for one form of the window. Split out of
-/// [`apply_panel_min_size`] so the invariants that matter — a live call keeps
-/// its controls reachable, and neither the collapsed pill nor the talking pill is
-/// ever refused — are testable without a window.
+/// The resize floor for one form, or `None` for a form the user cannot resize.
 ///
-/// The quick ask's two stages differ in width as well as height: the talking
-/// pill is narrower than the card's width floor, so a single floor for both
-/// stages would quietly stretch the pill to 300px and undo the whole point of it.
-fn panel_min_size(form: PanelForm) -> (f64, f64) {
+/// Only the expanded call is resizable. The quick ask's frame and the call bar are
+/// fixed shapes set by the app, and a floor on them could only ever refuse one of
+/// the app's own resizes.
+fn panel_min_size(form: PanelForm) -> Option<(f64, f64)> {
     match form {
-        // Collapsing must never be refused, so the pill's own size is the floor.
-        PanelForm::Pill => (PILL_WIDTH, PILL_HEIGHT),
-        PanelForm::AskBar => (ASK_PILL_WIDTH, ASK_PILL_HEIGHT),
-        // `PANEL_MIN_HEIGHT` was the floor for a window that always held a message
-        // list and an input row; a 360px floor would refuse a card sized to a
-        // one-line answer. Width still has a real floor, because the width is the
-        // one dimension the user drags and the one the answer wraps to.
-        PanelForm::AskCard => (PANEL_MIN_WIDTH, ASK_CARD_MIN_HEIGHT),
-        // A fixed frame: its floor is itself.
-        PanelForm::CallBar => (CALL_BAR_FRAME_WIDTH, CALL_BAR_FRAME_HEIGHT),
-        PanelForm::CallExpanded => (CONVERSATION_MIN_WIDTH, CONVERSATION_MIN_HEIGHT),
+        PanelForm::Ask | PanelForm::CallBar => None,
+        PanelForm::CallExpanded => Some((CONVERSATION_MIN_WIDTH, CONVERSATION_MIN_HEIGHT)),
     }
 }
 
-/// Re-apply the resize floor for the form the window is about to take. It has
-/// to move with the form: the pill is 240x44, so a conversation-sized floor
-/// left in place would refuse the collapse outright.
-fn apply_panel_min_size(app: &AppHandle, window: &tauri::WebviewWindow, collapsed: bool) {
-    let (w, h) = panel_min_size(panel_form(
-        collapsed,
+fn current_panel_form(app: &AppHandle) -> PanelForm {
+    panel_form(
         crate::voice_conversation::is_active(app),
         CONVERSATION_EXPANDED.load(Ordering::SeqCst),
-        ASK_STAGE_CARD.load(Ordering::SeqCst),
-    ));
-    let _ = window.set_min_size(Some(tauri::LogicalSize::new(w, h)));
+    )
+}
+
+/// Whether the window currently carries the resizable style. Tracked so the flag
+/// is only written on a real change: tao re-shows a visible window on *every*
+/// style change, and on Windows that re-show activates it.
+static PANEL_RESIZABLE: AtomicBool = AtomicBool::new(false);
+
+/// Apply the resize floor and resizability for the form the window is in.
+fn apply_panel_constraints(app: &AppHandle, window: &tauri::WebviewWindow) {
+    let form = current_panel_form(app);
+    let _ = window.set_min_size(
+        panel_min_size(form).map(|(w, h)| tauri::Size::Logical(tauri::LogicalSize::new(w, h))),
+    );
+    let resizable = form == PanelForm::CallExpanded;
+    if PANEL_RESIZABLE.swap(resizable, Ordering::SeqCst) != resizable {
+        let _ = window.set_resizable(resizable);
+    }
 }
 
 /// Nudge the panel back inside its monitor after a resize — growing can push it
@@ -985,264 +664,46 @@ fn keep_panel_on_monitor(window: &tauri::WebviewWindow, w: f64, h: f64) {
     }
 }
 
-/// Resize the window to whatever the current form (pill / chat panel / voice
-/// conversation) asks for. Main thread only: it touches the WebView window.
-fn apply_panel_form_size(app: &AppHandle) {
+/// Tell the webview which edge of the frame the quick ask grows from.
+fn emit_ask_layout(app: &AppHandle, layout: AskLayout) {
+    let _ = app.emit_to(PANEL_LABEL, "assistant-ask-layout", layout);
+}
+
+/// Size and place the quick ask's frame at its dock zone. Main thread only.
+fn place_ask_window(app: &AppHandle, window: &tauri::WebviewWindow) {
+    let placement = ask_placement(app);
+    apply_panel_constraints(app, window);
+    let _ = window.set_size(tauri::LogicalSize::new(placement.width, placement.height));
+    place_panel(window, placement.x, placement.y);
+    emit_ask_layout(app, placement.layout);
+}
+
+/// Resize the window to whatever the current form asks for. Main thread only.
+fn apply_panel_geometry(app: &AppHandle) {
     let Some(window) = app.get_webview_window(PANEL_LABEL) else {
         return;
     };
-    let collapsed = PILL_MODE.load(Ordering::SeqCst);
-    let (w, h) = if collapsed {
-        collapsed_size(app)
-    } else if crate::voice_conversation::is_active(app) {
-        conversation_size(app)
+    if crate::voice_conversation::is_active(app) {
+        let (w, h) = conversation_size(app);
+        apply_panel_constraints(app, &window);
+        let _ = window.set_size(tauri::LogicalSize::new(w, h));
+        keep_panel_on_monitor(&window, w, h);
     } else {
-        expanded_size(app)
-    };
-    apply_panel_min_size(app, &window, collapsed);
-    let _ = window.set_size(tauri::LogicalSize::new(w, h));
-    keep_panel_on_monitor(&window, w, h);
-    save_position(app);
-}
-
-/* =============================================================================
- * The quick ask's two stages
- *
- * A question opens the talking pill; the answer replaces it with the card. Both
- * are the same window in two shapes, each placed by the dock zone the user chose.
- *
- * Ordering is the entire design here, and it runs in three beats:
- *
- *   1. the webview fades the pill out          (`stage: "leaving"`)
- *   2. the window is resized and moved         — nothing is drawn, so nothing can
- *                                                visibly jump
- *   3. the webview fades the card in           (`stage: "card"`)
- *
- * Beat 2 is the one that used to be impossible. While the pill and the card
- * shared a footprint the geometry never changed and no sequencing was needed, at
- * the cost of a pill as wide as the card. Fading out first buys the same
- * seamlessness without that cost: a window may change size, change place, and
- * change dock zone between beats 1 and 3, and none of it is visible because there
- * is nothing on screen at the time.
- *
- * The rule that survives from the old arrangement: never let the animation
- * outrun the frame. The card must not begin drawing into a window that is still
- * pill sized, or the answer is clipped to 52px.
- * ============================================================================= */
-
-/// Which shape the webview should be drawing, and in which direction it is
-/// moving.
-#[derive(Clone, Copy, PartialEq)]
-enum AskStage {
-    /// The talking pill: listening, transcribing, thinking.
-    Pill,
-    /// The pill, on its way out. The window changes shape once this has finished.
-    Leaving,
-    /// The answer card.
-    Card,
-}
-
-impl AskStage {
-    /// The wire name. Kept explicit rather than derived so renaming the variant
-    /// cannot silently break the webview, which matches on these strings.
-    fn as_str(self) -> &'static str {
-        match self {
-            AskStage::Pill => "pill",
-            AskStage::Leaving => "leaving",
-            AskStage::Card => "card",
-        }
+        place_ask_window(app, &window);
     }
 }
 
-/// Tell the webview which stage it is in, and how much room it has to draw.
-///
-/// Re-sent on every show as well as on every change, which is what lets a
-/// reloaded webview — whose React state comes back believing it is a pill — draw
-/// the right shape without a command to ask with.
-fn emit_ask_frame(app: &AppHandle, stage: AskStage, height: f64) {
-    let _ = app.emit(
-        "assistant-ask-frame",
-        AskFramePayload {
-            stage: stage.as_str(),
-            height,
-        },
-    );
-}
-
-#[derive(Clone, Serialize)]
-struct AskFramePayload {
-    /// `"pill"`, `"leaving"`, or `"card"`.
-    stage: &'static str,
-    /// The height the window has just been given, in logical px. The webview
-    /// morphs its surface to exactly this, so it is the clamped value rather than
-    /// whatever was asked for.
-    height: f64,
-}
-
-/// Put the surface back to the talking pill.
-///
-/// Only ever called while the card is off screen — a fresh ask, or a close — so
-/// there is nothing to animate and no reason to make the user watch a card
-/// collapse before they can speak.
-fn reset_ask_stage_now(app: &AppHandle) {
-    // Any morph still waiting on its fade-out belongs to the surface being
-    // replaced, so retire its ticket before it can resize the pill into a card.
-    ASK_MORPH_TICKET.fetch_add(1, Ordering::SeqCst);
-    if !ASK_STAGE_CARD.swap(false, Ordering::SeqCst) && ASK_CARD_HEIGHT.load(Ordering::SeqCst) == 0
-    {
-        return;
-    }
-    ASK_CARD_HEIGHT.store(0, Ordering::SeqCst);
-    if PILL_MODE.load(Ordering::SeqCst) || crate::voice_conversation::is_active(app) {
-        return;
-    }
-    if app.get_webview_window(PANEL_LABEL).is_some() {
-        apply_panel_form_size(app);
-        emit_ask_frame(app, AskStage::Pill, ASK_PILL_HEIGHT);
-    }
-}
-
-/// Give the answer the room it measured, and let the webview swap the pill for
-/// the card.
-///
-/// `requested` is the height the webview needs for the whole card. It is clamped
-/// here rather than there because the ceiling belongs to the display, which the
-/// webview cannot see (its own `100vh` is only ever the window it is already in).
-///
-/// Two quite different transitions arrive through this one door, and conflating
-/// them is what made the old version need a card-width pill:
-///
-/// * **The first answer.** The pill is on screen and the card is not, so the
-///   window has to change size *and* place. The pill fades out first and the
-///   geometry changes against an empty window (see [`ASK_PILL_EXIT_MS`]).
-/// * **A follow-up answer.** The card is already in front of the user, so only its
-///   height changes and it keeps its top-left corner. Re-centring it on the dock
-///   zone would slide a card somebody is reading, which is worse than letting it
-///   grow downward.
-pub fn fit_ask_card(app: &AppHandle, requested: f64) {
-    if requested <= 0.0 {
-        return;
-    }
-    let app_main = app.clone();
-    if let Err(e) = app.run_on_main_thread(move || {
-        // The pill and the card are the quick ask's shapes. A call owns the window
-        // while it runs, and the collapsed pill is a form the user chose.
-        if PILL_MODE.load(Ordering::SeqCst) || crate::voice_conversation::is_active(&app_main) {
-            return;
-        }
-        if app_main.get_webview_window(PANEL_LABEL).is_none() {
-            return;
-        }
-        let (width, max_height) = ask_bounds(&app_main);
-        let target = clamp_ask_fit(requested, max_height);
-        let previous = ASK_CARD_HEIGHT.swap(target.round() as u32, Ordering::SeqCst) as f64;
-
-        if ASK_STAGE_CARD.swap(true, Ordering::SeqCst) {
-            resize_ask_card_in_place(&app_main, width, target, previous);
-            return;
-        }
-
-        // Beat 1: the pill leaves. Nothing about the window changes yet.
-        let ticket = ASK_MORPH_TICKET.fetch_add(1, Ordering::SeqCst) + 1;
-        emit_ask_frame(&app_main, AskStage::Leaving, ASK_PILL_HEIGHT);
-
-        let app_late = app_main.clone();
-        tauri::async_runtime::spawn(async move {
-            tokio::time::sleep(std::time::Duration::from_millis(ASK_PILL_EXIT_MS)).await;
-            let app_final = app_late.clone();
-            let _ = app_late.run_on_main_thread(move || {
-                // Anything that touched the stage during the fade owns the window
-                // now: a cancel, a close, or a second question already speaking.
-                if ASK_MORPH_TICKET.load(Ordering::SeqCst) != ticket
-                    || PILL_MODE.load(Ordering::SeqCst)
-                    || crate::voice_conversation::is_active(&app_final)
-                    || !ASK_STAGE_CARD.load(Ordering::SeqCst)
-                {
-                    return;
-                }
-                let Some(window) = app_final.get_webview_window(PANEL_LABEL) else {
-                    return;
-                };
-                // Re-read rather than reuse: the answer can have grown between the
-                // two beats, and the measurement that arrived last is the right one.
-                let (width, max_height) = ask_bounds(&app_final);
-                let height = ask_card_height(max_height);
-
-                // Beat 2: change shape and place while the window is empty.
-                apply_panel_min_size(&app_final, &window, false);
-                let _ = window.set_size(tauri::LogicalSize::new(width, height));
-                let (x, y) = default_position_for(&app_final, width, height);
-                place_panel(&window, x, y);
-                keep_panel_on_monitor(&window, width, height);
-
-                // Beat 3: the card arrives, into a frame that already fits it.
-                emit_ask_frame(&app_final, AskStage::Card, height);
-            });
-        });
-    }) {
-        error!("Could not queue ask-card fit: {}", e);
-    }
-}
-
-/// Resize a card that is already on screen, holding the taller of the two heights
-/// for the length of the morph.
-///
-/// The window is transparent, so one that is briefly too tall shows nothing at
-/// all; one that is too short clips the answer mid-animation. So the hold is only
-/// ever downward, and the trim only happens once the morph has finished — at which
-/// point the window stops intercepting clicks in the empty strip below the card.
-fn resize_ask_card_in_place(app: &AppHandle, width: f64, target: f64, previous: f64) {
-    let Some(window) = app.get_webview_window(PANEL_LABEL) else {
-        return;
-    };
-    apply_panel_min_size(app, &window, false);
-    let hold = target.max(previous);
-    let _ = window.set_size(tauri::LogicalSize::new(width, hold));
-    keep_panel_on_monitor(&window, width, hold);
-    emit_ask_frame(app, AskStage::Card, target);
-
-    if hold <= target {
-        return;
-    }
-    let app_trim = app.clone();
-    tauri::async_runtime::spawn(async move {
-        tokio::time::sleep(std::time::Duration::from_millis(ASK_MORPH_SETTLE_MS)).await;
-        let app_final = app_trim.clone();
-        let _ = app_trim.run_on_main_thread(move || {
-            // Anything that changed the stage meanwhile owns the window now.
-            if PILL_MODE.load(Ordering::SeqCst)
-                || crate::voice_conversation::is_active(&app_final)
-                || !ASK_STAGE_CARD.load(Ordering::SeqCst)
-                || (ASK_CARD_HEIGHT.load(Ordering::SeqCst) as f64 - target).abs() > 0.5
-            {
-                return;
-            }
-            if let Some(window) = app_final.get_webview_window(PANEL_LABEL) {
-                let _ = window.set_size(tauri::LogicalSize::new(width, target));
-            }
-        });
-    });
-}
-
-/// A voice conversation is starting: park the chat panel's current size in its
-/// own lane, then turn the window into the call bar. Safe on any thread —
-/// `assistant_conversation_start` is an async command, not the event loop.
+/// A voice conversation is starting: turn the window into the call bar. Safe on
+/// any thread — `assistant_conversation_start` is an async command, not the event
+/// loop.
 pub fn enter_conversation_size(app: &AppHandle) {
     let app_main = app.clone();
     if let Err(e) = app.run_on_main_thread(move || {
-        remember_size_in_lane(&app_main, SizeLane::Panel);
         CONVERSATION_EXPANDED.store(false, Ordering::SeqCst);
-        apply_panel_form_size(&app_main);
-        // Place the call by its OWN footprint, as it arrives.
-        //
-        // Without this the call inherits wherever the quick-ask surface was standing
-        // and grows out of that corner, which honours nothing the user chose. The
-        // bar opens where it was last left this session, else docked at the bottom
-        // centre of the display.
-        //
-        // On entry only, and deliberately not on every show: a call is a surface you
-        // park somewhere and work alongside, so a drag during the call has to win.
-        // That is why `present_assistant_panel` leaves a live call where it is.
+        apply_panel_geometry(&app_main);
+        // Place the call by its own footprint, as it arrives: where it was last
+        // left this session, else docked at the bottom centre of the display. On
+        // entry only, so a drag during the call wins.
         place_call_window(&app_main);
     }) {
         error!("Could not queue conversation panel sizing: {}", e);
@@ -1274,22 +735,20 @@ fn place_call_window(app: &AppHandle) {
     place_panel(&window, x, y);
 }
 
-/// A voice conversation ended: park its size in the voice lane, drop the
-/// expanded form, and put the window back into the chat panel's lane. Called
-/// after the session ticket is cleared, so the lane lookups below already
-/// resolve to the chat panel.
+/// A voice conversation ended: park its size and drop the expanded form.
+///
+/// A call that ends is normally hung up (the window is hidden straight after) or
+/// replaced by a quick ask (whose show re-places the frame). If the window is
+/// still up anyway, it is put back into the quick ask's frame here, so it is never
+/// left drawing the quick ask inside the call bar's shape and resize rules.
 pub fn leave_conversation_size(app: &AppHandle) {
     let app_main = app.clone();
     if let Err(e) = app.run_on_main_thread(move || {
-        remember_size_in_lane(&app_main, SizeLane::Conversation);
+        remember_call_size(&app_main);
         CONVERSATION_EXPANDED.store(false, Ordering::SeqCst);
-        if PILL_MODE.load(Ordering::SeqCst) {
-            // The collapsed form changes shape too: the call bar gives way to
-            // whichever overlay style the user picked, and Live is a different
-            // size again.
-            set_panel_collapsed(&app_main, true);
-        } else {
-            apply_panel_form_size(&app_main);
+        if PANEL_VISIBLE.load(Ordering::SeqCst) && !crate::voice_conversation::is_active(&app_main)
+        {
+            apply_panel_geometry(&app_main);
         }
     }) {
         error!("Could not queue conversation panel restore: {}", e);
@@ -1301,13 +760,11 @@ pub fn leave_conversation_size(app: &AppHandle) {
 /// which is what makes the control a toggle in both directions.
 ///
 /// The window grows and shrinks around its bottom-centre point, so the bar the
-/// user just clicked stays exactly where it was: expanding opens the
-/// conversation *above* it, and collapsing folds it back down onto it.
+/// user just clicked stays exactly where it was.
 ///
 /// Emits `assistant-call-frame` (the form now in place) once the geometry has
 /// been applied. The webview draws nothing while the window changes shape and
-/// waits for this before it animates the new form in, because a resized
-/// webview briefly paints its old picture at the new window's corner.
+/// waits for this before it animates the new form in.
 pub fn set_conversation_expanded(app: &AppHandle, expanded: bool) {
     if !crate::voice_conversation::is_active(app) {
         return;
@@ -1325,11 +782,11 @@ pub fn set_conversation_expanded(app: &AppHandle, expanded: bool) {
             return;
         };
         // Capture a manual resize of the expanded form before leaving it.
-        remember_size_in_lane(&app_main, SizeLane::Conversation);
+        remember_call_size(&app_main);
         let anchor = window_bottom_centre(&window);
         CONVERSATION_EXPANDED.store(expanded, Ordering::SeqCst);
         let (w, h) = conversation_size(&app_main);
-        apply_panel_min_size(&app_main, &window, PILL_MODE.load(Ordering::SeqCst));
+        apply_panel_constraints(&app_main, &window);
         let _ = window.set_size(tauri::LogicalSize::new(w, h));
         match (anchor, window.current_monitor()) {
             (Some(anchor), Ok(Some(monitor))) => {
@@ -1338,17 +795,11 @@ pub fn set_conversation_expanded(app: &AppHandle, expanded: bool) {
             }
             _ => keep_panel_on_monitor(&window, w, h),
         }
-        save_position(&app_main);
         report(&app_main);
     }) {
         error!("Could not queue conversation resize: {}", e);
     }
 }
-
-/// Whether the panel is currently collapsed to the pill. Starts collapsed so
-/// the assistant first appears as the small pill rather than the full panel;
-/// expanding (or collapsing) updates it for the rest of the session.
-static PILL_MODE: AtomicBool = AtomicBool::new(true);
 
 /// Authorization carried by one user-controlled screen operation. Leaving or
 /// re-entering Manual advances the shared generation, invalidating every token
@@ -2132,6 +1583,11 @@ pub struct AssistantConversation {
     summarized_len: AtomicUsize,
     /// Guards against overlapping background summarization passes.
     summarizing: AtomicBool,
+    /// Which conversation this is. Bumped whenever the message list is replaced
+    /// out from under a turn (a quick ask reset, a saved thread loaded into a
+    /// call), so a turn still unwinding from the old one cannot write its reply
+    /// into the new one — or into a fresh History row of its own.
+    epoch: AtomicU64,
 }
 
 impl AssistantConversation {
@@ -2146,7 +1602,18 @@ impl AssistantConversation {
             summary: Mutex::new(String::new()),
             summarized_len: AtomicUsize::new(0),
             summarizing: AtomicBool::new(false),
+            epoch: AtomicU64::new(0),
         }
+    }
+
+    /// The current conversation's epoch (see the field).
+    pub fn epoch(&self) -> u64 {
+        self.epoch.load(Ordering::SeqCst)
+    }
+
+    /// Start a new conversation epoch, orphaning any turn still in flight.
+    pub fn bump_epoch(&self) {
+        self.epoch.fetch_add(1, Ordering::SeqCst);
     }
 
     /// Whether a turn is currently in flight.
@@ -2532,33 +1999,9 @@ fn release_panel_foreground(window: &tauri::webview::WebviewWindow) {
     });
 }
 
-/// Storage key for the current mode's position slot.
-fn position_key() -> &'static str {
-    if PILL_MODE.load(Ordering::SeqCst) {
-        PANEL_POSITION_KEY
-    } else {
-        PANEL_POSITION_EXPANDED_KEY
-    }
-}
-
-/// Is a window placed at this logical position actually reachable on one of the
-/// monitors connected *right now*?
-///
-/// Stored positions outlive the display they were recorded on. Park the panel on
-/// a second monitor, unplug it, and the stored coordinate still points into
-/// empty space — so the window is shown somewhere the user cannot see, while
-/// `is_visible()` cheerfully reports `true`, which makes the toggle shortcut
-/// hide it again on the next press. The panel has no taskbar button and no
-/// alt-tab entry (`skip_taskbar`), so there is no way to find it and no way back
-/// short of editing the store by hand. Worse, `save_position` writes the bad
-/// coordinate straight back on every move, hide and destroy, so the state is
-/// self-perpetuating: this is the "the assistant never opens" bug.
-///
-/// Deliberately conservative: an unreadable monitor list means "assume fine",
-/// because throwing away a good position is its own bug.
 /// The pure geometry behind [`position_is_visible`]: does a window whose
 /// top-left corner is at (`x`, `y`) land inside this monitor with enough room to
-/// see and grab its header?
+/// see and grab it?
 ///
 /// Split out from the monitor enumeration so the rule that decides whether the
 /// assistant is reachable at all is testable without a window or a display.
@@ -2571,6 +2014,10 @@ fn position_is_on_monitor(x: f64, y: f64, mx: f64, my: f64, mw: f64, mh: f64) ->
         && y <= my + mh - MIN_VISIBLE_EDGE
 }
 
+/// Is a window placed at this logical position actually reachable on one of the
+/// monitors connected *right now*? A display can be unplugged while the window is
+/// parked on it, and the panel has no taskbar button or alt-tab entry to find it
+/// by. Deliberately conservative: an unreadable monitor list means "assume fine".
 fn position_is_visible(app: &AppHandle, x: f64, y: f64) -> bool {
     let Ok(monitors) = app.available_monitors() else {
         return true;
@@ -2591,109 +2038,9 @@ fn position_is_visible(app: &AppHandle, x: f64, y: f64) -> bool {
     })
 }
 
-fn saved_position_for(app: &AppHandle, key: &str) -> Option<(f64, f64)> {
-    let store = app
-        .store(crate::portable::store_path(
-            crate::settings::SETTINGS_STORE_PATH,
-        ))
-        .ok()?;
-    let value = store.get(key)?;
-    let x = value.get("x")?.as_f64()?;
-    let y = value.get("y")?.as_f64()?;
-    if !position_is_visible(app, x, y) {
-        warn!(
-            "Ignoring stored assistant panel position ({:.0}, {:.0}) for '{}': not on any \
-             connected monitor. Falling back to the default position.",
-            x, y, key
-        );
-        return None;
-    }
-    Some((x, y))
-}
-
-/// Persist the window's current position into the slot for the CURRENT mode
-/// (pill or expanded), so each form remembers its own place.
-fn save_position(app: &AppHandle) {
-    if let Some(window) = app.get_webview_window(PANEL_LABEL) {
-        if let (Ok(pos), Ok(monitor)) = (window.outer_position(), window.current_monitor()) {
-            let scale = monitor.map(|m| m.scale_factor()).unwrap_or(1.0);
-            if let Ok(store) = app.store(crate::portable::store_path(
-                crate::settings::SETTINGS_STORE_PATH,
-            )) {
-                store.set(
-                    position_key(),
-                    serde_json::json!({
-                        "x": pos.x as f64 / scale,
-                        "y": pos.y as f64 / scale,
-                    }),
-                );
-            }
-        }
-    }
-}
-
-/// Hold a window of this size inside a display, keeping its top-left as close to
-/// the requested point as the display allows.
-///
-/// Pure, and shared by the anchor path and the dragged-position path so a remembered
-/// drop and a dock zone cannot disagree about where the edge of the screen is.
-fn clamp_position_into_display(
-    x: f64,
-    y: f64,
-    display: DisplayBounds,
-    w: f64,
-    h: f64,
-) -> (f64, f64) {
-    let min_x = display.x + PANEL_MARGIN;
-    let min_y = display.y + PANEL_MARGIN;
-    let max_x = (display.x + display.width - w - PANEL_MARGIN).max(min_x);
-    let max_y = (display.y + display.height - h - PANEL_MARGIN - TASKBAR_CLEARANCE).max(min_y);
-    (x.clamp(min_x, max_x), y.clamp(min_y, max_y))
-}
-
-/// The position the user dragged the quick-ask surface to, if they ever did and it
-/// is still reachable.
-fn dragged_position(app: &AppHandle) -> Option<(f64, f64)> {
-    saved_position_for(app, PANEL_DRAGGED_KEY)
-}
-
-/// Where the Ask surface should open, for a window of the given size.
-///
-/// Two inputs, in priority order: a position the user **dragged** it to, and
-/// otherwise the dock zone they chose in Settings. Both are resolved against the
-/// display the panel is pinned to (see [`active_display_bounds`]), so the answer is
-/// the same on every open rather than a function of where the pointer was resting.
-///
-/// A drag winning here is what makes dragging mean anything. The previous version
-/// ignored every stored coordinate, because the only coordinate available was the
-/// one `save_position` wrote after every hide and every programmatic placement —
-/// which could not distinguish a choice from an echo, so honouring it defeated the
-/// anchor setting and ignoring it defeated the drag. `PANEL_DRAGGED_KEY` is written
-/// by one gesture and cleared by one gesture, so it can be honoured safely.
-fn default_position_for(app: &AppHandle, w: f64, h: f64) -> (f64, f64) {
-    use crate::settings::AskAnchor;
-    let Some(display) = active_display_bounds(app) else {
-        return (100.0, 100.0);
-    };
-    if let Some((x, y)) = dragged_position(app) {
-        return clamp_position_into_display(x, y, display, w, h);
-    }
-    // `Custom` is the legacy value written by the old drag handler, which used to
-    // flip the setting behind the user's back. There is nothing to place it by, so
-    // it reads as the default; a real drag now lands in `PANEL_DRAGGED_KEY` above
-    // and never touches the anchor.
-    let anchor = match get_settings(app).assistant_ask_anchor {
-        AskAnchor::Custom => AskAnchor::Center,
-        anchor => anchor,
-    };
-    anchor_position(anchor, display, w, h)
-}
-
-/// Move the panel back onto a visible monitor if it is currently parked off
-/// screen. Complements [`position_is_visible`], which only guards the *stored*
-/// position: a display can be unplugged while the app is running, and nothing
-/// else moves the live window back.
-fn ensure_panel_on_screen(app: &AppHandle, window: &tauri::WebviewWindow, w: f64, h: f64) {
+/// Move a live call back onto a visible monitor if it is parked off screen. The
+/// quick ask needs no such check: it is re-placed at its dock zone on every show.
+fn ensure_call_on_screen(app: &AppHandle, window: &tauri::WebviewWindow) {
     let scale = window
         .current_monitor()
         .ok()
@@ -2707,51 +2054,28 @@ fn ensure_panel_on_screen(app: &AppHandle, window: &tauri::WebviewWindow, w: f64
     if position_is_visible(app, x, y) {
         return;
     }
-    let (nx, ny) = default_position_for(app, w, h);
     warn!(
-        "Assistant panel was off screen at ({:.0}, {:.0}); moving it to ({:.0}, {:.0})",
-        x, y, nx, ny
+        "Assistant call was off screen at ({:.0}, {:.0}); moving it back",
+        x, y
     );
-    place_panel(window, nx, ny);
+    place_call_window(app);
 }
 
-/// Discard the remembered dragged position for the Ask surface.
-///
-/// Called when the user picks an anchor in Settings: picking a dock zone is a
-/// statement that overrides an earlier drag, and without this the drag would keep
-/// winning and the new zone would appear to do nothing.
-///
-/// The display pin is deliberately **kept**. "Bottom" means the bottom of the
-/// screen the panel lives on, and clearing the pin here would send it back to
-/// hunting for the cursor's screen the moment the user adjusted the zone.
-pub fn forget_dragged_position(app: &AppHandle) {
+/// Delete the positions earlier versions stored (see [`LEGACY_POSITION_KEYS`]).
+fn forget_legacy_positions(app: &AppHandle) {
     if let Ok(store) = app.store(crate::portable::store_path(
         crate::settings::SETTINGS_STORE_PATH,
     )) {
-        store.delete(PANEL_DRAGGED_KEY);
-        store.delete(PANEL_POSITION_EXPANDED_KEY);
-    }
-}
-
-/// Discard the remembered display, so `last_used` starts from nothing.
-///
-/// Called when the user picks a display in Settings. Keeping the old pin would let it
-/// win over a fresh `last_used` choice, which is the same trap the dragged position
-/// used to set.
-pub fn forget_panel_display(app: &AppHandle) {
-    if let Ok(store) = app.store(crate::portable::store_path(
-        crate::settings::SETTINGS_STORE_PATH,
-    )) {
-        store.delete(PANEL_DISPLAY_KEY);
+        for key in LEGACY_POSITION_KEYS {
+            store.delete(key);
+        }
     }
 }
 
 /// The position the app itself last placed the window at.
 ///
 /// Every programmatic move fires a `Moved` event exactly like a drag does, so
-/// without this, simply opening the card at the Centre anchor would look like the
-/// user had dragged it there — flipping the anchor setting to `Custom` on the first
-/// open and permanently defeating the setting it was meant to honour.
+/// this is how a drag of the call bar is told apart from the app placing it.
 static PLACED_AT: std::sync::Mutex<Option<(f64, f64)>> = std::sync::Mutex::new(None);
 
 /// Move the window and remember that *we* did it, not the user.
@@ -2774,181 +2098,51 @@ fn is_our_own_placement(x: f64, y: f64) -> bool {
 }
 
 /// Generation counter for debouncing the end of a drag. Every `Moved` event bumps
-/// it, and a deferred snap only acts if it is still the newest.
+/// it, and a deferred handler only acts if it is still the newest.
 static MOVE_GENERATION: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
-/// How long the window has to sit still before the drag counts as finished.
-///
-/// `Moved` fires continuously while the pointer is down, and calling
-/// `set_position` on each one fights the drag: the window sticks to an edge the
-/// user is trying to pull away from, which reads as the app grabbing the mouse.
-/// Waiting for the movement to stop turns the same code into magnetism applied
-/// once, on release.
-const SNAP_SETTLE: std::time::Duration = std::time::Duration::from_millis(180);
+/// How long the window has to sit still before a drag counts as finished.
+const MOVE_SETTLE: std::time::Duration = std::time::Duration::from_millis(180);
 
-/// Handle a panel move: remember the position, and snap to an edge once the drag
-/// has actually finished.
+/// Handle a panel move once the drag has actually finished.
 fn on_panel_moved(app: &AppHandle) {
     let generation = MOVE_GENERATION.fetch_add(1, Ordering::SeqCst) + 1;
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
-        tokio::time::sleep(SNAP_SETTLE).await;
-        // A newer move arrived, so the pointer is still down. Let that one settle.
+        tokio::time::sleep(MOVE_SETTLE).await;
         if MOVE_GENERATION.load(Ordering::SeqCst) != generation {
             return;
         }
         let app_main = app.clone();
-        if let Err(e) = app.run_on_main_thread(move || snap_and_remember(&app_main)) {
-            debug!("Could not queue the panel snap: {e}");
+        if let Err(e) = app.run_on_main_thread(move || settle_panel_move(&app_main)) {
+            debug!("Could not queue the panel move handler: {e}");
         }
     });
 }
 
-/// Which dock zone a window dropped at this position belongs to.
+/// Remember where the user parked a call.
 ///
-/// Decided by asking each zone where it *would* have put a window of this size and
-/// taking the closest answer, rather than by carving the screen into regions. The
-/// zones already know their own geometry (margins, taskbar clearance, the slight
-/// lift above true centre), so reimplementing that as a set of thresholds is how
-/// the two would drift apart — and a zone you cannot reach by dragging to the
-/// obvious place is worse than no dragging at all.
-///
-/// `Custom` is deliberately not a candidate: it is not somewhere you can drop
-/// something, it is the absence of a zone.
-fn nearest_anchor(
-    x: f64,
-    y: f64,
-    display: DisplayBounds,
-    w: f64,
-    h: f64,
-) -> crate::settings::AskAnchor {
-    use crate::settings::AskAnchor;
-    [
-        AskAnchor::Center,
-        AskAnchor::TopCenter,
-        AskAnchor::BottomCenter,
-        AskAnchor::Left,
-        AskAnchor::Right,
-    ]
-    .into_iter()
-    .map(|anchor| {
-        let (ax, ay) = anchor_position(anchor, display, w, h);
-        let (dx, dy) = (ax - x, ay - y);
-        (anchor, dx * dx + dy * dy)
-    })
-    .min_by(|a, b| a.1.total_cmp(&b.1))
-    .map(|(anchor, _)| anchor)
-    .unwrap_or(AskAnchor::Center)
-}
-
-/// How close to a dock zone a drop has to land before the surface snaps into it.
-///
-/// A radius rather than a nearest-zone vote, because "nearest" always has an
-/// answer. On a 1440-wide portrait display the Left, Center and Right zones sit a
-/// few hundred points apart, so every drop was inside somebody's territory and a
-/// small nudge teleported the window across the screen — which is what made the
-/// gesture feel like it was fighting the pointer. Outside this radius the drop is
-/// simply where the user let go.
-const SNAP_RADIUS: f64 = 96.0;
-
-/// Resolve where a drop actually lands: the dock zone it was aimed at, or the free
-/// position if it was not aimed at one.
-///
-/// Pure, so "does dropping near the bottom edge snap to Bottom, and does dropping
-/// in the middle of nowhere stay put" is answerable without a monitor.
-fn snapped_drop(x: f64, y: f64, display: DisplayBounds, w: f64, h: f64) -> (f64, f64) {
-    let anchor = nearest_anchor(x, y, display, w, h);
-    let (ax, ay) = anchor_position(anchor, display, w, h);
-    if (ax - x).hypot(ay - y) <= SNAP_RADIUS {
-        (ax, ay)
-    } else {
-        clamp_position_into_display(x, y, display, w, h)
+/// Only a call remembers a drag. A quick ask can be dragged out of the way for as
+/// long as it is up, and the next one opens at its dock zone again: remembering
+/// drops is exactly what made the quick ask open somewhere different every time.
+fn settle_panel_move(app: &AppHandle) {
+    if !crate::voice_conversation::is_active(app) {
+        return;
     }
-}
-
-/// Settle the quick-ask surface after the user finishes dragging it, and remember
-/// where it ended up.
-///
-/// Called on the window's `Moved` event. Acting on every intermediate move would
-/// fight the drag, so this runs once the movement has stopped (see `SNAP_SETTLE`).
-///
-/// A drop remembers a **position and a display**, and nothing else. It used to
-/// remember a dock *zone* by writing `assistant_ask_anchor`, on the reasoning that a
-/// zone knows which proportions suit it. The reasoning was fine and the consequence
-/// was not: the one gesture available on this window silently rewrote a setting the
-/// user had chosen in Settings, so the dock zone was a moving target and moving the
-/// window was indistinguishable from reconfiguring it. Dragging now moves the
-/// window. Choosing a zone is done where zones are chosen.
-///
-/// The zones are still magnetic, so dropping near one lands cleanly on it — that is
-/// [`snapped_drop`], and it changes only the coordinate.
-fn snap_and_remember(app: &AppHandle) {
     let Some(window) = app.get_webview_window(PANEL_LABEL) else {
         return;
     };
-    // The collapsed pill has its own small footprint and its own remembered slot;
-    // snapping it to a card-sized grid would fling it across the screen.
-    if PILL_MODE.load(Ordering::SeqCst) && !crate::voice_conversation::is_active(app) {
-        save_position(app);
-        remember_panel_display(app);
-        return;
-    }
-    // A call is parked wherever it is dropped, with no snapping: the dock zones
-    // are laid out for the quick-ask card, and snapping a 440px bar frame to them
-    // pulled it away from the bottom edge the user dragged it to. Its position is
-    // remembered as its own, so it never becomes the quick ask's dragged position.
-    if crate::voice_conversation::is_active(app) {
-        // Our own placement echoing back through `Moved` is not the user parking it.
-        let own = window
-            .current_monitor()
-            .ok()
-            .flatten()
-            .zip(window.outer_position().ok())
-            .is_some_and(|(monitor, pos)| {
-                let scale = monitor.scale_factor();
-                is_our_own_placement(pos.x as f64 / scale, pos.y as f64 / scale)
-            });
-        if !own {
-            remember_call_anchor(&window);
-        }
-        save_position(app);
-        remember_panel_display(app);
-        return;
-    }
-    let (Ok(pos), Ok(size), Ok(Some(monitor))) = (
-        window.outer_position(),
-        window.inner_size(),
-        window.current_monitor(),
-    ) else {
-        save_position(app);
-        return;
-    };
-    let scale = monitor.scale_factor();
-    let (x, y) = (pos.x as f64 / scale, pos.y as f64 / scale);
-    let (w, h) = (size.width as f64 / scale, size.height as f64 / scale);
-    let display = display_bounds_of(&monitor);
-    // Our own placement echoing back through `Moved`. Save nothing and move
-    // nothing: this is the app opening the panel where it already belongs, not the
-    // user asking for it somewhere new.
-    if is_our_own_placement(x, y) {
-        return;
-    }
-
-    let (dx, dy) = snapped_drop(x, y, display, w, h);
-    if (dx - x).abs() > 0.5 || (dy - y).abs() > 0.5 {
-        place_panel(&window, dx, dy);
-    }
-    save_position(app);
-    store_dragged_position(app, dx, dy);
-    remember_panel_display(app);
-}
-
-/// File the position a drag ended at, so every later open uses it.
-fn store_dragged_position(app: &AppHandle, x: f64, y: f64) {
-    if let Ok(store) = app.store(crate::portable::store_path(
-        crate::settings::SETTINGS_STORE_PATH,
-    )) {
-        store.set(PANEL_DRAGGED_KEY, serde_json::json!({ "x": x, "y": y }));
+    let own = window
+        .current_monitor()
+        .ok()
+        .flatten()
+        .zip(window.outer_position().ok())
+        .is_some_and(|(monitor, pos)| {
+            let scale = monitor.scale_factor();
+            is_our_own_placement(pos.x as f64 / scale, pos.y as f64 / scale)
+        });
+    if !own {
+        remember_call_anchor(&window);
     }
 }
 
@@ -3185,13 +2379,29 @@ fn tick_panel_input(app: &AppHandle) {
             EMPTY_RECT_GRACE
         );
     }
-    let take = panel_should_take_pointer(
-        hit,
-        cursor_in_window,
-        PANEL_POINTER_HELD.load(Ordering::SeqCst),
-        empty_for,
-    );
+    let take =
+        panel_should_take_pointer(hit, cursor_in_window, panel_pointer_still_held(), empty_for);
     apply_panel_passthrough(&window, !take);
+}
+
+/// The webview's drag hold, checked against the mouse itself.
+///
+/// The hold is set on `pointerdown` and cleared on `pointerup`, and the release
+/// is exactly the event a system move or resize loop swallows (tauri#10767). A
+/// non-activating panel does not get the `blur` that would otherwise clear it
+/// either, so a single resize used to leave the whole transparent frame taking
+/// every click meant for the app underneath until the next click on the panel.
+/// No button physically down means nothing is being held, whatever the webview
+/// last said.
+fn panel_pointer_still_held() -> bool {
+    if !PANEL_POINTER_HELD.load(Ordering::SeqCst) {
+        return false;
+    }
+    if crate::window_drag::any_mouse_button_down() {
+        return true;
+    }
+    PANEL_POINTER_HELD.store(false, Ordering::SeqCst);
+    false
 }
 
 /// Flip the window's cursor pass-through, but only on a real change.
@@ -3251,6 +2461,88 @@ fn stop_panel_input_guard(app: &AppHandle) {
     }
 }
 
+/// Does the quick ask take the keyboard when it appears?
+///
+/// Not on Windows. A voice ask is asked *about* the app you are in: the selection
+/// is harvested with a synthetic Ctrl+C at the moment the hotkey goes down, and
+/// Insert pastes the answer back into the same field. A panel that activates on
+/// show takes the foreground at exactly that moment, so the copy lands in our own
+/// webview and the selection is lost, and the paste has to be steered back. So the
+/// window is `WS_EX_NOACTIVATE` and only takes the keyboard when the user asks for
+/// it — by opening it from the tray, or by clicking into its text field (see
+/// [`set_panel_keyboard`]). Buttons still work without activation on Windows, which
+/// is the same property the reminder popup and the recording overlay rely on.
+///
+/// Elsewhere the panel keeps its previous behaviour: on macOS a non-activating
+/// window makes WebView buttons unreliable, and on X11 the selection is read from
+/// `PRIMARY` without a keystroke at all.
+const ASK_KEYBOARD_ON_SHOW: bool = !cfg!(target_os = "windows");
+
+/// Whether the window currently accepts activation, tracked so `set_focusable` is
+/// only called on a real change: tao re-shows a visible window on every style
+/// change, and on Windows that re-show activates it.
+static PANEL_FOCUSABLE: AtomicBool = AtomicBool::new(ASK_KEYBOARD_ON_SHOW);
+
+/// Make the panel activatable or not, handing the foreground back if it is being
+/// made non-activatable while it holds it. Main thread only.
+fn set_panel_focusable(window: &tauri::WebviewWindow, focusable: bool) {
+    if PANEL_FOCUSABLE.swap(focusable, Ordering::SeqCst) == focusable {
+        return;
+    }
+    let _ = window.set_focusable(focusable);
+    #[cfg(target_os = "windows")]
+    if !focusable {
+        release_panel_foreground(window);
+    }
+}
+
+/// Give the panel the keyboard, or give it back.
+///
+/// Sent by the webview (`assistant-ask-keyboard`) when the user reaches for the
+/// quick ask's text field, which is the one control that needs typed input. Taking
+/// it is explicit because the panel does not take the keyboard when it appears (see
+/// [`ASK_KEYBOARD_ON_SHOW`]).
+pub fn set_panel_keyboard(app: &AppHandle, want: bool) {
+    let app_main = app.clone();
+    if let Err(e) = app.run_on_main_thread(move || {
+        if !PANEL_VISIBLE.load(Ordering::SeqCst) {
+            return;
+        }
+        let Some(window) = app_main.get_webview_window(PANEL_LABEL) else {
+            return;
+        };
+        if want {
+            set_panel_focusable(&window, true);
+            let _ = window.set_focus();
+        } else if !ASK_KEYBOARD_ON_SHOW && !crate::voice_conversation::is_active(&app_main) {
+            set_panel_focusable(&window, false);
+        }
+    }) {
+        error!("Could not queue assistant keyboard change: {}", e);
+    }
+}
+
+/// Windows: show the panel without taking the foreground.
+///
+/// A `WS_EX_NOACTIVATE` window is not activated by being shown, but this is the
+/// one moment the rest of the quick ask depends on — the selection copy is in
+/// flight on another thread — so it is checked rather than assumed: if the panel
+/// did end up in front, the foreground goes straight back to the window that had
+/// it.
+#[cfg(target_os = "windows")]
+fn show_panel_without_activation(window: &tauri::WebviewWindow) {
+    use windows::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, SetForegroundWindow};
+    let before = unsafe { GetForegroundWindow() };
+    let _ = window.show();
+    if let Ok(hwnd) = window.hwnd() {
+        unsafe {
+            if GetForegroundWindow() == hwnd && before != hwnd && !before.is_invalid() {
+                let _ = SetForegroundWindow(before);
+            }
+        }
+    }
+}
+
 /// Create the assistant panel window, hidden by default. Idempotent: an
 /// existing window is left exactly as it is.
 ///
@@ -3268,30 +2560,9 @@ fn build_assistant_panel(app: &AppHandle) {
     if app.get_webview_window(PANEL_LABEL).is_some() {
         return;
     }
-    // Build at whichever size matches the current mode (pill by default) so the
-    // first show doesn't briefly flash the large panel before collapsing.
-    let initially_collapsed = PILL_MODE.load(Ordering::SeqCst);
-    let (init_w, init_h) = if initially_collapsed {
-        collapsed_size(app)
-    } else {
-        expanded_size(app)
-    };
-    // Where to put it. The pill keeps its own remembered slot — it is a small HUD
-    // the user parks somewhere deliberately. The card goes wherever the anchor says,
-    // and only falls back to a remembered position when the anchor *is* "Custom".
-    //
-    // The saved position used to be consulted first, unconditionally. That quietly
-    // defeated the whole anchor setting: anyone who had ever opened the old panel
-    // had a stored coordinate, so the card kept reappearing in the old corner and
-    // "opens in the middle" simply never happened for an existing install.
-    let (x, y) = if initially_collapsed {
-        saved_position_for(app, PANEL_POSITION_KEY)
-            .unwrap_or_else(|| default_position_for(app, init_w, init_h))
-    } else {
-        // By the card's footprint, not the bar's: see `ask_anchor_size`.
-        let (anchor_w, anchor_h) = ask_anchor_size(app);
-        default_position_for(app, anchor_w, anchor_h)
-    };
+    forget_legacy_positions(app);
+    // Built at the quick ask's frame, which is what the first show will want.
+    let placement = ask_placement(app);
 
     let mut builder = WebviewWindowBuilder::new(
         app,
@@ -3305,10 +2576,10 @@ fn build_assistant_panel(app: &AppHandle) {
     // macOS otherwise suspends hidden webviews, including an active voice call.
     .background_throttling(tauri::utils::config::BackgroundThrottlingPolicy::Disabled)
     .title("Assistant")
-    .inner_size(init_w, init_h)
-    .min_inner_size(PILL_WIDTH, PILL_HEIGHT)
-    .position(x, y)
-    .resizable(true)
+    .inner_size(placement.width, placement.height)
+    .position(placement.x, placement.y)
+    // Only the expanded call is resizable (see `apply_panel_constraints`).
+    .resizable(false)
     .maximizable(false)
     .minimizable(false)
     .decorations(false)
@@ -3316,10 +2587,7 @@ fn build_assistant_panel(app: &AppHandle) {
     .shadow(false)
     .always_on_top(true)
     .skip_taskbar(true)
-    // The compact voice HUD accepts pointer controls without taking keyboard
-    // focus from the app underneath. Expanding restores focusability for the
-    // prompt input and the rest of the full assistant UI.
-    .focusable(!initially_collapsed)
+    .focusable(ASK_KEYBOARD_ON_SHOW)
     .accept_first_mouse(true)
     .focused(false)
     .visible(false);
@@ -3330,12 +2598,13 @@ fn build_assistant_panel(app: &AppHandle) {
 
     match builder.build() {
         Ok(window) => {
+            PANEL_RESIZABLE.store(false, Ordering::SeqCst);
+            PANEL_FOCUSABLE.store(ASK_KEYBOARD_ON_SHOW, Ordering::SeqCst);
             // The builder's own `.position()` can surface as a `Moved` event once the
             // window exists, so record it as ours before any handler can see it.
             if let Ok(mut placed) = PLACED_AT.lock() {
-                *placed = Some((x, y));
+                *placed = Some((placement.x, placement.y));
             }
-            // Persist position while the user drags the panel around.
             let app_handle = app.clone();
             window.on_window_event(move |event| {
                 match event {
@@ -3371,108 +2640,70 @@ pub fn create_assistant_panel(app: &AppHandle) {
     }
 }
 
+/// Put the panel on screen because the user asked for it: History, a CLI flag,
+/// or the assistant key pressed during a call.
 pub fn show_assistant_panel(app: &AppHandle) {
-    // Nothing may summon the panel while the assistant is switched off.
-    if !get_settings(app).assistant_enabled {
-        return;
-    }
-    // Shortcut actions run on the keyboard engine's thread, so creating and
-    // showing the window from here would touch the WebView from the wrong
-    // thread. Queue the whole create-then-show sequence on the main thread; it
-    // stays ordered with the destroy queued by the master switch, which is what
-    // keeps "off then straight back on" from leaving a half-built panel behind.
-    let app_main = app.clone();
-    if let Err(e) = app.run_on_main_thread(move || {
-        // The window normally exists from launch, but it is absent right after
-        // the user turns the assistant back on. No-op when it is already there.
-        build_assistant_panel(&app_main);
-        present_assistant_panel(&app_main, PresentReason::UserOpened);
-    }) {
-        error!("Could not queue assistant panel show: {}", e);
-    }
+    open_assistant_panel(app);
 }
 
 /// Why the panel is being put on screen.
-///
-/// The webview needs this to decide whether the surface is allowed to retire
-/// itself. A transient voice overlay should fade and time out; a window the user
-/// explicitly asked for must stay exactly where it is until they dismiss it.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum PresentReason {
-    /// The user asked for the assistant: the toggle shortcut, or the tray entry.
+    /// The user asked for the assistant: the tray entry, the call key, History.
     UserOpened,
-    /// A voice turn is showing its own overlay.
+    /// A voice ask is showing its own surface.
     VoiceTurn,
 }
 
 /// Size, place and reveal the existing panel window. Main thread only.
+///
+/// The quick ask is re-placed at its dock zone on **every** show. The window is
+/// created once and thereafter only hidden and shown, so anything less leaves it
+/// wherever it was last — which is how it used to open somewhere different each
+/// time. A live call keeps its place: it is a surface you park and work beside.
 fn present_assistant_panel(app: &AppHandle, reason: PresentReason) {
-    if let Some(window) = app.get_webview_window(PANEL_LABEL) {
-        // Keep the webview's layout in sync with the actual window before
-        // showing. A reloaded webview resets its React state to "expanded", so
-        // without this it can render the full panel inside the pill-sized
-        // window (showing only the header bar). Re-assert the pill size when
-        // collapsed, and always tell the webview which mode to render.
-        let collapsed = PILL_MODE.load(Ordering::SeqCst);
-        let _ = window.set_focusable(!collapsed);
-        // Size for whichever form is being presented — not just the collapsed
-        // one. Only re-asserting the pill size meant the mirror-image bug went
-        // unfixed: a window left small by an earlier collapse stayed small when
-        // presented expanded, so the full panel rendered inside a 240x44 frame.
-        let (width, height) = if collapsed {
-            collapsed_size(app)
-        } else if crate::voice_conversation::is_active(app) {
-            conversation_size(app)
-        } else {
-            expanded_size(app)
-        };
-        apply_panel_min_size(app, &window, collapsed);
-        let _ = window.set_size(tauri::LogicalSize::new(width, height));
-        // Put the card back at its anchor on every show.
-        //
-        // The window is created once at launch and thereafter only hidden and shown,
-        // so without this it stays wherever it happened to be last — which meant the
-        // anchor setting only ever applied on the very first run after an install and
-        // "it opens in the middle" was not true of any subsequent open.
-        //
-        // The pill is left where the user parked it, and a live call keeps its place
-        // too: both are surfaces you position once and work alongside, not transient
-        // cards that should reappear front and centre.
-        if !collapsed && !crate::voice_conversation::is_active(app) {
-            // Placed by the CARD's footprint even when the bar is what is being
-            // shown, so the answer unfolds downward into the anchor's space
-            // instead of the window having to move once it arrives.
-            let (anchor_w, anchor_h) = ask_anchor_size(app);
-            let (x, y) = default_position_for(app, anchor_w, anchor_h);
-            place_panel(&window, x, y);
-        }
-        // A monitor can be unplugged while the app runs, which leaves the window
-        // parked in dead space with no taskbar button and no alt-tab entry to
-        // find it by. Check every time we show rather than only at creation.
-        ensure_panel_on_screen(app, &window, width, height);
-        let _ = app.emit("assistant-collapsed", collapsed);
-        // A reloaded webview comes back believing it is a card, so the stage has
-        // to be re-asserted with the size, not just at the moment it changes.
-        if !collapsed && !crate::voice_conversation::is_active(app) {
-            let stage = if ASK_STAGE_CARD.load(Ordering::SeqCst) {
-                AskStage::Card
-            } else {
-                AskStage::Pill
-            };
-            emit_ask_frame(app, stage, height);
-        }
-
-        let _ = window.show();
-        PANEL_VISIBLE.store(true, Ordering::SeqCst);
-        // Only take the pointer where something is drawn, from now until it is
-        // hidden again (see the cursor pass-through section).
-        start_panel_input_guard(app);
-        #[cfg(any(target_os = "windows", target_os = "linux"))]
-        force_panel_topmost(&window);
-        let _ = app.emit("assistant-panel-shown", reason == PresentReason::UserOpened);
-    } else {
+    let Some(window) = app.get_webview_window(PANEL_LABEL) else {
         warn!("present_assistant_panel: the panel window does not exist; nothing to show");
+        return;
+    };
+    let call_active = crate::voice_conversation::is_active(app);
+    if call_active {
+        let (width, height) = conversation_size(app);
+        apply_panel_constraints(app, &window);
+        let _ = window.set_size(tauri::LogicalSize::new(width, height));
+        ensure_call_on_screen(app, &window);
+    } else if !PANEL_VISIBLE.load(Ordering::SeqCst) || reason == PresentReason::VoiceTurn {
+        // A new ask opens at its dock zone. Opening the window the user can
+        // already see (the tray, mid-answer) leaves it where it is.
+        place_ask_window(app, &window);
     }
+
+    // A call is a surface you type into, and a panel the user opened on purpose
+    // should be ready to type into. A voice ask must leave the foreground alone.
+    let keyboard = call_active || reason == PresentReason::UserOpened || ASK_KEYBOARD_ON_SHOW;
+    set_panel_focusable(&window, keyboard);
+
+    #[cfg(target_os = "windows")]
+    if keyboard {
+        let _ = window.show();
+    } else {
+        show_panel_without_activation(&window);
+    }
+    #[cfg(not(target_os = "windows"))]
+    let _ = window.show();
+
+    PANEL_VISIBLE.store(true, Ordering::SeqCst);
+    // Only take the pointer where something is drawn, from now until it is
+    // hidden again (see the cursor pass-through section).
+    start_panel_input_guard(app);
+    #[cfg(any(target_os = "windows", target_os = "linux"))]
+    force_panel_topmost(&window);
+    // The panel is absent from the taskbar and from alt-tab, so a window the user
+    // just asked for has no other way to reach the foreground.
+    if reason == PresentReason::UserOpened {
+        let _ = window.set_focus();
+    }
+    let _ = app.emit("assistant-panel-shown", reason == PresentReason::UserOpened);
 }
 
 /// Whether the panel window is on screen, tracked rather than asked.
@@ -3480,45 +2711,28 @@ fn present_assistant_panel(app: &AppHandle, reason: PresentReason) {
 /// `window.is_visible()` is a blocking round-trip to the event loop, and the
 /// decision below is reached from the transcription coordinator's single thread —
 /// the same thread that handles the shortcut release. Blocking it there delays the
-/// microphone opening and swallows the first words of the question, and the very
-/// next statement queues a WebView show on the main thread, so it is one press
-/// away from waiting on a loop that is busy building this window. Two other call
-/// sites in this file already push `is_visible` onto the main thread for exactly
-/// this reason; a flag costs nothing and is readable from anywhere.
+/// microphone opening and swallows the first words of the question. A flag costs
+/// nothing and is readable from anywhere.
 static PANEL_VISIBLE: AtomicBool = AtomicBool::new(false);
 
 /// Whether a quick ask should start from an empty conversation.
 ///
-/// The quick ask and the call are two features that happened to share one
-/// `AssistantConversation`, and that single fact produced the worst bug either of
-/// them had: finish a hands-free call, press the assistant shortcut, and the
-/// entire call transcript is sitting in the quick-ask card, because the call
-/// wrote into the same message list the card reads from. Nothing about the layout
-/// caused that and no amount of restyling could fix it.
+/// Always, unless a call is running. A quick ask is one job — translate this,
+/// rewrite that, what does this mean — with one question and one answer, and there
+/// is no follow-up field to continue it from; a conversation is what the call is
+/// for. Keeping the previous exchange would quietly turn the next ask into a
+/// follow-up the user never asked for, answered in the context of something they
+/// already dismissed.
 ///
-/// So they get separate lifetimes. A call is a conversation and keeps everything
-/// said in it. A quick ask is one job — translate this, rewrite that — and starts
-/// from nothing.
-///
-/// Two exceptions, and they are the whole rule:
-///
-/// * **Never during a call.** The conversation belongs to the call while it is
-///   running; wiping it would erase what the user is in the middle of saying.
-/// * **Not when the card is already on screen.** Then the ask is a follow-up to
-///   the answer in front of you — "make it shorter", "in Nepali instead" — and
-///   that needs the previous turn. One *topic*, discarded when the card closes,
-///   is what "quick" means here; one *message* would make the single most useful
-///   thing about the feature impossible.
-pub fn should_reset_quick_ask(call_active: bool, card_on_screen: bool) -> bool {
-    !call_active && !card_on_screen
+/// During a call the conversation belongs to the call; wiping it would erase what
+/// the user is in the middle of saying.
+pub fn should_reset_quick_ask(call_active: bool) -> bool {
+    !call_active
 }
 
-/// Start a quick ask from a clean slate unless it is a follow-up to the card
-/// already in front of the user. Call before the overlay is presented, while
-/// panel visibility still describes the previous state.
+/// Start a quick ask from a clean slate. A no-op during a call.
 pub fn begin_quick_ask_exchange(app: &AppHandle) {
-    let call_active = crate::voice_conversation::is_active(app);
-    if !should_reset_quick_ask(call_active, PANEL_VISIBLE.load(Ordering::SeqCst)) {
+    if !should_reset_quick_ask(crate::voice_conversation::is_active(app)) {
         return;
     }
     reset_conversation_for_new_exchange(app);
@@ -3535,6 +2749,12 @@ pub fn begin_quick_ask_exchange(app: &AppHandle) {
 /// next ask starts clean.
 pub fn reset_conversation_for_new_exchange(app: &AppHandle) {
     let conversation = app.state::<AssistantConversation>();
+    // A new question supersedes one still being answered: stop it, and make sure
+    // its reply cannot land in the conversation that replaces it.
+    if conversation.is_busy() {
+        conversation.request_cancel();
+    }
+    conversation.bump_epoch();
     let snapshot = conversation.take_distillable();
     match conversation.messages.lock() {
         Ok(mut messages) => {
@@ -3570,6 +2790,7 @@ pub fn reset_conversation_for_new_exchange(app: &AppHandle) {
 pub fn adopt_saved_conversation(app: &AppHandle, id: i64, messages: Vec<ChatMessage>) {
     let conversation = app.state::<AssistantConversation>();
     let snapshot = conversation.take_distillable();
+    conversation.bump_epoch();
     conversation.load_session(id, messages);
     conversation.mark_distilled_current();
     emit_conversation(app);
@@ -3581,44 +2802,58 @@ pub fn adopt_saved_conversation(app: &AppHandle, id: i64, messages: Vec<ChatMess
     }
 }
 
-/// Put the quick-ask card on screen for a voice turn, already listening.
+/// Put a branch of a saved conversation into the live call: the thread up to the
+/// chosen message, with no History row, so the next turn saves a new one and the
+/// original is left exactly as it was.
+pub fn adopt_branch(app: &AppHandle, messages: Vec<ChatMessage>) {
+    let conversation = app.state::<AssistantConversation>();
+    let snapshot = conversation.take_distillable();
+    conversation.bump_epoch();
+    conversation.load_branch(messages);
+    conversation.mark_distilled_current();
+    emit_conversation(app);
+    if let Some(messages) = snapshot {
+        let app_for_memory = app.clone();
+        tauri::async_runtime::spawn(async move {
+            crate::memory::distill_and_store(app_for_memory, messages).await;
+        });
+    }
+}
+
+/// A saved conversation for the call to pick up, sent with
+/// `assistant-start-conversation`.
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CallContinuation {
+    /// The History row to carry on.
+    pub id: i64,
+    /// Continue from this message as a new branch, rather than from the end.
+    pub message_index: Option<usize>,
+}
+
+/// Open the call with a saved conversation in it.
+///
+/// The webview drives the call (its microphone loop lives there), so this opens
+/// the panel and asks it to start; it loads the conversation once the call has a
+/// session. A call already running loads it in place.
+pub fn continue_in_call(app: &AppHandle, continuation: CallContinuation) {
+    open_assistant_panel(app);
+    let _ = app.emit("assistant-start-conversation", continuation);
+}
+
+/// Put the quick ask on screen for a voice turn, already listening.
 ///
 /// Runs entirely on the main thread for the reason spelled out on
-/// `build_assistant_panel`: this is called from the keyboard engine's thread, and
-/// `set_panel_collapsed` alone makes half a dozen blocking window calls. Leaving
-/// those on the hotkey thread means it sits waiting for the event loop at exactly
-/// the moment the loop may be building the panel's WebView — the deadlock this
-/// window's lifecycle is now arranged to avoid.
+/// `build_assistant_panel`: this is called from the keyboard engine's thread.
+///
+/// A call owns the window while it runs, so a call is left in whatever shape it
+/// is in; everything else opens as the quick ask's frame at its dock zone.
 pub fn show_assistant_voice_overlay(app: &AppHandle) {
-    let settings = get_settings(app);
-    if !settings.assistant_enabled || matches!(settings.assistant_overlay_style, OverlayStyle::None)
-    {
+    if !get_settings(app).assistant_enabled {
         return;
     }
-
     let app_main = app.clone();
     if let Err(e) = app.run_on_main_thread(move || {
-        // A call owns the collapsed form — that pill is the conversation, and the
-        // user parks it somewhere on purpose — so a call is left in whatever shape
-        // it is in. Everything else opens as the talking bar, already listening,
-        // and unfolds into the card when there is an answer to read.
-        //
-        // An earlier version of this grew a 240x44 pill into a panel at a
-        // different place on screen, which read as a glitch; the version after it
-        // over-corrected and opened the finished card the instant the microphone
-        // did, so every question began by throwing a near-empty 650x570 panel over
-        // the user's work. The bar is the same window at the same width and the
-        // same top-left corner as the card, so the unfold moves one edge and
-        // nothing else.
-        if !crate::voice_conversation::is_active(&app_main) {
-            set_panel_collapsed(&app_main, false);
-            // A question asked while the card is already up is a follow-up to the
-            // answer in front of the user, so that card stays. Only a fresh ask —
-            // nothing on screen — starts from the bar.
-            if !PANEL_VISIBLE.load(Ordering::SeqCst) {
-                reset_ask_stage_now(&app_main);
-            }
-        }
         build_assistant_panel(&app_main);
         present_assistant_panel(&app_main, PresentReason::VoiceTurn);
     }) {
@@ -3628,27 +2863,14 @@ pub fn show_assistant_voice_overlay(app: &AppHandle) {
 
 /// Send the quick-ask surface away, if it is on screen.
 ///
-/// A no-op when the panel is already hidden, and a no-op during a call: there the
-/// window is the conversation and hiding hangs up, so Esc mid-reply should stop
-/// the reply instead.
+/// A no-op during a call: there the window is the conversation and hiding hangs
+/// up, so Esc mid-reply should stop the reply instead.
 pub fn dismiss_voice_overlay(app: &AppHandle) {
-    // The panel *is* the quick-ask card now, and a quick ask is a transient thing
-    // by definition, so Esc may always send it away. A call is the one exception:
-    // there the collapsed form is the conversation pill and hiding hangs up, so
-    // Esc mid-reply stops the reply instead.
     if crate::voice_conversation::is_active(app) {
         return;
     }
-    // `panel_is_visible` is a blocking round-trip to the event loop, so keep it
-    // (and the hide behind it) off the caller's thread — cancel arrives from the
-    // keyboard engine's thread too.
-    let app_main = app.clone();
-    if let Err(e) = app.run_on_main_thread(move || {
-        if panel_is_visible(&app_main) {
-            hide_assistant_panel(&app_main);
-        }
-    }) {
-        error!("Could not queue voice overlay dismissal: {}", e);
+    if PANEL_VISIBLE.load(Ordering::SeqCst) {
+        hide_assistant_panel(app);
     }
 }
 
@@ -3669,48 +2891,25 @@ pub fn branch_messages(messages: Vec<ChatMessage>, message_index: usize) -> Vec<
     messages.into_iter().take(keep).collect()
 }
 
-/// Whether the assistant panel window exists and is currently on screen.
-fn panel_is_visible(app: &AppHandle) -> bool {
-    app.get_webview_window(PANEL_LABEL)
-        .and_then(|window| window.is_visible().ok())
-        .unwrap_or(false)
-}
-
-/// Whether the assistant panel is currently collapsed to the pill. Lets the
-/// webview initialise its layout correctly after a (re)load.
-pub fn is_panel_collapsed() -> bool {
-    PILL_MODE.load(Ordering::SeqCst)
-}
-
 pub fn hide_assistant_panel(app: &AppHandle) {
-    // A hidden window must not keep the microphone. Closing the panel during a
-    // call used to leave the session running: every utterance was still
-    // transcribed and answered, and replies were still spoken aloud, from a
-    // window that was no longer on screen — while the X read as "hang up".
-    // Collapsing is the gesture that keeps a call alive, because the pill stays
-    // visible and says so. Ending here also runs the call's own teardown, which
-    // is what lets a spoken conversation reach memory.
+    // A hidden window must not keep the microphone. Ending here also runs the
+    // call's own teardown, which is what lets a spoken conversation reach memory.
     crate::voice_conversation::end(app);
-    // No longer on screen, so it is no longer a card Esc should be able to close.
     // Window work on the event loop's own thread: this is reached from the
     // keyboard engine's thread as well as from commands (see
     // `build_assistant_panel` for why that distinction matters).
     let app_main = app.clone();
     if let Err(e) = app.run_on_main_thread(move || {
-        save_position(&app_main);
         // Before the window goes down, so a tick already queued cannot flip
         // pass-through on a window that is on its way out.
         stop_panel_input_guard(&app_main);
         if let Some(window) = app_main.get_webview_window(PANEL_LABEL) {
             let _ = window.hide();
             PANEL_VISIBLE.store(false, Ordering::SeqCst);
+            // Back to the quick ask's policy while nothing is on screen, so the
+            // style change cannot re-show (and activate) the window.
+            set_panel_focusable(&window, ASK_KEYBOARD_ON_SHOW);
         }
-        // The next question starts from the talking bar. Done here rather than on
-        // the way back in so the window is already the right shape before it is
-        // shown — a card that folds up in front of the user on its way out is
-        // motion nobody asked for.
-        ASK_STAGE_CARD.store(false, Ordering::SeqCst);
-        ASK_CARD_HEIGHT.store(0, Ordering::SeqCst);
         // Tell the webview it is off screen. The window stays alive for the app's
         // lifetime, so this is its cue to give back anything it only needs while
         // visible — notably the local TTS model's ONNX session and GPU buffers.
@@ -3718,11 +2917,10 @@ pub fn hide_assistant_panel(app: &AppHandle) {
     }) {
         error!("Could not queue assistant panel hide: {}", e);
     }
-    // Learn from the conversation when the panel is closed — the common way to
-    // "end" a chat besides Clear (users often just close it when it gets long).
-    // A call that was live has already been ended above, and `take_distillable`
-    // is dirty-guarded, so this is a no-op when its hang-up just did the pass.
-    distill_conversation_if_ended(app);
+    // A quick ask is over once its card is gone. Clearing it here (which also hands
+    // it to memory, dirty-guarded) is what makes the next open a fresh prompt rather
+    // than the last answer reappearing. Everything said is already in History.
+    begin_quick_ask_exchange(app);
 }
 
 /// Learn from a conversation that has just ended.
@@ -3732,10 +2930,7 @@ pub fn hide_assistant_panel(app: &AppHandle) {
 /// repeatedly never spends a wasted model call.
 ///
 /// Shared by every way a conversation can end — closing the panel, clearing it,
-/// and hanging up a voice call. A spoken conversation is a conversation: it used
-/// to be the one kind that taught the assistant nothing, because closing the
-/// panel skipped the pass while the call was still live and ending the call
-/// never ran it at all.
+/// and hanging up a voice call.
 pub fn distill_conversation_if_ended(app: &AppHandle) {
     let settings = crate::settings::get_settings(app);
     if !settings.assistant_memory_enabled || settings.assistant_memory_incognito {
@@ -3751,45 +2946,19 @@ pub fn distill_conversation_if_ended(app: &AppHandle) {
     }
 }
 
-/// Open the assistant as the full panel, creating the window if needed.
+/// Open the assistant because the user asked for it, creating the window if
+/// needed: the tray entry, the call key, History, a CLI flag.
 ///
-/// This is what an explicit "open the assistant" gesture means — the tray entry,
-/// and the call key on its way to starting a conversation. It exists because
-/// [`PILL_MODE`] starts `true` and nothing that opened the window ever cleared
-/// it, so the first open of a process produced a 240x44 pill instead of the
-/// panel, and kept doing so for the rest of the process lifetime. Combined with
-/// the pill's idle fade, that is what "the assistant never opens" looked like
-/// from the outside.
-///
-/// A live call is deliberately left in whatever form it is in: there, the
-/// collapsed form is the conversation pill, which the user may have parked in a
-/// corner on purpose.
+/// With nothing in flight it opens as the quick ask's prompt, ready to type into.
+/// A live call is left in whatever form it is in.
 pub fn open_assistant_panel(app: &AppHandle) {
     if !get_settings(app).assistant_enabled {
         return;
     }
     let app_main = app.clone();
     if let Err(e) = app.run_on_main_thread(move || {
-        // This is the user asking for the window, so it opens as the quick-ask
-        // surface rather than whatever form it was last left in.
-        if !crate::voice_conversation::is_active(&app_main) {
-            PILL_MODE.store(false, Ordering::SeqCst);
-            // Opened cold, with no answer on screen, it is a prompt — so it opens
-            // as the bar. An open card is left alone: the user asked for the window
-            // they can already see, not for it to fold up.
-            if !PANEL_VISIBLE.load(Ordering::SeqCst) {
-                reset_ask_stage_now(&app_main);
-            }
-        }
         build_assistant_panel(&app_main);
         present_assistant_panel(&app_main, PresentReason::UserOpened);
-        // The panel is absent from the taskbar and from alt-tab, so a window the
-        // user just asked for has no other way to reach the foreground.
-        if let Some(window) = app_main.get_webview_window(PANEL_LABEL) {
-            if !PILL_MODE.load(Ordering::SeqCst) {
-                let _ = window.set_focus();
-            }
-        }
     }) {
         error!("Could not queue assistant panel open: {}", e);
     }
@@ -3808,8 +2977,6 @@ pub fn destroy_assistant_panel(app: &AppHandle) {
     let app_main = app.clone();
     if let Err(e) = app.run_on_main_thread(move || {
         if let Some(window) = app_main.get_webview_window(PANEL_LABEL) {
-            // Remember where it sat, so re-enabling puts it back in the same place.
-            save_position(&app_main);
             stop_panel_input_guard(&app_main);
             let _ = window.destroy();
             PANEL_VISIBLE.store(false, Ordering::SeqCst);
@@ -3820,113 +2987,20 @@ pub fn destroy_assistant_panel(app: &AppHandle) {
     }
 }
 
-/// Collapse the panel to a small pill, or restore it to the expanded size.
-/// Each form remembers its own last position (separate slots), so expanding
-/// brings the panel back where the PANEL last was — not wherever the pill was
-/// dragged. First-ever expand falls back to growing upward from the pill
-/// (bottom-left anchor). Everything is clamped onto the current monitor.
-pub fn set_panel_collapsed(app: &AppHandle, collapsed: bool) {
-    if let Some(window) = app.get_webview_window(PANEL_LABEL) {
-        let scale = window
-            .current_monitor()
-            .ok()
-            .flatten()
-            .map(|m| m.scale_factor())
-            .unwrap_or(1.0);
-        let old_pos = window.outer_position().ok();
-        let old_size = window.inner_size().ok();
-
-        // Remember the current form's position + (for the panel) its size, in
-        // whichever lane it belongs to — chat panel or voice conversation.
-        save_position(app);
-        if collapsed {
-            remember_size_in_lane(app, current_size_lane(app));
-        }
-        PILL_MODE.store(collapsed, Ordering::SeqCst);
-        let _ = window.set_focusable(!collapsed);
-
-        let (new_w, new_h) = if collapsed {
-            collapsed_size(app)
-        } else if crate::voice_conversation::is_active(app) {
-            conversation_size(app)
-        } else {
-            expanded_size(app)
-        };
-        apply_panel_min_size(app, &window, collapsed);
-        let _ = window.set_size(tauri::LogicalSize::new(new_w, new_h));
-
-        // Restore the target form's own remembered position; fall back to a
-        // bottom-left anchor on the current spot (grows upward, never off the
-        // bottom of the screen).
-        let target_key = if collapsed {
-            PANEL_POSITION_KEY
-        } else {
-            PANEL_POSITION_EXPANDED_KEY
-        };
-        let (mut new_x, mut new_y) = match saved_position_for(app, target_key) {
-            Some(pos) => pos,
-            None => match (old_pos, old_size) {
-                (Some(pos), Some(size)) => {
-                    let old_x = pos.x as f64 / scale;
-                    let old_y = pos.y as f64 / scale;
-                    let old_h = size.height as f64 / scale;
-                    (old_x, old_y + old_h - new_h)
-                }
-                _ => default_position_for(app, new_w, new_h),
-            },
-        };
-        if let Ok(Some(monitor)) = window.current_monitor() {
-            let mx = monitor.position().x as f64 / scale;
-            let my = monitor.position().y as f64 / scale;
-            let mw = monitor.size().width as f64 / scale;
-            let mh = monitor.size().height as f64 / scale;
-            new_x = new_x.clamp(mx + 8.0, (mx + mw - new_w - 8.0).max(mx + 8.0));
-            new_y = new_y.clamp(my + 8.0, (my + mh - new_h - 8.0).max(my + 8.0));
-        }
-        place_panel(&window, new_x, new_y);
-
-        // The pill is deliberately non-activatable so typing keeps going to the
-        // app underneath. On Windows that flag has to be paired with giving the
-        // foreground away, or the desktop is left unable to activate anything
-        // (see `release_panel_foreground`).
-        #[cfg(target_os = "windows")]
-        if collapsed {
-            release_panel_foreground(&window);
-        }
-
-        let _ = app.emit("assistant-collapsed", collapsed);
-    } else {
-        PILL_MODE.store(collapsed, Ordering::SeqCst);
-    }
-}
-
-/// Apply a panel-size preset chosen in Panel Appearance settings. Clears the
-/// session's manual drag-resize in BOTH size lanes — chat panel and voice
-/// conversation — so the new choice takes effect immediately in whichever form
-/// is on screen, and resizes the live window when it is currently expanded and
-/// visible. The pill is unaffected.
+/// Apply a panel-size preset chosen in Settings. Clears the session's manual
+/// resize of the expanded call so the new choice takes effect immediately, and
+/// re-shapes the window if it is on screen.
 pub fn apply_panel_size(app: &AppHandle) {
-    // 0 means "no manual resize this session", which sends each lane back to
-    // its own preset — read from the setting that was just written.
-    EXPANDED_W.store(0, Ordering::SeqCst);
     CONVERSATION_W.store(0, Ordering::SeqCst);
     CONVERSATION_H.store(0, Ordering::SeqCst);
-
-    // Only touch the window if the expanded panel is actually visible.
-    if PILL_MODE.load(Ordering::SeqCst) {
-        return;
+    let app_main = app.clone();
+    if let Err(e) = app.run_on_main_thread(move || {
+        if PANEL_VISIBLE.load(Ordering::SeqCst) {
+            apply_panel_geometry(&app_main);
+        }
+    }) {
+        error!("Could not queue assistant panel resize: {}", e);
     }
-    let Some(window) = app.get_webview_window(PANEL_LABEL) else {
-        return;
-    };
-    if !window.is_visible().unwrap_or(false) {
-        return;
-    }
-
-    // The preset is clamped to the current monitor so a large size never
-    // overflows a small screen; the raw preset stays in settings, so moving to
-    // a bigger display re-expands to the full chosen size.
-    apply_panel_form_size(app);
 }
 
 // ---------------------------------------------------------------------------
@@ -3946,7 +3020,6 @@ fn snip_epoch_is_current(epoch: u64) -> bool {
 fn destroy_snip_overlay(app: &AppHandle) {
     if let Some(window) = app.get_webview_window(SNIP_LABEL) {
         let _ = window.destroy();
-        PANEL_VISIBLE.store(false, Ordering::SeqCst);
     }
 }
 
@@ -4112,7 +3185,6 @@ pub fn open_snip_overlay(
     };
     if !shown {
         let _ = window.destroy();
-        PANEL_VISIBLE.store(false, Ordering::SeqCst);
         clear_pending_snip_for_epoch(epoch);
         return Ok(());
     }
@@ -4765,6 +3837,26 @@ fn parse_web_search_args(raw: &str) -> (String, Option<String>, bool) {
     (query, freshness, news)
 }
 
+/// Whether an Agent-decides turn offers the model the `capture_screen` tool.
+///
+/// Withheld in two cases. A screenshot already riding along (the vision hotkey,
+/// a manual attach) leaves nothing to decide. And a **text selection** already
+/// is the "this" — the quick ask's main job is "select something, ask what it
+/// is", and the tool's own description tells the model to capture on "what does
+/// this mean", so with the tool on offer a model looked at the whole screen to
+/// answer a question about three highlighted words. That cost a screenshot's
+/// latency and sent the user's screen to the provider for nothing. Someone who
+/// does want the screen alongside a selection still has the vision hotkey.
+///
+/// Pure, so the rule is a test rather than something inferred from a log.
+fn offers_agent_screen_capture(
+    agent_decides: bool,
+    has_screenshot: bool,
+    has_selection: bool,
+) -> bool {
+    agent_decides && !has_screenshot && !has_selection
+}
+
 /// The production tool loop allows at most three model rounds. On the last
 /// round, requested tools are still executed (the existing behavior), but no
 /// fourth model request is made.
@@ -5078,6 +4170,7 @@ async fn run_assistant_turn_inner(
         }
     }
     let _busy = BusyReset(app.clone());
+    let turn_epoch = app.state::<AssistantConversation>().epoch();
 
     // Fresh turn: clear any leftover cancel signal from a previous Stop.
     app.state::<AssistantConversation>().begin_turn();
@@ -5189,11 +4282,13 @@ async fn run_assistant_turn_inner(
         web_wanted && is_openrouter && !has_visual && settings.assistant_prefer_provider_web_search;
     let web_via_tools = web_wanted && !web_via_online;
     // Agent-decides screen access: expose a `capture_screen` tool and let the
-    // model itself decide whether this turn needs to see the screen. Skipped
-    // when a screenshot already rides along (nothing left to decide).
-    let agent_screen = settings.assistant_screen_access_mode
-        == AssistantScreenAccessMode::AgentDecides
-        && screenshot.is_none();
+    // model itself decide whether this turn needs to see the screen. See
+    // `offers_agent_screen_capture` for when it is withheld.
+    let agent_screen = offers_agent_screen_capture(
+        settings.assistant_screen_access_mode == AssistantScreenAccessMode::AgentDecides,
+        screenshot.is_some(),
+        selection.is_some(),
+    );
     // Get the frame moving now rather than inside the tool call. If the model
     // decides it needs to look, the screenshot is already done or nearly done;
     // if it doesn't, the frame is dropped at the end of the turn and never
@@ -5233,6 +4328,9 @@ async fn run_assistant_turn_inner(
     if user_message_recorded {
         let conversation = app.state::<AssistantConversation>();
         let mut history = conversation.messages.lock().unwrap();
+        if conversation.epoch() != turn_epoch {
+            return;
+        }
         history.push(pending_user_message.take().unwrap());
         drop(history);
         emit_conversation(&app);
@@ -5577,6 +4675,9 @@ async fn run_assistant_turn_inner(
         // The screen request is now committed for dispatch. Publish exactly the
         // marker/thumbnail that corresponds to that outbound request before
         // starting it, preserving the existing visible audit trail.
+        if conversation.epoch() != turn_epoch {
+            return;
+        }
         conversation
             .messages
             .lock()
@@ -5993,8 +5094,12 @@ async fn run_assistant_turn_inner(
                 .lock()
                 .map(|b| b.trim().to_string())
                 .unwrap_or_default();
+            let conversation = app.state::<AssistantConversation>();
+            if conversation.epoch() != turn_epoch {
+                debug!("Cancelled turn belongs to a conversation that was since replaced");
+                return;
+            }
             if !partial_text.is_empty() {
-                let conversation = app.state::<AssistantConversation>();
                 let mut history = conversation.messages.lock().unwrap();
                 history.push(ChatMessage {
                     role: "assistant".to_string(),
@@ -6027,6 +5132,10 @@ async fn run_assistant_turn_inner(
             // panel and a content-free assistant message in history, which then
             // breaks the strict user/assistant alternation that some chat
             // templates (Gemma) require on every later request.
+            if app.state::<AssistantConversation>().epoch() != turn_epoch {
+                debug!("Reply belongs to a conversation that was since replaced; dropping it");
+                return;
+            }
             if full_text.trim().is_empty() {
                 warn!("Assistant produced an empty reply; not recording a turn");
             } else {
@@ -6136,7 +5245,7 @@ fn spawn_tts_speak(app: &AppHandle, settings: &crate::settings::AppSettings, ful
             debug!("TTS superseded before playback; skipping");
             return;
         }
-        if settings.assistant_tts_engine == "kokoro" {
+        if crate::native_tts::uses_webview(&settings) {
             // Local engine lives in the panel webview (kokoro-js); the webview
             // hook ignores it when TTS is disabled.
             let _ = app.emit("assistant-tts", text);
@@ -6221,6 +5330,7 @@ pub async fn run_summarize_turn(app: AppHandle) {
         }
     }
     let _busy = BusyReset(app.clone());
+    let turn_epoch = app.state::<AssistantConversation>().epoch();
     app.state::<AssistantConversation>().begin_turn();
 
     let settings = get_settings(&app);
@@ -6326,7 +5436,8 @@ pub async fn run_summarize_turn(app: AppHandle) {
         }
         Some(Ok(full_text)) => {
             let text = full_text.trim().to_string();
-            if !text.is_empty() {
+            let current = app.state::<AssistantConversation>().epoch() == turn_epoch;
+            if !text.is_empty() && current {
                 {
                     let conversation = app.state::<AssistantConversation>();
                     let mut history = conversation.messages.lock().unwrap();
@@ -6528,81 +5639,6 @@ mod tests {
         width: 1440.0,
         height: 2560.0,
     };
-
-    /// Only a named screen is rewritten by a drag. The three policies are choices
-    /// about *how* to pick a screen, so moving the window is not a contradiction of
-    /// them and must not overwrite them — "follow my mouse" turning itself into a
-    /// fixed monitor the first time the panel was nudged is the same mistake the dock
-    /// zone used to make.
-    #[test]
-    fn only_a_named_screen_is_rewritten_by_a_drag() {
-        for policy in ["last_used", "cursor", "primary"] {
-            assert!(
-                !display_choice_is_named(policy),
-                "'{policy}' is a policy, not a screen"
-            );
-        }
-        for name in [r"\\.\DISPLAY1", r"\\.\DISPLAY2", "at:-1440,-510", "HDMI-1"] {
-            assert!(
-                display_choice_is_named(name),
-                "'{name}' names a specific screen"
-            );
-        }
-    }
-
-    /// A drop nowhere near a zone stays where it was let go. "Nearest zone" always
-    /// has an answer, and on a 1440-wide portrait screen every drop was inside
-    /// somebody's territory — so the window teleported away from the pointer, which
-    /// is what made dragging feel broken rather than magnetic.
-    #[test]
-    fn a_drop_away_from_every_zone_stays_put() {
-        let (w, h) = (400.0, 500.0);
-        // Deliberately off-centre and off-edge on the portrait display.
-        let (x, y) = (-1100.0, 900.0);
-        let (dx, dy) = snapped_drop(x, y, PORTRAIT, w, h);
-        assert_eq!((dx, dy), (x, y), "a free drop must not be pulled to a zone");
-    }
-
-    /// Dropped close to a zone, it still snaps cleanly onto it — the magnetism is
-    /// the good half of the old behaviour and is kept.
-    #[test]
-    fn a_drop_near_a_zone_snaps_onto_it() {
-        let (w, h) = (669.0, 583.0);
-        let (zx, zy) = anchor_position(crate::settings::AskAnchor::BottomCenter, LANDSCAPE, w, h);
-        let (dx, dy) = snapped_drop(zx + 30.0, zy - 20.0, LANDSCAPE, w, h);
-        assert_eq!(
-            (dx, dy),
-            (zx, zy),
-            "a drop inside SNAP_RADIUS should land on the zone"
-        );
-    }
-
-    /// A drop is never allowed off its own display, however far the pointer went.
-    #[test]
-    fn a_free_drop_is_still_held_on_screen() {
-        let (w, h) = (400.0, 500.0);
-        let (dx, dy) = snapped_drop(9_999.0, 9_999.0, PORTRAIT, w, h);
-        assert!(
-            dx >= PORTRAIT.x && dx + w <= PORTRAIT.x + PORTRAIT.width,
-            "x {dx} escaped the portrait display"
-        );
-        assert!(
-            dy >= PORTRAIT.y && dy + h <= PORTRAIT.y + PORTRAIT.height,
-            "y {dy} escaped the portrait display"
-        );
-    }
-
-    /// A remembered drop made when the card was short must not hang off the bottom
-    /// once a long answer makes it tall.
-    #[test]
-    fn a_remembered_drop_is_reclamped_for_a_taller_card() {
-        let low = LANDSCAPE.y + LANDSCAPE.height - 200.0;
-        let (_, y) = clamp_position_into_display(400.0, low, LANDSCAPE, 669.0, 700.0);
-        assert!(
-            y + 700.0 <= LANDSCAPE.y + LANDSCAPE.height - TASKBAR_CLEARANCE,
-            "a tall card at a remembered low position should be lifted clear of the taskbar"
-        );
-    }
 
     /// The two displays disagree about everything, which is exactly why the panel
     /// must not pick one from the cursor. This pins the disagreement so nobody
@@ -6865,6 +5901,24 @@ mod tests {
         assert!(args.in_minutes.is_none());
     }
 
+    /// A selected piece of text is already the "this" in "what is this", so the
+    /// model is not offered the screen on top of it — it used to take a
+    /// screenshot to answer a question about three highlighted words. The
+    /// screenshot and mode rules are unchanged.
+    #[test]
+    fn a_selection_withholds_the_screen_capture_tool() {
+        // Agent decides, nothing attached: the model may look.
+        assert!(offers_agent_screen_capture(true, false, false));
+        // A selection answers "this" on its own.
+        assert!(!offers_agent_screen_capture(true, false, true));
+        // A frame already riding along leaves nothing to decide.
+        assert!(!offers_agent_screen_capture(true, true, false));
+        assert!(!offers_agent_screen_capture(true, true, true));
+        // Manual or off: never offered, whatever else is attached.
+        assert!(!offers_agent_screen_capture(false, false, false));
+        assert!(!offers_agent_screen_capture(false, false, true));
+    }
+
     /// The system prompt has to describe the tools that are actually attached, or
     /// the model is told about a capability it cannot reach (or not told about one
     /// it has). Reminders are in every combination.
@@ -6922,48 +5976,6 @@ mod tests {
         }
     }
 
-    /// The pill is what a question opens, and it has to be smaller than the card
-    /// it hands over to on every screen and in every dock zone. If it were ever
-    /// taller or wider than the card, the transition would be a shrink dressed up
-    /// as a bloom — and on a small display the pill could end up the larger of the
-    /// two surfaces, which is the "why is this thing so big" this whole shape
-    /// exists to answer.
-    #[test]
-    fn the_talking_pill_is_smaller_than_every_card_it_hands_over_to() {
-        use crate::settings::AskAnchor;
-        for (mon_w, mon_h) in [
-            (1024.0, 600.0),
-            (1366.0, 768.0),
-            (1920.0, 1080.0),
-            (2560.0, 1440.0),
-            (3840.0, 2160.0),
-        ] {
-            for preset in ["mini", "compact", "standard", "large", "unknown-legacy"] {
-                for anchor in [
-                    AskAnchor::Center,
-                    AskAnchor::TopCenter,
-                    AskAnchor::BottomCenter,
-                    AskAnchor::Left,
-                    AskAnchor::Right,
-                    AskAnchor::Custom,
-                ] {
-                    let (width, max_height) = ask_size_for_display(mon_w, mon_h, preset, anchor);
-                    assert!(
-                        ASK_PILL_HEIGHT < max_height,
-                        "the pill must be shorter than the card's ceiling on \
-                         {mon_w}x{mon_h} ({preset}, {anchor:?}): {ASK_PILL_HEIGHT} vs \
-                         {max_height}"
-                    );
-                    assert!(
-                        ASK_PILL_WIDTH < width,
-                        "the pill must be narrower than the card on {mon_w}x{mon_h} \
-                         ({preset}, {anchor:?}): {ASK_PILL_WIDTH} vs {width}"
-                    );
-                }
-            }
-        }
-    }
-
     /// A dock zone picks proportions, not just coordinates: a card down one side
     /// of the screen should be a tall rail and one along an edge a wide banner. If
     /// every zone resolved to the same shape, "optimised for that direction" would
@@ -6984,36 +5996,33 @@ mod tests {
         );
     }
 
-    /// The resize floor has to admit both of the quick ask's shapes. It is stage
-    /// aware because the card's width floor is wider than the whole pill: one
-    /// floor for both would quietly stretch the pill back out, which is exactly
-    /// the regression this surface was redesigned to undo.
-    #[test]
-    fn the_resize_floor_admits_both_ask_shapes() {
-        let (pill_w, pill_h) = panel_min_size(PanelForm::AskBar);
-        assert!(
-            pill_w <= ASK_PILL_WIDTH && pill_h <= ASK_PILL_HEIGHT,
-            "a floor of {pill_w}x{pill_h} would refuse the \
-             {ASK_PILL_WIDTH}x{ASK_PILL_HEIGHT} pill"
-        );
-        let (_, card_h) = panel_min_size(PanelForm::AskCard);
-        assert!(
-            card_h <= ASK_CARD_MIN_HEIGHT,
-            "a floor of {card_h} would refuse a card sized to a one-line answer"
-        );
-    }
-
-    /// The window's form is decided by three flags, and a live call wins over
-    /// the other two: a collapse that reaches a call lands on the call bar, not
-    /// on the quick-ask pill, and the expanded flag means nothing outside a call.
+    /// The window's form is decided by two flags, and a live call wins: the
+    /// expanded flag means nothing outside a call.
     #[test]
     fn a_live_call_decides_the_form_before_anything_else() {
-        assert_eq!(panel_form(false, true, false, false), PanelForm::CallBar);
-        assert_eq!(panel_form(false, true, true, true), PanelForm::CallExpanded);
-        assert_eq!(panel_form(true, true, true, false), PanelForm::CallBar);
-        assert_eq!(panel_form(true, false, true, true), PanelForm::Pill);
-        assert_eq!(panel_form(false, false, true, true), PanelForm::AskCard);
-        assert_eq!(panel_form(false, false, true, false), PanelForm::AskBar);
+        assert_eq!(panel_form(false, false), PanelForm::Ask);
+        assert_eq!(panel_form(false, true), PanelForm::Ask);
+        assert_eq!(panel_form(true, false), PanelForm::CallBar);
+        assert_eq!(panel_form(true, true), PanelForm::CallExpanded);
+    }
+
+    /// Only the expanded call is the user's to resize. The quick ask's frame and
+    /// the call bar are fixed shapes the app sets, and a floor on either could only
+    /// ever refuse one of the app's own resizes; the expanded call's floor has to
+    /// sit under every preset or the smallest one could not be applied.
+    #[test]
+    fn only_the_expanded_call_has_a_resize_floor() {
+        assert_eq!(panel_min_size(PanelForm::Ask), None);
+        assert_eq!(panel_min_size(PanelForm::CallBar), None);
+        let (floor_w, floor_h) =
+            panel_min_size(PanelForm::CallExpanded).expect("the expanded call is resizable");
+        for preset in ["mini", "compact", "standard", "large", "unknown-legacy"] {
+            let (w, h) = conversation_preset_size(preset);
+            assert!(
+                w >= floor_w && h >= floor_h,
+                "{preset} is below the conversation resize floor"
+            );
+        }
     }
 
     /// The call bar's frame has to hold the widest bar (typing, 300px) and a
@@ -7029,12 +6038,7 @@ mod tests {
         const _: () = assert!(CALL_BAR_FRAME_WIDTH >= TYPING_BAR_WIDTH + 2.0 * 16.0);
         // Room for at least three lines of status above the bar.
         const _: () = assert!(CALL_BAR_FRAME_HEIGHT >= BAR_HEIGHT + 3.0 * 22.0);
-        assert_eq!(
-            panel_min_size(PanelForm::CallBar),
-            (CALL_BAR_FRAME_WIDTH, CALL_BAR_FRAME_HEIGHT),
-            "the bar is a fixed frame"
-        );
-        let (floor_w, _) = panel_min_size(PanelForm::CallExpanded);
+        let (floor_w, _) = panel_min_size(PanelForm::CallExpanded).expect("resizable");
         assert!(floor_w >= TYPING_BAR_WIDTH + 2.0 * 10.0);
     }
 
@@ -7080,87 +6084,6 @@ mod tests {
         };
         let (lx, _) = bottom_anchored_position(default_call_bar_anchor(left), ew, eh, left);
         assert!(lx < 0.0 && lx + ew <= 0.0);
-    }
-
-    /// Dropping the surface near an edge has to choose *that* zone. This is the
-    /// only way the dock zones can be reached by hand, and it is decided by
-    /// re-asking each zone where it would place the window — so if a zone's own
-    /// geometry ever changes, this follows it instead of drifting away from it.
-    #[test]
-    fn a_drop_lands_in_the_zone_it_was_aimed_at() {
-        use crate::settings::AskAnchor;
-        let display = DisplayBounds {
-            x: 0.0,
-            y: 0.0,
-            width: 1920.0,
-            height: 1080.0,
-        };
-        let (w, h) = (520.0, 420.0);
-        for anchor in [
-            AskAnchor::Center,
-            AskAnchor::TopCenter,
-            AskAnchor::BottomCenter,
-            AskAnchor::Left,
-            AskAnchor::Right,
-        ] {
-            // Dropped exactly on a zone, and dropped roughly at it, both resolve
-            // to that zone.
-            let (ax, ay) = anchor_position(anchor, display, w, h);
-            assert_eq!(nearest_anchor(ax, ay, display, w, h), anchor);
-            assert_eq!(nearest_anchor(ax + 18.0, ay - 14.0, display, w, h), anchor);
-        }
-        // And a drop is never answered with `Custom`, which is the absence of a
-        // zone rather than a place to land.
-        assert_ne!(
-            nearest_anchor(700.0, 400.0, display, w, h),
-            AskAnchor::Custom
-        );
-    }
-
-    /// A two-line reply gets a two-line card; a very long one stops at the
-    /// screen. Both directions matter: without the floor a one-word answer would
-    /// arrive in a sliver with no room for the follow-up row, and without the
-    /// ceiling a long answer would grow past the display and take its own close
-    /// button with it.
-    #[test]
-    fn a_measured_answer_is_clamped_to_something_readable() {
-        let (_, ceiling) = ask_size_for_display(
-            1920.0,
-            1080.0,
-            "standard",
-            crate::settings::AskAnchor::Center,
-        );
-
-        // Short answers are floored, not honoured literally.
-        assert_eq!(clamp_ask_fit(40.0, ceiling), ASK_CARD_MIN_HEIGHT);
-        assert_eq!(clamp_ask_fit(0.5, ceiling), ASK_CARD_MIN_HEIGHT);
-        // A comfortable middle is taken as asked.
-        let middle = (ASK_CARD_MIN_HEIGHT + ceiling) / 2.0;
-        assert_eq!(clamp_ask_fit(middle, ceiling), middle);
-        // And an essay stops at the ceiling.
-        assert_eq!(clamp_ask_fit(9000.0, ceiling), ceiling);
-        // The default the card opens at, before anything has been measured, has
-        // to be inside the band on every display — otherwise the very first
-        // answer arrives at a height the next fit report contradicts.
-        for (mon_w, mon_h) in [(1024.0, 600.0), (1920.0, 1080.0), (3840.0, 2160.0)] {
-            let (_, ceiling) =
-                ask_size_for_display(mon_w, mon_h, "standard", crate::settings::AskAnchor::Center);
-            let opened = clamp_ask_fit(ASK_CARD_FALLBACK_HEIGHT, ceiling);
-            assert!(
-                opened <= ceiling.max(ASK_CARD_MIN_HEIGHT.min(ceiling)),
-                "the opening height escaped the band on {mon_w}x{mon_h}: {opened} / {ceiling}"
-            );
-        }
-    }
-
-    /// A display too small to hold even the minimum card is the one case where
-    /// the clamp has to invert its own floor: a card taller than the screen
-    /// cannot be read, and cannot be dragged anywhere better.
-    #[test]
-    fn a_tiny_display_wins_over_the_minimum_card_height() {
-        let tiny = 120.0;
-        assert_eq!(clamp_ask_fit(400.0, tiny), tiny);
-        assert_eq!(clamp_ask_fit(10.0, tiny), tiny);
     }
 
     #[test]
@@ -7239,9 +6162,8 @@ mod tests {
         ));
     }
 
-    /// The expanded call is mostly text now, so every preset must be a real
-    /// panel, at least as large as the chat panel at the same preset, and able
-    /// to hold the call bar below the conversation.
+    /// The expanded call is mostly text, so every preset must be a real panel
+    /// able to hold the call bar below the conversation.
     #[test]
     fn every_expanded_call_preset_is_a_panel_that_holds_the_bar() {
         for preset in ["mini", "compact", "standard", "large", "unknown-legacy"] {
@@ -7249,57 +6171,6 @@ mod tests {
             assert!(
                 w >= CALL_BAR_FRAME_WIDTH - 40.0 && h > CALL_BAR_FRAME_HEIGHT * 2.0,
                 "{preset} is too small for a conversation above the bar"
-            );
-        }
-        for preset in ["mini", "compact", "standard", "large"] {
-            let (chat_w, chat_h) = panel_preset_size(preset);
-            let (voice_w, voice_h) = conversation_preset_size(preset);
-            assert!(voice_w >= chat_w && voice_h >= chat_h, "{preset} shrank");
-        }
-    }
-
-    /// The drag-resize floor has to sit under every preset (or the smallest one
-    /// could not be applied) and above the pill (or the user could drag a live
-    /// call down to a strip with no reachable hang-up) — and a collapse must use
-    /// the pill's floor, or the collapse is refused.
-    #[test]
-    fn the_conversation_resize_floor_sits_between_the_pill_and_every_preset() {
-        let (call_w, call_h) = panel_min_size(PanelForm::CallExpanded);
-        let (pill_w, pill_h) = panel_min_size(PanelForm::Pill);
-        assert!(call_w > pill_w && call_h > pill_h);
-        for preset in ["mini", "compact", "standard", "large", "unknown-legacy"] {
-            let (w, h) = conversation_preset_size(preset);
-            assert!(
-                w >= call_w && h >= call_h,
-                "{preset} is below the conversation resize floor"
-            );
-        }
-    }
-
-    /// The quick-ask surface needs a floor of its own, for exactly the reason the
-    /// call does. It used to share the pill's 240x44 — which is no floor for a
-    /// window an answer has to wrap inside. A single small drag was accepted,
-    /// filed as the remembered expanded size by `remember_size_in_lane`, and then
-    /// reproduced on every later expand, so the panel came back as a transparent
-    /// sliver until the app was restarted. The old version of the test above
-    /// asserted that shared floor as if it were intended.
-    ///
-    /// The height half of the floor is now the talking bar rather than a full
-    /// panel's worth (see `the_resize_floor_admits_the_talking_bar`), because the
-    /// surface deliberately takes that shape while a question is being asked.
-    #[test]
-    fn the_chat_panel_resize_floor_sits_between_the_pill_and_every_preset() {
-        let (panel_w, panel_h) = panel_min_size(PanelForm::AskCard);
-        let (pill_w, pill_h) = panel_min_size(PanelForm::Pill);
-        assert!(
-            panel_w > pill_w && panel_h > pill_h,
-            "the expanded surface's floor must sit above the pill's, not equal it"
-        );
-        for preset in ["mini", "compact", "standard", "large", "unknown-legacy"] {
-            let (w, h) = panel_preset_size(preset);
-            assert!(
-                w >= panel_w && h >= panel_h,
-                "{preset} is below the quick-ask resize floor"
             );
         }
     }
@@ -7534,29 +6405,188 @@ mod tests {
         assert_eq!(x, (1920.0 - w) / 2.0);
     }
 
-    /// The bug the whole separation exists for: hang up a call, press the assistant
-    /// shortcut, and the entire call transcript was sitting in the quick-ask card,
-    /// because both features wrote into one `AssistantConversation`.
+    /// Every quick ask starts from nothing: there is no follow-up field, so a
+    /// previous exchange left in the conversation could only turn the next ask into
+    /// a follow-up nobody asked for. This includes the first ask after a call,
+    /// whose whole transcript used to land in the quick-ask card.
     #[test]
-    fn a_quick_ask_after_a_call_starts_empty() {
-        assert!(should_reset_quick_ask(false, false));
-    }
-
-    /// A follow-up to the answer in front of you keeps its context. "Make it
-    /// shorter" is the single most useful thing about a quick ask and it is
-    /// impossible without the previous turn, so "quick" means one *topic*, not one
-    /// message.
-    #[test]
-    fn a_follow_up_to_the_open_card_keeps_its_context() {
-        assert!(!should_reset_quick_ask(false, true));
+    fn every_quick_ask_starts_empty() {
+        assert!(should_reset_quick_ask(false));
     }
 
     /// The conversation belongs to the call while it is running. Wiping it here
     /// would erase what the user is in the middle of saying.
     #[test]
     fn nothing_is_reset_during_a_call() {
-        assert!(!should_reset_quick_ask(true, false));
-        assert!(!should_reset_quick_ask(true, true));
+        assert!(!should_reset_quick_ask(true));
+    }
+
+    /// A turn still unwinding from a conversation that was replaced (the panel
+    /// was closed mid-answer, or a new question started) must recognise that it
+    /// no longer owns the message list. Without this its reply landed in the next
+    /// quick ask's empty conversation and in a History row of its own.
+    #[test]
+    fn replacing_the_conversation_orphans_the_turn_in_flight() {
+        let conversation = AssistantConversation::new();
+        let turn_epoch = conversation.epoch();
+        assert_eq!(conversation.epoch(), turn_epoch, "nothing replaced it yet");
+        conversation.bump_epoch();
+        assert_ne!(
+            conversation.epoch(),
+            turn_epoch,
+            "a replaced conversation must not accept the old turn's writes"
+        );
+    }
+
+    /// `last_used` was the old default and meant "the display I last dragged it
+    /// to", a remembered position that no longer exists. It must follow the cursor
+    /// like the new default, not be mistaken for the name of a monitor.
+    #[test]
+    fn an_old_last_used_display_follows_the_cursor() {
+        assert!(display_choice_follows_cursor("cursor"));
+        assert!(display_choice_follows_cursor("last_used"));
+        assert!(display_choice_follows_cursor(""));
+        assert!(!display_choice_follows_cursor("primary"));
+        assert!(!display_choice_follows_cursor(r"\\.\DISPLAY2"));
+        assert!(!display_choice_follows_cursor("at:-1440,-510"));
+    }
+
+    /// The pill sits on the edge of the screen the user docked it to and the card
+    /// grows away from that edge: up from the bottom, down from everywhere else,
+    /// and the side docks hug their own side.
+    #[test]
+    fn the_quick_ask_grows_away_from_the_edge_it_is_docked_to() {
+        use crate::settings::AskAnchor;
+        assert_eq!(
+            ask_layout_for_anchor(AskAnchor::BottomCenter),
+            AskLayout {
+                align: AskEdge::Bottom,
+                justify: AskSide::Center
+            }
+        );
+        for anchor in [AskAnchor::Center, AskAnchor::TopCenter, AskAnchor::Custom] {
+            assert_eq!(
+                ask_layout_for_anchor(anchor),
+                AskLayout {
+                    align: AskEdge::Top,
+                    justify: AskSide::Center
+                },
+                "{anchor:?}"
+            );
+        }
+        assert_eq!(
+            ask_layout_for_anchor(AskAnchor::Left).justify,
+            AskSide::Start
+        );
+        assert_eq!(
+            ask_layout_for_anchor(AskAnchor::Right).justify,
+            AskSide::End
+        );
+    }
+
+    /// The wire format the webview matches on.
+    #[test]
+    fn the_layout_event_uses_the_names_the_webview_expects() {
+        let json = serde_json::to_value(ask_layout_for_anchor(
+            crate::settings::AskAnchor::BottomCenter,
+        ))
+        .unwrap();
+        assert_eq!(
+            json,
+            serde_json::json!({ "align": "bottom", "justify": "center" })
+        );
+        let json =
+            serde_json::to_value(ask_layout_for_anchor(crate::settings::AskAnchor::Left)).unwrap();
+        assert_eq!(
+            json,
+            serde_json::json!({ "align": "top", "justify": "start" })
+        );
+    }
+
+    /// Where the quick ask opens depends on the dock zone, the preset and the
+    /// display, and nothing else — no stored coordinate, no previous drag. This is
+    /// the fix for "it opens in a random place". `Custom`, the legacy value an old
+    /// drag handler wrote, opens exactly where Centre does.
+    #[test]
+    fn the_quick_ask_frame_depends_only_on_its_settings_and_display() {
+        use crate::settings::AskAnchor;
+        for display in [LANDSCAPE, PORTRAIT, screen(1366.0, 768.0)] {
+            for anchor in [
+                AskAnchor::Center,
+                AskAnchor::TopCenter,
+                AskAnchor::BottomCenter,
+                AskAnchor::Left,
+                AskAnchor::Right,
+            ] {
+                assert_eq!(
+                    ask_placement_on(display, "standard", anchor),
+                    ask_placement_on(display, "standard", anchor)
+                );
+            }
+            assert_eq!(
+                ask_placement_on(display, "compact", AskAnchor::Custom),
+                ask_placement_on(display, "compact", AskAnchor::Center)
+            );
+        }
+    }
+
+    /// The frame is flush with the edge it is docked to, so the pill — pinned to
+    /// that edge of the frame — lands exactly there.
+    #[test]
+    fn the_pill_lands_on_the_docked_edge() {
+        use crate::settings::AskAnchor;
+        let d = LANDSCAPE;
+        let bottom = ask_placement_on(d, "standard", AskAnchor::BottomCenter);
+        assert_eq!(
+            bottom.y + bottom.height,
+            d.y + d.height - PANEL_MARGIN - TASKBAR_CLEARANCE
+        );
+        let top = ask_placement_on(d, "standard", AskAnchor::TopCenter);
+        assert_eq!(top.y, d.y + PANEL_MARGIN);
+        let left = ask_placement_on(d, "standard", AskAnchor::Left);
+        assert_eq!(left.x, d.x + PANEL_MARGIN);
+        let right = ask_placement_on(d, "standard", AskAnchor::Right);
+        assert_eq!(right.x + right.width, d.x + d.width - PANEL_MARGIN);
+        let centre = ask_placement_on(d, "standard", AskAnchor::Center);
+        assert_eq!(centre.x + centre.width / 2.0, d.x + d.width / 2.0);
+    }
+
+    /// Every frame, on every display, is big enough to hold the pill and stays on
+    /// the display it belongs to.
+    #[test]
+    fn every_frame_holds_the_pill_and_stays_on_its_display() {
+        use crate::settings::AskAnchor;
+        for display in [
+            screen(1024.0, 600.0),
+            screen(1366.0, 768.0),
+            screen(1920.0, 1080.0),
+            LANDSCAPE,
+            PORTRAIT,
+            screen(3840.0, 2160.0),
+        ] {
+            for preset in ["mini", "compact", "standard", "large"] {
+                for anchor in [
+                    AskAnchor::Center,
+                    AskAnchor::TopCenter,
+                    AskAnchor::BottomCenter,
+                    AskAnchor::Left,
+                    AskAnchor::Right,
+                ] {
+                    let p = ask_placement_on(display, preset, anchor);
+                    assert!(
+                        p.width >= ASK_FRAME_FLOOR_WIDTH && p.height >= ASK_FRAME_FLOOR_HEIGHT,
+                        "{preset} {anchor:?} on {display:?} is too small: {p:?}"
+                    );
+                    assert!(
+                        p.x >= display.x
+                            && p.y >= display.y
+                            && p.x + p.width <= display.x + display.width + 0.01
+                            && p.y + p.height <= display.y + display.height + 0.01,
+                        "{preset} {anchor:?} escaped {display:?}: {p:?}"
+                    );
+                }
+            }
+        }
     }
 
     /// Every anchor must land the card fully on screen, on any display size —
@@ -7607,31 +6637,6 @@ mod tests {
         );
         assert!(x >= -1920.0 && x + 600.0 <= 0.0);
         assert!(y >= 0.0);
-    }
-
-    /// `nearest_anchor` always names a zone, from anywhere on the display. That is
-    /// a property of the candidate search, not a decision: [`snapped_drop`] is what
-    /// decides, and it only accepts the answer within `SNAP_RADIUS` — otherwise the
-    /// drop is left where the user let go. The distinction matters because "nearest"
-    /// having an answer everywhere is exactly what used to teleport the window away
-    /// from the pointer on a narrow display.
-    ///
-    /// What is asserted here is that the search is self-consistent: the zone it
-    /// names for a point is the zone that point's placement then belongs to, so a
-    /// snap can never land somewhere that would snap again.
-    #[test]
-    fn a_drop_in_open_space_still_resolves_to_a_zone() {
-        use crate::settings::AskAnchor;
-        let display = screen(1920.0, 1080.0);
-        let (w, h) = (400.0, 300.0);
-        for (x, y) in [(700.0, 400.0), (30.0, 30.0), (1500.0, 900.0), (960.0, 20.0)] {
-            let anchor = nearest_anchor(x, y, display, w, h);
-            assert_ne!(anchor, AskAnchor::Custom);
-            // And the zone it names is one the placement agrees with, so a drop is
-            // never answered with a zone the window is then not put in.
-            let (ax, ay) = anchor_position(anchor, display, w, h);
-            assert_eq!(nearest_anchor(ax, ay, display, w, h), anchor);
-        }
     }
 
     fn msg(role: &str, content: &str) -> ChatMessage {

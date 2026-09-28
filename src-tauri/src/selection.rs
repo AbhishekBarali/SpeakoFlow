@@ -337,12 +337,23 @@ pub fn begin_capture(app: &AppHandle) -> u64 {
                 // "why didn't it see my selection" is otherwise unanswerable.
                 Err(e) => debug!("selection capture for generation {generation} failed: {e}"),
             }
+            let chars = match &result {
+                Ok(Some(selection)) => selection.text.chars().count(),
+                _ => 0,
+            };
             if let Ok(mut pending) = PENDING.lock() {
                 *pending = Some(PendingCapture {
                     generation,
                     captured_at: Instant::now(),
                     result,
                 });
+            }
+            // Say so while the user is still speaking, so the quick ask can show
+            // that it has their selection before the answer arrives. A newer
+            // recording has already moved on, so a stale capture stays quiet.
+            if GENERATION.load(std::sync::atomic::Ordering::SeqCst) == generation {
+                use tauri::Emitter;
+                let _ = app.emit("assistant-selection-captured", chars);
             }
         })
         .map_err(|e| warn!("could not spawn the selection capture thread: {e}"))

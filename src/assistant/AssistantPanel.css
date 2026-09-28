@@ -1,16 +1,21 @@
-/* Assistant panel + pill — the STT recording overlay's calmer sibling.
+/* The assistant's windows: the quick ask, the call, and the reminder popup.
  *
- * One dark-only visual language for both windows (the STT overlay is dark-only
- * too): warm near-black glass, off-white ink, hairline edges, and depth from
- * inner highlights rather than big drop shadows (both windows are transparent,
- * so a large elevation would clip at the window bounds).
+ * One dark visual language: graphite glass, cool off-white ink, hairline edges.
+ * The quick ask and the call are one family and are drawn from the same parts:
+ * the quick ask's waiting pill *is* the call's status bubble (same surface, same
+ * level bars and spinner, same few words), and the one primary action in either
+ * is an ink-filled button. There is no badge and no accent colour on the
+ * assistant's surfaces. A teal sparkle, a teal ring and a teal edge used to mark
+ * the quick ask as "the assistant"; beside the monochrome call they read as a
+ * different app, and the mark said nothing the words next to it did not.
+ * (`--as-accent*` survives only for thumbnail hover and a few focus rings.)
  *
- * Tokens live on `.assistant-scope` so the settings preview renders the exact
- * same classes from the same stylesheet — it cannot drift from the real panel.
+ * Tokens live on `.assistant-scope` so the settings preview and the reminder
+ * popup render the exact same classes from the same stylesheet.
  *
  * Two knobs, both set from settings:
- *   --as-msg-font   message text size
- *   --as-alpha      surface opacity (0.5–1; 1 = fully opaque panel)
+ *   --as-msg-font   answer text size
+ *   --as-alpha      surface opacity (0.5–1; 1 = fully opaque)
  */
 
 /* ---------- Theme tokens (dark only) ---------- */
@@ -18,36 +23,46 @@
 @import "./CallBar.css";
 
 .assistant-scope {
-  /* --as-alpha (surface opacity) and --as-msg-font (message text size) are the
-   * two runtime knobs. They are deliberately NOT declared here: the real panel
-   * sets them on the window root (<html>) from settings, and the settings
-   * preview sets them inline on this same element. Declaring them on
-   * `.assistant-scope` would SHADOW both of those (a local declaration wins over
-   * an inherited one) — that is exactly what pinned the live panel at 100 %
-   * opacity regardless of the slider. So we only ever *read* them here, with a
-   * sensible fallback for when nothing upstream has set them. */
+  /* --as-alpha and --as-msg-font are only ever *read* here. The panel sets them
+   * on <html> and the settings preview inline on this element; declaring them
+   * here would shadow both. */
 
-  /* The pill keeps the STT overlay's exact glass at full opacity and scales
-   * down with the user's opacity choice; the panel is solid at 1.0. */
-  --as-chip-surface: rgba(24, 22, 20, calc(0.94 * var(--as-alpha, 1)));
-  --as-panel-surface: rgba(21, 19, 17, var(--as-alpha, 1));
-  --as-ink: #f7f6f4;
-  --as-body: #d9d6d2;
-  --as-muted: #a9a39c;
-  --as-faint: #7b756d;
-  --as-hairline: rgba(255, 255, 255, 0.09);
-  --as-hairline-strong: rgba(255, 255, 255, 0.16);
+  /* Graphite, tinted a hair toward the brand's own hue rather than toward warm.
+   * The previous brown-black is what made the whole surface read as yellowish. */
+  --as-surface: rgba(19, 22, 23, var(--as-alpha, 1));
+  --as-panel-surface: var(--as-surface);
+  --as-chip-surface: rgba(21, 24, 25, calc(0.96 * var(--as-alpha, 1)));
+  --as-menu-surface: #1c2123;
+  --as-ink: #eef2f2;
+  --as-body: #d2d8d8;
+  --as-muted: #9ba5a6;
+  --as-faint: #6e797a;
+  --as-placeholder: #86908f;
+  --as-hairline: rgba(255, 255, 255, 0.08);
+  --as-hairline-strong: rgba(255, 255, 255, 0.14);
   --as-inner:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    inset 0 0 0 0.5px rgba(0, 0, 0, 0.45);
-  --as-raise: rgba(255, 255, 255, 0.075);
-  --as-raise-strong: rgba(255, 255, 255, 0.13);
-  --as-inset-bg: rgba(0, 0, 0, 0.3);
-  --as-user-bg: rgba(255, 255, 255, 0.1);
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    inset 0 0 0 0.5px rgba(0, 0, 0, 0.5);
+  --as-raise: rgba(255, 255, 255, 0.06);
+  --as-raise-strong: rgba(255, 255, 255, 0.11);
+  --as-inset-bg: rgba(0, 0, 0, 0.28);
+  --as-user-bg: rgba(255, 255, 255, 0.08);
+
+  /* The brand teal, as the app's dark theme defines it (App.css). */
+  --as-accent: #5cd6be;
+  --as-accent-strong: #90e8d4;
+  --as-accent-fill: #1ea28f;
+  /* Text on a teal fill: ~9.5:1 on --as-accent. */
+  --as-accent-ink: #04241f;
+  --as-accent-soft: rgba(92, 214, 190, 0.13);
+  --as-accent-line: rgba(92, 214, 190, 0.36);
+
   --as-error: #fda4af;
   --as-error-bg: rgba(244, 63, 94, 0.12);
-
   --as-live: #e5484d;
+
+  /* Fast off the mark, unhurried settle, no overshoot. */
+  --as-ease: cubic-bezier(0.22, 1, 0.36, 1);
 
   --as-font:
     "Inter Variable", -apple-system, BlinkMacSystemFont,
@@ -56,10 +71,6 @@
   color: var(--as-ink);
   font-family: var(--as-font);
   color-scheme: dark;
-}
-
-* {
-  box-sizing: border-box;
 }
 
 /* ---------- Scrollbars ----------
@@ -119,588 +130,6 @@
   align-items: center;
   justify-content: center;
   overflow: hidden;
-}
-
-/* =========================================================================
- * The pill — a voice HUD, sized and toned like the STT overlay chip.
- * ========================================================================= */
-
-.apill {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  box-sizing: border-box;
-  height: 34px;
-  min-width: 52px;
-  max-width: 100%;
-  padding: 0 8px;
-  /* Rounded-rect, not the STT overlay's full-stadium lozenge. This is the
-   * quiet-but-strong silhouette cue: the STT recording chip stays a pure
-   * 999px pill (fleeting voice → text), while the assistant reads as a small
-   * window that shares the 16px radius of its own expanded panel. Different
-   * shape = distinguishable at a glance, even in peripheral vision and for
-   * red-weak color vision, without leaning on colour alone. */
-  border-radius: 16px;
-  background: var(--as-chip-surface);
-  border: 1px solid var(--as-hairline);
-  box-shadow: var(--as-inner);
-  backdrop-filter: blur(20px) saturate(1.4);
-  -webkit-backdrop-filter: blur(20px) saturate(1.4);
-  user-select: none;
-  cursor: grab;
-  /* Reveal: fade + small settle, like the STT overlay. */
-  opacity: 0;
-  transform: scale(0.92) translateY(2px);
-  transition:
-    opacity 220ms ease-out,
-    transform 240ms cubic-bezier(0.22, 0.61, 0.36, 1),
-    width 240ms cubic-bezier(0.22, 0.61, 0.36, 1),
-    height 260ms cubic-bezier(0.22, 0.61, 0.36, 1),
-    padding 240ms ease-out;
-}
-
-.assistant-shell.fade-in .apill {
-  opacity: 1;
-  transform: scale(1) translateY(0);
-}
-
-/* Idle-dim: after a spell of inactivity the resting pill fades and shrinks to a
- * small, compact nub (not a full-width sliver) so it stays well out of the
- * user's way. It collapses on BOTH axes — a fixed narrow width + clipped
- * overflow, on top of the thin height — then hovering it (or any activity,
- * which drops the class) snaps it straight back. Scoped under `.fade-in` so it
- * outranks the reveal rule above that pins opacity to 1. */
-.assistant-shell.fade-in .apill.dimmed {
-  width: 54px;
-  min-width: 0;
-  height: 14px;
-  padding: 0;
-  opacity: 0.32;
-  overflow: hidden;
-  cursor: default;
-}
-
-.apill.dimmed > * {
-  visibility: hidden;
-}
-
-.assistant-shell.fade-in .apill.dimmed:hover {
-  width: auto;
-  min-width: 52px;
-  height: 34px;
-  padding: 0 8px;
-  opacity: 1;
-  overflow: visible;
-  cursor: grab;
-}
-
-.apill.dimmed:hover > * {
-  visibility: visible;
-}
-
-/* Small icon-only buttons inside the pill. */
-.apill-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 21px;
-  height: 21px;
-  padding: 0;
-  flex-shrink: 0;
-  border: none;
-  border-radius: 50%;
-  background: transparent;
-  color: var(--as-ink);
-  cursor: pointer;
-  transition:
-    background 0.15s ease,
-    color 0.15s ease,
-    transform 0.12s ease;
-}
-
-.apill-btn:hover {
-  background: var(--as-raise);
-}
-
-.apill-btn:active {
-  transform: scale(0.92);
-}
-
-.apill-btn.danger:hover {
-  background: var(--as-error-bg);
-  color: var(--as-error);
-}
-
-/* The idle mic — the pill's one standing affordance. Quiet disc; colour is
- * earned only while actually recording (handled by the wave, not the mic). */
-.apill-mic {
-  border: 1px solid var(--as-hairline);
-  background: var(--as-raise);
-}
-
-.apill-mic:hover {
-  background: var(--as-raise-strong);
-}
-
-/* Waveform container — a fixed little spindle box, like the STT overlay. */
-.apill-wave {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 64px;
-  height: 20px;
-  flex-shrink: 0;
-  transition: width 220ms cubic-bezier(0.22, 0.61, 0.36, 1);
-}
-
-.apill-wave.rest {
-  width: 40px;
-  opacity: 0.5;
-}
-
-/* Phase glyph (globe while searching, speaker while speaking) + spinner. */
-.apill-glyph {
-  display: flex;
-  align-items: center;
-  flex-shrink: 0;
-  color: var(--as-muted);
-  pointer-events: none;
-}
-
-/* Identity anchor: the sparkle that leads the pill during listening / thinking
- * (whenever a phase glyph isn't showing). It carries the live accent so the
- * red reads as an intentional identity mark on one small element, rather than
- * the whole chip being recoloured — the waveform itself stays the shared
- * off-white so both surfaces still feel like one family. */
-.apill-glyph.identity {
-  color: var(--as-live);
-}
-
-.apill-spin {
-  flex-shrink: 0;
-  color: var(--as-muted);
-  animation: apill-rotate 0.85s linear infinite;
-  pointer-events: none;
-}
-
-@keyframes apill-rotate {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-/* Idle hover reveals expand/close inline: width eases from 0 — after a short
- * hover-intent delay, so skimming the pill with the cursor never makes it
- * twitch. Leaving collapses immediately (no delay on the way out). */
-.apill-reveal {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  width: 0;
-  overflow: hidden;
-  opacity: 0;
-  transition:
-    width 260ms cubic-bezier(0.22, 0.61, 0.36, 1) 0ms,
-    opacity 200ms ease 0ms;
-}
-
-.apill:hover .apill-reveal,
-.apill:focus-within .apill-reveal {
-  width: 46px;
-  opacity: 1;
-  transition:
-    width 260ms cubic-bezier(0.22, 0.61, 0.36, 1) 340ms,
-    opacity 200ms ease 340ms;
-}
-
-/* Busy phases: the reveal must not slow a cancel down — a short beat only. */
-.apill:hover .apill-reveal.quick,
-.apill:focus-within .apill-reveal.quick {
-  transition:
-    width 220ms cubic-bezier(0.22, 0.61, 0.36, 1) 120ms,
-    opacity 180ms ease 120ms;
-}
-
-/* Busy cancel — hidden until the chip is hovered, then floats over the
- * trailing edge (exactly the STT overlay's cancel affordance). */
-.apill-cancel {
-  position: absolute;
-  right: 4px;
-  top: 50%;
-  transform: translateY(-50%) scale(0.85);
-  width: 20px;
-  height: 20px;
-  padding: 0;
-  border: none;
-  border-radius: 50%;
-  background: var(--as-chip-surface);
-  box-shadow:
-    0 0 0 1px var(--as-hairline),
-    0 0 6px 5px var(--as-chip-surface);
-  color: var(--as-muted);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  opacity: 0;
-  pointer-events: none;
-  transition:
-    opacity 0.16s ease,
-    transform 0.16s ease,
-    color 0.15s ease;
-}
-
-.apill:hover .apill-cancel {
-  opacity: 1;
-  pointer-events: auto;
-  transform: translateY(-50%) scale(1);
-}
-
-.apill-cancel:hover {
-  color: var(--as-error);
-}
-
-/* Hands-free lock: inline Cancel · wave · Done, like the STT locked layout. */
-.apill-done {
-  color: var(--as-ink);
-  background: var(--as-raise);
-  border: 1px solid var(--as-hairline);
-}
-
-.apill-done:hover {
-  background: var(--as-raise-strong);
-}
-
-/* Live-recording cue. A whisper-thin, low-opacity accent ring (no blurry outer
- * glow — that read as a cheap red halo on the desktop) is also what tells the
- * assistant's hands-free (locked) pill apart from the STT overlay's locked
- * pill: a quiet warm edge the dictation chip never has, without adding width. */
-.apill.listening {
-  border-color: color-mix(in srgb, var(--as-live) 30%, var(--as-hairline));
-  box-shadow:
-    var(--as-inner),
-    0 0 0 1px color-mix(in srgb, var(--as-live) 12%, transparent);
-}
-
-/* Screen-vision toggle badge (top-right). Hidden by default; appears on pill
- * hover so it's there to enable but never clutters, and — once armed — stays
- * visible in every state as the "capture is on" indicator. The icon is chosen
- * in JSX (Camera when armed, CameraOff when not); hovering shows the red
- * "click to change" cue. */
-.apill-screen {
-  position: absolute;
-  top: -5px;
-  right: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 16px;
-  padding: 0;
-  border: none;
-  border-radius: 50%;
-  background: var(--as-raise);
-  color: var(--as-muted);
-  box-shadow: 0 0 0 2px var(--as-chip-surface);
-  cursor: pointer;
-  opacity: 0;
-  pointer-events: none;
-  transition:
-    opacity 0.16s ease,
-    background 0.15s ease,
-    color 0.15s ease;
-}
-
-/* Off state: reveal on hover so it's available to enable, never permanent. */
-.apill:hover .apill-screen {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-/* Armed: prominent, and pinned visible even without hover. */
-.apill-screen.armed {
-  opacity: 1;
-  pointer-events: auto;
-  background: var(--as-ink);
-  color: var(--as-chip-surface);
-}
-
-/* Hover cue (both states): red = "click to change". */
-.apill-screen:hover {
-  background: var(--as-error);
-  color: #fff;
-}
-
-/* Pill error: compact icon + short localized message. */
-.apill.error {
-  border-color: color-mix(in srgb, var(--as-error) 30%, var(--as-hairline));
-}
-
-.apill-error-text {
-  min-width: 0;
-  max-width: 168px;
-  font-size: 11.5px;
-  font-weight: 500;
-  letter-spacing: 0.01em;
-  color: var(--as-error);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  pointer-events: none;
-}
-
-.apill-error-icon {
-  flex-shrink: 0;
-  color: var(--as-error);
-  pointer-events: none;
-}
-
-/* Pill notice: a quiet globe + short muted text (e.g. web search found
- * nothing). Non-blocking and deliberately understated — it self-clears with
- * the transient timer and never uses the error red. */
-.apill-notice {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  min-width: 0;
-  color: var(--as-muted);
-  pointer-events: none;
-}
-
-.apill-notice-icon {
-  flex-shrink: 0;
-  opacity: 0.85;
-}
-
-.apill-notice-text {
-  min-width: 0;
-  max-width: 130px;
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.01em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* =========================================================================
- * Live voice overlay — compact transcript + streamed answer.
- * ========================================================================= */
-
-.alive-card {
-  width: calc(100% - 8px);
-  height: calc(100% - 8px);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  color: var(--as-ink);
-  background: var(--as-panel-surface);
-  border: 1px solid var(--as-hairline);
-  border-radius: 18px;
-  box-shadow: var(--as-inner);
-  backdrop-filter: blur(22px) saturate(1.4);
-  -webkit-backdrop-filter: blur(22px) saturate(1.4);
-  opacity: 0;
-  transform: translateY(-3px) scale(0.985);
-  transition:
-    opacity 180ms ease-out,
-    transform 210ms cubic-bezier(0.22, 0.61, 0.36, 1);
-}
-
-.assistant-shell.fade-in .alive-card {
-  opacity: 1;
-  transform: translateY(0) scale(1);
-}
-
-.alive-card.listening {
-  border-color: color-mix(in srgb, var(--as-live) 28%, var(--as-hairline));
-}
-
-.alive-card.error {
-  border-color: color-mix(in srgb, var(--as-error) 32%, var(--as-hairline));
-}
-
-.alive-header {
-  min-height: 38px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 5px 7px 5px 12px;
-  border-bottom: 1px solid var(--as-hairline);
-  cursor: grab;
-  user-select: none;
-}
-
-.alive-phase,
-.alive-actions,
-.alive-button,
-.alive-row,
-.alive-working,
-.alive-error,
-.alive-capture {
-  display: flex;
-  align-items: center;
-}
-
-.alive-phase {
-  flex: 1;
-  min-width: 0;
-  gap: 7px;
-  color: var(--as-muted);
-  font-size: 11.5px;
-  font-weight: 500;
-}
-
-.alive-phase > span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.alive-actions {
-  position: relative;
-  z-index: 2;
-  gap: 2px;
-  flex-shrink: 0;
-  -webkit-app-region: no-drag;
-  cursor: default;
-}
-
-.alive-button {
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  padding: 0;
-  border: 0;
-  border-radius: 8px;
-  color: var(--as-muted);
-  background: transparent;
-  cursor: pointer;
-  pointer-events: auto;
-  -webkit-app-region: no-drag;
-}
-
-.alive-button:hover,
-.alive-button.active {
-  color: var(--as-ink);
-  background: var(--as-raise);
-}
-
-.alive-button.danger:hover {
-  color: var(--as-error);
-  background: var(--as-error-bg);
-}
-
-.alive-content {
-  min-height: 0;
-  flex: 1;
-  padding: 8px 12px 10px;
-  overflow: hidden;
-}
-
-.alive-row {
-  align-items: flex-start;
-  gap: 8px;
-  min-height: 0;
-  color: var(--as-muted);
-}
-
-.alive-row + .alive-row {
-  margin-top: 7px;
-  padding-top: 7px;
-  border-top: 1px solid var(--as-hairline);
-}
-
-.alive-row > svg {
-  flex-shrink: 0;
-  margin-top: 2px;
-}
-
-.alive-row.user p,
-.alive-answer,
-.alive-answer p {
-  margin: 0;
-}
-
-.alive-row.user p,
-.alive-answer {
-  min-width: 0;
-  color: var(--as-body);
-  font-size: var(--as-msg-font, 14.5px);
-  line-height: 1.45;
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-}
-
-.alive-row.user p {
-  -webkit-line-clamp: 2;
-  color: var(--as-ink);
-}
-
-.alive-answer ul,
-.alive-answer ol {
-  margin: 0;
-  padding-left: 18px;
-}
-
-.alive-working {
-  gap: 6px;
-  color: var(--as-muted);
-}
-
-.alive-placeholder {
-  color: var(--as-faint);
-}
-
-.alive-error,
-.alive-capture {
-  justify-content: center;
-  height: 100%;
-  gap: 9px;
-  color: var(--as-muted);
-  font-size: 12.5px;
-}
-
-.alive-error {
-  color: var(--as-error);
-}
-
-/* =========================================================================
- * The expanded panel — one quiet chat card.
- * ========================================================================= */
-
-.assistant-panel {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  font-size: 13.5px;
-  letter-spacing: 0.01em;
-  color: var(--as-ink);
-  background: var(--as-panel-surface);
-  backdrop-filter: blur(22px) saturate(1.4);
-  -webkit-backdrop-filter: blur(22px) saturate(1.4);
-  border: 1px solid var(--as-hairline);
-  border-radius: 16px;
-  box-shadow: var(--as-inner);
-  overflow: hidden;
-  animation: as-panel-in 0.2s ease-out;
-}
-
-@keyframes as-panel-in {
-  from {
-    opacity: 0;
-    transform: scale(0.99);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
 }
 
 /* ---------- Resize grips ----------
@@ -780,113 +209,6 @@
   cursor: nwse-resize;
 }
 
-/* ---------- Header ---------- */
-
-/* Deliberately without a bottom rule. A full-width divider under a row of icons
-   is the single strongest "this is a window" signal there is, and this surface
-   opens over the work you were already doing — it should read as a card that
-   arrived, not as another window to manage. Identity on the left, three controls
-   on the right, and the card below simply continues. */
-.assistant-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 8px 2px 13px;
-  user-select: none;
-  cursor: grab;
-  flex-shrink: 0;
-}
-
-.assistant-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: -0.005em;
-  color: var(--as-ink);
-  -webkit-app-region: no-drag;
-  cursor: default;
-}
-
-.assistant-header-drag {
-  align-self: stretch;
-  flex: 1;
-  min-width: 12px;
-  cursor: grab;
-}
-
-.assistant-state-chip {
-  font-size: 10.5px;
-  font-weight: 500;
-  letter-spacing: 0.02em;
-  color: var(--as-muted);
-  background: var(--as-raise);
-  border: 1px solid var(--as-hairline);
-  border-radius: 999px;
-  padding: 2px 8px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  animation: as-chip-in 0.18s ease-out;
-}
-
-@keyframes as-chip-in {
-  from {
-    opacity: 0;
-    transform: translateY(-2px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.assistant-header-actions {
-  position: relative;
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  gap: 1px;
-  flex-shrink: 0;
-  -webkit-app-region: no-drag;
-  cursor: default;
-}
-
-.assistant-icon-button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 27px;
-  height: 27px;
-  border: none;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--as-muted);
-  cursor: pointer;
-  pointer-events: auto;
-  -webkit-app-region: no-drag;
-  transition:
-    background 0.15s ease,
-    color 0.15s ease;
-}
-
-.assistant-icon-button:hover {
-  background: var(--as-raise);
-  color: var(--as-ink);
-}
-
-.assistant-icon-button.close:hover {
-  background: var(--as-error-bg);
-  color: var(--as-error);
-}
-
-.assistant-icon-button.active {
-  color: var(--as-ink);
-  background: var(--as-raise);
-}
-
 /* ---------- Character switcher ---------- */
 
 .assistant-character {
@@ -953,7 +275,7 @@
   max-height: 264px;
   overflow-y: auto;
   padding: 4px;
-  background: #1c1a18;
+  background: var(--as-menu-surface);
   border: 1px solid var(--as-hairline);
   border-radius: 10px;
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4);
@@ -1541,389 +863,372 @@
 }
 
 /* =========================================================================
- * The quick ask — one surface in two shapes
+ * The quick ask — one surface in three shapes
  *
- * A question opens the talking bar; the finished answer unfolds it into the
- * card. The window is transparent and already the right size by the time any of
- * this runs (Rust resizes first, then emits `assistant-ask-frame`), so every
- * pixel of the motion below is drawn by the compositor and none of it is a
- * native resize the user can see.
- *
- * The surface is one element whose height and corner radius travel; the bar and
- * the card are two layers inside it that cross-fade. That is what keeps the
- * rounded edge continuous — swapping one element for another cannot morph an
- * edge — and it is also what lets the card be measured before it is ever shown,
- * since it is in the DOM, at full width, the whole time.
+ * The window is a fixed, transparent frame placed at the dock zone the user
+ * chose (see `ask_placement` in assistant.rs), and it does not change size while
+ * an ask runs. The surface inside it is one element that is a pill while it
+ * waits, a bar while you type, and a card once there is something to read; it
+ * widens and unfolds in place rather than being swapped for another element.
+ * `hitRegion.ts` measures it so the empty part of the frame passes clicks
+ * through.
  * ========================================================================= */
 
-/* Keep `--ask-pill-w` / `--ask-pill-h` in sync with `ASK_PILL_WIDTH` /
- * `ASK_PILL_HEIGHT` in `assistant.rs`, and `--ask-pill-exit` with
- * `ASK_PILL_EXIT_MS` (Rust deliberately waits slightly longer than the fade, so
- * the window never changes shape before the last frame of it). `--ask-h` is set
- * inline from the height Rust reports.
- *
- * The transition here is a CROSS-FADE, and that is the whole reason the pill is
- * allowed to be pill sized. The previous version morphed one surface's height,
- * which is only seamless while the two shapes share a footprint — so the "pill"
- * had to be as wide as the card and as tall as a toolbar. Fading one shape out
- * and the other in has no such requirement: the window is free to change size,
- * position and dock zone in the gap, because at that moment there is nothing on
- * screen to be seen changing. */
-.ask-stage {
-  --ask-pill-h: 56px;
-  --ask-h: var(--ask-pill-h);
-  --ask-pill-exit: 140ms;
-  --ask-card-in: 320ms;
-  /* Fast off the mark, then an unhurried settle. Nothing overshoots — a bounce
-     reads as sloppy at this size, where the eye is on the text arriving rather
-     than on the frame. */
-  --ask-ease: cubic-bezier(0.16, 0.84, 0.24, 1);
+/* The frame: empty space, pinned to whichever edge of the screen the surface is
+   docked to, so the pill lands there and the card grows away from it. */
+.qa-frame {
   position: fixed;
   inset: 0;
-  overflow: hidden;
-}
-
-/* A bare container. Each layer carries its own background, border and radius,
-   which is what makes the cross-fade complete: if the frame were drawn out here
-   it would survive the fade and the lozenge would visibly pop into a rectangle
-   with nothing inside it. */
-.ask-surface {
-  position: absolute;
-  inset: 0;
-}
-
-.ask-layer {
-  position: absolute;
-  top: 0;
-}
-
-/* A centring frame, not a shape. The pill inside hugs its own content — exactly
-   as `.overlay-root` does for the dictation pill — so listening, transcribing and
-   searching can be different widths without the window resizing between them. The
-   frame is generous and transparent; only the pill is visible. */
-.ask-layer.pill {
-  inset-inline: 0;
-  height: var(--ask-pill-h);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 6px;
-  box-sizing: border-box;
-  opacity: 1;
-  transition:
-    opacity var(--ask-pill-exit) ease-in,
-    transform var(--ask-pill-exit) ease-in;
-}
-
-/* Shrinking very slightly as it goes reads as the pill handing over rather than
-   simply being switched off. */
-.ask-stage.leaving .ask-layer.pill,
-.ask-stage.card .ask-layer.pill {
-  opacity: 0;
-  pointer-events: none;
-  transform: scale(0.96);
-}
-
-.ask-layer.card {
-  inset-inline: 0;
-  height: var(--ask-h);
   display: flex;
   flex-direction: column;
-  min-height: 0;
-  opacity: 0;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 4px;
+  box-sizing: border-box;
   pointer-events: none;
-  /* Zooms open from noticeably small, about its own middle, so the card reads as
-     the pill opening out rather than a new window appearing. This is the only
-     motion in the whole transition, so it is allowed to be the thing the user
-     actually sees — an earlier 0.96 was so slight that the card looked like it had
-     simply cut in, which is what made the arrival feel abrupt rather than
-     satisfying. It stops exactly at 1: nothing overshoots, because a bounce on a
-     surface carrying text to read is motion competing with the reading. */
-  transform: scale(0.9);
-  transform-origin: 50% 45%;
-  transition:
-    opacity 120ms ease-in,
-    transform 120ms ease-in;
 }
 
-.ask-stage.card .ask-layer.card {
-  opacity: 1;
+.qa-frame[data-align="bottom"] {
+  justify-content: flex-end;
+}
+
+.qa-frame[data-justify="start"] {
+  align-items: flex-start;
+}
+
+.qa-frame[data-justify="end"] {
+  align-items: flex-end;
+}
+
+.qa-surface {
+  /* Lets `width` animate between the pill's fit-content and the card's 100%. A
+     runtime without it simply snaps, which is still correct. */
+  interpolate-size: allow-keywords;
   pointer-events: auto;
-  transform: none;
-  transition:
-    opacity calc(var(--ask-card-in) * 0.65) ease-out,
-    transform var(--ask-card-in) var(--ask-ease);
-}
-
-/* One measurement, and only in a layout pass: the card is let go of its pinned
-   height so it can report what it actually wants (see the `useLayoutEffect` in
-   `AssistantPanel.tsx`). `overflow-y: scroll` keeps the body's gutter reserved
-   during the measurement, so the width the answer wraps to is the same one it
-   will wrap to afterwards. */
-.ask-layer.card.measuring {
-  height: auto;
-}
-
-.ask-layer.card.measuring .ask-card,
-.ask-layer.card.measuring .ask-answer-body {
-  flex: 0 0 auto;
-}
-
-.ask-layer.card.measuring .ask-answer-body {
-  overflow-y: scroll;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .ask-layer.pill,
-  .ask-layer.card,
-  .ask-stage.leaving .ask-layer.pill,
-  .ask-stage.card .ask-layer.pill,
-  .ask-stage.card .ask-layer.card {
-    transition-duration: 1ms;
-    transition-delay: 0s;
-  }
-
-  .ask-layer.pill {
-    transform: none;
-  }
-
-  .ask-layer.card {
-    transform: none;
-  }
-}
-
-/* ---------- The talking pill ---------- */
-
-/*
- * Deliberately a mirror of `.overlay-pill` in `RecordingOverlay.css`: the same
- * height, radius, fill, hairline and inner highlight. It is the same gesture as
- * dictation, so it is the same object — and two visual languages for one gesture
- * is a cost paid on every use. If either side of this pair changes, change both.
- *
- * The pill hugs its content and floats centred in a transparent frame, which is
- * what lets listening, transcribing and searching be different widths with no
- * window resize between them.
- */
-.ask-pill {
   position: relative;
-  display: inline-flex;
+  display: flex;
+  flex-direction: column;
+  width: fit-content;
+  min-width: 0;
+  max-width: 100%;
+  max-height: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  color: var(--as-ink);
+  background: var(--as-surface);
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  border: 1px solid var(--as-hairline);
+  border-radius: 18px;
+  box-shadow: var(--as-inner);
+  transform-origin: top center;
+  animation: qa-arrive 180ms var(--as-ease) both;
+  transition:
+    width 260ms var(--as-ease),
+    border-radius 260ms var(--as-ease),
+    border-color 160ms ease,
+    background-color 160ms ease;
+}
+
+.qa-frame[data-align="bottom"] .qa-surface {
+  transform-origin: bottom center;
+  --qa-arrive-y: 6px;
+}
+
+/* Waiting: the call's status bubble, to the pixel — chip surface, faint
+   hairline that firms up under the pointer, 13px muted words. */
+.qa-surface[data-shape="pill"] {
+  background: var(--as-chip-surface);
+}
+
+.qa-surface[data-shape="pill"]:hover {
+  border-color: var(--as-hairline-strong);
+}
+
+/* Typing: the call's text bar. A one-line question does not need the width of
+   the answer card, so the bar stays a bar. */
+.qa-surface[data-shape="bar"] {
+  width: min(100%, 460px);
+  border-radius: 22px;
+  border-color: var(--as-hairline-strong);
+}
+
+.qa-surface[data-shape="card"] {
+  width: 100%;
+}
+
+/* A failure wears the call's error bubble: a faint red tint, not a badge. */
+.qa-surface[data-phase="error"] {
+  background: color-mix(
+    in srgb,
+    var(--as-error-bg) 70%,
+    var(--as-chip-surface)
+  );
+  border-color: color-mix(in srgb, var(--as-error) 25%, transparent);
+}
+
+@keyframes qa-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(var(--qa-arrive-y, -4px)) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* The one row every shape has: what is going on, and the way out. */
+.qa-row {
+  display: flex;
   align-items: center;
   gap: 8px;
-  height: 34px;
-  max-width: 100%;
-  padding: 0 11px;
+  flex-shrink: 0;
+  min-height: 36px;
+  padding: 0 6px 0 14px;
   box-sizing: border-box;
-  border-radius: 999px;
-  background: rgba(24, 22, 20, 0.94);
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    inset 0 0 0 0.5px rgba(0, 0, 0, 0.45);
-  color: #f5f5f4;
-  /* The pill moves the window. A nudge is harmless because a drop re-settles into
-     a dock zone, so this needs no long-press guard. */
-  cursor: grab;
 }
 
-/* A written state explains itself or it is noise, so it gets the wider, softer
-   frame — the same trade `.overlay-pill.labeled` makes. */
-.ask-pill.labeled {
-  height: auto;
-  min-height: 34px;
-  padding: 7px 8px 7px 11px;
-  border-radius: 18px;
+.qa-surface[data-shape="bar"] .qa-row {
+  gap: 2px;
+  min-height: 44px;
+  padding: 0 6px 0 16px;
 }
 
-/* The halo: the quietest available way to say "assistant, not dictation" without
-   a second shape or a second colour. Sits behind the pill, cannot be clicked, and
-   is a single soft bloom rather than a glow on the edge — an edge glow at this
-   size reads as a focus ring.
-   `z-index: -1` puts it behind the pill's own opaque fill, so only the part that
-   spills past the lozenge is ever visible. The inset stays inside the frame's
-   clearance (34px pill in a 56px frame leaves 11px), because `.ask-stage` clips
-   its overflow and a hard cut through a glow is worse than no glow. */
-.ask-pill::before {
-  content: "";
-  position: absolute;
-  inset: -9px;
-  border-radius: inherit;
-  background: radial-gradient(
-    62% 130% at 16% 50%,
-    rgba(255, 214, 148, 0.2),
-    rgba(255, 214, 148, 0) 72%
-  );
-  pointer-events: none;
-  z-index: -1;
+.qa-surface[data-shape="card"] .qa-row {
+  min-height: 44px;
+  padding: 8px 8px 4px 16px;
 }
 
-/* The mark says both "this is the assistant" and "this is what it is doing".
-   It changes with the state, which is the whole reason it earns its place. */
-.ask-pill-mark {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  width: 18px;
-  height: 18px;
-  color: rgba(255, 214, 148, 0.92);
+/* ---------- Pill contents ---------- */
+
+/* The indicator is `.call-level` / `.call-spin` from CallBar.css. */
+.qa-row > .call-spin {
+  color: var(--as-muted);
 }
 
-.ask-pill.labeled .ask-pill-mark {
-  align-self: flex-start;
-}
-
-/* One width for the waveform *and* the progress sweep, because they replace each
-   other mid-action: 54px each, as `.pill-wave` is next door. Two different widths
-   here is exactly how the pill used to change size while it worked. */
-.ask-pill-indicator {
-  display: flex;
-  align-items: center;
-  flex-shrink: 0;
-  width: 54px;
-}
-
-/* Matches `.pill-label`. Only a failure reaches this now — every working state is
-   a glyph and a sweep, with the words carried by `aria-label` for anyone who needs
-   them read out. */
-.ask-pill-label {
+.qa-status {
+  flex: 0 1 auto;
   min-width: 0;
-  font-size: 11.5px;
-  line-height: 16px;
-  font-weight: 500;
-  letter-spacing: 0.01em;
-  color: rgba(245, 245, 244, 0.92);
-  white-space: normal;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
+  max-width: 320px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--as-muted);
+  white-space: nowrap;
   overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.ask-pill-label.error {
-  font-weight: 400;
-  color: var(--as-error);
+/* What the answer was about, on the card only. The thread's `.screen-chip`. */
+.qa-chip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  padding: 0 8px;
+  box-sizing: border-box;
+  border: 1px solid var(--as-hairline);
+  border-radius: 999px;
+  background: var(--as-inset-bg);
+  color: var(--as-muted);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
 }
 
-.ask-pill-input {
+/* ---------- Bar contents ---------- */
+
+.qa-input {
   flex: 1;
   min-width: 0;
-  width: 100%;
-  height: 20px;
+  height: 32px;
   padding: 0;
   border: none;
-  background: transparent;
   outline: none;
+  background: transparent;
+  color: var(--as-ink);
   font-family: inherit;
-  font-size: 12.5px;
-  letter-spacing: 0.01em;
-  color: #f5f5f4;
+  font-size: 14px;
+  letter-spacing: 0.005em;
 }
 
-.ask-pill-input::placeholder {
-  color: rgba(245, 245, 244, 0.45);
+.qa-input::placeholder {
+  color: var(--as-placeholder);
 }
 
-.ask-pill-btn {
+.qa-thumbs {
+  flex: none;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  flex-shrink: 0;
+  gap: 4px;
+  margin-inline-end: 6px;
+}
+
+.qa-thumb {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--as-hairline-strong);
+  border-radius: 7px;
+  background: none;
+  cursor: pointer;
+}
+
+.qa-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.qa-thumb:hover {
+  border-color: var(--as-error);
+}
+
+/* ---------- Buttons ---------- */
+
+/* Round and borderless, like `.call-icon`. */
+.qa-icon-btn {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
   border: none;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.1);
-  color: rgba(245, 245, 244, 0.85);
+  background: transparent;
+  color: var(--as-muted);
   cursor: pointer;
   transition:
-    color 0.15s ease,
-    background 0.15s ease;
+    background 140ms ease,
+    color 140ms ease,
+    transform 140ms ease;
 }
 
-.ask-pill-btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.18);
-  color: #f5f5f4;
+.qa-icon-btn:hover {
+  background: var(--as-raise);
+  color: var(--as-ink);
 }
 
-.ask-pill-btn.primary {
-  background: #f5f5f4;
-  color: #18160f;
+.qa-icon-btn:active {
+  transform: scale(0.93);
 }
 
-.ask-pill-btn.quiet {
-  background: transparent;
-  color: rgba(245, 245, 244, 0.55);
+.qa-icon-btn.is-on {
+  background: var(--as-raise-strong);
+  color: var(--as-ink);
 }
 
-.ask-pill-btn.quiet:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.1);
-  color: #f5f5f4;
-}
-
-.ask-pill-btn:disabled {
-  opacity: 0.35;
-  cursor: default;
-}
-
-.ask-pill-btn:focus-visible {
-  outline: 2px solid rgba(255, 214, 148, 0.8);
-  outline-offset: 2px;
-}
-
-/* ---------- The answer card ---------- */
-/*
-   No title bar, no caption over the answer, no box around it. The card used to
-   be a sparkle glyph and the word "Answer" above a bordered panel, inside
-   another bordered panel, inside the window's own border — three nested frames
-   labelling the one thing on screen that could not be anything else. What is
-   left is the question you asked, the answer, and what you can do with it.
-*/
-
-.ask-card {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-  /* Its own frame, for the same reason the pill has one: the cross-fade has to
-     take the frame with it, so neither shape may inherit one from the container
-     they share. */
-  border-radius: 18px;
-  background: var(--as-panel-surface);
-  backdrop-filter: blur(22px) saturate(1.4);
-  -webkit-backdrop-filter: blur(22px) saturate(1.4);
-  border: 1px solid var(--as-hairline);
-  box-shadow: var(--as-inner);
-}
-
-.ask-head {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  flex-shrink: 0;
-  min-height: 40px;
-  padding: 10px 10px 4px 16px;
-  cursor: grab;
-}
-
-.ask-head-icon {
-  flex-shrink: 0;
+/* The way out. Quiet in the pill — the call bubble's dismiss — so the words,
+   not the ×, are what the eye lands on. */
+.qa-close {
+  width: 28px;
+  height: 28px;
   color: var(--as-faint);
 }
 
-.ask-head-spacer {
-  flex: 1;
+.qa-surface[data-shape="pill"] .qa-close {
+  width: 22px;
+  height: 22px;
 }
 
-/* Capped at one line. The question is context for the answer, not the content —
-   the user said it a second ago, so it does not need to be re-read in full, and
-   giving it two lines pushed the answer down the card. */
-.ask-question-text {
+.qa-surface[data-phase="error"] .qa-close {
+  align-self: flex-start;
+}
+
+.qa-send {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  margin-left: 2px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--as-ink);
+  color: #111415;
+  cursor: pointer;
+  transition:
+    background 140ms ease,
+    color 140ms ease,
+    transform 140ms ease;
+}
+
+.qa-send:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.qa-send:disabled {
+  background: var(--as-raise-strong);
+  color: var(--as-faint);
+  cursor: default;
+}
+
+.qa-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--as-hairline-strong);
+  border-radius: 9px;
+  background: var(--as-raise);
+  color: var(--as-body);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.005em;
+  cursor: pointer;
+  transition:
+    background 140ms ease,
+    color 140ms ease,
+    border-color 140ms ease;
+}
+
+.qa-btn:hover {
+  background: var(--as-raise-strong);
+  color: var(--as-ink);
+}
+
+.qa-btn:active {
+  transform: scale(0.98);
+}
+
+/* The one action that writes back into the user's app: ink-filled, like the
+   call's send button. */
+.qa-btn.primary {
+  border-color: transparent;
+  background: var(--as-ink);
+  color: #111415;
+}
+
+.qa-btn.primary:hover {
+  background: #ffffff;
+  color: #111415;
+}
+
+.qa-surface :focus-visible {
+  outline: 2px solid var(--as-ink);
+  outline-offset: 2px;
+}
+
+.qa-input:focus-visible {
+  outline: none;
+}
+
+/* ---------- Card contents ---------- */
+
+/* What was asked: context for the answer, so one quiet line. An error takes
+   its place and may wrap, because it is the content. */
+.qa-question {
   flex: 1;
   min-width: 0;
   margin: 0;
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 500;
   letter-spacing: 0.005em;
   color: var(--as-muted);
@@ -1932,15 +1237,140 @@
   text-overflow: ellipsis;
 }
 
-.ask-selection-chip {
-  flex-shrink: 0;
-  padding: 1px 7px;
-  border-radius: 999px;
-  background: var(--as-raise);
+.qa-surface[data-phase="error"] .qa-question {
+  padding-block: 4px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--as-error);
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+}
+
+.qa-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  animation: qa-unfold 240ms var(--as-ease) both;
+}
+
+@keyframes qa-unfold {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.qa-answer.ask-answer-body {
+  padding: 4px 18px 10px;
+  /* Left-aligned with the row above rather than centred: in a wide banner a
+     centred column floats away from the question it answers. */
+  margin-inline: 0;
+}
+
+/* Keep the line breaks the model wrote. A quick ask is often a draft — an
+   email, a reply — and markdown's soft breaks would fold "Best,\nSam" into one
+   line on screen while Insert pastes it correctly. */
+.qa-answer p,
+.qa-answer li {
+  white-space: pre-line;
+}
+
+/* A caret at the end of the text while it is still being written, so a pause
+   between tokens reads as "still writing" rather than "finished". */
+.qa-surface[data-phase="answering"] .qa-answer > :last-child::after {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 1.05em;
+  margin-inline-start: 3px;
+  vertical-align: -0.16em;
+  border-radius: 2px;
+  background: var(--as-body);
+  animation: qa-caret 1s steps(2, jump-none) infinite;
+}
+
+@keyframes qa-caret {
+  50% {
+    opacity: 0;
+  }
+}
+
+.qa-notice {
+  margin: 0;
+  padding: 0 18px 8px;
+  font-size: 11.5px;
   color: var(--as-muted);
-  font-size: 10px;
+}
+
+.qa-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  padding: 8px 10px 10px;
+  border-top: 1px solid var(--as-hairline);
+}
+
+.qa-actions-gap {
+  flex: 1;
+}
+
+/* =========================================================================
+ * The static answer card — the reminder popup's card
+ *
+ * The reminder renders these classes directly, and the quick ask's answer body
+ * shares `.ask-answer-body`, so a reminder is the assistant's card rather than a
+ * look-alike that drifts from it.
+ * ========================================================================= */
+
+.ask-card {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: 18px;
+  background: var(--as-surface);
+  backdrop-filter: blur(24px) saturate(1.3);
+  -webkit-backdrop-filter: blur(24px) saturate(1.3);
+  border: 1px solid var(--as-hairline-strong);
+  box-shadow: var(--as-inner);
+}
+
+.ask-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  min-height: 44px;
+  padding: 8px 8px 4px 16px;
+  cursor: grab;
+}
+
+.ask-head-icon {
+  flex-shrink: 0;
+  color: var(--as-accent);
+}
+
+.ask-question-text {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 12.5px;
   font-weight: 500;
+  letter-spacing: 0.005em;
+  color: var(--as-muted);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .ask-head-actions {
@@ -1951,57 +1381,47 @@
   margin-inline-start: auto;
 }
 
-/* The actions stay visible rather than appearing on hover. Copy and Insert are
-   the whole point of the card — hiding them behind a hover made them
-   undiscoverable, and a keyboard user could not reach them at all. */
 .ask-action {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   border: none;
-  border-radius: 8px;
+  border-radius: 9px;
   background: transparent;
   color: var(--as-muted);
   cursor: pointer;
   transition:
-    color 0.15s ease,
-    background 0.15s ease;
+    color 140ms ease,
+    background 140ms ease;
 }
 
 .ask-action:hover {
   color: var(--as-ink);
-  background: var(--as-raise);
+  background: var(--as-raise-strong);
 }
 
-.ask-action.close:hover {
-  color: var(--as-error);
-}
-
-/* Insert carries its word. It is the one action that does something outside this
-   window — it writes the answer back where you were typing — and as a bare
-   corner-arrow glyph next to a copy glyph, nobody could tell which was which
-   without hovering both. Copy stays iconic: everyone already knows that one. */
 .ask-action.labelled {
   width: auto;
   gap: 5px;
-  padding: 0 10px 0 8px;
-  height: 26px;
-  font-size: 11.5px;
+  padding: 0 11px 0 9px;
+  font-family: inherit;
+  font-size: 12px;
   font-weight: 600;
-  letter-spacing: 0.01em;
+  letter-spacing: 0.005em;
   color: var(--as-body);
   background: var(--as-raise);
+  border: 1px solid var(--as-hairline-strong);
 }
 
 .ask-action.labelled:hover {
-  background: var(--as-ink);
-  color: var(--as-panel-surface);
+  background: var(--as-raise-strong);
+  color: var(--as-ink);
 }
 
 .ask-action:focus-visible {
-  outline: 2px solid currentColor;
+  outline: 2px solid var(--as-accent);
   outline-offset: 1px;
 }
 
@@ -2012,42 +1432,25 @@
   overscroll-behavior: contain;
   padding: 2px 16px 12px;
   font-size: var(--as-msg-font, 14.5px);
-  line-height: 1.7;
-  /* Body copy sits one step below the panel's brightest ink, and both of the
-     reasons are about reading rather than taste. Near-white on near-black is
-     about 15:1, far past what any guideline asks for, and at that ratio light
-     glyphs bloom into the background on an LCD — the text looks slightly soft
-     and tiring without looking obviously wrong, which is exactly how it gets
-     reported ("hard to read, I don't know why"). Dropping to --as-body keeps
-     ~13:1, comfortably above AAA, and matches the thread view, which was
-     already the more readable of the two surfaces. Emphasis and headings still
-     step up to --as-ink below, so the hierarchy gets brighter rather than the
-     paragraph. */
+  line-height: 1.65;
+  /* One step below the brightest ink: near-white on near-black blooms on an
+     LCD, and emphasis and headings step up to --as-ink instead. */
   color: var(--as-body);
-  /* `anywhere` also feeds min-content sizing, so it will split an ordinary word
-     mid-glyph even when the line had somewhere to wrap. `break-word` only breaks
-     a token that genuinely cannot fit, which is all a URL or a hash needs. */
+  /* `anywhere` would split ordinary words mid-glyph; `break-word` only breaks a
+     token that genuinely cannot fit, which is all a URL needs. */
   overflow-wrap: break-word;
-  /* A reserved gutter, so an answer that grows past the card does not re-wrap
-     the moment its scrollbar appears — and so the height measured for it is the
-     height it keeps. */
+  /* So an answer that grows past the card does not re-wrap the moment its
+     scrollbar appears. */
   scrollbar-gutter: stable;
-  /* Cap the measure. The card is as wide as the panel, so at a standard size a
-     line of answer ran past 100 characters — roughly a third more than the eye
-     tracks comfortably, and the single biggest reason a well-contrasted answer
-     still felt like work to read. `ch` rather than px so the cap follows the
-     user's text size instead of fighting it, plus the horizontal padding so the
-     cap describes the text and not the box. The auto margins centre it, so a
-     wide window reads as a column instead of a lopsided block; a narrow one is
-     unaffected. Capping the container rather than each child keeps the markdown
-     margin rules below in charge of vertical rhythm. */
+  /* Cap the measure at a readable line length, centred in a wide card. */
   width: 100%;
-  max-width: calc(68ch + 32px);
+  max-width: calc(68ch + 36px);
   margin-inline: auto;
+  box-sizing: border-box;
 }
 
 .ask-answer-body::-webkit-scrollbar {
-  width: 3px;
+  width: 4px;
 }
 
 .ask-answer-body::-webkit-scrollbar-track {
@@ -2055,7 +1458,8 @@
 }
 
 .ask-answer-body::-webkit-scrollbar-thumb {
-  border-radius: 3px;
+  border: none;
+  border-radius: 4px;
   background: var(--as-hairline-strong);
 }
 
@@ -2067,83 +1471,15 @@
   margin-block-end: 0;
 }
 
-.ask-waiting,
-.ask-empty,
-.ask-error {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  margin: 0;
-  font-size: 12.5px;
-  color: var(--as-muted);
+.as-spin {
+  animation: qa-spin 1s linear infinite;
 }
 
-.ask-error {
-  color: var(--as-error);
+@keyframes qa-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
-
-/* Listening / transcribing inside an open card — only reachable on a follow-up,
-   since a first ask is still the bar at this point. */
-.ask-capture {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  min-height: 72px;
-  padding: 12px 0 6px;
-  color: var(--as-muted);
-  font-size: 12.5px;
-}
-
-/* Sits under the answer, because it is about that answer. */
-.ask-notice {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-  margin: 0;
-  padding: 0 16px 8px;
-  color: var(--as-faint);
-  font-size: 11px;
-}
-
-.ask-spin {
-  animation: apill-rotate 1s linear infinite;
-}
-
-/* ---------- Listening / transcribing (inline, panel expanded) ---------- */
-
-.assistant-listening {
-  align-self: flex-start;
-  max-width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--as-muted);
-  border: 1px solid var(--as-hairline);
-  background: var(--as-raise);
-  border-radius: 14px;
-  border-bottom-left-radius: 5px;
-  padding: 6px 12px 6px 10px;
-  animation: as-bubble-in 0.18s ease-out;
-}
-
-.listening-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  white-space: nowrap;
-}
-
-.listening-cam,
-.listening-lock {
-  color: var(--as-muted);
-  flex-shrink: 0;
-}
-
 /* ---------- Tool chip ---------- */
 
 /* What the turn is doing right now: the tool and, for a search, its query.
@@ -2156,9 +1492,9 @@
   max-width: 100%;
   margin: 2px 0;
   padding: 4px 9px;
-  border: 1px solid var(--as-border);
+  border: 1px solid var(--as-hairline);
   border-radius: 999px;
-  background: var(--as-surface-2, transparent);
+  background: var(--as-raise);
   color: var(--as-muted);
   font-size: 11px;
   line-height: 1.3;
@@ -2213,302 +1549,74 @@
   }
 }
 
-/* ---------- Attachments (pending, above the input row) ---------- */
-
-.assistant-attachments {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 12px 0;
-}
-
-.attachment-chip {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  max-width: 180px;
-  height: 28px;
-  padding: 0 8px;
-  border: 1px solid var(--as-hairline);
-  border-radius: 8px;
-  background: var(--as-raise);
-  color: var(--as-body);
-  font-size: 11.5px;
-  animation: as-chip-in 0.18s ease-out;
-}
-
-.attachment-chip .chip-name {
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.attachment-chip img {
-  width: 20px;
-  height: 20px;
-  border-radius: 4px;
-  object-fit: cover;
-}
-
-.attachment-chip .chip-remove {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 16px;
-  padding: 0;
-  border: none;
-  border-radius: 50%;
-  background: transparent;
-  color: var(--as-muted);
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-.attachment-chip .chip-remove:hover {
-  color: var(--as-error);
-  background: var(--as-error-bg);
-}
-
-/* ---------- Input row ---------- */
-
-/* No top rule either, for the same reason the header has none: two horizontal
-   dividers turn a card into a window with a title bar and a status bar. The row
-   is short enough that the controls read as a group on their own. */
-.assistant-input-row {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 6px 10px 10px;
-  flex-shrink: 0;
-}
-
-.assistant-attach-button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  flex-shrink: 0;
-  border: 1px solid var(--as-hairline);
-  border-radius: 9px;
-  background: transparent;
-  color: var(--as-muted);
-  cursor: pointer;
-  transition:
-    color 0.15s ease,
-    border-color 0.15s ease,
-    background 0.15s ease;
-}
-
-.assistant-attach-button:hover {
-  color: var(--as-ink);
-  background: var(--as-raise);
-}
-
-.assistant-attach-button.armed {
-  background: var(--as-ink);
-  border-color: transparent;
-  color: var(--as-panel-surface);
-}
-
-.assistant-input {
-  flex: 1;
-  min-width: 0;
-  height: 30px;
-  padding: 0 11px;
-  font-size: 13px;
-  font-family: inherit;
-  letter-spacing: 0.01em;
-  color: var(--as-ink);
-  background: var(--as-inset-bg);
-  border: 1px solid var(--as-hairline);
-  border-radius: 9px;
-  outline: none;
-  transition:
-    border-color 0.15s ease,
-    box-shadow 0.15s ease;
-}
-
-.assistant-input::placeholder {
-  color: var(--as-faint);
-}
-
-.assistant-input:focus {
-  border-color: var(--as-hairline-strong);
-  box-shadow: 0 0 0 3px var(--as-raise);
-}
-
-.assistant-send-button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  flex-shrink: 0;
-  border: none;
-  border-radius: 50%;
-  background: var(--as-ink);
-  color: var(--as-panel-surface);
-  cursor: pointer;
-  transition:
-    transform 0.15s ease,
-    opacity 0.15s ease;
-}
-
-.assistant-send-button:hover:not(:disabled) {
-  transform: translateY(-1px);
-}
-
-.assistant-send-button:disabled {
-  opacity: 0.35;
-  cursor: default;
-}
-
-/* The cancel that sits next to the send button while a follow-up is being
-   spoken. Two filled circles side by side read as two equally-weighted choices;
-   only one of them is what the user came here to press. */
-.assistant-send-button.ghost {
-  background: transparent;
-  border: 1px solid var(--as-hairline);
-  color: var(--as-muted);
-}
-
-.assistant-send-button.ghost:hover:not(:disabled) {
-  color: var(--as-ink);
-  background: var(--as-raise);
-}
-
-/* Inside the answer card the row is a follow-up, not the main event: a hairline
-   above it separates it from the answer without boxing it in, and it sits flush
-   with the card's own padding. */
-.ask-layer.card .assistant-input-row {
-  padding: 8px 12px 12px;
-  border-top: 1px solid var(--as-hairline);
-}
-
-.ask-layer.card .assistant-attachments {
-  padding-inline: 12px;
-}
-
 /* ---------- Settings preview ----------
- * Renders real panel classes at a reduced footprint. Only layout is scoped
- * here; every colour/token comes from the shared scope above. */
+ * The real quick-ask surface, rendered with sample content on a small
+ * faux-desktop so lowering the opacity reads as frosted glass over a wallpaper,
+ * as it does over the real desktop. */
 
-/* The preview sits on a small faux-desktop (a calm dark gradient) so that
- * lowering the opacity reads as frosted glass over a wallpaper — exactly what
- * the real panel does over the desktop — instead of compositing near-black
- * over the white settings card and turning muddy grey. */
 .assistant-preview {
   border-radius: 16px;
   overflow: hidden;
   padding: 18px;
   background: radial-gradient(
     130% 130% at 15% 12%,
-    #3a4252 0%,
-    #262b37 48%,
-    #171920 100%
+    #34444a 0%,
+    #222c30 48%,
+    #14191b 100%
   );
 }
 
-.assistant-preview .assistant-panel {
-  height: auto;
-  animation: none;
-  /* No live backdrop blur in the preview: there is no moving content behind it,
-   * so blurring the static gradient would only cost paint. The gradient
-   * backdrop above already makes the translucency read correctly. */
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-}
-
-.assistant-preview .assistant-messages {
-  overflow-y: hidden;
-}
-
-/* The floating-panel preview on the Assistant page: a miniature desktop the
- * card is drawn on, at the spot it opens. The same calm wallpaper as above, so
- * lowering the opacity still reads as frosted glass over a desktop. */
+/* The floating-panel preview on the Assistant page uses the same wallpaper. */
 .assistant-desktop {
   background: radial-gradient(
     130% 130% at 15% 12%,
-    #3a4252 0%,
-    #262b37 48%,
-    #171920 100%
+    #34444a 0%,
+    #222c30 48%,
+    #14191b 100%
   );
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
 }
 
-/* The two shapes the real surface takes, drawn statically side by side. They
- * borrow the panel's own classes so colour, opacity and text size can only ever
- * be the live ones; only the positioning is preview-specific, because the real
- * surface is absolutely placed inside a window this has no equivalent of. */
+/* The two shapes in the order they happen: the pill a question opens in, and
+   the card the answer unfolds into. Inert — it is a picture of the surface. */
 .assistant-preview-stack {
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 12px;
+  pointer-events: none;
+  user-select: none;
 }
 
-.assistant-preview-surface {
-  background: var(--as-panel-surface);
-  border: 1px solid var(--as-hairline);
-  border-radius: 18px;
-  box-shadow: var(--as-inner);
-  overflow: hidden;
-}
-
-.assistant-preview-surface.pill {
-  /* The pill draws its own lozenge and hugs its content, so the wrapper stands
-     back rather than framing it twice or stretching it. */
-  display: flex;
-  justify-content: center;
-  border: none;
-  background: none;
-  box-shadow: none;
-  border-radius: 999px;
-}
-
-.assistant-preview-surface .ask-pill {
-  cursor: default;
-}
-
-.assistant-preview-surface .ask-card {
-  /* Already framed by the wrapper here, unlike in the panel where the card is
-     the outermost shape. */
-  border: none;
-  box-shadow: none;
+.assistant-preview-stack .qa-surface {
+  animation: none;
+  /* No live backdrop blur in the preview: nothing moves behind it, so blurring
+     the static gradient would only cost paint. */
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 }
 
-.assistant-preview-surface .ask-head {
-  cursor: default;
-}
-
-.assistant-preview-surface .ask-answer-body {
+.assistant-preview-stack .ask-answer-body {
   overflow-y: hidden;
 }
 
 /* ---------- Reduced motion ---------- */
 
 @media (prefers-reduced-motion: reduce) {
-  .apill,
-  .apill-wave,
-  .apill-reveal,
-  .assistant-panel,
+  .qa-surface,
+  .qa-body,
   .assistant-message,
-  .assistant-listening,
-  .assistant-notice,
-  .assistant-state-chip {
+  .assistant-notice {
     animation: none;
     transition: none;
   }
 
-  .apill-spin,
-  .ask-spin,
+  .as-spin,
   .typing-dot {
+    animation: none;
+  }
+
+  .qa-surface[data-phase="answering"] .qa-answer > :last-child::after {
     animation: none;
   }
 }

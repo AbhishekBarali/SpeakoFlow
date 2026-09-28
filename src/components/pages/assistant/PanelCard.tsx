@@ -8,7 +8,11 @@ import { Segmented } from "@/components/ui/Segmented";
 import { Dropdown } from "@/components/ui/Dropdown";
 import { InfoTip } from "@/components/ui/InfoTip";
 import { PanelPreview } from "@/components/settings/assistant/AssistantSettings";
-import type { PanelAnchor } from "./panelGeometry";
+import {
+  askDisplayOptions,
+  askDisplayValue,
+  type PanelAnchor,
+} from "./panelGeometry";
 
 /**
  * "Floating panel", in two halves.
@@ -175,35 +179,9 @@ export const PanelCard: React.FC = () => {
     };
   }, []);
 
-  const currentDisplay =
-    displays.findIndex((display) => display.is_current) + 1;
   const displayOptions = useMemo(
-    () => [
-      {
-        value: "last_used",
-        label: currentDisplay
-          ? t("settings.assistant.appearance.askDisplays.lastUsedOn", {
-              number: currentDisplay,
-            })
-          : t("settings.assistant.appearance.askDisplays.lastUsed"),
-      },
-      {
-        value: "cursor",
-        label: t("settings.assistant.appearance.askDisplays.cursor"),
-      },
-      ...displays.map((display, index) => ({
-        value: display.id,
-        label: t("settings.assistant.appearance.askDisplays.numbered", {
-          number: index + 1,
-          width: display.width,
-          height: display.height,
-          suffix: display.is_primary
-            ? t("settings.assistant.appearance.askDisplays.mainSuffix")
-            : "",
-        }),
-      })),
-    ],
-    [displays, currentDisplay, t],
+    () => askDisplayOptions(displays, t),
+    [displays, t],
   );
 
   const commitOpacity = () => {
@@ -328,7 +306,7 @@ export const PanelCard: React.FC = () => {
             >
               <Dropdown
                 options={displayOptions}
-                selectedValue={settings?.assistant_ask_display ?? "last_used"}
+                selectedValue={askDisplayValue(settings?.assistant_ask_display)}
                 onSelect={(display) =>
                   void run(commands.setAssistantAskDisplay(display))
                 }

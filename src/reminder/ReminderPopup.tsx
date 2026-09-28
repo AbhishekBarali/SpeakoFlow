@@ -4,6 +4,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { BellRing, Check, Clock, X } from "lucide-react";
 import { FONT_SIZES } from "@/assistant/appearance";
+import { preventBrowserContextMenu } from "@/lib/contextMenu";
+import { useSafeWindowDrag } from "@/lib/useSafeWindowDrag";
 // The panel's own stylesheet, so this window is literally the assistant's card
 // rather than something that resembles it. Same import the settings preview
 // uses, and for the same reason: two copies of a visual language drift.
@@ -56,6 +58,11 @@ export function overdueBucket(
 
 const ReminderPopup: React.FC = () => {
   const { t } = useTranslation();
+  // The header is a drag region. Without this every press on it went straight
+  // to Tauri's handler, which starts the system move loop on mousedown — the
+  // loop that can leave a window stuck to the cursor and the desktop
+  // unclickable (see useSafeWindowDrag).
+  useSafeWindowDrag();
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [snoozeOpenFor, setSnoozeOpenFor] = useState<string | null>(null);
   const [fontSize, setFontSize] = useState(FONT_SIZES.medium);
@@ -163,6 +170,7 @@ const ReminderPopup: React.FC = () => {
       className="assistant-scope reminder-scope"
       ref={rootRef}
       style={{ "--as-msg-font": fontSize } as React.CSSProperties}
+      onContextMenu={preventBrowserContextMenu}
     >
       {reminders.map((reminder) => (
         <section className="ask-card" key={reminder.id}>

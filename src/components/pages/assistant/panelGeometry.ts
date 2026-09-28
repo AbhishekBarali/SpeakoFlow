@@ -1,4 +1,4 @@
-import type { AskAnchor } from "@/bindings";
+import type { AskAnchor, DisplayChoice } from "@/bindings";
 
 /**
  * Where the floating panel opens and how big it is, mirroring the backend
@@ -12,12 +12,47 @@ import type { AskAnchor } from "@/bindings";
 
 export type PanelAnchor = Exclude<AskAnchor, "custom">;
 
+/**
+ * The "Which screen" choices: the screen the mouse is on (the default), then each
+ * connected display by number and resolution. A raw device name ("\\.\DISPLAY2")
+ * means nothing to anyone; the resolution is what people recognise their screens
+ * by.
+ */
+export const askDisplayOptions = (
+  displays: DisplayChoice[],
+  t: (key: string, options?: Record<string, unknown>) => string,
+): { value: string; label: string }[] => [
+  {
+    value: "cursor",
+    label: t("settings.assistant.appearance.askDisplays.cursor"),
+  },
+  ...displays.map((display, index) => ({
+    value: display.id,
+    label: t("settings.assistant.appearance.askDisplays.numbered", {
+      number: index + 1,
+      width: display.width,
+      height: display.height,
+      suffix: display.is_primary
+        ? t("settings.assistant.appearance.askDisplays.mainSuffix")
+        : "",
+    }),
+  })),
+];
+
+/**
+ * The stored display choice as the dropdown shows it. `last_used` was the old
+ * default and now follows the cursor, as the backend treats it.
+ */
+export const askDisplayValue = (stored: string | undefined): string =>
+  !stored || stored === "last_used" ? "cursor" : stored;
+
 const ASK_MIN_WIDTH = 380;
 const ASK_MAX_WIDTH = 760;
 const ASK_MIN_HEIGHT = 340;
 const ASK_MAX_HEIGHT = 720;
-const ASK_PILL_WIDTH = 340;
-const ASK_PILL_HEIGHT = 56;
+/** The smallest frame a display is ever asked to hold (ASK_FRAME_FLOOR_*). */
+const ASK_FRAME_FLOOR_WIDTH = 320;
+const ASK_FRAME_FLOOR_HEIGHT = 160;
 /** Gap between the card and the edge of the display. */
 export const PANEL_MARGIN = 24;
 /** Room left below the card for a taskbar or dock. */
@@ -83,12 +118,15 @@ export const askSizeForDisplay = (
     ASK_MIN_HEIGHT,
     ASK_MAX_HEIGHT * scale,
   );
-  // A small screen wins over the minimum: a card larger than the display
-  // could not be dragged back into view.
-  const fitWidth = Math.max(displayWidth - 2 * PANEL_MARGIN, ASK_PILL_WIDTH);
+  // A small screen wins over the minimum: a frame larger than the display would
+  // put part of the card off screen.
+  const fitWidth = Math.max(
+    displayWidth - 2 * PANEL_MARGIN,
+    ASK_FRAME_FLOOR_WIDTH,
+  );
   const fitHeight = Math.max(
     displayHeight - 2 * PANEL_MARGIN - TASKBAR_CLEARANCE,
-    ASK_PILL_HEIGHT,
+    ASK_FRAME_FLOOR_HEIGHT,
   );
   return {
     width: Math.min(width, fitWidth),

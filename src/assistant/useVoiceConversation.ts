@@ -824,12 +824,15 @@ export function useVoiceConversation(callbacks: VoiceCallbacks) {
   }, [interrupt, refreshPhase]);
 
   /**
-   * Replace the call's conversation — with a new one, or with one from
-   * History — without hanging up.
+   * Replace the call's conversation — with a new one, with one from History, or
+   * with a branch of one from History — without hanging up.
    */
   const switchConversation = useCallback(
     async (
-      command: "assistant_conversation_new" | "assistant_conversation_load",
+      command:
+        | "assistant_conversation_new"
+        | "assistant_conversation_load"
+        | "assistant_conversation_branch",
       args: Record<string, number>,
     ): Promise<boolean> => {
       const s = sessionRef.current;
@@ -860,6 +863,15 @@ export function useVoiceConversation(callbacks: VoiceCallbacks) {
   );
   const loadConversation = useCallback(
     (id: number) => switchConversation("assistant_conversation_load", { id }),
+    [switchConversation],
+  );
+  /** Continue a saved conversation from one message, as a new branch. */
+  const branchConversation = useCallback(
+    (id: number, messageIndex: number) =>
+      switchConversation("assistant_conversation_branch", {
+        id,
+        messageIndex,
+      }),
     [switchConversation],
   );
 
@@ -1093,6 +1105,7 @@ export function useVoiceConversation(callbacks: VoiceCallbacks) {
     stopReply,
     newConversation,
     loadConversation,
+    branchConversation,
     setComposing,
     browserSink,
   };

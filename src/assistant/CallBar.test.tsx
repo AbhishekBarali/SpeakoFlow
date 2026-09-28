@@ -25,6 +25,7 @@ mock.module("@/bindings", () => ({
   },
 }));
 mock.module("@tauri-apps/api/event", () => ({
+  emit: async () => {},
   listen: async () => () => {},
 }));
 
@@ -66,6 +67,7 @@ const voice = (over: Partial<Voice> = {}): Voice =>
       return true;
     },
     loadConversation: async () => true,
+    branchConversation: async () => true,
     setComposing() {},
     browserSink: {},
     ...over,

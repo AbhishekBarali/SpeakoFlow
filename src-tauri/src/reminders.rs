@@ -511,16 +511,14 @@ pub fn schedule(
     info!(
         "Reminder scheduled for {} — {}",
         describe_due(now, due),
-        reminder.text
+        crate::utils::redact_text(&reminder.text)
     );
     Ok(reminder)
 }
 
 /// Acknowledge a reminder: it is done, and it goes away for good.
 pub fn complete(app: &AppHandle, id: &str) -> Result<(), String> {
-    remove(app, id)?;
-    refresh_popup(app);
-    Ok(())
+    remove(app, id)
 }
 
 /// Drop a reminder, fired or not. Used by Done, by Cancel, and by the model's
@@ -543,6 +541,11 @@ pub fn remove(app: &AppHandle, id: &str) -> Result<(), String> {
     }
     store.nudge_scheduler();
     emit_changed(app);
+    // Every removal, not only Done. Cancelling the one reminder on screen (by
+    // asking the assistant, or from Settings) used to empty the card and leave
+    // the window up: invisible, always on top, and taking every click in the
+    // top-right corner of the display.
+    refresh_popup(app);
     Ok(())
 }
 
@@ -731,13 +734,32 @@ fn place_popup(app: &AppHandle, window: &tauri::WebviewWindow) {
     let Some(monitor) = monitor else {
         return;
     };
-    let scale = monitor.scale_factor();
-    let mx = monitor.position().x as f64 / scale;
-    let my = monitor.position().y as f64 / scale;
-    let mw = monitor.size().width as f64 / scale;
-    let x = mx + mw - POPUP_WIDTH - POPUP_MARGIN;
-    let y = my + POPUP_MARGIN;
-    let _ = window.set_position(tauri::LogicalPosition::new(x, y));
+    // Placed in physical pixels on Windows. A logical position is converted with
+    // the scale of the display the window is on *now* — the one it is leaving —
+    // so on a desk with mixed scaling the corner computed for the target display
+    // landed somewhere else, often past its right edge and off screen entirely.
+    // The recording overlay places itself the same way (`PLACE_IN_PHYSICAL`).
+    #[cfg(target_os = "windows")]
+    {
+        let scale = monitor.scale_factor();
+        let right = monitor.position().x as f64 + monitor.size().width as f64;
+        let x = right - (POPUP_WIDTH + POPUP_MARGIN) * scale;
+        let y = monitor.position().y as f64 + POPUP_MARGIN * scale;
+        let _ = window.set_position(tauri::PhysicalPosition::new(
+            x.round() as i32,
+            y.round() as i32,
+        ));
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let scale = monitor.scale_factor();
+        let mx = monitor.position().x as f64 / scale;
+        let my = monitor.position().y as f64 / scale;
+        let mw = monitor.size().width as f64 / scale;
+        let x = mx + mw - POPUP_WIDTH - POPUP_MARGIN;
+        let y = my + POPUP_MARGIN;
+        let _ = window.set_position(tauri::LogicalPosition::new(x, y));
+    }
 }
 
 fn popup_height() -> f64 {

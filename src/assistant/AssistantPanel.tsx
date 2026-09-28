@@ -1,9 +1,9 @@
 import { emit, listen } from "@tauri-apps/api/event";
+import { isTauri } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import React, {
   useCallback,
   useEffect,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -12,10 +12,7 @@ import { useTranslation } from "react-i18next";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
-  AlertCircle,
-  ArrowUp,
   Camera,
-  CameraOff,
   Check,
   Copy,
   CornerDownLeft,
@@ -23,42 +20,33 @@ import {
   Globe,
   ImagePlus,
   Loader2,
-  Lock,
-  Maximize2,
-  Mic,
-  Scissors,
-  Sparkles,
-  Square,
   TextSelect,
-  Volume2,
-  X,
 } from "lucide-react";
 import { commands, type AppSettings } from "@/bindings";
 import { syncLanguageFromSettings } from "@/i18n";
-import { AudioWaveform } from "@/components/shared";
-import { FONT_SIZES, errorKind, type AssistantError } from "./appearance";
+import { FONT_SIZES, type AssistantError } from "./appearance";
 import { useKokoroTts } from "./useKokoroTts";
 import { localTtsActive } from "./localTts";
+import { parseKokoroDevice, useLocalVoiceStatus } from "./localVoice";
 import { usePanelHitRegion, useSuppressContextMenu } from "./hitRegion";
 import { useVoiceConversation } from "./useVoiceConversation";
 import { CallSurface } from "./CallBar";
 import { useCallForm } from "./useCallForm";
 import { AssistantProfilePicker } from "./AssistantProfilePicker";
-import AskBar, { type AskBarPhase } from "./AskBar";
-import AskCard from "./AskCard";
+import QuickAsk, { type PendingImage } from "./QuickAsk";
+import {
+  DEFAULT_LAYOUT,
+  parseLayout,
+  quickAskPhase,
+  workingLabelKey,
+  type AssistantState,
+  type QuickAskLayout,
+} from "./quickAskState";
 import { VOICE_INTERRUPTED_MARKER } from "./conversationPolicy";
 import { useLocalLlmEngineStatus } from "@/hooks/useLocalLlmEngineStatus";
-import { useSafeWindowDrag } from "@/lib/useSafeWindowDrag";
+import { beginSafeResize, useSafeWindowDrag } from "@/lib/useSafeWindowDrag";
 import "./AssistantPanel.css";
 import "@/lib/windowActivity.css";
-
-type AssistantState =
-  | "idle"
-  | "listening"
-  | "transcribing"
-  | "searching"
-  | "thinking"
-  | "speaking";
 
 /** A tool the current turn is running, as reported by the backend. */
 interface ToolActivity {
@@ -72,6 +60,12 @@ interface ToolActivity {
   startedAt: number;
 }
 
+/** A saved conversation for the call to pick up (History → Continue). */
+interface CallContinuation {
+  id: number;
+  messageIndex: number | null;
+}
+
 interface DisplayMessage {
   role: "user" | "assistant";
   content: string;
@@ -79,8 +73,7 @@ interface DisplayMessage {
   images?: number;
   files?: string[];
   /** Display thumbnails (data URLs) for the visuals sent with this message —
-   *  the screen capture first (if any), then attached images. Present on new
-   *  messages; empty on older history (which falls back to the text chips). */
+   *  the screen capture first (if any), then attached images. */
   thumbnails?: string[];
   /** How many characters of text the user had selected in another application
    *  when they asked. The block itself is collapsed into a chip rather than
@@ -102,30 +95,20 @@ const SELECTION_LEAD_IN =
   "The user has this text selected in another application:";
 const SELECTION_REQUEST_PREFIX = "Their request about it: ";
 
-/** A picture waiting to be sent with the next message. Only ever a screen-region
- *  snip — the panel has no route from disk (see the attachment sync effect). */
-interface PendingImage {
-  id: string;
-  dataUrl: string;
-}
-
 const MAX_PENDING_IMAGES = 4;
 
 let attachmentSeq = 0;
 const nextAttachmentId = (): string => `att-${++attachmentSeq}`;
 
-/** How long a transient error / notice lingers on the pill before self-clearing. */
-const TRANSIENT_MS = 5000;
-/** How long a blocking error (needs a settings/permission fix) lingers before
- *  self-clearing. Longer than a transient hiccup so there's time to read the
- *  fix, but it STILL clears — an always-on-top pill must never get permanently
- *  stuck showing a stale error. */
-const BLOCKING_MS = 7000;
+/**
+ * How long a voice-opened quick ask that ended up with nothing to show waits
+ * before it puts itself away. Long enough to ride over the gap between two
+ * pipeline states, short enough that a mis-tap does not leave a prompt behind.
+ */
+const EMPTY_ASK_DISMISS_MS = 350;
 
-/** How long the collapsed pill sits idle (at rest, no hover) before it dims to
- *  a quiet, thin sliver so it stays out of the user's way. Any activity or a
- *  hover brings it straight back. */
-const PILL_IDLE_DIM_MS = 6000;
+/** How long a voice ask's error stays on screen when nobody is pointing at it. */
+const ERROR_DISMISS_MS = 9000;
 
 function toDisplay(raw: {
   role: string;
@@ -139,8 +122,8 @@ function toDisplay(raw: {
   const kept: string[] = [];
   // A selection can be thousands of characters, and re-reading your own
   // highlighted paragraph above the answer is noise. The block is replaced by a
-  // chip saying how much text was attached — the same treatment the screenshot and
-  // file markers get. Keep these delimiters in sync with assistant.rs.
+  // chip saying how much text was attached. Keep these delimiters in sync with
+  // assistant.rs.
   let selectionChars = 0;
   let inSelection = false;
   for (const line of raw.content.split("\n")) {
@@ -157,8 +140,6 @@ function toDisplay(raw: {
       selectionChars += line.length;
       continue;
     }
-    // The lead-in line the backend writes above the block; it explains the
-    // relationship to the model and is redundant next to the chip.
     if (trimmed === SELECTION_LEAD_IN) continue;
     if (trimmed === VOICE_INTERRUPTED_MARKER) continue;
     if (trimmed === SCREENSHOT_MARKER) {
@@ -181,8 +162,6 @@ function toDisplay(raw: {
     content: kept
       .join("\n")
       .trim()
-      // The question is stored as "Their request about it: <question>"; show just
-      // the question, since the chip already says it was about a selection.
       .replace(SELECTION_REQUEST_PREFIX, "")
       .trim(),
     screenshot: screenshot || undefined,
@@ -212,16 +191,8 @@ const CopyButton: React.FC<{ content: string; title: string }> = ({
   );
 };
 
-/** Writes an answer into the app the question was asked from. When the question
- *  was about selected text, the paste lands over that selection and replaces it;
- *  otherwise it goes in at the caret.
- *
- *  Always an explicit click, never automatic. Restoring focus does not reliably
- *  restore a *selection* — some editors and many `contenteditable` fields collapse
- *  it to a caret on blur — and when that happens a "replace" silently becomes an
- *  "insert", leaving the user with both the original and the rewrite. That cannot
- *  be detected beforehand, so the destructive version stays something the user
- *  chooses while looking at the answer. */
+/** Writes an answer from the call transcript into the app it was asked from.
+ *  Always an explicit click, never automatic. */
 const InsertButton: React.FC<{ content: string; title: string }> = ({
   content,
   title,
@@ -282,13 +253,9 @@ const CodeBlock: React.FC<React.HTMLAttributes<HTMLPreElement>> = ({
   );
 };
 
-/** Small inline preview thumbnails of the image(s) sent with a message (screen
- *  capture and/or attached pictures). Clicking a thumbnail pops a larger
- *  preview so you can tell exactly what the assistant was sent — the
- *  full-resolution frame goes to the model, these compact copies are stored
- *  with the message and survive restarts. The first thumbnail carries a small
- *  camera badge when it's a screen capture. Click again (or the backdrop, or
- *  Esc) to dismiss. */
+/** Small inline preview thumbnails of the image(s) sent with a call message.
+ *  Clicking one pops a larger preview; click again, the backdrop, or Esc to
+ *  dismiss. */
 const MessageThumbnails: React.FC<{
   urls: string[];
   hasScreen?: boolean;
@@ -303,24 +270,19 @@ const MessageThumbnails: React.FC<{
 
   const toggle = (el: HTMLElement, url: string) => {
     setPreview((cur) => {
-      // Clicking the open thumbnail again closes it.
       if (cur && cur.url === url) return null;
       const rect = el.getBoundingClientRect();
       const maxW = Math.min(320, window.innerWidth - 24);
       let left = rect.left + rect.width / 2 - maxW / 2;
       left = Math.max(12, Math.min(left, window.innerWidth - maxW - 12));
-      // Prefer showing the enlarged preview above the thumbnail; flip below when
-      // there isn't enough headroom (e.g. a message near the top of the panel).
       const above = rect.top > 220;
       const top = above ? rect.top - 8 : rect.bottom + 8;
       return { url, left, top, above };
     });
   };
 
-  // Dismiss the popped preview on Escape, and let nothing else act on that press.
-  // The panel has its own Escape ladder (clear input, close thread, close panel),
-  // and both listeners sit on `window`, so without this one keystroke closed the
-  // enlarged image *and* the thread it was opened from.
+  // Escape closes the enlarged image and nothing else: the call's own Escape
+  // (hang up) listens on the same window.
   useEffect(() => {
     if (!preview) return;
     const onKey = (e: KeyboardEvent) => {
@@ -377,44 +339,9 @@ const MessageThumbnails: React.FC<{
 /** Shared react-markdown renderers (module scope — stable identity). */
 const MD_COMPONENTS = { pre: CodeBlock };
 
-/**
- * Which shape the quick-ask surface is in.
- *
- * `"leaving"` is the pill on its way out: the beat during which Rust resizes and
- * moves the window. It is a state of its own rather than a flag on `"pill"`
- * because it is the one moment when what the webview draws and what size the
- * window is are deliberately allowed to disagree — the pill has faded to nothing,
- * so the geometry underneath it can change without anything visible jumping.
- */
-type AskStage = "pill" | "leaving" | "card";
-
-/**
- * Height of the talking pill's transparent frame, in logical px.
- *
- * The frame, not the pill: the pill is 34px and hugs its content, floating centred
- * inside this, exactly as the dictation overlay's does. Keep in sync with
- * `ASK_PILL_HEIGHT` in `assistant.rs` and `--ask-pill-h` in `AssistantPanel.css`.
- * Rust owns the window and sends this back on every show, so this constant only
- * covers the frames before the first event arrives.
- */
-const ASK_PILL_HEIGHT = 56;
-
-/**
- * Slack added to a measured card height.
- *
- * Sub-pixel layout rounding and a scrollbar gutter that appears only once the
- * body actually scrolls can each cost a pixel or two, and coming up short is not
- * symmetric with coming up long: two spare pixels of transparent window are
- * invisible, while two missing ones clip the last line of the answer.
- */
-const ASK_FIT_SLACK = 2;
-
-/** Invisible edge/corner grips that drive Tauri's native window resize. The
- *  panel window is borderless (no OS resize border — most noticeably on
- *  Windows), so these provide reliable, easy resizing. Only rendered on the
- *  expanded panel; the pill isn't resizable. */
-// Mirrors Tauri's (non-exported) ResizeDirection string union so we can type
-// the handles without importing an internal type.
+/** Invisible edge/corner grips that drive Tauri's native window resize for the
+ *  expanded call — the only form of this window the user resizes. */
+// Mirrors Tauri's (non-exported) ResizeDirection string union.
 type ResizeDir =
   | "North"
   | "South"
@@ -436,27 +363,14 @@ const RESIZE_HANDLES: { cls: string; dir: ResizeDir }[] = [
   { cls: "sw", dir: "SouthWest" },
 ];
 
-const ResizeHandles: React.FC<{ axis?: "both" | "horizontal" }> = ({
-  axis = "both",
-}) => {
-  const onDown = (e: React.MouseEvent, dir: ResizeDir) => {
-    // Primary button only; don't let the grip start a header drag or a text
-    // selection while the native resize loop runs.
-    if (e.button !== 0) return;
-    e.preventDefault();
-    e.stopPropagation();
-    void getCurrentWindow().startResizeDragging(dir);
-  };
-  // The quick-ask surface is sized to its answer, so only its width is the
-  // user's to set: a vertical grip there would be a control the next reply
-  // silently overrules, which is worse than not offering it.
-  const handles =
-    axis === "horizontal"
-      ? RESIZE_HANDLES.filter(({ cls }) => cls === "e" || cls === "w")
-      : RESIZE_HANDLES;
+const ResizeHandles: React.FC = () => {
+  // Threshold-gated: a resize begun on the press itself could outlive a quick
+  // click and leave the window resizing with the cursor (see beginSafeResize).
+  const onDown = (e: React.MouseEvent, dir: ResizeDir) =>
+    beginSafeResize(e, dir);
   return (
     <>
-      {handles.map(({ cls, dir }) => (
+      {RESIZE_HANDLES.map(({ cls, dir }) => (
         <div
           key={cls}
           className={`assistant-resize ${cls}`}
@@ -469,64 +383,43 @@ const ResizeHandles: React.FC<{ axis?: "both" | "horizontal" }> = ({
 
 const AssistantPanel: React.FC = () => {
   const { t } = useTranslation();
-  // Window dragging with a movement threshold. The pill is one big drag
-  // surface, so without this every click on it enters Windows' modal move loop
-  // (see useSafeWindowDrag).
+  // Window dragging with a movement threshold, so a click on the surface is a
+  // click rather than the start of Windows' modal move loop.
   useSafeWindowDrag();
   // Conversation snapshots from the backend are the single source of truth;
-  // `stream` only holds the in-flight answer between snapshots. This makes
-  // rendering idempotent: duplicate events can never duplicate messages.
+  // `stream` only holds the in-flight answer between snapshots.
   const [history, setHistory] = useState<DisplayMessage[]>([]);
   const [stream, setStream] = useState("");
   const [error, setError] = useState<AssistantError | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [state, setState] = useState<AssistantState>("idle");
-  // Background rolling-summary pass is running (long-chat auto-summarization).
+  // Background rolling-summary pass (long calls).
   const [summarizing, setSummarizing] = useState(false);
   const [input, setInput] = useState("");
   const [attachScreen, setAttachScreen] = useState(false);
-  const [collapsed, setCollapsed] = useState(true);
   // Is the panel window actually on screen? It is built hidden at launch and
   // only shown on a hotkey/turn, so anything expensive (the local TTS weights)
   // waits for this rather than loading into a window nobody has opened.
   const [panelVisible, setPanelVisible] = useState(false);
-  // Whether this window is on screen because the user asked for it (shortcut,
-  // tray) rather than as a voice turn's transient overlay. A deliberately opened
-  // window must never fade itself or time out; see the idle-dim and Live
-  // auto-hide effects.
+  // Whether this window is on screen because the user asked for it (tray,
+  // History, the call key) rather than as a voice ask.
   const [userOpened, setUserOpened] = useState(false);
-  // How many characters of selected text rode along with the current question,
-  // 0 for none. Drives the "about your selection" chip and makes the Insert
-  // button say "Replace selection" rather than just "Insert".
-  const [selectionChars, setSelectionChars] = useState(0);
-  const [locked, setLocked] = useState(false);
-  // The collapsed pill dims to a thin, translucent sliver after a spell of
-  // inactivity so it doesn't sit in the user's way; hovering it (CSS) or any
-  // activity restores it.
-  const [dimmed, setDimmed] = useState(false);
+  // Characters of selected text the current recording picked up, reported while
+  // the user is still speaking. The message itself carries the count once sent.
+  const [selectionCaptured, setSelectionCaptured] = useState(0);
   const [ttsPlaying, setTtsPlaying] = useState(false);
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [micLevels, setMicLevels] = useState<number[]>([]);
   const [visionActive, setVisionActive] = useState(false);
-  // Which tool the turn is running, if any. Shown as a chip: the voice says
-  // "let me look that up", this says *what* is being looked up. Deliberately
-  // never the spoken sentence itself — printing that would just be noise.
   const [tool, setTool] = useState<ToolActivity | null>(null);
   const [toolElapsed, setToolElapsed] = useState(0);
-  const [mounted, setMounted] = useState(false);
   const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
+  const [layout, setLayout] = useState<QuickAskLayout>(DEFAULT_LAYOUT);
+  // The pointer is on the quick-ask surface, which holds back the error timeout.
+  const [hovered, setHovered] = useState(false);
 
-  // Which of the quick ask's shapes is on screen: the small talking pill it opens
-  // in, or the answer card that replaces it. Rust owns this — it has to resize
-  // and move the window before the webview may draw into the new room — and sends
-  // it back with the height the card is allowed to draw (see
-  // `assistant-ask-frame`).
-  const [askStage, setAskStage] = useState<AskStage>("pill");
-  const [askFrameHeight, setAskFrameHeight] = useState(ASK_PILL_HEIGHT);
-
-  // Built-in (llama.cpp) engine setup progress. Lets the panel show "Setting up
-  // the local engine…" during the one-time first-run download instead of a
-  // silent "Thinking…" (or, on failure, a cryptic "Model couldn't start").
+  // Built-in (llama.cpp) engine setup progress, so the first-run download reads
+  // as "Setting up the local engine…" rather than a silent "Thinking…".
   const engine = useLocalLlmEngineStatus();
   const engineSetupActive = engine.active;
   const engineSetupLabel = engineSetupActive
@@ -537,48 +430,27 @@ const AssistantPanel: React.FC = () => {
         : t("assistant.engineSetup.preparing")
     : "";
   const listRef = useRef<HTMLDivElement>(null);
-  // The answer card, measured so Rust can size the window to it rather than to a
-  // guess. Only the webview can know how tall a rendered answer is.
-  const askCardRef = useRef<HTMLDivElement>(null);
-  // The last height reported, so the same answer is not reported twice — every
-  // report resizes a window, and a loop of them would fight the morph.
-  const fittedHeightRef = useRef(0);
   const sendingRef = useRef(false);
-  /// Text typed while a reply was still streaming, sent when the turn ends.
-  const queuedTextRef = useRef<string | null>(null);
   // Streaming is smoothed: raw tokens accumulate in a buffer and are flushed to
-  // React state at most once per animation frame. A fast provider can burst
-  // many tokens between paints, and each flush re-parses the whole growing
-  // markdown reply, so coalescing per-frame keeps the answer readable instead
-  // of janky — readability over raw speed. Reset whenever the stream clears.
+  // React state at most once per animation frame, so a fast provider cannot
+  // re-parse the whole growing markdown reply per token.
   const streamBufferRef = useRef("");
   const streamRafRef = useRef<number | null>(null);
   // Auto-scroll follows new content only while the user is already near the
-  // bottom, so a streaming reply never yanks them down while they scroll up to
-  // read. A brand-new message (their own) always scrolls into view.
+  // bottom, so a streaming reply never yanks them down while they scroll up.
   const stickToBottomRef = useRef(true);
   const prevHistoryLenRef = useRef(0);
-  // Pending animation frame for the scroll-to-bottom that runs when the panel is
-  // shown, so a fast hide/show can't leave two of them queued.
-  const rafRef = useRef<number | null>(null);
-  // Remembers the last pipeline state so we can tell a brand-new turn (idle →
-  // active) from a mid-turn transition — used to clear a stale notice only at
-  // the start of the next turn, never mid-turn.
   const prevStateRef = useRef<AssistantState>("idle");
   // Tracks whether audio actually began during the current "speaking" phase,
   // so we can detect when playback *ends* and hand the UI back to idle.
   const spokeRef = useRef(false);
   // Set when the user presses Stop; blocks a TTS event that was emitted just
-  // before the Stop from slipping through (events can arrive slightly out of
-  // order). Cleared as soon as any new turn becomes active, so it never blocks
-  // a legitimate next answer.
+  // before the Stop from slipping through.
   const suppressTtsRef = useRef(false);
-  // Only surface a local-Kokoro load failure once per failure.
   const kokoroErrorRef = useRef(false);
   const localVoiceRef = useRef<ReturnType<typeof useKokoroTts> | null>(null);
   // Hanging up needs `hidePanel`, which is declared below because it needs
-  // `voice`. The indirection breaks that cycle; the ref is pointed at the real
-  // thing further down, on every render.
+  // `voice`. The indirection breaks that cycle.
   const hangUpRef = useRef<() => void>(() => {});
   const voice = useVoiceConversation({
     stopLocal: () => localVoiceRef.current?.stop(),
@@ -592,39 +464,29 @@ const AssistantPanel: React.FC = () => {
     // The assistant's own voice volume, not the feedback-beep slider — see
     // `assistant_tts_volume` in settings.rs.
     volume: settings?.assistant_tts_volume,
-    // No pace: the call always waits the middle length of pause before ending
-    // a turn. The "time to finish speaking" dial it came from is gone — see
-    // `CallOptions` — and a value someone saved with it must not keep applying
-    // with no control left to change it.
+    // No pace: the call always waits the middle length of pause.
     pace: null,
     onPaceChange: () => {},
     sensitivity: settings?.assistant_conversation_sensitivity,
     onSensitivityChange: (sensitivity) => {
       void commands.setAssistantConversationSensitivity(sensitivity);
     },
-    // Where the call's speaker switch starts. The switch itself is per call.
     speakerOn: settings?.assistant_tts_enabled ?? true,
     onHangUp: () => hangUpRef.current(),
   });
 
   // The call has two forms — the floating bar, and the bar under the open
-  // conversation — and the window size belongs to the form. `useCallForm`
-  // sequences the change so the window resizes while nothing is on screen and
-  // the new form animates in once its window exists. Rust owns the geometry
-  // (see `assistant::set_conversation_expanded`). A call that ends leaves no
-  // expanded form behind: the next one opens as the bar again.
+  // conversation — and the window size belongs to the form (see
+  // `assistant::set_conversation_expanded`).
   const callForm = useCallForm(voice.open);
   const callExpanded = callForm.expanded;
   const resetCallFormRef = useRef(callForm.reset);
   resetCallFormRef.current = callForm.reset;
+  const expandCallRef = useRef(callForm.expand);
+  expandCallRef.current = callForm.expand;
 
-  // Speaking belongs to the call and nothing else. A quick text answer is read,
-  // not listened to, and `run_assistant_turn_inner` decides it the same way: only
-  // a turn that carries a voice ticket is spoken. The local voice stays loaded
-  // while the call's speaker is on, or while the setting says replies are spoken
-  // at all — so flipping the speaker off and on again mid-call does not unload
-  // and reload ~310 MB of weights, while someone who never asked for spoken
-  // replies does not load them just by starting a call.
+  // Speaking belongs to the call and nothing else: a quick answer is read, not
+  // listened to, and `run_assistant_turn_inner` decides it the same way.
   const ttsEnabled =
     voice.open &&
     voice.phase !== "error" &&
@@ -633,15 +495,26 @@ const AssistantPanel: React.FC = () => {
   const ttsVoice = settings?.assistant_tts_voice ?? "af_heart";
   const ttsDtype = settings?.assistant_tts_kokoro_dtype ?? "fp32";
   const ttsSpeed = settings?.assistant_tts_speed ?? 1;
-  // Only the built-in Kokoro engine synthesizes inside this WebView; every
-  // remote engine (OpenAI / ElevenLabs / Azure / OpenRouter) is spoken by Rust,
-  // and the backend only emits `assistant-tts-*` for "kokoro". Mounting the
-  // local model for a remote engine therefore pinned a ~310 MB fp32 ONNX graph
-  // (plus an equal-sized set of WebGPU buffers in the shared GPU process) in a
-  // window that is created at launch and never closed — for a model that is
-  // never asked to speak. See `localTts.ts`.
-  const kokoroEnabled = localTtsActive(ttsEnabled, ttsEngine);
-  const liveOverlay = settings?.assistant_overlay_style === "live";
+  const kokoroDevice = parseKokoroDevice(settings?.assistant_tts_kokoro_device);
+  // Only Kokoro can synthesize inside this WebView, and only while Rust routes
+  // it here; see `localTts.ts` / `localVoice.ts`. On the processor route the
+  // weights stay unloaded. The WebGPU probe runs once, when a call could
+  // actually use it, so Automatic knows where to speak before the first reply.
+  const localVoice = useLocalVoiceStatus({
+    enabled: ttsEngine === "kokoro",
+    probe: localTtsActive(ttsEnabled, ttsEngine) && kokoroDevice === "auto",
+  });
+  const kokoroEnabled =
+    localTtsActive(ttsEnabled, ttsEngine) && localVoice?.route !== "native";
+  const kokoroNativeReady = localVoice?.kokoro_native_ready ?? false;
+  // Don't prepare the in-app model before Rust knows where Kokoro will speak:
+  // on a machine that ends up on the processor it would load ~100–300 MB only
+  // to drop it. The probe answers within milliseconds of a call opening, and a
+  // reply that arrives first still loads the model on demand.
+  const kokoroRouteKnown =
+    !isTauri() ||
+    (localVoice !== null &&
+      !(kokoroDevice === "auto" && localVoice.webgpu === "unknown"));
   const screenAccessMode = settings?.assistant_screen_access_mode ?? "manual";
   const manualScreenAccess = screenAccessMode === "manual";
   const characters = settings?.assistant_characters ?? [];
@@ -654,24 +527,17 @@ const AssistantPanel: React.FC = () => {
     ttsVoice,
     ttsDtype,
     ttsSpeed,
-    // Prepare the weights only once the panel is actually on screen. The window
-    // exists from launch (hidden) so the old unconditional preload paid the full
-    // model cost in the background before the user had asked for anything. A
-    // hidden panel still speaks on demand: `beginStream` loads lazily.
-    panelVisible || voice.open,
+    (panelVisible || voice.open) && kokoroRouteKnown,
     voice.open ? voice.browserSink : undefined,
+    kokoroDevice,
   );
   localVoiceRef.current = tts;
-  // The event listeners are registered once on mount, so anything they call has to
-  // be reached through a ref that always points at the latest value. The spoken
-  // "open live conversation" command arrives on that mount-time listener and needs
-  // the live conversation controls, not the ones from first render.
+  // The event listeners are registered once on mount, so anything they call has
+  // to be reached through a ref that always points at the latest value.
   const voiceRef = useRef(voice);
   voiceRef.current = voice;
   const speakRef = useRef(tts.speak);
   speakRef.current = tts.speak;
-  // The event listeners are registered once on mount, so the streaming calls are
-  // reached through refs that always point at the latest closures.
   const beginStreamRef = useRef(tts.beginStream);
   beginStreamRef.current = tts.beginStream;
   const pushTextRef = useRef(tts.pushText);
@@ -679,12 +545,8 @@ const AssistantPanel: React.FC = () => {
   const endStreamRef = useRef(tts.endStream);
   endStreamRef.current = tts.endStream;
 
-  useEffect(() => setMounted(true), []);
-
-  // Seed the visibility flag from the real window state. The events below are
-  // the live source of truth, but a webview created (or reloaded) while the
-  // panel is already on screen would otherwise sit at "hidden" until the next
-  // show, and skip preparing the local voice.
+  // Seed the visibility flag from the real window state, for a webview created
+  // (or reloaded) while the panel is already on screen.
   useEffect(() => {
     let active = true;
     void getCurrentWindow()
@@ -699,25 +561,20 @@ const AssistantPanel: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (!manualScreenAccess) {
-      setAttachScreen(false);
-    }
+    if (!manualScreenAccess) setAttachScreen(false);
   }, [manualScreenAccess]);
 
   const refreshSettings = useCallback(async () => {
     try {
       const result = await commands.getAppSettings();
-      if (result.status === "ok") {
-        setSettings(result.data);
-      }
+      if (result.status === "ok") setSettings(result.data);
     } catch {
       // bindings not ready yet
     }
   }, []);
 
-  // Clear the in-flight stream and cancel any pending frame flush. Used on a
-  // new conversation snapshot, an error, and when the chat is cleared, so no
-  // buffered tokens leak from a finished turn into the next.
+  // Clear the in-flight stream and cancel any pending frame flush, so no buffered
+  // tokens leak from a finished turn into the next.
   const resetStream = useCallback(() => {
     if (streamRafRef.current !== null) {
       cancelAnimationFrame(streamRafRef.current);
@@ -736,8 +593,7 @@ const AssistantPanel: React.FC = () => {
     [refreshSettings],
   );
 
-  // Apply text size + surface opacity. The panel is dark-only (like the STT
-  // overlay), so there is no theme resolution anymore.
+  // Text size and surface opacity, from settings.
   useEffect(() => {
     if (!settings) return;
     const root = document.documentElement;
@@ -751,9 +607,8 @@ const AssistantPanel: React.FC = () => {
     );
   }, [settings]);
 
-  // Auto-scroll: follow new content while the user sits near the bottom, but
-  // don't fight them if they've scrolled up to read an earlier message. A
-  // freshly-added message (their own typed/spoken one) always scrolls in.
+  // Call transcript auto-scroll: follow new content while the user sits near
+  // the bottom; a freshly-added message of their own always scrolls in.
   useEffect(() => {
     const el = listRef.current;
     if (!el) return;
@@ -764,18 +619,8 @@ const AssistantPanel: React.FC = () => {
     if (stickToBottomRef.current) el.scrollTop = el.scrollHeight;
   }, [history, stream, state, error, notice, callExpanded]);
 
-  // Re-pin after the browser has actually laid the content out.
-  //
-  // The effect above runs on the React commit, which is *before* markdown
-  // reflows, inline image thumbnails decode, and web fonts settle — so
-  // `scrollHeight` at that moment is short and the "scroll to bottom" landed
-  // partway up. Worse, the panel window is hidden rather than destroyed, and a
-  // hidden window measures as zero-height: every scroll performed while it was
-  // off screen was a no-op, so re-opening the panel showed the top of the
-  // conversation and left the user to scroll down to their last message by hand.
-  //
-  // Observing the list covers both: any size change while we're sticking to the
-  // bottom re-pins, including the one that happens when the window is shown.
+  // Re-pin after the browser has actually laid the content out (markdown
+  // reflow, decoded thumbnails, a window that was hidden measuring as zero).
   useEffect(() => {
     const el = listRef.current;
     if (!el || typeof ResizeObserver === "undefined") return;
@@ -786,42 +631,12 @@ const AssistantPanel: React.FC = () => {
     observer.observe(el);
     for (const child of Array.from(el.children)) observer.observe(child);
     return () => observer.disconnect();
-    // `callExpanded`: the call's transcript is only mounted in the expanded
-    // form, so opening it is when there is first something to observe.
   }, [history.length, callExpanded]);
 
-  // Opening the call's conversation is a fresh look at it too: start at the
-  // newest message rather than wherever the list last scrolled to.
   useEffect(() => {
     if (callExpanded) stickToBottomRef.current = true;
   }, [callExpanded]);
 
-  // Showing the panel always returns to the newest message. Re-opening a chat is
-  // a fresh look at it, so an old scroll position (or a stale "user scrolled up"
-  // flag from the previous session) must not survive the reopen.
-  useEffect(() => {
-    if (!panelVisible) return;
-    stickToBottomRef.current = true;
-    const el = listRef.current;
-    if (!el) return;
-    // Two frames: the first is when the shown window gets a real layout, the
-    // second is after that layout has been measured.
-    const outer = requestAnimationFrame(() => {
-      el.scrollTop = el.scrollHeight;
-      const inner = requestAnimationFrame(() => {
-        el.scrollTop = el.scrollHeight;
-      });
-      rafRef.current = inner;
-    });
-    rafRef.current = outer;
-    return () => {
-      cancelAnimationFrame(outer);
-      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
-    };
-  }, [panelVisible, collapsed]);
-
-  // Track whether the message list is scrolled to (near) the bottom, so the
-  // auto-scroll effect knows whether to keep following the reply as it streams.
   const handleMessagesScroll = useCallback(() => {
     const el = listRef.current;
     if (!el) return;
@@ -836,11 +651,8 @@ const AssistantPanel: React.FC = () => {
     /** Register a listener, immediately disposing it if the effect was
      *  already cleaned up (StrictMode double-mount protection). */
     const track = (unlisten: () => void) => {
-      if (cancelled) {
-        unlisten();
-      } else {
-        unlisteners.push(unlisten);
-      }
+      if (cancelled) unlisten();
+      else unlisteners.push(unlisten);
     };
 
     const setup = async () => {
@@ -854,17 +666,7 @@ const AssistantPanel: React.FC = () => {
         // bindings not ready yet; the arm event will synchronize later
       }
 
-      // Sync the pill/expanded state from the backend so a freshly (re)loaded
-      // panel renders the right layout. Without this the webview defaults to
-      // "expanded" and can show the full panel header inside the pill window.
-      try {
-        const isCollapsed = await commands.getAssistantPanelCollapsed();
-        if (!cancelled) setCollapsed(isCollapsed);
-      } catch {
-        // bindings not ready yet; keep current state
-      }
-
-      // Restore conversation (panel window can be recreated mid-conversation)
+      // Restore the conversation (the window can be recreated mid-call).
       try {
         const result = await commands.assistantGetConversation();
         if (result.status === "ok" && !cancelled) {
@@ -877,27 +679,18 @@ const AssistantPanel: React.FC = () => {
       track(
         await listen<{ state: AssistantState }>("assistant-state", (e) => {
           const next = e.payload.state;
-          // A brand-new turn (idle → active) clears any lingering notice from
-          // the previous turn. Mid-turn transitions (e.g. searching → thinking)
-          // must NOT clear it, or the "no web results" heads-up would vanish
-          // before it's seen. Otherwise the transient timer clears it.
+          // A brand-new turn clears any lingering notice from the previous one.
+          // Mid-turn transitions must not, or the "no web results" heads-up
+          // would vanish before it is seen.
           if (prevStateRef.current === "idle" && next !== "idle") {
             setNotice(null);
           }
           prevStateRef.current = next;
           setState(next);
-          if (next !== "listening") {
-            setLocked(false);
-          }
           if (next !== "idle") {
             setError(null);
-            // A new turn is active — allow its eventual spoken reply through,
-            // clearing any suppression left by a previous Stop.
             suppressTtsRef.current = false;
           }
-          // The turn finished — drop the per-turn indicators. The notice is
-          // intentionally kept so it can surface on the collapsed pill after
-          // the turn ends (it self-clears via the transient timer).
           if (next === "idle") {
             setVisionActive(false);
             setTool(null);
@@ -905,8 +698,6 @@ const AssistantPanel: React.FC = () => {
         }),
       );
 
-      // Which tool is running, or null when none is. Emitted at dispatch and
-      // cleared when the turn ends.
       track(
         await listen<{ name: string; detail: string; count: number } | null>(
           "assistant-tool",
@@ -927,14 +718,6 @@ const AssistantPanel: React.FC = () => {
       );
 
       track(
-        await listen<boolean>("recording-locked", (e) => {
-          setLocked(e.payload);
-        }),
-      );
-
-      // Live microphone levels (broadcast to all windows during recording)
-      // drive the waveform shown while the assistant is listening.
-      track(
         await listen<number[]>("mic-level", (e) => {
           setMicLevels(e.payload);
         }),
@@ -946,16 +729,12 @@ const AssistantPanel: React.FC = () => {
         }),
       );
 
-      // Background rolling-summary pass (long-chat auto-summarization) toggling
-      // on/off, so the panel can show a subtle "Summarizing…" indicator.
       track(
         await listen<boolean>("assistant-summarizing", (e) => {
           setSummarizing(e.payload);
         }),
       );
 
-      // Whether the in-flight turn is a screen-vision turn (e.g. the
-      // "Assistant + Screen" shortcut), so the panel/pill can show it.
       track(
         await listen<boolean>("assistant-vision-active", (e) => {
           setVisionActive(e.payload);
@@ -974,8 +753,6 @@ const AssistantPanel: React.FC = () => {
 
       track(
         await listen<string>("assistant-token", (e) => {
-          // Coalesce tokens into the next animation frame rather than
-          // re-rendering (and re-parsing the whole markdown reply) per token.
           streamBufferRef.current += e.payload;
           if (streamRafRef.current === null) {
             streamRafRef.current = window.requestAnimationFrame(() => {
@@ -998,7 +775,6 @@ const AssistantPanel: React.FC = () => {
         ),
       );
 
-      // Non-blocking notices (the turn keeps going), e.g. web search failed.
       track(
         await listen<string>("assistant-notice", (e) => {
           setNotice(e.payload);
@@ -1007,15 +783,11 @@ const AssistantPanel: React.FC = () => {
 
       track(
         await listen<string>("assistant-tts", (e) => {
-          // Ignore a reply that was emitted just before a Stop.
           if (suppressTtsRef.current) return;
           void speakRef.current(e.payload);
         }),
       );
 
-      // Streamed speech: the backend opens a reply, feeds sentences as the model
-      // writes them, then closes it. Kokoro keeps one splitter open across the
-      // whole reply so it reads a continuous answer rather than isolated clips.
       track(
         await listen<number>("assistant-tts-begin", (e) => {
           if (suppressTtsRef.current) return;
@@ -1039,10 +811,9 @@ const AssistantPanel: React.FC = () => {
       track(
         await listen("assistant-tts-stop", () => {
           suppressTtsRef.current = true;
-          // The backend already invalidated the playback epoch. Echoing Stop
-          // back could invalidate a newer reply that started in the meantime.
-          tts.stop(false);
-          // Stopping during the spoken-reply phase ends the turn.
+          // The backend already invalidated the playback epoch; echoing Stop
+          // back could invalidate a newer reply.
+          localVoiceRef.current?.stop(false);
           setState((s) => (s === "speaking" ? "idle" : s));
         }),
       );
@@ -1053,56 +824,62 @@ const AssistantPanel: React.FC = () => {
         }),
       );
 
+      // Which edge of the frame the quick ask grows from. Sent on every show.
       track(
-        await listen<boolean>("assistant-collapsed", (e) => {
-          setCollapsed(e.payload);
+        await listen("assistant-ask-layout", (e) => {
+          setLayout(parseLayout(e.payload));
         }),
       );
 
-      // The stage Rust says we are in. Order is strict and it owns it: the card
-      // may only start drawing once the window is already the card's size, or the
-      // answer is animated inside a 52px pill and clipped. `"leaving"` is the
-      // beat before that, when the pill is fading out and the window is about to
-      // change shape underneath it.
+      // A new quick ask is starting: nothing on screen belongs to it yet.
       track(
-        await listen<{ stage: AskStage; height: number }>(
-          "assistant-ask-frame",
+        await listen("assistant-quick-ask", () => {
+          resetStream();
+          setError(null);
+          setNotice(null);
+          setSelectionCaptured(0);
+          setInput("");
+          setHovered(false);
+        }),
+      );
+
+      // The recording picked up the user's selection. Reported while they are
+      // still speaking, so the pill can show it before the answer arrives.
+      track(
+        await listen<number>("assistant-selection-captured", (e) => {
+          setSelectionCaptured(typeof e.payload === "number" ? e.payload : 0);
+        }),
+      );
+
+      // The call key starts a call. History's Continue starts one with a saved
+      // conversation in it, or loads that conversation into a call already live.
+      track(
+        await listen<CallContinuation | null>(
+          "assistant-start-conversation",
           (e) => {
-            setAskStage(e.payload.stage);
-            setAskFrameHeight(e.payload.height);
-            // A reset back to the pill starts the next answer's measurement from
-            // scratch, so an identical reply still gets a fit report.
-            if (e.payload.stage === "pill") fittedHeightRef.current = 0;
+            const continuation = e.payload;
+            void (async () => {
+              const current = voiceRef.current;
+              if (!current.open || current.phase === "error") {
+                resetCallFormRef.current();
+                await current.start();
+              }
+              if (!continuation) return;
+              const live = voiceRef.current;
+              const opened =
+                continuation.messageIndex === null ||
+                continuation.messageIndex === undefined
+                  ? await live.loadConversation(continuation.id)
+                  : await live.branchConversation(
+                      continuation.id,
+                      continuation.messageIndex,
+                    );
+              if (opened) expandCallRef.current();
+            })();
           },
         ),
       );
 
-      // A turn picked up the text the user had selected in another app. The
-      // payload is the character count, so the panel can say what it is acting on
-      // without echoing the whole selection back at them.
-      track(
-        await listen<number>("assistant-selection-attached", (e) => {
-          setSelectionChars(typeof e.payload === "number" ? e.payload : 0);
-        }),
-      );
-
-      // Only the dedicated call action starts hands-free conversation.
-      track(
-        await listen("assistant-start-conversation", () => {
-          if (voiceRef.current.open && voiceRef.current.phase !== "error")
-            return;
-          resetCallFormRef.current();
-          void voiceRef.current.start();
-        }),
-      );
-
-      // Window visibility, from the two places Rust shows/hides the panel. Used
-      // to decide when it is worth holding the local TTS model in memory.
-      //
-      // The payload says whether the user asked for this window (shortcut, tray)
-      // or whether it is a voice turn's transient overlay. Only the transient
-      // kind may fade itself or time out — see the idle-dim and auto-hide
-      // effects below.
       track(
         await listen<boolean>("assistant-panel-shown", (e) => {
           setPanelVisible(true);
@@ -1110,10 +887,19 @@ const AssistantPanel: React.FC = () => {
         }),
       );
 
+      // Off screen: the quick ask is over, so nothing it showed may be there the
+      // next time the window appears.
       track(
         await listen("assistant-panel-hidden", () => {
           setPanelVisible(false);
           setUserOpened(false);
+          setError(null);
+          setNotice(null);
+          setInput("");
+          setSelectionCaptured(0);
+          setPendingImages([]);
+          setHovered(false);
+          resetStream();
         }),
       );
 
@@ -1134,7 +920,7 @@ const AssistantPanel: React.FC = () => {
         }),
       );
 
-      // A voice turn (pill mic / hotkey) consumed the staged attachments.
+      // A voice turn consumed the staged attachments.
       track(
         await listen("assistant-attachments-consumed", () => {
           setPendingImages([]);
@@ -1154,28 +940,15 @@ const AssistantPanel: React.FC = () => {
     };
   }, [refreshSettings, resetStream]);
 
-  // Every error self-clears so the always-on-top pill can never get stuck
-  // showing a stale error forever (the bug where e.g. "Model can't see images"
-  // lingered indefinitely). Blocking errors — which carry a fix — linger a bit
-  // longer than transient hiccups; both can still be dismissed early with the ×
-  // or resolved in settings.
-  useEffect(() => {
-    if (!error) return;
-    const ms = errorKind(error) === "blocking" ? BLOCKING_MS : TRANSIENT_MS;
-    const timer = window.setTimeout(() => setError(null), ms);
-    return () => window.clearTimeout(timer);
-  }, [error]);
-
+  // A notice is a heads-up, not a state: it clears itself.
   useEffect(() => {
     if (!notice) return;
-    const timer = window.setTimeout(() => setNotice(null), TRANSIENT_MS);
+    const timer = window.setTimeout(() => setNotice(null), 6000);
     return () => window.clearTimeout(timer);
   }, [notice]);
 
-  // Surface a local Kokoro failure (§4: TTS errors are not silent), mapping the
-  // hook's reason to a precise, actionable message. Only once per failure — the
-  // hook keeps the error set until it's retried or cleared. A failure also ends
-  // the "speaking" phase so the pill can't hang.
+  // Surface a local Kokoro failure once per failure, and end the "speaking"
+  // phase so the call cannot hang on it.
   useEffect(() => {
     const err = tts.error;
     if (err && !kokoroErrorRef.current) {
@@ -1185,18 +958,21 @@ const AssistantPanel: React.FC = () => {
           ? "tts_blocked"
           : err.reason === "playback"
             ? "tts_playback"
-            : "tts_local"; // load / synthesis
+            : err.reason === "gpu"
+              ? kokoroDevice === "gpu"
+                ? "tts_gpu_forced"
+                : kokoroNativeReady
+                  ? "tts_gpu"
+                  : "tts_gpu_slow"
+              : "tts_local";
       setError({ code, detail: "" });
       setState((s) => (s === "speaking" ? "idle" : s));
     }
-    if (!err) {
-      kokoroErrorRef.current = false;
-    }
-  }, [tts.error]);
+    if (!err) kokoroErrorRef.current = false;
+  }, [tts.error, kokoroDevice, kokoroNativeReady]);
 
-  // When local voice audio was blocked from auto-playing, the very next click in
-  // the panel is exactly the user gesture the system was waiting for — replay
-  // the held clip on it, so "tap the panel to hear it" just works.
+  // When local voice audio was blocked from auto-playing, the next click in the
+  // panel is exactly the user gesture the system was waiting for.
   useEffect(() => {
     if (tts.error?.reason !== "blocked") return;
     const onGesture = () => tts.retry();
@@ -1205,10 +981,8 @@ const AssistantPanel: React.FC = () => {
   }, [tts.error, tts.retry]);
 
   const busy = state !== "idle";
-  const isListening = state === "listening";
 
-  // Tick a seconds counter while a tool runs, so a long wait reads as progress
-  // rather than as a frozen panel. Stops the moment the tool does.
+  // Tick a seconds counter while a tool runs, so a long wait reads as progress.
   useEffect(() => {
     if (!tool) {
       setToolElapsed(0);
@@ -1222,7 +996,7 @@ const AssistantPanel: React.FC = () => {
     return () => window.clearInterval(id);
   }, [tool]);
 
-  /** What the tool chip reads: the action, then what it's acting on. */
+  /** What the call's tool chip reads: the action, then what it's acting on. */
   const toolLabel = useMemo(() => {
     if (!tool) return null;
     const action =
@@ -1234,16 +1008,8 @@ const AssistantPanel: React.FC = () => {
     return tool.detail ? `${action} · ${tool.detail}` : action;
   }, [tool, t]);
 
-  // Mirror the staged screen captures into the backend so VOICE turns (pill mic
-  // or hotkey — they run entirely in Rust) send them too.
-  //
-  // Images here only ever come from a region snip, which is screen vision. The
-  // panel deliberately has no way to attach a file or an image from disk: it is
-  // the surface you reach for mid-sentence to ask about the thing in front of
-  // you, and a file picker is a errand you go and run. Anything that needs
-  // documents belongs in a chat app with a sidebar, not in a card that opens
-  // over your work. The `files` half of the call stays wired so the backend
-  // keeps one shape of message regardless of where a turn came from.
+  // Mirror the staged screen snips into the backend so voice asks (which run
+  // entirely in Rust) send them too.
   useEffect(() => {
     void commands
       .assistantSetPendingAttachments(
@@ -1263,20 +1029,9 @@ const AssistantPanel: React.FC = () => {
     }
   }, []);
 
-  // Audio is actually coming out of the speakers right now vs. the voice
-  // still being prepared (model loading / synthesis / fetch). The distinction
-  // drives the pill: preparing shows a spinner (feedback, not dead air),
-  // audible shows the speaker + flowing wave.
   const ttsAudible = ttsPlaying || tts.status === "speaking";
-  const ttsActive = ttsAudible || tts.status === "loading";
-  const showStop = busy || ttsActive;
 
-  // The backend parks the turn in "speaking" when a spoken reply is starting.
-  // We own the end of that phase: once playback has started and then stopped
-  // (audio fell after having risen), return to idle. While the voice model is
-  // still loading there is no timeout (the spinner shows honest progress);
-  // otherwise a generous safety timeout prevents a stuck "speaking" pill if
-  // audio never materialises.
+  // The backend parks a spoken turn in "speaking"; we own the end of that phase.
   useEffect(() => {
     if (state !== "speaking") {
       spokeRef.current = false;
@@ -1290,95 +1045,18 @@ const AssistantPanel: React.FC = () => {
       setState("idle");
       return;
     }
-    if (tts.status === "loading") return; // legit long prep — spinner shows
+    if (tts.status === "loading") return;
     const timer = window.setTimeout(() => setState("idle"), 20000);
     return () => window.clearTimeout(timer);
   }, [state, ttsAudible, tts.status]);
 
-  // Idle-dim the collapsed pill: after a spell at rest (idle, no error/notice,
-  // no voice playing) fade and thin it to a quiet sliver so it stays out of the
-  // way. Any activity flips it back here; a hover restores it via CSS. Only the
-  // pill dims — the expanded panel never does.
-  //
-  // The dim only applies to a pill that arrived on its own, as the transient
-  // overlay for a voice turn. A pill the user opened by hand must stay put: the
-  // dimmed state is 54x14 at 0.32 opacity with `visibility: hidden` on every
-  // child, and the window has no taskbar button or alt-tab entry, so fading it
-  // six seconds after an explicit open made the assistant look like it had never
-  // opened at all. Between that and the panel opening collapsed in the first
-  // place, pressing the shortcut appeared to do nothing whatsoever.
-  useEffect(() => {
-    if (!collapsed || userOpened) {
-      setDimmed(false);
-      return;
-    }
-    const atRest = state === "idle" && !error && !notice && !ttsActive;
-    if (!atRest) {
-      setDimmed(false);
-      return;
-    }
-    const timer = window.setTimeout(() => setDimmed(true), PILL_IDLE_DIM_MS);
-    return () => window.clearTimeout(timer);
-  }, [collapsed, userOpened, state, error, notice, ttsActive]);
-
-  // A Live voice overlay is transient: keep it on screen while recording,
-  // generating, and speaking, then dismiss it shortly after the completed
-  // reply. The expanded chat panel remains persistent and is never affected.
-  useEffect(() => {
-    const shouldAutoHide =
-      collapsed &&
-      liveOverlay &&
-      // Same rule as the idle dim: never time out a surface the user opened
-      // deliberately. Because the panel toggle used to leave the window
-      // collapsed, a Live-style user with any prior conversation pressed their
-      // shortcut and watched it vanish 2.5s later.
-      !userOpened &&
-      state === "idle" &&
-      !ttsActive &&
-      !error &&
-      // Never during a call. Hiding now hangs up (see `hide_assistant_panel`),
-      // and the collapsed form here is the conversation pill — a live call the
-      // user can see, not a transient overlay to time out. Without this, a Live
-      // user lost the call 2.5s after every reply with no gesture of their own.
-      !voice.open &&
-      history.length > 0;
-    if (!shouldAutoHide) return;
-
-    const timer = window.setTimeout(() => {
-      void commands.hideAssistantPanel();
-    }, 2500);
-    return () => window.clearTimeout(timer);
-  }, [
-    collapsed,
-    liveOverlay,
-    userOpened,
-    state,
-    ttsActive,
-    error,
-    voice.open,
-    history.length,
-  ]);
-
   const dispatchText = useCallback(
     async (text: string) => {
       sendingRef.current = true;
-      // The one slash command: /summarize compacts the conversation.
-      if (text.toLowerCase() === "/summarize") {
-        try {
-          await commands.assistantSummarize();
-        } catch (err) {
-          setError({ code: null, detail: String(err) });
-        } finally {
-          sendingRef.current = false;
-        }
-        return;
-      }
       const withScreen = attachScreen && manualScreenAccess;
       const images = pendingImages.map((image) => image.dataUrl);
       try {
         if (images.length > 0 || withScreen) {
-          // Screen vision is sticky: it stays armed for the following turns
-          // until the user switches it off (camera toggle or pill badge).
           await commands.assistantSendComposed(text, images, [], withScreen);
           setPendingImages([]);
         } else {
@@ -1395,164 +1073,59 @@ const AssistantPanel: React.FC = () => {
 
   const sendText = useCallback(async () => {
     const text = input.trim();
-    if (!text || sendingRef.current) return;
+    if (!text || sendingRef.current || busy) return;
     setInput("");
-    // Typing while a reply is still streaming used to discard the message
-    // silently, which is worst exactly when it matters: "no, stop, use JWT
-    // instead" is the kind of correction a person types before the previous
-    // answer has finished. Hold it and send it as soon as the turn ends.
-    if (busy) {
-      queuedTextRef.current = text;
-      // A code, not a sentence. The notice surfaces go through
-      // `assistant.notices.<code>`, so storing translated prose here meant the
-      // lookup missed and every surface fell back to its default — which is the
-      // web-search wording. Typing while a reply streamed announced "Web search
-      // didn't return results".
-      setNotice("queued");
-      return;
-    }
+    setError(null);
     await dispatchText(text);
   }, [input, busy, dispatchText]);
 
-  // Flush whatever was typed mid-reply, once the turn is over.
-  useEffect(() => {
-    if (busy) return;
-    const queued = queuedTextRef.current;
-    if (!queued) return;
-    queuedTextRef.current = null;
-    void dispatchText(queued);
-  }, [busy, dispatchText]);
-
   const stopTurn = useCallback(async () => {
-    // Block any reply that was just emitted, then stop local + remote TTS.
     suppressTtsRef.current = true;
     tts.stop();
     setTtsPlaying(false);
     try {
       await commands.assistantStop();
     } catch {
-      // ignore — stop is best-effort
+      // best-effort
     }
   }, [tts]);
 
-  // Cancel an in-flight voice capture (recording/transcribing) without
-  // sending it — the pill's hover-reveal ×, like the STT overlay.
-  const cancelVoice = useCallback(async () => {
-    try {
-      await commands.cancelOperation();
-    } catch {
-      // best-effort
-    }
-  }, []);
-
   const hidePanel = useCallback(async () => {
-    // Closing the panel hangs up. The backend ends the session too (so the
-    // hotkey and tray paths behave the same, and the call's memory pass runs),
-    // but doing it here first releases the microphone on the click instead of on
-    // the event that comes back — X should never leave a live mic behind an
-    // invisible window.
+    // Closing the panel hangs up. The backend ends the session too, but doing it
+    // here first releases the microphone on the click.
     if (voice.open) voice.end();
     await commands.hideAssistantPanel();
   }, [voice]);
 
   // Back out of a quick ask that is still working: stop the recording,
-  // transcription or reply, *then* put the surface away.
-  //
-  // Both halves are needed and the order matters. Hiding alone leaves the
-  // microphone open behind an invisible window — the same bug as a call outliving
-  // its panel — and cancelling alone leaves a pill on screen showing a state that
-  // no longer exists. This is what the ask bar's × does in every working phase;
-  // `hidePanel` on its own is for the resting phases, where there is nothing in
-  // flight to stop.
+  // transcription or reply, *then* put the surface away. Hiding alone would
+  // leave the microphone open behind an invisible window.
   const dismissAsk = useCallback(async () => {
-    await cancelVoice();
+    try {
+      await commands.cancelOperation();
+    } catch {
+      // best-effort
+    }
     await hidePanel();
-  }, [cancelVoice, hidePanel]);
+  }, [hidePanel]);
 
-  // Hang up. The same thing as closing the panel, and deliberately so: the
-  // window *is* the call, so ending the call has to take the window with it.
-  // Ending only the session left the window up and the panel re-rendered as the
-  // quick-ask card, so End looked like it had opened a second, different
-  // assistant — and the next quick ask counted as a follow-up to a call that was
-  // already over.
+  // Hang up. The window *is* the call, so ending the call takes the window.
   const endCall = useCallback(() => {
     void hidePanel();
   }, [hidePanel]);
   hangUpRef.current = endCall;
 
-  const toggleVoice = useCallback(async () => {
-    setError(null);
-    await commands.assistantToggleVoice();
-  }, []);
-
-  // Finish a hands-free (tap-to-lock or toggle) voice capture and send it —
-  // the keyboard-free equivalent of pressing the hotkey again. Stops the
-  // recording and runs the assistant turn on it.
-  const finishVoice = useCallback(async () => {
-    await commands.commitRecording();
-  }, []);
-
-  // Keep a click on a pill button from being swallowed by the window drag
-  // region: the whole pill is draggable (data-tauri-drag-region), so a plain
-  // mousedown on a button starts a native window-move and the button's click
-  // never lands. Stopping propagation on mousedown lets onClick fire reliably.
   const stopDrag = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
   }, []);
 
-  const collapse = useCallback(async (value: boolean) => {
-    await commands.setAssistantPanelCollapsed(value);
-    setCollapsed(value);
-  }, []);
-
-  // A call has no collapsed form (its resting form is the floating bar), and a
-  // collapsed window is not focusable — the call's text field could never take
-  // the keyboard. If the window is ever collapsed during a call, undo it.
-  useEffect(() => {
-    if (voice.open && collapsed) void collapse(false);
-  }, [voice.open, collapsed, collapse]);
-
-  /**
-   * Escape dismisses the card.
-   *
-   * The global cancel binding only exists while a turn is in flight, so once the
-   * answer has landed there is nothing listening system-wide — and a card you
-   * asked for with a keystroke should not need the mouse to go away.
-   *
-   * Not during a call, where the panel is the conversation and closing it hangs
-   * up, and not while a reply is streaming — the global cancel owns that moment
-   * and stopping the reply is what Esc should do there.
-   *
-   * It clears a half-typed follow-up first, so one stray press does not throw
-   * away what you were in the middle of writing.
-   */
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== "Escape" || e.repeat) return;
-      if (voice.open || busy || collapsed) return;
-      e.preventDefault();
-      if (input.trim()) {
-        setInput("");
-        return;
-      }
-      void hidePanel();
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [voice.open, busy, collapsed, input, hidePanel]);
-
-  // Toggle screen-vision straight from the collapsed pill's hover controls, so
-  // it can be armed AND disarmed without opening the panel — one control, shown
-  // only on hover (no separate always-on badge). Derived from the raw state,
-  // not `screenActive`, which is declared later in render.
   const toggleScreen = useCallback(async () => {
-    const next = !(visionActive || attachScreen);
+    const next = !attachScreen;
     setAttachScreen(next);
     await commands.setAssistantScreenArmed(next);
-  }, [visionActive, attachScreen]);
+  }, [attachScreen]);
 
-  /** Localized primary message for a structured error (falls back to the raw
-   *  backend detail for unknown codes / webview-side failures). */
+  /** Localized message for a structured error (falls back to the raw detail). */
   const errorPrimary = useCallback(
     (err: AssistantError): string =>
       err.code
@@ -1563,58 +1136,21 @@ const AssistantPanel: React.FC = () => {
     [t],
   );
 
-  /** Pill-sized variant of the same message. */
-  const errorShort = useCallback(
-    (err: AssistantError): string =>
-      err.code
-        ? t(`assistant.errors.${err.code}Short`, {
-            defaultValue: errorPrimary(err),
-          })
-        : errorPrimary(err),
-    [t, errorPrimary],
-  );
-
-  /**
-   * A notice code as words.
-   *
-   * Every surface used to inline this lookup with `web_search_failed` as the
-   * fallback, so any code without a translation — or, worse, a notice that was
-   * already a sentence — silently claimed a failed web search. One resolver, and
-   * an unknown code degrades to itself rather than to the wrong explanation.
-   */
+  /** A notice code as words; an unknown code degrades to itself. */
   const noticeText = useCallback(
     (code: string): string =>
       t(`assistant.notices.${code}`, { defaultValue: code }),
     [t],
   );
 
-  /** Pill-sized variant, which falls back to the full wording. */
-  const noticeShort = useCallback(
-    (code: string): string =>
-      t(`assistant.notices.${code}Short`, { defaultValue: noticeText(code) }),
-    [t, noticeText],
-  );
-
-  // A voice-engine failure during a call, in the wording the panel would have
-  // used for it. The panel's own error banner lives inside the message list,
-  // which is hidden behind the orb, so a voice that could not load or play left
-  // the call silent with the explanation on a surface nobody could see.
+  // A voice-engine failure during a call, in the wording the panel would use.
   const voiceFault =
     voice.open && error?.code?.startsWith("tts") ? errorPrimary(error) : null;
 
-  const showTypingDots =
-    (state === "thinking" || state === "searching") && stream === "";
-  // User-controlled screen state is meaningful only in Manual mode.
-  const screenActive = manualScreenAccess && (visionActive || attachScreen);
-
-  // The single exchange the Ask card shows. Derived from the same history the
-  // thread renders, so a follow-up ("now make it shorter") still has the whole
-  // conversation behind it — the card only narrows what is *displayed*.
+  // ---- The quick ask ---------------------------------------------------------
   //
-  // The answer is paired by POSITION, not just by role. Taking "the last assistant
-  // message" outright meant a new question that was still transcribing appeared
-  // above the *previous* answer, which reads as though it had already been
-  // answered — the one thing a single-exchange card must never do.
+  // One question and its answer, paired by position so a question still being
+  // transcribed never appears above the previous answer.
   let lastUserIndex = -1;
   let lastAssistantIndex = -1;
   history.forEach((message, index) => {
@@ -1623,140 +1159,91 @@ const AssistantPanel: React.FC = () => {
   });
   const lastUserMessage =
     lastUserIndex >= 0 ? history[lastUserIndex] : undefined;
-  const lastQuestion = lastUserMessage?.content ?? "";
-  const lastAnswer =
+  const question = lastUserMessage?.content ?? "";
+  const finishedAnswer =
     lastAssistantIndex > lastUserIndex
       ? (history[lastAssistantIndex]?.content ?? "")
       : "";
-  // Prefer the count stored on the message itself: the event-driven value survives
-  // past its own turn, so it would keep labelling later answers as being about a
-  // selection long after that selection was used.
-  const askSelectionChars = lastUserMessage?.selectionChars ?? 0;
-  // Status line for the card while it is working. Mirrors the pill's wording so the
-  // two surfaces never disagree about what the assistant is doing.
-  const askStatus = engineSetupActive
+  const phase = quickAskPhase({
+    state,
+    stream,
+    answer: finishedAnswer,
+    hasError: !!error,
+  });
+  const selectionChars =
+    lastUserMessage?.selectionChars ?? (question ? 0 : selectionCaptured);
+  const status = engineSetupActive
     ? engineSetupLabel || t("assistant.engineSetup.short")
-    : state !== "idle"
-      ? t(`assistant.status.${state}`)
-      : t("assistant.status.thinking");
+    : // No search query appended: the pill says what is happening in a few
+      // words, and a query is a sentence the user cannot read at a glance.
+      t(workingLabelKey(phase, state, tool));
 
-  // A new question is being spoken or transcribed, so nothing in `history` belongs
-  // to it yet. Same rule the Live overlay already uses — the card just had no way
-  // to know, which is why a follow-up ask looked like nothing was happening.
-  const askCapturing = state === "listening" || state === "transcribing";
+  // A voice ask that ended with nothing to show — a tap too short to record, or
+  // silence — puts itself away instead of leaving an empty prompt on screen.
+  const capturedRef = useRef(false);
+  useEffect(() => {
+    if (voice.open) return;
+    if (phase === "listening" || phase === "transcribing") {
+      capturedRef.current = true;
+      return;
+    }
+    if (phase !== "prompt") {
+      capturedRef.current = false;
+      return;
+    }
+    if (!capturedRef.current || userOpened || !panelVisible) return;
+    const timer = window.setTimeout(() => {
+      capturedRef.current = false;
+      void commands.hideAssistantPanel();
+    }, EMPTY_ASK_DISMISS_MS);
+    return () => window.clearTimeout(timer);
+  }, [phase, voice.open, userOpened, panelVisible]);
 
-  // The answer is finished when the backend's authoritative snapshot has replaced
-  // the streamed text. Deliberately not `!busy`: a spoken reply keeps the pipeline
-  // busy for as long as it takes to read the answer aloud, and the card should not
-  // wait for that. Deliberately not "an error arrived" either — a failure is one
-  // line, the pill says it perfectly well, and opening a card to deliver bad news
-  // is exactly the sort of motion that makes an app feel unreliable.
-  const askAnswerDone =
-    !voice.open &&
-    !askCapturing &&
-    stream === "" &&
-    lastAnswer.trim().length > 0;
+  // A failed voice ask stays long enough to read, then puts itself away unless the
+  // pointer is on it: an always-on-top error nobody asked to keep must not sit
+  // over the user's work forever. One the user opened from the tray stays.
+  useEffect(() => {
+    if (phase !== "error" || userOpened || hovered || voice.open) return;
+    const timer = window.setTimeout(
+      () => void commands.hideAssistantPanel(),
+      ERROR_DISMISS_MS,
+    );
+    return () => window.clearTimeout(timer);
+  }, [phase, userOpened, hovered, voice.open]);
 
-  /**
-   * Whether the card should be on screen.
-   *
-   * An answer opens the card by itself, always. There was briefly a style in which
-   * the finished reply stayed in the pill behind an expand button, and it was a
-   * mistake in two ways at once: it crammed a paragraph into a 34px lozenge, and
-   * it made the user press something to see the thing they had just asked for. The
-   * card *is* the answer, so arriving at one is what opens it.
-   *
-   * The overlay style now decides only *when*, which is the only part of this a
-   * preference can sensibly own:
-   *
-   *   • live — on the first token, so the reply is read as it is written.
-   *   • otherwise — when the reply is complete. For the two sentences a quick ask
-   *     usually gets, watching them stream is motion with no information in it.
-   */
-  const overlayStyle = settings?.assistant_overlay_style ?? "auto";
-  const askAnswerReady =
-    overlayStyle === "live"
-      ? !voice.open && !askCapturing && (stream !== "" || askAnswerDone)
-      : askAnswerDone;
+  // Escape puts the quick ask away — cancelling whatever is in flight first —
+  // whenever the panel has the keyboard. The call owns Escape while it runs.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.repeat || voice.open) return;
+      e.preventDefault();
+      if (busy) void dismissAsk();
+      else void hidePanel();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [voice.open, busy, dismissAsk, hidePanel]);
 
-  /** Which shape the pill should be showing what it has. */
-  const askBarPhase: AskBarPhase = askCapturing
-    ? state === "listening"
-      ? "listening"
-      : "transcribing"
-    : busy
-      ? "working"
-      : "prompt";
-
-  /**
-   * Measure the finished card and tell Rust how much window it needs.
-   *
-   * The height cannot be decided on the Rust side: it depends on how the answer
-   * wraps, which only the webview knows. It cannot be decided here either — the
-   * ceiling belongs to the display. So the webview measures, Rust clamps and
-   * resizes, and the morph starts when the frame that answer needs already exists
-   * (`assistant-ask-frame`).
-   *
-   * `useLayoutEffect` because the measurement has to happen after the answer is in
-   * the DOM and before the browser paints it: measuring a frame later would let a
-   * card at the wrong height reach the screen first.
-   */
-  useLayoutEffect(() => {
-    if (collapsed || voice.open || !panelVisible || !askAnswerReady) return;
-    const node = askCardRef.current;
-    if (!node) return;
-    // The card is normally pinned to the height Rust gave it, so it has to be let
-    // go for the length of one measurement to find out what it actually wants.
-    node.classList.add("measuring");
-    const natural = Math.ceil(node.scrollHeight) + ASK_FIT_SLACK;
-    node.classList.remove("measuring");
-    // Report only a real change: every report resizes a window, and a report
-    // triggered by its own resize is a loop.
-    if (natural <= 0 || Math.abs(natural - fittedHeightRef.current) < 3) return;
-    fittedHeightRef.current = natural;
-    void emit("assistant-ask-fit", { height: natural });
-  }, [
-    askAnswerReady,
-    lastAnswer,
-    lastQuestion,
-    notice,
-    askSelectionChars,
-    collapsed,
-    panelVisible,
-    voice.open,
-  ]);
+  const requestKeyboard = useCallback(() => {
+    void emit("assistant-ask-keyboard", { want: true });
+  }, []);
 
   /**
-   * Tell Rust which part of the window is drawn, so the transparent rest of it
-   * passes clicks through to the app underneath (see `hitRegion.ts`). Reported
-   * only while the panel is on screen: a hidden window needs no pass-through, and
-   * the guard on the Rust side is retired with the hide anyway.
+   * Tell Rust which part of the window is drawn, so the transparent rest of the
+   * fixed frame passes clicks through to the app underneath (see
+   * `hitRegion.ts`).
    */
   usePanelHitRegion(panelVisible);
   useSuppressContextMenu();
 
   const shellClass = `assistant-scope assistant-shell${
-    collapsed ? "" : " expanded"
-  }${mounted ? " fade-in" : ""}${panelVisible ? "" : " native-window-hidden"}`;
-
-  const profilePicker = (
-    <AssistantProfilePicker
-      profiles={characters}
-      activeId={activeCharacterId}
-      onSelect={selectCharacter}
-      conversation={voice.open}
-    />
-  );
+    panelVisible ? "" : " native-window-hidden"
+  }`;
 
   // ---- The live call: a floating bar, or the bar under the conversation -----
-  //
-  // A call owns the window for as long as it runs, whatever the collapsed flag
-  // says: its resting form already is the small floating bar, so there is no
-  // separate pill for it to collapse into.
   if (voice.open) {
-    const last = history[history.length - 1];
-    const reply =
-      stream || (last?.role === "assistant" ? (last.content ?? "") : "");
+    const showTypingDots =
+      (state === "thinking" || state === "searching") && stream === "";
     const transcript = (
       <div
         className="assistant-messages"
@@ -1833,11 +1320,7 @@ const AssistantPanel: React.FC = () => {
             {message.role === "assistant" && (
               <InsertButton
                 content={message.content}
-                title={
-                  selectionChars > 0
-                    ? t("assistant.insertReplace")
-                    : t("assistant.insert")
-                }
+                title={t("assistant.insert")}
               />
             )}
           </div>
@@ -1850,13 +1333,13 @@ const AssistantPanel: React.FC = () => {
         )}
         {summarizing && (
           <div className="assistant-notice" role="status">
-            <Loader2 size={12} strokeWidth={2} className="apill-spin" />
+            <Loader2 size={12} strokeWidth={2} className="as-spin" />
             {t("assistant.summarizing")}
           </div>
         )}
         {engineSetupActive && (
           <div className="assistant-notice" role="status" aria-live="polite">
-            <Loader2 size={12} strokeWidth={2} className="apill-spin" />
+            <Loader2 size={12} strokeWidth={2} className="as-spin" />
             {engineSetupLabel}
           </div>
         )}
@@ -1874,7 +1357,7 @@ const AssistantPanel: React.FC = () => {
         )}
         {toolLabel && (
           <div className="assistant-tool-chip" aria-live="polite">
-            <Loader2 className="apill-spin" size={12} aria-hidden="true" />
+            <Loader2 className="as-spin" size={12} aria-hidden="true" />
             <span className="assistant-tool-text">{toolLabel}</span>
             {toolElapsed >= 3 && (
               <span className="assistant-tool-elapsed">
@@ -1901,7 +1384,14 @@ const AssistantPanel: React.FC = () => {
           onCollapse={callForm.collapse}
           onEnd={endCall}
           name={activeCharacter?.name ?? t("assistant.title")}
-          profilePicker={profilePicker}
+          profilePicker={
+            <AssistantProfilePicker
+              profiles={characters}
+              activeId={activeCharacterId}
+              onSelect={selectCharacter}
+              conversation={voice.open}
+            />
+          }
           transcript={transcript}
           resizeHandles={callExpanded ? <ResizeHandles /> : null}
           hasConversation={history.length > 0}
@@ -1919,592 +1409,62 @@ const AssistantPanel: React.FC = () => {
     );
   }
 
-  if (collapsed) {
-    // ---- The voice pill: state carried by the waveform -------------------
-    const isSearchingPhase = state === "searching";
-    // Voice reply actually audible vs. still being prepared (model load /
-    // synthesis / fetch). Preparing shows a spinner — honest feedback instead
-    // of a silent "speaking" wave.
-    const isVoicePreparing =
-      tts.status === "loading" || (state === "speaking" && !ttsAudible);
-    const isWorkingPhase =
-      state === "thinking" || state === "transcribing" || isVoicePreparing;
-    const showError = !!error && !busy;
-    const pillBusy = showStop && !showError;
-    // A quiet post-turn heads-up (e.g. web search found nothing), shown only at
-    // rest so it never competes with the working waveform. Self-clears.
-    const showNotice = !!notice && !showStop && !showError;
-
-    const pillStatus = showError
-      ? errorShort(error)
-      : engineSetupActive
-        ? engineSetupLabel || t("assistant.engineSetup.short")
-        : tts.status === "loading"
-          ? t("assistant.tts.loadingShort", { progress: tts.progress })
-          : busy
-            ? t(`assistant.status.${state}`)
-            : ttsActive
-              ? t("assistant.status.speaking")
-              : t("assistant.pill.idle");
-
-    const waveMode: "reactive" | "shimmer" | "flow" = isListening
-      ? "reactive"
-      : ttsAudible
-        ? "flow"
-        : "shimmer";
-
-    if (liveOverlay) {
-      const latestUser = [...history]
-        .reverse()
-        .find((message) => message.role === "user");
-      const latestAssistant = [...history]
-        .reverse()
-        .find((message) => message.role === "assistant");
-      const capturing = state === "listening" || state === "transcribing";
-      const question = capturing ? "" : (latestUser?.content ?? "");
-      const answer = capturing ? "" : stream || latestAssistant?.content || "";
-
-      return (
-        <div className={`${shellClass} live-overlay`}>
-          <section
-            className={`alive-card${isListening ? " listening" : ""}${
-              error ? " error" : ""
-            }`}
-            aria-live="polite"
-          >
-            <header className="alive-header">
-              <div className="alive-phase" data-tauri-drag-region>
-                {isListening ? (
-                  <AudioWaveform
-                    levels={micLevels}
-                    size="sm"
-                    barCount={10}
-                    mode="reactive"
-                    active
-                  />
-                ) : ttsAudible ? (
-                  <Volume2 size={14} strokeWidth={2} />
-                ) : busy || tts.status === "loading" ? (
-                  <Loader2 size={14} strokeWidth={2.4} className="apill-spin" />
-                ) : (
-                  <Sparkles size={14} strokeWidth={2} />
-                )}
-                <span data-tauri-drag-region>{pillStatus}</span>
-              </div>
-              <div className="alive-actions" onMouseDown={stopDrag}>
-                {locked && isListening && (
-                  <button
-                    type="button"
-                    className="alive-button"
-                    onClick={finishVoice}
-                    onMouseDown={stopDrag}
-                    title={t("assistant.status.locked")}
-                    aria-label={t("assistant.status.locked")}
-                  >
-                    <Check size={14} strokeWidth={2.5} />
-                  </button>
-                )}
-                {showStop && (
-                  <button
-                    type="button"
-                    className="alive-button danger"
-                    onClick={capturing ? cancelVoice : stopTurn}
-                    onMouseDown={stopDrag}
-                    title={
-                      capturing ? t("assistant.cancel") : t("assistant.stop")
-                    }
-                    aria-label={
-                      capturing ? t("assistant.cancel") : t("assistant.stop")
-                    }
-                  >
-                    {capturing ? (
-                      <X size={14} strokeWidth={2.5} />
-                    ) : (
-                      <Square size={12} strokeWidth={2.5} />
-                    )}
-                  </button>
-                )}
-                <button
-                  type="button"
-                  className="alive-button"
-                  onClick={() => collapse(false)}
-                  onMouseDown={stopDrag}
-                  title={t("assistant.pill.expand")}
-                  aria-label={t("assistant.pill.expand")}
-                >
-                  <Maximize2 size={13} />
-                </button>
-                <button
-                  type="button"
-                  className="alive-button danger"
-                  onClick={hidePanel}
-                  onMouseDown={stopDrag}
-                  title={t("assistant.pill.close")}
-                  aria-label={t("assistant.pill.close")}
-                >
-                  <X size={14} />
-                </button>
-              </div>
-            </header>
-
-            <div className="alive-content">
-              {error ? (
-                <div className="alive-error" role="alert">
-                  <AlertCircle size={15} />
-                  <span>{errorPrimary(error)}</span>
-                </div>
-              ) : capturing ? (
-                <div className="alive-capture">
-                  <AudioWaveform
-                    levels={isListening ? micLevels : []}
-                    size="md"
-                    barCount={18}
-                    mode={isListening ? "reactive" : "shimmer"}
-                    active={isListening}
-                  />
-                  <span>
-                    {locked && isListening
-                      ? t("assistant.status.locked")
-                      : t(`assistant.status.${state}`)}
-                  </span>
-                </div>
-              ) : (
-                <>
-                  {question && (
-                    <div className="alive-row user">
-                      <Mic size={13} strokeWidth={2} aria-hidden="true" />
-                      <p>{question}</p>
-                    </div>
-                  )}
-                  <div className="alive-row assistant">
-                    <Sparkles size={13} strokeWidth={2} aria-hidden="true" />
-                    <div className="alive-answer">
-                      {answer ? (
-                        <ReactMarkdown
-                          remarkPlugins={[remarkGfm]}
-                          components={MD_COMPONENTS}
-                        >
-                          {answer}
-                        </ReactMarkdown>
-                      ) : showTypingDots || engineSetupActive ? (
-                        <span className="alive-working">
-                          <Loader2 className="apill-spin" size={12} />
-                          {engineSetupActive
-                            ? engineSetupLabel
-                            : (toolLabel ?? t(`assistant.status.${state}`))}
-                        </span>
-                      ) : (
-                        <span className="alive-placeholder">
-                          {activeCharacter?.greeting?.trim()
-                            ? activeCharacter.greeting
-                            : t("assistant.empty")}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-          </section>
-        </div>
-      );
-    }
-
-    return (
-      <div className={shellClass} data-tauri-drag-region>
-        <div
-          className={`apill${isListening ? " listening" : ""}${
-            showError ? " error" : ""
-          }${dimmed ? " dimmed" : ""}`}
-          data-tauri-drag-region
-          role="status"
-          aria-label={pillStatus}
-          title={showError ? error.detail || undefined : undefined}
-        >
-          {showError ? (
-            <>
-              <AlertCircle size={14} className="apill-error-icon" />
-              <span className="apill-error-text" data-tauri-drag-region>
-                {errorShort(error)}
-              </span>
-              <button
-                className="apill-cancel"
-                onClick={() => setError(null)}
-                onMouseDown={stopDrag}
-                title={t("assistant.pill.dismiss")}
-                aria-label={t("assistant.pill.dismiss")}
-              >
-                <X size={13} strokeWidth={2.5} />
-              </button>
-            </>
-          ) : pillBusy || isListening ? (
-            // Busy phases: one living waveform, a small side glyph for the
-            // phases worth calling out. Hovering reveals expand + cancel — the
-            // user is never locked out of the full panel while it works.
-            <>
-              {/* Assistant identity anchor: a sparkle leads the pill whenever a
-                  phase-specific glyph (search / speaking) isn't showing, so the
-                  listening / thinking states never collapse to "just a
-                  waveform" — which is what made this chip indistinguishable
-                  from the STT recording overlay. The accent tint lives here
-                  (see .apill-glyph.identity) rather than being smeared across
-                  the whole chip. */}
-              {!isSearchingPhase && !ttsAudible && (
-                <span
-                  className="apill-glyph identity"
-                  data-tauri-drag-region
-                  aria-hidden="true"
-                >
-                  <Sparkles size={13} strokeWidth={2} />
-                </span>
-              )}
-              {isSearchingPhase && (
-                <span className="apill-glyph" data-tauri-drag-region>
-                  <Globe size={13} strokeWidth={2} />
-                </span>
-              )}
-              {ttsAudible && (
-                <span className="apill-glyph" data-tauri-drag-region>
-                  <Volume2 size={13} strokeWidth={2} />
-                </span>
-              )}
-              <div className="apill-wave" data-tauri-drag-region>
-                <AudioWaveform
-                  levels={isListening ? micLevels : []}
-                  size="sm"
-                  barCount={12}
-                  mode={waveMode}
-                  active={isListening}
-                />
-              </div>
-              {isWorkingPhase && (
-                <Loader2 size={12} strokeWidth={2.5} className="apill-spin" />
-              )}
-              <div className="apill-reveal quick">
-                <button
-                  className="apill-btn"
-                  onClick={() => collapse(false)}
-                  onMouseDown={stopDrag}
-                  title={t("assistant.pill.expand")}
-                  aria-label={t("assistant.pill.expand")}
-                >
-                  <Maximize2 size={11} strokeWidth={2.25} />
-                </button>
-                {/* Stop: revealed on hover so the resting pill stays a calm
-                    "playing" wave (speaker + waveform). Hovering while the
-                    assistant is thinking, searching, or speaking exposes the
-                    square to stop the turn. During voice capture
-                    (listening/transcribing) the ✗ below cancels instead. */}
-                {showStop && !isListening && state !== "transcribing" && (
-                  <button
-                    className="apill-btn danger apill-stop"
-                    onClick={stopTurn}
-                    onMouseDown={stopDrag}
-                    title={t("assistant.stop")}
-                    aria-label={t("assistant.stop")}
-                  >
-                    <Square size={11} strokeWidth={2.75} />
-                  </button>
-                )}
-                {/* Cancel during voice capture: aborts the recording/
-                    transcription without sending it (the ✗ the comment above
-                    promised). Wired to the global cancel so it stops recording,
-                    STT, and any in-flight turn. */}
-                {(isListening || state === "transcribing") && (
-                  <button
-                    className="apill-btn danger apill-stop"
-                    onClick={cancelVoice}
-                    onMouseDown={stopDrag}
-                    title={t("assistant.cancel")}
-                    aria-label={t("assistant.cancel")}
-                  >
-                    <X size={11} strokeWidth={2.75} />
-                  </button>
-                )}
-              </div>
-            </>
-          ) : (
-            // Idle: a quiet mic + resting wave; hovering reveals expand/close.
-            <>
-              <button
-                className="apill-btn apill-mic"
-                onClick={toggleVoice}
-                onMouseDown={stopDrag}
-                title={t("assistant.pill.talk")}
-                aria-label={t("assistant.pill.talk")}
-              >
-                <Mic size={13} strokeWidth={2.25} />
-              </button>
-              {showNotice ? (
-                <span
-                  className="apill-notice"
-                  role="status"
-                  data-tauri-drag-region
-                  title={noticeText(notice)}
-                >
-                  <Globe
-                    size={11}
-                    strokeWidth={2}
-                    className="apill-notice-icon"
-                  />
-                  <span className="apill-notice-text">
-                    {noticeShort(notice)}
-                  </span>
-                </span>
-              ) : (
-                <div className="apill-wave rest" data-tauri-drag-region>
-                  <AudioWaveform
-                    levels={[]}
-                    size="sm"
-                    barCount={8}
-                    mode="reactive"
-                    active={false}
-                  />
-                </div>
-              )}
-              <div className="apill-reveal">
-                <button
-                  className="apill-btn"
-                  onClick={() => collapse(false)}
-                  onMouseDown={stopDrag}
-                  title={t("assistant.pill.expand")}
-                  aria-label={t("assistant.pill.expand")}
-                >
-                  <Maximize2 size={12} strokeWidth={2.25} />
-                </button>
-                <button
-                  className="apill-btn danger"
-                  onClick={hidePanel}
-                  onMouseDown={stopDrag}
-                  title={t("assistant.pill.close")}
-                  aria-label={t("assistant.pill.close")}
-                >
-                  <X size={13} strokeWidth={2.5} />
-                </button>
-              </div>
-            </>
-          )}
-          {/* Screen-vision toggle: a small top-right badge. When armed it stays
-              visible in every state (so you always know capture is on); when off
-              it's hidden until you hover the pill, so it's there to enable but
-              never clutters. One control — click to arm, click to disarm. */}
-          {manualScreenAccess && !showError && (
-            <button
-              className={`apill-screen${screenActive ? " armed" : ""}`}
-              onClick={toggleScreen}
-              onMouseDown={stopDrag}
-              title={
-                screenActive
-                  ? t("assistant.pill.disarmScreen")
-                  : t("assistant.pill.armScreen")
-              }
-              aria-label={
-                screenActive
-                  ? t("assistant.pill.disarmScreen")
-                  : t("assistant.pill.armScreen")
-              }
-              aria-pressed={screenActive}
-            >
-              {screenActive ? (
-                <Camera size={9} strokeWidth={2.5} />
-              ) : (
-                <CameraOff size={9} strokeWidth={2.5} />
-              )}
-            </button>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  // ---- The quick ask: one surface, two shapes ---------------------------
-  //
-  // The bar and the card are drawn as two layers of the same morphing surface
-  // rather than swapped for each other, for two reasons. The surface's rounded
-  // edge has to travel from a lozenge to a card in one continuous motion, which a
-  // swap cannot do. And the card has to be in the DOM, laid out at its real
-  // width, *before* it is shown — that is what the measurement in
-  // `useLayoutEffect` above reads, and the height it reports is what buys the
-  // window the room to unfold into.
-  const followUpBusy = busy || ttsActive;
   return (
     <div className={shellClass}>
       <div
-        className={`ask-stage ${askStage}`}
-        style={{ "--ask-h": `${askFrameHeight}px` } as React.CSSProperties}
+        className="qa-frame"
+        data-align={layout.align}
+        data-justify={layout.justify}
+        onPointerEnter={() => setHovered(true)}
+        onPointerLeave={() => setHovered(false)}
       >
-        <div className="ask-surface">
-          {/* Width only. Height belongs to the answer, so a vertical grip
-                would be a control the next reply silently overrules. */}
-          <ResizeHandles axis="horizontal" />
-
-          <div className="ask-layer pill" aria-hidden={askStage !== "pill"}>
-            <AskBar
-              phase={askBarPhase}
-              active={askStage === "pill" && !askAnswerReady}
-              state={state}
-              status={askStatus}
-              levels={isListening ? micLevels : undefined}
-              error={error && !busy ? errorShort(error) : null}
-              input={input}
-              onInputChange={(value) => {
-                setInput(value);
-                if (error) setError(null);
-              }}
-              onSubmit={() => void sendText()}
-              onClose={hidePanel}
-              onCancel={dismissAsk}
-              stopDrag={stopDrag}
-            />
-          </div>
-
-          <div
-            className="ask-layer card"
-            ref={askCardRef}
-            aria-hidden={askStage !== "card"}
-          >
-            <AskCard
-              question={lastQuestion}
-              answer={stream || lastAnswer}
-              busy={busy}
-              status={askStatus}
-              capturing={askCapturing}
-              levels={isListening ? micLevels : undefined}
-              error={error ? errorPrimary(error) : null}
-              notice={notice ? noticeText(notice) : null}
-              selectionChars={askSelectionChars}
-              markdown={MD_COMPONENTS}
-              onClose={hidePanel}
-              stopDrag={stopDrag}
-            />
-
-            {pendingImages.length > 0 && (
-              <div className="assistant-attachments">
-                {pendingImages.map((image) => (
-                  <span className="attachment-chip" key={image.id}>
-                    <img src={image.dataUrl} alt="" />
-                    <span className="chip-name">
-                      {t("assistant.attach.image")}
-                    </span>
-                    <button
-                      className="chip-remove"
-                      onClick={() =>
-                        setPendingImages((prev) =>
-                          prev.filter((i) => i.id !== image.id),
-                        )
-                      }
-                      title={t("assistant.attach.remove")}
-                    >
-                      <X size={11} strokeWidth={2.5} />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
-
-            {/* Ask again, about the answer above. Whether the assistant may
-                  search the web is a preference, not a per-question decision, so
-                  its switch lives in Settings → Assistant with the rest of the
-                  search configuration — the model decides when to actually use
-                  it. */}
-            <div className="assistant-input-row">
-              {manualScreenAccess && (
-                <button
-                  className={`assistant-attach-button${attachScreen ? " armed" : ""}`}
-                  onClick={() => void toggleScreen()}
-                  onMouseDown={stopDrag}
-                  disabled={askStage !== "card"}
-                  title={
-                    attachScreen
-                      ? t("assistant.detachScreen")
-                      : t("assistant.attachScreen")
-                  }
-                >
-                  <Camera size={15} />
-                </button>
-              )}
-              {manualScreenAccess && (
-                <button
-                  className="assistant-attach-button"
-                  onClick={beginSnip}
-                  onMouseDown={stopDrag}
-                  disabled={askStage !== "card"}
-                  title={t("assistant.attach.snip")}
-                >
-                  <Scissors size={15} />
-                </button>
-              )}
-              <input
-                className="assistant-input"
-                type="text"
-                value={input}
-                // The bar carries the same field while it is on screen; two
-                // live inputs over one value would fight for the caret.
-                disabled={askStage !== "card"}
-                placeholder={
-                  attachScreen
-                    ? t("assistant.inputPlaceholderScreen")
-                    : t("assistant.followUpPlaceholder")
-                }
-                onChange={(e) => {
-                  setInput(e.target.value);
-                  // Typing a new message clears any lingering error so the user
-                  // isn't blocked by (or waiting out) a stale failure notice.
-                  if (error) setError(null);
-                }}
-                onMouseDown={stopDrag}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.repeat) {
-                    void sendText();
-                  }
-                }}
-              />
-              {(isListening || state === "transcribing") && (
-                <button
-                  className="assistant-send-button ghost"
-                  onClick={cancelVoice}
-                  onMouseDown={stopDrag}
-                  title={t("assistant.cancel")}
-                  aria-label={t("assistant.cancel")}
-                >
-                  <X size={16} strokeWidth={2.75} />
-                </button>
-              )}
-              {state !== "transcribing" && (
-                <button
-                  className="assistant-send-button"
-                  onClick={
-                    isListening
-                      ? finishVoice
-                      : followUpBusy
-                        ? stopTurn
-                        : sendText
-                  }
-                  onMouseDown={stopDrag}
-                  disabled={
-                    askStage !== "card" ||
-                    (!isListening && !followUpBusy && !input.trim())
-                  }
-                  title={
-                    isListening
-                      ? t("assistant.finish")
-                      : followUpBusy
-                        ? t("assistant.stop")
-                        : t("assistant.send")
-                  }
-                >
-                  {isListening ? (
-                    <Check size={16} strokeWidth={2.75} />
-                  ) : followUpBusy ? (
-                    <Square size={15} strokeWidth={2.5} />
-                  ) : (
-                    <ArrowUp size={16} strokeWidth={2.5} />
-                  )}
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
+        <QuickAsk
+          phase={phase}
+          status={status}
+          levels={state === "listening" ? micLevels : undefined}
+          question={question}
+          answer={stream || finishedAnswer}
+          markdown={MD_COMPONENTS}
+          selectionChars={selectionChars}
+          screen={
+            visionActive ||
+            tool?.name === "capture_screen" ||
+            (manualScreenAccess && attachScreen && phase !== "prompt")
+          }
+          error={error ? errorPrimary(error) : null}
+          notice={notice ? noticeText(notice) : null}
+          canRetry={question.trim().length > 0 && !busy}
+          input={input}
+          onInputChange={(value) => {
+            setInput(value);
+            if (error) setError(null);
+          }}
+          onSubmit={() => void sendText()}
+          autoFocus
+          onRequestKeyboard={requestKeyboard}
+          screenToggle={
+            manualScreenAccess
+              ? { armed: attachScreen, onToggle: () => void toggleScreen() }
+              : null
+          }
+          onSnip={manualScreenAccess ? () => void beginSnip() : null}
+          pendingImages={pendingImages}
+          onRemoveImage={(id) =>
+            setPendingImages((prev) => prev.filter((i) => i.id !== id))
+          }
+          onClose={() => void hidePanel()}
+          onCancel={() => void dismissAsk()}
+          onStop={() => void stopTurn()}
+          onRetry={() => {
+            setError(null);
+            void commands.assistantRegenerate();
+          }}
+          onInsert={async (text) => {
+            const result = await commands.assistantInsertText(text);
+            return result.status === "ok";
+          }}
+          stopDrag={stopDrag}
+        />
       </div>
     </div>
   );

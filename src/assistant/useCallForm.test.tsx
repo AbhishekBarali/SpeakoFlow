@@ -22,6 +22,7 @@ mock.module("@/bindings", () => ({
   },
 }));
 mock.module("@tauri-apps/api/event", () => ({
+  emit: async () => {},
   listen: async (
     name: string,
     handler: (event: { payload: unknown }) => void,

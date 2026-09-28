@@ -27,9 +27,13 @@ fn legacy_screen_access_mode(enabled: bool) -> AssistantScreenAccessMode {
 }
 
 /// Send a typed message to the assistant (keyboard alternative to voice).
+///
+/// A typed quick ask is one job, exactly like a spoken one, so it starts from an
+/// empty conversation (a no-op during a call, which owns the conversation).
 #[tauri::command]
 #[specta::specta]
 pub async fn assistant_send_text(app: AppHandle, text: String) -> Result<(), String> {
+    assistant::begin_quick_ask_exchange(&app);
     assistant::run_assistant_turn(app, text, None, Vec::new(), Vec::new(), None).await;
     Ok(())
 }
@@ -87,6 +91,7 @@ pub async fn assistant_send_composed(
         None
     };
     let manual_screen_token = screenshot.as_ref().and(manual_screen_token);
+    assistant::begin_quick_ask_exchange(&app);
     assistant::run_assistant_turn(app, text, screenshot, images, files, manual_screen_token).await;
     Ok(())
 }
@@ -181,8 +186,16 @@ pub struct SnipRect {
 #[tauri::command]
 #[specta::specta]
 pub fn assistant_finish_region_snip(app: AppHandle, rect: Option<SnipRect>) -> Result<(), String> {
-    require_manual_screen_access(get_settings(&app).assistant_screen_access_mode)?;
-    assistant::authorize_manual_screen_operation(&app)?;
+    // The snip surface covers the whole display and takes every click, so it has
+    // to come down whatever happens next. Returning early here used to leave it
+    // up — and its Esc and right-click both call back into this same command, so
+    // they failed the same way and the screen stayed dead.
+    let allowed = require_manual_screen_access(get_settings(&app).assistant_screen_access_mode)
+        .and_then(|_| assistant::authorize_manual_screen_operation(&app).map(|_| ()));
+    if let Err(e) = allowed {
+        assistant::finish_region_snip(&app, None);
+        return Err(e);
+    }
     assistant::finish_region_snip(&app, rect.map(|r| (r.x, r.y, r.width, r.height)));
     Ok(())
 }
@@ -218,29 +231,22 @@ pub async fn assistant_summarize(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-/// Load a past conversation from History into the panel and open it, so the
-/// user can continue where they left off. Future turns update that same row.
+/// Carry on a past conversation from History.
+///
+/// A conversation is what the call is for — the quick ask is one question and one
+/// answer, with nothing to continue it from — so this opens the call with the
+/// saved thread loaded. Future turns update that same History row.
 #[tauri::command]
 #[specta::specta]
 pub fn assistant_resume_session(app: AppHandle, id: i64) -> Result<(), String> {
-    crate::voice_conversation::end(&app);
-    let conversation = app.state::<AssistantConversation>();
-    if conversation.is_busy() {
-        return Err("The assistant is answering right now — stop it first.".to_string());
-    }
-    let hm = app
-        .try_state::<std::sync::Arc<crate::managers::history::HistoryManager>>()
-        .ok_or_else(|| "History unavailable".to_string())?;
-    let entry = hm
-        .get_assistant_session(id)
-        .map_err(|e| format!("Couldn't load the conversation: {}", e))?
-        .ok_or_else(|| "That conversation no longer exists.".to_string())?;
-
-    conversation.load_session(entry.id, entry.messages);
-    assistant::emit_conversation(&app);
-    // Open straight into the full panel — resuming is a reading/typing flow.
-    assistant::set_panel_collapsed(&app, false);
-    assistant::show_assistant_panel(&app);
+    ensure_saved_session_is_available(&app, id)?;
+    assistant::continue_in_call(
+        &app,
+        assistant::CallContinuation {
+            id,
+            message_index: None,
+        },
+    );
     Ok(())
 }
 
@@ -248,13 +254,11 @@ pub fn assistant_resume_session(app: AppHandle, id: i64) -> Result<(), String> {
 ///
 /// The thread up to and including `message_index` is adopted and everything after
 /// it is left behind, so the user can take a conversation they liked and try a
-/// different direction from the middle of it.
+/// different direction from the middle of it. Opens in the call, like resuming.
 ///
 /// **The original is never modified.** The branch is loaded with no session id, so
 /// the next turn writes a fresh History row and the conversation being forked stays
-/// exactly as it was. That is what makes this safe to reach for — there is no
-/// version of this that loses the thread you branched from, and so no need for a
-/// history tree to protect it.
+/// exactly as it was.
 #[tauri::command]
 #[specta::specta]
 pub fn assistant_branch_session(
@@ -262,27 +266,33 @@ pub fn assistant_branch_session(
     id: i64,
     message_index: usize,
 ) -> Result<(), String> {
-    crate::voice_conversation::end(&app);
+    ensure_saved_session_is_available(&app, id)?;
+    assistant::continue_in_call(
+        &app,
+        assistant::CallContinuation {
+            id,
+            message_index: Some(message_index),
+        },
+    );
+    Ok(())
+}
+
+/// Refuse to continue a saved conversation that cannot be continued right now:
+/// one that no longer exists, or any while a quick ask is still answering.
+fn ensure_saved_session_is_available(app: &AppHandle, id: i64) -> Result<(), String> {
+    if !get_settings(app).assistant_enabled {
+        return Err("The assistant is switched off.".to_string());
+    }
     let conversation = app.state::<AssistantConversation>();
-    if conversation.is_busy() {
+    if conversation.is_busy() && !crate::voice_conversation::is_active(app) {
         return Err("The assistant is answering right now — stop it first.".to_string());
     }
     let hm = app
         .try_state::<std::sync::Arc<crate::managers::history::HistoryManager>>()
         .ok_or_else(|| "History unavailable".to_string())?;
-    let entry = hm
-        .get_assistant_session(id)
+    hm.get_assistant_session(id)
         .map_err(|e| format!("Couldn't load the conversation: {}", e))?
         .ok_or_else(|| "That conversation no longer exists.".to_string())?;
-
-    let branched = assistant::branch_messages(entry.messages, message_index);
-    if branched.is_empty() {
-        return Err("There's nothing to continue from there.".to_string());
-    }
-    conversation.load_branch(branched);
-    assistant::emit_conversation(&app);
-    assistant::set_panel_collapsed(&app, false);
-    assistant::show_assistant_panel(&app);
     Ok(())
 }
 
@@ -316,11 +326,7 @@ pub fn assistant_clear_conversation(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-/// Choose where the Ask card opens.
-///
-/// Picking any anchor other than `Custom` also discards the remembered dragged
-/// position, so the choice takes effect on the very next open instead of being
-/// quietly overridden by wherever the card was last dropped.
+/// Choose where the quick ask opens.
 #[tauri::command]
 #[specta::specta]
 pub fn set_assistant_ask_anchor(
@@ -330,27 +336,17 @@ pub fn set_assistant_ask_anchor(
     let mut settings = get_settings(&app);
     settings.assistant_ask_anchor = anchor;
     write_settings(&app, settings);
-    if anchor != crate::settings::AskAnchor::Custom {
-        assistant::forget_dragged_position(&app);
-    }
     Ok(())
 }
 
-/// Choose which display the Ask surface opens on.
-///
-/// Like the anchor, this discards the remembered dragged position: a coordinate on
-/// the screen you just moved away from is meaningless, and keeping it would make the
-/// new choice appear to do nothing on the very next open. The stored display pin goes
-/// too, so `last_used` starts from a clean slate rather than from the screen the user
-/// is trying to get away from.
+/// Choose which display the quick ask opens on: `cursor`, `primary`, or a
+/// monitor id from `list_assistant_displays`.
 #[tauri::command]
 #[specta::specta]
 pub fn set_assistant_ask_display(app: AppHandle, display: String) -> Result<(), String> {
     let mut settings = get_settings(&app);
     settings.assistant_ask_display = display;
     write_settings(&app, settings);
-    assistant::forget_dragged_position(&app);
-    assistant::forget_panel_display(&app);
     Ok(())
 }
 
@@ -687,8 +683,13 @@ pub fn set_assistant_tts_engine(app: AppHandle, engine: String) -> Result<(), St
     // Each engine keeps its own settings, so switching no longer wipes them or
     // carries another engine's values (e.g. an OpenAI base URL / key) across.
     settings.sync_active_tts_fields();
+    let native = crate::native_tts::route(&settings) == crate::native_tts::VoiceRoute::Native;
     write_settings(&app, settings);
+    if !native {
+        crate::native_tts::release(None);
+    }
     emit_settings_changed(&app);
+    emit_local_voice_status(&app);
     Ok(())
 }
 
@@ -759,6 +760,71 @@ pub fn set_assistant_tts_kokoro_dtype(app: AppHandle, dtype: String) -> Result<(
     Ok(())
 }
 
+/// Where Kokoro runs: "auto" (the graphics card when the panel's WebView can use
+/// it, the processor otherwise), "gpu" (always the WebView), or "cpu" (the
+/// native engine, once its voice pack is downloaded).
+#[tauri::command]
+#[specta::specta]
+pub fn set_assistant_tts_kokoro_device(app: AppHandle, device: String) -> Result<(), String> {
+    if !matches!(device.as_str(), "auto" | "gpu" | "cpu") {
+        return Err(format!("Unknown Kokoro device: {}", device));
+    }
+    // A reply playing on the old path should not keep talking over the switch.
+    crate::tts::stop_all(&app);
+    let mut settings = get_settings(&app);
+    settings.assistant_tts_kokoro_device = device;
+    let native = crate::native_tts::route(&settings) == crate::native_tts::VoiceRoute::Native;
+    write_settings(&app, settings);
+    if !native {
+        // The processor voice holds ~400 MB while loaded; nothing will use it.
+        crate::native_tts::release(None);
+    }
+    emit_settings_changed(&app);
+    emit_local_voice_status(&app);
+    Ok(())
+}
+
+/// Where local speech is produced right now and which native voices are
+/// installed: what the Voice settings need to explain Automatic.
+#[tauri::command]
+#[specta::specta]
+pub fn get_local_voice_status(app: AppHandle) -> crate::native_tts::LocalVoiceStatus {
+    crate::native_tts::status(&get_settings(&app))
+}
+
+/// The assistant panel's WebView reports whether it can run Kokoro on the
+/// graphics card: an adapter exists, it started, and its audio was not caught
+/// garbled. Automatic moves Kokoro to the processor when it cannot.
+#[tauri::command]
+#[specta::specta]
+pub fn assistant_report_webgpu(app: AppHandle, usable: bool) {
+    if crate::native_tts::report_webgpu(usable) {
+        log::info!(
+            "Local voice: the panel reports WebGPU {}",
+            if usable { "usable" } else { "unusable" }
+        );
+        // A call probes the GPU as it opens, after its own warm-up already
+        // found nothing to warm. If the answer moves Kokoro to the processor,
+        // load it now so the first reply does not pay for the cold start.
+        let settings = get_settings(&app);
+        if crate::voice_conversation::is_active(&app)
+            && crate::native_tts::route(&settings) == crate::native_tts::VoiceRoute::Native
+        {
+            crate::native_tts::prewarm(&settings);
+        }
+        emit_local_voice_status(&app);
+    }
+}
+
+/// Tell every window where local speech now comes from.
+pub(crate) fn emit_local_voice_status(app: &AppHandle) {
+    use tauri::Emitter;
+    let _ = app.emit(
+        "local-voice-status-changed",
+        crate::native_tts::status(&get_settings(app)),
+    );
+}
+
 /// Playback speed multiplier for spoken summaries (0.25x–4x). Clamped to that
 /// range so a stray manual entry can't request an unusable rate. The change
 /// takes effect on the next spoken clip rather than interrupting the current
@@ -783,12 +849,12 @@ pub fn set_assistant_panel_opacity(app: AppHandle, opacity: f64) -> Result<(), S
     Ok(())
 }
 
-/// Set the expanded panel size preset ("compact", "standard", or "large") and
-/// resize the live panel window to match when it's currently expanded.
+/// Set the panel size preset ("mini", "compact", "standard", or "large") and
+/// re-shape the live panel window to match when it is on screen.
 #[tauri::command]
 #[specta::specta]
 pub fn set_assistant_panel_size(app: AppHandle, size: String) -> Result<(), String> {
-    if !matches!(size.as_str(), "compact" | "standard" | "large") {
+    if !crate::settings::is_assistant_panel_size(&size) {
         return Err(format!("Unknown panel size: {}", size));
     }
     let mut settings = get_settings(&app);
@@ -836,22 +902,6 @@ pub fn redirect_transcription_to_assistant(app: AppHandle) -> Result<(), String>
     Ok(())
 }
 
-#[tauri::command]
-#[specta::specta]
-pub fn set_assistant_panel_collapsed(app: AppHandle, collapsed: bool) -> Result<(), String> {
-    assistant::set_panel_collapsed(&app, collapsed);
-    Ok(())
-}
-
-/// Current pill/expanded state of the assistant panel. The webview queries this
-/// on mount so a fresh or reloaded panel renders the right layout instead of
-/// showing the full panel header inside the collapsed pill window.
-#[tauri::command]
-#[specta::specta]
-pub fn get_assistant_panel_collapsed() -> bool {
-    assistant::is_panel_collapsed()
-}
-
 /// Arm or disarm sticky Manual screen capture. Disarming is always accepted for
 /// cleanup; arming is rejected unless the persisted mode is Manual.
 #[tauri::command]
@@ -897,7 +947,7 @@ pub async fn assistant_speak(app: AppHandle, text: String) -> Result<(), String>
     if text.trim().is_empty() {
         return Ok(());
     }
-    if settings.assistant_tts_engine == "kokoro" {
+    if crate::native_tts::uses_webview(&settings) {
         use tauri::Emitter;
         let _ = app.emit("assistant-tts", text);
     } else {
@@ -1036,8 +1086,11 @@ pub fn assistant_stop_local_tts() {
 #[specta::specta]
 pub async fn assistant_test_tts(app: AppHandle, text: String) -> Result<(), String> {
     let settings = get_settings(&app);
-    if settings.assistant_tts_engine == "kokoro" {
+    if crate::native_tts::uses_webview(&settings) {
         return Err("Kokoro is tested locally in the browser, not via this command".to_string());
+    }
+    if let Some(blocker) = crate::native_tts::blocker(&settings) {
+        return Err(blocker);
     }
     // Interrupt anything currently playing before the test clip.
     crate::tts::stop_remote();

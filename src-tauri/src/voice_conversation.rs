@@ -386,6 +386,10 @@ pub async fn assistant_conversation_start(app: AppHandle) -> Result<VoiceTicket,
     crate::tts::stop_all(&app);
     app.state::<Arc<TranscriptionManager>>()
         .initiate_model_load();
+    // A native voice loads in ~0.3 s (Kitten) to ~1.2 s (Kokoro) and pays ONNX
+    // Runtime's first-run cost on its first sentence; do both while the user is
+    // still speaking.
+    crate::native_tts::prewarm(&settings);
     if provider.id == "builtin" {
         if let Some(model) = settings.assistant_models.get(&provider.id) {
             crate::actions::prewarm_assistant_llm(&app, model.clone());
@@ -649,6 +653,35 @@ pub async fn assistant_conversation_load(
         .ok_or("That conversation no longer exists.")?;
     settle_call_for_switch(&app, session).await?;
     assistant::adopt_saved_conversation(&app, entry.id, entry.messages);
+    Ok(())
+}
+
+/// Continue a saved conversation inside the live call from one chosen message, as
+/// a new branch (History → "Continue from here"). The original row is never
+/// modified: the branch has no History id, so its next turn saves a new one.
+#[tauri::command]
+#[specta::specta]
+pub async fn assistant_conversation_branch(
+    app: AppHandle,
+    session: u32,
+    id: i64,
+    message_index: usize,
+) -> Result<(), String> {
+    let history = app
+        .try_state::<Arc<crate::managers::history::HistoryManager>>()
+        .ok_or("History unavailable")?
+        .inner()
+        .clone();
+    let entry = history
+        .get_assistant_session(id)
+        .map_err(|e| format!("Couldn't load the conversation: {e}"))?
+        .ok_or("That conversation no longer exists.")?;
+    let branched = assistant::branch_messages(entry.messages, message_index);
+    if branched.is_empty() {
+        return Err("There's nothing to continue from there.".into());
+    }
+    settle_call_for_switch(&app, session).await?;
+    assistant::adopt_branch(&app, branched);
     Ok(())
 }
 

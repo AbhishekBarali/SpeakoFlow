@@ -2,13 +2,13 @@
  * What the assistant panel is actually drawing, reported to Rust so the rest of
  * the window can pass clicks through to whatever is underneath it.
  *
- * The panel window is deliberately larger than its content: the pill hugs its own
- * text and floats centred in a transparent frame (340x56 of window for roughly
- * 155x34 of pill), which is what lets "Listening", "Thinking" and "Searching the
- * web" be different widths without a window resize between them. Invisible is not
- * the same as intangible, though — that surplus used to sit in front of the
- * desktop and swallow every click and right-click landing on it, which made the
- * screen feel dead whenever the assistant was up.
+ * The panel window is deliberately larger than its content: the quick ask is a
+ * fixed frame as large as the biggest card it may show, with the pill or the card
+ * drawn inside it, which is what lets the surface grow from a pill into a card
+ * without a window resize. Invisible is not the same as intangible, though — that
+ * surplus used to sit in front of the desktop and swallow every click and
+ * right-click landing on it, which made the screen feel dead whenever the
+ * assistant was up.
  *
  * Only the webview can say where the drawn edge is, so it measures and Rust
  * decides: see the cursor pass-through section in `assistant.rs`.
@@ -21,48 +21,21 @@ import { useEffect } from "react";
  * The surfaces that are genuinely visible and clickable in each form the window
  * takes. Everything else in the tree is a transparent frame or a centring box.
  *
- * `.apill-screen` is listed even though it lives inside `.apill`, because it is
- * positioned at `top: -5px` and an absolutely-positioned child that overflows its
- * parent contributes nothing to the parent's `getBoundingClientRect()`. Measuring
- * only the pill would leave the top of the screen-vision badge outside the tangible
- * area — and once armed, that badge is permanently visible and is the control that
- * says capture is on. Its own `pointer-events` still decides whether it counts, so
- * a hidden badge is correctly ignored.
- *
- * A form with none of these — the full chat panel — measures as `unknown` and
- * stays fully tangible. That is the behaviour that shipped, so an unlisted form
- * can never become unclickable; it just does not get pass-through until it is
- * listed. The live call opts in with `[data-hit-surface]` on its bar, its status
- * bubble and (expanded) its whole panel, because at rest it is a small bar in a
- * 440x200 frame and the rest of that frame must not sit dead over the desktop.
+ * The quick ask is one element, `.qa-surface`, inside a fixed frame much larger
+ * than it (the frame is the largest the card may grow to, so the window never
+ * resizes while an ask runs). The live call opts in with `[data-hit-surface]` on
+ * its bar, its status bubble and (expanded) its whole panel.
  *
  * **Every visible surface must be listed, and an omission is not a partial
- * failure.** `.ask-pill` was missing here, which made the surface the assistant
- * hotkey actually opens completely dead: the ask stage keeps both layers in the
- * DOM at all times (the card has to be laid out to be measured), so the only
- * element this selector matched was the *inactive* `.ask-card`, whose inherited
- * `pointer-events: none` correctly reported it as not drawn. Nothing drawn resolves
- * to `none`, `none` is sent as a zero rect, and a zero rect makes the whole window
- * pass-through — so the pill, its cancel button, its text field and its drag region
- * were all unreachable, and because reports are change-gated the zero rect was sent
- * once and never revised. `[data-hit-surface]` is offered alongside the class list
- * so a new surface can opt in at its own element rather than by remembering to edit
- * a selector in another file.
- *
- * The two rows below `.ask-card` are listed for the same reason: they are DOM
- * siblings of the card rather than children of it (see `AssistantPanel.tsx`), so the
- * card's own rect stops above them and the follow-up input, the camera, the snip
- * button and the attachment chips all fell outside the tangible area.
+ * failure.** Nothing matched means `unknown`, which keeps the whole window
+ * tangible — the frame then eats clicks on the desktop around the surface. A
+ * listed surface that measures as not drawn means `none`, which makes the whole
+ * window pass-through. `[data-hit-surface]` is offered alongside the class list
+ * so a new surface can opt in at its own element.
  */
 export const HIT_SURFACE_SELECTORS = [
   "[data-hit-surface]",
-  ".apill",
-  ".apill-screen",
-  ".alive-card",
-  ".ask-card",
-  ".ask-pill",
-  ".assistant-attachments",
-  ".assistant-input-row",
+  ".qa-surface",
 ] as const;
 
 const HIT_SURFACES = HIT_SURFACE_SELECTORS.join(", ");
@@ -70,10 +43,10 @@ const HIT_SURFACES = HIT_SURFACE_SELECTORS.join(", ");
 /**
  * How often the drawn rect is re-measured.
  *
- * The pill animates its width (a hover reveals expand/close over 260ms), so this
- * has to track a transition rather than just react to a render. Measuring is two
- * `getBoundingClientRect` calls and a `getComputedStyle`; the report is
- * change-gated, so a still pill costs nothing beyond the measurement.
+ * The quick ask's surface animates its width and grows as an answer streams in,
+ * so this has to track a transition rather than just react to a render.
+ * Measuring is a `getBoundingClientRect` and a `getComputedStyle` per surface;
+ * the report is change-gated, so a still surface costs nothing beyond that.
  */
 const MEASURE_INTERVAL_MS = 50;
 
@@ -164,12 +137,11 @@ export function unionHitRect(
 /**
  * Collect the drawn surfaces from the live document.
  *
- * `pointer-events` is the "is it drawn" test, and it is the right one rather than
- * a convenient one: it is inherited, and the stylesheet already sets it to `none`
- * on every layer that is faded out (`.ask-stage.leaving .ask-layer.pill`, an
- * inactive `.ask-layer.card`). So a surface mid-cross-fade is correctly reported as
- * not drawn, using the same declaration that stops it being clicked — one source of
- * truth instead of a second opacity rule to keep in sync.
+ * `pointer-events` is the "is it drawn" test: it is inherited, so anything the
+ * stylesheet has switched off (a surface on its way out, the call's panels while
+ * they fold) is correctly reported as not drawn, using the same declaration that
+ * stops it being clicked — one source of truth instead of a second opacity rule
+ * to keep in sync.
  */
 function collectSurfaces(root: ParentNode): MeasuredSurface[] {
   return Array.from(root.querySelectorAll<HTMLElement>(HIT_SURFACES)).map(
