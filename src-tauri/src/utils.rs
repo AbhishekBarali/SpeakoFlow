@@ -12,6 +12,43 @@ pub use crate::clipboard::*;
 pub use crate::overlay::*;
 pub use crate::tray::*;
 
+/// Display wrapper for user content (transcripts, model output, reminder text,
+/// search queries) in log lines.
+///
+/// Development builds print the text so it can be debugged; release builds
+/// print only its length. The log file defaults to Debug level and lives on
+/// disk, so without this every dictation was written there in full — which the
+/// privacy promise ("your voice never leaves your device", nothing kept that you
+/// can't see) does not cover. Backport of Handy 258899a2, extended to every log
+/// site that carried user content. Not for secrets such as API keys, which must
+/// never be logged in any build.
+pub struct Redacted<'a>(pub &'a str);
+
+impl std::fmt::Display for Redacted<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if cfg!(debug_assertions) {
+            f.write_str(self.0)
+        } else {
+            write!(f, "[redacted, {} chars]", self.0.chars().count())
+        }
+    }
+}
+
+impl std::fmt::Debug for Redacted<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if cfg!(debug_assertions) {
+            write!(f, "{:?}", self.0)
+        } else {
+            std::fmt::Display::fmt(self, f)
+        }
+    }
+}
+
+/// Shorthand for [`Redacted`].
+pub fn redact_text(text: &str) -> Redacted<'_> {
+    Redacted(text)
+}
+
 /// Centralized cancellation function that can be called from anywhere in the app.
 /// Handles cancelling both recording and transcription operations and updates UI state.
 pub fn cancel_current_operation(app: &AppHandle) {
@@ -122,4 +159,24 @@ pub fn is_kde_plasma() -> bool {
 #[cfg(target_os = "linux")]
 pub fn is_kde_wayland() -> bool {
     is_wayland() && is_kde_plasma()
+}
+
+/// Check if running on the GNOME desktop environment.
+/// `XDG_CURRENT_DESKTOP` can be colon-separated (e.g. "ubuntu:GNOME").
+#[cfg(target_os = "linux")]
+pub fn is_gnome() -> bool {
+    std::env::var("XDG_CURRENT_DESKTOP")
+        .map(|v| v.to_uppercase().contains("GNOME"))
+        .unwrap_or(false)
+}
+
+/// Check if running on GNOME with Wayland.
+///
+/// True even when `main.rs` has moved *this process* onto XWayland for the
+/// overlay (`GDK_BACKEND=x11`): that only changes how our own windows are
+/// drawn. The session is still Wayland (`WAYLAND_DISPLAY` stays set) and the
+/// apps being pasted into are still native Wayland clients.
+#[cfg(target_os = "linux")]
+pub fn is_gnome_wayland() -> bool {
+    is_wayland() && is_gnome()
 }

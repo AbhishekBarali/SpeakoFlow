@@ -253,7 +253,7 @@ impl MeetingStore {
             "Others",
         )?;
 
-        info!("Started meeting {id}: {title}");
+        info!("Started meeting {id}: {}", crate::utils::redact_text(title));
         Ok(id)
     }
 

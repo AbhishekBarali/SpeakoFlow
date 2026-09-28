@@ -116,7 +116,8 @@ fn remember(app: &AppHandle, corrections: &[Correction]) {
         settings.learned_words.push(correction.to.clone());
         info!(
             "Learned \"{}\" from a correction of \"{}\"",
-            correction.to, correction.from
+            crate::utils::redact_text(&correction.to),
+            crate::utils::redact_text(&correction.from)
         );
     }
 

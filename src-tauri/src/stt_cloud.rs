@@ -795,7 +795,10 @@ impl CloudRequest {
             ));
         }
         serde_json::from_str(&body).map_err(|e| {
-            warn!("Cloud transcription: unparsable success body: {body}");
+            warn!(
+                "Cloud transcription: unparsable success body: {}",
+                crate::utils::redact_text(&body)
+            );
             format!("{} returned an unexpected response: {e}", self.label)
         })
     }

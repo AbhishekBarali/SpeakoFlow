@@ -299,7 +299,11 @@ pub async fn search_with_plan(settings: &AppSettings, plan: &SearchPlan) -> Vec<
         .map(|(i, r)| match r {
             Ok(v) => v,
             Err(e) => {
-                warn!("Web search for {:?} failed: {}", queries[i], e);
+                warn!(
+                    "Web search for {:?} failed: {}",
+                    crate::utils::redact_text(queries[i]),
+                    e
+                );
                 Vec::new()
             }
         })
@@ -451,7 +455,11 @@ async fn snippet_search(
     };
     debug!(
         "Snippet search via '{}' for {:?} (limit {}, news {}, tbs {:?})",
-        provider, query, limit, include_news, tbs
+        provider,
+        crate::utils::redact_text(query),
+        limit,
+        include_news,
+        tbs
     );
 
     match provider {
@@ -920,7 +928,7 @@ async fn search_serper(
                 Ok(_) => {
                     debug!(
                         "Serper returned no results for {:?} within the {} window; using the unfiltered pass",
-                        query, tbs
+                        crate::utils::redact_text(query), tbs
                     );
                     unfiltered?
                 }
@@ -932,7 +940,10 @@ async fn search_serper(
         None => {
             let hits = serper_query(&client, api_key, query, num, None, include_news).await?;
             if hits.is_empty() {
-                debug!("Serper returned no results for {:?}; retrying once", query);
+                debug!(
+                    "Serper returned no results for {:?}; retrying once",
+                    crate::utils::redact_text(query)
+                );
                 serper_query(&client, api_key, query, num, None, include_news).await?
             } else {
                 hits
@@ -943,7 +954,7 @@ async fn search_serper(
     debug!(
         "Serper returned {} candidate(s) for {:?}",
         candidates.len(),
-        query
+        crate::utils::redact_text(query)
     );
     Ok(candidates)
 }
@@ -1124,7 +1135,7 @@ async fn search_tinyfish(
     debug!(
         "TinyFish returned {} candidate(s) for {:?}",
         candidates.len(),
-        query
+        crate::utils::redact_text(query)
     );
     Ok(candidates)
 }

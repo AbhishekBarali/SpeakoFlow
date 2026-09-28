@@ -1070,7 +1070,7 @@ impl SseChatAccumulator {
             Err(error) => {
                 debug!(
                     "Skipping unparsable SSE chunk: {} ({})",
-                    String::from_utf8_lossy(data),
+                    crate::utils::redact_text(&String::from_utf8_lossy(data)),
                     error
                 );
                 return;
@@ -1094,7 +1094,11 @@ impl SseChatAccumulator {
                 }
                 // Assistant wrappers historically skip malformed provider
                 // frames and continue streaming; preserve that behavior.
-                debug!("Skipping unparsable SSE chunk: {} ({})", data, error);
+                debug!(
+                    "Skipping unparsable SSE chunk: {} ({})",
+                    crate::utils::redact_text(data),
+                    error
+                );
             }
         }
     }
