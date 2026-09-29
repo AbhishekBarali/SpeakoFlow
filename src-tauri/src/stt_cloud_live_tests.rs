@@ -173,6 +173,68 @@ macro_rules! require {
     };
 }
 
+/// An Azure AI Speech config from `AZURE_SPEECH_ENDPOINT` plus
+/// `AZURE_SPEECH_KEY`, falling back to the app's own keychain slot for the key.
+/// The endpoint has no fallback: it names a billable resource, so it is always
+/// chosen on purpose.
+fn azure_config() -> Option<ResolvedCloudStt> {
+    let endpoint = std::env::var("AZURE_SPEECH_ENDPOINT").ok()?;
+    let key = std::env::var("AZURE_SPEECH_KEY")
+        .ok()
+        .filter(|k| !k.trim().is_empty())
+        .or_else(|| crate::secret_store::get(&crate::secret_store::account_cloud_stt("azure")))?;
+    let mut settings = get_default_settings();
+    settings.stt_engine_mode = SttEngineMode::Cloud;
+    settings.cloud_stt_provider_id = "azure".to_string();
+    settings
+        .cloud_stt_api_keys
+        .insert("azure".to_string(), key.trim().to_string());
+    settings
+        .cloud_stt_base_urls
+        .insert("azure".to_string(), endpoint);
+    settings.cloud_stt_send_custom_words = false;
+    crate::stt_cloud::resolve_cloud_stt(&settings).ok()
+}
+
+/// The Azure request shape — `audio` part, JSON `definition`, subscription-key
+/// header — accepted by the real endpoint, through the app's own code path.
+///
+/// Also times a few requests, because latency is the reason this provider
+/// exists: the first pays the connection, the rest reuse it.
+///
+/// ```text
+/// $env:AZURE_SPEECH_ENDPOINT = "https://<resource>.cognitiveservices.azure.com"
+/// $env:SPEAKOFLOW_TEST_WAV = "<16 kHz mono wav>"
+/// cargo test --lib azure_mai_transcribes -- --ignored --nocapture
+/// ```
+#[test]
+#[ignore = "live network test; needs an Azure Speech key and endpoint"]
+fn azure_mai_transcribes_through_the_app_path() {
+    let cfg = require!(
+        azure_config(),
+        "set AZURE_SPEECH_ENDPOINT (and AZURE_SPEECH_KEY, or save a key in the app)"
+    );
+    let wav = require!(sample_wav(), "no recording found to transcribe");
+    let samples = read_wav(&wav);
+    eprintln!(
+        "azure: {} ({:.1}s) -> {} at {}",
+        wav.display(),
+        samples.len() as f32 / 16_000.0,
+        cfg.model,
+        cfg.base_url
+    );
+    for attempt in 1..=3 {
+        let started = std::time::Instant::now();
+        let text = crate::stt_cloud::transcribe_cloud_blocking(&cfg, &samples)
+            .expect("Azure MAI transcription should succeed");
+        eprintln!("request {attempt}: {:?} -> {text:?}", started.elapsed());
+        assert!(!text.trim().is_empty(), "real speech should produce text");
+    }
+    let verified = crate::stt_cloud::verify_cloud_stt(&cfg)
+        .expect("the Settings test button should pass against the same endpoint");
+    eprintln!("verify: {verified}");
+}
+
 #[test]
 #[ignore = "live network test; needs an ElevenLabs key"]
 fn elevenlabs_batch_transcribes_a_real_recording() {

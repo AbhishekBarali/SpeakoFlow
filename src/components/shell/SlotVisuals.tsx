@@ -134,6 +134,8 @@ export const useSlotStatusText = () => {
         return t("modelsHub.status.notDownloaded");
       case "no_key":
         return t("modelsHub.status.noKey");
+      case "no_endpoint":
+        return t("modelsHub.status.noEndpoint");
       default:
         return summary.modelLabel ?? summary.providerLabel ?? "";
     }

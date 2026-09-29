@@ -11,7 +11,8 @@ import { useSettings } from "@/hooks/useSettings";
 import { useModelStore } from "@/stores/modelStore";
 import { getTranslatedModelName } from "@/lib/utils/modelTranslation";
 import { ttsEngineSpec, ttsNeedsSetup, ttsValues } from "@/lib/ttsEngines";
-import { KITTEN_MODEL_ID } from "@/assistant/localVoice";
+import { nativePackId } from "@/lib/nativeVoices";
+import { cloudSttKeyOptional, cloudSttNeedsEndpoint } from "@/lib/cloudStt";
 import {
   prettyModelName,
   splitLocalModelName,
@@ -31,7 +32,12 @@ import { useSlotDataStore } from "./slotData";
  * reads this one derivation so they cannot disagree.
  */
 
-export type SlotIssue = "no_model" | "not_downloaded" | "no_key" | null;
+export type SlotIssue =
+  | "no_model"
+  | "not_downloaded"
+  | "no_key"
+  | "no_endpoint"
+  | null;
 
 export interface SlotSummary {
   slot: ModelSlot;
@@ -88,11 +94,15 @@ export const summarizeStt = (
     const model =
       settings.cloud_stt_models?.[id]?.trim() || provider?.default_model || "";
     const hasKey = cloudKeys[id] ?? false;
-    const keyless = provider?.allow_base_url_edit ?? false;
+    const keyless = cloudSttKeyOptional(provider);
+    const needsEndpoint = cloudSttNeedsEndpoint(
+      provider,
+      settings.cloud_stt_base_urls?.[id],
+    );
     return {
       slot: "stt",
       active: true,
-      ready: !!model && (hasKey || keyless),
+      ready: !!model && (hasKey || keyless) && !needsEndpoint,
       where: "cloud",
       providerId: id,
       providerKind: "stt",
@@ -101,7 +111,14 @@ export const summarizeStt = (
       modelId: model || null,
       localModel: null,
       borrowsAssistant: false,
-      issue: !hasKey && !keyless ? "no_key" : !model ? "no_model" : null,
+      issue:
+        !hasKey && !keyless
+          ? "no_key"
+          : needsEndpoint
+            ? "no_endpoint"
+            : !model
+              ? "no_model"
+              : null,
     };
   }
 
@@ -234,13 +251,12 @@ export const summarizeVoice = (
   const spec = ttsEngineSpec(engine);
   const isDevice = !!spec?.local;
   const values = ttsValues(settings, engine);
-  // Kitten needs nothing configured, only its voice pack on disk.
-  const kittenPack =
-    engine === "kitten" ? findLocal(models, KITTEN_MODEL_ID) : null;
-  const ready =
-    engine === "kitten"
-      ? !!kittenPack?.is_downloaded
-      : !ttsNeedsSetup(settings, engine);
+  // A native voice needs nothing configured, only its pack on disk.
+  const packId = nativePackId(engine, values.model);
+  const pack = packId ? findLocal(models, packId) : null;
+  const ready = packId
+    ? !!pack?.is_downloaded
+    : !ttsNeedsSetup(settings, engine);
   const model = values.model || null;
   // A custom server on this machine runs on this computer too.
   const onThisComputer =
@@ -260,16 +276,16 @@ export const summarizeVoice = (
     modelLabel:
       engine === "kokoro"
         ? t("modelsHub.voice.kokoroModel")
-        : engine === "kitten"
-          ? t("modelsHub.voice.kittenModel")
+        : pack
+          ? getTranslatedModelName(pack, t)
           : prettyModelName(model) || null,
-    modelId: isDevice ? engine : model,
+    modelId: packId ?? (isDevice ? engine : model),
     localModel: null,
     borrowsAssistant: false,
     // "Add a key" only when a key is what's missing; an address or a voice
     // still reads as "Needs setup" without pointing at the wrong field.
     issue:
-      engine === "kitten" && !ready
+      packId && !ready
         ? "not_downloaded"
         : !ready && spec?.key === "required" && !values.key
           ? "no_key"

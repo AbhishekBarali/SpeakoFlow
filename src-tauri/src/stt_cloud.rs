@@ -8,14 +8,16 @@
 //! OpenAI-compatible entry, and the whole thing is gated on
 //! [`SttEngineMode::Cloud`]; on `Local` not a single line here runs.
 //!
-//! ## Three protocols, not one
+//! ## Four protocols, not one
 //!
 //! "OpenAI-compatible" is close to universal for *chat*, so it is tempting to
 //! assume the same for transcription. It is not: ElevenLabs authenticates with
-//! an `xi-api-key` header and names the model field `model_id`, and Deepgram
+//! an `xi-api-key` header and names the model field `model_id`, Deepgram
 //! takes the audio as a raw request body with every option as a query
-//! parameter and no multipart envelope at all. [`CloudSttKind`] is therefore a
-//! real dispatch, while the provider *list* stays data.
+//! parameter and no multipart envelope at all, and Azure AI Speech wants an
+//! `audio` part plus a JSON `definition` in which the model is a nested field.
+//! [`CloudSttKind`] is therefore a real dispatch, while the provider *list*
+//! stays data.
 //!
 //! ## Why the requests run on their own thread
 //!
@@ -56,6 +58,10 @@ const MAX_KEYTERMS: usize = 50;
 /// Longest keyterm worth forwarding. Beyond this it is a sentence, not a term,
 /// and ElevenLabs rejects it outright for realtime.
 const MAX_KEYTERM_CHARS: usize = 50;
+
+/// Fast-transcription API version that accepts `enhancedMode.model`, which is
+/// how MAI-Transcribe is selected. Earlier versions have no such field.
+const AZURE_SPEECH_API_VERSION: &str = "2025-10-15";
 
 /// Resolve the active cloud transcription configuration, or explain why it
 /// cannot run. Returns `Err` with [`CloudSttUnavailableReason::NotEnabled`] when
@@ -118,6 +124,20 @@ pub(crate) fn resolve_cloud_stt(
         .map(|u| u.trim().trim_end_matches('/').to_string())
         .filter(|u| !u.is_empty() && provider.allow_base_url_edit)
         .unwrap_or_else(|| provider.base_url.trim_end_matches('/').to_string());
+
+    // Azure's endpoint is the user's own resource, so there is no shipped
+    // default to fall back to, and what people paste varies (the portal's
+    // resource URL, a Foundry project URL, a region name). Normalised here so the
+    // request path only ever sees a bare origin.
+    let base_url = if provider.kind == CloudSttKind::AzureSpeech {
+        azure_speech_base_url(&base_url).ok_or_else(|| CloudSttResolutionError {
+            reason: CloudSttUnavailableReason::MissingEndpoint,
+            provider_id: Some(provider.id.clone()),
+            provider_label: Some(provider.label.clone()),
+        })?
+    } else {
+        base_url
+    };
 
     let language = cloud_language_code(&settings.selected_language);
 
@@ -188,11 +208,140 @@ fn cloud_language_code(selected: &str) -> Option<String> {
     }
 }
 
-/// Whether this provider is usable without an API key. Only the user-editable
-/// custom entry qualifies, and only because it is the one that can point at
-/// `localhost`.
+/// Whether this provider is usable without an API key. Only the custom entry
+/// qualifies, and only because it is the one that can point at `localhost`.
 fn allows_anonymous(provider: &CloudSttProvider) -> bool {
-    provider.allow_base_url_edit
+    provider.key_optional
+}
+
+/// Regions where Azure serves MAI-Transcribe, per Microsoft's Speech region
+/// table (LLM speech tab, "Transcribe with MAI-Transcribe").
+///
+/// Used only to read a bare region name as a region rather than as a resource
+/// name. A resource elsewhere still works for plain Speech, but answers every
+/// MAI request with "Enhanced mode with model is currently not supported yet".
+const AZURE_MAI_REGIONS: &[&str] = &[
+    "centralindia",
+    "eastus",
+    "northeurope",
+    "southeastasia",
+    "westus",
+    "westus2",
+];
+
+/// Reduce whatever the user pasted as their Azure endpoint to a bare origin.
+///
+/// Accepted, because each is what some screen in Azure hands you:
+///
+/// - the resource endpoint from *Keys and Endpoint*
+///   (`https://name.cognitiveservices.azure.com/`), kept as is;
+/// - a Foundry project URL (`https://name.services.ai.azure.com/api/projects/p`)
+///   or an Azure OpenAI one (`https://name.openai.azure.com/`), both of which
+///   are the same resource under another host, so they map to
+///   `name.cognitiveservices.azure.com`;
+/// - a regional endpoint (`https://centralindia.api.cognitive.microsoft.com`);
+/// - a bare region name in [`AZURE_MAI_REGIONS`], expanded to that endpoint;
+/// - a bare resource name, expanded to its `cognitiveservices` host.
+///
+/// Any path or query is dropped, so pasting the full transcription URL also
+/// works. `None` means there is nothing usable to call.
+pub(crate) fn azure_speech_base_url(raw: &str) -> Option<String> {
+    let trimmed = raw.trim().trim_end_matches('/');
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    if !trimmed.contains("://") && !trimmed.contains('.') && !trimmed.contains('/') {
+        let name = trimmed.to_ascii_lowercase();
+        let valid = name.chars().all(|c| c.is_ascii_alphanumeric() || c == '-');
+        if !valid {
+            return None;
+        }
+        return Some(if AZURE_MAI_REGIONS.contains(&name.as_str()) {
+            format!("https://{name}.api.cognitive.microsoft.com")
+        } else {
+            format!("https://{name}.cognitiveservices.azure.com")
+        });
+    }
+
+    let with_scheme = if trimmed.contains("://") {
+        trimmed.to_string()
+    } else {
+        format!("https://{trimmed}")
+    };
+    let url = reqwest::Url::parse(&with_scheme).ok()?;
+    let host = url.host_str()?.to_ascii_lowercase();
+    let host = [".services.ai.azure.com", ".openai.azure.com"]
+        .iter()
+        .find_map(|suffix| host.strip_suffix(suffix))
+        .map(|name| format!("{name}.cognitiveservices.azure.com"))
+        .unwrap_or(host);
+    let port = url.port().map(|p| format!(":{p}")).unwrap_or_default();
+    Some(format!("{}://{host}{port}", url.scheme()))
+}
+
+/// Whether an Azure MAI model takes `modelOptions.transcribeStyle`.
+///
+/// Microsoft documents the option for MAI-Transcribe-2 only. Sending it to 1.5
+/// risks a rejected request over a cosmetic setting, so anything below version 2
+/// (and anything that is not a MAI id at all) goes without it.
+fn azure_model_takes_style(model: &str) -> bool {
+    model
+        .trim()
+        .to_ascii_lowercase()
+        .strip_prefix("mai-transcribe-")
+        .and_then(|version| version.parse::<f32>().ok())
+        .is_some_and(|version| version >= 2.0)
+}
+
+/// The JSON `definition` part of an Azure fast-transcription request.
+///
+/// Pulled out of the request so the mapping from settings to Azure's schema is
+/// testable without a network: `enhancedMode` is what selects MAI at all,
+/// `transcribeStyle` is where the app's filler switch lands (Azure's default is
+/// verbatim, so it is always sent explicitly), `locales` carries the spoken
+/// language, and `phraseList` the custom words.
+fn azure_definition(
+    model: &str,
+    language: Option<&str>,
+    keyterms: &[String],
+    no_verbatim: bool,
+) -> serde_json::Value {
+    let mut enhanced = serde_json::json!({ "enabled": true, "model": model });
+    if azure_model_takes_style(model) {
+        enhanced["modelOptions"] = serde_json::json!({
+            "transcribeStyle": if no_verbatim { "clean" } else { "verbatim" },
+        });
+    }
+    let mut definition = serde_json::json!({ "enhancedMode": enhanced });
+    if let Some(language) = language {
+        // MAI takes bare language codes here ("en", "ne"), which is exactly what
+        // `cloud_language_code` already produces.
+        definition["locales"] = serde_json::json!([language]);
+    }
+    if !keyterms.is_empty() {
+        definition["phraseList"] = serde_json::json!({ "phrases": keyterms });
+    }
+    definition
+}
+
+/// Join the text of Azure's `combinedPhrases` into one transcript.
+///
+/// One entry per channel for stereo audio; the app always sends mono, so this is
+/// normally a single string, but joining is correct either way.
+fn azure_transcript(body: &serde_json::Value) -> String {
+    body.get("combinedPhrases")
+        .and_then(|phrases| phrases.as_array())
+        .map(|phrases| {
+            phrases
+                .iter()
+                .filter_map(|p| p.get("text").and_then(|t| t.as_str()))
+                .map(str::trim)
+                .filter(|t| !t.is_empty())
+                .collect::<Vec<_>>()
+                .join(" ")
+        })
+        .unwrap_or_default()
 }
 
 /// True when the recording pipeline should route to a cloud provider. Both
@@ -604,7 +753,58 @@ impl CloudRequest {
             CloudSttKind::ElevenLabs => self.transcribe_elevenlabs(wav).await,
             CloudSttKind::OpenAiCompatible => self.transcribe_openai(wav).await,
             CloudSttKind::Deepgram => self.transcribe_deepgram(wav).await,
+            CloudSttKind::AzureSpeech => self.transcribe_azure(wav).await,
         }
+    }
+
+    /// `POST /speechtotext/transcriptions:transcribe` — Azure AI Speech's fast
+    /// transcription, with MAI-Transcribe selected through `enhancedMode`.
+    ///
+    /// Multipart like the others, but the parts are `audio` and a JSON
+    /// `definition` (see [`azure_definition`]), and the key goes in
+    /// `Ocp-Apim-Subscription-Key`. The one error worth rewording is the region
+    /// one: a resource outside [`AZURE_MAI_REGIONS`] rejects MAI with a message
+    /// that says nothing about regions, which is how a working key looks broken.
+    async fn transcribe_azure(&self, wav: Vec<u8>) -> Result<String, String> {
+        let url = format!(
+            "{}/speechtotext/transcriptions:transcribe?api-version={AZURE_SPEECH_API_VERSION}",
+            self.base_url
+        );
+        let definition = azure_definition(
+            &self.model,
+            self.language.as_deref(),
+            &self.keyterms,
+            self.no_verbatim,
+        );
+        let part = reqwest::multipart::Part::bytes(wav)
+            .file_name("audio.wav")
+            .mime_str("audio/wav")
+            .map_err(|e| format!("Failed to attach audio: {e}"))?;
+        let form = reqwest::multipart::Form::new()
+            .part("audio", part)
+            .text("definition", definition.to_string());
+
+        let response = self
+            .client()?
+            .post(&url)
+            .header("Ocp-Apim-Subscription-Key", &self.api_key)
+            .multipart(form)
+            .send()
+            .await
+            .map_err(|e| self.network_error(e))?;
+
+        let parsed: serde_json::Value = self.parse_json(response).await.map_err(|e| {
+            if e.contains("not supported yet") {
+                format!(
+                    "{e}. MAI-Transcribe only runs on Azure resources in {}; \
+                     this resource is in another region.",
+                    AZURE_MAI_REGIONS.join(", ")
+                )
+            } else {
+                e
+            }
+        })?;
+        Ok(azure_transcript(&parsed))
     }
 
     /// `POST /v1/speech-to-text` — multipart, `xi-api-key`, `model_id`.
@@ -1115,6 +1315,170 @@ mod tests {
         settings.stt_engine_mode = SttEngineMode::Cloud;
         settings.cloud_stt_provider_id = "custom".to_string();
         assert!(resolve_cloud_stt(&settings).is_ok());
+    }
+
+    fn azure_settings(endpoint: &str) -> AppSettings {
+        let mut settings = get_default_settings();
+        settings.stt_engine_mode = SttEngineMode::Cloud;
+        settings.cloud_stt_provider_id = "azure".to_string();
+        settings
+            .cloud_stt_api_keys
+            .insert("azure".to_string(), "test-key".to_string());
+        if !endpoint.is_empty() {
+            settings
+                .cloud_stt_base_urls
+                .insert("azure".to_string(), endpoint.to_string());
+        }
+        settings
+    }
+
+    /// Azure's URL is editable because it is the user's own resource — which is
+    /// exactly why "editable URL" can no longer mean "no key needed".
+    #[test]
+    fn azure_needs_a_key_even_though_its_endpoint_is_editable() {
+        let mut settings = azure_settings("https://name.cognitiveservices.azure.com");
+        settings
+            .cloud_stt_api_keys
+            .insert("azure".to_string(), String::new());
+        assert!(matches!(
+            resolve_cloud_stt(&settings),
+            Err(CloudSttResolutionError {
+                reason: CloudSttUnavailableReason::MissingApiKey,
+                ..
+            })
+        ));
+        for provider in crate::settings::default_cloud_stt_providers() {
+            assert_eq!(
+                provider.key_optional,
+                provider.id == "custom",
+                "{} has the wrong key requirement",
+                provider.id
+            );
+        }
+    }
+
+    #[test]
+    fn azure_without_an_endpoint_is_unavailable_not_active() {
+        let settings = azure_settings("");
+        assert!(!cloud_stt_active(&settings));
+        assert!(matches!(
+            resolve_cloud_stt(&settings),
+            Err(CloudSttResolutionError {
+                reason: CloudSttUnavailableReason::MissingEndpoint,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn azure_resolves_to_mai_on_the_users_resource() {
+        let settings = azure_settings("https://kaikidrive-ai.cognitiveservices.azure.com/");
+        let cfg = resolve_cloud_stt(&settings).expect("should resolve");
+        assert_eq!(cfg.provider.kind, CloudSttKind::AzureSpeech);
+        assert_eq!(
+            cfg.base_url,
+            "https://kaikidrive-ai.cognitiveservices.azure.com"
+        );
+        assert_eq!(cfg.model, "MAI-Transcribe-2");
+        assert!(!cfg.translate);
+    }
+
+    /// Every shape Azure's own screens hand out has to land on the same origin.
+    #[test]
+    fn azure_endpoints_are_normalised_from_whatever_the_portal_shows() {
+        let resource = Some("https://kaikidrive-ai.cognitiveservices.azure.com".to_string());
+        for pasted in [
+            "https://kaikidrive-ai.cognitiveservices.azure.com/",
+            "kaikidrive-ai.cognitiveservices.azure.com",
+            "https://kaikidrive-ai.services.ai.azure.com/api/projects/kaikidrive-ai-project",
+            "https://kaikidrive-ai.openai.azure.com/",
+            "https://kaikidrive-ai.cognitiveservices.azure.com/speechtotext/transcriptions:transcribe?api-version=2025-10-15",
+            "kaikidrive-ai",
+            "  KaikiDrive-AI  ",
+        ] {
+            assert_eq!(azure_speech_base_url(pasted), resource, "pasted {pasted:?}");
+        }
+        assert_eq!(
+            azure_speech_base_url("centralindia").as_deref(),
+            Some("https://centralindia.api.cognitive.microsoft.com")
+        );
+        assert_eq!(
+            azure_speech_base_url("https://eastus.api.cognitive.microsoft.com/").as_deref(),
+            Some("https://eastus.api.cognitive.microsoft.com")
+        );
+        assert_eq!(azure_speech_base_url(""), None);
+        assert_eq!(azure_speech_base_url("   "), None);
+        assert_eq!(azure_speech_base_url("not a name!"), None);
+    }
+
+    #[test]
+    fn azure_definition_selects_mai_and_maps_every_setting() {
+        let words = vec!["SpeakoFlow".to_string(), "Kiro".to_string()];
+        let definition = azure_definition("MAI-Transcribe-2", Some("ne"), &words, true);
+        assert_eq!(definition["enhancedMode"]["enabled"], true);
+        assert_eq!(definition["enhancedMode"]["model"], "MAI-Transcribe-2");
+        assert_eq!(
+            definition["enhancedMode"]["modelOptions"]["transcribeStyle"],
+            "clean"
+        );
+        assert_eq!(definition["locales"], serde_json::json!(["ne"]));
+        assert_eq!(
+            definition["phraseList"]["phrases"],
+            serde_json::json!(["SpeakoFlow", "Kiro"])
+        );
+
+        // Azure's default style is verbatim, so "off" is sent explicitly too,
+        // and auto-detect / no words send no field at all.
+        let plain = azure_definition("MAI-Transcribe-2", None, &[], false);
+        assert_eq!(
+            plain["enhancedMode"]["modelOptions"]["transcribeStyle"],
+            "verbatim"
+        );
+        assert!(plain.get("locales").is_none());
+        assert!(plain.get("phraseList").is_none());
+    }
+
+    #[test]
+    fn transcribe_style_is_only_sent_where_it_is_documented() {
+        assert!(azure_model_takes_style("MAI-Transcribe-2"));
+        assert!(azure_model_takes_style("mai-transcribe-2.5"));
+        assert!(!azure_model_takes_style("MAI-Transcribe-1.5"));
+        assert!(!azure_model_takes_style("something-else"));
+        let older = azure_definition("MAI-Transcribe-1.5", None, &[], true);
+        assert!(older["enhancedMode"].get("modelOptions").is_none());
+    }
+
+    #[test]
+    fn azure_transcript_joins_combined_phrases() {
+        let body = serde_json::json!({
+            "durationMilliseconds": 3000,
+            "combinedPhrases": [{ "text": " Send the report by Friday. " }],
+            "phrases": [{ "text": "ignored" }]
+        });
+        assert_eq!(azure_transcript(&body), "Send the report by Friday.");
+        assert_eq!(azure_transcript(&serde_json::json!({})), "");
+        assert_eq!(
+            azure_transcript(&serde_json::json!({ "combinedPhrases": [] })),
+            ""
+        );
+    }
+
+    /// Azure's error envelopes differ between the Speech route and the gateway
+    /// in front of it; both have to reduce to the sentence that explains them.
+    #[test]
+    fn azure_error_bodies_are_reduced_to_their_message() {
+        assert_eq!(
+            summarize_error_body(
+                r#"{"code":"InvalidRequest","message":"Enhanced mode with model is currently not supported yet."}"#
+            ),
+            "Enhanced mode with model is currently not supported yet."
+        );
+        assert_eq!(
+            summarize_error_body(
+                r#"{"error":{"code":"401","message":"Access denied due to invalid subscription key."}}"#
+            ),
+            "Access denied due to invalid subscription key."
+        );
     }
 
     #[test]

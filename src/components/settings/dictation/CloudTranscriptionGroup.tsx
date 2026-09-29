@@ -17,6 +17,7 @@ import { LanguageSelector } from "../LanguageSelector";
 import { TranslateToEnglish } from "../TranslateToEnglish";
 import { useSettings } from "@/hooks/useSettings";
 import { commands, type CloudSttProvider } from "@/bindings";
+import { cloudSttKeyOptional, cloudSttNeedsEndpoint } from "@/lib/cloudStt";
 
 /**
  * "Where transcription runs" — the on-device engine, or a hosted one.
@@ -110,6 +111,11 @@ export const CloudTranscriptionGroup: React.FC<{
   const hasKey = keyStatus[providerId] ?? false;
   const selectedModel = settings?.cloud_stt_models?.[providerId] ?? "";
   const baseUrlOverride = settings?.cloud_stt_base_urls?.[providerId] ?? "";
+  const keyOptional = cloudSttKeyOptional(provider);
+  const needsEndpoint = cloudSttNeedsEndpoint(provider, baseUrlOverride);
+  // Azure's endpoint is the user's own resource, not a server they host, so it
+  // gets its own wording and an example of the URL the portal shows.
+  const isAzure = provider?.kind === "azure_speech";
 
   /** Run a settings write and pull the authoritative state back. */
   const commit = async (write: () => Promise<unknown>) => {
@@ -180,7 +186,9 @@ export const CloudTranscriptionGroup: React.FC<{
   const providerOptions = providers.map((entry) => ({
     value: entry.id,
     label: entry.label,
-    ready: !!keyStatus[entry.id] || !!entry.allow_base_url_edit,
+    ready:
+      (!!keyStatus[entry.id] || cloudSttKeyOptional(entry)) &&
+      !cloudSttNeedsEndpoint(entry, settings?.cloud_stt_base_urls?.[entry.id]),
     hint:
       prettyModelName(
         settings?.cloud_stt_models?.[entry.id]?.trim() || entry.default_model,
@@ -302,7 +310,11 @@ export const CloudTranscriptionGroup: React.FC<{
       {provider?.allow_base_url_edit && (
         <SettingContainer
           title={t("settings.dictation.cloud.endpoint.title")}
-          description={t("settings.dictation.cloud.endpoint.description")}
+          description={
+            isAzure
+              ? t("settings.dictation.cloud.endpoint.azureDescription")
+              : t("settings.dictation.cloud.endpoint.description")
+          }
           grouped={true}
         >
           {/* Committed on blur, not per keystroke: each write is a full
@@ -316,7 +328,11 @@ export const CloudTranscriptionGroup: React.FC<{
               if (next === baseUrlOverride) return;
               void commit(() => commands.setCloudSttBaseUrl(providerId, next));
             }}
-            placeholder={provider.base_url}
+            placeholder={
+              isAzure
+                ? t("settings.dictation.cloud.endpoint.azurePlaceholder")
+                : provider.base_url
+            }
             variant="compact"
             className="min-w-[280px]"
           />
@@ -428,7 +444,7 @@ export const CloudTranscriptionGroup: React.FC<{
           size="sm"
           variant="secondary"
           onClick={() => void runTest()}
-          disabled={testing || (!hasKey && !provider?.allow_base_url_edit)}
+          disabled={testing || (!hasKey && !keyOptional) || needsEndpoint}
         >
           {testing ? (
             <span className="inline-flex items-center gap-1.5">

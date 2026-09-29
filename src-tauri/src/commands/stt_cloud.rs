@@ -211,5 +211,11 @@ fn describe_unavailable(error: crate::settings::CloudSttResolutionError) -> Stri
                 .provider_label
                 .unwrap_or_else(|| "this provider".to_string())
         ),
+        Reason::MissingEndpoint => format!(
+            "Add the endpoint of your {} resource first",
+            error
+                .provider_label
+                .unwrap_or_else(|| "provider".to_string())
+        ),
     }
 }
