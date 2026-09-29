@@ -5,18 +5,24 @@
 #
 #   1. bun install
 #   2. bunx wrangler login
-#   3. Give the Worker a GitHub credential. Pick ONE:
+#   3. Give the Worker a GitHub credential. Pick ONE. Both need two repository
+#      permissions: Issues = Read and write (the report) and Contents = Read
+#      and write (screenshots are committed under attachments/YYYY-MM/ and
+#      embedded in the issue). Without Contents, reports still arrive; the
+#      issue just says its screenshots couldn't be stored.
 #
 #      a) GitHub App (recommended: issues are opened by "<app>[bot]", so GitHub
 #         emails you about each one like any other new issue).
 #         github.com/settings/apps/new → no webhook, Repository permissions:
-#         Issues = Read and write, "Only on this account". Generate a private
-#         key, then install the app on the feedback repository only.
+#         Issues + Contents = Read and write, "Only on this account". Generate
+#         a private key, then install the app on the feedback repository only.
+#         (An existing App: add Contents, then accept the new permission on
+#         the installation page, or uploads keep failing with 403.)
 #           bunx wrangler secret put GITHUB_APP_ID
 #           bunx wrangler secret put GITHUB_APP_PRIVATE_KEY   < the-downloaded.pem
 #
 #      b) Fine-grained personal access token, limited to the feedback
-#         repository with Issues = Read and write.
+#         repository with Issues + Contents = Read and write.
 #           bunx wrangler secret put GITHUB_TOKEN
 #         Issues are then opened as you, and GitHub does not email you about
 #         your own activity unless Settings → Notifications → "Include your own
@@ -54,6 +60,15 @@ simple = { limit = 5, period = 60 }
 name = "GLOBAL_LIMIT"
 namespace_id = "7302"
 simple = { limit = 60, period = 60 }
+
+# Reports that carry screenshots, everyone together. Screenshots are what grow
+# the repository (each is capped at 1 MB and usually a few hundred KB), so
+# they get a tighter budget than text. Over it, the report is still filed and
+# the issue notes the missing images.
+[[ratelimits]]
+name = "ATTACHMENT_LIMIT"
+namespace_id = "7303"
+simple = { limit = 10, period = 60 }
 
 [observability]
 enabled = true

@@ -224,11 +224,10 @@ export interface NewIssue {
 
 export async function createIssue(
   env: GitHubEnv,
+  token: string,
   issue: NewIssue,
   fetchImpl: Fetch,
-  nowSeconds: number,
 ): Promise<number> {
-  const token = await resolveToken(env, fetchImpl, nowSeconds);
   const response = await expectOk(
     await fetchImpl(`${API}/repos/${env.FEEDBACK_REPO}/issues`, {
       method: "POST",
@@ -238,4 +237,45 @@ export async function createIssue(
     "creating the issue",
   );
   return ((await response.json()) as { number: number }).number;
+}
+
+/**
+ * Commit one file to the feedback repository's default branch and return a
+ * URL an issue can embed.
+ *
+ * The URL is the file's `blob` page with `?raw=true`, not the API's
+ * `download_url`: in a private repository the latter carries a short-lived
+ * token and stops rendering within the hour, while the blob URL redirects
+ * through the viewer's own GitHub session every time it is loaded — so the
+ * image shows for anyone who can see the repository and for nobody else.
+ *
+ * Needs Contents: Read and write on the App or token, on top of Issues.
+ */
+export async function uploadFile(
+  env: GitHubEnv,
+  token: string,
+  path: string,
+  base64: string,
+  message: string,
+  fetchImpl: Fetch,
+): Promise<string> {
+  const encodedPath = path.split("/").map(encodeURIComponent).join("/");
+  const response = await expectOk(
+    await fetchImpl(
+      `${API}/repos/${env.FEEDBACK_REPO}/contents/${encodedPath}`,
+      {
+        method: "PUT",
+        headers: { ...headers(token), "Content-Type": "application/json" },
+        body: JSON.stringify({ message, content: base64 }),
+      },
+    ),
+    "uploading an attachment",
+  );
+  const result = (await response.json()) as {
+    content?: { html_url?: string };
+  };
+  const page =
+    result.content?.html_url ??
+    `https://github.com/${env.FEEDBACK_REPO}/blob/HEAD/${encodedPath}`;
+  return `${page}?raw=true`;
 }

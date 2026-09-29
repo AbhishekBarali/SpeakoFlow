@@ -12,8 +12,10 @@
 //! post to it on a visitor's behalf.
 //!
 //! What is sent is exactly what the dialog shows: the message, an email only
-//! if the person typed one, and — only if they left the box ticked — the app
-//! version, OS and install type. No logs, no transcripts, no identifiers.
+//! if the person typed one, any screenshots they attached (compressed in the
+//! dialog first, since each one is committed to the feedback repository), and
+//! — only if they left the box ticked — the app version, OS and install type.
+//! No logs, no transcripts, no identifiers.
 
 use log::{info, warn};
 use serde::{Deserialize, Serialize};
@@ -27,6 +29,10 @@ pub const FEEDBACK_ENDPOINT: &str = "https://feedback.speakoflow.com/v1/feedback
 pub const MIN_MESSAGE_CHARS: usize = 3;
 pub const MAX_MESSAGE_CHARS: usize = 5000;
 const MAX_EMAIL_CHARS: usize = 254;
+/// Screenshots are compressed in the dialog before they get here (usually to
+/// a few hundred KB); these caps only catch a bypassed or broken compressor.
+pub const MAX_ATTACHMENTS: usize = 3;
+pub const MAX_ATTACHMENT_BYTES: usize = 1024 * 1024;
 
 #[derive(Serialize, Deserialize, Type, Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -36,12 +42,34 @@ pub enum FeedbackKind {
     Question,
 }
 
+/// One screenshot as the dialog hands it over: a MIME type and plain base64.
+#[derive(Serialize, Deserialize, Type, Clone, Debug, PartialEq, Eq)]
+pub struct FeedbackAttachment {
+    pub media_type: String,
+    pub data: String,
+}
+
 #[derive(Deserialize, Type, Debug)]
 pub struct FeedbackRequest {
     pub kind: FeedbackKind,
     pub message: String,
     pub email: Option<String>,
     pub include_system_info: bool,
+    #[serde(default)]
+    pub attachments: Vec<FeedbackAttachment>,
+}
+
+/// What the dialog needs to know after a successful send. Screenshots are
+/// best-effort on the Worker's side, so a report can arrive without them.
+#[derive(Serialize, Type, Clone, Debug, Default, PartialEq, Eq)]
+pub struct FeedbackOutcome {
+    pub attachments_dropped: u32,
+}
+
+#[derive(Deserialize, Debug, Default)]
+struct WorkerReply {
+    #[serde(default)]
+    attachments_dropped: u32,
 }
 
 /// The optional "about this install" block, shown verbatim in the dialog
@@ -62,6 +90,8 @@ struct FeedbackPayload<'a> {
     email: Option<&'a str>,
     #[serde(skip_serializing_if = "Option::is_none")]
     system: Option<FeedbackSystemInfo>,
+    #[serde(skip_serializing_if = "<[_]>::is_empty")]
+    attachments: &'a [FeedbackAttachment],
 }
 
 /// A validated message and optional email, trimmed.
@@ -76,6 +106,9 @@ pub enum FeedbackError {
     TooShort,
     TooLong,
     InvalidEmail,
+    TooManyAttachments,
+    AttachmentTooLarge,
+    InvalidAttachment,
 }
 
 impl FeedbackError {
@@ -86,8 +119,55 @@ impl FeedbackError {
                 "That's longer than 5,000 characters. Trim it a little and send again."
             }
             Self::InvalidEmail => "That email address doesn't look right.",
+            Self::TooManyAttachments => "You can attach up to 3 screenshots.",
+            Self::AttachmentTooLarge => {
+                "One of the screenshots is too large to send. Remove it and attach a smaller one."
+            }
+            Self::InvalidAttachment => {
+                "One of the attachments isn't a PNG, JPEG or WebP image. Remove it and try again."
+            }
         }
     }
+}
+
+/// The format the leading bytes say a file is, if it is one we send.
+pub fn sniff_image(bytes: &[u8]) -> Option<&'static str> {
+    if bytes.starts_with(&[0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a]) {
+        Some("image/png")
+    } else if bytes.starts_with(&[0xff, 0xd8, 0xff]) {
+        Some("image/jpeg")
+    } else if bytes.len() >= 12 && &bytes[0..4] == b"RIFF" && &bytes[8..12] == b"WEBP" {
+        Some("image/webp")
+    } else {
+        None
+    }
+}
+
+/// Decodes each screenshot to check it really is the image it says, and
+/// within the size cap, before anything leaves the machine. The Worker checks
+/// the same things; checking here turns a rejected upload into a sentence in
+/// the dialog instead of a generic "couldn't be accepted".
+pub fn check_attachments(attachments: &[FeedbackAttachment]) -> Result<(), FeedbackError> {
+    use base64::Engine;
+    if attachments.len() > MAX_ATTACHMENTS {
+        return Err(FeedbackError::TooManyAttachments);
+    }
+    for attachment in attachments {
+        // Cheap bound first, so a huge string is never decoded.
+        if attachment.data.len() > MAX_ATTACHMENT_BYTES.div_ceil(3) * 4 {
+            return Err(FeedbackError::AttachmentTooLarge);
+        }
+        let bytes = base64::engine::general_purpose::STANDARD
+            .decode(attachment.data.as_bytes())
+            .map_err(|_| FeedbackError::InvalidAttachment)?;
+        if bytes.len() > MAX_ATTACHMENT_BYTES {
+            return Err(FeedbackError::AttachmentTooLarge);
+        }
+        if sniff_image(&bytes) != Some(attachment.media_type.as_str()) {
+            return Err(FeedbackError::InvalidAttachment);
+        }
+    }
+    Ok(())
 }
 
 pub fn clean_feedback(message: &str, email: Option<&str>) -> Result<CleanFeedback, FeedbackError> {
@@ -189,27 +269,39 @@ pub fn get_feedback_system_info(app: AppHandle) -> FeedbackSystemInfo {
 pub fn describe_http_failure(status: u16) -> &'static str {
     match status {
         429 => "You've sent a lot of feedback in a short time. Try again in a minute.",
-        400 | 413 | 415 | 422 => "The feedback couldn't be accepted. Try shortening it and send again.",
+        413 => "The screenshots are too large to send. Remove one and try again.",
+        400 | 415 | 422 => "The feedback couldn't be accepted. Try shortening it and send again.",
         _ => "The feedback service isn't answering right now. Your message is saved here, so try again later.",
     }
 }
 
 #[tauri::command]
 #[specta::specta]
-pub async fn send_feedback(app: AppHandle, request: FeedbackRequest) -> Result<(), String> {
+pub async fn send_feedback(
+    app: AppHandle,
+    request: FeedbackRequest,
+) -> Result<FeedbackOutcome, String> {
     let clean = clean_feedback(&request.message, request.email.as_deref())
         .map_err(|e| e.message().to_string())?;
+    check_attachments(&request.attachments).map_err(|e| e.message().to_string())?;
     let payload = FeedbackPayload {
         kind: request.kind,
         message: &clean.message,
         email: clean.email.as_deref(),
         system: request.include_system_info.then(|| system_info(&app)),
+        attachments: &request.attachments,
     };
 
     let client = reqwest::Client::builder()
         .user_agent(concat!("SpeakoFlow/", env!("CARGO_PKG_VERSION")))
         .connect_timeout(Duration::from_secs(10))
-        .timeout(Duration::from_secs(25))
+        // Screenshots mean up to ~4 MB of upload and one GitHub commit each
+        // on the Worker's side before the issue is filed.
+        .timeout(Duration::from_secs(if request.attachments.is_empty() {
+            25
+        } else {
+            60
+        }))
         .build()
         .map_err(|e| e.to_string())?;
 
@@ -225,12 +317,17 @@ pub async fn send_feedback(app: AppHandle, request: FeedbackRequest) -> Result<(
 
     let status = response.status();
     if status.is_success() {
+        let reply: WorkerReply = response.json().await.unwrap_or_default();
         info!(
-            "Feedback sent ({:?}, {} chars)",
+            "Feedback sent ({:?}, {} chars, {} screenshot(s), {} not stored)",
             request.kind,
-            clean.message.chars().count()
+            clean.message.chars().count(),
+            request.attachments.len(),
+            reply.attachments_dropped
         );
-        return Ok(());
+        return Ok(FeedbackOutcome {
+            attachments_dropped: reply.attachments_dropped,
+        });
     }
     let body = response.text().await.unwrap_or_default();
     warn!(
@@ -300,12 +397,119 @@ mod tests {
             message: "dark mode for the overlay",
             email: None,
             system: None,
+            attachments: &[],
         };
         let json = serde_json::to_value(&payload).unwrap();
         assert_eq!(
             json,
             serde_json::json!({ "kind": "idea", "message": "dark mode for the overlay" })
         );
+    }
+
+    fn b64(bytes: &[u8]) -> String {
+        use base64::Engine;
+        base64::engine::general_purpose::STANDARD.encode(bytes)
+    }
+
+    const PNG: &[u8] = &[0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13];
+
+    fn png() -> FeedbackAttachment {
+        FeedbackAttachment {
+            media_type: "image/png".into(),
+            data: b64(PNG),
+        }
+    }
+
+    #[test]
+    fn screenshots_travel_under_the_workers_field_names() {
+        let attachments = [png()];
+        let payload = FeedbackPayload {
+            kind: FeedbackKind::Bug,
+            message: "the overlay is clipped",
+            email: None,
+            system: None,
+            attachments: &attachments,
+        };
+        let json = serde_json::to_value(&payload).unwrap();
+        assert_eq!(
+            json["attachments"],
+            serde_json::json!([{ "media_type": "image/png", "data": b64(PNG) }])
+        );
+    }
+
+    #[test]
+    fn an_older_dialog_without_attachments_still_deserializes() {
+        let request: FeedbackRequest = serde_json::from_value(serde_json::json!({
+            "kind": "bug", "message": "hello there", "email": null,
+            "include_system_info": false
+        }))
+        .unwrap();
+        assert!(request.attachments.is_empty());
+    }
+
+    #[test]
+    fn only_real_images_within_the_cap_are_sent() {
+        assert_eq!(check_attachments(&[png(), png(), png()]), Ok(()));
+        assert_eq!(
+            check_attachments(&[png(), png(), png(), png()]),
+            Err(FeedbackError::TooManyAttachments)
+        );
+
+        let jpeg_claiming_png = FeedbackAttachment {
+            media_type: "image/png".into(),
+            data: b64(&[0xff, 0xd8, 0xff, 0xe0, 0, 0]),
+        };
+        assert_eq!(
+            check_attachments(&[jpeg_claiming_png]),
+            Err(FeedbackError::InvalidAttachment)
+        );
+
+        let not_base64 = FeedbackAttachment {
+            media_type: "image/png".into(),
+            data: "not base64!".into(),
+        };
+        assert_eq!(
+            check_attachments(&[not_base64]),
+            Err(FeedbackError::InvalidAttachment)
+        );
+
+        let mut big = PNG.to_vec();
+        big.resize(MAX_ATTACHMENT_BYTES + 1, 0);
+        let too_big = FeedbackAttachment {
+            media_type: "image/png".into(),
+            data: b64(&big),
+        };
+        assert_eq!(
+            check_attachments(&[too_big]),
+            Err(FeedbackError::AttachmentTooLarge)
+        );
+
+        // Exactly at the cap is fine.
+        big.truncate(MAX_ATTACHMENT_BYTES);
+        let at_cap = FeedbackAttachment {
+            media_type: "image/png".into(),
+            data: b64(&big),
+        };
+        assert_eq!(check_attachments(&[at_cap]), Ok(()));
+    }
+
+    #[test]
+    fn webp_and_jpeg_are_recognised() {
+        let mut webp = b"RIFF\x10\0\0\0WEBPVP8 ".to_vec();
+        webp.extend_from_slice(&[0; 8]);
+        assert_eq!(sniff_image(&webp), Some("image/webp"));
+        assert_eq!(sniff_image(&[0xff, 0xd8, 0xff, 0xdb]), Some("image/jpeg"));
+        assert_eq!(sniff_image(b"GIF89a"), None);
+        assert_eq!(sniff_image(b"RIFF"), None);
+    }
+
+    #[test]
+    fn a_worker_reply_names_dropped_screenshots_or_nothing() {
+        let reply: WorkerReply =
+            serde_json::from_str(r#"{"ok":true,"attachments_dropped":2}"#).unwrap();
+        assert_eq!(reply.attachments_dropped, 2);
+        let reply: WorkerReply = serde_json::from_str(r#"{"ok":true}"#).unwrap();
+        assert_eq!(reply.attachments_dropped, 0);
     }
 
     #[test]

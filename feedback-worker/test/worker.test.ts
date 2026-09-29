@@ -2,7 +2,12 @@ import { describe, expect, test } from "bun:test";
 import { generateKeyPairSync, verify } from "node:crypto";
 import { handle, type Env } from "../src/index";
 import {
+  MAX_ATTACHMENTS,
+  MAX_ATTACHMENT_BYTES,
+  MAX_BODY_BYTES,
   MAX_MESSAGE_CHARS,
+  attachmentPath,
+  base64DecodedBytes,
   defuseMentions,
   issueBody,
   issueTitle,
@@ -81,6 +86,7 @@ describe("parseFeedback", () => {
         message: "dark mode please",
         email: null,
         system: null,
+        attachments: [],
       },
     });
   });
@@ -118,6 +124,7 @@ describe("issue formatting", () => {
       "  \n@octocat it crashed when I pressed Ctrl+Space twice\nsecond line",
     email: null,
     system: null,
+    attachments: [],
   };
 
   test("mentions cannot ping anyone", () => {
@@ -197,7 +204,11 @@ describe("handle", () => {
       { "Content-Type": "application/x-www-form-urlencoded" },
       415,
     ],
-    ["an oversized declaration", { "Content-Length": String(64 * 1024) }, 413],
+    [
+      "an oversized declaration",
+      { "Content-Length": String(8 * 1024 * 1024) },
+      413,
+    ],
   ])("refuses %s", async (_name, headers, status) => {
     const gh = github([]);
     const response = await handle(request(valid, { headers }), PAT_ENV, {
@@ -223,9 +234,12 @@ describe("handle", () => {
 
   test("measures the real body, not the declared length", async () => {
     const response = await handle(
-      request(JSON.stringify({ ...valid, message: "x".repeat(40 * 1024) }), {
-        headers: { "Content-Length": "10" },
-      }),
+      request(
+        JSON.stringify({ ...valid, message: "x".repeat(MAX_BODY_BYTES + 1) }),
+        {
+          headers: { "Content-Length": "10" },
+        },
+      ),
       PAT_ENV,
       { fetch: github([]).fetch, now: () => NOW },
     );
@@ -291,6 +305,236 @@ describe("handle", () => {
     expect(health.status).toBe(200);
     const missing = await handle(new Request("https://x/admin"), PAT_ENV, deps);
     expect(missing.status).toBe(404);
+  });
+});
+
+describe("attachments", () => {
+  // Real headers; the rest of the bytes do not matter to the sniffing.
+  const png = Buffer.from([
+    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 1, 2, 3,
+  ]).toString("base64");
+  const webp = Buffer.concat([
+    Buffer.from("RIFF"),
+    Buffer.from([0x10, 0, 0, 0]),
+    Buffer.from("WEBPVP8 "),
+    Buffer.alloc(8),
+  ]).toString("base64");
+  const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 16, 1, 2, 3]).toString(
+    "base64",
+  );
+
+  const withImages = (attachments: unknown) => ({ ...valid, attachments });
+
+  test("accepts the three formats the app produces", () => {
+    const result = parseFeedback(
+      withImages([
+        { media_type: "image/png", data: png },
+        { media_type: "image/webp", data: webp },
+        { media_type: "image/jpeg", data: jpeg },
+      ]),
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.feedback.attachments.map((a) => a.mediaType)).toEqual([
+        "image/png",
+        "image/webp",
+        "image/jpeg",
+      ]);
+      expect(result.feedback.attachments[0].bytes).toBe(15);
+    }
+  });
+
+  test("the decoded size is computed without decoding", () => {
+    for (const n of [1, 2, 3, 4, 5, 100]) {
+      const data = Buffer.alloc(n).toString("base64");
+      expect(base64DecodedBytes(data)).toBe(n);
+    }
+  });
+
+  test.each([
+    ["not an array", { media_type: "image/png", data: png }, "array"],
+    [
+      "too many",
+      Array.from({ length: MAX_ATTACHMENTS + 1 }, () => ({
+        media_type: "image/png",
+        data: png,
+      })),
+      "at most",
+    ],
+    ["a GIF", [{ media_type: "image/gif", data: png }], "png, jpeg or webp"],
+    [
+      "bytes that disagree with the declared type",
+      [{ media_type: "image/png", data: jpeg }],
+      "claims",
+    ],
+    [
+      "something that is not an image at all",
+      [
+        {
+          media_type: "image/png",
+          data: Buffer.from("#!/bin/sh\necho hi\n").toString("base64"),
+        },
+      ],
+      "claims",
+    ],
+    ["broken base64", [{ media_type: "image/png", data: "@@@@" }], "base64"],
+    [
+      "an image over the cap",
+      [
+        {
+          media_type: "image/png",
+          data: Buffer.concat([
+            Buffer.from(png, "base64"),
+            Buffer.alloc(MAX_ATTACHMENT_BYTES),
+          ]).toString("base64"),
+        },
+      ],
+      "too large",
+    ],
+  ])("rejects %s", (_name, attachments, reason) => {
+    const result = parseFeedback(withImages(attachments));
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toContain(reason);
+  });
+
+  test("files are grouped by month and sort by arrival", () => {
+    expect(attachmentPath(NOW, "a1b2c3", 0, "image/webp")).toBe(
+      "attachments/2026-09/20260928-100000-a1b2c3-1.webp",
+    );
+    expect(attachmentPath(NOW, "a1b2c3", 1, "image/jpeg")).toBe(
+      "attachments/2026-09/20260928-100000-a1b2c3-2.jpg",
+    );
+  });
+
+  const deps = (gh: ReturnType<typeof github>) => ({
+    fetch: gh.fetch,
+    now: () => NOW,
+    randomId: () => "abc123",
+  });
+
+  test("uploads each screenshot, then embeds them in the issue", async () => {
+    const gh = github([
+      [
+        201,
+        {
+          content: {
+            html_url:
+              "https://github.com/owner/feedback/blob/main/attachments/2026-09/20260928-100000-abc123-1.png",
+          },
+        },
+      ],
+      [201, { content: {} }],
+      [201, { number: 7 }],
+    ]);
+    const response = await handle(
+      request(
+        withImages([
+          { media_type: "image/png", data: png },
+          { media_type: "image/webp", data: webp },
+        ]),
+      ),
+      PAT_ENV,
+      deps(gh),
+    );
+    expect(response.status).toBe(201);
+    expect(await response.json()).toEqual({ ok: true });
+
+    expect(gh.calls.map((c) => [c.init?.method, c.url])).toEqual([
+      [
+        "PUT",
+        "https://api.github.com/repos/owner/feedback/contents/attachments/2026-09/20260928-100000-abc123-1.png",
+      ],
+      [
+        "PUT",
+        "https://api.github.com/repos/owner/feedback/contents/attachments/2026-09/20260928-100000-abc123-2.webp",
+      ],
+      ["POST", "https://api.github.com/repos/owner/feedback/issues"],
+    ]);
+    const upload = JSON.parse(gh.calls[0].init?.body as string);
+    expect(upload.content).toBe(png);
+    expect(upload.message).toContain("screenshot 1 of 2");
+
+    const issue = JSON.parse(gh.calls[2].init?.body as string);
+    expect(issue.body).toContain(
+      "![Screenshot 1](https://github.com/owner/feedback/blob/main/attachments/2026-09/20260928-100000-abc123-1.png?raw=true)",
+    );
+    // No html_url in the response: fall back to the default branch.
+    expect(issue.body).toContain(
+      "![Screenshot 2](https://github.com/owner/feedback/blob/HEAD/attachments/2026-09/20260928-100000-abc123-2.webp?raw=true)",
+    );
+    // Images sit between the message and the details table.
+    expect(issue.body.indexOf("![Screenshot 1]")).toBeGreaterThan(
+      issue.body.indexOf("> The overlay"),
+    );
+    expect(issue.body.indexOf("![Screenshot 1]")).toBeLessThan(
+      issue.body.indexOf("| Reply to"),
+    );
+  });
+
+  test("a failed upload still files the report, and says so", async () => {
+    // A token without Contents permission: the first PUT is refused.
+    const gh = github([
+      [403, { message: "Resource not accessible by integration" }],
+      [201, { number: 8 }],
+    ]);
+    const response = await handle(
+      request(
+        withImages([
+          { media_type: "image/png", data: png },
+          { media_type: "image/png", data: png },
+        ]),
+      ),
+      PAT_ENV,
+      deps(gh),
+    );
+    expect(response.status).toBe(201);
+    expect(await response.json()).toEqual({
+      ok: true,
+      attachments_dropped: 2,
+    });
+    // It does not keep trying the second one after the first was refused.
+    expect(gh.calls).toHaveLength(2);
+    const issue = JSON.parse(gh.calls[1].init?.body as string);
+    expect(issue.body).toContain(
+      "_2 screenshots were attached but couldn't be stored._",
+    );
+    expect(issue.body).not.toContain("![");
+  });
+
+  test("the attachment budget drops images, never the report", async () => {
+    const gh = github([[201, { number: 9 }]]);
+    const env: Env = {
+      ...PAT_ENV,
+      ATTACHMENT_LIMIT: { limit: async () => ({ success: false }) },
+    };
+    const response = await handle(
+      request(withImages([{ media_type: "image/png", data: png }])),
+      env,
+      deps(gh),
+    );
+    expect(response.status).toBe(201);
+    expect(await response.json()).toEqual({
+      ok: true,
+      attachments_dropped: 1,
+    });
+    expect(gh.calls.map((c) => c.url)).toEqual([
+      "https://api.github.com/repos/owner/feedback/issues",
+    ]);
+    const issue = JSON.parse(gh.calls[0].init?.body as string);
+    expect(issue.body).toContain("_1 screenshot was attached");
+  });
+
+  test("a report with three full-size screenshots fits the body limit", () => {
+    const biggest = Math.ceil((MAX_ATTACHMENT_BYTES * 4) / 3);
+    const body = JSON.stringify({
+      ...valid,
+      message: "é".repeat(MAX_MESSAGE_CHARS),
+      attachments: Array.from({ length: MAX_ATTACHMENTS }, () => ({
+        media_type: "image/webp",
+        data: "A".repeat(biggest),
+      })),
+    });
+    expect(new TextEncoder().encode(body).length).toBeLessThan(MAX_BODY_BYTES);
   });
 });
 

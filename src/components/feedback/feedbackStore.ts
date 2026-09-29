@@ -19,18 +19,30 @@ export interface FeedbackSystemInfo {
   install: string;
 }
 
+/** One screenshot on the wire; see `FeedbackAttachment` in feedback.rs. */
+export interface FeedbackAttachment {
+  media_type: string;
+  data: string;
+}
+
 export interface FeedbackRequest {
   kind: FeedbackKind;
   message: string;
   email: string | null;
   include_system_info: boolean;
+  attachments: FeedbackAttachment[];
+}
+
+export interface FeedbackOutcome {
+  /** Screenshots the service could not store; the report arrived anyway. */
+  attachments_dropped: number;
 }
 
 export const getFeedbackSystemInfo = () =>
   invoke<FeedbackSystemInfo>("get_feedback_system_info");
 
 export const sendFeedback = (request: FeedbackRequest) =>
-  invoke<void>("send_feedback", { request });
+  invoke<FeedbackOutcome | null>("send_feedback", { request });
 
 /** Same limits as the backend and the Worker. */
 export const MIN_MESSAGE_CHARS = 3;
