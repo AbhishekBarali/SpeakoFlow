@@ -68,7 +68,7 @@
   "feedback": {
     "button": "Send feedback",
     "title": "Send feedback",
-    "description": "Found a bug, have an idea, or a question? It goes straight to the developer.",
+    "description": "I read every message myself, so say it however it comes out. Thanks for helping make SpeakoFlow better.",
     "kind": {
       "label": "Kind of feedback",
       "bug": "Bug",
@@ -81,19 +81,30 @@
       "question": "What would you like to know?"
     },
     "messageLabel": "Message",
-    "emailLabel": "Email",
-    "emailOptional": "optional",
-    "emailPlaceholder": "you@example.com",
-    "emailHint": "Only if you'd like a reply.",
+    "emailLabel": "Email for a reply",
+    "emailPlaceholder": "Email, if you'd like a reply",
     "emailInvalid": "That email address doesn't look right.",
-    "includeSystem": "Include app version and system",
-    "remaining": "{{count}} characters left",
-    "privacy": "Only what's shown here is sent.",
+    "includeSystem": "Include app version and OS",
+    "systemDetails": "Sent exactly as: {{system}}",
+    "remaining": "{{count}} left",
+    "screenshots": {
+      "add": "Add screenshot",
+      "pasteHint": "or paste with {{shortcut}}",
+      "remove": "Remove screenshot {{index}}",
+      "preview": "Screenshot {{index}}, {{width}} × {{height}}, {{size}}",
+      "working": "Shrinking screenshot…",
+      "limit": "You can attach up to {{count}} screenshots.",
+      "notImage": "That file isn't an image.",
+      "tooLarge": "That image is too large to attach.",
+      "unreadable": "That image couldn't be read."
+    },
     "send": "Send",
     "sending": "Sending…",
     "sentTitle": "Thanks, it's on its way",
-    "sentBody": "Your feedback reached the developer.",
+    "sentBody": "It's with me now, and I'll read it soon.",
     "sentWithEmail": "If there's something to follow up on, you'll hear back at {{email}}.",
+    "screenshotsDropped_one": "The screenshot couldn't be stored, but your message arrived.",
+    "screenshotsDropped_other": "{{count}} screenshots couldn't be stored, but your message arrived.",
     "sendAnother": "Send another",
     "errors": {
       "generic": "Couldn't send your feedback. Your message is saved here, so try again in a moment."
@@ -1040,7 +1051,9 @@
         },
         "endpoint": {
           "title": "Endpoint",
-          "description": "Base URL of an OpenAI-compatible transcription server."
+          "description": "Base URL of an OpenAI-compatible transcription server.",
+          "azureDescription": "Your Azure resource's endpoint, from Keys and Endpoint in the Azure portal. MAI-Transcribe needs a resource in Central India, Southeast Asia, East US, West US, West US 2, or North Europe.",
+          "azurePlaceholder": "https://your-resource.cognitiveservices.azure.com"
         },
         "model": {
           "title": "Model",
@@ -1518,7 +1531,12 @@
         "stopOnDictationLabel": "Stop speech when dictation starts",
         "stopOnDictationDescription": "Stop any reply that's still playing when you start dictating.",
         "engineLabel": "Engine",
-        "engineDescription": "Kokoro and Kitten run on this PC for free. Cloud engines use an API key from that provider. Custom connects to a speech server you run yourself.",
+        "engineDescription": "Voices on this computer are free and private, and work without the internet. Cloud voices use an API key from that provider. Custom connects to a speech server you run yourself.",
+        "sectionLocal": "On this computer",
+        "sectionLocalHint": "Free and private. Runs on this computer and works offline.",
+        "sectionCloud": "Cloud",
+        "sectionCloudHint": "Needs an API key from the provider. Custom connects to a speech server you run yourself.",
+        "readyLabel": "Ready to use",
         "kokoroSetupLabel": "Kokoro voice model",
         "kokoroSetupDescription": "Download it once, then spoken replies run privately on this device.",
         "kokoroDownload": "Download Kokoro",
@@ -1544,8 +1562,27 @@
         },
         "kokoroNativeLabel": "Processor voice",
         "kokoroNativeDescription": "Lets Kokoro speak fast on the processor when the graphics card can't. {{size}} download.",
-        "kittenPackLabel": "Kitten voice",
-        "kittenPackDescription": "A small voice that runs on the processor. {{size}} download.",
+        "kittenSizeLabel": "Kitten size",
+        "kittenSizeDescription": "All three sizes have the same eight voices. Bigger sizes sound more natural but take longer to start speaking, most of all on a small processor.",
+        "kittenSizes": {
+          "nano": "Nano · fastest ({{size}})",
+          "micro": "Micro · balanced ({{size}})",
+          "mini": "Mini · most natural ({{size}})"
+        },
+        "packLabel": {
+          "kitten": "Kitten voice",
+          "pocket": "Pocket TTS voice",
+          "supertonic": "Supertonic voice"
+        },
+        "packDescription": {
+          "kitten": "A small voice that runs on the processor. {{size}} download.",
+          "pocket": "Kyutai's natural-sounding voice, made for processors, with 14 speakers. {{size}} download.",
+          "supertonic": "Supertone's fast, clear voice, with ten speakers. {{size}} download."
+        },
+        "voiceNamedFemale": "{{name}} (female)",
+        "voiceNamedMale": "{{name}} (male)",
+        "voiceNumberedFemale": "Female {{n}}",
+        "voiceNumberedMale": "Male {{n}}",
         "packSize": "{{size}} MB",
         "packDownload": "Download ({{size}})",
         "packDownloading": "Downloading",
@@ -1559,6 +1596,8 @@
         "engines": {
           "kokoro": "Kokoro (local, free)",
           "kitten": "Kitten (local, light)",
+          "pocket": "Pocket TTS (local)",
+          "supertonic": "Supertonic (local)",
           "openai": "OpenAI",
           "elevenlabs": "ElevenLabs",
           "openrouter": "OpenRouter",
@@ -2204,6 +2243,7 @@
       "dictation": "Dictation",
       "assistant": "Assistant",
       "cleanupOff": "Turn on AI cleanup to get this shortcut.",
+      "cleanupOnDictation": "Your dictation shortcut cleans up every dictation, so this one is not needed.",
       "openCleanup": "Open AI cleanup",
       "assistantOff": "The assistant is turned off, so its shortcuts do nothing.",
       "openAssistant": "Open Assistant"
@@ -2362,11 +2402,11 @@
       "assistantOff": "Assistant is turned off",
       "noModel": "No model chosen yet",
       "notDownloaded": "Model not downloaded",
-      "noKey": "Add an API key"
+      "noKey": "Add an API key",
+      "noEndpoint": "Add an endpoint"
     },
     "voice": {
-      "kokoroModel": "Kokoro voice",
-      "kittenModel": "Kitten voice"
+      "kokoroModel": "Kokoro voice"
     },
     "usedBy": {
       "label": "Used by",
@@ -2488,7 +2528,14 @@
       "after": "Let's meet at eleven and bring the budget.",
       "offHint": "Turn on AI cleanup to use this shortcut",
       "onHint": "Hold, talk, let go. Cleaned text is typed for you.",
-      "onHintTap": "Tap, talk, tap again. Cleaned text is typed for you."
+      "onHintTap": "Tap, talk, tap again. Cleaned text is typed for you.",
+      "onDictationHint": "Every dictation is cleaned up."
+    },
+    "shortcut": {
+      "title": "Shortcut",
+      "info": "Give cleanup its own shortcut, or let your dictation shortcut clean up every dictation so there is one set of keys to remember.",
+      "separate": "Its own shortcut",
+      "dictation": "Same as dictation"
     },
     "shortcutRow": "Shortcut"
   },
@@ -2912,8 +2959,10 @@
     "showFewer": "Show fewer"
   },
   "voiceEngines": {
-    "kokoro": "Free, on this PC",
-    "kitten": "Light, on this PC",
+    "kokoro": "Best quality",
+    "kitten": "Lightest",
+    "pocket": "14 voices",
+    "supertonic": "Fast and clear",
     "openai": "GPT voices",
     "elevenlabs": "Most natural",
     "openrouter": "Many voices",
@@ -2929,6 +2978,8 @@
     "names": {
       "kokoro": "Kokoro",
       "kitten": "Kitten",
+      "pocket": "Pocket TTS",
+      "supertonic": "Supertonic",
       "openai": "OpenAI",
       "elevenlabs": "ElevenLabs",
       "openrouter": "OpenRouter",

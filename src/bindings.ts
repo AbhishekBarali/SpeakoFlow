@@ -247,6 +247,19 @@ async changePostProcessEnabledSetting(enabled: boolean) : Promise<Result<null, s
 }
 },
 /**
+ * Choose which shortcut runs AI cleanup: its own (`false`), or the dictation
+ * shortcut (`true`), in which case every dictation is cleaned up and the
+ * separate cleanup shortcut is released.
+ */
+async changePostProcessOnDictationSetting(enabled: boolean) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("change_post_process_on_dictation_setting", { enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * Make an on-device model the AI-cleanup engine, keeping the prompt layer
  * coherent with it.
  * 
@@ -259,7 +272,7 @@ async changePostProcessEnabledSetting(enabled: boolean) : Promise<Result<null, s
  * stay on task. Getting that pairing wrong looks like "the model is bad", so the
  * app pairs them.
  * 
- * Only the two *shipped* prompts are ever swapped. Anything the user selected or
+ * Only the *shipped* prompts are ever swapped. Anything the user selected or
  * wrote themselves is left exactly as it is — a silent switch away from
  * someone's own prompt would be worse than a suboptimal default.
  */
@@ -780,7 +793,7 @@ async revealUpdateInstaller(path: string) : Promise<Result<null, string>> {
 async getFeedbackSystemInfo() : Promise<FeedbackSystemInfo> {
     return await TAURI_INVOKE("get_feedback_system_info");
 },
-async sendFeedback(request: FeedbackRequest) : Promise<Result<null, string>> {
+async sendFeedback(request: FeedbackRequest) : Promise<Result<FeedbackOutcome, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("send_feedback", { request }) };
 } catch (e) {
@@ -3517,7 +3530,16 @@ post_process_unload_timeout?: ModelUnloadTimeout; word_correction_threshold?: nu
  * policy, and paired with `RecordingRetentionPeriod::CustomDays` exactly the
  * way `history_limit` is paired with `PreserveLimit`.
  */
-recording_retention_days?: number; paste_method?: PasteMethod; clipboard_handling?: ClipboardHandling; auto_submit?: boolean; auto_submit_key?: AutoSubmitKey; post_process_enabled?: boolean; post_process_provider_id?: string; post_process_providers?: PostProcessProvider[]; post_process_api_keys?: SecretMap; post_process_models?: Partial<{ [key in string]: string }>; post_process_prompts?: LLMPrompt[]; post_process_selected_prompt_id?: string | null; post_process_tone?: PostProcessTone; 
+recording_retention_days?: number; paste_method?: PasteMethod; clipboard_handling?: ClipboardHandling; auto_submit?: boolean; auto_submit_key?: AutoSubmitKey; post_process_enabled?: boolean; 
+/**
+ * Which shortcut runs AI cleanup. Off (the default): cleanup has its own
+ * shortcut, `transcribe_with_post_process`, and plain dictation stays plain.
+ * On: the dictation shortcut cleans up every dictation, and the separate
+ * cleanup shortcut is unregistered, so there is one combo to remember.
+ * Only matters while `post_process_enabled` is on; see
+ * [`cleanup_on_dictation`] and [`cleanup_binding_active`].
+ */
+post_process_on_dictation?: boolean; post_process_provider_id?: string; post_process_providers?: PostProcessProvider[]; post_process_api_keys?: SecretMap; post_process_models?: Partial<{ [key in string]: string }>; post_process_prompts?: LLMPrompt[]; post_process_selected_prompt_id?: string | null; post_process_tone?: PostProcessTone; 
 /**
  * User-created writing styles. Built-ins remain code-defined/localized and
  * are selected by their stable IDs.
@@ -4032,8 +4054,13 @@ export type CloseBehavior = "minimize_to_tray" | "quit"
  * - [`Deepgram`](Self::Deepgram): `POST /v1/listen` with the audio as the raw
  * request body (no multipart), `Authorization: Token <key>`, and everything
  * else as query parameters.
+ * - [`AzureSpeech`](Self::AzureSpeech): Azure AI Speech's fast-transcription
+ * route, `POST /speechtotext/transcriptions:transcribe`, with an
+ * `Ocp-Apim-Subscription-Key` header and a multipart body of `audio` plus a
+ * JSON `definition`. The model is not a form field: MAI-Transcribe is chosen
+ * by `definition.enhancedMode.model`.
  */
-export type CloudSttKind = "eleven_labs" | "open_ai_compatible" | "deepgram"
+export type CloudSttKind = "eleven_labs" | "open_ai_compatible" | "deepgram" | "azure_speech"
 /**
  * A configurable cloud speech-to-text endpoint. Seeded from
  * [`default_cloud_stt_providers`] and repaired on load, so a provider added in
@@ -4100,6 +4127,16 @@ supports_streaming?: boolean;
  */
 supports_translation?: boolean; 
 /**
+ * Whether this endpoint works without an API key.
+ * 
+ * Only the custom entry, because it is the one that points at a
+ * self-hosted server on `localhost`. This used to be inferred from
+ * `allow_base_url_edit`, which stopped being true the moment a hosted
+ * provider (Azure, whose endpoint is the user's own resource) needed an
+ * editable URL *and* a key.
+ */
+key_optional?: boolean; 
+/**
  * Where the user goes to get a key. Surfaced as a link in Settings so the
  * first-run path isn't "search the web for it".
  */
@@ -4113,7 +4150,11 @@ export type CloudSttReadiness = { state: "ready"; provider_id: string; provider_
  * [`PostProcessUnavailableReason`]: the pipeline needs to know *why* it is
  * falling back so the UI can say something more useful than "failed".
  */
-export type CloudSttUnavailableReason = "not_enabled" | "selected_provider_missing" | "missing_api_key" | "no_model_configured"
+export type CloudSttUnavailableReason = "not_enabled" | "selected_provider_missing" | "missing_api_key" | "no_model_configured" | 
+/**
+ * The provider's endpoint is the user's own resource and none is set.
+ */
+"missing_endpoint"
 /**
  * How long the assistant waits for you to finish speaking before it treats an
  * utterance as a complete turn, in a hands-free voice conversation.
@@ -4244,8 +4285,17 @@ export type EngineType = "Whisper" | "Parakeet" | "Moonshine" | "MoonshineStream
  * Not a transcription engine.
  */
 "NativeTts"
+/**
+ * One screenshot as the dialog hands it over: a MIME type and plain base64.
+ */
+export type FeedbackAttachment = { media_type: string; data: string }
 export type FeedbackKind = "bug" | "idea" | "question"
-export type FeedbackRequest = { kind: FeedbackKind; message: string; email: string | null; include_system_info: boolean }
+/**
+ * What the dialog needs to know after a successful send. Screenshots are
+ * best-effort on the Worker's side, so a report can arrive without them.
+ */
+export type FeedbackOutcome = { attachments_dropped: number }
+export type FeedbackRequest = { kind: FeedbackKind; message: string; email: string | null; include_system_info: boolean; attachments?: FeedbackAttachment[] }
 /**
  * The optional "about this install" block, shown verbatim in the dialog
  * before it is sent.
@@ -4398,7 +4448,11 @@ native_supported: boolean;
  * The processor voice is downloaded but couldn't start this session: the
  * engine library refused to load, or the Kokoro pack refused to start.
  */
-native_load_failed: boolean; kokoro_native_ready: boolean; kitten_ready: boolean }
+native_load_failed: boolean; kokoro_native_ready: boolean; 
+/**
+ * The Kitten size currently chosen is ready.
+ */
+kitten_ready: boolean }
 export type LogLevel = "trace" | "debug" | "info" | "warn" | "error"
 /**
  * A meeting record without its transcript.

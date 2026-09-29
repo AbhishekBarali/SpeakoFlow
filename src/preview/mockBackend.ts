@@ -276,6 +276,7 @@ const settings: Json = {
     ? []
     : ["Abhishek Barali", "SpeakoFlow", "firecrawl", "Gintama", "Tauri"],
   post_process_enabled: true,
+  post_process_on_dictation: params.get("cleanupShortcut") === "dictation",
   post_process_provider_id:
     params.get("cleanup") === "device" ? "builtin" : "bedrock_mantle",
   post_process_last_cloud_provider_id: "bedrock_mantle",
@@ -307,6 +308,11 @@ const settings: Json = {
     openrouter: "google/gemma-3-27b-it",
   },
   post_process_prompts: [
+    {
+      id: "speakoflow_readable",
+      name: "Readable (recommended)",
+      prompt: "Turn the transcript into readable text.",
+    },
     {
       id: "default_improve_transcriptions",
       name: "Improve transcriptions",
@@ -464,6 +470,16 @@ const cloudProviders: Json[] = [
     kind: "deepgram",
     default_model: "nova-3",
     supports_streaming: true,
+  },
+  {
+    id: "azure",
+    label: "Azure AI Speech",
+    base_url: "",
+    allow_base_url_edit: true,
+    kind: "azure_speech",
+    default_model: "MAI-Transcribe-2",
+    models: ["MAI-Transcribe-2", "MAI-Transcribe-1.5"],
+    honors_keyterms: true,
   },
 ];
 
@@ -738,7 +754,11 @@ const handlers: Record<string, (args: Json) => unknown> = {
     arch: "x86_64",
     install: "nsis",
   }),
-  send_feedback: () => null,
+  // A short wait, so the preview shows the "Sending…" state like the app does.
+  send_feedback: () =>
+    new Promise((resolve) =>
+      setTimeout(() => resolve({ attachments_dropped: 0 }), 600),
+    ),
 
   // Setters that change what the pages show.
   set_stt_engine_mode: ({ mode }) => {
@@ -780,6 +800,10 @@ const handlers: Record<string, (args: Json) => unknown> = {
   },
   change_post_process_enabled_setting: ({ enabled }) => {
     settings.post_process_enabled = enabled;
+    return null;
+  },
+  change_post_process_on_dictation_setting: ({ enabled }) => {
+    settings.post_process_on_dictation = enabled;
     return null;
   },
   set_assistant_enabled: ({ enabled }) => {

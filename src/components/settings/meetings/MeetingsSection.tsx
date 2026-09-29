@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { listen } from "@tauri-apps/api/event";
 import { toast } from "sonner";
 import { PageHeader, SectionTitle } from "@/components/ui/Page";
+import Badge from "@/components/ui/Badge";
 import { SubPage } from "@/components/ui/SubPage";
 import { Hero } from "@/components/ui/Hero";
 import { usePageReset } from "@/components/shell/navigation";
@@ -286,6 +287,7 @@ export const MeetingsSection: React.FC<{
     <div className="w-full">
       <PageHeader
         title={t("sidebar.meetings")}
+        badge={<Badge variant="outline">{t("common.beta")}</Badge>}
         description={t("sectionSubtitles.meetings")}
       />
 
