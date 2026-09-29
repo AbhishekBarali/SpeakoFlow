@@ -88,6 +88,46 @@ export function waveTargets(
     : Array(count).fill(REST_HEIGHT);
 }
 
+/** The working ripple: one soft crest travelling left to right across the bars
+ * while the app transcribes or cleans up.
+ *
+ * It replaced three dots that brightened in turn, which put a second, unrelated
+ * indicator in the place the user had just been watching the waveform, and whose
+ * blink read as nagging. Here the bars the user spoke into simply settle into a
+ * low, slow swell, so recording → working is one object changing pace rather
+ * than one object replaced by another.
+ *
+ * Deliberately smaller and slower than speech: the crest adds less than half a
+ * speaking crest's height and crosses the row in 1.6s, so it reads as "working
+ * on it" and never as "still listening". The crest is periodic over a span wider
+ * than the row, summed with its neighbours, so the loop has no seam — a crest
+ * leaving the right edge is already entering from the left. */
+const WORK_PERIOD = 1.6;
+const WORK_FLOOR = 0.15;
+const WORK_CREST = 0.24;
+/** Crest width, as a fraction of the row. About three bars of the pill. */
+const WORK_WIDTH = 0.2;
+/** Distance between successive crests, as a fraction of the row. Over 1, so
+ * there is always a moment with no crest in view: calmer than a conveyor. */
+const WORK_SPAN = 1.7;
+/** What working looks like without motion: a still, low row. */
+export const WORK_REST_HEIGHT = WORK_FLOOR + WORK_CREST * 0.25;
+
+export function workingWave(count: number, seconds: number): number[] {
+  const time = Number.isFinite(seconds) ? seconds : 0;
+  const cycle = (((time / WORK_PERIOD) % 1) + 1) % 1;
+  const centre = -(WORK_SPAN - 1) / 2 + WORK_SPAN * cycle;
+  return Array.from({ length: count }, (_, index) => {
+    const u = count === 1 ? 0.5 : index / (count - 1);
+    let crest = 0;
+    for (const shift of [-WORK_SPAN, 0, WORK_SPAN]) {
+      const distance = (u - centre - shift) / WORK_WIDTH;
+      crest += Math.exp(-distance * distance);
+    }
+    return WORK_FLOOR + WORK_CREST * Math.min(1, crest);
+  });
+}
+
 export interface Spring {
   position: number;
   velocity: number;

@@ -2,9 +2,12 @@ import { describe, expect, test } from "bun:test";
 import {
   MAX_HEIGHT,
   REST_HEIGHT,
+  WORK_REST_HEIGHT,
+  speechWave,
   stepSpring,
   voiceEnergy,
   waveTargets,
+  workingWave,
 } from "./waveformSignal";
 const speech = [
   0.15, 0.28, 0.55, 0.72, 0.66, 0.48, 0.35, 0.3, 0.22, 0.18, 0.12, 0.09, 0.07,
@@ -152,5 +155,50 @@ describe("speech-driven waveform", () => {
     };
     expect(atRate(30)).toBeCloseTo(atRate(60), 6);
     expect(atRate(120)).toBeCloseTo(atRate(60), 6);
+  });
+});
+
+describe("working ripple", () => {
+  const frames = (count: number, seconds: number) =>
+    Array.from({ length: seconds * 60 }, (_, i) => workingWave(count, i / 60));
+
+  test("stays calmer than speech: lower, and never below rest", () => {
+    const speechPeak = Math.max(
+      ...Array.from({ length: 120 }, (_, i) =>
+        Math.max(...speechWave(14, i / 60)),
+      ),
+    );
+    for (const frame of frames(14, 4)) {
+      for (const height of frame) {
+        expect(height).toBeGreaterThan(REST_HEIGHT);
+        expect(height).toBeLessThan(speechPeak * 0.75);
+      }
+    }
+    expect(WORK_REST_HEIGHT).toBeGreaterThan(REST_HEIGHT);
+  });
+
+  test("a crest travels left to right and loops without a seam", () => {
+    const peakAt = (seconds: number) => {
+      const row = workingWave(14, seconds);
+      return row.indexOf(Math.max(...row));
+    };
+    // Early in the cycle the crest is on the left, later on the right.
+    expect(peakAt(0.5)).toBeLessThan(peakAt(0.9));
+    // Continuous everywhere, including across the wrap at each period.
+    const all = frames(14, 5);
+    for (let i = 1; i < all.length; i++)
+      all[i].forEach((height, bar) =>
+        expect(Math.abs(height - all[i - 1][bar])).toBeLessThan(0.03),
+      );
+    // Periodic: one full period later, the same shape.
+    workingWave(14, 0.3).forEach((height, bar) =>
+      expect(height).toBeCloseTo(workingWave(14, 1.9)[bar], 6),
+    );
+  });
+
+  test("invalid time cannot create invalid geometry", () => {
+    for (const seconds of [NaN, Infinity, -5])
+      for (const value of workingWave(5, seconds))
+        expect(Number.isFinite(value)).toBe(true);
   });
 });

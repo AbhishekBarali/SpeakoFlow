@@ -3,16 +3,20 @@ import {
   AUDIO_STALE_MS,
   REST_HEIGHT,
   SPEECH_RELEASE_MS,
+  WORK_REST_HEIGHT,
   speechWave,
   stepSpring,
   voiceEnergy,
-  waveTargets,
+  workingWave,
   type Spring,
 } from "./waveformSignal";
 import { useReducedMotion } from "../../hooks/useReducedMotion";
 import "./AudioWaveform.css";
 
-export type WaveMode = "reactive" | "shimmer" | "flow";
+/** `reactive` follows the microphone. `working` is the slow ripple shown while
+ * the app transcribes or cleans up; switching between the two is animated, so
+ * the bars the user spoke into settle into it instead of being replaced. */
+export type WaveMode = "reactive" | "working";
 export interface AudioWaveformProps {
   levels: number[];
   barCount?: number;
@@ -26,7 +30,8 @@ export interface AudioWaveformProps {
   className?: string;
 }
 
-const WORKING_LEVELS = [0.15, 0.4, 0.6, 0.3, 0.2, 0.45, 0.65, 0.4, 0.15];
+const restingSprings = (count: number): Spring[] =>
+  Array.from({ length: count }, () => ({ position: REST_HEIGHT, velocity: 0 }));
 
 const AudioWaveform: React.FC<AudioWaveformProps> = ({
   levels,
@@ -48,6 +53,9 @@ const AudioWaveform: React.FC<AudioWaveformProps> = ({
   const lastAudio = useRef(0);
   const lastSpeech = useRef(0);
   const wake = useRef<(() => void) | null>(null);
+  /** Where every bar is and how fast it is moving. Kept across a change of
+   * mode, because that hand-off is the transition from listening to working. */
+  const springs = useRef<Spring[]>([]);
   const reducedMotion = useReducedMotion();
   const [heights, setHeights] = useState(() =>
     Array<number>(count).fill(REST_HEIGHT),
@@ -55,16 +63,17 @@ const AudioWaveform: React.FC<AudioWaveformProps> = ({
 
   useEffect(() => {
     const rest = Array<number>(count).fill(REST_HEIGHT);
-    let springs: Spring[] = rest.map((position) => ({ position, velocity: 0 }));
+    const park = () => {
+      springs.current = restingSprings(count);
+      setHeights(rest);
+    };
+    // Only a new bar count or a stopped indicator starts over from rest.
+    if (springs.current.length !== count || !active) park();
     speaking.current = false;
     lastSpeech.current = 0;
-    setHeights(rest);
-    if (
-      mode !== "reactive" ||
-      !active ||
-      typeof requestAnimationFrame !== "function"
-    )
-      return;
+    if (!active || typeof requestAnimationFrame !== "function") return;
+    const working = mode === "working";
+    const workRest = Array<number>(count).fill(WORK_REST_HEIGHT);
     let frame: number | null = null;
     let last = 0;
     let nextPaint = 0;
@@ -72,7 +81,7 @@ const AudioWaveform: React.FC<AudioWaveformProps> = ({
     const step = (now: number) => {
       frame = null;
       if (svgRef.current?.closest(".native-window-hidden")) {
-        setHeights(rest);
+        park();
         return;
       }
       // High-refresh displays need no more than 60 geometry updates per second
@@ -85,35 +94,52 @@ const AudioWaveform: React.FC<AudioWaveformProps> = ({
       const dt = (now - last) / 1000;
       last = now;
       const speechActive =
+        !working &&
         speaking.current &&
         now - lastAudio.current <= AUDIO_STALE_MS &&
         now - lastSpeech.current <= SPEECH_RELEASE_MS;
       // The wave keeps travelling through the release, so speech that resumes
       // after a syllable gap does not restart from the identical crest.
       if (!reducedMotion) phase += Math.min(dt, 0.05);
-      const target = speechActive ? speechWave(count, phase) : rest;
+      const target = working
+        ? reducedMotion
+          ? workRest
+          : workingWave(count, phase)
+        : speechActive
+          ? speechWave(count, phase)
+          : rest;
       if (!speechActive) speaking.current = false;
       let changed = false,
         settled = true;
-      springs = springs.map((spring, index) => {
+      springs.current = springs.current.map((spring, index) => {
         const next = stepSpring(spring, target[index], dt);
         changed ||= next.position !== spring.position;
         settled &&= next.position === target[index] && next.velocity === 0;
         return next;
       });
-      if (changed) setHeights(springs.map((spring) => spring.position));
-      // Keep smoothing while speech arrives, then release and park completely.
-      // An idle microphone does not run an animation loop.
-      if (!settled || target.some((value) => value > REST_HEIGHT))
+      if (changed) setHeights(springs.current.map((spring) => spring.position));
+      // Keep smoothing while speech arrives or work is under way, then release
+      // and park completely. An idle microphone does not run an animation loop.
+      if (!settled || speechActive || (working && !reducedMotion))
         frame = requestAnimationFrame(step);
     };
-    wake.current = () => {
+    const start = () => {
       if (frame !== null || svgRef.current?.closest(".native-window-hidden"))
         return;
       last = performance.now();
       nextPaint = last;
       frame = requestAnimationFrame(step);
     };
+    wake.current = working ? null : start;
+    // Working runs on its own clock. Back in reactive mode, a shape the
+    // previous mode left behind still has to settle to rest.
+    if (
+      working ||
+      springs.current.some(
+        (spring) => spring.position !== REST_HEIGHT || spring.velocity !== 0,
+      )
+    )
+      start();
     return () => {
       if (frame !== null) cancelAnimationFrame(frame);
       wake.current = null;
@@ -131,8 +157,6 @@ const AudioWaveform: React.FC<AudioWaveformProps> = ({
     // The running clock bridges syllable gaps, releases, and then parks.
   }, [levels, active, mode, count, reducedMotion]);
 
-  const display =
-    mode === "reactive" ? heights : waveTargets(WORKING_LEVELS, count);
   const width = (count - 1) * pitch + barWidth;
   return (
     <svg
@@ -156,10 +180,7 @@ const AudioWaveform: React.FC<AudioWaveformProps> = ({
         </linearGradient>
       </defs>
       {Array.from({ length: count }, (_, index) => {
-        const height =
-          active || mode !== "reactive"
-            ? (display[index] ?? REST_HEIGHT)
-            : REST_HEIGHT;
+        const height = active ? (heights[index] ?? REST_HEIGHT) : REST_HEIGHT;
         return (
           <line
             key={index}
@@ -172,7 +193,6 @@ const AudioWaveform: React.FC<AudioWaveformProps> = ({
             strokeWidth={barWidth}
             strokeLinecap="round"
             vectorEffect="non-scaling-stroke"
-            style={{ "--phase": `${index * -0.085}s` } as React.CSSProperties}
           />
         );
       })}

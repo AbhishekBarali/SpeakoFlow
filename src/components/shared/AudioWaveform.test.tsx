@@ -125,3 +125,49 @@ test("moving closer to the microphone does not inflate the speaking wave", () =>
       );
   }
 });
+
+test("working mode ripples on its own clock, without audio", () => {
+  act(() =>
+    renderer.update(<AudioWaveform levels={[]} mode="working" barCount={14} />),
+  );
+  tick(20);
+  const early = heights();
+  tick(30);
+  const later = heights();
+  // Something is moving, nothing is at rest, and the shape changes over time.
+  expect(frames.size).toBe(1);
+  expect(later.every((height) => height > 2)).toBe(true);
+  expect(later).not.toEqual(early);
+});
+
+test("listening hands its shape to working instead of restarting from rest", () => {
+  act(() => renderer.update(<AudioWaveform levels={levels} barCount={14} />));
+  for (let i = 0; i < 20; i++) {
+    show([...levels]);
+    tick(2);
+  }
+  const speaking = heights();
+  act(() =>
+    renderer.update(
+      <AudioWaveform levels={levels} mode="working" barCount={14} />,
+    ),
+  );
+  // The first working frame starts from where speech left the bars, not flat.
+  expect(heights()).toEqual(speaking);
+  tick(1);
+  expect(Math.max(...heights())).toBeGreaterThan(4);
+  // …and settles into the calmer ripple.
+  tick(40);
+  expect(Math.max(...heights())).toBeLessThan(Math.max(...speaking));
+});
+
+test("leaving working mode settles back to rest and stops the clock", () => {
+  act(() =>
+    renderer.update(<AudioWaveform levels={[]} mode="working" barCount={14} />),
+  );
+  tick(30);
+  act(() => renderer.update(<AudioWaveform levels={[]} barCount={14} />));
+  tick(60);
+  expect(frames.size).toBe(0);
+  expect(heights().every((height) => height === 2)).toBe(true);
+});

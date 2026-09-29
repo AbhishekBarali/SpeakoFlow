@@ -5,7 +5,6 @@ import { Check, Copy } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import AudioWaveform from "../components/shared/AudioWaveform";
 import CompletionMark from "./CompletionMark";
-import OverlayWorking from "./OverlayWorking";
 import { voiceEnergy } from "../components/shared/waveformSignal";
 import i18n, { syncLanguageFromSettings } from "@/i18n";
 import { preventBrowserContextMenu } from "@/lib/contextMenu";
@@ -58,7 +57,8 @@ const EMPTY_TRANSCRIPT: Transcript = {
 };
 
 /** The card's indicator slot is 23px: five 3px bars on a 5px pitch, the same
- * footprint as the three working dots, so a change of state moves nothing. */
+ * footprint as the check that replaces them, so a change of state moves
+ * nothing. */
 const CARD_WAVE: WaveShape = { bars: 5, pitch: 5, barWidth: 3 };
 const PILL_WAVE: WaveShape = { bars: 14 };
 const LABELED_PILL_WAVE: WaveShape = { bars: 9 };
@@ -91,6 +91,11 @@ const LABELED: readonly OverlayState[] = ["generating", "vision", "notice"];
 
 /** How long a copy confirms before the header returns to normal. */
 const COPIED_FEEDBACK_MS = 1600;
+
+/** A hop that faded the overlay out and never heard back fades it in anyway.
+ * The backend's own fade is 60ms (`HOP_FADE_OUT`), so this only fires when its
+ * "in" was lost. */
+const HOP_TIMEOUT_MS = 400;
 
 /** Fold one engine update into what is on screen. */
 function nextTranscript(
@@ -179,6 +184,8 @@ const RecordingOverlay: React.FC = () => {
   const [copyFailed, setCopyFailed] = useState(false);
   const [completed, setCompleted] = useState(false);
   const [fading, setFading] = useState(false);
+  /** Moving to another display: faded out while the window moves under it. */
+  const [hopping, setHopping] = useState(false);
   /** Whether there is text past the top or bottom edge, which is what fades
    * that edge instead of cutting a line in half. */
   const [edges, setEdges] = useState({ above: false, below: false });
@@ -187,6 +194,7 @@ const RecordingOverlay: React.FC = () => {
   const cardRef = useRef<HTMLDivElement>(null);
   const cardBodyRef = useRef<HTMLDivElement>(null);
   const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hopTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingText = useRef<StreamTextPayload | null>(null);
   const pendingReplace = useRef<Transcript | null>(null);
   const textFrame = useRef(false);
@@ -253,6 +261,17 @@ const RecordingOverlay: React.FC = () => {
   const clearHoldTimer = () => {
     if (holdTimer.current) clearTimeout(holdTimer.current);
     holdTimer.current = null;
+  };
+  /** Fade out for a move to another display, or back in once it has landed. */
+  const setHop = (out: boolean) => {
+    if (hopTimer.current) clearTimeout(hopTimer.current);
+    hopTimer.current = out
+      ? setTimeout(() => {
+          hopTimer.current = null;
+          setHopping(false);
+        }, HOP_TIMEOUT_MS)
+      : null;
+    setHopping(out);
   };
   /** Resume updates and catch up on whatever arrived while the text was held
    * still. */
@@ -326,6 +345,8 @@ const RecordingOverlay: React.FC = () => {
         finished = false;
         setCompleted(false);
         setFading(false);
+        // A show places the window itself, so any hop it interrupted is over.
+        setHop(false);
         setCopyFailed(false);
         visible = true;
         recording = payload.state === "recording";
@@ -354,6 +375,7 @@ const RecordingOverlay: React.FC = () => {
         finished = false;
         endPress();
         setFading(false);
+        setHop(false);
         visible = false;
         recording = false;
         setIsVisible(false);
@@ -397,6 +419,9 @@ const RecordingOverlay: React.FC = () => {
       listen<boolean>("recording-locked", ({ payload }) => {
         if (recording) setLocked(payload);
       }).then(register),
+      listen<"out" | "in">("overlay-hop", ({ payload }) => {
+        if (visible) setHop(payload === "out");
+      }).then(register),
       listen<number[]>("mic-level", ({ payload }) => {
         if (!recording) return;
         setLevels(voiceEnergy(payload) === 0 ? EMPTY_LEVELS : payload);
@@ -411,6 +436,7 @@ const RecordingOverlay: React.FC = () => {
     return () => {
       cancelled = true;
       pendingText.current = null;
+      if (hopTimer.current) clearTimeout(hopTimer.current);
       for (const unlisten of unlisteners) unlisten();
     };
   }, []);
@@ -585,24 +611,34 @@ const RecordingOverlay: React.FC = () => {
   const indicator = (shape: WaveShape) =>
     completed ? (
       <CompletionMark label={cardLabel} />
-    ) : working ? (
-      <OverlayWorking label={busyLabel} active={isVisible} />
     ) : (
-      <AudioWaveform
-        barCount={shape.bars}
-        pitch={shape.pitch}
-        barWidth={shape.barWidth}
-        levels={live ? levels : EMPTY_LEVELS}
-        size="sm"
-        active={isVisible}
-        mode="reactive"
-      />
+      // One waveform for listening and for working, in the same element, so the
+      // bars the user spoke into settle into the working ripple instead of being
+      // swapped for a different indicator. Working carries the progressbar role
+      // (indeterminate: nothing here can report a fraction).
+      <span
+        className="overlay-wave"
+        role={working ? "progressbar" : undefined}
+        aria-label={working ? busyLabel : undefined}
+        aria-valuemin={working ? 0 : undefined}
+        aria-valuemax={working ? 100 : undefined}
+      >
+        <AudioWaveform
+          barCount={shape.bars}
+          pitch={shape.pitch}
+          barWidth={shape.barWidth}
+          levels={live ? levels : EMPTY_LEVELS}
+          size="sm"
+          active={isVisible}
+          mode={working ? "working" : "reactive"}
+        />
+      </span>
     );
 
   return (
     <div
       dir={getLanguageDirection(i18n.language)}
-      className={`overlay-root ${isVisible ? "fade-in" : "native-window-hidden"}${fading ? " is-fading" : ""}`}
+      className={`overlay-root ${isVisible ? "fade-in" : "native-window-hidden"}${fading ? " is-fading" : ""}${hopping ? " is-hopping" : ""}`}
       onContextMenu={preventBrowserContextMenu}
     >
       {streamingWindow ? (

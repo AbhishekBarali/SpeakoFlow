@@ -223,14 +223,21 @@
   gap: 10px;
   min-width: 0;
 }
-/* The five bars, the three working dots and the check all start at the same
-   left edge as the transcript under them, so a change of state never shifts
-   the label. */
+/* The bars (listening or working) and the check all start at the same left edge
+   as the transcript under them, so a change of state never shifts the label. */
 .card-wave {
   flex: 0 0 23px;
   display: flex;
   align-items: center;
   height: 24px;
+}
+/* Holds the waveform in every state but done, so React keeps the same bars
+   from listening into working. */
+.overlay-wave {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  min-width: 0;
 }
 .card-label {
   color: var(--ov-muted);
@@ -337,6 +344,21 @@
   transition:
     opacity 150ms ease-out,
     transform 150ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+/* ── Moving to another display ─────────────────────────────────────────────
+ * The window moves in one step, while nothing is drawn: the surface fades out
+ * in 60ms (`HOP_FADE_OUT` in overlay_follow.rs), the window jumps, and the
+ * surface comes back with the same small settle it first appears with. A move
+ * that is seen reads as a glitch; one that is not reads as the overlay simply
+ * being wherever you are working. */
+.overlay-root.is-hopping > .overlay-pill,
+.overlay-root.is-hopping > .overlay-card {
+  opacity: 0;
+  transform: scale(0.96);
+  transition:
+    opacity 60ms ease-in,
+    transform 60ms ease-in;
 }
 .overlay-sr-only {
   position: absolute;
@@ -492,10 +514,13 @@
   .overlay-copy,
   .overlay-root.native-window-hidden > .overlay-card,
   .overlay-root.is-fading > .overlay-card,
-  .overlay-root:not(.is-fading) > .overlay-card {
+  .overlay-root:not(.is-fading) > .overlay-card,
+  .overlay-root.is-hopping > .overlay-pill,
+  .overlay-root.is-hopping > .overlay-card {
     transition: none;
   }
-  .overlay-root.native-window-hidden > * {
+  .overlay-root.native-window-hidden > *,
+  .overlay-root.is-hopping > * {
     transform: none;
   }
   .overlay-root.is-fading > .overlay-card {

@@ -25,23 +25,15 @@
 .audio-waveform .wave-bar {
   transform-box: fill-box;
   transform-origin: center;
+  transition: opacity 320ms ease-out;
 }
-/* Work has a gentle light pulse, distinct from the audio-driven bar heights. */
-.audio-waveform.shimmer:not(.is-idle) .wave-bar,
-.audio-waveform.flow:not(.is-idle) .wave-bar {
-  animation: wave-work 2.2s ease-in-out infinite alternate;
-  animation-delay: var(--phase);
-}
-@keyframes wave-work {
-  from {
-    opacity: 0.45;
-  }
-  to {
-    opacity: 0.95;
-  }
+/* Working: the same bars, a little quieter, so the slow ripple reads as the app
+   thinking rather than the microphone still listening. */
+.audio-waveform.working .wave-bar {
+  opacity: 0.78;
 }
 @media (prefers-reduced-motion: reduce) {
   .audio-waveform .wave-bar {
-    animation: none !important;
+    transition: none;
   }
 }

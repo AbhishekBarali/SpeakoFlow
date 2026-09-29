@@ -111,6 +111,28 @@ test("a delayed language sync cannot resurrect a hidden recording", async () => 
   expect(renderer.root.findAllByType("button")).toHaveLength(0);
 });
 
+test("a hop to another display fades out, then back in, and is never left hidden", async () => {
+  await fire("show-overlay", { state: "recording", streamingWindow: false });
+  await fire("overlay-hop", "out");
+  expect(rootClass()).toContain("is-hopping");
+  await fire("overlay-hop", "in");
+  expect(rootClass()).not.toContain("is-hopping");
+
+  // Interrupted by the next state: the show placed the window itself.
+  await fire("overlay-hop", "out");
+  await fire("show-overlay", { state: "transcribing", streamingWindow: false });
+  expect(rootClass()).not.toContain("is-hopping");
+
+  // Interrupted by a hide.
+  await fire("overlay-hop", "out");
+  await fire("hide-overlay");
+  expect(rootClass()).not.toContain("is-hopping");
+
+  // A hidden overlay ignores a late hop entirely.
+  await fire("overlay-hop", "out");
+  expect(rootClass()).not.toContain("is-hopping");
+});
+
 test("completion preserves the final cleaned text during fade and copies that text", async () => {
   await fire("show-overlay", { state: "recording", streamingWindow: true });
   await fire("stream-text", {
@@ -223,7 +245,7 @@ test("failed clipboard access offers retry without claiming success", async () =
   expect(button.props["aria-label"]).toBe("overlay.copied");
 });
 
-test("transcription and cleanup show calm working dots, then a check replaces them", async () => {
+test("transcription and cleanup settle the same bars into a working ripple, then a check replaces them", async () => {
   await fire("show-overlay", { state: "recording", streamingWindow: true });
   await fire("stream-text", {
     committed: "Keep these words visible.",
@@ -232,23 +254,25 @@ test("transcription and cleanup show calm working dots, then a check replaces th
   expect(renderer.root.findAllByProps({ role: "progressbar" })).toHaveLength(0);
   // Five bars while listening, not a barcode of fourteen.
   expect(renderer.root.findAllByType("line")).toHaveLength(5);
+  const listening = renderer.root
+    .findAllByType("svg")
+    .find((node) => node.props.className?.includes("audio-waveform"));
+  expect(listening?.props.className).toContain("reactive");
   for (const state of ["transcribing", "processing"]) {
     await fire("show-overlay", { state, streamingWindow: true });
     const working = renderer.root.findByProps({ role: "progressbar" });
     expect(working.props["aria-valuenow"]).toBeUndefined();
     expect(working.props["aria-label"]).toBe(`overlay.${state}`);
+    // The same five bars, now in working mode — no dots, no sweeping bar.
+    const waves = renderer.root
+      .findAllByType("svg")
+      .filter((node) => node.props.className?.includes("audio-waveform"));
+    expect(waves).toHaveLength(1);
+    expect(waves[0].props.className).toContain("working");
+    expect(renderer.root.findAllByType("line")).toHaveLength(5);
     expect(
       renderer.root.findAllByProps({ className: "overlay-working-dot" }),
-    ).toHaveLength(3);
-    // No sweeping bar, and no waveform while there is nothing to hear.
-    expect(
-      renderer.root.findAllByProps({ className: "progress-sheen" }),
     ).toHaveLength(0);
-    expect(
-      renderer.root
-        .findAllByType("svg")
-        .some((node) => node.props.className?.includes("audio-waveform")),
-    ).toBe(false);
   }
   await fire("finish-overlay", { epoch: 9, text: "Keep these words visible." });
   expect(renderer.root.findAllByProps({ role: "progressbar" })).toHaveLength(0);

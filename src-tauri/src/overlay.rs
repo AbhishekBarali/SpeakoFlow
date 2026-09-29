@@ -1,7 +1,7 @@
 use crate::input;
 use crate::overlay_follow::{
-    display_under, placement_on, rect_contains, DisplayFollower, Edge, MonitorBounds, Point,
-    FOLLOW_POLL,
+    display_under, hop_destination, placement_on, rect_contains, DisplayFollower, Edge,
+    MonitorBounds, Point, FOLLOW_POLL, HOP_FADE_OUT,
 };
 use crate::overlay_lifecycle::OverlayLifecycle;
 use crate::settings;
@@ -522,9 +522,13 @@ const STALE_HOVER_AFTER: std::time::Duration = std::time::Duration::from_millis(
 
 /// Keep the overlay on the display the cursor is on for as long as it is up.
 ///
-/// The decision — wait for the cursor to settle on another display, then move
-/// there in one step — is `overlay_follow::DisplayFollower`; this is only the loop
-/// that samples the cursor and applies what it says.
+/// The decision — wait for the cursor to settle on another display, then hop
+/// there — is `overlay_follow::DisplayFollower`; this is only the loop that
+/// samples the cursor and applies what it says. A hop is three steps: the webview
+/// fades the overlay out (`overlay-hop` `"out"`), the window moves while nothing
+/// is drawn, and it fades back in (`"in"`). Both a new state and a hide reset the
+/// webview's hop state, so a hop interrupted between the two can never leave the
+/// overlay invisible.
 ///
 /// Everything the loop needs is captured when the overlay is shown: the display
 /// it was placed on, its size, and one enumeration of the displays. Asking the
@@ -605,8 +609,24 @@ fn start_overlay_follow(
                 let Some(window) = app.get_webview_window("recording_overlay") else {
                     break;
                 };
-                set_overlay_placement(&window, placement_on(target, size, edge, PLACE_IN_PHYSICAL));
-                current = target;
+                let _ = window.emit("overlay-hop", "out");
+                std::thread::sleep(HOP_FADE_OUT);
+                // Whoever retired this follower (a hide, or the next state's
+                // show) also cleared the fade in the webview, and placed the
+                // window themselves.
+                if !alive() {
+                    break;
+                }
+                let now_under = input::get_cursor_position(&app)
+                    .and_then(|(x, y)| display_under(&displays, (x as f64, y as f64)));
+                if let Some(destination) = hop_destination(current, target, now_under) {
+                    set_overlay_placement(
+                        &window,
+                        placement_on(destination, size, edge, PLACE_IN_PHYSICAL),
+                    );
+                    current = destination;
+                }
+                let _ = window.emit("overlay-hop", "in");
             }
         }
     });
@@ -1064,8 +1084,8 @@ pub fn hide_recording_overlay(app_handle: &AppHandle) {
     // the main thread cannot put a deliberately hidden overlay back on screen.
     #[cfg(target_os = "windows")]
     stop_overlay_topmost_guard();
-    // Same for the cursor follower: a glide frame must not move (or, on some
-    // platforms, re-map) a window that is on its way down.
+    // Same for the cursor follower: a hop must not move (or, on some platforms,
+    // re-map) a window that is on its way down.
     stop_overlay_follow();
     if let Some(window) = app_handle.get_webview_window("recording_overlay") {
         let _ = window.emit("hide-overlay", ());

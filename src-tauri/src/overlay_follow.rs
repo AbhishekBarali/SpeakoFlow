@@ -6,18 +6,22 @@
 //! running on a screen nobody was looking at. So while the overlay is up it
 //! follows the cursor from display to display.
 //!
-//! The rule is deliberately plain: once the cursor has **stayed** on another
-//! display for [`FOLLOW_DWELL`], the overlay moves there in one step. Sweeping the
-//! pointer across a monitor edge on the way to something else moves nothing,
-//! because the dwell restarts every time the cursor changes its mind.
+//! The rule: once the cursor has stayed on another display for [`FOLLOW_DWELL`],
+//! the overlay **hops** there. The webview fades the pill out for
+//! [`HOP_FADE_OUT`], the window moves while nothing is drawn, and the pill fades
+//! back in on the new display. Sweeping the pointer across a monitor edge on the
+//! way to something else moves nothing, because the dwell restarts every time the
+//! cursor changes its mind.
 //!
-//! An earlier version glided there instead, with an eased 360 ms animation at
-//! 16 ms frames. Every frame was a round trip through the event loop (read the
-//! window position, read its size and scale, enumerate the monitors, then move
-//! it), so the glide stuttered whenever the main thread was busy — which during
-//! a dictation it usually is — and still arrived half a second after the user
-//! had already looked over. One move after a short dwell reads as instant, and
-//! costs one message.
+//! Two earlier versions each got half of this wrong. The first glided, with an
+//! eased 360 ms animation at 16 ms frames; every frame was a round trip through
+//! the event loop, so the glide stuttered whenever the main thread was busy —
+//! which during a dictation it usually is. The second teleported after a 300 ms
+//! dwell sampled at 50 ms, so the overlay arrived up to a third of a second after
+//! the user's eyes had, and then appeared in a single frame. Both read as lag.
+//! The dwell is now short enough to land inside the saccade to the other screen,
+//! and the fade makes the one move look deliberate instead of like a glitch —
+//! while still costing a single window move, not an animation.
 //!
 //! Everything here is pure — the clock and the displays are parameters — so the
 //! behaviour is unit-tested without a window or a sleep. The thread that drives
@@ -25,15 +29,21 @@
 
 use std::time::{Duration, Instant};
 
-/// How long the cursor must stay on another display before the overlay jumps
-/// there. Long enough that crossing a monitor edge in passing does not move
-/// anything; short enough that the overlay is already waiting by the time the
-/// user's eyes have settled on the new screen.
-pub(crate) const FOLLOW_DWELL: Duration = Duration::from_millis(300);
+/// How long the cursor must stay on another display before the overlay hops
+/// there. Long enough that overshooting a monitor edge by a few pixels, or
+/// flicking straight through a display, moves nothing; short enough that the
+/// hop is finished about when the user's eyes arrive on the new screen.
+pub(crate) const FOLLOW_DWELL: Duration = Duration::from_millis(60);
 
 /// How often the cursor is sampled. Only decides how soon a display change is
-/// *noticed*; the dwell above is what gates the move.
-pub(crate) const FOLLOW_POLL: Duration = Duration::from_millis(50);
+/// *noticed*; the dwell above is what gates the move. One `GetCursorPos` per
+/// tick on Windows, so sampling this often is free.
+pub(crate) const FOLLOW_POLL: Duration = Duration::from_millis(20);
+
+/// How long the webview takes to fade the overlay out before the window moves.
+/// Matches the `.is-hopping` transition in `RecordingOverlay.css`, so the move
+/// happens while nothing is on screen.
+pub(crate) const HOP_FADE_OUT: Duration = Duration::from_millis(60);
 
 pub(crate) type Point = (f64, f64);
 
@@ -182,6 +192,24 @@ impl DisplayFollower {
     }
 }
 
+/// Where a hop that has already faded the overlay out should land, decided from
+/// the cursor as it is *after* the fade, or `None` to fade back in where it is.
+///
+/// The fade takes [`HOP_FADE_OUT`], and the cursor keeps moving during it. Moving
+/// to the display the follower picked regardless would put the overlay on a
+/// screen the user has already left; so the cursor is read again, and a cursor
+/// that went back to the overlay's own display cancels the move. A cursor that
+/// cannot be located keeps the original decision — that sample was fine a moment
+/// ago, and the overlay is already invisible.
+pub(crate) fn hop_destination(
+    current: MonitorBounds,
+    chosen: MonitorBounds,
+    under_cursor_now: Option<MonitorBounds>,
+) -> Option<MonitorBounds> {
+    let destination = under_cursor_now.unwrap_or(chosen);
+    (destination != current).then_some(destination)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -210,6 +238,23 @@ mod tests {
 
     fn at(start: Instant, ms: u64) -> Instant {
         start + Duration::from_millis(ms)
+    }
+
+    /// The dwell in milliseconds, so the tests describe the rule rather than
+    /// one particular tuning of it.
+    fn dwell() -> u64 {
+        FOLLOW_DWELL.as_millis() as u64
+    }
+
+    #[test]
+    fn the_dwell_is_short_and_the_poll_can_see_it() {
+        // The follow used to wait 300 ms sampled at 50 ms, which read as lag.
+        // Anything near that again brings the complaint back.
+        assert!(FOLLOW_DWELL <= Duration::from_millis(100));
+        // Sampled more often than the dwell, or the poll is the real delay.
+        assert!(FOLLOW_POLL < FOLLOW_DWELL);
+        // Dwell plus fade must still land inside the eye's move to the new screen.
+        assert!(FOLLOW_DWELL + FOLLOW_POLL + HOP_FADE_OUT <= Duration::from_millis(200));
     }
 
     #[test]
@@ -291,39 +336,38 @@ mod tests {
     fn moves_in_one_step_once_the_cursor_has_settled() {
         let mut follower = DisplayFollower::default();
         let start = Instant::now();
+        let d = dwell();
         // Noticed, but not yet acted on.
         assert_eq!(follower.step(MIDDLE, Some(RIGHT), start), None);
-        assert_eq!(follower.step(MIDDLE, Some(RIGHT), at(start, 100)), None);
-        assert_eq!(follower.step(MIDDLE, Some(RIGHT), at(start, 250)), None);
+        assert_eq!(follower.step(MIDDLE, Some(RIGHT), at(start, d / 3)), None);
+        assert_eq!(follower.step(MIDDLE, Some(RIGHT), at(start, d - 1)), None);
         // Dwell elapsed: one move, straight to the destination.
-        let dwell = FOLLOW_DWELL.as_millis() as u64;
         assert_eq!(
-            follower.step(MIDDLE, Some(RIGHT), at(start, dwell)),
+            follower.step(MIDDLE, Some(RIGHT), at(start, d)),
             Some(RIGHT)
         );
         // Arrived: nothing more to do, however long the cursor stays.
-        assert_eq!(
-            follower.step(RIGHT, Some(RIGHT), at(start, dwell + 50)),
-            None
-        );
-        assert_eq!(
-            follower.step(RIGHT, Some(RIGHT), at(start, dwell + 5000)),
-            None
-        );
+        assert_eq!(follower.step(RIGHT, Some(RIGHT), at(start, d + 20)), None);
+        assert_eq!(follower.step(RIGHT, Some(RIGHT), at(start, d + 5000)), None);
     }
 
     #[test]
     fn a_brief_crossing_does_not_drag_the_overlay_along() {
         let mut follower = DisplayFollower::default();
         let start = Instant::now();
+        let d = dwell();
         assert_eq!(follower.step(MIDDLE, Some(RIGHT), start), None);
         // Back before the dwell ran out.
-        assert_eq!(follower.step(MIDDLE, Some(MIDDLE), at(start, 200)), None);
+        assert_eq!(follower.step(MIDDLE, Some(MIDDLE), at(start, d / 2)), None);
         // Crossing again restarts the dwell rather than inheriting the old one.
-        assert_eq!(follower.step(MIDDLE, Some(RIGHT), at(start, 250)), None);
-        assert_eq!(follower.step(MIDDLE, Some(RIGHT), at(start, 400)), None);
+        let again = d / 2 + 10;
+        assert_eq!(follower.step(MIDDLE, Some(RIGHT), at(start, again)), None);
         assert_eq!(
-            follower.step(MIDDLE, Some(RIGHT), at(start, 550)),
+            follower.step(MIDDLE, Some(RIGHT), at(start, again + d - 1)),
+            None
+        );
+        assert_eq!(
+            follower.step(MIDDLE, Some(RIGHT), at(start, again + d)),
             Some(RIGHT)
         );
     }
@@ -332,14 +376,16 @@ mod tests {
     fn passing_through_a_display_on_the_way_to_another_restarts_the_dwell() {
         let mut follower = DisplayFollower::default();
         let start = Instant::now();
+        let d = dwell();
         // Left edge → through the middle → settles on the right.
         assert_eq!(follower.step(LEFT, Some(MIDDLE), start), None);
-        assert_eq!(follower.step(LEFT, Some(RIGHT), at(start, 200)), None);
-        // 300 ms after first seeing the middle display, but only 100 ms on the
-        // right one: not yet.
-        assert_eq!(follower.step(LEFT, Some(RIGHT), at(start, 300)), None);
+        let arrived = d * 2 / 3;
+        assert_eq!(follower.step(LEFT, Some(RIGHT), at(start, arrived)), None);
+        // A full dwell after first seeing the middle display, but not yet a
+        // full dwell on the right one: not yet.
+        assert_eq!(follower.step(LEFT, Some(RIGHT), at(start, d)), None);
         assert_eq!(
-            follower.step(LEFT, Some(RIGHT), at(start, 500)),
+            follower.step(LEFT, Some(RIGHT), at(start, arrived + d)),
             Some(RIGHT)
         );
     }
@@ -348,14 +394,28 @@ mod tests {
     fn losing_the_cursor_mid_dwell_cancels_the_move() {
         let mut follower = DisplayFollower::default();
         let start = Instant::now();
+        let d = dwell();
         assert_eq!(follower.step(MIDDLE, Some(RIGHT), start), None);
-        assert_eq!(follower.step(MIDDLE, None, at(start, 200)), None);
+        assert_eq!(follower.step(MIDDLE, None, at(start, d / 2)), None);
         // The cursor reappears on the right: that is a fresh dwell.
-        assert_eq!(follower.step(MIDDLE, Some(RIGHT), at(start, 350)), None);
+        let back = d / 2 + 20;
+        assert_eq!(follower.step(MIDDLE, Some(RIGHT), at(start, back)), None);
         assert_eq!(
-            follower.step(MIDDLE, Some(RIGHT), at(start, 650)),
+            follower.step(MIDDLE, Some(RIGHT), at(start, back + d)),
             Some(RIGHT)
         );
+    }
+
+    #[test]
+    fn a_hop_lands_where_the_cursor_is_after_the_fade() {
+        // Still on the chosen display: go there.
+        assert_eq!(hop_destination(MIDDLE, RIGHT, Some(RIGHT)), Some(RIGHT));
+        // Kept going to a third display during the fade: go there instead.
+        assert_eq!(hop_destination(LEFT, MIDDLE, Some(RIGHT)), Some(RIGHT));
+        // Came back to the overlay's own display: fade back in, no move.
+        assert_eq!(hop_destination(MIDDLE, RIGHT, Some(MIDDLE)), None);
+        // Lost the cursor: the decision from a moment ago stands.
+        assert_eq!(hop_destination(MIDDLE, RIGHT, None), Some(RIGHT));
     }
 
     #[test]
