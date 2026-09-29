@@ -1514,7 +1514,13 @@
     "locked": "Đang ghi âm rảnh tay — nhấn lại phím tắt để dừng",
     "cancel": "Hủy",
     "done": "Xong",
-    "askAssistant": "Hỏi trợ lý thay vì gõ nội dung này"
+    "askAssistant": "Hỏi trợ lý thay vì gõ nội dung này",
+    "recovery": {
+      "dismissed": "Đã hủy",
+      "failed": "Phiên âm thất bại",
+      "undo": "Hoàn tác",
+      "retry": "Thử lại"
+    }
   },
   "assistant": {
     "title": "Trợ lý",

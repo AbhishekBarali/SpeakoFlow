@@ -68,7 +68,23 @@ static MIGRATIONS: &[M] = &[
             value TEXT NOT NULL
         );",
     ),
+    // A dictation the user cancelled (Esc, the tray's Cancel) is kept instead
+    // of thrown away, so a slip of the finger costs nothing: the row keeps its
+    // audio and whatever transcript already existed, the History panel shows
+    // it as dismissed with a way back, and usage does not count it until it is
+    // recovered.
+    M::up("ALTER TABLE transcription_history ADD COLUMN dismissed BOOLEAN NOT NULL DEFAULT 0;"),
 ];
+
+/// Every `transcription_history` column [`HistoryManager::map_history_entry`]
+/// reads, in one place so a new column cannot be forgotten in one of the
+/// queries that feed it.
+macro_rules! entry_columns {
+    () => {
+        "id, file_name, timestamp, saved, title, transcription_text, post_processed_text, \
+         post_process_prompt, post_process_requested, dismissed"
+    };
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize, Type)]
 pub struct PaginatedHistory {
@@ -121,6 +137,45 @@ pub struct HistoryEntry {
     pub post_processed_text: Option<String>,
     pub post_process_prompt: Option<String>,
     pub post_process_requested: bool,
+    /// The user cancelled this dictation. Its audio (and any transcript that
+    /// was already finished) is kept so it can be recovered; History shows it
+    /// as dismissed rather than as text.
+    pub dismissed: bool,
+}
+
+/// What a dictation finally produced, written over a row that already exists:
+/// a dismissed dictation that was recovered, a failed one that was retried, or
+/// a finished one that was then cancelled.
+#[derive(Clone, Debug, Default)]
+pub struct EntryOutcome {
+    pub transcription_text: String,
+    pub post_processed_text: Option<String>,
+    pub post_process_prompt: Option<String>,
+    pub post_process_requested: bool,
+    pub dismissed: bool,
+}
+
+impl From<&HistoryEntry> for EntryOutcome {
+    fn from(entry: &HistoryEntry) -> Self {
+        Self {
+            transcription_text: entry.transcription_text.clone(),
+            post_processed_text: entry.post_processed_text.clone(),
+            post_process_prompt: entry.post_process_prompt.clone(),
+            post_process_requested: entry.post_process_requested,
+            dismissed: entry.dismissed,
+        }
+    }
+}
+
+/// Words a row contributes to lifetime usage. A dismissed dictation contributes
+/// nothing until it is recovered: nobody dictated it as far as the stats are
+/// concerned, and recovering it later counts it on the day it was spoken.
+fn counted_words(text: &str, dismissed: bool) -> i64 {
+    if dismissed {
+        0
+    } else {
+        count_words(text)
+    }
 }
 
 pub struct HistoryManager {
@@ -343,6 +398,83 @@ fn retry_usage_delta(
     })
 }
 
+/// Write `outcome` over row `id` and correct lifetime usage by the difference.
+///
+/// Usage is corrected against what the row *counted* before and after, not just
+/// its text: a dismissed row counts nothing (see [`counted_words`]), so
+/// recovering one adds a dictation and dismissing a counted one takes it away.
+/// A failure to read the previous values only skips the usage correction; the
+/// outcome itself is still written.
+fn write_outcome(
+    conn: &Connection,
+    recordings_dir: &Path,
+    id: i64,
+    outcome: &EntryOutcome,
+) -> Result<HistoryEntry> {
+    let previous: Option<(String, bool, i64, String)> = conn
+        .query_row(
+            "SELECT transcription_text, dismissed, timestamp, file_name
+             FROM transcription_history WHERE id = ?1",
+            params![id],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+        )
+        .optional()
+        .unwrap_or_else(|e| {
+            error!("Failed to read previous transcript for usage stats: {}", e);
+            None
+        });
+    let updated = conn.execute(
+        "UPDATE transcription_history
+         SET transcription_text = ?1,
+             post_processed_text = ?2,
+             post_process_prompt = ?3,
+             post_process_requested = ?4,
+             dismissed = ?5
+         WHERE id = ?6",
+        params![
+            outcome.transcription_text,
+            outcome.post_processed_text,
+            outcome.post_process_prompt,
+            outcome.post_process_requested,
+            outcome.dismissed,
+            id
+        ],
+    )?;
+    if updated == 0 {
+        return Err(anyhow!("History entry {} not found", id));
+    }
+
+    if let Some((old_text, old_dismissed, original_timestamp, file_name)) = previous {
+        let delta = retry_usage_delta(
+            counted_words(&old_text, old_dismissed),
+            counted_words(&outcome.transcription_text, outcome.dismissed),
+            || wav_duration_seconds(&recordings_dir.join(&file_name)),
+        );
+        if let Some((d_dictations, d_words, d_timed, d_seconds)) = delta {
+            if let Err(e) = apply_usage_delta(
+                conn,
+                &local_day(original_timestamp),
+                d_dictations,
+                d_words,
+                d_timed,
+                d_seconds,
+            ) {
+                error!("Failed to update usage stats: {}", e);
+            }
+        }
+    }
+
+    Ok(conn.query_row(
+        concat!(
+            "SELECT ",
+            entry_columns!(),
+            " FROM transcription_history WHERE id = ?1"
+        ),
+        params![id],
+        HistoryManager::map_history_entry,
+    )?)
+}
+
 /// Fold existing history into `usage_daily`, once per database.
 ///
 /// Guarded by the `backfill_v1` meta key and done in one transaction, so it is
@@ -369,7 +501,7 @@ fn backfill_usage(
     {
         let mut stmt = tx.prepare(
             "SELECT timestamp, file_name, transcription_text
-             FROM transcription_history ORDER BY id DESC",
+             FROM transcription_history WHERE dismissed = 0 ORDER BY id DESC",
         )?;
         let mut rows = stmt.query([])?;
         while let Some(row) = rows.next()? {
@@ -625,6 +757,7 @@ impl HistoryManager {
             post_processed_text: row.get("post_processed_text")?,
             post_process_prompt: row.get("post_process_prompt")?,
             post_process_requested: row.get("post_process_requested")?,
+            dismissed: row.get("dismissed")?,
         })
     }
 
@@ -669,6 +802,9 @@ impl HistoryManager {
 
     /// Save a new history entry to the database.
     /// The WAV file should already have been written to the recordings directory.
+    ///
+    /// A `dismissed` entry is a cancelled dictation kept for recovery. It is not
+    /// counted toward usage until [`Self::record_outcome`] recovers it.
     pub fn save_entry(
         &self,
         file_name: String,
@@ -676,6 +812,7 @@ impl HistoryManager {
         post_process_requested: bool,
         post_processed_text: Option<String>,
         post_process_prompt: Option<String>,
+        dismissed: bool,
     ) -> Result<HistoryEntry> {
         let timestamp = Utc::now().timestamp();
         let title = self.format_timestamp_title(timestamp);
@@ -690,8 +827,9 @@ impl HistoryManager {
                 transcription_text,
                 post_processed_text,
                 post_process_prompt,
-                post_process_requested
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                post_process_requested,
+                dismissed
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
             params![
                 &file_name,
                 timestamp,
@@ -701,13 +839,16 @@ impl HistoryManager {
                 &post_processed_text,
                 &post_process_prompt,
                 post_process_requested,
+                dismissed,
             ],
         )?;
 
         // Capture the id before touching usage: the usage UPSERT is an insert
         // too and would move `last_insert_rowid`.
         let id = conn.last_insert_rowid();
-        self.record_new_entry_usage(&conn, timestamp, &file_name, &transcription_text);
+        if !dismissed {
+            self.record_new_entry_usage(&conn, timestamp, &file_name, &transcription_text);
+        }
 
         let entry = HistoryEntry {
             id,
@@ -719,6 +860,7 @@ impl HistoryManager {
             post_processed_text,
             post_process_prompt,
             post_process_requested,
+            dismissed,
         };
 
         debug!("Saved history entry with id {}", entry.id);
@@ -752,77 +894,17 @@ impl HistoryManager {
         Ok(entry)
     }
 
-    /// Update an existing history entry with new transcription results (used by retry).
-    pub fn update_transcription(
-        &self,
-        id: i64,
-        transcription_text: String,
-        post_processed_text: Option<String>,
-        post_process_prompt: Option<String>,
-    ) -> Result<HistoryEntry> {
+    /// Overwrite an existing row with what its dictation finally produced: a
+    /// retry, a recovery of a dismissed dictation, or a dictation cancelled
+    /// after its row was written.
+    pub fn record_outcome(&self, id: i64, outcome: EntryOutcome) -> Result<HistoryEntry> {
         let conn = self.get_connection()?;
-        // The previous transcript, read before it is overwritten, so usage can
-        // be corrected by the difference. A failure here only skips the usage
-        // correction; the retry itself still goes through.
-        let previous: Option<(String, i64, String)> = conn
-            .query_row(
-                "SELECT transcription_text, timestamp, file_name
-                 FROM transcription_history WHERE id = ?1",
-                params![id],
-                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
-            )
-            .optional()
-            .unwrap_or_else(|e| {
-                error!("Failed to read previous transcript for usage stats: {}", e);
-                None
-            });
-        let updated = conn.execute(
-            "UPDATE transcription_history
-             SET transcription_text = ?1,
-                 post_processed_text = ?2,
-                 post_process_prompt = ?3
-             WHERE id = ?4",
-            params![
-                transcription_text,
-                post_processed_text,
-                post_process_prompt,
-                id
-            ],
-        )?;
+        let entry = write_outcome(&conn, &self.recordings_dir, id, &outcome)?;
 
-        if updated == 0 {
-            return Err(anyhow!("History entry {} not found", id));
-        }
-
-        if let Some((old_text, original_timestamp, file_name)) = previous {
-            let delta = retry_usage_delta(
-                count_words(&old_text),
-                count_words(&transcription_text),
-                || wav_duration_seconds(&self.recordings_dir.join(&file_name)),
-            );
-            if let Some((d_dictations, d_words, d_timed, d_seconds)) = delta {
-                if let Err(e) = apply_usage_delta(
-                    &conn,
-                    &local_day(original_timestamp),
-                    d_dictations,
-                    d_words,
-                    d_timed,
-                    d_seconds,
-                ) {
-                    error!("Failed to update usage stats after retry: {}", e);
-                }
-            }
-        }
-
-        let entry = conn
-            .query_row(
-                "SELECT id, file_name, timestamp, saved, title, transcription_text, post_processed_text, post_process_prompt, post_process_requested
-                 FROM transcription_history WHERE id = ?1",
-                params![id],
-                Self::map_history_entry,
-            )?;
-
-        debug!("Updated transcription for history entry {}", id);
+        debug!(
+            "Recorded outcome for history entry {} (dismissed: {})",
+            id, entry.dismissed
+        );
 
         if let Err(e) = (HistoryUpdatePayload::Updated {
             entry: entry.clone(),
@@ -833,6 +915,35 @@ impl HistoryManager {
         }
 
         Ok(entry)
+    }
+
+    /// Mark a row dismissed, or bring a dismissed one back, keeping everything
+    /// else it holds. Usage follows (see [`write_outcome`]).
+    pub fn set_dismissed(&self, id: i64, dismissed: bool) -> Result<HistoryEntry> {
+        let current = {
+            let conn = self.get_connection()?;
+            conn.query_row(
+                concat!(
+                    "SELECT ",
+                    entry_columns!(),
+                    " FROM transcription_history WHERE id = ?1"
+                ),
+                params![id],
+                Self::map_history_entry,
+            )
+            .optional()?
+            .ok_or_else(|| anyhow!("History entry {} not found", id))?
+        };
+        if current.dismissed == dismissed {
+            return Ok(current);
+        }
+        self.record_outcome(
+            id,
+            EntryOutcome {
+                dismissed,
+                ..EntryOutcome::from(&current)
+            },
+        )
     }
 
     /// Apply the active recording-retention policy and return the number of
@@ -1003,13 +1114,14 @@ impl HistoryManager {
         let mut entries: Vec<HistoryEntry> = match (cursor, limit) {
             (Some(cursor_id), Some(lim)) => {
                 let fetch_count = (lim + 1) as i64;
-                let mut stmt = conn.prepare(
-                    "SELECT id, file_name, timestamp, saved, title, transcription_text, post_processed_text, post_process_prompt, post_process_requested
-                     FROM transcription_history
+                let mut stmt = conn.prepare(concat!(
+                    "SELECT ",
+                    entry_columns!(),
+                    " FROM transcription_history
                      WHERE id < ?1
                      ORDER BY id DESC
-                     LIMIT ?2",
-                )?;
+                     LIMIT ?2"
+                ))?;
                 let result = stmt
                     .query_map(params![cursor_id, fetch_count], Self::map_history_entry)?
                     .collect::<std::result::Result<Vec<_>, _>>()?;
@@ -1017,23 +1129,25 @@ impl HistoryManager {
             }
             (None, Some(lim)) => {
                 let fetch_count = (lim + 1) as i64;
-                let mut stmt = conn.prepare(
-                    "SELECT id, file_name, timestamp, saved, title, transcription_text, post_processed_text, post_process_prompt, post_process_requested
-                     FROM transcription_history
+                let mut stmt = conn.prepare(concat!(
+                    "SELECT ",
+                    entry_columns!(),
+                    " FROM transcription_history
                      ORDER BY id DESC
-                     LIMIT ?1",
-                )?;
+                     LIMIT ?1"
+                ))?;
                 let result = stmt
                     .query_map(params![fetch_count], Self::map_history_entry)?
                     .collect::<std::result::Result<Vec<_>, _>>()?;
                 result
             }
             (_, None) => {
-                let mut stmt = conn.prepare(
-                    "SELECT id, file_name, timestamp, saved, title, transcription_text, post_processed_text, post_process_prompt, post_process_requested
-                     FROM transcription_history
-                     ORDER BY id DESC",
-                )?;
+                let mut stmt = conn.prepare(concat!(
+                    "SELECT ",
+                    entry_columns!(),
+                    " FROM transcription_history
+                     ORDER BY id DESC"
+                ))?;
                 let result = stmt
                     .query_map([], Self::map_history_entry)?
                     .collect::<std::result::Result<Vec<_>, _>>()?;
@@ -1051,49 +1165,35 @@ impl HistoryManager {
 
     #[cfg(test)]
     fn get_latest_entry_with_conn(conn: &Connection) -> Result<Option<HistoryEntry>> {
-        let mut stmt = conn.prepare(
-            "SELECT
-                id,
-                file_name,
-                timestamp,
-                saved,
-                title,
-                transcription_text,
-                post_processed_text,
-                post_process_prompt,
-                post_process_requested
-             FROM transcription_history
+        let mut stmt = conn.prepare(concat!(
+            "SELECT ",
+            entry_columns!(),
+            " FROM transcription_history
              ORDER BY timestamp DESC
-             LIMIT 1",
-        )?;
+             LIMIT 1"
+        ))?;
 
         let entry = stmt.query_row([], Self::map_history_entry).optional()?;
         Ok(entry)
     }
 
-    /// Get the latest entry with non-empty transcription text.
+    /// Get the latest entry with non-empty transcription text. A dismissed
+    /// dictation is skipped even when it has a transcript: the user threw it
+    /// away, so "copy the last transcript" must not hand it back unasked.
     pub fn get_latest_completed_entry(&self) -> Result<Option<HistoryEntry>> {
         let conn = self.get_connection()?;
         Self::get_latest_completed_entry_with_conn(&conn)
     }
 
     fn get_latest_completed_entry_with_conn(conn: &Connection) -> Result<Option<HistoryEntry>> {
-        let mut stmt = conn.prepare(
-            "SELECT
-                id,
-                file_name,
-                timestamp,
-                saved,
-                title,
-                transcription_text,
-                post_processed_text,
-                post_process_prompt,
-                post_process_requested
-             FROM transcription_history
-             WHERE transcription_text != ''
+        let mut stmt = conn.prepare(concat!(
+            "SELECT ",
+            entry_columns!(),
+            " FROM transcription_history
+             WHERE transcription_text != '' AND dismissed = 0
              ORDER BY timestamp DESC
-             LIMIT 1",
-        )?;
+             LIMIT 1"
+        ))?;
 
         let entry = stmt.query_row([], Self::map_history_entry).optional()?;
         Ok(entry)
@@ -1132,20 +1232,12 @@ impl HistoryManager {
 
     pub async fn get_entry_by_id(&self, id: i64) -> Result<Option<HistoryEntry>> {
         let conn = self.get_connection()?;
-        let mut stmt = conn.prepare(
-            "SELECT
-                id,
-                file_name,
-                timestamp,
-                saved,
-                title,
-                transcription_text,
-                post_processed_text,
-                post_process_prompt,
-                post_process_requested
-             FROM transcription_history
-             WHERE id = ?1",
-        )?;
+        let mut stmt = conn.prepare(concat!(
+            "SELECT ",
+            entry_columns!(),
+            " FROM transcription_history
+             WHERE id = ?1"
+        ))?;
 
         let entry = stmt.query_row([id], Self::map_history_entry).optional()?;
 
@@ -1430,7 +1522,8 @@ mod tests {
                 transcription_text TEXT NOT NULL,
                 post_processed_text TEXT,
                 post_process_prompt TEXT,
-                post_process_requested BOOLEAN NOT NULL DEFAULT 0
+                post_process_requested BOOLEAN NOT NULL DEFAULT 0,
+                dismissed BOOLEAN NOT NULL DEFAULT 0
             );",
         )
         .expect("create transcription_history table");
@@ -1498,6 +1591,7 @@ mod tests {
             "post_processed_text",
             "post_process_prompt",
             "post_process_requested",
+            "dismissed",
         ] {
             assert!(columns.iter().any(|column| column == required));
         }
@@ -1941,6 +2035,89 @@ mod tests {
         assert_eq!(retry_usage_delta(5, 0, unknown), Some((-1, -5, 0, 0.0)));
         assert_eq!(retry_usage_delta(5, 8, known), Some((0, 3, 3, 0.0)));
         assert_eq!(retry_usage_delta(8, 5, unknown), Some((0, -3, 0, 0.0)));
+    }
+
+    fn insert_dismissed(conn: &Connection, timestamp: i64, text: &str) -> i64 {
+        conn.execute(
+            "INSERT INTO transcription_history (
+                file_name, timestamp, saved, title, transcription_text, dismissed
+            ) VALUES (?1, ?2, 0, 'Dismissed', ?3, 1)",
+            params![format!("speakoflow-{}.wav", timestamp), timestamp, text],
+        )
+        .expect("insert dismissed entry");
+        conn.last_insert_rowid()
+    }
+
+    fn outcome(text: &str, dismissed: bool) -> EntryOutcome {
+        EntryOutcome {
+            transcription_text: text.to_string(),
+            dismissed,
+            ..EntryOutcome::default()
+        }
+    }
+
+    #[test]
+    fn a_dismissed_row_counts_nothing_until_it_is_recovered() {
+        let conn = migrated_conn();
+        let spoken = local_noon(2026, 4, 2);
+        let id = insert_dismissed(&conn, spoken, "");
+        let dir = std::env::temp_dir();
+
+        // Recovering it counts one dictation, on the day it was spoken.
+        let entry =
+            write_outcome(&conn, &dir, id, &outcome("three whole words", false)).expect("recover");
+        assert!(!entry.dismissed);
+        assert_eq!(entry.transcription_text, "three whole words");
+        assert_eq!(usage_row(&conn, "2026-04-02"), Some((1, 3, 0, 0.0)));
+
+        // Dismissing it again takes the dictation back out.
+        write_outcome(&conn, &dir, id, &outcome("three whole words", true)).expect("dismiss");
+        assert_eq!(usage_row(&conn, "2026-04-02"), Some((0, 0, 0, 0.0)));
+    }
+
+    #[test]
+    fn a_transcript_kept_on_a_dismissed_row_is_not_counted_twice() {
+        // Cancelled after transcription finished: the text is stored, but
+        // uncounted, so recovering it counts exactly one dictation.
+        let conn = migrated_conn();
+        let id = insert_dismissed(&conn, local_noon(2026, 4, 3), "kept words");
+        let entry = write_outcome(
+            &conn,
+            &std::env::temp_dir(),
+            id,
+            &EntryOutcome {
+                transcription_text: "kept words".to_string(),
+                post_processed_text: Some("Kept words.".to_string()),
+                post_process_requested: true,
+                ..EntryOutcome::default()
+            },
+        )
+        .expect("recover");
+        assert_eq!(entry.post_processed_text.as_deref(), Some("Kept words."));
+        assert!(entry.post_process_requested);
+        assert_eq!(usage_row(&conn, "2026-04-03"), Some((1, 2, 0, 0.0)));
+    }
+
+    #[test]
+    fn writing_an_outcome_to_a_missing_row_fails() {
+        let conn = migrated_conn();
+        assert!(write_outcome(&conn, &std::env::temp_dir(), 99, &outcome("x", false)).is_err());
+    }
+
+    #[test]
+    fn dismissed_rows_are_not_the_last_transcript_and_are_not_backfilled() {
+        let mut conn = migrated_conn();
+        insert_entry(&conn, local_noon(2026, 4, 4), "kept", None);
+        insert_dismissed(&conn, local_noon(2026, 4, 5), "thrown away");
+
+        let latest = HistoryManager::get_latest_completed_entry_with_conn(&conn)
+            .expect("query")
+            .expect("an entry");
+        assert_eq!(latest.transcription_text, "kept");
+
+        backfill_usage(&mut conn, |_| None).expect("backfill");
+        assert_eq!(usage_row(&conn, "2026-04-05"), None);
+        assert_eq!(usage_row(&conn, "2026-04-04"), Some((1, 1, 0, 0.0)));
     }
 
     #[test]

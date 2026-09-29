@@ -30,6 +30,26 @@ pub fn copy_overlay_transcript(app: AppHandle, text: String) -> Result<(), Strin
     crate::clipboard::write_clipboard_text(&app, &text)
 }
 
+/// The recording pill's Undo / Try again. `epoch` is the overlay lifetime the
+/// pill was shown in (from its `show-overlay` event), so a click on a pill that
+/// has since been replaced cannot act on another dictation. Returns whether
+/// there was still something to recover; when there was not, the stale pill is
+/// taken down.
+#[tauri::command]
+#[specta::specta]
+pub fn recover_dictation(app: AppHandle, epoch: u64) -> bool {
+    match crate::dictation_recovery::take(epoch) {
+        Some(offer) => {
+            crate::actions::start_recovery(&app, offer);
+            true
+        }
+        None => {
+            crate::utils::dismiss_recovery_overlay(&app, epoch);
+            false
+        }
+    }
+}
+
 /// Finish the current recording right now and run the normal transcribe /
 /// assistant pipeline on it. This is the "done" tick on the recording overlay
 /// and the finish button on the assistant panel — the keyboard-free way to end

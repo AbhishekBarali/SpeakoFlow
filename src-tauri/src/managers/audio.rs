@@ -554,15 +554,7 @@ impl AudioRecordingManager {
                 }
 
                 // Pad if very short
-                let s_len = samples.len();
-                // debug!("Got {} samples", s_len);
-                if s_len < WHISPER_SAMPLE_RATE && s_len > 0 {
-                    let mut padded = samples;
-                    padded.resize(WHISPER_SAMPLE_RATE * 5 / 4, 0.0);
-                    Some(padded)
-                } else {
-                    Some(samples)
-                }
+                Some(pad_short_recording(samples))
             }
             _ => None,
         }
@@ -574,17 +566,29 @@ impl AudioRecordingManager {
         )
     }
 
-    /// Cancel any ongoing recording without returning audio samples
-    pub fn cancel_recording(&self) {
+    /// Cancel any ongoing recording and hand back what it captured.
+    ///
+    /// The audio used to be discarded here, which made a cancel irreversible: an
+    /// Esc pressed by mistake threw away everything the user had said. Returning
+    /// it lets the caller keep a dismissed dictation for recovery; callers that
+    /// do not want it simply drop it. The samples are *not* padded (see
+    /// [`pad_short_recording`]), so the caller can still tell a real utterance
+    /// from a stray key press by its length.
+    pub fn cancel_recording(&self) -> Option<CancelledRecording> {
         let mut state = self.state.lock().unwrap();
 
-        if let RecordingState::Recording { .. } = *state {
+        if let RecordingState::Recording { ref binding_id } = *state {
+            let binding_id = binding_id.clone();
             *state = RecordingState::Idle;
             drop(state);
 
-            if let Some(rec) = self.recorder.lock().unwrap().as_ref() {
-                let _ = rec.stop(); // Discard the result
-            }
+            let samples = match self.recorder.lock().unwrap().as_ref() {
+                Some(rec) => rec.stop().unwrap_or_else(|e| {
+                    error!("stop() failed while cancelling: {e}");
+                    Vec::new()
+                }),
+                None => Vec::new(),
+            };
 
             *self.is_recording.lock().unwrap() = false;
 
@@ -596,6 +600,30 @@ impl AudioRecordingManager {
                     self.stop_microphone_stream();
                 }
             }
+
+            return Some(CancelledRecording {
+                binding_id,
+                samples,
+            });
         }
+        None
     }
+}
+
+/// What a cancelled recording had captured when it was cancelled.
+pub struct CancelledRecording {
+    pub binding_id: String,
+    /// 16 kHz mono, unpadded.
+    pub samples: Vec<f32>,
+}
+
+/// Pad a recording shorter than a second to 1.25 s of audio. Whisper-style
+/// models misbehave on very short input, and every path that transcribes a
+/// recording — a normal stop, or recovering a cancelled one — has to agree.
+pub fn pad_short_recording(mut samples: Vec<f32>) -> Vec<f32> {
+    let len = samples.len();
+    if len < WHISPER_SAMPLE_RATE && len > 0 {
+        samples.resize(WHISPER_SAMPLE_RATE * 5 / 4, 0.0);
+    }
+    samples
 }

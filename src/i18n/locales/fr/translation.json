@@ -1514,7 +1514,13 @@
     "locked": "Enregistrement mains libres — appuyez à nouveau sur le raccourci pour arrêter",
     "cancel": "Annuler",
     "done": "Terminé",
-    "askAssistant": "Demander à l'assistant au lieu de taper ce texte"
+    "askAssistant": "Demander à l'assistant au lieu de taper ce texte",
+    "recovery": {
+      "dismissed": "Annulé",
+      "failed": "Échec de la transcription",
+      "undo": "Annuler",
+      "retry": "Réessayer"
+    }
   },
   "assistant": {
     "title": "Assistant",

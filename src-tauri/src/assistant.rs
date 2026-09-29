@@ -1175,6 +1175,14 @@ pub fn take_dictate_to_field() -> bool {
     DICTATE_TO_FIELD.swap(false, Ordering::SeqCst)
 }
 
+/// Whether the recording in progress is an in-app dictation, without
+/// consuming the flag. An in-app field cancels its own recording as part of
+/// ordinary use (leaving the pane it was aimed at), so cancellation must not
+/// treat that as a dictation worth offering back.
+pub fn is_dictate_to_field() -> bool {
+    DICTATE_TO_FIELD.load(Ordering::SeqCst)
+}
+
 /// In-memory conversation history, managed as Tauri state.
 pub struct AssistantConversation {
     pub messages: Mutex<Vec<ChatMessage>>,

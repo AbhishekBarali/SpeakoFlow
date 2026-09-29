@@ -1514,7 +1514,13 @@
     "locked": "免持录制中——再次按下快捷键即可停止",
     "cancel": "取消",
     "done": "完成",
-    "askAssistant": "改为询问助手，而不是把这些文字输入进去"
+    "askAssistant": "改为询问助手，而不是把这些文字输入进去",
+    "recovery": {
+      "dismissed": "已取消",
+      "failed": "转写失败",
+      "undo": "撤销",
+      "retry": "重试"
+    }
   },
   "assistant": {
     "title": "助手",

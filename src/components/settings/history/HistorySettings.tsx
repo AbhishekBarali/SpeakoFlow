@@ -349,6 +349,7 @@ export const HistorySettings: React.FC = () => {
   const sentinelRef = useRef<HTMLDivElement>(null);
   const entriesRef = useRef<HistoryEntry[]>([]);
   const loadingRef = useRef(false);
+  const pageGenerationRef = useRef(0);
 
   // Assistant conversations are stored separately from transcriptions, so we
   // load them as their own list and merge for display. They are few and
@@ -369,6 +370,12 @@ export const HistorySettings: React.FC = () => {
   const loadPage = useCallback(async (cursor?: number) => {
     const isFirstPage = cursor === undefined;
     if (!isFirstPage && loadingRef.current) return;
+    // A first-page reload (retention sweep, which runs after every save under a
+    // keep-N policy) supersedes any page still in flight. Without the
+    // generation check, that older page was appended after the fresh first
+    // page and the list showed duplicates.
+    if (isFirstPage) pageGenerationRef.current += 1;
+    const generation = pageGenerationRef.current;
     loadingRef.current = true;
 
     if (isFirstPage) setLoading(true);
@@ -378,6 +385,7 @@ export const HistorySettings: React.FC = () => {
         cursor ?? null,
         PAGE_SIZE,
       );
+      if (generation !== pageGenerationRef.current) return;
       if (result.status === "ok") {
         const { entries: newEntries, has_more } = result.data;
         setEntries((prev) =>
@@ -388,8 +396,10 @@ export const HistorySettings: React.FC = () => {
     } catch (error) {
       console.error("Failed to load history entries:", error);
     } finally {
-      setLoading(false);
-      loadingRef.current = false;
+      if (generation === pageGenerationRef.current) {
+        setLoading(false);
+        loadingRef.current = false;
+      }
     }
   }, []);
 
@@ -474,10 +484,18 @@ export const HistorySettings: React.FC = () => {
   // so a turn there can't update this list directly). Refetch on each signal —
   // expansion state is keyed by id, so it survives the reload.
   useEffect(() => {
+    // Coalesced: one turn emits this more than once, and each reload fetches
+    // every conversation with its messages.
+    let timer: ReturnType<typeof setTimeout> | null = null;
     const unlisten = listen("assistant-history-updated", () => {
-      loadAssistantSessions();
+      if (timer !== null) clearTimeout(timer);
+      timer = setTimeout(() => {
+        timer = null;
+        loadAssistantSessions();
+      }, 400);
     });
     return () => {
+      if (timer !== null) clearTimeout(timer);
       unlisten.then((fn) => fn());
     };
   }, [loadAssistantSessions]);
@@ -561,6 +579,13 @@ export const HistorySettings: React.FC = () => {
 
   const retryHistoryEntry = async (id: number) => {
     const result = await commands.retryHistoryEntryTranscription(id);
+    if (result.status !== "ok") {
+      throw new Error(String(result.error));
+    }
+  };
+
+  const recoverHistoryEntry = async (id: number) => {
+    const result = await commands.recoverHistoryEntry(id);
     if (result.status !== "ok") {
       throw new Error(String(result.error));
     }
@@ -763,6 +788,7 @@ export const HistorySettings: React.FC = () => {
                       getAudioUrl={getAudioUrl}
                       deleteAudio={deleteAudioEntry}
                       retryTranscription={retryHistoryEntry}
+                      recoverDismissed={recoverHistoryEntry}
                     />
                   ) : (
                     <AssistantHistoryEntryComponent
@@ -843,6 +869,8 @@ interface HistoryEntryProps {
   getAudioUrl: (fileName: string) => Promise<string | null>;
   deleteAudio: (id: number) => Promise<void>;
   retryTranscription: (id: number) => Promise<void>;
+  /** Bring back a dismissed dictation (Esc, or the tray's Cancel). */
+  recoverDismissed: (id: number) => Promise<void>;
 }
 
 /** "4:07 PM" — the day is already the group heading. */
@@ -870,6 +898,7 @@ const HistoryEntryComponent: React.FC<HistoryEntryProps> = ({
   getAudioUrl,
   deleteAudio,
   retryTranscription,
+  recoverDismissed,
 }) => {
   const { t, i18n } = useTranslation();
   const [showCopied, setShowCopied] = useState(false);
@@ -878,6 +907,10 @@ const HistoryEntryComponent: React.FC<HistoryEntryProps> = ({
   const [audioSrc, setAudioSrc] = useState<string | null>(null);
   const [loadingAudio, setLoadingAudio] = useState(false);
 
+  /** Cancelled by the user. The row keeps its audio (and any transcript that
+   * was finished) so it can be brought back, but it does not show text the
+   * user threw away until they ask for it. */
+  const dismissed = entry.dismissed;
   const hasTranscription = entry.transcription_text.trim().length > 0;
   const flowEntry = isFlowHistoryEntry(entry);
   const processedText = entry.post_processed_text?.trim()
@@ -896,7 +929,10 @@ const HistoryEntryComponent: React.FC<HistoryEntryProps> = ({
    * worked perfectly unless the row says so.
    */
   const cleanupMadeNoChanges =
-    !flowEntry && processedText !== null && !hasDistinctProcessedText;
+    !dismissed &&
+    !flowEntry &&
+    processedText !== null &&
+    !hasDistinctProcessedText;
   // What was pasted, and what it was made from (when those differ).
   const finalText = flowEntry
     ? processedText
@@ -906,10 +942,11 @@ const HistoryEntryComponent: React.FC<HistoryEntryProps> = ({
         ? entry.transcription_text
         : null;
   const originalText =
-    (flowEntry || hasDistinctProcessedText) && hasTranscription
+    !dismissed && (flowEntry || hasDistinctProcessedText) && hasTranscription
       ? entry.transcription_text
       : null;
-  const hasCopyableText = finalText !== null || hasTranscription;
+  const hasCopyableText =
+    !dismissed && (finalText !== null || hasTranscription);
 
   const handleCopyText = () => {
     if (!hasCopyableText) return;
@@ -939,6 +976,18 @@ const HistoryEntryComponent: React.FC<HistoryEntryProps> = ({
     }
   };
 
+  const handleRecover = async () => {
+    try {
+      setRetrying(true);
+      await recoverDismissed(entry.id);
+    } catch (error) {
+      console.error("Failed to recover a dismissed transcription:", error);
+      toast.error(t("historyPage.recoverError"));
+    } finally {
+      setRetrying(false);
+    }
+  };
+
   const toggleAudio = async () => {
     if (audioSrc) {
       // Unmounting the player releases a Linux blob URL, so the next play has
@@ -960,7 +1009,7 @@ const HistoryEntryComponent: React.FC<HistoryEntryProps> = ({
     ? t("settings.history.flowLabel")
     : t("settings.history.recordingLabel");
   const KindIcon = flowEntry ? Sparkles : Mic;
-  const failed = !retrying && finalText === null;
+  const failed = !retrying && !dismissed && finalText === null;
   const copyTitle = t(
     flowEntry && processedText
       ? "settings.history.copyFlowOutput"
@@ -990,10 +1039,12 @@ const HistoryEntryComponent: React.FC<HistoryEntryProps> = ({
     },
     {
       id: "retry",
-      label: t("settings.history.retranscribe"),
+      label: dismissed
+        ? t("historyPage.recover")
+        : t("settings.history.retranscribe"),
       icon: RotateCcw,
       disabled: retrying,
-      onSelect: () => void handleRetranscribe(),
+      onSelect: () => void (dismissed ? handleRecover() : handleRetranscribe()),
     },
     {
       id: "delete",
@@ -1018,28 +1069,44 @@ const HistoryEntryComponent: React.FC<HistoryEntryProps> = ({
               }
             `}</style>
           )}
-          <p
-            className={`max-w-[75ch] text-sm leading-relaxed ${
-              retrying
-                ? ""
+          {dismissed && !retrying ? (
+            // Said plainly and in the same quiet grey as a failed row: a
+            // dismissal is the user's own choice, not an error to flag.
+            <p className="max-w-[75ch] text-sm leading-relaxed text-muted">
+              {t("historyPage.dismissed")}{" "}
+              <button
+                type="button"
+                onClick={() => void handleRecover()}
+                title={t("historyPage.recoverTitle")}
+                className="cursor-pointer rounded text-muted underline decoration-hairline-strong underline-offset-2 transition-colors hover:text-ink hover:decoration-current focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+              >
+                {t("historyPage.recover")}
+              </button>
+            </p>
+          ) : (
+            <p
+              className={`max-w-[75ch] text-sm leading-relaxed ${
+                retrying
+                  ? ""
+                  : finalText !== null
+                    ? "text-ink select-text cursor-text whitespace-pre-wrap break-words"
+                    : "text-muted-soft"
+              }`}
+              style={
+                retrying
+                  ? { animation: "transcribe-pulse 3s ease-in-out infinite" }
+                  : undefined
+              }
+            >
+              {retrying
+                ? t("settings.history.transcribing")
                 : finalText !== null
-                  ? "text-ink select-text cursor-text whitespace-pre-wrap break-words"
-                  : "text-muted-soft"
-            }`}
-            style={
-              retrying
-                ? { animation: "transcribe-pulse 3s ease-in-out infinite" }
-                : undefined
-            }
-          >
-            {retrying
-              ? t("settings.history.transcribing")
-              : finalText !== null
-                ? finalText
-                : flowEntry && hasTranscription
-                  ? t("settings.history.flowNoOutput")
-                  : t("historyPage.failed")}
-          </p>
+                  ? finalText
+                  : flowEntry && hasTranscription
+                    ? t("settings.history.flowNoOutput")
+                    : t("historyPage.failed")}
+            </p>
+          )}
 
           {showOriginal && originalText && (
             <div className="mt-2.5 rounded-lg border border-hairline bg-canvas px-3 py-2.5">

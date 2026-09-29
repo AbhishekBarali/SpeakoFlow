@@ -150,6 +150,14 @@ enum Command {
         generation: u64,
     },
     ProcessingFinished,
+    /// Take the pipeline stage for work that did not start with a recording: a
+    /// dismissed or failed dictation being recovered. Granted only while idle,
+    /// and released like any pipeline, by [`Command::ProcessingFinished`].
+    /// `audio` is how much speech it has to transcribe, which sizes its cap.
+    Claim {
+        audio: Duration,
+        reply: Sender<bool>,
+    },
 }
 
 /// Pipeline lifecycle, owned exclusively by the coordinator thread.
@@ -216,7 +224,11 @@ impl TranscriptionCoordinator {
     pub fn new(app: AppHandle) -> Self {
         let (tx, rx) = mpsc::channel();
 
-        thread::spawn(move || {
+        thread::spawn(move || loop {
+            // Restarted after a panic rather than left dead: a panic used to
+            // end this thread, after which every shortcut was dropped with only
+            // a "channel closed" warning and dictation stayed broken until the
+            // app was restarted. Each run starts from a fresh idle state.
             let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 let mut stage = Stage::Idle;
                 let mut last_press: Option<Instant> = None;
@@ -376,6 +388,21 @@ impl TranscriptionCoordinator {
                         Command::ProcessingFinished => {
                             stage = Stage::Idle;
                         }
+                        Command::Claim { audio, reply } => {
+                            let granted = claim_granted(&stage);
+                            if granted {
+                                stage = Stage::Processing;
+                                // A fresh generation, so a stall cap armed for
+                                // an earlier pipeline can never release this one.
+                                generation = generation.wrapping_add(1);
+                                recording_since = Instant::now()
+                                    .checked_sub(audio)
+                                    .unwrap_or_else(Instant::now);
+                            } else {
+                                debug!("Recovery claim refused: the pipeline is busy");
+                            }
+                            let _ = reply.send(granted);
+                        }
                     }
                     // One place arms and drops every stage's deadline. Entering a
                     // stage starts its cap; leaving one throws it away; a command
@@ -398,8 +425,25 @@ impl TranscriptionCoordinator {
                 }
                 debug!("Transcription coordinator exited");
             }));
-            if let Err(e) = result {
-                error!("Transcription coordinator panicked: {e:?}");
+            match result {
+                // The channel closed: the app is shutting down.
+                Ok(()) => break,
+                Err(e) => {
+                    let message = e
+                        .downcast_ref::<&str>()
+                        .map(|s| s.to_string())
+                        .or_else(|| e.downcast_ref::<String>().cloned())
+                        .unwrap_or_else(|| "unknown panic".to_string());
+                    error!("Transcription coordinator panicked: {message}; restarting it");
+                    // Take down whatever the panic left half-done (recording,
+                    // overlay, tray icon) so the fresh idle state is true.
+                    let reset = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                        crate::utils::cancel_current_operation(&app);
+                    }));
+                    if reset.is_err() {
+                        error!("Resetting after the coordinator panic also panicked");
+                    }
+                }
             }
         });
 
@@ -456,6 +500,31 @@ impl TranscriptionCoordinator {
             warn!("Transcription coordinator channel closed");
         }
     }
+
+    /// Hold the pipeline stage for a dictation being recovered, exactly as a
+    /// recording's own pipeline holds it: a hotkey pressed meanwhile is "busy"
+    /// instead of a second dictation racing this one for the overlay and the
+    /// paste. Returns false when something else already has the stage. A
+    /// granted claim must be released with [`Self::notify_processing_finished`]
+    /// (the pipeline's `FinishGuard` does this).
+    ///
+    /// Blocks briefly for the coordinator's answer, so call it off the async
+    /// runtime and never from the main thread.
+    pub fn claim_processing(&self, audio: Duration) -> bool {
+        let (reply, answer) = mpsc::channel();
+        if self.tx.send(Command::Claim { audio, reply }).is_err() {
+            warn!("Transcription coordinator channel closed");
+            return false;
+        }
+        answer.recv_timeout(Duration::from_secs(2)).unwrap_or(false)
+    }
+}
+
+/// Whether a recovery may take the stage. Only an idle coordinator gives it up:
+/// a recording owns the microphone and the overlay, and a pipeline owns the
+/// paste.
+fn claim_granted(stage: &Stage) -> bool {
+    matches!(stage, Stage::Idle)
 }
 
 fn start(
@@ -621,6 +690,16 @@ mod tests {
         assert!(long > MAX_RECORDING_DURATION * 5);
         // Still finite, which is the whole point.
         assert!(long < Duration::from_secs(6 * 60 * 60));
+    }
+
+    #[test]
+    fn only_an_idle_coordinator_lends_its_stage_to_a_recovery() {
+        assert!(claim_granted(&Stage::Idle));
+        assert!(!claim_granted(&Stage::Processing));
+        assert!(!claim_granted(&Stage::Recording {
+            binding_id: "transcribe".to_string(),
+            mode: RecordingMode::Lock,
+        }));
     }
 
     #[test]

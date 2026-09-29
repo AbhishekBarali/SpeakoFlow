@@ -482,3 +482,89 @@ test("the transcript follows new lines until the user scrolls back, then resumes
   await fire("finish-overlay", { epoch: 30, text: "Two tidy lines." });
   expect(scrolls.at(-1)).toEqual({ top: 0, behavior: "instant" });
 });
+
+/** Every text node under `node`, joined, for asserting what a pill says. */
+const textOf = (node: ReturnType<typeof renderer.root.findByType>): string =>
+  node.children
+    .map((child) => (typeof child === "string" ? child : textOf(child)))
+    .join("");
+
+test("a dismissed dictation offers Undo, which sends back the pill's own epoch once", async () => {
+  await fire("show-overlay", {
+    state: "dismissed",
+    streamingWindow: false,
+    interactive: true,
+    epoch: 12,
+  });
+  const pill = renderer.root.findByProps({ role: "group" });
+  expect(textOf(pill)).toContain("overlay.recovery.dismissed");
+  const buttons = renderer.root.findAllByType("button");
+  expect(buttons).toHaveLength(1);
+  expect(textOf(buttons[0])).toContain("overlay.recovery.undo");
+
+  await act(async () => {
+    buttons[0].props.onClick();
+  });
+  expect(calls).toEqual([
+    { command: "recover_dictation", args: { epoch: 12 } },
+  ]);
+  // A second click while the first is being answered does nothing.
+  expect(renderer.root.findByType("button").props.disabled).toBe(true);
+  await act(async () => {
+    renderer.root.findByType("button").props.onClick();
+  });
+  expect(calls).toHaveLength(1);
+
+  // The working state that follows is an ordinary pill again.
+  await fire("show-overlay", {
+    state: "transcribing",
+    streamingWindow: false,
+    epoch: 13,
+  });
+  expect(renderer.root.findAllByType("button")).toHaveLength(0);
+});
+
+test("a failure explains itself and offers to try again, even with the live card on", async () => {
+  await fire("show-overlay", {
+    state: "failed",
+    // The backend never sends the card for a recovery pill; the webview
+    // must not draw one if it did.
+    streamingWindow: true,
+    interactive: true,
+    notice: "cloudSttFailed",
+    epoch: 4,
+  });
+  const pill = renderer.root.findByProps({ role: "group" });
+  expect(String(pill.props.className)).toContain("has-notice");
+  expect(String(pill.props.className)).not.toContain("overlay-card");
+  expect(textOf(pill)).toContain("overlay.notices.cloudSttFailed");
+  expect(textOf(renderer.root.findByType("button"))).toContain(
+    "overlay.recovery.retry",
+  );
+});
+
+test("the recovery pill fades with its own epoch, and a hide clears it", async () => {
+  await fire("show-overlay", {
+    state: "dismissed",
+    streamingWindow: false,
+    interactive: true,
+    epoch: 20,
+  });
+  await fire("fade-overlay", 19);
+  expect(rootClass()).not.toContain("is-fading");
+  await fire("fade-overlay", 20);
+  expect(rootClass()).toContain("is-fading");
+  await fire("restore-overlay", 20);
+  expect(rootClass()).not.toContain("is-fading");
+
+  await fire("hide-overlay");
+  expect(rootClass()).toContain("native-window-hidden");
+  // A late click on a pill that has gone must not reach the backend.
+  const buttons = renderer.root.findAllByType("button");
+  if (buttons.length > 0) {
+    await act(async () => {
+      buttons[0].props.onClick();
+    });
+  }
+  expect(calls).toHaveLength(0);
+});

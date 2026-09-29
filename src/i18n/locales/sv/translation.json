@@ -1514,7 +1514,13 @@
     "locked": "Spelar in handsfree — tryck på kortkommandot igen för att stoppa",
     "cancel": "Avbryt",
     "done": "Klar",
-    "askAssistant": "Fråga assistenten i stället för att skriva in det här"
+    "askAssistant": "Fråga assistenten i stället för att skriva in det här",
+    "recovery": {
+      "dismissed": "Avbruten",
+      "failed": "Transkriberingen misslyckades",
+      "undo": "Ångra",
+      "retry": "Försök igen"
+    }
   },
   "assistant": {
     "title": "Assistent",

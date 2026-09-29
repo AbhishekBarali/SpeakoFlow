@@ -816,6 +816,16 @@ async copyOverlayTranscript(text: string) : Promise<Result<null, string>> {
 }
 },
 /**
+ * The recording pill's Undo / Try again. `epoch` is the overlay lifetime the
+ * pill was shown in (from its `show-overlay` event), so a click on a pill that
+ * has since been replaced cannot act on another dictation. Returns whether
+ * there was still something to recover; when there was not, the stale pill is
+ * taken down.
+ */
+async recoverDictation(epoch: number) : Promise<boolean> {
+    return await TAURI_INVOKE("recover_dictation", { epoch });
+},
+/**
  * Finish the current recording right now and run the normal transcribe /
  * assistant pipeline on it. This is the "done" tick on the recording overlay
  * and the finish button on the assistant panel — the keyboard-free way to end
@@ -1334,10 +1344,10 @@ async getCloudSttReadiness() : Promise<CloudSttReadiness> {
 /**
  * Switch between the local engine and cloud transcription.
  * 
- * A command rather than a raw settings write because turning cloud *off* has a
- * side effect: the local model has not been loaded while the user was on cloud,
- * so it is asked to start loading now instead of on the first press of the
- * dictation key, where the wait would be visible.
+ * A command rather than a raw settings write because the switch has a side
+ * effect in each direction: turning cloud *off* starts loading the local model
+ * now instead of on the first press of the dictation key, where the wait would
+ * be visible, and turning it *on* releases a local model nothing will use.
  */
 async setSttEngineMode(mode: SttEngineMode) : Promise<void> {
     await TAURI_INVOKE("set_stt_engine_mode", { mode });
@@ -1461,6 +1471,24 @@ async deleteHistoryEntry(id: number) : Promise<Result<null, string>> {
 async retryHistoryEntryTranscription(id: number) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("retry_history_entry_transcription", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Bring back a dictation that was dismissed (Esc, or the tray's Cancel).
+ * 
+ * It is transcribed and cleaned up the way a retry is, and nothing is pasted:
+ * the History panel has the keyboard, so there is nowhere sensible to paste
+ * into. What the dismissed row already holds is reused: a transcript is not
+ * transcribed again, and text that was already cleaned up (or written by
+ * Flow) is not produced again. The row then counts toward usage, on the day it
+ * was spoken.
+ */
+async recoverHistoryEntry(id: number) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("recover_history_entry", { id }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -4386,7 +4414,13 @@ gguf_files: HfGgufFile[];
  * Companion vision projectors, if the repo is multimodal.
  */
 mmproj_files: HfGgufFile[] }
-export type HistoryEntry = { id: number; file_name: string; timestamp: number; saved: boolean; title: string; transcription_text: string; post_processed_text: string | null; post_process_prompt: string | null; post_process_requested: boolean }
+export type HistoryEntry = { id: number; file_name: string; timestamp: number; saved: boolean; title: string; transcription_text: string; post_processed_text: string | null; post_process_prompt: string | null; post_process_requested: boolean; 
+/**
+ * The user cancelled this dictation. Its audio (and any transcript that
+ * was already finished) is kept so it can be recovered; History shows it
+ * as dismissed rather than as text.
+ */
+dismissed: boolean }
 export type HistoryUpdatePayload = { action: "added"; entry: HistoryEntry } | { action: "updated"; entry: HistoryEntry } | { action: "deleted"; id: number } | { action: "toggled"; id: number }
 /**
  * Result of changing keyboard implementation

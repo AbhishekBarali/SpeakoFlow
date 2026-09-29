@@ -57,10 +57,11 @@ pub fn cancel_current_operation(app: &AppHandle) {
     // Unregister the cancel shortcut asynchronously
     shortcut::unregister_cancel_shortcut(app);
 
-    // Cancel any ongoing recording
+    // Cancel any ongoing recording. What it captured comes back, so a
+    // dictation cancelled by mistake can be offered back below instead of lost.
     let audio_manager = app.state::<Arc<AudioRecordingManager>>();
-    let recording_was_active = audio_manager.is_recording();
-    audio_manager.cancel_recording();
+    let cancelled = audio_manager.cancel_recording();
+    let recording_was_active = cancelled.is_some();
 
     // Cancel any in-flight Flow generation and ensure a cancelled recording's
     // live-transcript watcher cannot leak into the next recording mode.
@@ -113,14 +114,23 @@ pub fn cancel_current_operation(app: &AppHandle) {
         crate::assistant::dismiss_voice_overlay(app);
     }
 
+    // A dictation cancelled mid-recording is kept (History, marked dismissed)
+    // and offered back on the pill for a few seconds, which replaces the hide.
+    let offered = cancelled
+        .map(|recording| crate::actions::keep_cancelled_recording(app, recording))
+        .unwrap_or(false);
+
     // Update tray icon and hide overlay
     change_tray_icon(app, crate::tray::TrayIconState::Idle);
-    hide_recording_overlay(app);
-
-    // Nothing will be pasted, so the window this recording was aimed at stops
-    // being a restore target. Keeping it would mean a later paste could hand the
-    // foreground to a window the user has since abandoned.
-    crate::input::forget_paste_target();
+    if !offered {
+        hide_recording_overlay(app);
+        // Nothing will be pasted, so the window this recording was aimed at
+        // stops being a restore target. Keeping it would mean a later paste
+        // could hand the foreground to a window the user has since abandoned.
+        // An Undo on the pill is the one paste still meant for it; that offer
+        // forgets it when it expires (`dictation_recovery::expire`).
+        crate::input::forget_paste_target();
+    }
 
     // Unload model if immediate unload is enabled
     let tm = app.state::<Arc<TranscriptionManager>>();

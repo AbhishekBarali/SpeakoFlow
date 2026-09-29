@@ -9,6 +9,7 @@ mod catalog;
 pub mod cli;
 mod clipboard;
 mod commands;
+mod dictation_recovery;
 mod feedback;
 mod flow;
 mod helpers;
@@ -242,6 +243,9 @@ fn initialize_core_logic(app_handle: &AppHandle) {
         TranscriptionManager::new(app_handle, model_manager.clone(), stream_router.clone())
             .expect("Failed to initialize transcription manager"),
     );
+    // Screen vision captures the monitor under the pointer; on macOS it needs
+    // the app to ask where that is.
+    screenshot::set_cursor_source(app_handle);
     let history_manager =
         Arc::new(HistoryManager::new(app_handle).expect("Failed to initialize history manager"));
 
@@ -893,6 +897,7 @@ pub fn run(cli_args: CliArgs) {
             feedback::send_feedback,
             commands::cancel_operation,
             commands::copy_overlay_transcript,
+            commands::recover_dictation,
             commands::commit_recording,
             commands::toggle_dictation,
             commands::is_portable,
@@ -968,6 +973,7 @@ pub fn run(cli_args: CliArgs) {
             commands::history::get_audio_file_path,
             commands::history::delete_history_entry,
             commands::history::retry_history_entry_transcription,
+            commands::history::recover_history_entry,
             commands::history::update_history_limit,
             commands::history::update_recording_retention_period,
             commands::history::update_recording_retention_days,

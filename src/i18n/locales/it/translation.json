@@ -1514,7 +1514,13 @@
     "locked": "Registrazione a mani libere — premi di nuovo la scorciatoia per fermarti",
     "cancel": "Annulla",
     "done": "Fatto",
-    "askAssistant": "Chiedi all'assistente invece di digitare questo testo"
+    "askAssistant": "Chiedi all'assistente invece di digitare questo testo",
+    "recovery": {
+      "dismissed": "Annullato",
+      "failed": "Trascrizione non riuscita",
+      "undo": "Annulla",
+      "retry": "Riprova"
+    }
   },
   "assistant": {
     "title": "Assistente",

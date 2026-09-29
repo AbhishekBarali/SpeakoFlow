@@ -1514,7 +1514,13 @@
     "locked": "핸즈프리로 녹음 중 — 단축키를 다시 누르면 정지합니다",
     "cancel": "취소",
     "done": "완료",
-    "askAssistant": "이 내용을 입력하는 대신 어시스턴트에게 묻기"
+    "askAssistant": "이 내용을 입력하는 대신 어시스턴트에게 묻기",
+    "recovery": {
+      "dismissed": "취소됨",
+      "failed": "받아쓰기 실패",
+      "undo": "실행 취소",
+      "retry": "다시 시도"
+    }
   },
   "assistant": {
     "title": "어시스턴트",

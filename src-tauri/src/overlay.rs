@@ -66,6 +66,36 @@ const OVERLAY_LABEL_HEIGHT: f64 = 60.0;
 const OVERLAY_STREAM_WIDTH: f64 = 400.0;
 const OVERLAY_STREAM_HEIGHT: f64 = 120.0;
 
+// The Undo / Try again pill left behind by a dismissed or failed dictation.
+// Unlike every other state it takes the pointer, so the frame *is* the pill:
+// the pill fills it edge to edge (see `.overlay-pill.recovery`), and no
+// transparent margin sits in front of the app underneath catching clicks meant
+// for it. "Try again" is longer than "Undo"; a failure that explains itself
+// (a cloud key, Flow) needs the two-line labelled frame.
+const OVERLAY_RECOVERY_WIDTH: f64 = 184.0;
+const OVERLAY_RECOVERY_WIDE_WIDTH: f64 = 248.0;
+const OVERLAY_RECOVERY_HEIGHT: f64 = 40.0;
+
+/// How long the Undo / Try again pill waits for a click. Short on purpose — it
+/// is there for the second after a slip, and History keeps the dictation for
+/// anything later — and a pointer resting on it holds it open.
+const RECOVERY_LINGER: std::time::Duration = std::time::Duration::from_secs(6);
+
+fn is_recovery_state(state: &str) -> bool {
+    matches!(state, "dismissed" | "failed")
+}
+
+/// Frame for a recovery pill.
+fn recovery_overlay_size(state: &str, has_notice: bool) -> (f64, f64) {
+    if has_notice {
+        (OVERLAY_LABEL_WIDTH, OVERLAY_LABEL_HEIGHT)
+    } else if state == "failed" {
+        (OVERLAY_RECOVERY_WIDE_WIDTH, OVERLAY_RECOVERY_HEIGHT)
+    } else {
+        (OVERLAY_RECOVERY_WIDTH, OVERLAY_RECOVERY_HEIGHT)
+    }
+}
+
 /// Windows accessibility text size (Settings → Accessibility → Text size).
 ///
 /// A separate axis from display scaling: WebView2 applies it as a document zoom
@@ -146,6 +176,10 @@ struct ShowOverlayPayload {
     interactive: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     notice: Option<String>,
+    /// The overlay lifetime this show began. The recovery pill hands it back
+    /// with its click (`recover_dictation`), so a click meant for a pill that
+    /// has since been replaced can never act on a different dictation.
+    epoch: u64,
 }
 
 /// Whether the live card can take the pointer mid-recording without being able
@@ -829,8 +863,14 @@ fn show_overlay_state(app_handle: &AppHandle, state: &str) {
     show_overlay_state_with_notice(app_handle, state, None);
 }
 
-fn show_overlay_state_with_notice(app_handle: &AppHandle, state: &str, notice: Option<String>) {
-    OVERLAY_LIFECYCLE.advance();
+/// Show the overlay in `state`. Returns the lifetime it started, or `None` when
+/// the overlay is switched off and nothing was shown.
+fn show_overlay_state_with_notice(
+    app_handle: &AppHandle,
+    state: &str,
+    notice: Option<String>,
+) -> Option<u64> {
+    let epoch = OVERLAY_LIFECYCLE.advance();
     // Check if overlay should be shown based on position setting
     let settings = settings::get_settings(app_handle);
 
@@ -840,17 +880,23 @@ fn show_overlay_state_with_notice(app_handle: &AppHandle, state: &str, notice: O
     let supports_live = selected_model_supports_live(app_handle);
     let style = settings::resolve_overlay_style(settings.overlay_style, supports_live);
     if style == settings::OverlayStyle::None || settings.overlay_position == OverlayPosition::None {
-        return;
+        return None;
     }
 
     // Live → the enlarged readable card (running committed + tentative
     // transcript); Minimal → the compact pill. The card is only meaningful
     // while streaming actually produces text, but it degrades gracefully to a
     // waveform + state label for batch models, so it's safe to show on Live.
-    let streaming_window = style == settings::OverlayStyle::Live;
+    // A recovery offer is always the compact pill: it has one line to say and
+    // one thing to click, and a card-sized window taking the pointer would sit
+    // in front of far more of the user's app than it needs to.
+    let recovery = is_recovery_state(state);
+    let streaming_window = style == settings::OverlayStyle::Live && !recovery;
     OVERLAY_STREAMING.store(streaming_window, Ordering::SeqCst);
 
-    let (width, height) = if streaming_window {
+    let (width, height) = if recovery {
+        recovery_overlay_size(state, notice.is_some())
+    } else if streaming_window {
         (OVERLAY_STREAM_WIDTH, OVERLAY_STREAM_HEIGHT)
     } else if matches!(state, "generating" | "vision" | "notice") {
         (OVERLAY_LABEL_WIDTH, OVERLAY_LABEL_HEIGHT)
@@ -884,7 +930,9 @@ fn show_overlay_state_with_notice(app_handle: &AppHandle, state: &str, notice: O
         // The compact pill has nothing to act on, so it never intercepts the
         // pointer. The live card takes it wherever that cannot cost the paste
         // target its focus; elsewhere it waits for `finish_recording_overlay`.
-        let interactive = streaming_window && live_card_takes_pointer();
+        // A recovery pill exists to be clicked, and is only ever offered where
+        // that is safe (see `show_recovery_overlay`).
+        let interactive = (streaming_window || recovery) && live_card_takes_pointer();
         let _ = overlay_window.set_ignore_cursor_events(!interactive);
         let _ = overlay_window.show();
 
@@ -914,9 +962,12 @@ fn show_overlay_state_with_notice(app_handle: &AppHandle, state: &str, notice: O
                 streaming_window,
                 interactive,
                 notice,
+                epoch,
             },
         );
+        return Some(epoch);
     }
+    None
 }
 
 /// Shows the recording overlay window with fade-in animation
@@ -958,6 +1009,84 @@ pub fn show_overlay_notice(app_handle: &AppHandle, notice_key: &str) {
             hide_recording_overlay(&app);
         }
     });
+}
+
+/// Offer a dismissed or failed dictation back on the pill: "Dismissed · Undo"
+/// or "Transcription failed · Try again". `state` is `"dismissed"` or
+/// `"failed"`; `notice` replaces the pill's words with an `overlay.notices.*`
+/// explanation.
+///
+/// `on_shown` receives the overlay lifetime the pill was shown in, before
+/// anything can click it, so the caller can key its offer to exactly this pill.
+/// The pill waits [`RECOVERY_LINGER`] (longer while the pointer is on it), then
+/// fades out and the offer expires; replaced by anything else first, the offer
+/// is withdrawn.
+///
+/// Returns false, showing nothing, where a clickable overlay could take
+/// keyboard focus from the app being dictated into (see
+/// [`live_card_takes_pointer`]) or when the overlay is switched off. The
+/// dictation is still in History either way.
+pub fn show_recovery_overlay(
+    app: &AppHandle,
+    state: &str,
+    notice: Option<&'static str>,
+    on_shown: impl FnOnce(u64),
+) -> bool {
+    if !live_card_takes_pointer() {
+        return false;
+    }
+    set_overlay_hovered(false);
+    let Some(epoch) = show_overlay_state_with_notice(app, state, notice.map(str::to_string)) else {
+        return false;
+    };
+    let Some(window) = app.get_webview_window("recording_overlay") else {
+        return false;
+    };
+    on_shown(epoch);
+
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        let ready = OVERLAY_LIFECYCLE
+            .wait_for_dismissal(
+                epoch,
+                RECOVERY_LINGER,
+                std::time::Duration::from_millis(OVERLAY_FADE_MS),
+                |fading| {
+                    let _ = window.emit(
+                        if fading {
+                            "fade-overlay"
+                        } else {
+                            "restore-overlay"
+                        },
+                        epoch,
+                    );
+                },
+            )
+            .await;
+        if !ready {
+            // Something else took the overlay: an Undo that is now running, or
+            // a new recording. Either way this pill's offer is over.
+            crate::dictation_recovery::withdraw(epoch);
+            return;
+        }
+        crate::dictation_recovery::expire(epoch);
+        let app_main = app.clone();
+        let _ = app.run_on_main_thread(move || {
+            if OVERLAY_LIFECYCLE.is_current(epoch) {
+                hide_recording_overlay(&app_main);
+            }
+        });
+    });
+    true
+}
+
+/// A click reached a recovery pill whose offer is already gone (it expired a
+/// moment earlier, or History recovered the same dictation). Take the pill
+/// down rather than leave a button that does nothing.
+pub fn dismiss_recovery_overlay(app: &AppHandle, epoch: u64) {
+    if OVERLAY_LIFECYCLE.is_current(epoch) {
+        hide_recording_overlay(app);
+    }
 }
 
 /// Updates the overlay window position based on current settings, re-centering

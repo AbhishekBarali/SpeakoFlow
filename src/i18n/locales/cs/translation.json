@@ -1514,7 +1514,13 @@
     "locked": "Nahrávám bez držení — dalším stiskem zkratky nahrávání zastavíte",
     "cancel": "Zrušit",
     "done": "Hotovo",
-    "askAssistant": "Zeptat se asistenta místo vypsání tohoto textu"
+    "askAssistant": "Zeptat se asistenta místo vypsání tohoto textu",
+    "recovery": {
+      "dismissed": "Zrušeno",
+      "failed": "Přepis se nezdařil",
+      "undo": "Zpět",
+      "retry": "Zkusit znovu"
+    }
   },
   "assistant": {
     "title": "Asistent",

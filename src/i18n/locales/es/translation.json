@@ -1514,7 +1514,13 @@
     "locked": "Grabando con manos libres: pulsa el atajo de nuevo para detener",
     "cancel": "Cancelar",
     "done": "Listo",
-    "askAssistant": "Preguntar al asistente en lugar de escribir esto"
+    "askAssistant": "Preguntar al asistente en lugar de escribir esto",
+    "recovery": {
+      "dismissed": "Descartado",
+      "failed": "La transcripción falló",
+      "undo": "Deshacer",
+      "retry": "Reintentar"
+    }
   },
   "assistant": {
     "title": "Asistente",

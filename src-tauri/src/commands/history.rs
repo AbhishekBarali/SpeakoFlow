@@ -1,6 +1,8 @@
 use crate::actions::process_transcription_output;
 use crate::managers::{
-    history::{HistoryManager, PaginatedAssistantHistory, PaginatedHistory, UsageStats},
+    history::{
+        EntryOutcome, HistoryManager, PaginatedAssistantHistory, PaginatedHistory, UsageStats,
+    },
     transcription::TranscriptionManager,
 };
 use std::sync::Arc;
@@ -67,50 +69,102 @@ pub async fn retry_history_entry_transcription(
     transcription_manager: State<'_, Arc<TranscriptionManager>>,
     id: i64,
 ) -> Result<(), String> {
+    rerun_entry(&app, &history_manager, &transcription_manager, id, true).await
+}
+
+/// Bring back a dictation that was dismissed (Esc, or the tray's Cancel).
+///
+/// It is transcribed and cleaned up the way a retry is, and nothing is pasted:
+/// the History panel has the keyboard, so there is nowhere sensible to paste
+/// into. What the dismissed row already holds is reused: a transcript is not
+/// transcribed again, and text that was already cleaned up (or written by
+/// Flow) is not produced again. The row then counts toward usage, on the day it
+/// was spoken.
+#[tauri::command]
+#[specta::specta]
+pub async fn recover_history_entry(
+    app: AppHandle,
+    history_manager: State<'_, Arc<HistoryManager>>,
+    transcription_manager: State<'_, Arc<TranscriptionManager>>,
+    id: i64,
+) -> Result<(), String> {
+    // The pill may still be offering the same dictation; recovering it twice
+    // would paste it a second time.
+    crate::dictation_recovery::withdraw_row(id);
+    rerun_entry(&app, &history_manager, &transcription_manager, id, false).await
+}
+
+/// Re-run a History entry. `retranscribe` forces a fresh transcription from
+/// the audio; otherwise an existing transcript is kept. Either way the row
+/// comes out not dismissed: asking for its text back is asking to keep it.
+async fn rerun_entry(
+    app: &AppHandle,
+    history_manager: &Arc<HistoryManager>,
+    transcription_manager: &Arc<TranscriptionManager>,
+    id: i64,
+    retranscribe: bool,
+) -> Result<(), String> {
     let entry = history_manager
         .get_entry_by_id(id)
         .await
         .map_err(|e| e.to_string())?
         .ok_or_else(|| format!("History entry {} not found", id))?;
 
-    let audio_path = history_manager.get_audio_file_path(&entry.file_name);
-    let samples = crate::audio_toolkit::read_wav_samples(&audio_path)
-        .map_err(|e| format!("Failed to load audio: {}", e))?;
+    let had_transcript = !entry.transcription_text.trim().is_empty();
+    let transcription = if had_transcript && !retranscribe {
+        entry.transcription_text.clone()
+    } else {
+        let audio_path = history_manager.get_audio_file_path(&entry.file_name);
+        let samples = crate::audio_toolkit::read_wav_samples(&audio_path)
+            .map_err(|e| format!("Failed to load audio: {}", e))?;
 
-    if samples.is_empty() {
-        return Err("Recording has no audio samples".to_string());
-    }
+        if samples.is_empty() {
+            return Err("Recording has no audio samples".to_string());
+        }
 
-    transcription_manager.initiate_model_load();
+        transcription_manager.initiate_model_load();
 
-    let tm = Arc::clone(&transcription_manager);
-    let transcription = tauri::async_runtime::spawn_blocking(move || tm.transcribe(samples))
-        .await
-        .map_err(|e| format!("Transcription task panicked: {}", e))?
-        .map_err(|e| e.to_string())?;
+        let tm = Arc::clone(transcription_manager);
+        let transcription = tauri::async_runtime::spawn_blocking(move || tm.transcribe(samples))
+            .await
+            .map_err(|e| format!("Transcription task panicked: {}", e))?
+            .map_err(|e| e.to_string())?;
 
-    if transcription.is_empty() {
-        return Err("Recording contains no speech".to_string());
-    }
+        if transcription.is_empty() {
+            return Err("Recording contains no speech".to_string());
+        }
+        transcription
+    };
 
     let is_flow_entry =
         entry.post_process_prompt.as_deref() == Some(crate::flow::FLOW_HISTORY_MARKER);
-    let (post_processed_text, post_process_prompt) = if is_flow_entry {
+    let reuse_processed = had_transcript && !retranscribe && entry.post_processed_text.is_some();
+    let (post_processed_text, post_process_prompt) = if is_flow_entry || reuse_processed {
         // Re-running speech recognition should repair only the transcript. A
         // Flow output is a completed generated artifact; keep it and its marker
-        // instead of silently converting the row into ordinary dictation.
+        // instead of silently converting the row into ordinary dictation. The
+        // same goes for cleanup a dismissed dictation already finished.
         (
             entry.post_processed_text.clone(),
             entry.post_process_prompt.clone(),
         )
     } else {
         let processed =
-            process_transcription_output(&app, &transcription, entry.post_process_requested).await;
+            process_transcription_output(app, &transcription, entry.post_process_requested).await;
         (processed.post_processed_text, processed.post_process_prompt)
     };
 
     history_manager
-        .update_transcription(id, transcription, post_processed_text, post_process_prompt)
+        .record_outcome(
+            id,
+            EntryOutcome {
+                transcription_text: transcription,
+                post_processed_text,
+                post_process_prompt,
+                post_process_requested: entry.post_process_requested,
+                dismissed: false,
+            },
+        )
         .map(|_| ())
         .map_err(|e| e.to_string())
 }

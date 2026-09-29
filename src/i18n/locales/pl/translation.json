@@ -1514,7 +1514,13 @@
     "locked": "Nagrywanie bez trzymania klawisza — naciśnij skrót ponownie, aby zakończyć",
     "cancel": "Anuluj",
     "done": "Gotowe",
-    "askAssistant": "Zapytaj asystenta, zamiast to wpisywać"
+    "askAssistant": "Zapytaj asystenta, zamiast to wpisywać",
+    "recovery": {
+      "dismissed": "Odrzucono",
+      "failed": "Transkrypcja nie powiodła się",
+      "undo": "Cofnij",
+      "retry": "Spróbuj ponownie"
+    }
   },
   "assistant": {
     "title": "Asystent",

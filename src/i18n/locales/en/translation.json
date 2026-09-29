@@ -1986,7 +1986,13 @@
     "copied": "Copied",
     "copyFailed": "Could not copy — try again",
     "done": "Done",
-    "askAssistant": "Ask the assistant instead of typing this"
+    "askAssistant": "Ask the assistant instead of typing this",
+    "recovery": {
+      "dismissed": "Dismissed",
+      "failed": "Transcription failed",
+      "undo": "Undo",
+      "retry": "Try again"
+    }
   },
   "reminders": {
     "title": "Reminder",
@@ -2827,6 +2833,10 @@
     "audioMissing": "This recording's audio file is no longer available.",
     "failed": "Transcription failed",
     "retry": "Try again",
+    "dismissed": "This transcription was dismissed.",
+    "recover": "Recover",
+    "recoverTitle": "Transcribe it again and keep it",
+    "recoverError": "Couldn't recover this transcription. Try again.",
     "more": "More actions",
     "chat": {
       "continue": "Continue",

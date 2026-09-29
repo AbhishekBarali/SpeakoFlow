@@ -144,6 +144,82 @@
   line-clamp: 2;
 }
 
+/* ── Recovery pill: "Dismissed · Undo", "Transcription failed · Try again" ──
+ * Left behind for a few seconds when a dictation is cancelled or fails, so a
+ * slip of the finger costs nothing. It should read as an afterthought, not an
+ * alarm: the same surface and greys as every other state, a muted line saying
+ * what happened, and one action in the ordinary text colour. No red, no icon
+ * badge — a failure is already explained by its words.
+ *
+ * This is the one pill that takes the pointer, so the backend sizes the window
+ * to it and it fills that frame: a transparent margin would sit in front of the
+ * user's app and swallow clicks meant for it. */
+.overlay-pill.recovery {
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 4px 0 14px;
+}
+.overlay-pill.recovery.has-notice {
+  border-radius: 18px;
+  padding: 6px 6px 6px 14px;
+}
+.recovery-label {
+  min-width: 0;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 450;
+  color: var(--ov-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.has-notice .recovery-label {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+.recovery-action {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 10px 0 8px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--ov-text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+  cursor: pointer;
+  transition:
+    background-color 140ms,
+    color 140ms;
+}
+.recovery-action:hover {
+  background: rgba(255, 255, 255, 0.13);
+  color: #f5f5f7;
+}
+.recovery-action:active {
+  background: rgba(255, 255, 255, 0.18);
+}
+.recovery-action:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.4);
+  outline-offset: 1px;
+}
+/* Clicked: the working state replaces the pill a moment later. */
+.recovery-action:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
 /* ── Live transcript, compact pill ──────────────────────────────────────────
  * A ticker: pinned to the newest words, older ones scrolling out of the far
  * edge. `text-align: end` cannot do this — alignment stops mattering once a
@@ -333,7 +409,8 @@
  * hit-testing — and a pointer entering it cancels the fade and restarts the
  * full reading window (`OverlayLifecycle::wait_for_dismissal`), which is what
  * makes a short exit safe: the copy button is never taken away mid-reach. */
-.overlay-root.is-fading > .overlay-card {
+.overlay-root.is-fading > .overlay-card,
+.overlay-root.is-fading > .overlay-pill.recovery {
   opacity: 0;
   transform: scale(0.965) translateY(-3px);
   transition:
@@ -512,8 +589,10 @@
   .overlay-pill,
   .overlay-card,
   .overlay-copy,
+  .recovery-action,
   .overlay-root.native-window-hidden > .overlay-card,
   .overlay-root.is-fading > .overlay-card,
+  .overlay-root.is-fading > .overlay-pill.recovery,
   .overlay-root:not(.is-fading) > .overlay-card,
   .overlay-root.is-hopping > .overlay-pill,
   .overlay-root.is-hopping > .overlay-card {
@@ -523,7 +602,8 @@
   .overlay-root.is-hopping > * {
     transform: none;
   }
-  .overlay-root.is-fading > .overlay-card {
+  .overlay-root.is-fading > .overlay-card,
+  .overlay-root.is-fading > .overlay-pill.recovery {
     transform: none;
   }
   .card-body {

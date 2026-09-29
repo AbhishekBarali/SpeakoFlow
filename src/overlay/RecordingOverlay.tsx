@@ -1,7 +1,7 @@
 import { emit, listen, type UnlistenFn } from "@tauri-apps/api/event";
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Check, Copy } from "lucide-react";
+import { Check, Copy, RotateCcw, Undo2 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import AudioWaveform from "../components/shared/AudioWaveform";
 import CompletionMark from "./CompletionMark";
@@ -18,7 +18,9 @@ type OverlayState =
   | "processing"
   | "generating"
   | "vision"
-  | "notice";
+  | "notice"
+  | "dismissed"
+  | "failed";
 type StreamTextPayload = { committed: string; tentative: string };
 /** One run of committed text, rendered as its own element.
  *
@@ -45,6 +47,10 @@ type ShowOverlayPayload = {
    * cannot take keyboard focus, so a click can never steal the paste target. */
   interactive?: boolean;
   notice?: string;
+  /** The overlay lifetime this show began. The recovery pill sends it back
+   * with its click, so a click on a pill that has since been replaced cannot
+   * act on a different dictation. */
+  epoch?: number;
 };
 type WaveShape = { bars: number; pitch?: number; barWidth?: number };
 
@@ -88,6 +94,11 @@ const HOLD_LIMIT_MS = 10_000;
 /** States that carry a written label instead of leaning on the waveform. The
  * backend widens the window for exactly these (see OVERLAY_LABEL_WIDTH). */
 const LABELED: readonly OverlayState[] = ["generating", "vision", "notice"];
+
+/** A dismissed or failed dictation offered back: one quiet line and one
+ * action. The backend sizes the window to the pill and lets it take the
+ * pointer (`show_recovery_overlay`). */
+const RECOVERY: readonly OverlayState[] = ["dismissed", "failed"];
 
 /** How long a copy confirms before the header returns to normal. */
 const COPIED_FEEDBACK_MS = 1600;
@@ -192,6 +203,11 @@ const RecordingOverlay: React.FC = () => {
   const completionEpoch = useRef<number | null>(null);
   const copyGeneration = useRef(0);
   const cardRef = useRef<HTMLDivElement>(null);
+  const pillRef = useRef<HTMLDivElement>(null);
+  /** The lifetime the current show began, which a recovery click hands back. */
+  const showEpoch = useRef<number | null>(null);
+  /** An Undo / Try again was clicked and has not been answered yet. */
+  const [recovering, setRecovering] = useState(false);
   const cardBodyRef = useRef<HTMLDivElement>(null);
   const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hopTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -340,9 +356,16 @@ const RecordingOverlay: React.FC = () => {
     // Register together so a slow registration cannot leave hide unobserved.
     void Promise.all([
       listen<ShowOverlayPayload>("show-overlay", ({ payload }) => {
-        completionEpoch.current = null;
+        const offersRecovery = RECOVERY.includes(payload.state);
+        showEpoch.current = payload.epoch ?? null;
+        // A recovery pill lingers and fades exactly like a finished card, and
+        // the fade events are matched against this epoch.
+        completionEpoch.current = offersRecovery
+          ? (payload.epoch ?? null)
+          : null;
         copyGeneration.current++;
         finished = false;
+        setRecovering(false);
         setCompleted(false);
         setFading(false);
         // A show places the window itself, so any hop it interrupted is over.
@@ -371,9 +394,11 @@ const RecordingOverlay: React.FC = () => {
       }).then(register),
       listen("hide-overlay", () => {
         completionEpoch.current = null;
+        showEpoch.current = null;
         copyGeneration.current++;
         finished = false;
         endPress();
+        setRecovering(false);
         setFading(false);
         setHop(false);
         visible = false;
@@ -506,10 +531,11 @@ const RecordingOverlay: React.FC = () => {
   );
 
   useEffect(() => {
-    if (isVisible && streamingWindow) {
+    if (isVisible && (streamingWindow || RECOVERY.includes(state))) {
+      const target = cardRef.current ?? pillRef.current;
       void emit(
         "overlay-hover",
-        !!cardRef.current?.matches(":hover, :has(:focus-visible)"),
+        !!target?.matches(":hover, :has(:focus-visible)"),
       );
     }
   }, [isVisible, streamingWindow, state, completed]);
@@ -517,8 +543,13 @@ const RecordingOverlay: React.FC = () => {
   const isRecording = state === "recording" && !completed;
   const hasLiveText = !!(transcript.committed || transcript.tentative);
   const live = isRecording && micLive;
+  const recovery = RECOVERY.includes(state);
   const labeled = LABELED.includes(state);
-  const working = state !== "recording" && state !== "notice";
+  const working = state !== "recording" && state !== "notice" && !recovery;
+  // The pointer holds these open (the backend waits on `overlay-hover`): the
+  // finished card so it can be read and copied, the recovery pill so it is
+  // still there when the pointer reaches it.
+  const holdsOnHover = streamingWindow || recovery;
   // A finished card takes the pointer on every platform; before that, only
   // where the backend could give it one without risking the paste target.
   // Offering a button or a selectable line that the window then passes
@@ -528,7 +559,11 @@ const RecordingOverlay: React.FC = () => {
   const busyLabel =
     state === "notice"
       ? t(`overlay.notices.${notice ?? "flowFailed"}`)
-      : t(`overlay.${state}`);
+      : recovery
+        ? notice
+          ? t(`overlay.notices.${notice}`)
+          : t(`overlay.recovery.${state}`)
+        : t(`overlay.${state}`);
   const doneLabel = notice ? t(`overlay.notices.${notice}`) : t("overlay.done");
   // The pill has nowhere to put a second line, so its one label is the invitation
   // to speak. The card keeps the state word in its header and lets the body hold
@@ -555,13 +590,28 @@ const RecordingOverlay: React.FC = () => {
         : pillLabel;
 
   const reportHover = (hovered: boolean) => {
-    if (!streamingWindow) return;
+    if (!holdsOnHover) return;
+    const target = cardRef.current ?? pillRef.current;
     const holdingOpen =
-      hovered || !!cardRef.current?.matches(":hover, :has(:focus-visible)");
+      hovered || !!target?.matches(":hover, :has(:focus-visible)");
     if (holdingOpen) setFading(false);
     void emit("overlay-hover", holdingOpen).catch((error) =>
       console.error("Overlay hover failed:", error),
     );
+  };
+
+  /** Undo / Try again. The backend answers by showing the working state, or,
+   * when the offer has already expired, by taking the pill down. */
+  const recover = async () => {
+    const epoch = showEpoch.current;
+    if (epoch === null || recovering) return;
+    setRecovering(true);
+    try {
+      await invoke<boolean>("recover_dictation", { epoch });
+    } catch (error) {
+      console.error("Could not recover the dictation:", error);
+      setRecovering(false);
+    }
   };
 
   const copyTranscript = () =>
@@ -641,7 +691,7 @@ const RecordingOverlay: React.FC = () => {
       className={`overlay-root ${isVisible ? "fade-in" : "native-window-hidden"}${fading ? " is-fading" : ""}${hopping ? " is-hopping" : ""}`}
       onContextMenu={preventBrowserContextMenu}
     >
-      {streamingWindow ? (
+      {streamingWindow && !recovery ? (
         <div
           ref={cardRef}
           className={`overlay-card ${state}${completed ? " completed" : ""}`}
@@ -727,6 +777,36 @@ const RecordingOverlay: React.FC = () => {
               )
             )}
           </div>
+        </div>
+      ) : recovery ? (
+        <div
+          ref={pillRef}
+          className={`overlay-pill recovery ${state}${notice ? " has-notice" : ""}`}
+          role="group"
+          aria-label={busyLabel}
+          onMouseEnter={() => reportHover(true)}
+          onMouseLeave={() => reportHover(false)}
+        >
+          <span className="recovery-label" role="status">
+            {busyLabel}
+          </span>
+          <button
+            type="button"
+            className="recovery-action"
+            onClick={() => void recover()}
+            disabled={recovering}
+          >
+            {state === "dismissed" ? (
+              <Undo2 size={13} strokeWidth={1.7} aria-hidden="true" />
+            ) : (
+              <RotateCcw size={12} strokeWidth={1.7} aria-hidden="true" />
+            )}
+            <span>
+              {state === "dismissed"
+                ? t("overlay.recovery.undo")
+                : t("overlay.recovery.retry")}
+            </span>
+          </button>
         </div>
       ) : (
         <div

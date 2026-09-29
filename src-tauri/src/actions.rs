@@ -2,8 +2,11 @@
 use crate::apple_intelligence;
 use crate::audio_feedback::{play_feedback_sound, play_feedback_sound_blocking, SoundType};
 use crate::audio_toolkit::{is_microphone_access_denied, is_no_input_device_error};
-use crate::managers::audio::AudioRecordingManager;
-use crate::managers::history::HistoryManager;
+use crate::dictation_recovery::{
+    DictationContext, Offer, OfferKind, PendingPaste, Remaining, RowHandle,
+};
+use crate::managers::audio::{AudioRecordingManager, CancelledRecording};
+use crate::managers::history::{EntryOutcome, HistoryManager};
 use crate::managers::transcription::TranscriptionManager;
 use crate::settings::{
     get_settings, resolve_post_process_config, AppSettings, ModelUnloadTimeout,
@@ -2369,8 +2372,10 @@ impl ShortcutAction for TranscribeAction {
                                                  // Two different questions. Flow listens only on the dictation shortcut,
                                                  // whatever it does with cleanup; cleanup runs on the cleanup shortcut,
                                                  // and on the dictation shortcut too once it has been moved there.
-        let flow_eligible = !self.post_process;
-        let post_process = cleans_up(self.post_process, &get_settings(app));
+        let context = DictationContext {
+            post_process: cleans_up(self.post_process, &get_settings(app)),
+            flow_eligible: !self.post_process,
+        };
         let flow_cancel_generation = crate::flow::cancellation_generation();
 
         tauri::async_runtime::spawn(async move {
@@ -2381,450 +2386,105 @@ impl ShortcutAction for TranscribeAction {
             );
 
             let stop_recording_time = Instant::now();
-            if let Some(samples) = rm.stop_recording(&binding_id) {
-                debug!(
-                    "Recording stopped and samples retrieved in {:?}, sample count: {}",
-                    stop_recording_time.elapsed(),
-                    samples.len()
-                );
+            let Some(samples) = rm.stop_recording(&binding_id) else {
+                debug!("No samples retrieved from recording stop");
+                finish_idle(&ah);
+                return;
+            };
+            debug!(
+                "Recording stopped and samples retrieved in {:?}, sample count: {}",
+                stop_recording_time.elapsed(),
+                samples.len()
+            );
+            if samples.is_empty() {
+                debug!("Recording produced no audio samples; skipping persistence");
+                finish_idle(&ah);
+                return;
+            }
 
-                if samples.is_empty() {
-                    debug!("Recording produced no audio samples; skipping persistence");
-                    utils::hide_recording_overlay(&ah);
-                    change_tray_icon(&ah, TrayIconState::Idle);
-                } else {
-                    // Save WAV concurrently with transcription
-                    let sample_count = samples.len();
-                    let file_name = next_recording_file_name();
-                    let wav_path = hm.recordings_dir().join(&file_name);
-                    let wav_path_for_verify = wav_path.clone();
-                    let samples_for_wav = samples.clone();
-                    let wav_handle = tauri::async_runtime::spawn_blocking(move || {
-                        crate::audio_toolkit::save_wav_file(&wav_path, &samples_for_wav)
-                    });
+            // Save WAV concurrently with transcription. The copy made for the
+            // file comes back when it is written, so a transcription that fails
+            // can still be offered back on the pill without a second copy of
+            // the audio sitting in memory for every dictation.
+            let sample_count = samples.len();
+            let file_name = next_recording_file_name();
+            let wav_path = hm.recordings_dir().join(&file_name);
+            let wav_path_for_verify = wav_path.clone();
+            let samples_for_wav = samples.clone();
+            let wav_handle = tauri::async_runtime::spawn_blocking(move || {
+                let saved = crate::audio_toolkit::save_wav_file(&wav_path, &samples_for_wav);
+                (saved, samples_for_wav)
+            });
 
-                    // Transcribe concurrently with WAV save.
-                    // Live transcription: finalize the streaming worker for the
-                    // merged result. finalize_stream() is a no-op returning
-                    // Ok(None) when no stream is active (the default), so the
-                    // batch transcribe() path is used exactly as before. It also
-                    // falls back to batch when the stream produced nothing or
-                    // errored/timed out, so the user never loses their words.
-                    let transcription_time = Instant::now();
-                    let transcription_result = match tm.finalize_stream() {
-                        Ok(Some(text)) => Ok(text),
-                        Ok(None) => tm.transcribe(samples),
+            // Transcribe concurrently with WAV save.
+            // Live transcription: finalize the streaming worker for the
+            // merged result. finalize_stream() is a no-op returning
+            // Ok(None) when no stream is active (the default), so the
+            // batch transcribe() path is used exactly as before. It also
+            // falls back to batch when the stream produced nothing or
+            // errored/timed out, so the user never loses their words.
+            let transcription_time = Instant::now();
+            let transcription_result = match tm.finalize_stream() {
+                Ok(Some(text)) => Ok(text),
+                Ok(None) => tm.transcribe(samples),
+                Err(e) => {
+                    warn!(
+                        "Live transcription finalize failed ({}); using batch transcription",
+                        e
+                    );
+                    tm.transcribe(samples)
+                }
+            };
+
+            // Await WAV save and verify
+            let (wav_saved, retained) = match wav_handle.await {
+                Ok((Ok(()), retained)) => {
+                    match crate::audio_toolkit::verify_wav_file(&wav_path_for_verify, sample_count)
+                    {
+                        Ok(()) => (true, Some(retained)),
                         Err(e) => {
-                            warn!(
-                                "Live transcription finalize failed ({}); using batch transcription",
-                                e
-                            );
-                            tm.transcribe(samples)
-                        }
-                    };
-
-                    // Await WAV save and verify
-                    let wav_saved = match wav_handle.await {
-                        Ok(Ok(())) => {
-                            match crate::audio_toolkit::verify_wav_file(
-                                &wav_path_for_verify,
-                                sample_count,
-                            ) {
-                                Ok(()) => true,
-                                Err(e) => {
-                                    error!("WAV verification failed: {}", e);
-                                    false
-                                }
-                            }
-                        }
-                        Ok(Err(e)) => {
-                            error!("Failed to save WAV file: {}", e);
-                            false
-                        }
-                        Err(e) => {
-                            error!("WAV save task panicked: {}", e);
-                            false
-                        }
-                    };
-
-                    match transcription_result {
-                        Ok(transcription) => {
-                            debug!(
-                                "Transcription completed in {:?}: '{}'",
-                                transcription_time.elapsed(),
-                                crate::utils::redact_text(&transcription)
-                            );
-
-                            if crate::flow::is_generation_cancelled(flow_cancel_generation) {
-                                finish_idle(&ah);
-                                return;
-                            }
-                            if crate::audio_toolkit::is_speechless_transcription(&transcription) {
-                                debug!(
-                                    "Recording produced no speech ({transcription:?}); nothing to \
-                                     paste, clean up, or hand to the assistant"
-                                );
-                                finish_idle(&ah);
-                                crate::assistant::take_transcribe_redirect();
-                                if crate::assistant::take_dictate_to_field() {
-                                    let _ = ah.emit("dictation-transcript", "");
-                                }
-                                if wav_saved {
-                                    if let Err(err) = hm.save_entry(
-                                        file_name,
-                                        String::new(),
-                                        post_process,
-                                        None,
-                                        None,
-                                    ) {
-                                        error!("Failed to save silent recording: {}", err);
-                                    }
-                                }
-                                return;
-                            }
-
-                            // Rerouted to the assistant (the overlay's Ask-
-                            // Assistant button): hand the transcript to the
-                            // assistant instead of pasting it anywhere.
-                            if crate::assistant::take_transcribe_redirect() {
-                                utils::hide_recording_overlay(&ah);
-                                change_tray_icon(&ah, TrayIconState::Idle);
-                                // Same rule as the assistant shortcut: this is a
-                                // quick ask, so it starts clean unless the card is
-                                // already in front of the user. Missing it here
-                                // meant "Ask Assistant" on the dictation overlay
-                                // was the one route that still inherited whatever
-                                // the last exchange left behind.
-                                crate::assistant::begin_quick_ask_exchange(&ah);
-                                crate::assistant::show_assistant_voice_overlay(&ah);
-                                crate::assistant::run_voice_turn(ah.clone(), transcription).await;
-                                return;
-                            }
-
-                            // In-app dictation (e.g. the Create-with-AI persona
-                            // description box): deliver the transcript to the
-                            // webview as an event so it lands in the focused
-                            // in-app field reliably, without a synthetic paste
-                            // or touching the OS clipboard.
-                            if crate::assistant::take_dictate_to_field() {
-                                utils::hide_recording_overlay(&ah);
-                                change_tray_icon(&ah, TrayIconState::Idle);
-                                if let Err(e) =
-                                    ah.emit("dictation-transcript", transcription.clone())
-                                {
-                                    error!("Failed to emit dictation-transcript: {}", e);
-                                }
-                                return;
-                            }
-
-                            // Generate with Flow: when enabled, a normal
-                            // dictation that begins with the activation phrase
-                            // becomes a one-shot AI generation command whose
-                            // finished result is pasted instead of the spoken
-                            // words. Only the dictation shortcut participates —
-                            // the separate cleanup shortcut keeps its existing
-                            // behavior — and it does so whether or not cleanup
-                            // runs on it. All-or-nothing: any failure pastes
-                            // nothing and shows a brief overlay notice.
-                            //
-                            // The same slot also carries the AI-cleanup fallback
-                            // notice below. A Flow notice wins: it is only set
-                            // when Flow did not run, and it explains the text.
-                            let mut overlay_notice: Option<&'static str> = None;
-                            if flow_eligible {
-                                let settings = crate::settings::get_settings(&ah);
-                                match crate::flow::plan_flow(&settings, &transcription) {
-                                    crate::flow::FlowPlan::NotFlow => {}
-                                    crate::flow::FlowPlan::Unconfigured => {
-                                        // No assistant model set up: behave as
-                                        // ordinary dictation, then briefly tell
-                                        // the user why nothing was generated.
-                                        debug!("Flow phrase matched but no assistant model is configured; pasting as dictation");
-                                        overlay_notice = Some("flowNotConfigured");
-                                    }
-                                    crate::flow::FlowPlan::EmptyCommand => {
-                                        // Just the phrase, no command. Never
-                                        // paste the phrase itself, but keep its
-                                        // transcript and audio in Flow history.
-                                        if wav_saved {
-                                            if let Err(err) = hm.save_entry(
-                                                file_name,
-                                                transcription,
-                                                false,
-                                                None,
-                                                Some(crate::flow::FLOW_HISTORY_MARKER.to_string()),
-                                            ) {
-                                                error!("Failed to save history entry: {}", err);
-                                            }
-                                        }
-                                        utils::show_overlay_notice(&ah, "flowEmpty");
-                                        change_tray_icon(&ah, TrayIconState::Idle);
-                                        return;
-                                    }
-                                    crate::flow::FlowPlan::Generate { command } => {
-                                        utils::show_generating_overlay(&ah);
-                                        match crate::flow::run_flow_generation(
-                                            &ah,
-                                            &command,
-                                            flow_cancel_generation,
-                                        )
-                                        .await
-                                        {
-                                            Ok(generated) => {
-                                                // Persist the completed Flow turn before the
-                                                // paste boundary. If Escape lands after
-                                                // generation, History still keeps what was
-                                                // said, the audio, and the finished output.
-                                                if wav_saved {
-                                                    if let Err(err) = hm.save_entry(
-                                                        file_name,
-                                                        transcription,
-                                                        false,
-                                                        Some(generated.clone()),
-                                                        Some(
-                                                            crate::flow::FLOW_HISTORY_MARKER
-                                                                .to_string(),
-                                                        ),
-                                                    ) {
-                                                        error!(
-                                                            "Failed to save history entry: {}",
-                                                            err
-                                                        );
-                                                    }
-                                                }
-                                                if crate::flow::is_generation_cancelled(
-                                                    flow_cancel_generation,
-                                                ) {
-                                                    debug!(
-                                                        "Flow generation cancelled before paste"
-                                                    );
-                                                    utils::hide_recording_overlay(&ah);
-                                                    change_tray_icon(&ah, TrayIconState::Idle);
-                                                    return;
-                                                }
-                                                let ah_clone = ah.clone();
-                                                ah.run_on_main_thread(move || {
-                                                    if crate::flow::is_generation_cancelled(
-                                                        flow_cancel_generation,
-                                                    ) {
-                                                        debug!("Flow paste skipped after cancellation");
-                                                        utils::hide_recording_overlay(&ah_clone);
-                                                        change_tray_icon(
-                                                            &ah_clone,
-                                                            TrayIconState::Idle,
-                                                        );
-                                                        return;
-                                                    }
-                                                    match utils::paste_with_behavior(
-                                                        generated,
-                                                        ah_clone.clone(),
-                                                        crate::clipboard::PasteBehavior {
-                                                            allow_trailing_space: false,
-                                                            allow_auto_submit: false,
-                                                        },
-                                                    ) {
-                                                        Ok(()) => {
-                                                            debug!("Flow output pasted successfully")
-                                                        }
-                                                        Err(e) => {
-                                                            error!(
-                                                                "Failed to paste Flow output: {}",
-                                                                e
-                                                            );
-                                                            let _ =
-                                                                ah_clone.emit("paste-error", ());
-                                                        }
-                                                    }
-                                                    utils::hide_recording_overlay(&ah_clone);
-                                                    change_tray_icon(
-                                                        &ah_clone,
-                                                        TrayIconState::Idle,
-                                                    );
-                                                })
-                                                .unwrap_or_else(|e| {
-                                                    error!(
-                                                        "Failed to run Flow paste on main thread: {:?}",
-                                                        e
-                                                    );
-                                                    utils::hide_recording_overlay(&ah);
-                                                    change_tray_icon(&ah, TrayIconState::Idle);
-                                                });
-                                            }
-                                            Err(e) => {
-                                                // Keep every completed Flow recording in
-                                                // History, including failed or cancelled
-                                                // generations. The missing output is shown
-                                                // explicitly in the Flow view.
-                                                if wav_saved {
-                                                    if let Err(err) = hm.save_entry(
-                                                        file_name,
-                                                        transcription,
-                                                        false,
-                                                        None,
-                                                        Some(
-                                                            crate::flow::FLOW_HISTORY_MARKER
-                                                                .to_string(),
-                                                        ),
-                                                    ) {
-                                                        error!(
-                                                            "Failed to save history entry: {}",
-                                                            err
-                                                        );
-                                                    }
-                                                }
-                                                if crate::flow::is_generation_cancelled(
-                                                    flow_cancel_generation,
-                                                ) {
-                                                    debug!("Flow generation cancelled");
-                                                    utils::hide_recording_overlay(&ah);
-                                                    change_tray_icon(&ah, TrayIconState::Idle);
-                                                    return;
-                                                }
-                                                // Paste NOTHING on failure —
-                                                // no partials, no errors, no
-                                                // raw command.
-                                                error!("Flow generation failed: {}", e);
-                                                utils::show_overlay_notice(&ah, "flowFailed");
-                                                change_tray_icon(&ah, TrayIconState::Idle);
-                                            }
-                                        }
-                                        return;
-                                    }
-                                }
-                            }
-
-                            if post_process {
-                                show_processing_overlay(&ah);
-                            }
-                            let processed = tokio::select! {
-                                biased;
-                                _ = crate::flow::wait_for_generation_cancel(flow_cancel_generation) => {
-                                    finish_idle(&ah);
-                                    return;
-                                }
-                                result = process_transcription_output(&ah, &transcription, post_process) => result,
-                            };
-
-                            // A cleanup that fell back used to be completely
-                            // silent: the raw transcript was pasted with no
-                            // signal at all, which is what made "it didn't clean
-                            // up" and "it pasted the raw text" look like two
-                            // different bugs instead of one failure the user was
-                            // never told about. (`post-process-result` is
-                            // emitted, but nothing in the webview listens to it,
-                            // and the settings window is usually hidden anyway.)
-                            // The overlay is still on screen at this point, so
-                            // say it there.
-                            if overlay_notice.is_none() {
-                                overlay_notice =
-                                    cleanup_fallback_notice(processed.post_process_result.as_ref());
-                            }
-
-                            // Save to history if WAV was saved
-                            if wav_saved {
-                                if let Err(err) = hm.save_entry(
-                                    file_name,
-                                    transcription,
-                                    post_process,
-                                    processed.post_processed_text.clone(),
-                                    processed.post_process_prompt.clone(),
-                                ) {
-                                    error!("Failed to save history entry: {}", err);
-                                }
-                            }
-
-                            if processed.final_text.is_empty() {
-                                finish_idle(&ah);
-                            } else {
-                                let ah_clone = ah.clone();
-                                let paste_time = Instant::now();
-                                let final_text = processed.final_text;
-                                ah.run_on_main_thread(move || {
-                                    // A cancel can arrive after cleanup finished
-                                    // but before this main-thread closure runs.
-                                    if crate::flow::is_generation_cancelled(flow_cancel_generation)
-                                    {
-                                        finish_idle(&ah_clone);
-                                        return;
-                                    }
-                                    match utils::paste(final_text.clone(), ah_clone.clone()) {
-                                        Ok(()) => {
-                                            debug!(
-                                                "Text pasted successfully in {:?}",
-                                                paste_time.elapsed()
-                                            );
-                                            // Watch the field for a correction, so a
-                                            // word the user fixes by hand is learned.
-                                            // Only on the success path, and only here:
-                                            // the target still has keyboard focus at
-                                            // this moment, which is what makes the
-                                            // right control findable. A no-op unless
-                                            // the user turned the setting on.
-                                            crate::autolearn::learner::watch_after_paste(
-                                                &ah_clone,
-                                                &final_text,
-                                            );
-                                        }
-                                        Err(e) => {
-                                            error!("Failed to paste transcription: {}", e);
-                                            let _ = ah_clone.emit("paste-error", ());
-                                        }
-                                    }
-                                    // A Flow phrase that couldn't run (no
-                                    // assistant model) pastes as dictation and
-                                    // then briefly explains itself; a cleanup
-                                    // that fell back does the same. Otherwise
-                                    // the overlay just hides.
-                                    utils::finish_recording_overlay(
-                                        &ah_clone,
-                                        &final_text,
-                                        overlay_notice,
-                                    );
-                                    change_tray_icon(&ah_clone, TrayIconState::Idle);
-                                })
-                                .unwrap_or_else(|e| {
-                                    error!("Failed to run paste on main thread: {:?}", e);
-                                    utils::hide_recording_overlay(&ah);
-                                    change_tray_icon(&ah, TrayIconState::Idle);
-                                });
-                            }
-                        }
-                        Err(err) => {
-                            debug!("Global Shortcut Transcription error: {}", err);
-                            // Save entry with empty text so user can retry
-                            if wav_saved {
-                                if let Err(save_err) = hm.save_entry(
-                                    file_name,
-                                    String::new(),
-                                    post_process,
-                                    None,
-                                    None,
-                                ) {
-                                    error!("Failed to save failed history entry: {}", save_err);
-                                }
-                            }
-                            // On the local path a transcription failure means a
-                            // model problem the user can see in Settings. On the
-                            // cloud path it means a key, a quota, or a network —
-                            // none of which is visible anywhere, and all of which
-                            // otherwise present as dictation that silently pastes
-                            // nothing, every single time. Say so.
-                            if crate::stt_cloud::cloud_stt_active(&crate::settings::get_settings(
-                                &ah,
-                            )) {
-                                error!("Cloud transcription failed: {}", err);
-                                utils::show_overlay_notice(&ah, "cloudSttFailed");
-                            } else {
-                                utils::hide_recording_overlay(&ah);
-                            }
-                            change_tray_icon(&ah, TrayIconState::Idle);
+                            error!("WAV verification failed: {}", e);
+                            (false, Some(retained))
                         }
                     }
                 }
-            } else {
-                debug!("No samples retrieved from recording stop");
-                utils::hide_recording_overlay(&ah);
-                change_tray_icon(&ah, TrayIconState::Idle);
+                Ok((Err(e), retained)) => {
+                    error!("Failed to save WAV file: {}", e);
+                    (false, Some(retained))
+                }
+                Err(e) => {
+                    error!("WAV save task panicked: {}", e);
+                    (false, None)
+                }
+            };
+
+            let dictation = Dictation {
+                app: ah.clone(),
+                hm,
+                context,
+                history: HistorySlot::New {
+                    file_name,
+                    wav_saved,
+                },
+                flow_cancel_generation,
+                fresh: true,
+            };
+
+            match transcription_result {
+                Ok(transcription) => {
+                    debug!(
+                        "Transcription completed in {:?}: '{}'",
+                        transcription_time.elapsed(),
+                        crate::utils::redact_text(&transcription)
+                    );
+                    // Nothing below needs the audio again.
+                    drop(retained);
+                    deliver_transcription(dictation, transcription).await;
+                }
+                Err(err) => {
+                    debug!("Global Shortcut Transcription error: {}", err);
+                    transcription_failed(dictation, retained.map(Arc::new), &err);
+                }
             }
         });
 
@@ -2832,6 +2492,667 @@ impl ShortcutAction for TranscribeAction {
             "TranscribeAction::stop completed in {:?}",
             stop_time.elapsed()
         );
+    }
+}
+
+// === Delivering a dictation ==============================================
+//
+// Everything a dictation does once it has a transcript — Flow, AI cleanup,
+// History, the paste — lives here rather than inline in `TranscribeAction::stop`,
+// because a dictation that was dismissed or failed is finished by the same code
+// when the user takes it back (`start_recovery`). Two copies of this path would
+// drift, and the recovered dictation would then paste something different from
+// what the original would have.
+
+/// Where a dictation's History row is.
+enum HistorySlot {
+    /// Not written yet: it is inserted with the outcome, if the WAV was saved.
+    New { file_name: String, wav_saved: bool },
+    /// Already written: a dictation being recovered or retried from the pill.
+    Existing(i64),
+    /// Nothing to write to (its audio could not be saved).
+    Nowhere,
+}
+
+impl HistorySlot {
+    /// Record the outcome, returning the row it is in.
+    fn write(self, hm: &HistoryManager, outcome: EntryOutcome) -> Option<i64> {
+        let result = match self {
+            HistorySlot::New {
+                file_name,
+                wav_saved: true,
+            } => hm.save_entry(
+                file_name,
+                outcome.transcription_text,
+                outcome.post_process_requested,
+                outcome.post_processed_text,
+                outcome.post_process_prompt,
+                outcome.dismissed,
+            ),
+            HistorySlot::Existing(id) => hm.record_outcome(id, outcome),
+            HistorySlot::New {
+                wav_saved: false, ..
+            }
+            | HistorySlot::Nowhere => return None,
+        };
+        match result {
+            Ok(entry) => Some(entry.id),
+            Err(err) => {
+                error!("Failed to save history entry: {}", err);
+                None
+            }
+        }
+    }
+}
+
+/// One dictation between its transcript and its paste.
+struct Dictation {
+    app: AppHandle,
+    hm: Arc<HistoryManager>,
+    context: DictationContext,
+    history: HistorySlot,
+    /// Esc (or the tray's Cancel) bumps the Flow generation; a dictation that
+    /// started at this value has been cancelled once it moves on.
+    flow_cancel_generation: u64,
+    /// A dictation straight off a recording. Only that one consults the
+    /// one-shot routing flags (the overlay's Ask Assistant, in-app dictation):
+    /// they belong to the recording that set them, and a recovery must not
+    /// consume a flag a later recording is relying on.
+    fresh: bool,
+}
+
+impl Dictation {
+    fn cancelled(&self) -> bool {
+        crate::flow::is_generation_cancelled(self.flow_cancel_generation)
+    }
+
+    /// Whether this dictation can be offered back if it is dismissed or fails.
+    /// One headed for the assistant or for a field in the app's own window is
+    /// not: recovering it pastes, which is the wrong destination for both.
+    fn offers_recovery(&self) -> bool {
+        !self.fresh
+            || !(crate::assistant::is_transcribe_redirected()
+                || crate::assistant::is_dictate_to_field())
+    }
+
+    /// The dictation was cancelled with `remaining` still to do. Its row is
+    /// kept, marked dismissed, and the pill offers it back.
+    fn dismiss(self, remaining: Remaining, outcome: EntryOutcome) {
+        let row = self.history.write(&self.hm, outcome);
+        change_tray_icon(&self.app, TrayIconState::Idle);
+        let offer = Offer {
+            kind: OfferKind::Dismissed,
+            notice: None,
+            remaining,
+            context: self.context,
+            row: RowHandle::ready(row),
+        };
+        if !crate::dictation_recovery::present(&self.app, offer) {
+            utils::hide_recording_overlay(&self.app);
+        }
+    }
+
+    /// Cancelled with only the transcript in hand.
+    fn dismiss_transcript(self, transcription: String) {
+        if !self.offers_recovery() {
+            finish_idle(&self.app);
+            return;
+        }
+        debug!("Dictation dismissed after transcription; keeping it for recovery");
+        let outcome = EntryOutcome {
+            transcription_text: transcription.clone(),
+            post_process_requested: self.context.post_process,
+            dismissed: true,
+            ..EntryOutcome::default()
+        };
+        self.dismiss(Remaining::Deliver(transcription), outcome);
+    }
+}
+
+/// A Flow row: what was said, and what Flow wrote from it (if anything).
+fn flow_outcome(transcription: String, generated: Option<String>, dismissed: bool) -> EntryOutcome {
+    EntryOutcome {
+        transcription_text: transcription,
+        post_processed_text: generated,
+        post_process_prompt: Some(crate::flow::FLOW_HISTORY_MARKER.to_string()),
+        post_process_requested: false,
+        dismissed,
+    }
+}
+
+/// Finish a dictation that has its transcript: Flow or cleanup, History, paste.
+async fn deliver_transcription(d: Dictation, transcription: String) {
+    let ah = d.app.clone();
+    let post_process = d.context.post_process;
+
+    if d.cancelled() {
+        d.dismiss_transcript(transcription);
+        return;
+    }
+    if crate::audio_toolkit::is_speechless_transcription(&transcription) {
+        debug!(
+            "Recording produced no speech ({transcription:?}); nothing to paste, clean up, or \
+             hand to the assistant"
+        );
+        finish_idle(&ah);
+        if d.fresh {
+            crate::assistant::take_transcribe_redirect();
+            if crate::assistant::take_dictate_to_field() {
+                let _ = ah.emit("dictation-transcript", "");
+            }
+        }
+        d.history.write(
+            &d.hm,
+            EntryOutcome {
+                post_process_requested: post_process,
+                ..EntryOutcome::default()
+            },
+        );
+        return;
+    }
+
+    // Rerouted to the assistant (the overlay's Ask-Assistant button): hand the
+    // transcript to the assistant instead of pasting it anywhere.
+    if d.fresh && crate::assistant::take_transcribe_redirect() {
+        utils::hide_recording_overlay(&ah);
+        change_tray_icon(&ah, TrayIconState::Idle);
+        // Same rule as the assistant shortcut: this is a quick ask, so it
+        // starts clean unless the card is already in front of the user. Missing
+        // it here meant "Ask Assistant" on the dictation overlay was the one
+        // route that still inherited whatever the last exchange left behind.
+        crate::assistant::begin_quick_ask_exchange(&ah);
+        crate::assistant::show_assistant_voice_overlay(&ah);
+        crate::assistant::run_voice_turn(ah.clone(), transcription).await;
+        return;
+    }
+
+    // In-app dictation (e.g. the Create-with-AI persona description box):
+    // deliver the transcript to the webview as an event so it lands in the
+    // focused in-app field reliably, without a synthetic paste or touching the
+    // OS clipboard.
+    if d.fresh && crate::assistant::take_dictate_to_field() {
+        utils::hide_recording_overlay(&ah);
+        change_tray_icon(&ah, TrayIconState::Idle);
+        if let Err(e) = ah.emit("dictation-transcript", transcription.clone()) {
+            error!("Failed to emit dictation-transcript: {}", e);
+        }
+        return;
+    }
+
+    // Generate with Flow: when enabled, a normal dictation that begins with the
+    // activation phrase becomes a one-shot AI generation command whose finished
+    // result is pasted instead of the spoken words. Only the dictation shortcut
+    // participates — the separate cleanup shortcut keeps its existing behavior —
+    // and it does so whether or not cleanup runs on it. All-or-nothing: any
+    // failure pastes nothing and says so on the overlay.
+    //
+    // The same slot also carries the AI-cleanup fallback notice below. A Flow
+    // notice wins: it is only set when Flow did not run, and it explains the
+    // text.
+    let mut overlay_notice: Option<&'static str> = None;
+    if d.context.flow_eligible {
+        let settings = crate::settings::get_settings(&ah);
+        match crate::flow::plan_flow(&settings, &transcription) {
+            crate::flow::FlowPlan::NotFlow => {}
+            crate::flow::FlowPlan::Unconfigured => {
+                // No assistant model set up: behave as ordinary dictation, then
+                // briefly tell the user why nothing was generated.
+                debug!("Flow phrase matched but no assistant model is configured; pasting as dictation");
+                overlay_notice = Some("flowNotConfigured");
+            }
+            crate::flow::FlowPlan::EmptyCommand => {
+                // Just the phrase, no command. Never paste the phrase itself,
+                // but keep its transcript and audio in Flow history.
+                d.history
+                    .write(&d.hm, flow_outcome(transcription, None, false));
+                utils::show_overlay_notice(&ah, "flowEmpty");
+                change_tray_icon(&ah, TrayIconState::Idle);
+                return;
+            }
+            crate::flow::FlowPlan::Generate { command } => {
+                run_flow(d, transcription, command).await;
+                return;
+            }
+        }
+    }
+
+    if post_process {
+        show_processing_overlay(&ah);
+    }
+    let processed = tokio::select! {
+        biased;
+        _ = crate::flow::wait_for_generation_cancel(d.flow_cancel_generation) => {
+            d.dismiss_transcript(transcription);
+            return;
+        }
+        result = process_transcription_output(&ah, &transcription, post_process) => result,
+    };
+
+    // A cleanup that fell back used to be completely silent: the raw transcript
+    // was pasted with no signal at all, which is what made "it didn't clean up"
+    // and "it pasted the raw text" look like two different bugs instead of one
+    // failure the user was never told about. (`post-process-result` is emitted,
+    // but nothing in the webview listens to it, and the settings window is
+    // usually hidden anyway.) The overlay is still on screen at this point, so
+    // say it there.
+    if overlay_notice.is_none() {
+        overlay_notice = cleanup_fallback_notice(processed.post_process_result.as_ref());
+    }
+
+    let row = d.history.write(
+        &d.hm,
+        EntryOutcome {
+            transcription_text: transcription,
+            post_processed_text: processed.post_processed_text,
+            post_process_prompt: processed.post_process_prompt,
+            post_process_requested: post_process,
+            dismissed: false,
+        },
+    );
+
+    if processed.final_text.is_empty() {
+        finish_idle(&ah);
+        return;
+    }
+    paste_final(
+        ah,
+        d.hm,
+        row,
+        d.context,
+        d.flow_cancel_generation,
+        PendingPaste {
+            text: processed.final_text,
+            notice: overlay_notice,
+            flow: false,
+        },
+    );
+}
+
+/// Run a Flow command and paste what it writes.
+async fn run_flow(d: Dictation, transcription: String, command: String) {
+    let ah = d.app.clone();
+    utils::show_generating_overlay(&ah);
+    match crate::flow::run_flow_generation(&ah, &command, d.flow_cancel_generation).await {
+        Ok(generated) => {
+            // Persist the completed Flow turn before the paste boundary. If
+            // Escape lands after generation, History still keeps what was said,
+            // the audio, and the finished output.
+            let row = d.history.write(
+                &d.hm,
+                flow_outcome(transcription, Some(generated.clone()), false),
+            );
+            let pending = PendingPaste {
+                text: generated,
+                notice: None,
+                flow: true,
+            };
+            if crate::flow::is_generation_cancelled(d.flow_cancel_generation) {
+                debug!("Flow generation cancelled before paste");
+                dismiss_pending_paste(&ah, &d.hm, row, d.context, pending);
+                return;
+            }
+            paste_final(ah, d.hm, row, d.context, d.flow_cancel_generation, pending);
+        }
+        Err(e) => {
+            if d.cancelled() {
+                // Keep every completed Flow recording in History, including
+                // cancelled generations; this one can run again from the pill.
+                debug!("Flow generation cancelled");
+                let outcome = flow_outcome(transcription.clone(), None, true);
+                d.dismiss(Remaining::Deliver(transcription), outcome);
+                return;
+            }
+            // Paste NOTHING on failure — no partials, no errors, no raw
+            // command. The missing output is shown explicitly in History's Flow
+            // view, and the pill offers to run it again.
+            error!("Flow generation failed: {}", e);
+            let row = d
+                .history
+                .write(&d.hm, flow_outcome(transcription.clone(), None, false));
+            change_tray_icon(&ah, TrayIconState::Idle);
+            let offer = Offer {
+                kind: OfferKind::Failed,
+                notice: Some("flowFailed"),
+                remaining: Remaining::Deliver(transcription),
+                context: d.context,
+                row: RowHandle::ready(row),
+            };
+            if !crate::dictation_recovery::present(&ah, offer) {
+                utils::show_overlay_notice(&ah, "flowFailed");
+            }
+        }
+    }
+}
+
+/// Paste finished text into the window the dictation was aimed at.
+fn paste_final(
+    app: AppHandle,
+    hm: Arc<HistoryManager>,
+    row: Option<i64>,
+    context: DictationContext,
+    flow_cancel_generation: u64,
+    pending: PendingPaste,
+) {
+    let ah = app.clone();
+    let paste_time = Instant::now();
+    app.run_on_main_thread(move || {
+        // A cancel can arrive after the text was ready but before this
+        // main-thread closure runs.
+        if crate::flow::is_generation_cancelled(flow_cancel_generation) {
+            dismiss_pending_paste(&ah, &hm, row, context, pending);
+            return;
+        }
+        let PendingPaste { text, notice, flow } = pending;
+        let result = if flow {
+            utils::paste_with_behavior(
+                text.clone(),
+                ah.clone(),
+                crate::clipboard::PasteBehavior {
+                    allow_trailing_space: false,
+                    allow_auto_submit: false,
+                },
+            )
+        } else {
+            utils::paste(text.clone(), ah.clone())
+        };
+        match result {
+            Ok(()) => {
+                debug!("Text pasted successfully in {:?}", paste_time.elapsed());
+                // Watch the field for a correction, so a word the user fixes by
+                // hand is learned. Only on the success path, and only here: the
+                // target still has keyboard focus at this moment, which is what
+                // makes the right control findable. A no-op unless the user
+                // turned the setting on. Flow output is not the user's words.
+                if !flow {
+                    crate::autolearn::learner::watch_after_paste(&ah, &text);
+                }
+            }
+            Err(e) => {
+                error!("Failed to paste transcription: {}", e);
+                let _ = ah.emit("paste-error", ());
+            }
+        }
+        if flow {
+            utils::hide_recording_overlay(&ah);
+        } else {
+            // A Flow phrase that couldn't run (no assistant model) pastes as
+            // dictation and then briefly explains itself; a cleanup that fell
+            // back does the same. Otherwise the overlay just hides.
+            utils::finish_recording_overlay(&ah, &text, notice);
+        }
+        change_tray_icon(&ah, TrayIconState::Idle);
+    })
+    .unwrap_or_else(|e| {
+        error!("Failed to run paste on main thread: {:?}", e);
+        finish_idle(&app);
+    });
+}
+
+/// Cancelled with the text finished and only the paste left. The row already
+/// says what was produced; it is marked dismissed (off the main thread, which
+/// is where this usually runs) and the pill offers the paste back.
+fn dismiss_pending_paste(
+    app: &AppHandle,
+    hm: &Arc<HistoryManager>,
+    row: Option<i64>,
+    context: DictationContext,
+    pending: PendingPaste,
+) {
+    debug!("Dictation dismissed before its paste; keeping it for recovery");
+    let row = match row {
+        Some(id) => {
+            let (sender, handle) = RowHandle::pending();
+            let hm = Arc::clone(hm);
+            tauri::async_runtime::spawn_blocking(move || match hm.set_dismissed(id, true) {
+                Ok(entry) => sender.send(Some(entry.id)),
+                Err(err) => {
+                    error!("Failed to mark the dictation dismissed: {}", err);
+                    sender.send(Some(id));
+                }
+            });
+            handle
+        }
+        None => RowHandle::ready(None),
+    };
+    change_tray_icon(app, TrayIconState::Idle);
+    let offer = Offer {
+        kind: OfferKind::Dismissed,
+        notice: None,
+        remaining: Remaining::Paste(pending),
+        context,
+        row,
+    };
+    if !crate::dictation_recovery::present(app, offer) {
+        utils::hide_recording_overlay(app);
+    }
+}
+
+/// Transcription failed. The row keeps the audio (History can retry it), and
+/// the pill offers to try again right away.
+fn transcription_failed(d: Dictation, samples: Option<Arc<Vec<f32>>>, err: &anyhow::Error) {
+    let offers_recovery = d.offers_recovery();
+    let row = d.history.write(
+        &d.hm,
+        EntryOutcome {
+            post_process_requested: d.context.post_process,
+            ..EntryOutcome::default()
+        },
+    );
+    // On the local path a transcription failure means a model problem the user
+    // can see in Settings. On the cloud path it means a key, a quota, or a
+    // network — none of which is visible anywhere, and all of which otherwise
+    // present as dictation that silently pastes nothing, every single time. Say
+    // so.
+    let cloud = crate::stt_cloud::cloud_stt_active(&crate::settings::get_settings(&d.app));
+    if cloud {
+        error!("Cloud transcription failed: {}", err);
+    }
+    let notice = cloud.then_some("cloudSttFailed");
+    change_tray_icon(&d.app, TrayIconState::Idle);
+
+    if let (true, Some(samples)) = (offers_recovery, samples) {
+        let offer = Offer {
+            kind: OfferKind::Failed,
+            notice,
+            remaining: Remaining::Transcribe(samples),
+            context: d.context,
+            row: RowHandle::ready(row),
+        };
+        if crate::dictation_recovery::present(&d.app, offer) {
+            return;
+        }
+    }
+    match notice {
+        Some(notice) => utils::show_overlay_notice(&d.app, notice),
+        None => utils::hide_recording_overlay(&d.app),
+    }
+}
+
+// === Recovering a dictation ==============================================
+
+/// How long a recovery waits for a dismissed dictation's row to finish being
+/// written. The write is a WAV and one insert, so this is only reached if the
+/// disk is stuck; the dictation is then finished without writing History.
+const RECOVERY_ROW_WAIT: Duration = Duration::from_secs(3);
+
+/// A dictation cancelled while it was still recording.
+///
+/// The audio used to be thrown away here. It is now kept, both as a History
+/// row marked dismissed and as an offer on the pill, so an Esc pressed by
+/// mistake costs nothing. Returns whether the pill is showing the offer; when
+/// it is not, the caller hides the overlay as before.
+///
+/// Only dictation is kept. The assistant has its own surface, an in-app field
+/// cancels its own recordings as part of ordinary use, and a stray hotkey
+/// press is not worth an Undo (see `dictation_recovery::worth_keeping`).
+pub fn keep_cancelled_recording(app: &AppHandle, recording: CancelledRecording) -> bool {
+    let cleanup_binding = match recording.binding_id.as_str() {
+        "transcribe" => false,
+        "transcribe_with_post_process" => true,
+        _ => return false,
+    };
+    if crate::assistant::is_transcribe_redirected() || crate::assistant::is_dictate_to_field() {
+        return false;
+    }
+    if !crate::dictation_recovery::worth_keeping(recording.samples.len()) {
+        debug!(
+            "Cancelled recording held {} samples of speech; not keeping it",
+            recording.samples.len()
+        );
+        return false;
+    }
+
+    let context = DictationContext {
+        post_process: cleans_up(cleanup_binding, &get_settings(app)),
+        flow_eligible: !cleanup_binding,
+    };
+    let samples = Arc::new(crate::managers::audio::pad_short_recording(
+        recording.samples,
+    ));
+    debug!(
+        "Keeping a cancelled dictation ({:.1}s) for recovery",
+        samples.len() as f64 / 16_000.0
+    );
+
+    // The file and the row are written off this thread (this runs on the
+    // shortcut or tray thread, and on the main thread from a command); the
+    // offer learns its row when they are done.
+    let (row_sender, row) = RowHandle::pending();
+    let hm = Arc::clone(&app.state::<Arc<HistoryManager>>());
+    let for_file = Arc::clone(&samples);
+    let post_process = context.post_process;
+    tauri::async_runtime::spawn_blocking(move || {
+        let file_name = next_recording_file_name();
+        let path = hm.recordings_dir().join(&file_name);
+        let written = crate::audio_toolkit::save_wav_file(&path, &for_file)
+            .and_then(|()| crate::audio_toolkit::verify_wav_file(&path, for_file.len()));
+        let id = match written {
+            Ok(()) => hm
+                .save_entry(file_name, String::new(), post_process, None, None, true)
+                .map(|entry| entry.id)
+                .map_err(|err| error!("Failed to keep the dismissed dictation: {}", err))
+                .ok(),
+            Err(err) => {
+                error!("Failed to save the dismissed dictation's audio: {}", err);
+                None
+            }
+        };
+        row_sender.send(id);
+    });
+
+    crate::dictation_recovery::present(
+        app,
+        Offer {
+            kind: OfferKind::Dismissed,
+            notice: None,
+            remaining: Remaining::Transcribe(samples),
+            context,
+            row,
+        },
+    )
+}
+
+/// Finish a dictation the pill offered back, from where it stopped.
+///
+/// It holds the coordinator's pipeline stage for its whole run, exactly as a
+/// recording's own pipeline does, so a hotkey pressed meanwhile is "busy"
+/// rather than a second dictation racing this one for the overlay and the
+/// paste.
+pub fn start_recovery(app: &AppHandle, offer: Offer) {
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        let audio = offer.remaining.audio();
+        let claim_app = app.clone();
+        let claimed = tauri::async_runtime::spawn_blocking(move || {
+            claim_app
+                .try_state::<TranscriptionCoordinator>()
+                .is_some_and(|coordinator| coordinator.claim_processing(audio))
+        })
+        .await
+        .unwrap_or(false);
+        if !claimed {
+            warn!("Another dictation is in progress; the dismissed one stays in History");
+            finish_idle(&app);
+            return;
+        }
+        let _guard = FinishGuard(app.clone());
+        run_recovery(app, offer).await;
+    });
+}
+
+async fn run_recovery(app: AppHandle, offer: Offer) {
+    let hm = Arc::clone(&app.state::<Arc<HistoryManager>>());
+    // Esc works during a recovered dictation exactly as during any other: the
+    // pipeline's `FinishGuard` unregisters it again.
+    shortcut::register_cancel_shortcut(&app);
+    let flow_cancel_generation = crate::flow::cancellation_generation();
+    let Offer {
+        remaining,
+        context,
+        row,
+        ..
+    } = offer;
+
+    // The pill turns into the working state at once, so the click is seen to
+    // have done something even while the row is still being written.
+    change_tray_icon(&app, TrayIconState::Transcribing);
+    match &remaining {
+        Remaining::Transcribe(_) => show_transcribing_overlay(&app),
+        Remaining::Deliver(_) if context.post_process => show_processing_overlay(&app),
+        Remaining::Deliver(_) => show_transcribing_overlay(&app),
+        Remaining::Paste(_) => {}
+    }
+
+    let row = row.resolve(RECOVERY_ROW_WAIT).await;
+    let history = match row {
+        Some(id) => HistorySlot::Existing(id),
+        None => HistorySlot::Nowhere,
+    };
+    let dictation = Dictation {
+        app: app.clone(),
+        hm: Arc::clone(&hm),
+        context,
+        history,
+        flow_cancel_generation,
+        fresh: false,
+    };
+
+    match remaining {
+        Remaining::Transcribe(samples) => {
+            let tm = Arc::clone(&app.state::<Arc<TranscriptionManager>>());
+            if !crate::stt_cloud::cloud_stt_active(&get_settings(&app)) {
+                // A cancel may have unloaded the model (immediate unload).
+                tm.initiate_model_load();
+            }
+            let audio = Arc::clone(&samples);
+            let result =
+                tauri::async_runtime::spawn_blocking(move || tm.transcribe(audio.to_vec()))
+                    .await
+                    .unwrap_or_else(|e| Err(anyhow::anyhow!("Transcription task panicked: {e}")));
+            match result {
+                Ok(transcription) => {
+                    debug!(
+                        "Recovered dictation transcribed: '{}'",
+                        crate::utils::redact_text(&transcription)
+                    );
+                    drop(samples);
+                    deliver_transcription(dictation, transcription).await;
+                }
+                Err(err) => {
+                    debug!("Recovered dictation failed to transcribe: {}", err);
+                    transcription_failed(dictation, Some(samples), &err);
+                }
+            }
+        }
+        Remaining::Deliver(transcription) => deliver_transcription(dictation, transcription).await,
+        Remaining::Paste(pending) => {
+            if let Some(id) = row {
+                if let Err(err) = hm.set_dismissed(id, false) {
+                    error!("Failed to restore the dismissed dictation: {}", err);
+                }
+            }
+            paste_final(app, hm, row, context, flow_cancel_generation, pending);
+        }
     }
 }
 

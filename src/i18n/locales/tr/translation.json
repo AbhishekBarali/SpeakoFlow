@@ -1514,7 +1514,13 @@
     "locked": "Eller serbest kaydediliyor — durdurmak için kısayola tekrar basın",
     "cancel": "İptal",
     "done": "Bitti",
-    "askAssistant": "Bunu yazmak yerine asistana sor"
+    "askAssistant": "Bunu yazmak yerine asistana sor",
+    "recovery": {
+      "dismissed": "İptal edildi",
+      "failed": "Yazıya dökme başarısız",
+      "undo": "Geri al",
+      "retry": "Tekrar dene"
+    }
   },
   "assistant": {
     "title": "Asistan",

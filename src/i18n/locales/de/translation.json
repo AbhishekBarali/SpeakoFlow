@@ -1514,7 +1514,13 @@
     "locked": "Freihändige Aufnahme — drücke das Tastenkürzel erneut zum Stoppen",
     "cancel": "Abbrechen",
     "done": "Fertig",
-    "askAssistant": "Den Assistenten fragen, statt das zu tippen"
+    "askAssistant": "Den Assistenten fragen, statt das zu tippen",
+    "recovery": {
+      "dismissed": "Verworfen",
+      "failed": "Transkription fehlgeschlagen",
+      "undo": "Rückgängig",
+      "retry": "Erneut versuchen"
+    }
   },
   "assistant": {
     "title": "Assistent",
