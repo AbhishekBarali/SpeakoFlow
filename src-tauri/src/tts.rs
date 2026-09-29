@@ -23,7 +23,7 @@
 //! (kokoro-js, WebGPU) and never reaches this module — unless
 //! [`crate::native_tts::route`] sends it to the processor, in which case it is
 //! synthesized by `native_tts.rs` and played here exactly like a remote engine.
-//! "kitten" always takes that native path.
+//! "kitten", "pocket" and "supertonic" always take that native path.
 
 use crate::settings::{AppSettings, OPENROUTER_TTS_BASE_URL};
 use log::{debug, error};
@@ -47,7 +47,8 @@ pub(crate) enum TtsProtocol {
     /// Kokoro. Synthesized inside the assistant webview, or by `native_tts.rs`
     /// on the processor when [`crate::native_tts::route`] says so.
     Local,
-    /// A voice that only runs natively (`native_tts.rs`, sherpa-onnx): Kitten.
+    /// A voice that only runs natively (`native_tts.rs`, sherpa-onnx): Kitten,
+    /// Pocket TTS and Supertonic.
     Native,
     /// `POST {base}/audio/speech` with `{model, input, voice, response_format, speed}`.
     OpenAiCompatible,
@@ -141,6 +142,35 @@ pub(crate) const TTS_PROVIDERS: &[TtsProvider] = &[
         requires_key: false,
         max_chars: crate::native_tts::MAX_CHARS,
         speed_range: Some((0.25, 4.0)),
+        response_format: "",
+        auth: TtsAuth::Bearer,
+    },
+    TtsProvider {
+        id: "pocket",
+        label: "Pocket TTS",
+        protocol: TtsProtocol::Native,
+        base_url: None,
+        default_model: "",
+        default_voice: crate::native_tts::DEFAULT_POCKET_VOICE,
+        models: &[],
+        requires_key: false,
+        max_chars: crate::native_tts::MAX_CHARS,
+        // Pocket clones the pace of its reference clip and has no speed input.
+        speed_range: None,
+        response_format: "",
+        auth: TtsAuth::Bearer,
+    },
+    TtsProvider {
+        id: "supertonic",
+        label: "Supertonic",
+        protocol: TtsProtocol::Native,
+        base_url: None,
+        default_model: "",
+        default_voice: crate::native_tts::DEFAULT_SUPERTONIC_VOICE,
+        models: &[],
+        requires_key: false,
+        max_chars: crate::native_tts::MAX_CHARS,
+        speed_range: Some((0.5, 2.0)),
         response_format: "",
         auth: TtsAuth::Bearer,
     },
@@ -1913,9 +1943,9 @@ pub async fn list_tts_voices(settings: &AppSettings) -> Result<Vec<TtsVoice>, St
     let provider = active_provider(settings)?;
     match provider.protocol {
         TtsProtocol::Local => Err("Kokoro's voices are built in".to_string()),
-        TtsProtocol::Native => Ok(crate::native_tts::KITTEN_VOICES
-            .iter()
-            .map(|(name, _)| TtsVoice {
+        TtsProtocol::Native => Ok(crate::native_tts::voice_names(provider.id)
+            .into_iter()
+            .map(|name| TtsVoice {
                 id: name.to_string(),
                 label: name.to_string(),
             })

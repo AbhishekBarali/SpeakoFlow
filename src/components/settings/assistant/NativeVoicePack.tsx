@@ -3,14 +3,115 @@ import { useTranslation } from "react-i18next";
 import { Check, Download, Loader2, X } from "lucide-react";
 import { useModelStore } from "@/stores/modelStore";
 import { SettingContainer } from "@/components/ui/SettingContainer";
+import { Dropdown } from "@/components/ui/Dropdown";
 import { Button } from "@/components/ui/Button";
+import {
+  KITTEN_SIZES,
+  effectiveNativeVoice,
+  kittenSizeFor,
+  nativePackId,
+  nativeVoices,
+  type NativeEngine,
+} from "@/lib/nativeVoices";
+
+/**
+ * Everything a native-only engine needs below the engine grid: for Kitten, which
+ * size; then its download, and which voice. The size is the engine's model
+ * setting, so each engine keeps its own like every other engine does.
+ */
+export const NativeEngineRows: React.FC<{
+  engine: NativeEngine;
+  /** The engine's model setting (Kitten's size, as a catalog id). */
+  model: string;
+  voice: string;
+  unsupported: boolean;
+  disabled: boolean;
+  onModel: (model: string) => void;
+  onVoice: (voice: string) => void;
+}> = ({ engine, model, voice, unsupported, disabled, onModel, onVoice }) => {
+  const { t } = useTranslation();
+  const models = useModelStore((state) => state.models);
+  const packId = nativePackId(engine, model)!;
+  const sizeOf = (id: string) =>
+    t("settings.assistant.tts.packSize", {
+      size: models.find((m) => m.id === id)?.size_mb ?? "…",
+    });
+  const voiceOptions = nativeVoices(engine).map((entry) => ({
+    value: entry.id,
+    label:
+      entry.numbered !== undefined
+        ? t(
+            entry.female
+              ? "settings.assistant.tts.voiceNumberedFemale"
+              : "settings.assistant.tts.voiceNumberedMale",
+            { n: entry.numbered },
+          )
+        : t(
+            entry.female
+              ? "settings.assistant.tts.voiceNamedFemale"
+              : "settings.assistant.tts.voiceNamedMale",
+            { name: entry.id },
+          ),
+  }));
+
+  return (
+    <>
+      {engine === "kitten" && (
+        <SettingContainer
+          title={t("settings.assistant.tts.kittenSizeLabel")}
+          info={t("settings.assistant.tts.kittenSizeDescription")}
+          layout="horizontal"
+          grouped={true}
+        >
+          <Dropdown
+            options={KITTEN_SIZES.map(({ size, modelId }) => ({
+              value: modelId,
+              label: t(`settings.assistant.tts.kittenSizes.${size}`, {
+                size: sizeOf(modelId),
+              }),
+            }))}
+            selectedValue={
+              KITTEN_SIZES.find((entry) => entry.size === kittenSizeFor(model))!
+                .modelId
+            }
+            onSelect={onModel}
+            disabled={disabled}
+            className="min-w-[340px]"
+          />
+        </SettingContainer>
+      )}
+      <NativeVoicePackRow
+        modelId={packId}
+        title={t(`settings.assistant.tts.packLabel.${engine}`)}
+        description={(size) =>
+          t(`settings.assistant.tts.packDescription.${engine}`, { size })
+        }
+        unsupported={unsupported}
+        disabled={disabled}
+      />
+      <SettingContainer
+        title={t("settings.assistant.tts.voiceLabel")}
+        layout="horizontal"
+        grouped={true}
+      >
+        <Dropdown
+          options={voiceOptions}
+          selectedValue={effectiveNativeVoice(engine, voice)}
+          onSelect={onVoice}
+          disabled={disabled}
+          className="min-w-[340px]"
+        />
+      </SettingContainer>
+    </>
+  );
+};
 
 /**
  * One downloadable native voice (`native_tts.rs`): Kokoro for the processor,
- * or Kitten. It is an ordinary catalog download to the model manager, so the
- * progress, cancel and remove flows are the same ones every model uses; the
- * shared engine library comes down with the first pack and goes when the last
- * pack is removed.
+ * a Kitten size, Pocket TTS or Supertonic. It is an ordinary catalog download
+ * to the model manager, so the progress, cancel and remove flows are the same
+ * ones every model uses; the shared engine library comes down with the first
+ * pack and goes when the last pack is removed.
  */
 export const NativeVoicePackRow: React.FC<{
   modelId: string;

@@ -12,7 +12,7 @@ import type { AppSettings } from "@/bindings";
  */
 export interface TtsEngineSpec {
   id: string;
-  /** Synthesizes on this computer (Kokoro). */
+  /** Synthesizes on this computer (Kokoro, and the native voices). */
   local?: boolean;
   /** An address the user supplies. Hosted engines have a fixed one. */
   url?: { required: boolean; example: string };
@@ -38,12 +38,30 @@ export const TTS_ENGINES: readonly TtsEngineSpec[] = [
   },
   {
     // The small voice: runs on the processor through the native engine
-    // (native_tts.rs), a 64 MB download.
+    // (native_tts.rs), in three sizes (nano, micro, mini).
     id: "kitten",
     local: true,
     key: "none",
     voice: { required: false, example: "Bella" },
     speed: [0.25, 4],
+  },
+  {
+    // Kyutai's Pocket TTS, native. Each voice is cloned from a short
+    // recording, and the model follows that recording's pace, so it has no
+    // speed control.
+    id: "pocket",
+    local: true,
+    key: "none",
+    voice: { required: false, example: "Mary" },
+    speed: null,
+  },
+  {
+    // Supertone's Supertonic 3, native.
+    id: "supertonic",
+    local: true,
+    key: "none",
+    voice: { required: false, example: "F1" },
+    speed: [0.5, 2],
   },
   {
     id: "openai",

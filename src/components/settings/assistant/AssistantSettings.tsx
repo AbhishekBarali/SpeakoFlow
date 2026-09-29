@@ -35,6 +35,7 @@ import {
   Slider,
   ToggleSwitch,
 } from "@/components/ui";
+import { InfoTip } from "@/components/ui/InfoTip";
 import { Input } from "../../ui/Input";
 import { ModelCombo } from "../../ui/ModelCombo";
 import { LogoChoice } from "../../ui/LogoChoice";
@@ -50,19 +51,20 @@ import { useSettings } from "../../../hooks/useSettings";
 import { useKokoroTts } from "../../../assistant/useKokoroTts";
 import { localTtsActive } from "../../../assistant/localTts";
 import {
-  KITTEN_MODEL_ID,
   KOKORO_NATIVE_MODEL_ID,
   parseKokoroDevice,
   useLocalVoiceStatus,
 } from "../../../assistant/localVoice";
-import { NativeVoicePackRow } from "./NativeVoicePack";
+import { NativeEngineRows, NativeVoicePackRow } from "./NativeVoicePack";
 import { useModelStore } from "@/stores/modelStore";
 import {
   TTS_ENGINES,
   hostOf,
   ttsEngineSpec,
   ttsNeedsSetup,
+  ttsValues,
 } from "@/lib/ttsEngines";
+import { isNativeEngine, nativePackId } from "@/lib/nativeVoices";
 import { FONT_SIZES } from "../../../assistant/appearance";
 import QuickAsk from "../../../assistant/QuickAsk";
 import {
@@ -82,18 +84,6 @@ const KOKORO_DTYPES = [
   { value: "q4", label: "q4 (4-bit, fastest)" },
   { value: "q4f16", label: "q4f16 (4-bit mixed)" },
 ];
-
-/** Kitten's eight speakers (`native_tts::KITTEN_VOICES`). */
-const KITTEN_VOICES = [
-  "Bella",
-  "Luna",
-  "Rosie",
-  "Kiki",
-  "Jasper",
-  "Bruno",
-  "Hugo",
-  "Leo",
-].map((name) => ({ value: name, label: name }));
 
 const KOKORO_VOICES = [
   { value: "af_heart", label: "Heart (US female)" },
@@ -533,18 +523,22 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
   const localVoiceShown =
     assistantEnabled &&
     ttsEnabled &&
-    (ttsEngine === "kokoro" || ttsEngine === "kitten");
+    (ttsEngine === "kokoro" || isNativeEngine(ttsEngine));
   const localVoice = useLocalVoiceStatus({
     enabled: localVoiceShown,
     probe: localVoiceShown && ttsEngine === "kokoro" && kokoroDevice === "auto",
   });
   const kokoroOnProcessor =
     ttsEngine === "kokoro" && localVoice?.route === "native";
-  const kittenDownloaded = useModelStore(
-    (state) =>
-      state.models.find((m) => m.id === KITTEN_MODEL_ID)?.is_downloaded ??
-      false,
-  );
+  const storeModels = useModelStore((state) => state.models);
+  /** Whether a native engine's pack (for Kitten, the size it is set to) is on
+   *  disk, which is all that engine needs to speak. */
+  const nativeEngineReady = (engine: string): boolean => {
+    const packId = nativePackId(engine, ttsValues(settings, engine).model);
+    return (
+      !!packId && !!storeModels.find((m) => m.id === packId)?.is_downloaded
+    );
+  };
   // The processor voice is a 350 MB download, so it is offered only where it
   // helps: Kokoro set to the processor, a graphics card that can't run it, or a
   // pack already on disk (or on its way) that may need removing.
@@ -635,7 +629,10 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
     ? ttsDtype.slice(0, -"-cpu".length)
     : ttsDtype;
   const kokoroReadyKey = `speakoflow.kokoro.ready.${ttsDtypeBase}`;
-  const [kokoroPrepared, setKokoroPrepared] = useState(false);
+  /** Whether Kokoro's weights are already on this device; `null` until the
+   *  cache has been checked, so the row doesn't flash a Download button for
+   *  the few milliseconds the check takes. */
+  const [kokoroPrepared, setKokoroPrepared] = useState<boolean | null>(null);
 
   // Reflect the ACTUAL browser cache, not just a local flag. kokoro-js
   // (transformers.js) caches model weights in the "transformers-cache" Cache
@@ -658,7 +655,11 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
       bnb4: "_bnb4",
     };
     const refresh = async () => {
-      let cached = false;
+      // The cache is the truth wherever it can be read. The flag is only a
+      // fallback for a WebView without the Cache API: trusted over the cache,
+      // a flag left behind after the cache was evicted would say "Ready" while
+      // a Test voice quietly downloaded 300 MB.
+      let prepared: boolean;
       try {
         if (typeof caches !== "undefined") {
           const cache = await caches.open("transformers-cache");
@@ -666,15 +667,16 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
             .map((r) => r.url)
             .filter((u) => u.includes("Kokoro-82M"));
           const file = `model${dtypeSuffix[ttsDtypeBase] ?? ""}.onnx`;
-          cached =
+          prepared =
             urls.some((u) => u.includes(file)) ||
             urls.some((u) => u.endsWith(".onnx"));
+        } else {
+          prepared = window.localStorage.getItem(kokoroReadyKey) === "true";
         }
       } catch {
-        cached = false;
+        prepared = window.localStorage.getItem(kokoroReadyKey) === "true";
       }
-      const flagged = window.localStorage.getItem(kokoroReadyKey) === "true";
-      if (!cancelled) setKokoroPrepared(cached || flagged);
+      if (!cancelled) setKokoroPrepared(prepared);
     };
     void refresh();
     return () => {
@@ -1456,35 +1458,86 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
             <>
               <SettingContainer
                 title={t("settings.assistant.tts.engineLabel")}
-                info={t("settings.assistant.tts.engineDescription")}
                 layout="stacked"
                 grouped={true}
               >
-                <LogoChoice
-                  label={t("settings.assistant.tts.engineLabel")}
-                  minTile="9.5rem"
-                  readyLabel={t("assistantPage.cards.keySaved")}
-                  options={TTS_ENGINES.map((engine) => ({
-                    value: engine.id,
-                    label: t(`voiceEngines.names.${engine.id}`),
-                    hint: t(`voiceEngines.${engine.id}`),
-                    title: t(`settings.assistant.tts.engines.${engine.id}`),
-                    ready:
-                      engine.id === "kitten"
-                        ? kittenDownloaded
-                        : !!engine.local || !ttsNeedsSetup(settings, engine.id),
-                    icon: <ProviderTile id={engine.id} kind="tts" size="md" />,
-                  }))}
-                  value={settings?.assistant_tts_engine ?? "kokoro"}
-                  onChange={(engine) => {
-                    void queueTtsTask(async () => {
-                      await setAndRefresh(
-                        commands.setAssistantTtsEngine(engine),
-                      );
-                    });
-                  }}
-                  disabled={!settings?.assistant_tts_enabled}
-                />
+                {/* Two groups, one choice: where the voice runs is the first
+                  thing people decide, so it is the first thing the grid
+                  says. Both groups share one value; the unselected group
+                  simply has no ringed tile. What each group means sits behind
+                  its (i), so the grid reads as two labels and the tiles. */}
+                <div className="space-y-4">
+                  {(
+                    [
+                      {
+                        key: "local",
+                        engines: TTS_ENGINES.filter((e) => e.local),
+                      },
+                      {
+                        key: "cloud",
+                        engines: TTS_ENGINES.filter((e) => !e.local),
+                      },
+                    ] as const
+                  ).map(({ key, engines }) => {
+                    const heading =
+                      key === "local"
+                        ? t("settings.assistant.tts.sectionLocal")
+                        : t("settings.assistant.tts.sectionCloud");
+                    return (
+                      <section key={key} className="space-y-2">
+                        <div className="flex items-center gap-1">
+                          <h4 className="text-[0.8125rem] font-medium text-muted">
+                            {heading}
+                          </h4>
+                          <InfoTip
+                            text={
+                              key === "local"
+                                ? t("settings.assistant.tts.sectionLocalHint")
+                                : t("settings.assistant.tts.sectionCloudHint")
+                            }
+                          />
+                        </div>
+                        <LogoChoice
+                          label={heading}
+                          minTile="9.5rem"
+                          readyLabel={
+                            key === "local"
+                              ? t("settings.assistant.tts.readyLabel")
+                              : t("assistantPage.cards.keySaved")
+                          }
+                          options={engines.map((engine) => ({
+                            value: engine.id,
+                            label: t(`voiceEngines.names.${engine.id}`),
+                            hint: t(`voiceEngines.${engine.id}`),
+                            title: t(
+                              `settings.assistant.tts.engines.${engine.id}`,
+                            ),
+                            ready: isNativeEngine(engine.id)
+                              ? nativeEngineReady(engine.id)
+                              : !!engine.local ||
+                                !ttsNeedsSetup(settings, engine.id),
+                            icon: (
+                              <ProviderTile
+                                id={engine.id}
+                                kind="tts"
+                                size="md"
+                              />
+                            ),
+                          }))}
+                          value={settings?.assistant_tts_engine ?? "kokoro"}
+                          onChange={(engine) => {
+                            void queueTtsTask(async () => {
+                              await setAndRefresh(
+                                commands.setAssistantTtsEngine(engine),
+                              );
+                            });
+                          }}
+                          disabled={!settings?.assistant_tts_enabled}
+                        />
+                      </section>
+                    );
+                  })}
+                </div>
               </SettingContainer>
 
               {(settings?.assistant_tts_engine ?? "kokoro") === "kokoro" && (
@@ -1567,7 +1620,20 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
                       grouped={true}
                     >
                       <div className="flex min-w-[340px] justify-end">
-                        {kokoroStatus === "loading" ? (
+                        {/* Weights already on disk read as Ready even while
+                          they load: loading them from the cache fires the
+                          same progress events as a download, and switching
+                          engines drops the model, so every return to Kokoro
+                          used to show "Downloading Kokoro" for a file that
+                          was already here. The Test button shows the wait. */}
+                        {kokoroPrepared ||
+                        kokoroStatus === "ready" ||
+                        kokoroStatus === "speaking" ? (
+                          <span className="inline-flex items-center gap-1.5 text-[13px] font-medium text-accent">
+                            <Check className="h-4 w-4" />
+                            {t("settings.assistant.tts.kokoroReady")}
+                          </span>
+                        ) : kokoroStatus === "loading" ? (
                           <div className="w-full max-w-[260px] space-y-1.5">
                             <div className="flex items-center justify-between gap-3 text-xs text-muted">
                               <span className="inline-flex items-center gap-1.5">
@@ -1585,14 +1651,7 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
                               />
                             </div>
                           </div>
-                        ) : kokoroPrepared ||
-                          kokoroStatus === "ready" ||
-                          kokoroStatus === "speaking" ? (
-                          <span className="inline-flex items-center gap-1.5 text-[13px] font-medium text-accent">
-                            <Check className="h-4 w-4" />
-                            {t("settings.assistant.tts.kokoroReady")}
-                          </span>
-                        ) : (
+                        ) : kokoroPrepared === null ? null : (
                           <div className="flex flex-col items-end gap-1.5">
                             <Button
                               variant={
@@ -1637,46 +1696,28 @@ export const AssistantSettings: React.FC<AssistantSettingsProps> = ({
                 </>
               )}
 
-              {ttsEngine === "kitten" && (
-                <>
-                  <NativeVoicePackRow
-                    modelId={KITTEN_MODEL_ID}
-                    title={t("settings.assistant.tts.kittenPackLabel")}
-                    description={(size) =>
-                      t("settings.assistant.tts.kittenPackDescription", {
-                        size,
-                      })
-                    }
-                    unsupported={
-                      localVoice ? !localVoice.native_supported : false
-                    }
-                    disabled={!settings?.assistant_tts_enabled}
-                  />
-                  <SettingContainer
-                    title={t("settings.assistant.tts.voiceLabel")}
-                    layout="horizontal"
-                    grouped={true}
-                  >
-                    <Dropdown
-                      options={KITTEN_VOICES}
-                      selectedValue={
-                        KITTEN_VOICES.some(
-                          (v) =>
-                            v.value === settings?.assistant_tts_remote_voice,
-                        )
-                          ? (settings?.assistant_tts_remote_voice ?? "Bella")
-                          : "Bella"
-                      }
-                      onSelect={(voice) =>
-                        setAndRefresh(
-                          commands.setAssistantTtsRemoteVoice(voice),
-                        )
-                      }
-                      disabled={!settings?.assistant_tts_enabled}
-                      className="min-w-[340px]"
-                    />
-                  </SettingContainer>
-                </>
+              {isNativeEngine(ttsEngine) && (
+                <NativeEngineRows
+                  engine={ttsEngine}
+                  model={settings?.assistant_tts_model ?? ""}
+                  voice={settings?.assistant_tts_remote_voice ?? ""}
+                  unsupported={
+                    localVoice ? !localVoice.native_supported : false
+                  }
+                  disabled={!settings?.assistant_tts_enabled}
+                  onModel={(model) =>
+                    void queueTtsTask(async () => {
+                      await setAndRefresh(commands.setAssistantTtsModel(model));
+                    })
+                  }
+                  onVoice={(voice) =>
+                    void queueTtsTask(async () => {
+                      await setAndRefresh(
+                        commands.setAssistantTtsRemoteVoice(voice),
+                      );
+                    })
+                  }
+                />
               )}
 
               {ttsSpec && !ttsSpec.local && (

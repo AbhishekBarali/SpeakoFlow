@@ -11,6 +11,8 @@ import {
   Search,
   SearchCode,
   Sparkles,
+  Speech,
+  Waves,
 } from "lucide-react";
 import { OpenAILogo } from "./BrandLogos";
 
@@ -385,6 +387,8 @@ const E = {
   customMic: { glyph: lucide(Mic), tile: "generic" },
   kokoro: { glyph: lucide(AudioLines), tile: "ours" },
   kitten: { glyph: lucide(Cat), tile: "ours" },
+  pocket: { glyph: lucide(Speech), tile: "ours" },
+  supertonic: { glyph: lucide(Waves), tile: "ours" },
   search: { glyph: lucide(Search), tile: "generic" },
   searchApi: { glyph: lucide(SearchCode), tile: "generic" },
   fish: { glyph: lucide(Fish), tile: "generic" },
@@ -421,6 +425,8 @@ const EXACT: Record<string, Entry> = {
   // TTS engines
   kokoro: E.kokoro,
   kitten: E.kitten,
+  pocket: E.pocket,
+  supertonic: E.supertonic,
   azure: E.azure,
   cartesia: E.cartesia,
   inworld: E.inworld,

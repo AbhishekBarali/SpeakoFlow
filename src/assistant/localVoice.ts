@@ -16,9 +16,7 @@ import type { LocalVoiceStatus } from "@/bindings";
 
 export type KokoroDevice = "auto" | "gpu" | "cpu";
 
-/** Catalog ids of the native voice packs (`native_tts::PACKS`). */
-export const KOKORO_NATIVE_MODEL_ID = "kokoro-82m-native";
-export const KITTEN_MODEL_ID = "kitten-nano-0.8";
+export { KOKORO_NATIVE_MODEL_ID } from "@/lib/nativeVoices";
 
 export const parseKokoroDevice = (
   value: string | null | undefined,

@@ -105,6 +105,30 @@ async fn send_with_stall_timeout(request: reqwest::RequestBuilder) -> Result<req
     }
 }
 
+/// One reference recording for a native voice, checked against its pinned
+/// size and SHA-256 before anything is written.
+async fn fetch_voice_clip(
+    client: &reqwest::Client,
+    clip: &crate::native_tts::VoiceClip,
+) -> Result<Vec<u8>> {
+    let response = send_with_stall_timeout(client.get(clip.url())).await?;
+    let status = response.status();
+    if !status.is_success() {
+        return Err(anyhow::anyhow!("HTTP {}", status));
+    }
+    let bytes = tokio::time::timeout(DOWNLOAD_STALL_TIMEOUT, response.bytes())
+        .await
+        .map_err(|_| download_stalled_error())??;
+    let actual = format!("{:x}", Sha256::digest(&bytes));
+    if bytes.len() as u64 != clip.bytes || actual != clip.sha256 {
+        return Err(anyhow::anyhow!(
+            "the recording for {} did not match its checksum",
+            clip.name
+        ));
+    }
+    Ok(bytes.to_vec())
+}
+
 /// Next body chunk, failing if none arrives within [`DOWNLOAD_STALL_TIMEOUT`].
 async fn next_chunk_or_stall<S, B>(stream: &mut S) -> Result<Option<B>>
 where
@@ -1649,31 +1673,22 @@ id: "gemma-3-4b".to_string(),
         );
 
         // Native voice packs (`native_tts.rs`): Kokoro for the processor, used
-        // when the WebView cannot run it on the graphics card, and Kitten, the
-        // light voice. Hidden from the model lists (their category is "tts") and
-        // downloaded from the Voice settings. The engine library they need is
-        // fetched with the first one.
+        // when the WebView cannot run it on the graphics card, and the voices
+        // that only run natively (Kitten in three sizes, Pocket TTS,
+        // Supertonic). Hidden from the model lists (their category is "tts")
+        // and downloaded from the Voice settings. The engine library they need
+        // is fetched with the first one.
         for pack in crate::native_tts::PACKS {
-            let (name, description) = match pack.family {
-                crate::native_tts::VoiceFamily::Kokoro => (
-                    "Kokoro (processor)",
-                    "Kokoro running on your processor, for computers where the graphics card can't run the voice.",
-                ),
-                crate::native_tts::VoiceFamily::Kitten => (
-                    "Kitten",
-                    "A small, fast English voice that runs on your processor.",
-                ),
-            };
             available_models.insert(
                 pack.model_id.to_string(),
                 ModelInfo {
                     id: pack.model_id.to_string(),
-                    name: name.to_string(),
-                    description: description.to_string(),
+                    name: pack.name.to_string(),
+                    description: pack.description.to_string(),
                     filename: pack.dir.to_string(),
                     url: Some(pack.archive_url.to_string()),
                     sha256: Some(pack.sha256.to_string()),
-                    size_mb: pack.download_bytes.div_ceil(1_000_000),
+                    size_mb: pack.total_download_bytes().div_ceil(1_000_000),
                     is_downloaded: false,
                     is_downloading: false,
                     partial_size: 0,
@@ -2082,10 +2097,16 @@ id: "gemma-3-4b".to_string(),
                 model.is_downloaded =
                     model_path.exists() && model_path.is_dir() && projector_ready(&model.id);
                 // A native voice pack is only usable with the engine library it
-                // runs on, which is installed alongside the first pack.
+                // runs on, which is installed alongside the first pack, and
+                // with every file its engine opens (Pocket's reference clips
+                // arrive after the archive, so an interrupted install can leave
+                // the folder without them).
                 if model.engine_type == EngineType::NativeTts {
                     model.is_downloaded = model.is_downloaded
-                        && crate::native_tts::runtime_installed_in(&self.models_dir);
+                        && crate::native_tts::runtime_installed_in(&self.models_dir)
+                        && crate::native_tts::pack_for_model_id(&model.id).is_none_or(|pack| {
+                            crate::native_tts::pack_installed_in(&self.models_dir, pack)
+                        });
                 }
                 model.is_downloading = false;
 
@@ -3707,6 +3728,71 @@ id: "gemma-3-4b".to_string(),
         Ok(())
     }
 
+    /// Fetch the reference recordings a native voice pack speaks with (Pocket
+    /// TTS's voices), each checked against its pinned SHA-256 before it is
+    /// moved into place. Only clips not already on disk are fetched, so a
+    /// retry after an interrupted install picks up where it stopped. The clips
+    /// are under a megabyte each, so each is read whole and retried rather
+    /// than resumed.
+    async fn install_voice_clips(
+        &self,
+        model_id: &str,
+        cancel_flag: &Arc<AtomicBool>,
+    ) -> Result<()> {
+        let Some(pack) = crate::native_tts::pack_for_model_id(model_id) else {
+            return Ok(());
+        };
+        let missing = crate::native_tts::missing_clips(&self.models_dir, pack);
+        if missing.is_empty() {
+            return Ok(());
+        }
+        info!(
+            "Downloading {} voice recordings for {}",
+            missing.len(),
+            model_id
+        );
+        let client = download_client()?;
+        for (clip, path) in missing {
+            if let Some(parent) = path.parent() {
+                fs::create_dir_all(parent)?;
+            }
+            const ATTEMPTS: u32 = 3;
+            let mut last_error: Option<anyhow::Error> = None;
+            for attempt in 1..=ATTEMPTS {
+                if cancel_flag.load(Ordering::Relaxed) {
+                    return Err(anyhow::anyhow!(DOWNLOAD_CANCELLED_ERROR));
+                }
+                match fetch_voice_clip(&client, clip).await {
+                    Ok(bytes) => {
+                        let partial = path.with_extension("wav.partial");
+                        fs::write(&partial, &bytes)?;
+                        fs::rename(&partial, &path)?;
+                        last_error = None;
+                        break;
+                    }
+                    Err(error) => {
+                        warn!(
+                            "Voice recording {} attempt {}/{} failed: {}",
+                            clip.name, attempt, ATTEMPTS, error
+                        );
+                        last_error = Some(error);
+                        if attempt < ATTEMPTS {
+                            tokio::time::sleep(Duration::from_secs(1u64 << (attempt - 1))).await;
+                        }
+                    }
+                }
+            }
+            if let Some(error) = last_error {
+                return Err(anyhow::anyhow!(
+                    "Couldn't download the {} voice: {}",
+                    clip.name,
+                    error
+                ));
+            }
+        }
+        Ok(())
+    }
+
     pub async fn download_model(&self, model_id: &str) -> Result<()> {
         let model_info = {
             let models = self.available_models.lock().unwrap();
@@ -3778,6 +3864,7 @@ id: "gemma-3-4b".to_string(),
                 if !crate::native_tts::runtime_installed_in(&self.models_dir) {
                     self.install_tts_runtime(model_id, &cancel_flag).await?;
                 }
+                self.install_voice_clips(model_id, &cancel_flag).await?;
                 crate::native_tts::after_install(model_id);
             }
 
@@ -4091,6 +4178,7 @@ id: "gemma-3-4b".to_string(),
             if !crate::native_tts::runtime_installed_in(&self.models_dir) {
                 self.install_tts_runtime(model_id, &cancel_flag).await?;
             }
+            self.install_voice_clips(model_id, &cancel_flag).await?;
             crate::native_tts::after_install(model_id);
         }
 
@@ -4418,6 +4506,30 @@ mod tests {
         assert_eq!(contiguous_parallel_prefix(&[1, 1, 1, 1], total), total);
         // A short last chunk: the prefix never exceeds the file.
         assert_eq!(contiguous_parallel_prefix(&[1, 1], chunk + 10), chunk + 10);
+    }
+
+    /// Every Pocket voice recording the app will fetch still exists at its
+    /// pinned commit and matches the size and SHA-256 compiled in. A clip that
+    /// fails here would fail every Pocket install, so this is what to run after
+    /// touching `POCKET_VOICES`:
+    /// `cargo test --lib managers::model::tests::live_pocket_voice_clips -- --ignored`
+    #[tokio::test]
+    #[ignore]
+    async fn live_pocket_voice_clips_match_their_pins() {
+        let client = download_client().unwrap();
+        for clip in &crate::native_tts::POCKET_VOICES {
+            let bytes = fetch_voice_clip(&client, clip)
+                .await
+                .unwrap_or_else(|e| panic!("{}: {e}", clip.name));
+            assert_eq!(&bytes[0..4], b"RIFF", "{} is a WAV file", clip.name);
+        }
+        // A wrong pin is refused rather than written.
+        let tampered = crate::native_tts::VoiceClip {
+            sha256: "0000000000000000000000000000000000000000000000000000000000000000",
+            ..crate::native_tts::POCKET_VOICES[0]
+        };
+        let error = fetch_voice_clip(&client, &tampered).await.unwrap_err();
+        assert!(error.to_string().contains("checksum"), "{error}");
     }
 
     #[tokio::test]

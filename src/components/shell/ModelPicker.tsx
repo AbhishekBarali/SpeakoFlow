@@ -17,6 +17,7 @@ import {
   splitLocalModelName,
 } from "@/lib/utils/prettyModelName";
 import { getTranslatedModelName } from "@/lib/utils/modelTranslation";
+import { cloudSttKeyOptional, cloudSttNeedsEndpoint } from "@/lib/cloudStt";
 import { ProviderTile } from "@/components/icons/ProviderLogos";
 import { LogoSelect, type LogoSelectOption } from "@/components/ui/LogoSelect";
 import { Button } from "@/components/ui/Button";
@@ -30,7 +31,7 @@ import {
   VoiceEngineSetup,
   ttsNeedsSetup,
 } from "./ProviderSetup";
-import { TTS_ENGINE_IDS } from "@/lib/ttsEngines";
+import { TTS_ENGINE_IDS, ttsEngineSpec } from "@/lib/ttsEngines";
 
 /**
  * "Which model does this job" as one control, usable on any page.
@@ -301,7 +302,12 @@ export const SttModelPicker: React.FC<{ className?: string }> = ({
       }));
     const cloud = cloudProviders
       .filter(
-        (provider) => cloudKeys[provider.id] || provider.allow_base_url_edit,
+        (provider) =>
+          (cloudKeys[provider.id] || cloudSttKeyOptional(provider)) &&
+          !cloudSttNeedsEndpoint(
+            provider,
+            settings?.cloud_stt_base_urls?.[provider.id],
+          ),
       )
       .map<LogoSelectOption>((provider) => {
         const model =
@@ -386,17 +392,22 @@ export const VoicePicker: React.FC<{ className?: string }> = ({
   } | null>(null);
   const current = settings?.assistant_tts_engine ?? "kokoro";
 
-  const options = TTS_ENGINE_IDS.map<LogoSelectOption>((engine) => ({
-    value: engine,
-    label: t(`settings.assistant.tts.engines.${engine}`),
-    hint:
-      engine === "kokoro" || engine === "kitten"
+  const options = TTS_ENGINE_IDS.map<LogoSelectOption>((engine) => {
+    const local = !!ttsEngineSpec(engine)?.local;
+    return {
+      value: engine,
+      label: t(`settings.assistant.tts.engines.${engine}`),
+      hint: local
         ? t("modelsHub.where.device")
         : ttsNeedsSetup(settings, engine)
           ? t("pickers.needsSetup")
           : undefined,
-    icon: <ProviderTile id={engine} kind="tts" size="sm" />,
-  }));
+      icon: <ProviderTile id={engine} kind="tts" size="sm" />,
+      group: local
+        ? t("settings.assistant.tts.sectionLocal")
+        : t("settings.assistant.tts.sectionCloud"),
+    };
+  });
 
   const choose = async (engine: string) => {
     if (ttsNeedsSetup(settings, engine)) {
