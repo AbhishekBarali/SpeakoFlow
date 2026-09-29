@@ -324,7 +324,32 @@ pub(crate) fn cursor_position() -> Option<(i32, i32)> {
     Some((point.x, point.y))
 }
 
-#[cfg(not(target_os = "windows"))]
+#[cfg(target_os = "macos")]
+static CURSOR_SOURCE: std::sync::OnceLock<tauri::AppHandle> = std::sync::OnceLock::new();
+
+/// Give the capture code a way to ask where the pointer is on macOS, where that
+/// goes through the app's managed input state. Called once at setup; a no-op
+/// elsewhere.
+pub(crate) fn set_cursor_source(_app: &tauri::AppHandle) {
+    #[cfg(target_os = "macos")]
+    let _ = CURSOR_SOURCE.set(_app.clone());
+}
+
+/// The pointer in global display points, the space `Monitor::from_point` takes
+/// on macOS (enigo flips `NSEvent::mouseLocation` into it). Without this every
+/// macOS capture took the first display, not the one being worked on. `None`
+/// before input is initialised (no Accessibility permission yet), which falls
+/// back to that first display.
+#[cfg(target_os = "macos")]
+pub(crate) fn cursor_position() -> Option<(i32, i32)> {
+    crate::input::get_cursor_position(CURSOR_SOURCE.get()?)
+}
+
+/// Not attempted on Linux: xcap's X11 `from_point` multiplies by the Xft scale
+/// while the pointer is reported in physical pixels, so a scaled desktop would
+/// pick the wrong monitor, and under XWayland the pointer goes stale over native
+/// Wayland windows. The first monitor is at least predictable.
+#[cfg(not(any(target_os = "windows", target_os = "macos")))]
 pub(crate) fn cursor_position() -> Option<(i32, i32)> {
     None
 }

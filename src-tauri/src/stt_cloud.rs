@@ -149,11 +149,20 @@ pub(crate) fn resolve_cloud_stt(
     // endpoint never offered it.
     let translate = settings.translate_to_english && provider.supports_translation;
     if settings.translate_to_english && !translate {
-        warn!(
-            "Translate to English is on, but {} transcribes in the language spoken \
-             and has no translation endpoint; the transcript will not be translated",
-            provider.label
-        );
+        // This resolver runs several times per recording (activity checks,
+        // streaming checks, prewarm, readiness polls from Settings), so the
+        // warning is said once per provider rather than on every call. The
+        // transcription path logs its own per-request line.
+        static WARNED_FOR: Mutex<Option<String>> = Mutex::new(None);
+        let mut warned = WARNED_FOR.lock().unwrap_or_else(|e| e.into_inner());
+        if warned.as_deref() != Some(provider.id.as_str()) {
+            *warned = Some(provider.id.clone());
+            warn!(
+                "Translate to English is on, but {} transcribes in the language spoken \
+                 and has no translation endpoint; the transcript will not be translated",
+                provider.label
+            );
+        }
     }
 
     let keyterms = if settings.cloud_stt_send_custom_words && provider.honors_keyterms {
@@ -733,6 +742,11 @@ impl CloudRequest {
             .map_err(|e| format!("Failed to build the HTTP client: {e}"))?;
 
         if let Ok(mut cache) = client_cache().lock() {
+            // Every edit to the key, endpoint or timeout mints a new entry, and
+            // each holds an idle pool open for minutes. Same cap as `llm_client`.
+            if cache.len() >= 8 {
+                cache.clear();
+            }
             cache.insert(key, client.clone());
         }
         Ok(client)

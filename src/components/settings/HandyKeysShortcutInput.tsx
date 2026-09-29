@@ -150,6 +150,12 @@ export const HandyKeysShortcutInput: React.FC<HandyKeysShortcutInputProps> = ({
         },
       );
 
+      // The effect may have been torn down while `listen()` was resolving; the
+      // cleanup then found no handle to call, so remove the listener here.
+      if (cleanup) {
+        unlisten();
+        return;
+      }
       unlistenRef.current = unlisten;
     };
 

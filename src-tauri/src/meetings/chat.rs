@@ -412,6 +412,19 @@ async fn ask_inner(
     let accumulated = Arc::new(Mutex::new(String::new()));
     let sink = token_sink(app.clone(), Arc::clone(&accumulated));
 
+    // A Stop pressed while the engine was starting or the transcript was being
+    // read set the sticky flag with no waiter registered, so the `Notify` alone
+    // missed it and the whole answer was generated anyway. Register first, then
+    // check the flag, so a cancel from either side of that moment is seen.
+    let cancelled = async {
+        let notified = chat.cancel.notified();
+        tokio::pin!(notified);
+        notified.as_mut().enable();
+        if !chat.is_cancelled() {
+            notified.await;
+        }
+    };
+
     let answer = tokio::select! {
         result = crate::llm_client::send_chat_stream(
             &provider,
@@ -422,7 +435,7 @@ async fn ask_inner(
             None,
             sink,
         ) => result,
-        _ = chat.cancel.notified() => Err("cancelled".to_string()),
+        _ = cancelled => Err("cancelled".to_string()),
     };
 
     let partial = accumulated

@@ -319,63 +319,59 @@ pub fn get_available_typing_tools() -> Vec<String> {
     tools
 }
 
+/// Whether `program` is an executable file on `PATH`.
+///
+/// Searched in-process rather than by spawning `which`: not every distribution
+/// ships `which` (Arch's `base` group does not), and there every paste tool read
+/// as missing, so paste silently fell back to XTest, which native Wayland apps
+/// ignore.
+#[cfg(target_os = "linux")]
+fn linux_tool_on_path(program: &str) -> bool {
+    use std::os::unix::fs::PermissionsExt;
+    std::env::var_os("PATH")
+        .map(|paths| {
+            std::env::split_paths(&paths).any(|dir| {
+                std::fs::metadata(dir.join(program))
+                    .map(|meta| meta.is_file() && meta.permissions().mode() & 0o111 != 0)
+                    .unwrap_or(false)
+            })
+        })
+        .unwrap_or(false)
+}
+
 /// Check if wtype is available (Wayland text input tool)
 #[cfg(target_os = "linux")]
 fn is_wtype_available() -> bool {
-    Command::new("which")
-        .arg("wtype")
-        .output()
-        .map(|output| output.status.success())
-        .unwrap_or(false)
+    linux_tool_on_path("wtype")
 }
 
 /// Check if dotool is available (another Wayland text input tool)
 #[cfg(target_os = "linux")]
 fn is_dotool_available() -> bool {
-    Command::new("which")
-        .arg("dotool")
-        .output()
-        .map(|output| output.status.success())
-        .unwrap_or(false)
+    linux_tool_on_path("dotool")
 }
 
 /// Check if ydotool is available (uinput-based, works on both Wayland and X11)
 #[cfg(target_os = "linux")]
 fn is_ydotool_available() -> bool {
-    Command::new("which")
-        .arg("ydotool")
-        .output()
-        .map(|output| output.status.success())
-        .unwrap_or(false)
+    linux_tool_on_path("ydotool")
 }
 
 #[cfg(target_os = "linux")]
 fn is_xdotool_available() -> bool {
-    Command::new("which")
-        .arg("xdotool")
-        .output()
-        .map(|output| output.status.success())
-        .unwrap_or(false)
+    linux_tool_on_path("xdotool")
 }
 
 /// Check if kwtype is available (KDE Wayland virtual keyboard input tool)
 #[cfg(target_os = "linux")]
 fn is_kwtype_available() -> bool {
-    Command::new("which")
-        .arg("kwtype")
-        .output()
-        .map(|output| output.status.success())
-        .unwrap_or(false)
+    linux_tool_on_path("kwtype")
 }
 
 /// Check if wl-copy is available (Wayland clipboard tool)
 #[cfg(target_os = "linux")]
 fn is_wl_copy_available() -> bool {
-    Command::new("which")
-        .arg("wl-copy")
-        .output()
-        .map(|output| output.status.success())
-        .unwrap_or(false)
+    linux_tool_on_path("wl-copy")
 }
 
 /// Type text directly via wtype on Wayland.
@@ -414,6 +410,29 @@ fn type_text_via_xdotool(text: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// The dotool commands that type `text`.
+///
+/// dotool reads one command per line, so a newline inside the text ended the
+/// `type` command and everything after it was parsed as commands and lost (a
+/// cleanup that inserted "new paragraph" breaks did exactly that). Each line is
+/// typed on its own, with Enter pressed between them.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+fn dotool_script(text: &str) -> String {
+    let mut script = String::with_capacity(text.len() + 16);
+    for (i, line) in text.split('\n').enumerate() {
+        if i > 0 {
+            script.push_str("key enter\n");
+        }
+        let line = line.strip_suffix('\r').unwrap_or(line);
+        if !line.is_empty() {
+            script.push_str("type ");
+            script.push_str(line);
+            script.push('\n');
+        }
+    }
+    script
+}
+
 /// Type text directly via dotool (works on both Wayland and X11 via uinput).
 #[cfg(target_os = "linux")]
 fn type_text_via_dotool(text: &str) -> Result<(), String> {
@@ -426,8 +445,8 @@ fn type_text_via_dotool(text: &str) -> Result<(), String> {
         .map_err(|e| format!("Failed to spawn dotool: {}", e))?;
 
     if let Some(mut stdin) = child.stdin.take() {
-        // dotool uses "type <text>" command
-        writeln!(stdin, "type {}", text)
+        stdin
+            .write_all(dotool_script(text).as_bytes())
             .map_err(|e| format!("Failed to write to dotool stdin: {}", e))?;
     }
 
@@ -844,5 +863,19 @@ mod tests {
         assert!(should_send_auto_submit(true, PasteMethod::Direct));
         assert!(should_send_auto_submit(true, PasteMethod::CtrlShiftV));
         assert!(should_send_auto_submit(true, PasteMethod::ShiftInsert));
+    }
+
+    #[test]
+    fn dotool_script_types_each_line_and_presses_enter_between() {
+        assert_eq!(dotool_script("hello world"), "type hello world\n");
+        assert_eq!(
+            dotool_script("first\nsecond"),
+            "type first\nkey enter\ntype second\n"
+        );
+        // Blank lines are Enter presses only; CRLF is treated as a newline.
+        assert_eq!(
+            dotool_script("a\r\n\r\nb\n"),
+            "type a\nkey enter\nkey enter\ntype b\nkey enter\n"
+        );
     }
 }

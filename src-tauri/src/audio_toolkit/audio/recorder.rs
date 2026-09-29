@@ -26,6 +26,13 @@ enum Cmd {
     Shutdown,
 }
 
+/// How long opening the input stream may take before it is treated as hung.
+/// `open()` runs while the recording state is locked, so a driver that never
+/// answers (a wedged Bluetooth headset, a bad WASAPI/CoreAudio driver) used to
+/// wedge the recording pipeline and everything that asks whether it is
+/// recording. Generous, because a Bluetooth profile switch can take seconds.
+const MIC_OPEN_TIMEOUT: Duration = Duration::from_secs(15);
+
 // Audio and controls share a queue: Stop/Shutdown must wake a stalled microphone.
 enum RecorderEvent {
     Command(Cmd),
@@ -266,7 +273,7 @@ impl AudioRecorder {
             }
         });
 
-        match init_rx.recv() {
+        match init_rx.recv_timeout(MIC_OPEN_TIMEOUT) {
             Ok(Ok(())) => {
                 if let Some(entry) = config_to_cache {
                     self.config_cache = Some(entry);
@@ -289,12 +296,26 @@ impl AudioRecorder {
                 };
                 Err(Box::new(Error::new(kind, error_message)))
             }
-            Err(recv_error) => {
-                let _ = worker.join();
+            Err(mpsc::RecvTimeoutError::Timeout) => {
+                // The driver never answered. The worker cannot be interrupted
+                // inside cpal, so it is detached; the queued Shutdown makes it
+                // close the stream and exit if the open ever completes.
+                let _ = cmd_tx.send(RecorderEvent::Command(Cmd::Shutdown));
+                drop(worker);
                 self.config_cache = None;
                 Err(Box::new(Error::new(
-                    std::io::ErrorKind::Other,
-                    format!("Failed to initialize microphone worker: {recv_error}"),
+                    std::io::ErrorKind::TimedOut,
+                    format!(
+                        "The microphone did not start within {}s",
+                        MIC_OPEN_TIMEOUT.as_secs()
+                    ),
+                )))
+            }
+            Err(mpsc::RecvTimeoutError::Disconnected) => {
+                let _ = worker.join();
+                self.config_cache = None;
+                Err(Box::new(Error::other(
+                    "Failed to initialize microphone worker: the worker exited",
                 )))
             }
         }

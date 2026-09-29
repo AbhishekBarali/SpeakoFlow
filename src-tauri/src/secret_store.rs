@@ -255,6 +255,33 @@ pub fn sync(account: &str, value: &str) -> bool {
     // `set`/`delete` return true when the keychain reaches the desired state
     // (delete treats a missing credential as success).
     if value.is_empty() {
+        // An empty value with no cached answer is ambiguous: every hydrated
+        // account has a cache entry, so a miss here means the read failed
+        // (`get` never caches an `Err`). A D-Bus timeout or a dismissed unlock
+        // prompt hydrates the slot as "" and the very next settings write would
+        // then delete a key that was never cleared. Re-read before deleting.
+        let known = cache().lock().unwrap().contains_key(account);
+        if !known {
+            return match keyring_get(account) {
+                Ok(None) => {
+                    cache().lock().unwrap().insert(account.to_string(), None);
+                    true
+                }
+                Ok(Some(existing)) => {
+                    warn!(
+                        "secret_store: '{account}' was not hydrated but exists in the \
+                         keychain; keeping it instead of deleting it"
+                    );
+                    cache()
+                        .lock()
+                        .unwrap()
+                        .insert(account.to_string(), Some(existing));
+                    // Not the desired state; the caller keeps its (empty) copy.
+                    false
+                }
+                Err(()) => false,
+            };
+        }
         delete(account)
     } else {
         set(account, value)

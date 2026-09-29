@@ -404,6 +404,12 @@ const AssistantPanel: React.FC = () => {
   const [ttsPlaying, setTtsPlaying] = useState(false);
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [micLevels, setMicLevels] = useState<number[]>([]);
+  // Mirrors `state === "listening"` for the mic-level listener, which is
+  // registered once and must not close over a stale state.
+  const listeningRef = useRef(false);
+  useEffect(() => {
+    listeningRef.current = state === "listening";
+  }, [state]);
   const [tool, setTool] = useState<ToolActivity | null>(null);
   const [toolElapsed, setToolElapsed] = useState(0);
   const [layout, setLayout] = useState<QuickAskLayout>(DEFAULT_LAYOUT);
@@ -695,6 +701,10 @@ const AssistantPanel: React.FC = () => {
 
       track(
         await listen<number[]>("mic-level", (e) => {
+          // Emitted app-wide ~30x/s during *every* dictation, while this
+          // window is usually hidden. Only a listening ask renders the levels,
+          // so anything else would re-render the whole panel for nothing.
+          if (!listeningRef.current) return;
           setMicLevels(e.payload);
         }),
       );

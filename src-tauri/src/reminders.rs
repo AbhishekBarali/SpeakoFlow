@@ -152,7 +152,15 @@ impl ReminderStore {
                 if let Some(parent) = self.path.parent() {
                     let _ = std::fs::create_dir_all(parent);
                 }
-                if let Err(e) = std::fs::write(&self.path, json) {
+                // Write-then-rename, so a crash or power loss mid-write leaves
+                // the previous file rather than a truncated one that the next
+                // launch cannot parse. The rename replaces the target on every
+                // platform (MoveFileEx with REPLACE_EXISTING on Windows).
+                let tmp = self.path.with_extension("json.tmp");
+                let written =
+                    std::fs::write(&tmp, json).and_then(|()| std::fs::rename(&tmp, &self.path));
+                if let Err(e) = written {
+                    let _ = std::fs::remove_file(&tmp);
                     // Loud: an unwritten reminder is one the next launch will not
                     // have, and the user has already been told it is set.
                     error!("Failed to write {}: {}", self.path.display(), e);
@@ -338,10 +346,21 @@ pub fn init(app: &AppHandle) {
             Err(e) => {
                 // Keep going with an empty list rather than failing startup, but
                 // say so: the file is the user's data and they may want it back.
+                // Set it aside first, or the next save would overwrite it.
+                let backup = path.with_extension(format!(
+                    "json.corrupt-{}",
+                    chrono::Local::now().format("%Y%m%d-%H%M%S")
+                ));
+                let kept = std::fs::rename(&path, &backup).is_ok();
                 warn!(
-                    "Invalid {} ({}); starting with no reminders",
+                    "Invalid {} ({}); starting with no reminders{}",
                     path.display(),
-                    e
+                    e,
+                    if kept {
+                        format!(" (the unreadable file was kept as {})", backup.display())
+                    } else {
+                        String::new()
+                    }
                 );
                 Vec::new()
             }

@@ -287,11 +287,20 @@ impl MeetingStore {
     }
 
     /// Mark everything done.
+    ///
+    /// Never on a meeting that is still recording: notes can be written mid-call,
+    /// and marking that row complete took it out of `reconcile_interrupted`, so a
+    /// crash later in the call left it with no end time, reading as live forever.
+    /// The post-call job marks it complete once the recording has stopped.
     pub fn complete_meeting(&self, meeting_id: i64) -> Result<()> {
         let conn = self.open()?;
         conn.execute(
-            "UPDATE meetings SET status = ?2 WHERE id = ?1",
-            params![meeting_id, MeetingStatus::Complete.as_db_str()],
+            "UPDATE meetings SET status = ?2 WHERE id = ?1 AND status <> ?3",
+            params![
+                meeting_id,
+                MeetingStatus::Complete.as_db_str(),
+                MeetingStatus::Recording.as_db_str()
+            ],
         )?;
         Ok(())
     }
@@ -1074,6 +1083,21 @@ mod tests {
             store.get_meeting(id).unwrap().unwrap().status,
             MeetingStatus::Complete
         );
+    }
+
+    /// Notes written mid-call must not take a live meeting out of crash
+    /// reconciliation.
+    #[test]
+    fn notes_during_a_recording_do_not_mark_it_complete() {
+        let (store, _dir) = temp_store();
+        let id = store.create_meeting("Live", 1_000, None).unwrap();
+        store.complete_meeting(id).unwrap();
+
+        assert_eq!(
+            store.get_meeting(id).unwrap().unwrap().status,
+            MeetingStatus::Recording
+        );
+        assert_eq!(store.reconcile_interrupted().unwrap(), 1);
     }
 
     #[test]
