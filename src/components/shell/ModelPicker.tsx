@@ -340,8 +340,11 @@ export const SttModelPicker: React.FC<{ className?: string }> = ({
     setBusy(true);
     try {
       if (kind === "local") {
-        if (isCloud) await commands.setSttEngineMode("local");
-        await selectModel(id);
+        // Select first, then leave cloud. The other order started loading the
+        // *previous* model on the mode switch, and the selection that followed
+        // was refused with "Model load already in progress".
+        const selected = await selectModel(id);
+        if (selected && isCloud) await commands.setSttEngineMode("local");
       } else {
         await commands.setCloudSttProvider(id);
         if (!isCloud) await commands.setSttEngineMode("cloud");

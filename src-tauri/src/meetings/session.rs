@@ -351,6 +351,10 @@ pub struct MeetingRecorder {
     app: AppHandle,
     store: Arc<MeetingStore>,
     active: Mutex<Option<ActiveSession>>,
+    /// True from the moment a meeting starts until its transcription queue has
+    /// fully drained after stop. Lock-free, so the speech engine's idle checks
+    /// never wait on `active` (which `start` holds while opening the mic).
+    transcribing: AtomicBool,
 }
 
 impl MeetingRecorder {
@@ -359,11 +363,18 @@ impl MeetingRecorder {
             app,
             store,
             active: Mutex::new(None),
+            transcribing: AtomicBool::new(false),
         }
     }
 
     pub fn store(&self) -> &Arc<MeetingStore> {
         &self.store
+    }
+
+    /// Whether a meeting still needs the speech engine: recording, or draining
+    /// chunks queued before it stopped.
+    pub fn uses_speech_engine(&self) -> bool {
+        self.transcribing.load(Ordering::SeqCst)
     }
 
     /// Whether a meeting is recording right now.
@@ -491,7 +502,15 @@ impl MeetingRecorder {
             worker: Some(worker),
         });
 
+        // Under the lock, so a `stop` (which takes it first) can never clear the
+        // flag before it is set.
+        self.transcribing.store(true, Ordering::SeqCst);
         drop(guard);
+        // Start loading the speech model now so the first chunk, 30 s in, does
+        // not wait on it.
+        if let Some(tm) = self.app.try_state::<Arc<TranscriptionManager>>() {
+            tm.initiate_model_load();
+        }
         self.emit_state();
         Ok(meeting_id)
     }
@@ -557,6 +576,13 @@ impl MeetingRecorder {
             if worker.join().is_err() {
                 error!("Meeting transcription worker panicked");
             }
+        }
+        // The speech engine is free again. With "Immediately" nothing else
+        // would unload it: per-chunk unloads were held off for the meeting, and
+        // a meeting that ended on silence sends no final chunk.
+        self.transcribing.store(false, Ordering::SeqCst);
+        if let Some(tm) = self.app.try_state::<Arc<TranscriptionManager>>() {
+            tm.maybe_unload_immediately("meeting");
         }
 
         // 4. WAV headers need finalising or the files are unreadable.
@@ -763,12 +789,19 @@ fn write_batch(store: &MeetingStore, meeting_id: i64, pending: &mut Vec<NewSegme
 }
 
 /// Transcribe one chunk with the app's configured engine.
+///
+/// `transcribe` only *waits* for a load in flight; it never starts one, so a
+/// model that idled out, or that "Immediately" unloaded, made every later chunk
+/// fail with "Model is not loaded". Dictation asks for the load when recording
+/// starts; a meeting has to ask for each chunk. A no-op when the model is
+/// resident or cloud transcription is active.
 fn transcribe_chunk(app: &AppHandle, samples: Vec<f32>) -> Result<String> {
     let tm = app
         .try_state::<Arc<TranscriptionManager>>()
         .ok_or_else(|| anyhow!("Transcription manager is not initialised"))?
         .inner()
         .clone();
+    tm.initiate_model_load();
     tm.transcribe(samples)
 }
 

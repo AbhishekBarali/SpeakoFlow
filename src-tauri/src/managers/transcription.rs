@@ -39,6 +39,15 @@ pub struct ModelStateEvent {
     pub error: Option<String>,
 }
 
+/// Whether a meeting needs the speech engine (recording, or draining its queue).
+/// Meetings capture through their own recorder rather than
+/// `AudioRecordingManager`, so the dictation `is_recording` check does not see
+/// them.
+fn meeting_is_recording(app: &AppHandle) -> bool {
+    app.try_state::<Arc<crate::meetings::session::MeetingRecorder>>()
+        .is_some_and(|recorder| recorder.uses_speech_engine())
+}
+
 /// Incremental live-transcription text pushed to the recording overlay while a
 /// streaming recording is in progress. Emitted as an UNTYPED Tauri event
 /// ("stream-text") to match the existing "mic-level" pattern — intentionally
@@ -249,6 +258,26 @@ pub struct LoadingGuard {
     loading_condvar: Arc<Condvar>,
 }
 
+/// Marks the engine as taken out of its slot for a transcription or a live
+/// stream. While it is out the slot reads empty, and without this mark
+/// `initiate_model_load` took that for "not loaded" and started a second full
+/// copy of the model. Cleared on drop, so a panicking lease cannot leave the
+/// mark behind and block every later load.
+struct EngineLease(Arc<AtomicBool>);
+
+impl EngineLease {
+    fn new(flag: &Arc<AtomicBool>) -> Self {
+        flag.store(true, Ordering::SeqCst);
+        Self(flag.clone())
+    }
+}
+
+impl Drop for EngineLease {
+    fn drop(&mut self) {
+        self.0.store(false, Ordering::SeqCst);
+    }
+}
+
 impl Drop for LoadingGuard {
     fn drop(&mut self) {
         // Recover from a poisoned mutex instead of panicking — a panic inside
@@ -273,6 +302,8 @@ pub struct TranscriptionManager {
     watcher_handle: Arc<Mutex<Option<thread::JoinHandle<()>>>>,
     is_loading: Arc<Mutex<bool>>,
     loading_condvar: Arc<Condvar>,
+    /// Set while the engine is out of `engine` on lease; see [`EngineLease`].
+    engine_leased: Arc<AtomicBool>,
     /// Router for the opt-in live/streaming transcription path. Shared with the
     /// `AudioRecordingManager` so the recorder can feed frames into an active
     /// stream. When no stream is active, feeding is a cheap no-op.
@@ -295,6 +326,7 @@ impl TranscriptionManager {
             watcher_handle: Arc::new(Mutex::new(None)),
             is_loading: Arc::new(Mutex::new(false)),
             loading_condvar: Arc::new(Condvar::new()),
+            engine_leased: Arc::new(AtomicBool::new(false)),
             stream_router,
         };
 
@@ -331,11 +363,19 @@ impl TranscriptionManager {
                     }
 
                     // While recording, keep the idle timer fresh so the
-                    // model is never unloaded mid-session.
+                    // model is never unloaded mid-session. A meeting records
+                    // through its own recorder, not the dictation one, and
+                    // transcribes a chunk every ~30 s, so it counts too.
+                    //
+                    // With cloud transcription active the local model is only
+                    // a fallback and no recording will use it, so it is left
+                    // to idle out instead of being kept warm by every cloud
+                    // dictation.
                     let is_recording = app_handle_cloned
                         .try_state::<Arc<AudioRecordingManager>>()
-                        .map_or(false, |a| a.is_recording());
-                    if is_recording {
+                        .is_some_and(|a| a.is_recording())
+                        || meeting_is_recording(&app_handle_cloned);
+                    if is_recording && !crate::stt_cloud::cloud_stt_active(&settings) {
                         manager_cloned.touch_activity();
                         continue;
                     }
@@ -455,6 +495,12 @@ impl TranscriptionManager {
 
     /// Unloads the model immediately if the setting is enabled and the model is loaded
     pub fn maybe_unload_immediately(&self, context: &str) {
+        // A meeting transcribes a chunk every ~30 s through this same engine.
+        // Unloading after each one reloaded the model twice a minute; the chunk
+        // that lands after the meeting stops unloads it as usual.
+        if meeting_is_recording(&self.app_handle) {
+            return;
+        }
         let settings = get_settings(&self.app_handle);
         if settings.model_unload_timeout == ModelUnloadTimeout::Immediately
             && self.is_model_loaded()
@@ -719,7 +765,8 @@ impl TranscriptionManager {
             return;
         }
         let mut is_loading = self.is_loading.lock().unwrap();
-        if *is_loading || self.is_model_loaded() {
+        // A leased engine is loaded, just in use; `transcribe` waits for it.
+        if *is_loading || self.is_model_loaded() || self.engine_leased.load(Ordering::SeqCst) {
             return;
         }
 
@@ -736,6 +783,47 @@ impl TranscriptionManager {
             let mut is_loading = self_clone.is_loading.lock().unwrap();
             *is_loading = false;
             self_clone.loading_condvar.notify_all();
+        });
+    }
+
+    /// Unload the local model once cloud transcription is fully configured.
+    ///
+    /// Called when the user switches to cloud, or completes a cloud setup. The
+    /// pipeline will not use the local engine again unless a cloud request fails,
+    /// and that path (`load_fallback_engine`) loads it on demand, so keeping it
+    /// resident only holds RAM and VRAM. Skipped while anything is recording or
+    /// loading, so an in-flight dictation or meeting is never pulled out from
+    /// under itself.
+    pub fn release_local_for_cloud(&self) {
+        if !self.is_model_loaded() {
+            return;
+        }
+        // Off the caller's thread: the settings commands that call this run on
+        // the main thread, and tearing down a GPU context is not instant.
+        let this = self.clone();
+        thread::spawn(move || {
+            // Every condition is decided inside the loading slot, so a switch
+            // back to local (whose load needs the slot), a recording starting,
+            // or a lease taken in the meantime is seen rather than raced.
+            let Some(_loading) = this.try_start_loading() else {
+                return;
+            };
+            let recording = this
+                .app_handle
+                .try_state::<Arc<AudioRecordingManager>>()
+                .is_some_and(|a| a.is_recording())
+                || meeting_is_recording(&this.app_handle);
+            if recording
+                || this.engine_leased.load(Ordering::SeqCst)
+                || !this.is_model_loaded()
+                || !crate::stt_cloud::cloud_stt_active(&get_settings(&this.app_handle))
+            {
+                return;
+            }
+            info!("Cloud transcription is active; unloading the local model");
+            if let Err(e) = this.unload_model() {
+                warn!("Failed to unload the local model: {}", e);
+            }
         });
     }
 
@@ -792,8 +880,8 @@ impl TranscriptionManager {
             ));
         }
 
-        // Update last activity timestamp
-        self.touch_activity();
+        // The idle timer is touched below, on the local path only: a cloud
+        // dictation must not keep an unused fallback model resident.
 
         let st = std::time::Instant::now();
 
@@ -829,20 +917,11 @@ impl TranscriptionManager {
         {
             let settings = get_settings(&self.app_handle);
             if let Ok(cfg) = crate::stt_cloud::resolve_cloud_stt(&settings) {
-                // "Translate to English" is a local-engine feature: it maps onto
-                // Whisper's translate task, and none of the cloud transcription
-                // endpoints wired up here accept an equivalent flag. Silently
-                // returning the spoken language is the wrong kind of surprise —
-                // a user who turned this on and dictated Japanese gets Japanese
-                // back — so say so rather than letting the completion line below
-                // claim a translation that never happened.
-                if settings.translate_to_english {
-                    warn!(
-                        "\"Translate to English\" is not available on cloud transcription \
-                         ({} / {}); the transcript will be in the language spoken",
-                        cfg.provider.label, cfg.model
-                    );
-                }
+                // A provider without a translation route transcribes in the
+                // language spoken; `resolve_cloud_stt` already said so, once.
+                // On a provider that has the route (`cfg.translate`), the
+                // request goes to `/audio/translations`, so there is nothing to
+                // warn about — this used to claim the opposite on every request.
                 // The provider was already given the custom words as keyterm /
                 // prompt biasing, so a second fuzzy pass over its output would
                 // only risk rewriting words it already got right. With biasing
@@ -904,6 +983,9 @@ impl TranscriptionManager {
 
         // Check if model is loaded, if not try to load it
         {
+            // Local inference from here on: reset the idle timer.
+            self.touch_activity();
+
             // If the model is loading, wait for it to complete.
             let mut is_loading = self.is_loading.lock().unwrap();
             while *is_loading {
@@ -963,6 +1045,8 @@ impl TranscriptionManager {
                     ));
                 }
             };
+            // Held until the end of this block, after the engine is put back.
+            let _lease = EngineLease::new(&self.engine_leased);
 
             // Release the lock before transcribing — no mutex held during the engine call
             drop(engine_guard);
@@ -1417,6 +1501,10 @@ impl TranscriptionManager {
             let mut guard = self.lock_engine();
             guard.take()
         };
+        // Held for the whole worker; the engine is back in its slot by then.
+        let _lease = leased
+            .is_some()
+            .then(|| EngineLease::new(&self.engine_leased));
 
         // Decide the streaming path from the leased engine (see the fn doc).
         enum StreamPath {

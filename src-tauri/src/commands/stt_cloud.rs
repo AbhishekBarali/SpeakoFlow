@@ -28,10 +28,10 @@ pub fn get_cloud_stt_readiness(app: AppHandle) -> CloudSttReadiness {
 
 /// Switch between the local engine and cloud transcription.
 ///
-/// A command rather than a raw settings write because turning cloud *off* has a
-/// side effect: the local model has not been loaded while the user was on cloud,
-/// so it is asked to start loading now instead of on the first press of the
-/// dictation key, where the wait would be visible.
+/// A command rather than a raw settings write because the switch has a side
+/// effect in each direction: turning cloud *off* starts loading the local model
+/// now instead of on the first press of the dictation key, where the wait would
+/// be visible, and turning it *on* releases a local model nothing will use.
 #[tauri::command]
 #[specta::specta]
 pub fn set_stt_engine_mode(app: AppHandle, mode: SttEngineMode) {
@@ -42,12 +42,27 @@ pub fn set_stt_engine_mode(app: AppHandle, mode: SttEngineMode) {
     settings.stt_engine_mode = mode;
     write_settings(&app, settings);
 
+    let Some(manager) =
+        app.try_state::<std::sync::Arc<crate::managers::transcription::TranscriptionManager>>()
+    else {
+        return;
+    };
     if mode == SttEngineMode::Local {
-        if let Some(manager) =
-            app.try_state::<std::sync::Arc<crate::managers::transcription::TranscriptionManager>>()
-        {
-            manager.initiate_model_load();
-        }
+        manager.initiate_model_load();
+    } else {
+        // The mirror image: a complete cloud setup never uses the local model
+        // unless a request fails, and that path loads it on demand.
+        manager.release_local_for_cloud();
+    }
+}
+
+/// Unload the local model if the cloud configuration just became complete
+/// (a key, provider, model or endpoint was the missing piece).
+fn release_local_if_cloud_ready(app: &AppHandle) {
+    if let Some(manager) =
+        app.try_state::<std::sync::Arc<crate::managers::transcription::TranscriptionManager>>()
+    {
+        manager.release_local_for_cloud();
     }
 }
 
@@ -62,6 +77,7 @@ pub fn set_cloud_stt_api_key(app: AppHandle, provider_id: String, api_key: Strin
         .cloud_stt_api_keys
         .insert(provider_id, api_key.trim().to_string());
     write_settings(&app, settings);
+    release_local_if_cloud_ready(&app);
 }
 
 /// Select the active cloud provider.
@@ -78,6 +94,7 @@ pub fn set_cloud_stt_provider(app: AppHandle, provider_id: String) {
     }
     settings.cloud_stt_provider_id = provider_id;
     write_settings(&app, settings);
+    release_local_if_cloud_ready(&app);
 }
 
 /// Set the model for one provider.
@@ -92,6 +109,7 @@ pub fn set_cloud_stt_model(app: AppHandle, provider_id: String, model: String) {
         .cloud_stt_models
         .insert(provider_id, model.trim().to_string());
     write_settings(&app, settings);
+    release_local_if_cloud_ready(&app);
 }
 
 /// Set the endpoint override for one provider. An empty value clears the
@@ -107,6 +125,7 @@ pub fn set_cloud_stt_base_url(app: AppHandle, provider_id: String, base_url: Str
         settings.cloud_stt_base_urls.insert(provider_id, trimmed);
     }
     write_settings(&app, settings);
+    release_local_if_cloud_ready(&app);
 }
 
 /// Use the provider's realtime endpoint where it has one.

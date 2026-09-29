@@ -170,6 +170,13 @@ fn ensure_saved_session_is_available(app: &AppHandle, id: i64) -> Result<(), Str
 pub fn assistant_clear_conversation(app: AppHandle) -> Result<(), String> {
     crate::voice_conversation::end(&app);
     let conversation = app.state::<AssistantConversation>();
+    // Same guard as `reset_conversation_for_new_exchange`: a reply still
+    // streaming would otherwise be pushed into the emptied list and saved as a
+    // new History row holding only an assistant message.
+    if conversation.is_busy() {
+        conversation.request_cancel();
+    }
+    conversation.bump_epoch();
     // Learn from the conversation before wiping it — but only if there's new,
     // substantial content since the last pass. `take_distillable` enforces that
     // (and marks it), so clearing right after a close never double-distills.
@@ -297,6 +304,7 @@ pub fn set_assistant_provider(app: AppHandle, provider_id: String) -> Result<(),
     }
     settings.assistant_provider_id = provider_id;
     write_settings(&app, settings);
+    crate::managers::local_llm::stop_engines_if_unused(&app);
     Ok(())
 }
 

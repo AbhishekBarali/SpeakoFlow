@@ -1372,6 +1372,7 @@ pub fn set_post_process_provider(app: AppHandle, provider_id: String) -> Result<
     }
     settings.post_process_provider_id = provider_id;
     settings::write_settings(&app, settings);
+    crate::managers::local_llm::stop_engines_if_unused(&app);
     Ok(())
 }
 

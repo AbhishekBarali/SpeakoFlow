@@ -352,6 +352,34 @@ impl LlmRole {
 /// entries would collide).
 pub struct CleanupLlm(pub Arc<LocalLlmManager>);
 
+/// Stop both built-in engines once neither brain slot points at the built-in
+/// provider any more.
+///
+/// The two slots are the whole routing surface: the assistant, Flow and memory
+/// read `assistant_provider_id`; dictation cleanup reads `post_process_provider_id`
+/// and falls back to the assistant's; meetings try both. So with neither on
+/// `builtin`, nothing can reach either engine, and holding a loaded model until
+/// the idle timeout (or indefinitely, with "Never") only costs memory. With one
+/// still on `builtin` both are left alone — the idle watcher handles them.
+pub fn stop_engines_if_unused(app: &AppHandle) {
+    let settings = crate::settings::get_settings(app);
+    let builtin = crate::settings::BUILTIN_POST_PROCESS_PROVIDER_ID;
+    if settings.assistant_provider_id == builtin || settings.post_process_provider_id == builtin {
+        return;
+    }
+    let assistant = app
+        .try_state::<Arc<LocalLlmManager>>()
+        .map(|m| m.inner().clone());
+    let cleanup = app.try_state::<CleanupLlm>().map(|c| c.0.clone());
+    // Off the caller's thread: provider setters are synchronous commands, and
+    // stopping waits for the child process to exit.
+    std::thread::spawn(move || {
+        for manager in assistant.into_iter().chain(cleanup) {
+            manager.stop_if_idle();
+        }
+    });
+}
+
 /// Context window to launch with, per role. Pure so it is testable without an
 /// `AppHandle`.
 fn context_size_for(role: LlmRole, configured: u32) -> u32 {
@@ -718,18 +746,28 @@ impl LocalLlmManager {
     /// this OS/arch. The first asset whose name contains all tokens of a set
     /// wins.
     fn engine_asset_preferences() -> Vec<Vec<&'static str>> {
+        // Same OS × arch matrix as `pinned_asset_names`. This used to hardcode
+        // x64 on Windows and Linux, so an ARM64 machine that took this path got
+        // an x86_64 llama-server, stamped it as current, and never replaced it
+        // ("Exec format error" on every start on Linux ARM64).
+        let arm = cfg!(target_arch = "aarch64");
         if cfg!(target_os = "windows") {
-            // Prefer Vulkan (the app already ships Vulkan for Whisper), fall
-            // back to the CPU build which runs anywhere.
-            vec![vec!["win", "vulkan", "x64"], vec!["win", "cpu", "x64"]]
+            if arm {
+                vec![vec!["win", "cpu", "arm64"]]
+            } else {
+                // Prefer Vulkan (the app already ships Vulkan for Whisper), fall
+                // back to the CPU build which runs anywhere.
+                vec![vec!["win", "vulkan", "x64"], vec!["win", "cpu", "x64"]]
+            }
         } else if cfg!(target_os = "macos") {
-            if cfg!(target_arch = "aarch64") {
+            if arm {
                 vec![vec!["macos", "arm64"]]
             } else {
                 vec![vec!["macos", "x64"]]
             }
+        } else if arm {
+            vec![vec!["ubuntu", "vulkan", "arm64"], vec!["ubuntu", "arm64"]]
         } else {
-            // Linux
             vec![vec!["ubuntu", "vulkan", "x64"], vec!["ubuntu", "x64"]]
         }
     }
@@ -986,12 +1024,17 @@ impl LocalLlmManager {
     /// restarting with a different model) as needed. Returns once the server is
     /// accepting connections, or an error describing why it could not start.
     pub async fn ensure_running(&self, model_id: &str) -> Result<(), String> {
+        // Count the start itself as a request. A cold load can take longer than
+        // one 10 s watcher tick (and longer than the whole timeout when that is
+        // "Immediately"), and the callers only take their own request guard
+        // after this returns — so without it the idle watcher could stop the
+        // engine it was still waiting on. Dropping it also refreshes the timer.
+        // Taken before the start lock so a caller queued behind another start
+        // already counts as a pending request.
+        let _activity = self.begin_request();
+
         // Only one start sequence at a time.
         let _start_guard = self.start_lock.lock().await;
-
-        // Count this as activity so the idle watcher measures from now (covers
-        // prewarm, which calls ensure_running before any request is made).
-        self.touch_activity();
 
         // Fast path: already serving this model and the process is alive.
         {
@@ -1450,6 +1493,31 @@ impl LocalLlmManager {
             let _ = child.wait();
         }
         st.model_id = None;
+    }
+
+    /// Stop the engine unless it is starting or serving a request. Used when the
+    /// user moves a feature to a cloud provider, where waiting for the idle
+    /// timeout (or forever, with "Never") would hold gigabytes for nothing.
+    pub fn stop_if_idle(&self) {
+        // Holding the start lock means no `ensure_running` can be mid-spawn.
+        let Ok(_start_guard) = self.start_lock.try_lock() else {
+            return;
+        };
+        if self.in_flight.load(Ordering::SeqCst) > 0 {
+            return;
+        }
+        let running = {
+            let mut st = self.state.lock().unwrap_or_else(|e| e.into_inner());
+            match st.child.as_mut() {
+                Some(child) => matches!(child.try_wait(), Ok(None)),
+                None => false,
+            }
+        };
+        if running {
+            info!("Stopping the built-in LLM engine: no feature uses it any more");
+            self.stop();
+            self.emit_status();
+        }
     }
 
     fn set_error(&self, error: Option<String>) {

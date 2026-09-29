@@ -53,6 +53,8 @@ impl TranscriptionManager {
 
     pub fn initiate_model_load(&self) {}
 
+    pub fn release_local_for_cloud(&self) {}
+
     pub fn get_current_model(&self) -> Option<String> {
         None
     }

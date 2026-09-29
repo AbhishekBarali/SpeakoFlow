@@ -157,11 +157,16 @@ pub fn switch_active_model(app: &AppHandle, model_id: &str) -> Result<(), String
         settings.selected_language = "auto".to_string();
     }
 
+    // Loaded on demand (by `initiate_model_load` at the next recording, or the
+    // cloud fallback) rather than eagerly whenever nothing would use it now:
+    // "Immediately" unloads after every use anyway, and with cloud
+    // transcription active this model is only the fallback. Downloading one as
+    // a fallback used to put it straight into RAM/VRAM.
+    let cloud_active = crate::stt_cloud::cloud_stt_active(&settings);
+
     write_settings(app, settings);
 
-    // Skip eager loading if unload is set to "Immediately" — the model
-    // will be loaded on-demand during the next transcription.
-    if unload_timeout == ModelUnloadTimeout::Immediately {
+    if unload_timeout == ModelUnloadTimeout::Immediately || cloud_active {
         // Notify frontend — load_model won't be called so no events
         // would otherwise be emitted.
         let _ = app.emit(
@@ -174,9 +179,22 @@ pub fn switch_active_model(app: &AppHandle, model_id: &str) -> Result<(), String
             },
         );
         log::info!(
-            "Model selection changed to {} (not loading — unload set to Immediately).",
-            model_id
+            "Model selection changed to {} (not loading — {}).",
+            model_id,
+            if cloud_active {
+                "cloud transcription is active"
+            } else {
+                "unload set to Immediately"
+            }
         );
+        // A different model left resident would be the one a cloud fallback
+        // picks up, and it is no longer the user's choice.
+        if transcription_manager
+            .get_current_model()
+            .is_some_and(|loaded| loaded != model_id)
+        {
+            let _ = transcription_manager.unload_model();
+        }
         return Ok(());
     }
 
