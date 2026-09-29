@@ -45,6 +45,11 @@ export const HomePage: React.FC = () => {
   const { getSetting } = useSettings();
   const slots = useModelSlots();
   const holdToTalk = getSetting("push_to_talk") ?? true;
+  // With cleanup moved onto the dictation shortcut, these keys clean up too,
+  // so the hero says so instead of listing a second shortcut below.
+  const cleansUp =
+    (getSetting("post_process_enabled") ?? false) &&
+    (getSetting("post_process_on_dictation") ?? false);
   const greeting = t(`home.greeting.${partOfDay(new Date().getHours())}`);
 
   return (
@@ -58,7 +63,11 @@ export const HomePage: React.FC = () => {
         subtitle={holdToTalk ? t("home.hero.hold") : t("home.hero.tap")}
         aside={
           <HeroShortcut
-            label={t("home.shortcuts.dictate.title")}
+            label={
+              cleansUp
+                ? t("home.shortcuts.cleanup.title")
+                : t("home.shortcuts.dictate.title")
+            }
             hint={holdToTalk ? t("home.hero.holdHint") : t("home.hero.tapHint")}
           >
             <ShortcutInput

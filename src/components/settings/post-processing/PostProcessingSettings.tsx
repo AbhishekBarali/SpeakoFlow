@@ -202,10 +202,12 @@ const PostProcessingSettingsApiComponent: React.FC<{
 const NONE_PROMPT_ID = "none";
 
 /**
- * The prompts the app ships, mirrored from `settings.rs`. Only these can be
- * restored to their original text — a user's own prompt has no "original".
+ * The prompts the app ships, mirrored from `shipped_post_process_prompt_text`
+ * in `settings.rs`. Only these can be restored to their original text — a
+ * user's own prompt has no "original".
  */
 const SHIPPED_PROMPT_IDS = new Set([
+  "speakoflow_readable",
   "default_improve_transcriptions",
   "speakoflow_mini_cleanup",
 ]);

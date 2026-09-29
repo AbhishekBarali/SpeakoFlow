@@ -23,9 +23,10 @@ pub fn init_shortcuts(app: &AppHandle) {
         if id == "cancel" {
             continue; // Skip cancel shortcut, it will be registered dynamically
         }
-        // Skip the post-processing (AI Correction) shortcut when the feature is
-        // turned off. Gated only by its own toggle now — not by Experimental.
-        if id == "transcribe_with_post_process" && !user_settings.post_process_enabled {
+        // Skip the separate cleanup shortcut unless it is the one that runs
+        // cleanup: off with the feature, and off when cleanup rides on the
+        // dictation shortcut instead.
+        if id == settings::CLEANUP_BINDING_ID && !settings::cleanup_binding_active(&user_settings) {
             continue;
         }
         // Same for the assistant's own shortcuts when the master switch is off:

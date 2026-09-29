@@ -94,6 +94,14 @@ pub fn register_shortcut(app: &AppHandle, binding: ShortcutBinding) -> Result<()
         );
         return Ok(());
     }
+    // Same for the separate cleanup shortcut, which is only live while it is
+    // the shortcut that runs cleanup. Without this, finishing an edit of it in
+    // Settings re-armed it with cleanup off, or alongside the dictation
+    // shortcut that already cleans up.
+    if binding.id == settings::CLEANUP_BINDING_ID && !settings::cleanup_binding_active(&settings) {
+        debug!("Not registering '{}': it is not in use", binding.id);
+        return Ok(());
+    }
     match settings.keyboard_implementation {
         KeyboardImplementation::Tauri => tauri_impl::register_shortcut(app, binding),
         KeyboardImplementation::HandyKeys => handy_keys::register_shortcut(app, binding),
@@ -424,10 +432,11 @@ fn register_all_shortcuts_for_implementation(
             continue;
         }
 
-        // Skip the post-processing (AI Correction) shortcut when the feature is
-        // turned off. It's a first-class feature now, gated only by its own
-        // `post_process_enabled` toggle — no longer by Experimental.
-        if id == "transcribe_with_post_process" && !current_settings.post_process_enabled {
+        // Skip the separate cleanup shortcut unless it is the one that runs
+        // cleanup (see `settings::cleanup_binding_active`).
+        if id == settings::CLEANUP_BINDING_ID
+            && !settings::cleanup_binding_active(&current_settings)
+        {
             continue;
         }
 
@@ -1054,23 +1063,48 @@ pub fn get_post_process_readiness(app: AppHandle) -> settings::PostProcessReadin
 pub fn change_post_process_enabled_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
     let mut settings = settings::get_settings(&app);
     settings.post_process_enabled = enabled;
-    settings::write_settings(&app, settings.clone());
+    settings::write_settings(&app, settings);
+    sync_cleanup_binding(&app);
+    Ok(())
+}
 
-    // AI Correction is a first-class feature; its hotkey is active whenever the
-    // feature itself is enabled.
-    if let Some(binding) = settings
-        .bindings
-        .get("transcribe_with_post_process")
-        .cloned()
-    {
-        if enabled {
-            let _ = register_shortcut(&app, binding);
-        } else {
-            let _ = unregister_shortcut(&app, binding);
+/// Choose which shortcut runs AI cleanup: its own (`false`), or the dictation
+/// shortcut (`true`), in which case every dictation is cleaned up and the
+/// separate cleanup shortcut is released.
+#[tauri::command]
+#[specta::specta]
+pub fn change_post_process_on_dictation_setting(
+    app: AppHandle,
+    enabled: bool,
+) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    settings.post_process_on_dictation = enabled;
+    settings::write_settings(&app, settings);
+    sync_cleanup_binding(&app);
+    Ok(())
+}
+
+/// Register or release the separate cleanup shortcut to match the settings.
+///
+/// Called after either setting that decides it has been written, so
+/// `register_shortcut`'s own gate reads the new values. It always releases
+/// first: the handy-keys engine registers a second copy of a hotkey it already
+/// holds, which would fire the action twice. Releasing one that is not held is
+/// harmless, so this is safe to repeat.
+fn sync_cleanup_binding(app: &AppHandle) {
+    let settings = settings::get_settings(app);
+    let Some(binding) = settings.bindings.get(settings::CLEANUP_BINDING_ID).cloned() else {
+        return;
+    };
+    if binding.current_binding.trim().is_empty() {
+        return;
+    }
+    let _ = unregister_shortcut(app, binding.clone());
+    if settings::cleanup_binding_active(&settings) {
+        if let Err(e) = register_shortcut(app, binding) {
+            warn!("Could not register the cleanup shortcut: {e}");
         }
     }
-
-    Ok(())
 }
 
 /// Toggle "Generate with Flow" (the spoken activation-phrase generation path).
@@ -1353,7 +1387,7 @@ pub fn set_post_process_provider(app: AppHandle, provider_id: String) -> Result<
 /// stay on task. Getting that pairing wrong looks like "the model is bad", so the
 /// app pairs them.
 ///
-/// Only the two *shipped* prompts are ever swapped. Anything the user selected or
+/// Only the *shipped* prompts are ever swapped. Anything the user selected or
 /// wrote themselves is left exactly as it is — a silent switch away from
 /// someone's own prompt would be worse than a suboptimal default.
 #[tauri::command]
@@ -1368,17 +1402,8 @@ pub fn set_cleanup_local_model(app: AppHandle, model_id: String) -> Result<(), S
         .post_process_selected_prompt_id
         .as_deref()
         .unwrap_or("");
-
-    let repaired_prompt_id =
-        if specialist && selected_prompt == settings::DEFAULT_POST_PROCESS_PROMPT_ID {
-            Some(settings::SPEAKOFLOW_MINI_PROMPT_ID.to_string())
-        } else if !specialist && selected_prompt == settings::SPEAKOFLOW_MINI_PROMPT_ID {
-            Some(settings::DEFAULT_POST_PROCESS_PROMPT_ID.to_string())
-        } else {
-            None
-        };
-    if let Some(prompt_id) = repaired_prompt_id {
-        settings.post_process_selected_prompt_id = Some(prompt_id);
+    if let Some(prompt_id) = paired_shipped_prompt(specialist, selected_prompt) {
+        settings.post_process_selected_prompt_id = Some(prompt_id.to_string());
     }
 
     settings
@@ -1387,6 +1412,24 @@ pub fn set_cleanup_local_model(app: AppHandle, model_id: String) -> Result<(), S
     settings.post_process_provider_id = provider_id;
     settings::write_settings(&app, settings);
     Ok(())
+}
+
+/// The shipped prompt a newly chosen cleanup model should use, or `None` to
+/// leave the selection alone.
+///
+/// A general-purpose shipped prompt moves to Mini's training prompt when Mini is
+/// chosen; Mini's prompt moves to the recommended general one when anything else
+/// is. "No prompt" and every prompt the user wrote are never touched.
+fn paired_shipped_prompt(specialist: bool, selected: &str) -> Option<&'static str> {
+    let general_shipped = selected == settings::DEFAULT_POST_PROCESS_PROMPT_ID
+        || selected == settings::READABLE_POST_PROCESS_PROMPT_ID;
+    if specialist && general_shipped {
+        Some(settings::SPEAKOFLOW_MINI_PROMPT_ID)
+    } else if !specialist && selected == settings::SPEAKOFLOW_MINI_PROMPT_ID {
+        Some(settings::RECOMMENDED_GENERAL_PROMPT_ID)
+    } else {
+        None
+    }
 }
 
 /// Restore a shipped cleanup prompt to the exact text the app ships.
@@ -1398,13 +1441,8 @@ pub fn set_cleanup_local_model(app: AppHandle, model_id: String) -> Result<(), S
 #[tauri::command]
 #[specta::specta]
 pub fn restore_post_process_prompt(app: AppHandle, id: String) -> Result<(), String> {
-    let shipped = match id.as_str() {
-        settings::DEFAULT_POST_PROCESS_PROMPT_ID => {
-            settings::default_improve_transcriptions_prompt()
-        }
-        settings::SPEAKOFLOW_MINI_PROMPT_ID => settings::speakoflow_mini_prompt_text(),
-        _ => return Err(format!("'{}' is not a shipped prompt", id)),
-    };
+    let shipped = settings::shipped_post_process_prompt_text(&id)
+        .ok_or_else(|| format!("'{}' is not a shipped prompt", id))?;
 
     let mut settings_value = settings::get_settings(&app);
     let prompt = settings_value
@@ -1483,11 +1521,12 @@ pub fn delete_post_process_prompt(app: AppHandle, id: String) -> Result<(), Stri
         return Err(format!("Prompt with id '{}' not found", id));
     }
 
-    // If the deleted prompt was selected, return to the stable bundled prompt.
-    // `get_settings`/migration guarantees that prompt exists and is non-empty.
+    // If the deleted prompt was selected, return to the recommended bundled
+    // prompt. `get_settings`/migration re-seeds every bundled prompt, so it
+    // exists and is non-empty even if it was the one just deleted.
     if settings.post_process_selected_prompt_id.as_ref() == Some(&id) {
         settings.post_process_selected_prompt_id =
-            Some(settings::DEFAULT_POST_PROCESS_PROMPT_ID.to_string());
+            Some(settings::RECOMMENDED_GENERAL_PROMPT_ID.to_string());
     }
 
     settings::write_settings(&app, settings);

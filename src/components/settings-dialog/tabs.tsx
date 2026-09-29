@@ -108,7 +108,8 @@ export const GeneralTab: React.FC = () => {
   );
 };
 
-/** A shortcut that only exists while its feature is on, with a way to turn it on. */
+/** A shortcut row with no keys of its own right now (its feature is off, or it
+ * rides on another shortcut), with a way to the page that changes that. */
 const UnavailableShortcut: React.FC<{
   title: string;
   hint: string;
@@ -133,6 +134,7 @@ export const ShortcutsTab: React.FC = () => {
   const { navigate, closeSettings } = useNavigation();
   const isLinux = type() === "linux";
   const cleanupEnabled = getSetting("post_process_enabled") ?? false;
+  const cleanupOnDictation = getSetting("post_process_on_dictation") ?? false;
   const assistantEnabled = getSetting("assistant_enabled") ?? true;
 
   const goTo = (page: "cleanup" | "assistant") => {
@@ -149,7 +151,16 @@ export const ShortcutsTab: React.FC = () => {
           icon={AudioLines}
           tone="teal"
         />
-        {cleanupEnabled ? (
+        {cleanupEnabled && cleanupOnDictation ? (
+          <UnavailableShortcut
+            title={t(
+              "settings.general.shortcut.bindings.transcribe_with_post_process.name",
+            )}
+            hint={t("settingsDialog.shortcuts.cleanupOnDictation")}
+            action={t("settingsDialog.shortcuts.openCleanup")}
+            onAction={() => goTo("cleanup")}
+          />
+        ) : cleanupEnabled ? (
           <ShortcutInput
             shortcutId="transcribe_with_post_process"
             grouped={true}

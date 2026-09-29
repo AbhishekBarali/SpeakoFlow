@@ -7,10 +7,10 @@ import { isCleanupSpecialistModel } from "@/lib/utils/cleanupSpecialist";
 import { Page, PageHeader, SectionTitle } from "@/components/ui/Page";
 import { Switch } from "@/components/ui/Switch";
 import { Button } from "@/components/ui/Button";
-import Badge from "@/components/ui/Badge";
 import { Callout } from "@/components/ui/Callout";
 import { Dialog } from "@/components/ui/Dialog";
 import { Hero, HeroShortcut } from "@/components/ui/Hero";
+import { Segmented } from "@/components/ui/Segmented";
 import { SettingsGroup } from "@/components/ui/SettingsGroup";
 import { SettingContainer } from "@/components/ui/SettingContainer";
 import { ShortcutInput } from "@/components/settings/ShortcutInput";
@@ -107,6 +107,39 @@ const InstructionsRow: React.FC = () => {
 };
 
 /**
+ * Which shortcut runs cleanup: its own, or the dictation shortcut. The second
+ * means one set of keys for everything, with every dictation cleaned up; the
+ * backend then releases the separate combo so it stops swallowing those keys
+ * from other apps.
+ */
+const ShortcutModeRow: React.FC = () => {
+  const { t } = useTranslation();
+  const { getSetting, updateSetting, isUpdating } = useSettings();
+  const onDictation = getSetting("post_process_on_dictation") ?? false;
+  return (
+    <SettingContainer
+      title={t("cleanup.shortcut.title")}
+      description={t("cleanup.shortcut.info")}
+      grouped={true}
+    >
+      <Segmented
+        size="sm"
+        label={t("cleanup.shortcut.title")}
+        value={onDictation ? "dictation" : "separate"}
+        onChange={(mode) =>
+          void updateSetting("post_process_on_dictation", mode === "dictation")
+        }
+        disabled={isUpdating("post_process_on_dictation")}
+        options={[
+          { value: "separate", label: t("cleanup.shortcut.separate") },
+          { value: "dictation", label: t("cleanup.shortcut.dictation") },
+        ]}
+      />
+    </SettingContainer>
+  );
+};
+
+/**
  * AI cleanup: a switch, the shortcut that uses it (click the keys to change
  * them), the model, and the writing styles — all of them visible, with the one
  * you pick shown on a real sentence. Only the long base prompt opens a window.
@@ -118,12 +151,14 @@ export const CleanupPage: React.FC = () => {
   const summary = useModelSlots().cleanup;
   const enabled = getSetting("post_process_enabled") ?? false;
   const holdToTalk = getSetting("push_to_talk") ?? true;
+  // The hero shows the keys that actually clean up: the dictation shortcut
+  // once cleanup rides on it, the separate one otherwise.
+  const onDictation = getSetting("post_process_on_dictation") ?? false;
 
   return (
     <Page>
       <PageHeader
         title={t("nav.cleanup")}
-        badge={<Badge variant="outline">{t("common.beta")}</Badge>}
         description={t("cleanup.description")}
         actions={
           <div className="inline-flex items-center gap-2.5 text-sm font-medium text-ink">
@@ -146,18 +181,31 @@ export const CleanupPage: React.FC = () => {
         title={t("cleanup.hero.title")}
         aside={
           <HeroShortcut
-            label={t("home.shortcuts.cleanup.title")}
+            label={
+              onDictation
+                ? t("home.shortcuts.dictate.title")
+                : t("home.shortcuts.cleanup.title")
+            }
             hint={
               !enabled
                 ? t("cleanup.hero.offHint")
-                : holdToTalk
-                  ? t("cleanup.hero.onHint")
-                  : t("cleanup.hero.onHintTap")
+                : onDictation
+                  ? t("cleanup.hero.onDictationHint")
+                  : holdToTalk
+                    ? t("cleanup.hero.onHint")
+                    : t("cleanup.hero.onHintTap")
             }
           >
             <span className={enabled ? undefined : "opacity-60"}>
               <ShortcutInput
-                shortcutId="transcribe_with_post_process"
+                // Keyed so switching modes mounts a fresh editor instead of
+                // re-pointing one mid-edit at a different binding.
+                key={
+                  onDictation ? "transcribe" : "transcribe_with_post_process"
+                }
+                shortcutId={
+                  onDictation ? "transcribe" : "transcribe_with_post_process"
+                }
                 bare
                 finish="glass"
                 size="lg"
@@ -183,6 +231,7 @@ export const CleanupPage: React.FC = () => {
       )}
 
       <SettingsGroup className="mt-6">
+        <ShortcutModeRow />
         <SettingContainer
           title={t("cleanup.model.title")}
           description={t("cleanup.model.info")}

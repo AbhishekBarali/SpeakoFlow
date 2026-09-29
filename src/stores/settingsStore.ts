@@ -44,6 +44,7 @@ const commandSucceeded = (result: unknown): void => {
 
 const isCleanupSetting = (key: keyof Settings): boolean =>
   key === "post_process_enabled" ||
+  key === "post_process_on_dictation" ||
   key === "post_process_selected_prompt_id" ||
   key === "post_process_tone" ||
   key === "post_process_timeout_secs";
@@ -217,6 +218,8 @@ const settingUpdaters: {
   history_limit: (value) => commands.updateHistoryLimit(value as number),
   post_process_enabled: (value) =>
     commands.changePostProcessEnabledSetting(value as boolean),
+  post_process_on_dictation: (value) =>
+    commands.changePostProcessOnDictationSetting(value as boolean),
   flow_enabled: (value) => commands.changeFlowEnabledSetting(value as boolean),
   flow_phrase: (value) => commands.changeFlowPhraseSetting(value as string),
   flow_screen_access: (value) =>

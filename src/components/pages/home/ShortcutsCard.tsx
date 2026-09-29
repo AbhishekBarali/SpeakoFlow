@@ -31,15 +31,23 @@ export const ShortcutsCard: React.FC = () => {
   const os = useOsType();
   const holdToTalk = getSetting("push_to_talk") ?? true;
   const cleanupOn = getSetting("post_process_enabled") ?? false;
+  // Cleanup that rides on the dictation shortcut has no keys of its own; the
+  // hero above already says "Dictate and clean up".
+  const cleanupOnDictation =
+    cleanupOn && (getSetting("post_process_on_dictation") ?? false);
   const assistantOn = getSetting("assistant_enabled") ?? true;
 
   const rows: ShortcutRow[] = [
-    {
-      id: "transcribe_with_post_process",
-      title: t("home.shortcuts.cleanup.title"),
-      info: t("home.shortcuts.cleanup.what"),
-      off: cleanupOn ? undefined : "cleanup",
-    },
+    ...(cleanupOnDictation
+      ? []
+      : [
+          {
+            id: "transcribe_with_post_process",
+            title: t("home.shortcuts.cleanup.title"),
+            info: t("home.shortcuts.cleanup.what"),
+            off: cleanupOn ? undefined : ("cleanup" as PageId),
+          },
+        ]),
     {
       id: "assistant",
       title: t("home.shortcuts.ask.title"),

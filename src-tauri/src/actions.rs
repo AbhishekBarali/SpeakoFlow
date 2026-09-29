@@ -77,11 +77,21 @@ pub trait ShortcutAction: Send + Sync {
 
 // Transcribe Action
 struct TranscribeAction {
+    /// This is the dedicated "dictate and clean up" shortcut. Whether a given
+    /// recording is cleaned up is [`cleans_up`], which also covers the dictation
+    /// shortcut when cleanup rides on it.
     post_process: bool,
 }
 
 fn uses_ai_cleanup(post_process: bool) -> bool {
     post_process
+}
+
+/// Whether a recording from this shortcut runs AI cleanup: always for the
+/// cleanup shortcut, and for the dictation shortcut too once cleanup has been
+/// moved onto it.
+fn cleans_up(cleanup_binding: bool, settings: &AppSettings) -> bool {
+    cleanup_binding || crate::settings::cleanup_on_dictation(settings)
 }
 
 /// Return the UI to rest: overlay down, tray idle.
@@ -2216,7 +2226,7 @@ impl ShortcutAction for TranscribeAction {
         // weights loaded and its first prefill forced; a remote provider needs
         // its connection opened and its route to the model touched, which used to
         // happen for the first time inside the user's wait.
-        if self.post_process
+        if cleans_up(self.post_process, &settings)
             && settings.post_process_unload_timeout != ModelUnloadTimeout::Immediately
         {
             if let Ok(config) = resolve_post_process_config(&settings) {
@@ -2356,7 +2366,11 @@ impl ShortcutAction for TranscribeAction {
         play_feedback_sound(app, SoundType::Stop);
 
         let binding_id = binding_id.to_string(); // Clone binding_id for the async task
-        let post_process = self.post_process;
+                                                 // Two different questions. Flow listens only on the dictation shortcut,
+                                                 // whatever it does with cleanup; cleanup runs on the cleanup shortcut,
+                                                 // and on the dictation shortcut too once it has been moved there.
+        let flow_eligible = !self.post_process;
+        let post_process = cleans_up(self.post_process, &get_settings(app));
         let flow_cancel_generation = crate::flow::cancellation_generation();
 
         tauri::async_runtime::spawn(async move {
@@ -2507,17 +2521,17 @@ impl ShortcutAction for TranscribeAction {
                             // dictation that begins with the activation phrase
                             // becomes a one-shot AI generation command whose
                             // finished result is pasted instead of the spoken
-                            // words. Only the plain dictation binding
-                            // participates — the AI-cleanup binding keeps its
-                            // existing behavior. All-or-nothing: any failure
-                            // pastes nothing and shows a brief overlay notice.
+                            // words. Only the dictation shortcut participates —
+                            // the separate cleanup shortcut keeps its existing
+                            // behavior — and it does so whether or not cleanup
+                            // runs on it. All-or-nothing: any failure pastes
+                            // nothing and shows a brief overlay notice.
                             //
                             // The same slot also carries the AI-cleanup fallback
-                            // notice below. The two can never collide: Flow only
-                            // runs when `!post_process` and cleanup only when
-                            // `post_process`.
+                            // notice below. A Flow notice wins: it is only set
+                            // when Flow did not run, and it explains the text.
                             let mut overlay_notice: Option<&'static str> = None;
-                            if !post_process {
+                            if flow_eligible {
                                 let settings = crate::settings::get_settings(&ah);
                                 match crate::flow::plan_flow(&settings, &transcription) {
                                     crate::flow::FlowPlan::NotFlow => {}
@@ -3136,7 +3150,7 @@ pub static ACTION_MAP: Lazy<HashMap<String, Arc<dyn ShortcutAction>>> = Lazy::ne
 mod tests {
     use super::{
         append_final_output_contract, append_style_layer, build_post_process_request,
-        build_system_prompt, classify_chat_error, cleanup_fallback_notice,
+        build_system_prompt, classify_chat_error, cleans_up, cleanup_fallback_notice,
         cleanup_reasoning_options, cleanup_token_budget, fallback_reason_for_failure,
         finalize_post_process_attempt, is_schema_compatibility_error, is_system_role_error,
         model_rejection_detail, parse_structured_output, remember_token_cap_starves_output,
@@ -3905,6 +3919,41 @@ Try plugging it into a coding agent or productivity app listed on https://openro
     fn plain_dictation_and_cleanup_keep_distinct_generation_paths() {
         assert!(!uses_ai_cleanup(false));
         assert!(uses_ai_cleanup(true));
+    }
+
+    #[test]
+    fn the_dictation_shortcut_cleans_up_only_when_cleanup_is_moved_onto_it() {
+        let mut settings = crate::settings::get_default_settings();
+        // Cleanup off: neither shortcut cleans up except the dedicated one,
+        // which is not even registered then.
+        settings.post_process_enabled = false;
+        settings.post_process_on_dictation = true;
+        assert!(!cleans_up(false, &settings));
+        assert!(!crate::settings::cleanup_binding_active(&settings));
+
+        // Cleanup on, on its own shortcut: the default arrangement.
+        settings.post_process_enabled = true;
+        settings.post_process_on_dictation = false;
+        assert!(!cleans_up(false, &settings));
+        assert!(cleans_up(true, &settings));
+        assert!(crate::settings::cleanup_binding_active(&settings));
+
+        // Cleanup on, on the dictation shortcut: dictation cleans up and the
+        // separate shortcut is released.
+        settings.post_process_on_dictation = true;
+        assert!(cleans_up(false, &settings));
+        assert!(!crate::settings::cleanup_binding_active(&settings));
+    }
+
+    #[test]
+    fn an_older_store_without_the_setting_keeps_its_separate_shortcut() {
+        let mut stored = serde_json::to_value(crate::settings::get_default_settings()).unwrap();
+        let object = stored.as_object_mut().unwrap();
+        assert!(object.remove("post_process_on_dictation").is_some());
+        object.insert("post_process_enabled".into(), serde_json::Value::Bool(true));
+        let settings: crate::settings::AppSettings = serde_json::from_value(stored).unwrap();
+        assert!(!settings.post_process_on_dictation);
+        assert!(crate::settings::cleanup_binding_active(&settings));
     }
 
     #[test]
