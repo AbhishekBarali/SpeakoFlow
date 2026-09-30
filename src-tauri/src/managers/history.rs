@@ -107,9 +107,26 @@ pub struct AssistantHistoryEntry {
     pub messages: Vec<ChatMessage>,
 }
 
+/// One row of the conversation list: what a list row shows, without the
+/// messages. Messages carry base64 screenshot thumbnails and the History page
+/// reloads its list after every assistant turn, so listing whole conversations
+/// moved megabytes per turn to render a title and a count. The messages are
+/// fetched one conversation at a time, when it is expanded.
+#[derive(Clone, Debug, Serialize, Deserialize, Type)]
+pub struct AssistantHistorySummary {
+    pub id: i64,
+    /// When the conversation was first saved (seconds since epoch).
+    pub timestamp: i64,
+    /// When the most recent turn was added (seconds since epoch).
+    pub updated_at: i64,
+    /// Short label derived from the first user message.
+    pub title: String,
+    pub message_count: i64,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, Type)]
 pub struct PaginatedAssistantHistory {
-    pub entries: Vec<AssistantHistoryEntry>,
+    pub entries: Vec<AssistantHistorySummary>,
     pub has_more: bool,
 }
 
@@ -1410,55 +1427,49 @@ impl HistoryManager {
     }
 
     /// Page through assistant conversations, newest first (keyset pagination
-    /// on `id`, mirroring `get_history_entries`).
+    /// on `id`, mirroring `get_history_entries`). Summaries only; one
+    /// conversation's messages come from [`Self::get_assistant_session`].
     pub async fn get_assistant_history_entries(
         &self,
         cursor: Option<i64>,
         limit: Option<usize>,
     ) -> Result<PaginatedAssistantHistory> {
         let conn = self.get_connection()?;
-        let limit = limit.map(|l| l.min(200));
+        Self::assistant_summaries_with_conn(&conn, cursor, limit)
+    }
 
-        let mut entries: Vec<AssistantHistoryEntry> = match (cursor, limit) {
-            (Some(cursor_id), Some(lim)) => {
-                let fetch_count = (lim + 1) as i64;
-                let mut stmt = conn.prepare(
-                    "SELECT id, timestamp, updated_at, title, messages
-                     FROM assistant_history
-                     WHERE id < ?1
-                     ORDER BY id DESC
-                     LIMIT ?2",
-                )?;
-                let result = stmt
-                    .query_map(params![cursor_id, fetch_count], Self::map_assistant_entry)?
-                    .collect::<std::result::Result<Vec<_>, _>>()?;
-                result
-            }
-            (None, Some(lim)) => {
-                let fetch_count = (lim + 1) as i64;
-                let mut stmt = conn.prepare(
-                    "SELECT id, timestamp, updated_at, title, messages
-                     FROM assistant_history
-                     ORDER BY id DESC
-                     LIMIT ?1",
-                )?;
-                let result = stmt
-                    .query_map(params![fetch_count], Self::map_assistant_entry)?
-                    .collect::<std::result::Result<Vec<_>, _>>()?;
-                result
-            }
-            (_, None) => {
-                let mut stmt = conn.prepare(
-                    "SELECT id, timestamp, updated_at, title, messages
-                     FROM assistant_history
-                     ORDER BY id DESC",
-                )?;
-                let result = stmt
-                    .query_map([], Self::map_assistant_entry)?
-                    .collect::<std::result::Result<Vec<_>, _>>()?;
-                result
-            }
-        };
+    fn assistant_summaries_with_conn(
+        conn: &Connection,
+        cursor: Option<i64>,
+        limit: Option<usize>,
+    ) -> Result<PaginatedAssistantHistory> {
+        let limit = limit.map(|l| l.min(200));
+        // One extra row answers `has_more`. A negative LIMIT is SQLite's "no limit".
+        let fetch_count = limit.map_or(-1, |lim| lim as i64 + 1);
+
+        // The count is taken in SQL so the messages never leave the database.
+        // Malformed JSON counts as an empty conversation instead of failing the
+        // whole list, the same leniency `map_assistant_entry` applies.
+        let mut stmt = conn.prepare(
+            "SELECT id, timestamp, updated_at, title,
+                    CASE WHEN json_valid(messages) THEN json_array_length(messages) ELSE 0 END
+                        AS message_count
+             FROM assistant_history
+             WHERE ?1 IS NULL OR id < ?1
+             ORDER BY id DESC
+             LIMIT ?2",
+        )?;
+        let mut entries = stmt
+            .query_map(params![cursor, fetch_count], |row| {
+                Ok(AssistantHistorySummary {
+                    id: row.get("id")?,
+                    timestamp: row.get("timestamp")?,
+                    updated_at: row.get("updated_at")?,
+                    title: row.get("title")?,
+                    message_count: row.get("message_count")?,
+                })
+            })?
+            .collect::<std::result::Result<Vec<_>, _>>()?;
 
         let has_more = limit.is_some_and(|lim| entries.len() > lim);
         if has_more {
@@ -2255,5 +2266,102 @@ mod tests {
         assert_eq!(stats.longest_streak_days, 0);
         assert_eq!(stats.active_days, 0);
         assert!(stats.recent_days.is_empty());
+    }
+
+    // ---- assistant conversation list ----
+
+    fn insert_conversation(conn: &Connection, updated_at: i64, messages: &str) -> i64 {
+        conn.execute(
+            "INSERT INTO assistant_history (timestamp, updated_at, title, messages)
+             VALUES (?1, ?2, ?3, ?4)",
+            params![
+                updated_at - 60,
+                updated_at,
+                format!("Chat {}", updated_at),
+                messages
+            ],
+        )
+        .expect("insert conversation");
+        conn.last_insert_rowid()
+    }
+
+    #[test]
+    fn conversation_list_counts_messages_without_loading_them() {
+        let conn = migrated_conn();
+        let messages = serde_json::to_string(&[
+            ChatMessage {
+                role: "user".into(),
+                content: "what is on my screen".into(),
+                images: vec!["data:image/jpeg;base64,AAAA".into()],
+            },
+            ChatMessage {
+                role: "assistant".into(),
+                content: "A terminal.".into(),
+                images: Vec::new(),
+            },
+        ])
+        .expect("serialize messages");
+        let id = insert_conversation(&conn, 1_000, &messages);
+
+        let page = HistoryManager::assistant_summaries_with_conn(&conn, None, None).expect("list");
+        assert!(!page.has_more);
+        assert_eq!(page.entries.len(), 1);
+        let entry = &page.entries[0];
+        assert_eq!(entry.id, id);
+        assert_eq!(entry.timestamp, 940);
+        assert_eq!(entry.updated_at, 1_000);
+        assert_eq!(entry.title, "Chat 1000");
+        assert_eq!(entry.message_count, 2);
+    }
+
+    #[test]
+    fn a_malformed_conversation_lists_as_empty_instead_of_failing_the_list() {
+        let conn = migrated_conn();
+        insert_conversation(&conn, 1_000, "not json");
+        insert_conversation(&conn, 2_000, "{\"role\":\"user\"}");
+        insert_conversation(&conn, 3_000, "[]");
+
+        let page = HistoryManager::assistant_summaries_with_conn(&conn, None, None).expect("list");
+        let counts: Vec<i64> = page.entries.iter().map(|e| e.message_count).collect();
+        assert_eq!(counts, vec![0, 0, 0]);
+    }
+
+    #[test]
+    fn conversation_list_pages_newest_first_by_id() {
+        let conn = migrated_conn();
+        let ids: Vec<i64> = (1..=5)
+            .map(|n| insert_conversation(&conn, n * 100, "[]"))
+            .collect();
+
+        let first =
+            HistoryManager::assistant_summaries_with_conn(&conn, None, Some(2)).expect("page 1");
+        assert!(first.has_more);
+        assert_eq!(
+            first.entries.iter().map(|e| e.id).collect::<Vec<_>>(),
+            vec![ids[4], ids[3]]
+        );
+
+        let cursor = first.entries.last().map(|e| e.id);
+        let second =
+            HistoryManager::assistant_summaries_with_conn(&conn, cursor, Some(2)).expect("page 2");
+        assert!(second.has_more);
+        assert_eq!(
+            second.entries.iter().map(|e| e.id).collect::<Vec<_>>(),
+            vec![ids[2], ids[1]]
+        );
+
+        let cursor = second.entries.last().map(|e| e.id);
+        let last =
+            HistoryManager::assistant_summaries_with_conn(&conn, cursor, Some(2)).expect("page 3");
+        assert!(!last.has_more);
+        assert_eq!(
+            last.entries.iter().map(|e| e.id).collect::<Vec<_>>(),
+            vec![ids[0]]
+        );
+
+        // Without a limit the whole list comes back and nothing is "more".
+        let all = HistoryManager::assistant_summaries_with_conn(&conn, None, None).expect("all");
+        assert!(!all.has_more);
+        assert_eq!(all.entries.len(), 5);
     }
 }

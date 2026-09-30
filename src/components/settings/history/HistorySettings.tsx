@@ -37,7 +37,8 @@ import { toast } from "sonner";
 import {
   commands,
   events,
-  type AssistantHistoryEntry,
+  type AssistantHistorySummary,
+  type ChatMessage,
   type HistoryEntry,
   type HistoryUpdatePayload,
 } from "@/bindings";
@@ -280,7 +281,7 @@ const OpenRecordingsButton: React.FC<OpenRecordingsButtonProps> = ({
  */
 type FeedItem =
   | { kind: "transcription"; sortTime: number; entry: HistoryEntry }
-  | { kind: "assistant"; sortTime: number; session: AssistantHistoryEntry };
+  | { kind: "assistant"; sortTime: number; session: AssistantHistorySummary };
 
 type HistoryFilter = "all" | "recordings" | "flow" | "assistant";
 
@@ -352,12 +353,17 @@ export const HistorySettings: React.FC = () => {
   const pageGenerationRef = useRef(0);
 
   // Assistant conversations are stored separately from transcriptions, so we
-  // load them as their own list and merge for display. They are few and
-  // capped on the backend, so a single fetch (no pagination) is enough.
+  // load them as their own list and merge for display. The list carries only
+  // what a row shows (no messages), and the backend caps it, so one fetch of
+  // the whole list stays small. It is not paged like recordings: the feed
+  // orders conversations by last activity, while the id cursor pages them by
+  // creation, so an old conversation continued today would sit on a page not
+  // yet loaded. A row loads its messages when expanded.
   const [assistantSessions, setAssistantSessions] = useState<
-    AssistantHistoryEntry[]
+    AssistantHistorySummary[]
   >([]);
   const [assistantLoaded, setAssistantLoaded] = useState(false);
+  const assistantGenerationRef = useRef(0);
   const [expandedAssistant, setExpandedAssistant] = useState<Set<number>>(
     new Set(),
   );
@@ -404,8 +410,12 @@ export const HistorySettings: React.FC = () => {
   }, []);
 
   const loadAssistantSessions = useCallback(async () => {
+    // A reload that resolves after a newer one must not put its older list back.
+    assistantGenerationRef.current += 1;
+    const generation = assistantGenerationRef.current;
     try {
       const result = await commands.getAssistantHistoryEntries(null, null);
+      if (generation !== assistantGenerationRef.current) return;
       if (result.status === "ok") {
         setAssistantSessions(result.data.entries);
       }
@@ -484,8 +494,7 @@ export const HistorySettings: React.FC = () => {
   // so a turn there can't update this list directly). Refetch on each signal —
   // expansion state is keyed by id, so it survives the reload.
   useEffect(() => {
-    // Coalesced: one turn emits this more than once, and each reload fetches
-    // every conversation with its messages.
+    // Coalesced: one turn emits this more than once.
     let timer: ReturnType<typeof setTimeout> | null = null;
     const unlisten = listen("assistant-history-updated", () => {
       if (timer !== null) clearTimeout(timer);
@@ -604,8 +613,8 @@ export const HistorySettings: React.FC = () => {
   }, []);
 
   const copyConversation = useCallback(
-    (session: AssistantHistoryEntry) => {
-      const text = session.messages
+    (messages: ChatMessage[]) => {
+      const text = messages
         .map((message) => {
           const { text: body } = cleanMessageContent(message.content);
           const label =
@@ -798,7 +807,7 @@ export const HistorySettings: React.FC = () => {
                       onToggleExpand={() =>
                         toggleExpandAssistant(item.session.id)
                       }
-                      onCopyConversation={() => copyConversation(item.session)}
+                      onCopyConversation={copyConversation}
                       onDelete={() => deleteAssistantSession(item.session.id)}
                       onResume={() =>
                         void resumeAssistantSession(item.session.id)
@@ -1241,15 +1250,24 @@ const HistoryEntryComponent: React.FC<HistoryEntryProps> = ({
 };
 
 interface AssistantHistoryEntryProps {
-  session: AssistantHistoryEntry;
+  session: AssistantHistorySummary;
   expanded: boolean;
   onToggleExpand: () => void;
-  onCopyConversation: () => void;
+  onCopyConversation: (messages: ChatMessage[]) => void;
   onDelete: () => Promise<void>;
   onResume: () => void;
   /** Continue from one message as a new conversation, leaving this one intact. */
   onBranch: (messageIndex: number) => void;
 }
+
+/** One conversation's messages; `null` when it was deleted in the meantime. */
+const fetchConversationMessages = async (
+  id: number,
+): Promise<ChatMessage[] | null> => {
+  const result = await commands.getAssistantHistoryEntry(id);
+  if (result.status !== "ok") throw new Error(String(result.error));
+  return result.data?.messages ?? null;
+};
 
 /**
  * Assistant conversations render as collapsible entries: a header with the
@@ -1268,13 +1286,42 @@ const AssistantHistoryEntryComponent: React.FC<AssistantHistoryEntryProps> = ({
 }) => {
   const { t, i18n } = useTranslation();
   const [showCopied, setShowCopied] = useState(false);
+  // Only an expanded row holds its messages. They are fetched again when the
+  // conversation gains a turn while open, and let go on collapse, so the page
+  // never accumulates every thread it has shown.
+  const [messages, setMessages] = useState<ChatMessage[] | null>(null);
+
+  useEffect(() => {
+    if (!expanded) {
+      setMessages(null);
+      return;
+    }
+    let cancelled = false;
+    fetchConversationMessages(session.id)
+      .then((loaded) => {
+        if (!cancelled) setMessages(loaded ?? []);
+      })
+      .catch((error) => {
+        console.error("Failed to load assistant conversation:", error);
+        if (!cancelled) setMessages([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [expanded, session.id, session.updated_at, session.message_count]);
 
   const formattedDate = formatTimeOfDay(session.updated_at, i18n.language);
 
-  const handleCopy = () => {
-    onCopyConversation();
-    setShowCopied(true);
-    setTimeout(() => setShowCopied(false), 2000);
+  const handleCopy = async () => {
+    try {
+      const loaded = messages ?? (await fetchConversationMessages(session.id));
+      if (!loaded) return;
+      onCopyConversation(loaded);
+      setShowCopied(true);
+      setTimeout(() => setShowCopied(false), 2000);
+    } catch (error) {
+      console.error("Failed to copy assistant conversation:", error);
+    }
   };
 
   const handleDelete = async () => {
@@ -1297,7 +1344,7 @@ const AssistantHistoryEntryComponent: React.FC<AssistantHistoryEntryProps> = ({
       id: "copy",
       label: t("settings.history.copyConversation"),
       icon: Copy,
-      onSelect: handleCopy,
+      onSelect: () => void handleCopy(),
     },
     {
       id: "delete",
@@ -1350,7 +1397,7 @@ const AssistantHistoryEntryComponent: React.FC<AssistantHistoryEntryProps> = ({
               {expanded
                 ? t("historyPage.chat.hideMessages")
                 : t("settings.history.messageCount", {
-                    count: session.messages.length,
+                    count: session.message_count,
                   })}
               <ChevronDown
                 className={`h-3 w-3 transition-transform duration-150 ${expanded ? "rotate-180" : ""}`}
@@ -1383,9 +1430,16 @@ const AssistantHistoryEntryComponent: React.FC<AssistantHistoryEntryProps> = ({
         </div>
       </div>
 
-      {expanded && (
+      {expanded && messages === null && (
+        <div
+          className="h-9 animate-pulse rounded-xl bg-surface-strong/60"
+          aria-busy="true"
+        />
+      )}
+
+      {expanded && messages !== null && (
         <div className="flex flex-col gap-2 pt-1.5">
-          {session.messages.map((message, index) => {
+          {messages.map((message, index) => {
             const { text, screenshot, files } = cleanMessageContent(
               message.content,
             );

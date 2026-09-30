@@ -27,7 +27,7 @@ import {
   VolumeX,
   X,
 } from "lucide-react";
-import { commands, type AssistantHistoryEntry } from "@/bindings";
+import { commands, type AssistantHistorySummary } from "@/bindings";
 import {
   CONVERSATION_SENSITIVITIES,
   type ConversationSensitivity,
@@ -653,29 +653,46 @@ function CallHistory({
   onOpen: (id: number) => Promise<boolean>;
 }) {
   const { t, i18n } = useTranslation();
-  const [entries, setEntries] = useState<AssistantHistoryEntry[]>([]);
+  const [entries, setEntries] = useState<AssistantHistorySummary[]>([]);
   const [hasMore, setHasMore] = useState(false);
   const [status, setStatus] = useState<"loading" | "ready" | "failed">(
     "loading",
   );
   const [opening, setOpening] = useState<number | null>(null);
+  const entriesRef = useRef<AssistantHistorySummary[]>([]);
+  const busyRef = useRef(false);
+  const generationRef = useRef(0);
+
+  useEffect(() => {
+    entriesRef.current = entries;
+  }, [entries]);
 
   const load = useCallback(async (cursor: number | null) => {
+    const isReload = cursor === null;
+    if (!isReload && busyRef.current) return;
+    // A reload supersedes a page still in flight, which would otherwise be
+    // appended after the fresh list (the same guard as History's `loadPage`).
+    if (isReload) generationRef.current += 1;
+    const generation = generationRef.current;
+    busyRef.current = true;
+    // A reload asks for as many rows as are showing, so a turn saved while
+    // the user is back in older pages does not fold the list to its first.
+    const limit = isReload
+      ? Math.max(HISTORY_PAGE, entriesRef.current.length)
+      : HISTORY_PAGE;
     try {
-      const result = await commands.getAssistantHistoryEntries(
-        cursor,
-        HISTORY_PAGE,
-      );
+      const result = await commands.getAssistantHistoryEntries(cursor, limit);
+      if (generation !== generationRef.current) return;
       if (result.status !== "ok") throw new Error(result.error);
       setEntries((previous) =>
-        cursor === null
-          ? result.data.entries
-          : [...previous, ...result.data.entries],
+        isReload ? result.data.entries : [...previous, ...result.data.entries],
       );
       setHasMore(result.data.has_more);
       setStatus("ready");
     } catch {
-      setStatus("failed");
+      if (generation === generationRef.current) setStatus("failed");
+    } finally {
+      if (generation === generationRef.current) busyRef.current = false;
     }
   }, []);
 
@@ -730,7 +747,7 @@ function CallHistory({
           const meta = [
             relativeTime(entry.updated_at || entry.timestamp, i18n.language),
             t("assistant.conversation.history.messages", {
-              count: entry.messages.length,
+              count: entry.message_count,
             }),
           ].join(" · ");
           return (

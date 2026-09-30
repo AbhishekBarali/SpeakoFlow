@@ -1,7 +1,8 @@
 use crate::actions::process_transcription_output;
 use crate::managers::{
     history::{
-        EntryOutcome, HistoryManager, PaginatedAssistantHistory, PaginatedHistory, UsageStats,
+        AssistantHistoryEntry, EntryOutcome, HistoryManager, PaginatedAssistantHistory,
+        PaginatedHistory, UsageStats,
     },
     transcription::TranscriptionManager,
 };
@@ -328,6 +329,19 @@ pub async fn get_assistant_history_entries(
     history_manager
         .get_assistant_history_entries(cursor, limit)
         .await
+        .map_err(|e| e.to_string())
+}
+
+/// One saved assistant conversation with its messages, loaded when the History
+/// list expands it. `None` when it has been deleted since the list was fetched.
+#[tauri::command]
+#[specta::specta]
+pub async fn get_assistant_history_entry(
+    history_manager: State<'_, Arc<HistoryManager>>,
+    id: i64,
+) -> Result<Option<AssistantHistoryEntry>, String> {
+    history_manager
+        .get_assistant_session(id)
         .map_err(|e| e.to_string())
 }
 
