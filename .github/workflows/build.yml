@@ -99,6 +99,9 @@ jobs:
       # path. A fork's PR build has no secret and simply skips updater
       # artifacts, exactly as before.
       HAS_UPDATER_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
+      # Whether an unsigned (not notarized) macOS build can still be signed
+      # with a stable identity. See "Import stable macOS signing identity".
+      HAS_MACOS_SIGNING_CERT: ${{ secrets.APPLE_CERTIFICATE != '' }}
     steps:
       - name: Enable long paths (Windows)
         if: runner.os == 'Windows'
@@ -452,6 +455,62 @@ jobs:
           sudo cp -vL "$LIBDIR"/libtranscribe.so* "$LIBDIR"/libggml*.so* /usr/local/lib/ 2>/dev/null || true
           sudo ldconfig
 
+      # Unsigned builds used to reach users with no signing identity at all, so
+      # every release had a different code signature. macOS stores an
+      # Accessibility grant with the signature it was given to, so after each
+      # update System Settings still showed SpeakoFlow switched on while the new
+      # binary was refused, and onboarding waited forever (issue #34). Signing
+      # every release with the SAME certificate gives the app a stable designated
+      # requirement, so a grant survives updates. The certificate does not have
+      # to come from Apple: a free self-signed one works, because TCC only
+      # compares the requirement and codesign signs with an untrusted identity
+      # (trust matters to Gatekeeper, which rejects this build either way until
+      # it is notarized). BUILD.md has the one-time setup.
+      #
+      # Only runs when APPLE_CERTIFICATE is set. Without it nothing here runs and
+      # the build is exactly what it was. The identity is exported as a SHA-1
+      # hash rather than a name because `find-identity -v` hides an untrusted
+      # certificate, and codesign accepts the hash either way.
+      - name: Import stable macOS signing identity (unsigned build)
+        if: ${{ !inputs.sign-binaries && contains(inputs.platform, 'macos') && env.HAS_MACOS_SIGNING_CERT == 'true' }}
+        shell: bash
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: |
+          set -euo pipefail
+          KEYCHAIN="$RUNNER_TEMP/speakoflow-signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -hex 24)"
+          CERT="$RUNNER_TEMP/speakoflow-signing.p12"
+          printf '%s' "$APPLE_CERTIFICATE" | base64 --decode > "$CERT"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -t 7200 -u "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security import "$CERT" -k "$KEYCHAIN" -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          rm -f "$CERT"
+          # Without the partition list, codesign would wait on a GUI prompt to
+          # use the key, which on a runner is a hang until the job times out.
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN" > /dev/null
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+
+          # No -v: that filters out certificates the runner does not trust,
+          # which is every self-signed one.
+          IDENTITIES="$(security find-identity -p codesigning "$KEYCHAIN")"
+          echo "$IDENTITIES"
+          if [ -n "${APPLE_SIGNING_IDENTITY}" ]; then
+            IDENTITY="$(grep -F "\"${APPLE_SIGNING_IDENTITY}\"" <<<"$IDENTITIES" | head -n1 | awk '{print $2}' || true)"
+          else
+            IDENTITY="$(grep -E '^ *[0-9]+\) [0-9A-F]{40} ' <<<"$IDENTITIES" | head -n1 | awk '{print $2}' || true)"
+          fi
+          if ! [[ "$IDENTITY" =~ ^[0-9A-F]{40}$ ]]; then
+            echo "ERROR: APPLE_CERTIFICATE is set but holds no usable code-signing identity" >&2
+            echo "       (check the .p12, its password, and APPLE_SIGNING_IDENTITY if set)." >&2
+            exit 1
+          fi
+          echo "Signing macOS bundle with identity ${IDENTITY}"
+          echo "MACOS_STABLE_SIGNING_IDENTITY=${IDENTITY}" >> "$GITHUB_ENV"
+
       # For UNSIGNED builds only (sign-binaries=false): the base
       # tauri.conf.json hard-wires a Windows `signCommand` (Azure Trusted
       # Signing), which needs a certificate this project does not have, so it
@@ -484,6 +543,15 @@ jobs:
             delete c.bundle.macOS.signingIdentity;
             delete c.bundle.macOS.entitlements;
             c.bundle.macOS.hardenedRuntime = false;
+            // Exception: with a stable identity imported above, sign with it so
+            // an Accessibility grant survives the next update. Runtime flags stay
+            // as they are for every other unsigned build; only the signature
+            // changes.
+            const stableIdentity = process.env.MACOS_STABLE_SIGNING_IDENTITY;
+            if (stableIdentity) {
+              c.bundle.macOS.signingIdentity = stableIdentity;
+              console.log("macOS: signing with stable identity " + stableIdentity);
+            }
             fs.writeFileSync(p, JSON.stringify(c, null, 2));
             console.log("Patched tauri.conf.json: code signing disabled; updater artifacts " + (c.bundle.createUpdaterArtifacts ? "ON (signed with the updater key)" : "OFF (no updater key)"));
           '
@@ -754,6 +822,24 @@ jobs:
           assetNamePattern: ${{ steps.patch-release-name.outputs.platform }}
           includeUpdaterJson: false
           args: ${{ inputs.build-args }}
+
+      # A stable identity that silently did not take would ship another
+      # ever-changing signature and look like it worked, so check it. The
+      # designated requirement is what TCC stores; it must name a certificate,
+      # not a cdhash, for a grant to outlive the next build.
+      - name: Verify stable macOS signature
+        if: ${{ !inputs.sign-binaries && contains(inputs.platform, 'macos') && env.MACOS_STABLE_SIGNING_IDENTITY != '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP="$(ls -d src-tauri/target/${{ inputs.target }}/${{ steps.build-profile.outputs.profile }}/bundle/macos/*.app | head -n1)"
+          codesign -dv --verbose=2 "$APP" 2>&1 | grep -E '^(Identifier|Authority|Signature|TeamIdentifier)=' || true
+          REQ="$(codesign -d -r- "$APP" 2>&1)"
+          echo "$REQ"
+          if ! grep -q 'certificate' <<<"$REQ"; then
+            echo "ERROR: ${APP} was not signed with the stable identity; its designated requirement names no certificate" >&2
+            exit 1
+          fi
 
       # The hard gate for Intel macOS, mirroring the Windows/Linux package audits:
       # a .dmg that installs and then cannot start is the failure mode worth

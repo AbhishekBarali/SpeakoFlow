@@ -6,5 +6,14 @@
     <true/>
     <key>com.apple.security.device.audio-input</key>
     <true/>
+    <!--
+      The native voice engine (native_tts.rs) downloads onnxruntime and the
+      sherpa-onnx C API at run time and dlopens them. Under the hardened runtime,
+      library validation only admits code signed by Apple or with the main
+      executable's Team ID, and those dylibs are neither, so without this the load
+      fails and every native voice reads as unavailable (LOAD_FAILED).
+    -->
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
   </dict>
 </plist>

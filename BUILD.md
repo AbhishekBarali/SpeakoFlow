@@ -112,6 +112,46 @@ bun run tauri build
 
 This compiles a release binary and generates platform-specific bundles (deb, rpm, AppImage on Linux; dmg on macOS; msi on Windows).
 
+## macOS release signing (one-time setup)
+
+macOS keeps an Accessibility grant only while the app's code signature matches
+the one it was granted to. An ad-hoc or unsigned build gets a new signature every
+release, so after each update the app is refused while System Settings still
+shows it switched on (issue #34). Signing every release with the same
+certificate fixes that, and the certificate does not have to come from Apple: a
+free self-signed one gives a stable signature. It does not get past Gatekeeper
+(that needs a paid Developer ID and notarization), so the `xattr` step in the
+README stays.
+
+Create it once, on any machine with OpenSSL:
+
+```bash
+openssl req -x509 -newkey rsa:2048 -days 3650 -nodes \
+  -keyout speakoflow-signing.key -out speakoflow-signing.crt \
+  -subj "/CN=SpeakoFlow Release Signing" \
+  -addext "keyUsage=critical,digitalSignature" \
+  -addext "extendedKeyUsage=codeSigning"
+# -legacy: the macOS keychain cannot import OpenSSL 3's default PKCS#12 encryption
+openssl pkcs12 -export -legacy -inkey speakoflow-signing.key -in speakoflow-signing.crt \
+  -name "SpeakoFlow Release Signing" -out speakoflow-signing.p12 -passout pass:<password>
+openssl base64 -A -in speakoflow-signing.p12 -out speakoflow-signing.p12.b64
+```
+
+Then add three repository secrets: `APPLE_CERTIFICATE` (the contents of the
+`.b64` file), `APPLE_CERTIFICATE_PASSWORD` (the password), and optionally
+`APPLE_SIGNING_IDENTITY` (`SpeakoFlow Release Signing`; without it the first
+identity in the file is used). `build.yml` signs unsigned macOS builds with it
+when the secret is present and falls back to the old unsigned bundle when it is
+not. The step "Verify stable macOS signature" fails the build if the signature
+did not take. `release.yml`, the notarized path, reads the same secrets but
+expects a Developer ID certificate in them; replace the self-signed one when
+there is one.
+
+Keep the `.p12` and its password somewhere safe and never regenerate them: a new
+certificate is a new signature, and every user would have to grant Accessibility
+again. The first release signed this way still needs one re-grant, because it
+replaces the unsigned signature; after that, updates keep it.
+
 ## Linux Install (from source)
 
 The raw binary (`src-tauri/target/release/speakoflow`) cannot run standalone — it needs Tauri resource files (tray icons, sounds, VAD model) to be co-located at the expected path.
