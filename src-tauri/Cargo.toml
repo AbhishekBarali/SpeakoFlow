@@ -20,37 +20,31 @@ incremental = true # Compile your binary in smaller steps.
 # feed — is numeric loops in *this* crate, so optimising only dependencies leaves
 # the hottest per-frame code unoptimised.
 #
-# **This must stay at 2 or higher, and that is a correctness requirement rather
-# than a performance preference.** At opt-level 0 and 1 rustc enables
-# `share-generics`, which imports a dependency's generic instantiations instead of
-# re-emitting them locally. Dependencies here are built at opt-level 3
-# (`[profile.dev.package."*"]`), where sharing is *off*, so the two sides disagree:
-# our crate emits a call to `rustfft::sse::sse_common::sse_fft_helper_inplace`
-# (reached from `audio_toolkit::audio::visualizer` and `meetings::diarize::fbank`)
-# together with references to the anonymous LLVM constants holding its SIMD shuffle
-# masks — and those constants have private linkage inside rustfft's own object
-# files, so nothing exports them. With `incremental = true` splitting this crate
-# across many codegen units, the link then fails outright:
-#
-#   error LNK2019: unresolved external symbol anon.<hash>.2.llvm.<id>
-#     referenced in function _ZN7rustfft3sse10sse_common22sse_fft_helper_inplaceE
-#   fatal error LNK1120: 2 unresolved externals
-#
-# It is latent rather than constant: whether the constant and its user land in the
-# same codegen unit depends on how this crate happens to partition, so an unrelated
-# edit of a few hundred lines flips it on or off. That makes it especially nasty to
-# diagnose — it arrives looking like the edit broke the build.
-#
 # Measured on this crate (Ryzen 7 7700X, warm incremental rebuild after a one-line
-# edit): 11.3s at level 2, against a documented 12.9s at level 1, so raising it
-# costs nothing in the edit loop and leaves the audio pipeline better optimised
-# than before. Level 3 is a slower cold build for little further gain.
+# edit): 11.3s at level 2, against 12.9s at level 1, so level 2 costs nothing in
+# the edit loop. Level 3 is a slower cold build for little further gain. Level 0
+# builds in 40s but reinstates exactly the "dictation takes many seconds and looks
+# like a regression" trap that `[profile.dev.package."*"]` below exists to avoid.
 #
-# The alternatives, both verified and both worse: `incremental = false` links
-# correctly at level 1 but makes every edit a 4m04s full rebuild, and dropping to
-# opt-level 0 builds in 40s but reinstates exactly the "dictation takes many
-# seconds and looks like a regression" trap that `[profile.dev.package."*"]` below
-# exists to avoid.
+# **If a dev build then fails to link** with
+#
+#   error LNK2019: unresolved external symbol anon.<hash>.<n>.llvm.<id>
+#   fatal error LNK1120: <n> unresolved externals
+#
+# the code is fine and the incremental cache is stale. At any opt-level above 0
+# rustc runs ThinLTO across this crate's codegen units, which renames private
+# constants to `<name>.llvm.<id>` so one unit can import a function from another.
+# Incremental compilation can then reuse a cached, already-optimised object that
+# still imports such a constant after the unit defining it was re-partitioned away
+# (rust-lang/rust#45929). The session is saved before linking, so every retry fails
+# identically until the cache goes:
+#
+#   cargo clean -p speakoflow      # then rebuild; only this crate recompiles (~2 min)
+#
+# Changing opt-level does not prevent it (it recurred at level 2 on 2026-09-30);
+# a profile change only appears to fix it because it discards the cache.
+# `incremental = false` does prevent it, at the price of a ~4 min full rebuild on
+# every edit.
 opt-level = 2
 
 # Full debug info on THIS crate is 390 MB of PDB that nothing reads. The app is
@@ -206,6 +200,10 @@ image = { version = "0.25.10", default-features = false, features = ["png", "jpe
 
 [target.'cfg(unix)'.dependencies]
 signal-hook = "0.3"
+# Reaping an orphaned llama-server after a crash: `kill`, and `proc_pidpath` to
+# confirm on macOS that a recorded pid is still our engine. Already in the
+# graph through other crates; pinned to the version the lockfile resolves.
+libc = "=0.2.182"
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-autostart = "2.5.1"

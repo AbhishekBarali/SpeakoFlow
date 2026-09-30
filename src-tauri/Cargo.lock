@@ -6789,6 +6789,7 @@ dependencies = [
  "image",
  "keyring",
  "kodama",
+ "libc",
  "libloading 0.8.9",
  "log",
  "natural",

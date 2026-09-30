@@ -426,7 +426,7 @@ impl LocalLlmManager {
             .map_err(|e| anyhow::anyhow!("Failed to get app data dir: {}", e))?
             .join("models");
 
-        Ok(Self {
+        let manager = Self {
             app_handle: app_handle.clone(),
             models_dir,
             port: role.port(),
@@ -439,7 +439,12 @@ impl LocalLlmManager {
             start_lock: tokio::sync::Mutex::new(()),
             last_activity: Arc::new(AtomicU64::new(Self::now_ms())),
             in_flight: Arc::new(AtomicUsize::new(0)),
-        })
+        };
+        // Here rather than before the first spawn: an orphan holds gigabytes of
+        // memory whether or not this session ever uses the built-in engine.
+        #[cfg(unix)]
+        manager.reap_orphaned_engine();
+        Ok(manager)
     }
 
     /// OpenAI-compatible base URL for this engine instance. Callers must use
@@ -477,6 +482,99 @@ impl LocalLlmManager {
         } else {
             Some(tail)
         }
+    }
+
+    /// Where this role's running engine is recorded, so the next launch can
+    /// find it if this process dies without stopping it. Windows needs no file:
+    /// its kill-on-close Job Object takes the engine down with us.
+    ///
+    /// Beside `engine/` rather than in it: refreshing a stale engine deletes
+    /// that directory, possibly while the other role's engine is running.
+    #[cfg(unix)]
+    fn engine_pid_path(&self) -> PathBuf {
+        let name = match self.role {
+            LlmRole::Assistant => ".llama-server.pid",
+            LlmRole::Cleanup => ".llama-server-cleanup.pid",
+        };
+        self.models_dir.join(name)
+    }
+
+    /// Record a freshly spawned engine. The path is canonicalized because it is
+    /// compared against what the kernel reports for the pid, which is always
+    /// the resolved path.
+    #[cfg(unix)]
+    fn record_engine_pid(&self, child: &Child, engine: &Path) {
+        let exe = std::fs::canonicalize(engine).unwrap_or_else(|_| engine.to_path_buf());
+        // Only an engine this app installed or ships is ever reaped. One found
+        // on PATH (or named by HANDY_LLAMA_SERVER) is the user's own binary, and
+        // after a crash its pid can be reused by a llama-server they started
+        // themselves, with the same path, which the reaper must never kill.
+        let ours = |dir: Option<PathBuf>| {
+            dir.and_then(|d| std::fs::canonicalize(d).ok())
+                .is_some_and(|d| exe.starts_with(d))
+        };
+        let app_root = std::env::current_exe()
+            .ok()
+            .and_then(|p| p.parent().and_then(Path::parent).map(Path::to_path_buf));
+        if !ours(Some(self.models_dir.clone())) && !ours(app_root) {
+            debug!(
+                "Engine {} is not one this app installed; not recording it for orphan cleanup",
+                exe.display()
+            );
+            return;
+        }
+        let Some(record) = format_engine_pid_record(child.id(), &exe) else {
+            warn!(
+                "Engine path {} can't be recorded; an orphan after a crash won't be reaped",
+                exe.display()
+            );
+            return;
+        };
+        if let Err(e) = std::fs::write(self.engine_pid_path(), record) {
+            warn!("Failed to record the engine pid (orphan cleanup disabled): {e}");
+        }
+    }
+
+    /// Drop the record once our engine is gone, so a later launch never acts on
+    /// a pid the OS may since have handed to something else.
+    fn forget_engine_pid(&self) {
+        #[cfg(unix)]
+        {
+            if let Err(e) = std::fs::remove_file(self.engine_pid_path()) {
+                if e.kind() != std::io::ErrorKind::NotFound {
+                    debug!("Failed to remove the engine pid file: {e}");
+                }
+            }
+        }
+    }
+
+    /// Kill an engine a previous run left behind (a crash, a force-quit, or the
+    /// OS reaping us under memory pressure), which would otherwise keep its
+    /// model in memory and its port bound, so this run's engine could never
+    /// start. Only a process whose executable is the recorded engine is touched.
+    #[cfg(unix)]
+    fn reap_orphaned_engine(&self) {
+        let path = self.engine_pid_path();
+        let content = match std::fs::read_to_string(&path) {
+            Ok(content) => content,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return,
+            Err(e) => {
+                warn!("Failed to read the engine pid file {}: {e}", path.display());
+                return;
+            }
+        };
+        match parse_engine_pid_record(&content) {
+            Some(record) => {
+                if orphan_engine::kill(&record) {
+                    info!(
+                        "Killed an orphaned built-in LLM engine (pid {}) left by a previous run",
+                        record.pid
+                    );
+                }
+            }
+            None => warn!("Ignoring a malformed engine pid file {}", path.display()),
+        }
+        let _ = std::fs::remove_file(&path);
     }
 
     /// Locate the engine binary, or `None` if it isn't installed/bundled.
@@ -1052,6 +1150,7 @@ impl LocalLlmManager {
                 debug!("Stopping local LLM engine before switching models");
                 let _ = child.kill();
                 let _ = child.wait();
+                self.forget_engine_pid();
             }
             st.model_id = None;
         }
@@ -1356,6 +1455,12 @@ impl LocalLlmManager {
         // in `lib.rs`.
         #[cfg(windows)]
         assign_child_to_kill_on_close_job(&child);
+        // macOS and Linux have no equivalent that survives a hard kill of this
+        // process (PR_SET_PDEATHSIG tracks the spawning *thread*, and this runs
+        // on runtime threads that come and go), so the engine is recorded
+        // instead and a later launch reaps it; see `reap_orphaned_engine`.
+        #[cfg(unix)]
+        self.record_engine_pid(&child, engine);
 
         Ok(child)
     }
@@ -1491,6 +1596,7 @@ impl LocalLlmManager {
             debug!("Stopping built-in LLM engine");
             let _ = child.kill();
             let _ = child.wait();
+            self.forget_engine_pid();
         }
         st.model_id = None;
     }
@@ -1536,6 +1642,7 @@ impl LocalLlmManager {
                 Ok(Some(_)) => {
                     st.child = None;
                     st.model_id = None;
+                    self.forget_engine_pid();
                     false
                 }
                 Ok(None) => true,
@@ -1728,6 +1835,142 @@ impl Drop for LocalLlmManager {
     }
 }
 
+/// What a role's pid file says about the engine it was written for.
+#[cfg_attr(not(unix), allow(dead_code))]
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct EnginePidRecord {
+    pid: u32,
+    /// Canonical path of the executable that was spawned.
+    exe: PathBuf,
+}
+
+/// Pid file contents: the pid, then the executable path, one per line.
+/// `None` for a path that would not read back intact.
+#[cfg_attr(not(unix), allow(dead_code))]
+fn format_engine_pid_record(pid: u32, exe: &Path) -> Option<String> {
+    let exe = exe.to_str()?;
+    if exe.is_empty() || exe.contains('\n') {
+        return None;
+    }
+    Some(format!("{pid}\n{exe}\n"))
+}
+
+/// Parse a pid file written by [`format_engine_pid_record`]. Pure so it is
+/// testable on every platform.
+#[cfg_attr(not(unix), allow(dead_code))]
+fn parse_engine_pid_record(content: &str) -> Option<EnginePidRecord> {
+    let (pid, exe) = content.split_once('\n')?;
+    let pid: u32 = pid.trim().parse().ok()?;
+    // kill(2) reads 0 and negative pids as process groups and pid 1 is init;
+    // none of them can be an engine we spawned.
+    if pid <= 1 || pid > i32::MAX as u32 {
+        return None;
+    }
+    let exe = exe.strip_suffix('\n').unwrap_or(exe);
+    if exe.is_empty() || exe.contains('\n') {
+        return None;
+    }
+    Some(EnginePidRecord {
+        pid,
+        exe: PathBuf::from(exe),
+    })
+}
+
+/// Whether the executable the kernel reports for a pid is the recorded engine.
+/// Linux reports a binary that was deleted or replaced on disk as
+/// `<path> (deleted)`, and that process is still the engine we spawned.
+#[cfg_attr(not(unix), allow(dead_code))]
+fn executable_matches(live: &Path, recorded: &Path) -> bool {
+    if live == recorded {
+        return true;
+    }
+    let mut deleted = recorded.as_os_str().to_owned();
+    deleted.push(" (deleted)");
+    live.as_os_str() == deleted
+}
+
+#[cfg(unix)]
+mod orphan_engine {
+    use super::{executable_matches, EnginePidRecord};
+    use log::warn;
+    use std::path::PathBuf;
+    use std::time::{Duration, Instant};
+
+    /// How long to wait for a killed engine to disappear. SIGKILL cannot be
+    /// caught, so this only covers the kernel tearing down a large mapping.
+    const EXIT_WAIT: Duration = Duration::from_secs(2);
+
+    #[cfg(target_os = "linux")]
+    fn running_executable(pid: u32) -> Option<PathBuf> {
+        // Fails for a pid that is gone or a zombie, which is what ends the wait.
+        std::fs::read_link(format!("/proc/{pid}/exe")).ok()
+    }
+
+    #[cfg(target_os = "macos")]
+    fn running_executable(pid: u32) -> Option<PathBuf> {
+        use std::ffi::OsString;
+        use std::os::unix::ffi::OsStringExt;
+
+        let mut buf = vec![0u8; libc::PROC_PIDPATHINFO_MAXSIZE as usize];
+        // SAFETY: `buf` is writable for exactly the length passed, and
+        // proc_pidpath writes at most that many bytes.
+        let len = unsafe {
+            libc::proc_pidpath(
+                pid as libc::c_int,
+                buf.as_mut_ptr().cast::<libc::c_void>(),
+                buf.len() as u32,
+            )
+        };
+        if len <= 0 {
+            return None;
+        }
+        buf.truncate(len as usize);
+        Some(PathBuf::from(OsString::from_vec(buf)))
+    }
+
+    /// No way to confirm what a pid is running here, so never kill anything.
+    #[cfg(not(any(target_os = "linux", target_os = "macos")))]
+    fn running_executable(_pid: u32) -> Option<PathBuf> {
+        None
+    }
+
+    fn is_recorded_engine(record: &EnginePidRecord) -> bool {
+        running_executable(record.pid).is_some_and(|live| {
+            let live = std::fs::canonicalize(&live).unwrap_or(live);
+            executable_matches(&live, &record.exe)
+        })
+    }
+
+    /// SIGKILL the recorded engine if that pid is still running it, then wait
+    /// briefly for it to go. Returns whether a signal was sent.
+    pub(super) fn kill(record: &EnginePidRecord) -> bool {
+        if !is_recorded_engine(record) {
+            return false;
+        }
+        // SAFETY: a plain syscall; the parser only yields pids in 2..=i32::MAX.
+        if unsafe { libc::kill(record.pid as libc::pid_t, libc::SIGKILL) } != 0 {
+            warn!(
+                "Failed to kill the orphaned engine (pid {}): {}",
+                record.pid,
+                std::io::Error::last_os_error()
+            );
+            return false;
+        }
+        let deadline = Instant::now() + EXIT_WAIT;
+        while is_recorded_engine(record) {
+            if Instant::now() >= deadline {
+                warn!(
+                    "Orphaned engine (pid {}) still running after SIGKILL",
+                    record.pid
+                );
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        true
+    }
+}
+
 /// Assign a spawned engine child to a process-wide Job Object configured with
 /// `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`. The job handle is created once and kept
 /// open for the entire process lifetime (stored as a raw `isize` in a
@@ -1798,6 +2041,80 @@ fn assign_child_to_kill_on_close_job(child: &Child) {
 mod tests {
     use super::*;
 
+    #[test]
+    fn engine_pid_record_round_trips() {
+        let exe = Path::new("/home/me/.local/share/speakoflow/models/engine/llama-server");
+        let written = format_engine_pid_record(4242, exe).unwrap();
+        assert_eq!(
+            parse_engine_pid_record(&written),
+            Some(EnginePidRecord {
+                pid: 4242,
+                exe: exe.to_path_buf(),
+            })
+        );
+    }
+
+    /// Spaces are legal in a path (macOS "Application Support") and must not be
+    /// trimmed or split on.
+    #[test]
+    fn engine_pid_record_keeps_spaces_in_the_path() {
+        let exe = "/Users/me/Library/Application Support/com.speakoflow/models/engine/llama-server";
+        let parsed = parse_engine_pid_record(&format!("77\n{exe}\n")).unwrap();
+        assert_eq!(parsed.exe, PathBuf::from(exe));
+    }
+
+    #[test]
+    fn engine_pid_record_accepts_a_missing_trailing_newline() {
+        let parsed = parse_engine_pid_record("77\n/opt/llama-server").unwrap();
+        assert_eq!(parsed.pid, 77);
+        assert_eq!(parsed.exe, PathBuf::from("/opt/llama-server"));
+    }
+
+    /// A pid of 0 or 1 would signal our process group or init, and a truncated
+    /// file (crash mid-write) must not be read as a pid with no executable.
+    #[test]
+    fn engine_pid_record_rejects_what_could_hit_the_wrong_process() {
+        for content in [
+            "",
+            "4242",
+            "4242\n",
+            "4242\n\n",
+            "0\n/opt/llama-server\n",
+            "1\n/opt/llama-server\n",
+            "-5\n/opt/llama-server\n",
+            "2147483648\n/opt/llama-server\n",
+            "abc\n/opt/llama-server\n",
+            "4242\n/opt/llama-server\nextra\n",
+        ] {
+            assert_eq!(parse_engine_pid_record(content), None, "{content:?}");
+        }
+    }
+
+    #[test]
+    fn engine_pid_record_refuses_a_path_that_would_not_read_back() {
+        assert_eq!(format_engine_pid_record(7, Path::new("")), None);
+        assert_eq!(format_engine_pid_record(7, Path::new("/a\nb")), None);
+    }
+
+    #[test]
+    fn only_the_recorded_executable_matches() {
+        let recorded = Path::new("/opt/speakoflow/llama-server");
+        assert!(executable_matches(recorded, recorded));
+        // The engine binary was replaced on disk while the orphan kept running.
+        assert!(executable_matches(
+            Path::new("/opt/speakoflow/llama-server (deleted)"),
+            recorded
+        ));
+        assert!(!executable_matches(
+            Path::new("/usr/bin/llama-server"),
+            recorded
+        ));
+        assert!(!executable_matches(Path::new("/usr/bin/bash"), recorded));
+        assert!(!executable_matches(
+            Path::new("/opt/speakoflow/llama-server-old"),
+            recorded
+        ));
+    }
     // The assistant and cleanup engines must never share a port, or the second
     // one to start fails to bind and the feature silently falls back to raw
     // transcripts.
