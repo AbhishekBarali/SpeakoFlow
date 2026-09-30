@@ -465,3 +465,15 @@ pub fn restore_paste_target() -> bool {
 pub fn restore_paste_target() -> bool {
     false
 }
+
+/// Whether this dictation started in another application's window, which the
+/// paste will hand the foreground back to (see [`restore_paste_target`]).
+#[cfg(target_os = "windows")]
+pub fn paste_target_is_elsewhere() -> bool {
+    PASTE_TARGET.load(std::sync::atomic::Ordering::SeqCst) != 0
+}
+
+#[cfg(not(target_os = "windows"))]
+pub fn paste_target_is_elsewhere() -> bool {
+    false
+}

@@ -10,8 +10,10 @@ import {
 import { toast } from "sonner";
 import { commands } from "@/bindings";
 import { useSettingsStore } from "@/stores/settingsStore";
-import Wordmark from "../Wordmark";
 import { Keyboard, Mic, Check, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/Button";
+import { StepHeading } from "./OnboardingFrame";
+import "./onboarding.css";
 
 interface AccessibilityOnboardingProps {
   onComplete: () => void;
@@ -24,6 +26,9 @@ interface PermissionsState {
   accessibility: PermissionStatus;
   microphone: PermissionStatus;
 }
+
+/** How long "Waiting…" runs before the reset option appears. */
+const STUCK_AFTER_MS = 6000;
 
 const AccessibilityOnboarding: React.FC<AccessibilityOnboardingProps> = ({
   onComplete,
@@ -42,9 +47,15 @@ const AccessibilityOnboarding: React.FC<AccessibilityOnboardingProps> = ({
     microphone: "checking",
   });
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const errorCountRef = useRef<number>(0);
   const MAX_POLLING_ERRORS = 3;
+  // An update can leave a grant behind that System Settings still shows as on
+  // but no longer matches this build's signature (issue #34), so waiting would
+  // never end. After a few seconds of it, offer to clear the stale entry.
+  const [accessibilityStuck, setAccessibilityStuck] = useState(false);
+  const [resetState, setResetState] = useState<"idle" | "resetting" | "done">(
+    "idle",
+  );
 
   const isMacOS = permissionPlatform === "macos";
   const isWindows = permissionPlatform === "windows";
@@ -60,7 +71,7 @@ const AccessibilityOnboarding: React.FC<AccessibilityOnboardingProps> = ({
 
   const completeOnboarding = useCallback(async () => {
     await Promise.all([refreshAudioDevices(), refreshOutputDevices()]);
-    timeoutRef.current = setTimeout(() => onComplete(), 300);
+    onComplete();
   }, [onComplete, refreshAudioDevices, refreshOutputDevices]);
 
   const hasWindowsMicrophoneAccess = useCallback(async (): Promise<boolean> => {
@@ -241,11 +252,14 @@ const AccessibilityOnboarding: React.FC<AccessibilityOnboardingProps> = ({
       if (pollingRef.current) {
         clearInterval(pollingRef.current);
       }
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
     };
   }, []);
+
+  useEffect(() => {
+    if (permissions.accessibility !== "waiting") return;
+    const timer = setTimeout(() => setAccessibilityStuck(true), STUCK_AFTER_MS);
+    return () => clearTimeout(timer);
+  }, [permissions.accessibility]);
 
   const handleGrantAccessibility = async () => {
     try {
@@ -256,6 +270,45 @@ const AccessibilityOnboarding: React.FC<AccessibilityOnboardingProps> = ({
       console.error("Failed to request accessibility permission:", error);
       toast.error(t("onboarding.permissions.errors.requestFailed"));
     }
+  };
+
+  const handleResetAccessibility = async () => {
+    setResetState("resetting");
+    let reset: Awaited<
+      ReturnType<typeof commands.resetMacosAccessibilityPermission>
+    >;
+    try {
+      reset = await commands.resetMacosAccessibilityPermission();
+    } catch (error) {
+      reset = { status: "error", error: String(error) };
+    }
+    if (reset.status === "error") {
+      console.error("Failed to reset accessibility permission:", reset.error);
+      toast.error(t("onboarding.permissions.errors.resetFailed"));
+      setResetState("idle");
+      return;
+    }
+    try {
+      // With the stale entry gone, this adds a fresh one for the running build,
+      // so the user only has to flip a switch rather than add the app by hand.
+      await requestAccessibilityPermission();
+    } catch (error) {
+      console.warn("Failed to re-request accessibility permission:", error);
+    }
+    const opened = await commands
+      .openMacosAccessibilitySettings()
+      .catch((error: unknown) => ({
+        status: "error" as const,
+        error: String(error),
+      }));
+    if (opened.status === "error") {
+      console.warn("Failed to open Accessibility settings:", opened.error);
+    }
+    setPermissions((prev) => ({ ...prev, accessibility: "waiting" }));
+    // The existing poll picks up the new grant, no relaunch needed. It is
+    // restarted here in case repeated errors had stopped it.
+    startPolling();
+    setResetState("done");
   };
 
   const handleGrantMicrophone = async () => {
@@ -281,124 +334,121 @@ const AccessibilityOnboarding: React.FC<AccessibilityOnboardingProps> = ({
       permissions.microphone === "checking") ||
     (isWindows && permissions.microphone === "checking");
 
-  // Still checking platform/initial permissions
-  if (isChecking) {
-    return (
-      <div className="h-full w-full flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-muted" />
-      </div>
-    );
+  // Nothing to ask for, or still finding out: an empty sheet, which reads as
+  // the page turning. A spinner and then an "All set" check flashed past on
+  // every machine that already had the permissions, which is almost all of
+  // them, and looked like something had gone wrong.
+  if (isChecking || allGranted) {
+    return <PermissionsSheet>{null}</PermissionsSheet>;
   }
-
-  // All permissions granted - show success briefly
-  if (allGranted) {
-    return (
-      <div className="h-full w-full flex flex-col items-center justify-center gap-4">
-        <div className="p-4 rounded-full bg-success/15">
-          <Check className="w-12 h-12 text-success" />
-        </div>
-        <p className="text-lg font-medium text-ink">
-          {t("onboarding.permissions.allGranted")}
-        </p>
-      </div>
-    );
-  }
+  const status = (value: PermissionStatus) =>
+    value === "granted" ? (
+      <span className="inline-flex items-center gap-1.5 text-sm font-medium text-accent">
+        <Check className="h-4 w-4" aria-hidden="true" />
+        {t("onboarding.permissions.granted")}
+      </span>
+    ) : value === "waiting" ? (
+      <span className="inline-flex items-center gap-1.5 text-sm text-muted">
+        <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+        {t("onboarding.permissions.waiting")}
+      </span>
+    ) : null;
 
   // Show permissions request screen
   return (
-    <div className="h-full w-full flex flex-col p-6 gap-6 items-center justify-center">
-      <div className="flex flex-col items-center gap-2">
-        <Wordmark className="text-4xl" />
-      </div>
-
-      <div className="max-w-md w-full flex flex-col items-center gap-4">
-        <div className="text-center mb-2">
-          <h2 className="text-xl font-semibold text-ink mb-2">
-            {t("onboarding.permissions.title")}
-          </h2>
-          <p className="text-muted">
-            {t("onboarding.permissions.description")}
-          </p>
-        </div>
-
-        {/* Microphone Permission Card */}
-        {showMicrophonePermission && (
-          <div className="w-full p-4 rounded-xl bg-surface border border-hairline">
-            <div className="flex items-center gap-4">
-              <div className="p-3 rounded-full bg-surface-strong shrink-0">
-                <Mic className="w-6 h-6 text-ink" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <h3 className="font-medium text-ink">
+    <PermissionsSheet>
+      <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col justify-center py-10">
+        <StepHeading
+          title={t("onboarding.permissions.title")}
+          body={t("onboarding.permissions.description")}
+        />
+        <ul className="mt-8 divide-y divide-hairline rounded-2xl border border-hairline bg-surface elev-card">
+          {showMicrophonePermission && (
+            <li className="flex flex-wrap items-center gap-x-4 gap-y-3 px-5 py-4">
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-surface-strong text-ink">
+                <Mic className="h-[1.125rem] w-[1.125rem]" aria-hidden="true" />
+              </span>
+              <div className="min-w-[12rem] flex-1">
+                <h2 className="text-sm font-medium text-ink">
                   {t("onboarding.permissions.microphone.title")}
-                </h3>
-                <p className="text-sm text-muted mb-3">
+                </h2>
+                <p className="mt-0.5 text-[0.8125rem] text-muted">
                   {t("onboarding.permissions.microphone.description")}
                 </p>
-                {permissions.microphone === "granted" ? (
-                  <div className="flex items-center gap-2 text-success text-sm">
-                    <Check className="w-4 h-4" />
-                    {t("onboarding.permissions.granted")}
-                  </div>
-                ) : permissions.microphone === "waiting" ? (
-                  <div className="flex items-center gap-2 text-muted text-sm">
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    {t("onboarding.permissions.waiting")}
-                  </div>
-                ) : (
-                  <button
-                    onClick={handleGrantMicrophone}
-                    className="px-4 py-2 rounded-full bg-accent hover:bg-accent-strong text-on-primary text-sm font-medium transition-colors"
-                  >
-                    {isWindows
-                      ? t("accessibility.openSettings")
-                      : t("onboarding.permissions.grant")}
-                  </button>
-                )}
               </div>
-            </div>
-          </div>
-        )}
+              {status(permissions.microphone) ?? (
+                <Button size="md" onClick={handleGrantMicrophone}>
+                  {isWindows
+                    ? t("accessibility.openSettings")
+                    : t("onboarding.permissions.grant")}
+                </Button>
+              )}
+            </li>
+          )}
 
-        {/* Accessibility Permission Card */}
-        {showAccessibilityPermission && (
-          <div className="w-full p-4 rounded-xl bg-surface border border-hairline">
-            <div className="flex items-center gap-4">
-              <div className="p-3 rounded-full bg-surface-strong shrink-0">
-                <Keyboard className="w-6 h-6 text-ink" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <h3 className="font-medium text-ink">
-                  {t("onboarding.permissions.accessibility.title")}
-                </h3>
-                <p className="text-sm text-muted mb-3">
-                  {t("onboarding.permissions.accessibility.description")}
-                </p>
-                {permissions.accessibility === "granted" ? (
-                  <div className="flex items-center gap-2 text-success text-sm">
-                    <Check className="w-4 h-4" />
-                    {t("onboarding.permissions.granted")}
-                  </div>
-                ) : permissions.accessibility === "waiting" ? (
-                  <div className="flex items-center gap-2 text-muted text-sm">
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    {t("onboarding.permissions.waiting")}
-                  </div>
-                ) : (
-                  <button
-                    onClick={handleGrantAccessibility}
-                    className="px-4 py-2 rounded-full bg-accent hover:bg-accent-strong text-on-primary text-sm font-medium transition-colors"
-                  >
+          {showAccessibilityPermission && (
+            <li className="px-5 py-4">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-surface-strong text-ink">
+                  <Keyboard
+                    className="h-[1.125rem] w-[1.125rem]"
+                    aria-hidden="true"
+                  />
+                </span>
+                <div className="min-w-[12rem] flex-1">
+                  <h2 className="text-sm font-medium text-ink">
+                    {t("onboarding.permissions.accessibility.title")}
+                  </h2>
+                  <p className="mt-0.5 text-[0.8125rem] text-muted">
+                    {t("onboarding.permissions.accessibility.description")}
+                  </p>
+                </div>
+                {status(permissions.accessibility) ?? (
+                  <Button size="md" onClick={handleGrantAccessibility}>
                     {t("onboarding.permissions.grant")}
-                  </button>
+                  </Button>
                 )}
               </div>
-            </div>
-          </div>
-        )}
+              {permissions.accessibility === "waiting" &&
+                (accessibilityStuck || resetState === "done") && (
+                  <div className="mt-3 flex flex-wrap items-center gap-3 ps-[3.25rem]">
+                    <p
+                      className="min-w-0 flex-1 text-[0.8125rem] text-muted"
+                      role={resetState === "done" ? "status" : undefined}
+                    >
+                      {resetState === "done"
+                        ? t("onboarding.permissions.accessibility.resetDone")
+                        : t("onboarding.permissions.accessibility.stuckHint")}
+                    </p>
+                    {accessibilityStuck && (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={handleResetAccessibility}
+                        disabled={resetState === "resetting"}
+                      >
+                        {t("onboarding.permissions.accessibility.reset")}
+                      </Button>
+                    )}
+                  </div>
+                )}
+            </li>
+          )}
+        </ul>
       </div>
-    </div>
+    </PermissionsSheet>
   );
 };
+
+/** The same inset sheet the rest of onboarding sits on. */
+const PermissionsSheet: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => (
+  <div className="flex h-full min-h-0 flex-col bg-canvas-soft">
+    <main className="flex min-h-0 flex-1 flex-col overflow-y-auto rounded-t-[1.25rem] border-t border-hairline bg-canvas px-6 elev-pane sm:px-10">
+      {children}
+    </main>
+  </div>
+);
 
 export default AccessibilityOnboarding;

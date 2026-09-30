@@ -9,16 +9,28 @@ import {
 } from "tauri-plugin-macos-permissions-api";
 import { ModelStateEvent, RecordingErrorEvent } from "./lib/types/events";
 import "./App.css";
-import Onboarding, {
+import {
   AccessibilityOnboarding,
-  LlmOnboarding,
-  ReadyStep,
+  FinishStep,
+  SetupStep,
+  WelcomeStep,
+  TourStep,
+  VoicePrefetch,
+  hasCompletedOnboarding,
+  markOnboardingComplete,
+  useOnboardingReplay,
+  useSetupQueue,
 } from "./components/onboarding";
 import TitleBar from "./components/TitleBar";
 import { MainShell } from "./components/shell/MainShell";
+import {
+  INITIAL_NAVIGATION,
+  type NavigationState,
+} from "./components/shell/navigation";
 import { useSettings } from "./hooks/useSettings";
 import { useSettingsStore } from "./stores/settingsStore";
 import { commands } from "@/bindings";
+import { insertDictation } from "@/lib/insertDictation";
 import { getLanguageDirection, initializeRTL } from "@/lib/utils/rtl";
 import {
   applyThemePreference,
@@ -26,14 +38,20 @@ import {
   type ThemePreference,
 } from "@/lib/theme";
 
-type OnboardingStep = "accessibility" | "model" | "llm" | "ready" | "done";
+type OnboardingStep =
+  | "welcome"
+  | "accessibility"
+  | "setup"
+  | "tour"
+  | "finish"
+  | "done";
 
 // Force the full onboarding flow on every launch so it can be tested
 // repeatedly. This is intentionally gated to dev builds only
 // (`import.meta.env.DEV`): during `tauri dev` the wizard shows every launch
 // for easy iteration, while compiled/release builds fall back to the real
 // first-run detection in `checkOnboardingStatus` (show onboarding only when
-// no model is installed yet).
+// no model is installed yet and setup has never been finished).
 const FORCE_ONBOARDING = import.meta.env.DEV;
 
 function App() {
@@ -44,6 +62,10 @@ function App() {
   // Track if this is a returning user who just needs to grant permissions
   // (vs a new user who needs full onboarding including model selection)
   const [isReturningUser, setIsReturningUser] = useState(false);
+  // Setup was left with "Set up models later": the app opens on Models.
+  const [skippedModels, setSkippedModels] = useState(false);
+  const [shellNavigation, setShellNavigation] =
+    useState<NavigationState>(INITIAL_NAVIGATION);
   const { settings, updateSetting } = useSettings();
   const direction = getLanguageDirection(i18n.language);
   const refreshAudioDevices = useSettingsStore(
@@ -53,10 +75,25 @@ function App() {
     (state) => state.refreshOutputDevices,
   );
   const hasCompletedPostOnboardingInit = useRef(false);
+  const replayRequests = useOnboardingReplay((state) => state.requests);
 
   useEffect(() => {
     checkOnboardingStatus();
   }, []);
+
+  // Settings → General → "Show onboarding again": the whole first-run flow,
+  // from the welcome screen, exactly as a new install sees it. Nothing is
+  // reset underneath it: models on disk stay installed (setup shows them as
+  // installed and offers Continue), downloads in flight keep going, and the
+  // completion flag is only rewritten when the replay reaches the end.
+  useEffect(() => {
+    if (replayRequests === 0) return;
+    useSetupQueue.getState().clearSettled();
+    setSkippedModels(false);
+    setIsReturningUser(false);
+    setShellNavigation(INITIAL_NAVIGATION);
+    setOnboardingStep("welcome");
+  }, [replayRequests]);
 
   // Initialize RTL direction when language changes
   useEffect(() => {
@@ -140,6 +177,19 @@ function App() {
     };
   }, [t]);
 
+  // A dictation made while this window is in front comes here instead of as a
+  // paste (see `insertDictation`), and lands at the caret.
+  useEffect(() => {
+    const unlisten = listen<string>("dictation-into-focus", (event) => {
+      if (!insertDictation(event.payload ?? "")) {
+        console.info("Dictation finished with no text field focused");
+      }
+    });
+    return () => {
+      unlisten.then((fn) => fn());
+    };
+  }, []);
+
   // Listen for paste failures and show a toast.
   // The technical error detail is logged to speakoflow.log on the Rust side
   // (see actions.rs `error!("Failed to paste transcription: ...")`),
@@ -187,15 +237,25 @@ function App() {
     try {
       if (FORCE_ONBOARDING) {
         setIsReturningUser(false);
-        setOnboardingStep("accessibility");
+        setOnboardingStep("welcome");
         return;
       }
-      // Check if they have any models available
+      // Anyone who can already dictate is a returning user: a local speech
+      // model on disk, speech set to a cloud service, or setup finished
+      // before (models chosen for later). Only a machine with none of these
+      // is new, which also keeps an upgrade from sending a cloud user through
+      // setup and switching their providers to on-device models.
       const result = await commands.hasAnyModelsAvailable();
       const hasModels = result.status === "ok" && result.data;
+      const settingsResult = hasModels
+        ? null
+        : await commands.getAppSettings().catch(() => null);
+      const dictatesInCloud =
+        settingsResult?.status === "ok" &&
+        settingsResult.data.stt_engine_mode === "cloud";
       const currentPlatform = platform();
 
-      if (hasModels) {
+      if (hasModels || dictatesInCloud || hasCompletedOnboarding()) {
         // Returning user - check if they need to grant permissions first
         setIsReturningUser(true);
 
@@ -238,7 +298,7 @@ function App() {
       } else {
         // New user - start full onboarding
         setIsReturningUser(false);
-        setOnboardingStep("accessibility");
+        setOnboardingStep("welcome");
       }
     } catch (error) {
       console.error("Failed to check onboarding status:", error);
@@ -248,23 +308,26 @@ function App() {
 
   const handleAccessibilityComplete = () => {
     // Returning users already have models, skip to main app
-    // New users need to select a model
-    setOnboardingStep(isReturningUser ? "done" : "model");
+    // New users go through setup
+    setOnboardingStep(isReturningUser ? "done" : "setup");
   };
 
-  const handleModelSelected = () => {
-    // Speech-to-text is set up; guide new users to pick an AI model next.
-    setOnboardingStep("llm");
+  const handleSetupComplete = ({
+    skippedModels: skipped,
+  }: {
+    skippedModels: boolean;
+  }) => {
+    setSkippedModels(skipped);
+    setOnboardingStep("tour");
   };
 
-  const handleLlmComplete = () => {
-    // Local-AI step finished (assistant and/or cleanup chosen, or skipped) —
-    // show the "You're ready" step.
-    setOnboardingStep("ready");
-  };
-
-  const handleReadyComplete = () => {
-    // "You're ready" step finished — enter the main app.
+  const handleFinish = (chooseModels = skippedModels) => {
+    markOnboardingComplete();
+    setShellNavigation(
+      chooseModels
+        ? { ...INITIAL_NAVIGATION, page: "models", modelSlot: "stt" }
+        : INITIAL_NAVIGATION,
+    );
     setOnboardingStep("done");
   };
 
@@ -272,32 +335,38 @@ function App() {
   // every screen and the body swaps underneath it. This keeps the window
   // draggable/closable during onboarding too.
   let body: ReactNode = null;
-  if (onboardingStep === "accessibility") {
+  if (onboardingStep === "welcome") {
+    body = (
+      <div className="flex-1 min-h-0">
+        <WelcomeStep onContinue={() => setOnboardingStep("accessibility")} />
+      </div>
+    );
+  } else if (onboardingStep === "accessibility") {
     body = (
       <div className="flex-1 min-h-0">
         <AccessibilityOnboarding onComplete={handleAccessibilityComplete} />
       </div>
     );
-  } else if (onboardingStep === "model") {
+  } else if (onboardingStep === "setup") {
     body = (
       <div className="flex-1 min-h-0">
-        <Onboarding onModelSelected={handleModelSelected} />
+        <SetupStep onContinue={handleSetupComplete} />
       </div>
     );
-  } else if (onboardingStep === "llm") {
+  } else if (onboardingStep === "tour") {
     body = (
       <div className="flex-1 min-h-0">
-        <LlmOnboarding onComplete={handleLlmComplete} />
+        <TourStep onDone={() => setOnboardingStep("finish")} />
       </div>
     );
-  } else if (onboardingStep === "ready") {
+  } else if (onboardingStep === "finish") {
     body = (
       <div className="flex-1 min-h-0">
-        <ReadyStep onComplete={handleReadyComplete} />
+        <FinishStep onDone={handleFinish} />
       </div>
     );
   } else if (onboardingStep === "done") {
-    body = <MainShell />;
+    body = <MainShell initialNavigation={shellNavigation} />;
   }
 
   return (
@@ -319,6 +388,8 @@ function App() {
       />
       <TitleBar />
       {body}
+      {/* Outlives the setup screens: the voice keeps loading after them. */}
+      <VoicePrefetch />
     </div>
   );
 }

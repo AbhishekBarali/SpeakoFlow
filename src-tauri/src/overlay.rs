@@ -78,12 +78,29 @@ const OVERLAY_RECOVERY_HEIGHT: f64 = 40.0;
 
 /// How long the Undo / Try again pill waits for a click. Short on purpose — it
 /// is there for the second after a slip, and History keeps the dictation for
-/// anything later — and a pointer resting on it holds it open.
-const RECOVERY_LINGER: std::time::Duration = std::time::Duration::from_secs(6);
+/// anything later — and a pointer resting on it holds it open. Six seconds was
+/// tried first and read as the pill being stuck rather than offering something.
+const RECOVERY_LINGER: std::time::Duration = std::time::Duration::from_millis(2500);
 
 fn is_recovery_state(state: &str) -> bool {
     matches!(state, "dismissed" | "failed")
 }
+
+/// States drawn as the compact pill even when the Live card is the overlay
+/// style: a recovery offer, and the "speech model still downloading" notice,
+/// which has no transcript to show and would read as a recording in the card.
+fn is_pill_only_state(state: &str) -> bool {
+    is_recovery_state(state) || state == "downloading"
+}
+
+/// States with a written line, which get the wider two-line frame.
+fn is_labeled_state(state: &str) -> bool {
+    matches!(state, "generating" | "vision" | "notice" | "downloading")
+}
+
+/// How long "speech model still downloading" stays up. Longer than a notice,
+/// because it carries a live percentage worth a second look.
+const DOWNLOAD_NOTICE_MS: u64 = 3200;
 
 /// Frame for a recovery pill.
 fn recovery_overlay_size(state: &str, has_notice: bool) -> (f64, f64) {
@@ -176,6 +193,10 @@ struct ShowOverlayPayload {
     interactive: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     notice: Option<String>,
+    /// For the `downloading` state: the catalog id of the speech model on its
+    /// way, so the pill can follow that model's `model-download-progress`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    download: Option<String>,
     /// The overlay lifetime this show began. The recovery pill hands it back
     /// with its click (`recover_dictation`), so a click meant for a pill that
     /// has since been replaced can never act on a different dictation.
@@ -870,6 +891,15 @@ fn show_overlay_state_with_notice(
     state: &str,
     notice: Option<String>,
 ) -> Option<u64> {
+    show_overlay(app_handle, state, notice, None)
+}
+
+fn show_overlay(
+    app_handle: &AppHandle,
+    state: &str,
+    notice: Option<String>,
+    download: Option<String>,
+) -> Option<u64> {
     let epoch = OVERLAY_LIFECYCLE.advance();
     // Check if overlay should be shown based on position setting
     let settings = settings::get_settings(app_handle);
@@ -891,14 +921,14 @@ fn show_overlay_state_with_notice(
     // one thing to click, and a card-sized window taking the pointer would sit
     // in front of far more of the user's app than it needs to.
     let recovery = is_recovery_state(state);
-    let streaming_window = style == settings::OverlayStyle::Live && !recovery;
+    let streaming_window = style == settings::OverlayStyle::Live && !is_pill_only_state(state);
     OVERLAY_STREAMING.store(streaming_window, Ordering::SeqCst);
 
     let (width, height) = if recovery {
         recovery_overlay_size(state, notice.is_some())
     } else if streaming_window {
         (OVERLAY_STREAM_WIDTH, OVERLAY_STREAM_HEIGHT)
-    } else if matches!(state, "generating" | "vision" | "notice") {
+    } else if is_labeled_state(state) {
         (OVERLAY_LABEL_WIDTH, OVERLAY_LABEL_HEIGHT)
     } else {
         (OVERLAY_WIDTH, OVERLAY_HEIGHT)
@@ -962,6 +992,7 @@ fn show_overlay_state_with_notice(
                 streaming_window,
                 interactive,
                 notice,
+                download,
                 epoch,
             },
         );
@@ -1005,6 +1036,23 @@ pub fn show_overlay_notice(app_handle: &AppHandle, notice_key: &str) {
     std::thread::spawn(move || {
         std::thread::sleep(std::time::Duration::from_millis(2600));
         // Only hide if no newer overlay state replaced the notice meanwhile.
+        if OVERLAY_LIFECYCLE.current() == epoch {
+            hide_recording_overlay(&app);
+        }
+    });
+}
+
+/// "Your speech model is still downloading", with its live progress, for a
+/// voice shortcut pressed before the model has landed (see
+/// `speech_readiness`). Click-through and short-lived like a notice.
+pub fn show_speech_download_overlay(app_handle: &AppHandle, model_id: &str) {
+    let Some(epoch) = show_overlay(app_handle, "downloading", None, Some(model_id.to_string()))
+    else {
+        return;
+    };
+    let app = app_handle.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(DOWNLOAD_NOTICE_MS));
         if OVERLAY_LIFECYCLE.current() == epoch {
             hide_recording_overlay(&app);
         }

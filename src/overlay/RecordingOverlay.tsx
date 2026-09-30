@@ -19,6 +19,7 @@ type OverlayState =
   | "generating"
   | "vision"
   | "notice"
+  | "downloading"
   | "dismissed"
   | "failed";
 type StreamTextPayload = { committed: string; tentative: string };
@@ -47,6 +48,9 @@ type ShowOverlayPayload = {
    * cannot take keyboard focus, so a click can never steal the paste target. */
   interactive?: boolean;
   notice?: string;
+  /** For `downloading`: the speech model on its way, whose
+   * `model-download-progress` events the pill follows. */
+  download?: string;
   /** The overlay lifetime this show began. The recovery pill sends it back
    * with its click, so a click on a pill that has since been replaced cannot
    * act on a different dictation. */
@@ -93,7 +97,12 @@ const HOLD_LIMIT_MS = 10_000;
 
 /** States that carry a written label instead of leaning on the waveform. The
  * backend widens the window for exactly these (see OVERLAY_LABEL_WIDTH). */
-const LABELED: readonly OverlayState[] = ["generating", "vision", "notice"];
+const LABELED: readonly OverlayState[] = [
+  "generating",
+  "vision",
+  "notice",
+  "downloading",
+];
 
 /** A dismissed or failed dictation offered back: one quiet line and one
  * action. The backend sizes the window to the pill and lets it take the
@@ -180,11 +189,41 @@ const onScrollbar = (body: HTMLElement, clientX: number) => {
   return x < body.clientLeft || x >= body.clientLeft + body.clientWidth;
 };
 
+/** A small progress ring for the "speech model still downloading" pill. Before
+ * the first progress event it spins as an open arc, so it never claims 0%. */
+const RING_R = 7;
+const RING_C = 2 * Math.PI * RING_R;
+const DownloadRing: React.FC<{ percent: number | null }> = ({ percent }) => (
+  <svg
+    className={`pill-ring${percent === null ? " is-waiting" : ""}`}
+    width="18"
+    height="18"
+    viewBox="0 0 18 18"
+    aria-hidden="true"
+  >
+    <circle className="pill-ring-track" cx="9" cy="9" r={RING_R} />
+    <circle
+      className="pill-ring-fill"
+      cx="9"
+      cy="9"
+      r={RING_R}
+      strokeDasharray={RING_C}
+      strokeDashoffset={
+        percent === null ? RING_C * 0.72 : RING_C * (1 - percent / 100)
+      }
+    />
+  </svg>
+);
+
 const RecordingOverlay: React.FC = () => {
   const { t } = useTranslation();
   const [isVisible, setIsVisible] = useState(false);
   const [state, setState] = useState<OverlayState>("recording");
   const [notice, setNotice] = useState<string | null>(null);
+  /** How far the speech model a `downloading` pill is waiting on has got
+   * (null until its first progress event), and which model that is. */
+  const [downloadPercent, setDownloadPercent] = useState<number | null>(null);
+  const downloadId = useRef<string | null>(null);
   const [locked, setLocked] = useState(false);
   const [levels, setLevels] = useState<number[]>(EMPTY_LEVELS);
   const [micLive, setMicLive] = useState(false);
@@ -375,6 +414,10 @@ const RecordingOverlay: React.FC = () => {
         recording = payload.state === "recording";
         setState(payload.state);
         setNotice(payload.notice ?? null);
+        const nextDownload =
+          payload.state === "downloading" ? (payload.download ?? null) : null;
+        if (nextDownload !== downloadId.current) setDownloadPercent(null);
+        downloadId.current = nextDownload;
         setStreamingWindow(payload.streamingWindow);
         setInteractive(!!payload.interactive);
         if (recording) {
@@ -403,6 +446,8 @@ const RecordingOverlay: React.FC = () => {
         setHop(false);
         visible = false;
         recording = false;
+        downloadId.current = null;
+        setDownloadPercent(null);
         setIsVisible(false);
         setInteractive(false);
         setLocked(false);
@@ -452,6 +497,17 @@ const RecordingOverlay: React.FC = () => {
         setLevels(voiceEnergy(payload) === 0 ? EMPTY_LEVELS : payload);
         setMicLive(true);
       }).then(register),
+      // The model manager reports every download ~10x a second. Only the one
+      // a `downloading` pill is waiting on matters here.
+      listen<{ model_id: string; percentage: number }>(
+        "model-download-progress",
+        ({ payload }) => {
+          if (!payload || payload.model_id !== downloadId.current) return;
+          const percent = Math.round(payload.percentage);
+          if (Number.isFinite(percent))
+            setDownloadPercent(Math.max(0, Math.min(100, percent)));
+        },
+      ).then(register),
       // After completion the card shows the final text; a late live update
       // must not paint the raw transcript back over it.
       listen<StreamTextPayload>("stream-text", ({ payload }) => {
@@ -545,7 +601,9 @@ const RecordingOverlay: React.FC = () => {
   const live = isRecording && micLive;
   const recovery = RECOVERY.includes(state);
   const labeled = LABELED.includes(state);
-  const working = state !== "recording" && state !== "notice" && !recovery;
+  const downloading = state === "downloading";
+  const working =
+    state !== "recording" && state !== "notice" && !downloading && !recovery;
   // The pointer holds these open (the backend waits on `overlay-hover`): the
   // finished card so it can be read and copied, the recovery pill so it is
   // still there when the pointer reaches it.
@@ -559,11 +617,15 @@ const RecordingOverlay: React.FC = () => {
   const busyLabel =
     state === "notice"
       ? t(`overlay.notices.${notice ?? "flowFailed"}`)
-      : recovery
-        ? notice
-          ? t(`overlay.notices.${notice}`)
-          : t(`overlay.recovery.${state}`)
-        : t(`overlay.${state}`);
+      : downloading
+        ? downloadPercent === null
+          ? t("overlay.downloading.title")
+          : t("overlay.downloading.percent", { percent: downloadPercent })
+        : recovery
+          ? notice
+            ? t(`overlay.notices.${notice}`)
+            : t(`overlay.recovery.${state}`)
+          : t(`overlay.${state}`);
   const doneLabel = notice ? t(`overlay.notices.${notice}`) : t("overlay.done");
   // The pill has nowhere to put a second line, so its one label is the invitation
   // to speak. The card keeps the state word in its header and lets the body hold
@@ -816,7 +878,17 @@ const RecordingOverlay: React.FC = () => {
           role="group"
           aria-label={ariaLabel}
         >
-          {labeled ? (
+          {downloading ? (
+            <>
+              <DownloadRing percent={downloadPercent} />
+              <span className="pill-download-text" role="status">
+                <span className="pill-label">{busyLabel}</span>
+                <span className="pill-hint">
+                  {t("overlay.downloading.hint")}
+                </span>
+              </span>
+            </>
+          ) : labeled ? (
             <>
               {state !== "notice" && (
                 <div className="pill-wave compact">

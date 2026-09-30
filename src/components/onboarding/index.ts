@@ -1,9 +1,12 @@
-export { default } from "./Onboarding";
 export { default as AccessibilityOnboarding } from "./AccessibilityOnboarding";
-export { default as LlmOnboarding } from "./LlmOnboarding";
-export { default as ReadyStep } from "./ReadyStep";
-export { default as OnboardingLayout } from "./OnboardingLayout";
-export { default as WelcomeChoiceCard } from "./WelcomeChoiceCard";
+export { SetupStep } from "./SetupStep";
+export { WelcomeStep } from "./WelcomeStep";
+export { TourStep } from "./TourStep";
+export { FinishStep } from "./FinishStep";
+export { VoicePrefetch } from "./VoicePrefetch";
+export { hasCompletedOnboarding, markOnboardingComplete } from "./completion";
+export { useOnboardingReplay } from "./replay";
+export { useSetupQueue } from "./setupQueue";
 export { default as ModelCard } from "./ModelCard";
 export { isLegacyModel } from "./ModelCard";
 export type { ModelCardStatus } from "./ModelCard";

@@ -270,14 +270,72 @@ pub fn assistant_insert_text(app: AppHandle, text: String) -> Result<(), String>
     // only repairs a foreground that one of our own windows took, and it needs the
     // real target to be next in line.
     assistant::hide_assistant_panel(&app);
-    crate::clipboard::paste_with_behavior(
+
+    // On macOS the click on Insert made SpeakoFlow the active app, and ordering a
+    // window out does not give activation back (`restore_paste_target` is
+    // Windows-only), so Cmd+V would land in our own app. `hide:` is AppKit's way of
+    // handing activation to the app that had it before us. Queued behind the panel
+    // hide above, so the panel is already gone and is not among the windows that
+    // come back afterwards.
+    #[cfg(target_os = "macos")]
+    let yield_queued = {
+        let (tx, rx) = std::sync::mpsc::channel();
+        let queued = app
+            .run_on_main_thread(move || {
+                use tauri_nspanel::objc2::MainThreadMarker;
+                use tauri_nspanel::objc2_app_kit::NSApplication;
+                let hid = MainThreadMarker::new().is_some_and(|mtm| {
+                    let ns_app = NSApplication::sharedApplication(mtm);
+                    let active = ns_app.isActive();
+                    if active {
+                        ns_app.hide(None);
+                    }
+                    active
+                });
+                let _ = tx.send(hid);
+            })
+            .is_ok();
+        // Activation moves in the window server, not in this call, so give it a
+        // moment before the keystroke goes out.
+        if queued
+            && rx
+                .recv_timeout(std::time::Duration::from_millis(500))
+                .unwrap_or(false)
+        {
+            std::thread::sleep(std::time::Duration::from_millis(150));
+        }
+        queued
+    };
+
+    let result = crate::clipboard::paste_with_behavior(
         text,
-        app,
+        app.clone(),
         crate::clipboard::PasteBehavior {
             allow_trailing_space: false,
             allow_auto_submit: false,
         },
-    )
+    );
+
+    // Bring back whatever `hide:` took down (an open Settings window) without
+    // taking activation back from the paste target. An app left hidden cannot be
+    // relied on to show its next window — the recording overlay, the next quick
+    // ask — until the user activates SpeakoFlow themselves.
+    // Queued after the hide, so it runs after it even if that was delayed.
+    #[cfg(target_os = "macos")]
+    if yield_queued {
+        let _ = app.run_on_main_thread(|| {
+            use tauri_nspanel::objc2::MainThreadMarker;
+            use tauri_nspanel::objc2_app_kit::NSApplication;
+            if let Some(mtm) = MainThreadMarker::new() {
+                let ns_app = NSApplication::sharedApplication(mtm);
+                if ns_app.isHidden() {
+                    ns_app.unhideWithoutActivation();
+                }
+            }
+        });
+    }
+
+    result
 }
 
 #[tauri::command]

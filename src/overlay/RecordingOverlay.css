@@ -144,6 +144,61 @@
   line-clamp: 2;
 }
 
+/* ── "Speech model still downloading" ───────────────────────────────────────
+ * A voice shortcut pressed before first-run setup's download has landed. It
+ * says what is happening and how far along it is, and nothing else: the same
+ * surface and greys as every other state, a thin ring for the progress, and a
+ * muted second line saying dictation will simply start working. */
+.overlay-pill.downloading {
+  gap: 10px;
+  padding-inline: 12px 15px;
+}
+.pill-ring {
+  flex-shrink: 0;
+  transform: rotate(-90deg);
+}
+.pill-ring circle {
+  fill: none;
+  stroke-width: 2;
+}
+.pill-ring-track {
+  stroke: rgba(255, 255, 255, 0.14);
+}
+.pill-ring-fill {
+  stroke: var(--ov-text);
+  stroke-linecap: round;
+  transition: stroke-dashoffset 300ms ease-out;
+}
+.pill-ring.is-waiting {
+  animation: pill-ring-spin 1s linear infinite;
+}
+@keyframes pill-ring-spin {
+  from {
+    transform: rotate(-90deg);
+  }
+  to {
+    transform: rotate(270deg);
+  }
+}
+.pill-download-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.overlay-pill.downloading .pill-label {
+  white-space: nowrap;
+  display: block;
+  font-variant-numeric: tabular-nums;
+}
+.pill-hint {
+  font-size: 11px;
+  line-height: 15px;
+  color: var(--ov-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* ── Recovery pill: "Dismissed · Undo", "Transcription failed · Try again" ──
  * Left behind for a few seconds when a dictation is cancelled or fails, so a
  * slip of the finger costs nothing. It should read as an afterthought, not an
@@ -613,7 +668,11 @@
   .transcript-arriving,
   .card-label,
   .card-copied,
-  .card-text.is-revealed {
+  .card-text.is-revealed,
+  .pill-ring.is-waiting {
     animation: none;
+  }
+  .pill-ring-fill {
+    transition: none;
   }
 }

@@ -4,6 +4,7 @@ import { ChevronUp, Loader2 } from "lucide-react";
 import type { ModelInfo } from "@/bindings";
 import { useModelStore } from "../../stores/modelStore";
 import { getTranslatedModelName } from "../../lib/utils/modelTranslation";
+import { formatBytes } from "../../lib/utils/format";
 
 /**
  * The single, cohesive home for model-download status.
@@ -24,25 +25,6 @@ import { getTranslatedModelName } from "../../lib/utils/modelTranslation";
 
 const RING_RADIUS = 7;
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
-
-/** Format a raw byte count as a compact MB/GB string (locale-aware). */
-const formatBytes = (bytes: number): string => {
-  if (!Number.isFinite(bytes) || bytes <= 0) return "0 MB";
-  const mb = bytes / (1024 * 1024);
-  if (mb >= 1024) {
-    const gb = mb / 1024;
-    const formatter = new Intl.NumberFormat(undefined, {
-      minimumFractionDigits: gb >= 10 ? 0 : 1,
-      maximumFractionDigits: gb >= 10 ? 0 : 1,
-    });
-    return `${formatter.format(gb)} GB`;
-  }
-  const formatter = new Intl.NumberFormat(undefined, {
-    minimumFractionDigits: mb >= 100 ? 0 : 1,
-    maximumFractionDigits: mb >= 100 ? 0 : 1,
-  });
-  return `${formatter.format(mb)} MB`;
-};
 
 type Phase = "downloading" | "verifying" | "extracting";
 

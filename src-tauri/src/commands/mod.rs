@@ -257,3 +257,78 @@ pub fn initialize_shortcuts(app: AppHandle) -> Result<(), String> {
     log::info!("Shortcuts initialized successfully");
     Ok(())
 }
+
+/// Remove this app's own Accessibility entry so macOS will ask again (issue #34).
+///
+/// TCC stores a grant together with the code signature it was given to. A build
+/// without a stable signing identity has a different signature every release, so
+/// after an update System Settings still lists SpeakoFlow as switched on (that
+/// row is keyed by bundle identifier) while `AXIsProcessTrusted` answers no for
+/// the new binary. Requesting access again shows nothing, because an entry
+/// already exists; removing it is what lets the next request add a fresh one.
+///
+/// Scoped to our own identifier, taken from the app config: `tccutil reset
+/// Accessibility` without one would revoke every app's access on the machine.
+/// No `sudo` — without it the reset applies to the current user's decisions.
+#[specta::specta]
+#[tauri::command]
+pub fn reset_macos_accessibility_permission(app: AppHandle) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        let identifier = app.config().identifier.clone();
+        if identifier.trim().is_empty() {
+            return Err("The app has no bundle identifier to reset".to_string());
+        }
+        let output = std::process::Command::new("/usr/bin/tccutil")
+            .args(["reset", "Accessibility", identifier.as_str()])
+            .output()
+            .map_err(|e| format!("Could not run tccutil: {}", e))?;
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            log::warn!(
+                "tccutil reset Accessibility {} failed ({}): {}",
+                identifier,
+                output.status,
+                stderr.trim()
+            );
+            return Err(format!(
+                "tccutil could not reset Accessibility for {}: {}",
+                identifier,
+                stderr.trim()
+            ));
+        }
+        log::info!("Reset the Accessibility permission for {}", identifier);
+        Ok(())
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = app;
+        Err("Resetting the Accessibility permission is only supported on macOS".to_string())
+    }
+}
+
+/// Open System Settings at Privacy & Security → Accessibility.
+#[specta::specta]
+#[tauri::command]
+pub fn open_macos_accessibility_settings() -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        // `open` hands the URL to LaunchServices and exits, so waiting is brief
+        // and leaves no child process behind.
+        let status = std::process::Command::new("/usr/bin/open")
+            .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
+            .status()
+            .map_err(|e| format!("Could not open Accessibility settings: {}", e))?;
+        if !status.success() {
+            return Err(format!(
+                "Could not open Accessibility settings ({})",
+                status
+            ));
+        }
+        Ok(())
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        Err("Opening Accessibility settings is only supported on macOS".to_string())
+    }
+}

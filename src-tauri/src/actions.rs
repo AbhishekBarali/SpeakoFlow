@@ -2121,6 +2121,14 @@ impl ShortcutAction for TranscribeAction {
         let start_time = Instant::now();
         debug!("TranscribeAction::start called for binding: {}", binding_id);
 
+        // Nothing to transcribe with yet (the speech model is still arriving
+        // from first-run setup, or there is none): say so on the overlay instead
+        // of recording audio that can only fail. Not recording leaves the
+        // coordinator idle, so the release is ignored.
+        if !crate::speech_readiness::allow_voice_input(app) {
+            return;
+        }
+
         // A fresh dictation can't be redirected by a stale Ask-Assistant click.
         crate::assistant::clear_transcribe_redirect();
 
@@ -2424,6 +2432,10 @@ impl ShortcutAction for TranscribeAction {
             // falls back to batch when the stream produced nothing or
             // errored/timed out, so the user never loses their words.
             let transcription_time = Instant::now();
+            // Cleared first: a streamed result never calls `transcribe`, so the
+            // flag would otherwise still hold whatever an earlier transcription
+            // on this worker thread (an assistant ask, say) left in it.
+            let _ = crate::managers::transcription::take_cloud_fallback();
             let transcription_result = match tm.finalize_stream() {
                 Ok(Some(text)) => Ok(text),
                 Ok(None) => tm.transcribe(samples),
@@ -2435,6 +2447,8 @@ impl ShortcutAction for TranscribeAction {
                     tm.transcribe(samples)
                 }
             };
+            // Read on this thread, right after `transcribe`, before any await.
+            let cloud_fell_back = crate::managers::transcription::take_cloud_fallback();
 
             // Await WAV save and verify
             let (wav_saved, retained) = match wav_handle.await {
@@ -2468,6 +2482,7 @@ impl ShortcutAction for TranscribeAction {
                 },
                 flow_cancel_generation,
                 fresh: true,
+                transcribed_on_fallback: cloud_fell_back,
             };
 
             match transcription_result {
@@ -2559,6 +2574,10 @@ struct Dictation {
     /// they belong to the recording that set them, and a recovery must not
     /// consume a flag a later recording is relying on.
     fresh: bool,
+    /// The cloud provider failed and the local model transcribed it instead.
+    /// Said on the pill, so a failing key or network is noticed on the first
+    /// dictation rather than discovered weeks later in the log.
+    transcribed_on_fallback: bool,
 }
 
 impl Dictation {
@@ -2738,6 +2757,11 @@ async fn deliver_transcription(d: Dictation, transcription: String) {
     if overlay_notice.is_none() {
         overlay_notice = cleanup_fallback_notice(processed.post_process_result.as_ref());
     }
+    // Last, because it explains the least: the text is right, it just came
+    // from this PC instead of the cloud provider.
+    if overlay_notice.is_none() && d.transcribed_on_fallback {
+        overlay_notice = Some("cloudSttFellBack");
+    }
 
     let row = d.history.write(
         &d.hm,
@@ -2843,6 +2867,31 @@ fn paste_final(
             return;
         }
         let PendingPaste { text, notice, flow } = pending;
+        // Dictating into a field of our own main window (onboarding's try-it
+        // box, a search field, a prompt editor). A synthetic Ctrl+V cannot land
+        // there: this closure holds the main thread from writing the clipboard
+        // through restoring it, and the webview only handles the keystroke once
+        // the thread is free, by which time the clipboard holds the user's old
+        // content again. Every other app pastes fine, which is why this only
+        // ever failed inside SpeakoFlow. So the text goes to the webview, which
+        // inserts it at the caret (`insertDictation` in the frontend).
+        let main_focused = ah
+            .get_webview_window("main")
+            .and_then(|window| window.is_focused().ok())
+            .unwrap_or(false);
+        if delivers_in_app(main_focused, crate::input::paste_target_is_elsewhere()) {
+            let text = if !flow && get_settings(&ah).append_trailing_space {
+                format!("{text} ")
+            } else {
+                text
+            };
+            if let Err(e) = ah.emit_to("main", "dictation-into-focus", text.clone()) {
+                error!("Failed to hand the dictation to the main window: {}", e);
+            }
+            utils::finish_recording_overlay(&ah, &text, notice);
+            change_tray_icon(&ah, TrayIconState::Idle);
+            return;
+        }
         let result = if flow {
             utils::paste_with_behavior(
                 text.clone(),
@@ -2886,6 +2935,14 @@ fn paste_final(
         error!("Failed to run paste on main thread: {:?}", e);
         finish_idle(&app);
     });
+}
+
+/// Whether a finished dictation goes into the main window as an event rather
+/// than as a synthetic paste: the main window is in front, and the recording
+/// did not start in another app (whose window the paste would hand the
+/// foreground back to).
+fn delivers_in_app(main_focused: bool, started_elsewhere: bool) -> bool {
+    main_focused && !started_elsewhere
 }
 
 /// Cancelled with the text finished and only the paste left. The row already
@@ -3108,13 +3165,14 @@ async fn run_recovery(app: AppHandle, offer: Offer) {
         Some(id) => HistorySlot::Existing(id),
         None => HistorySlot::Nowhere,
     };
-    let dictation = Dictation {
+    let mut dictation = Dictation {
         app: app.clone(),
         hm: Arc::clone(&hm),
         context,
         history,
         flow_cancel_generation,
         fresh: false,
+        transcribed_on_fallback: false,
     };
 
     match remaining {
@@ -3125,10 +3183,21 @@ async fn run_recovery(app: AppHandle, offer: Offer) {
                 tm.initiate_model_load();
             }
             let audio = Arc::clone(&samples);
-            let result =
-                tauri::async_runtime::spawn_blocking(move || tm.transcribe(audio.to_vec()))
-                    .await
-                    .unwrap_or_else(|e| Err(anyhow::anyhow!("Transcription task panicked: {e}")));
+            let (result, fell_back) = tauri::async_runtime::spawn_blocking(move || {
+                let result = tm.transcribe(audio.to_vec());
+                (
+                    result,
+                    crate::managers::transcription::take_cloud_fallback(),
+                )
+            })
+            .await
+            .unwrap_or_else(|e| {
+                (
+                    Err(anyhow::anyhow!("Transcription task panicked: {e}")),
+                    false,
+                )
+            });
+            dictation.transcribed_on_fallback = fell_back;
             match result {
                 Ok(transcription) => {
                     debug!(
@@ -3176,6 +3245,11 @@ struct AssistantAction;
 impl ShortcutAction for AssistantAction {
     fn start(&self, app: &AppHandle, binding_id: &str, _shortcut_str: &str) {
         debug!("AssistantAction::start called for binding: {}", binding_id);
+
+        // A spoken question needs the speech model as much as a dictation does.
+        if !crate::speech_readiness::allow_voice_input(app) {
+            return;
+        }
 
         // A quick ask always owns this surface, including after a call failed
         // before obtaining a backend session ticket.
@@ -3401,6 +3475,11 @@ impl ShortcutAction for AssistantCallAction {
             crate::assistant::hide_assistant_panel(app);
             return;
         }
+        // Every turn of a call is transcribed, so a call cannot start without
+        // the speech model either. Hanging up (above) is never refused.
+        if !crate::speech_readiness::allow_voice_input(app) {
+            return;
+        }
         // The panel has to be on screen before the webview can act on this: the
         // session is driven from `useVoiceConversation`, which only runs there.
         crate::assistant::open_assistant_panel(app);
@@ -3493,6 +3572,18 @@ mod tests {
     use std::thread;
     use std::time::{Duration, Instant};
     use tokio::time::Instant as TokioInstant;
+
+    #[test]
+    fn a_dictation_inside_the_main_window_is_delivered_to_it() {
+        use super::delivers_in_app;
+        // Started and finished in the main window: a paste cannot land there.
+        assert!(delivers_in_app(true, false));
+        // Started in another app: the paste hands that app its window back.
+        assert!(!delivers_in_app(true, true));
+        // The main window is not in front: an ordinary paste.
+        assert!(!delivers_in_app(false, false));
+        assert!(!delivers_in_app(false, true));
+    }
 
     #[test]
     fn missing_style_instruction_adds_no_style_block() {

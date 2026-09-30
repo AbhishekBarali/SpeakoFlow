@@ -111,6 +111,60 @@ test("a delayed language sync cannot resurrect a hidden recording", async () => 
   expect(renderer.root.findAllByType("button")).toHaveLength(0);
 });
 
+/** The label a `downloading` pill is showing right now. */
+const downloadLabel = () =>
+  renderer.root.findByProps({ className: "pill-label" }).props
+    .children as string;
+
+test("a still-downloading speech model follows only its own progress", async () => {
+  await fire("show-overlay", {
+    state: "downloading",
+    streamingWindow: false,
+    download: "parakeet",
+  });
+  // Nothing has arrived yet: no number is claimed.
+  expect(downloadLabel()).toBe("overlay.downloading.title");
+  expect(
+    renderer.root.findAll(
+      (node) =>
+        node.type === "svg" &&
+        String(node.props.className).includes("is-waiting"),
+    ),
+  ).toHaveLength(1);
+
+  // Another model's download is not this pill's business.
+  await fire("model-download-progress", {
+    model_id: "gemma-4-e2b",
+    percentage: 90,
+  });
+  expect(downloadLabel()).toBe("overlay.downloading.title");
+
+  await fire("model-download-progress", {
+    model_id: "parakeet",
+    percentage: 41.6,
+  });
+  expect(downloadLabel()).toBe("overlay.downloading.percent");
+  expect(
+    renderer.root.findAll(
+      (node) =>
+        node.type === "svg" &&
+        String(node.props.className).includes("is-waiting"),
+    ),
+  ).toHaveLength(0);
+  // The pill is status only: nothing on it takes a click.
+  expect(renderer.root.findAllByType("button")).toHaveLength(0);
+
+  // A hide forgets the download, so a late event cannot revive a number on
+  // the next pill.
+  await fire("hide-overlay");
+  await fire("show-overlay", {
+    state: "downloading",
+    streamingWindow: false,
+    download: "parakeet",
+  });
+  expect(downloadLabel()).toBe("overlay.downloading.title");
+});
+
 test("a hop to another display fades out, then back in, and is never left hidden", async () => {
   await fire("show-overlay", { state: "recording", streamingWindow: false });
   await fire("overlay-hop", "out");
