@@ -5,10 +5,10 @@ import { useOsType } from "@/hooks/useOsType";
 /**
  * A shortcut drawn as physical keys instead of the sentence "Left Ctrl + Left
  * Windows". People recognise keys faster than they read a string. Editing
- * still happens in Settings → Shortcuts.
+ * is provided by ShortcutKeysButton wherever the shortcut is shown.
  *
  * Two finishes: `default` is a light keycap with a pressed-in bottom edge for
- * cards, `glass` is a frosted key for the gradient heroes.
+ * cards, `hero` is a solid key for feature banners.
  */
 
 type KeycapSize = "sm" | "md" | "lg";
@@ -17,7 +17,7 @@ interface KeycapsProps {
   /** Raw binding string as stored, e.g. `ctrl_left+super_left`. */
   binding: string | null | undefined;
   size?: KeycapSize;
-  variant?: "default" | "glass";
+  variant?: "default" | "hero";
   className?: string;
   /** Rendered when there is no binding. */
   fallback?: React.ReactNode;
@@ -56,7 +56,7 @@ export const Keycaps: React.FC<KeycapsProps> = ({
   if (keys.length === 0) return <>{fallback}</>;
 
   const finish =
-    variant === "glass" ? "keycap-glass" : "keycap bg-surface text-ink";
+    variant === "hero" ? "keycap-hero" : "keycap bg-surface text-ink";
 
   return (
     <span

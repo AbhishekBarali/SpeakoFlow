@@ -35,10 +35,11 @@ const NeedsSpeechModel: React.FC = () => {
  * Home: the one shortcut that matters, what you have said, and how it is set
  * up.
  *
- * The hero carries the dictation keys at the size of real keys — and they are
- * the button that changes them. Below it, the other shortcuts beside the
- * models doing each job; then the last few things you said. Usage numbers
- * live on Insights.
+ * The banner carries the dictation keys at the size of real keys — and they
+ * are the button that changes them. How to use them is a tip that retires
+ * after the first few days. Below it, the other shortcuts beside the models
+ * doing each job; then the last few things you said. Usage numbers live on
+ * Insights.
  */
 export const HomePage: React.FC = () => {
   const { t } = useTranslation();
@@ -46,7 +47,7 @@ export const HomePage: React.FC = () => {
   const slots = useModelSlots();
   const holdToTalk = getSetting("push_to_talk") ?? true;
   // With cleanup moved onto the dictation shortcut, these keys clean up too,
-  // so the hero says so instead of listing a second shortcut below.
+  // so the banner says so instead of listing a second shortcut below.
   const cleansUp =
     (getSetting("post_process_enabled") ?? false) &&
     (getSetting("post_process_on_dictation") ?? false);
@@ -56,12 +57,11 @@ export const HomePage: React.FC = () => {
     <Page>
       {!slots.stt.ready && <NeedsSpeechModel />}
 
-      {/* No line art here: Home is read at a glance (and the art is off by
-          default — only Dictionary draws it). */}
       <Hero
+        art="home"
         title={greeting}
         subtitle={holdToTalk ? t("home.hero.hold") : t("home.hero.tap")}
-        aside={
+        actions={
           <HeroShortcut
             label={
               cleansUp
@@ -73,7 +73,7 @@ export const HomePage: React.FC = () => {
             <ShortcutInput
               shortcutId="transcribe"
               bare
-              finish="glass"
+              finish="hero"
               size="lg"
               showReset="never"
             />

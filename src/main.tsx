@@ -9,8 +9,11 @@ import { suppressCaretBrowsing } from "./lib/caretBrowsing";
 // No text caret in text that cannot be edited (see lib/caretBrowsing.ts).
 suppressCaretBrowsing();
 
-// Fonts — Inter (variable) carries every heading, label, control, and sentence.
+// Fonts — Inter (variable) carries every heading, label, control, and sentence;
+// Instrument Serif is only the feature banners' headline (ui/Hero.tsx).
 import "@fontsource-variable/inter";
+import "@fontsource/instrument-serif/400.css";
+import "@fontsource/instrument-serif/400-italic.css";
 
 // Set platform before render so CSS can scope per-platform (e.g. scrollbar styles)
 document.documentElement.dataset.platform = platform();

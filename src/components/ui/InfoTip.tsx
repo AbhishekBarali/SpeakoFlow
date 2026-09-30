@@ -18,7 +18,7 @@ export const InfoTip: React.FC<{
   /** Accessible name for the button. Defaults to "More information". */
   label?: string;
   className?: string;
-  /** Tone for placement on the gradient hero. */
+  /** Tone for placement on the neutral introduction surface. */
   tone?: "default" | "onHero";
   size?: "sm" | "md";
 }> = ({ text, label, className = "", tone = "default", size = "sm" }) => {
@@ -103,7 +103,7 @@ export const InfoTip: React.FC<{
         }}
         className={`inline-grid shrink-0 cursor-help place-items-center rounded-full p-0.5 transition-colors focus-visible:outline-none focus-visible:ring-2 ${
           tone === "onHero"
-            ? "text-white/60 hover:text-white focus-visible:ring-white/60"
+            ? "text-hero-muted hover:text-hero-ink focus-visible:ring-hero-ink"
             : "text-muted-soft hover:text-muted focus-visible:ring-accent/40"
         } ${className}`}
       >

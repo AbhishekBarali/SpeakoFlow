@@ -9,7 +9,7 @@ import { Switch } from "@/components/ui/Switch";
 import { Button } from "@/components/ui/Button";
 import { Callout } from "@/components/ui/Callout";
 import { Dialog } from "@/components/ui/Dialog";
-import { Hero, HeroShortcut } from "@/components/ui/Hero";
+import { Hero, HeroShortcut, HeroTitle } from "@/components/ui/Hero";
 import { Segmented } from "@/components/ui/Segmented";
 import { SettingsGroup } from "@/components/ui/SettingsGroup";
 import { SettingContainer } from "@/components/ui/SettingContainer";
@@ -20,18 +20,18 @@ import { useModelSlots } from "@/components/shell/useModelSlots";
 import { LlmModelPicker } from "@/components/shell/ModelPicker";
 import { WritingStyleCard } from "./cleanup/WritingStyle";
 
-/** "um so I think we should uh meet tomorrow" → the cleaned sentence. The
- *  feature explained by showing it, instead of a paragraph about it. */
+/** "let's meet at ten, actually no, make that eleven" → the cleaned sentence.
+ *  The feature explained by showing it, instead of a paragraph about it. */
 const BeforeAfter: React.FC = () => {
   const { t } = useTranslation();
   return (
-    <div className="glass-chip max-w-md rounded-2xl px-4 py-3.5">
-      <p className="text-[0.9375rem] text-white/60 line-through decoration-white/35">
+    <div className="max-w-[26rem]">
+      <p className="text-[0.9375rem] leading-relaxed text-hero-muted line-through decoration-hero-muted/60 text-pretty">
         {t("cleanup.hero.before")}
       </p>
-      <p className="mt-1.5 flex items-start gap-2 text-[0.9375rem] font-medium text-white">
+      <p className="mt-1.5 flex items-start gap-2 text-[0.9375rem] leading-relaxed text-hero-ink">
         <ArrowRight
-          className="mt-[0.3rem] h-3.5 w-3.5 shrink-0 text-white/70 rtl:rotate-180"
+          className="mt-[0.35rem] h-3.5 w-3.5 shrink-0 text-hero-muted rtl:rotate-180"
           aria-hidden="true"
         />
         {t("cleanup.hero.after")}
@@ -178,22 +178,24 @@ export const CleanupPage: React.FC = () => {
       />
 
       <Hero
-        title={t("cleanup.hero.title")}
-        aside={
+        art="cleanup"
+        title={<HeroTitle i18nKey="cleanup.hero.title" />}
+        actions={
           <HeroShortcut
             label={
               onDictation
                 ? t("home.shortcuts.dictate.title")
                 : t("home.shortcuts.cleanup.title")
             }
+            // Off is a state the user has to act on, so it never folds away;
+            // how to use the keys is a tip.
+            status={enabled ? undefined : t("cleanup.hero.offHint")}
             hint={
-              !enabled
-                ? t("cleanup.hero.offHint")
-                : onDictation
-                  ? t("cleanup.hero.onDictationHint")
-                  : holdToTalk
-                    ? t("cleanup.hero.onHint")
-                    : t("cleanup.hero.onHintTap")
+              onDictation
+                ? t("cleanup.hero.onDictationHint")
+                : holdToTalk
+                  ? t("cleanup.hero.onHint")
+                  : t("cleanup.hero.onHintTap")
             }
           >
             <span className={enabled ? undefined : "opacity-60"}>
@@ -207,7 +209,7 @@ export const CleanupPage: React.FC = () => {
                   onDictation ? "transcribe" : "transcribe_with_post_process"
                 }
                 bare
-                finish="glass"
+                finish="hero"
                 size="lg"
                 showReset="never"
               />

@@ -6,7 +6,7 @@ import { useSettingCommand } from "@/hooks/useSettingCommand";
 import { Page, PageHeader } from "@/components/ui/Page";
 import { Switch } from "@/components/ui/Switch";
 import { Dialog } from "@/components/ui/Dialog";
-import { Hero, HeroShortcut } from "@/components/ui/Hero";
+import { Hero, HeroShortcut, HeroTitle } from "@/components/ui/Hero";
 import { SettingsGroup } from "@/components/ui/SettingsGroup";
 import { SettingContainer } from "@/components/ui/SettingContainer";
 import { ShortcutInput } from "@/components/settings/ShortcutInput";
@@ -76,10 +76,11 @@ export const AssistantPage: React.FC = () => {
       ) : (
         <>
           <Hero
-            title={t("assistantPage.hero.title")}
+            art="assistant"
+            title={<HeroTitle i18nKey="assistantPage.hero.title" />}
             subtitle={t("assistantPage.hero.subtitle")}
-            aside={
-              <div className="flex flex-wrap gap-x-8 gap-y-5">
+            actions={
+              <div className="flex flex-wrap gap-x-9 gap-y-5">
                 <HeroShortcut
                   label={t("assistantPage.hero.ask")}
                   hint={
@@ -91,7 +92,7 @@ export const AssistantPage: React.FC = () => {
                   <ShortcutInput
                     shortcutId="assistant"
                     bare
-                    finish="glass"
+                    finish="hero"
                     size="lg"
                     showReset="never"
                   />
@@ -103,7 +104,7 @@ export const AssistantPage: React.FC = () => {
                   <ShortcutInput
                     shortcutId="assistant_call"
                     bare
-                    finish="glass"
+                    finish="hero"
                     size="lg"
                     showReset="never"
                   />

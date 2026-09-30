@@ -311,7 +311,9 @@ export const HandyKeysShortcutInput: React.FC<HandyKeysShortcutInputProps> = ({
           disabled={isUpdating(`binding_${shortcutId}`)}
           ariaLabel={t("shortcutEditor.reset", { name: translatedName })}
           className={
-            finish === "glass" ? "text-white/70 hover:bg-white/10" : ""
+            finish === "hero"
+              ? "text-hero-muted! hover:text-hero-ink! hover:bg-hero-hover! focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hero-ink"
+              : ""
           }
         />
       )}
