@@ -31,7 +31,9 @@ use tauri::{AppHandle, Emitter, Manager, State};
 use crate::meetings::session::{MeetingRecorder, MeetingState};
 use crate::meetings::store::{MeetingStore, SEGMENT_PAGE_SIZE};
 use crate::meetings::summarize::{GeneratedNotes, NotesTemplate};
-use crate::meetings::{Meeting, MeetingSpeaker, PaginatedMeetings, PaginatedSegments};
+use crate::meetings::{
+    Meeting, MeetingSpeaker, MeetingStatus, PaginatedMeetings, PaginatedSegments,
+};
 
 /// Emitted whenever the meeting list changes in a way a list view cannot infer
 /// from its own action — a delete, a rename, or notes landing on a row. The
@@ -91,6 +93,20 @@ fn require_text(value: &str, what: &str) -> Result<String, String> {
         return Err(format!("{what} cannot be empty."));
     }
     Ok(trimmed.to_string())
+}
+
+/// Why `meeting_id` cannot be touched yet, if the recorder still owns it.
+///
+/// Two cases, because the fix the user needs differs: a live recording has to be
+/// stopped, while one already stopped only has to finish transcribing.
+fn busy_meeting_error(state: &MeetingState, meeting_id: i64, action: &str) -> Option<String> {
+    if state.meeting_id != Some(meeting_id) {
+        return None;
+    }
+    Some(match state.status {
+        MeetingStatus::Recording => format!("Stop the recording before {action}."),
+        _ => format!("This meeting is still being transcribed. Try {action} again in a moment."),
+    })
 }
 
 /* ─────────────────────────────── recording ─────────────────────────────── */
@@ -662,9 +678,10 @@ pub async fn diarize_meeting(
     meeting_id: i64,
 ) -> Result<crate::meetings::diarize::DiarizationOutcome, String> {
     // The WAV is still being written and has no finalised header, so it cannot be
-    // decoded yet.
-    if recorder.state().meeting_id == Some(meeting_id) {
-        return Err("Stop the recording before identifying speakers.".to_string());
+    // decoded yet; and while a stopped meeting drains, its worker is still
+    // writing the segments this pass relabels.
+    if let Some(error) = busy_meeting_error(&recorder.state(), meeting_id, "identifying speakers") {
+        return Err(error);
     }
 
     let store = Arc::clone(&store);
@@ -799,9 +816,11 @@ pub async fn delete_meeting(
     meeting_id: i64,
 ) -> Result<(), String> {
     // Deleting the meeting currently being recorded would leave the capture
-    // threads writing into files and a row that no longer exist.
-    if recorder.state().meeting_id == Some(meeting_id) {
-        return Err("Stop the recording before deleting this meeting.".to_string());
+    // threads writing into files and a row that no longer exist, and one that
+    // stopped but is still draining has a worker appending segments to it.
+    if let Some(error) = busy_meeting_error(&recorder.state(), meeting_id, "deleting this meeting")
+    {
+        return Err(error);
     }
 
     let store = Arc::clone(&store);
@@ -855,5 +874,34 @@ mod tests {
             require_text("  Standup  ", "A meeting title"),
             Ok("Standup".to_string())
         );
+    }
+
+    fn state_for(meeting_id: Option<i64>, status: MeetingStatus) -> MeetingState {
+        MeetingState {
+            meeting_id,
+            status,
+            ..MeetingState::idle()
+        }
+    }
+
+    #[test]
+    fn other_meetings_are_never_busy() {
+        assert_eq!(busy_meeting_error(&MeetingState::idle(), 1, "x"), None);
+        let recording = state_for(Some(2), MeetingStatus::Recording);
+        assert_eq!(busy_meeting_error(&recording, 1, "x"), None);
+    }
+
+    /// A stopped meeting whose queue is still draining is refused too, with a
+    /// message that does not tell the user to stop something already stopped.
+    #[test]
+    fn a_draining_meeting_is_refused_without_asking_for_a_stop() {
+        let recording = state_for(Some(1), MeetingStatus::Recording);
+        assert!(busy_meeting_error(&recording, 1, "deleting this meeting")
+            .unwrap()
+            .starts_with("Stop the recording"));
+
+        let draining = state_for(Some(1), MeetingStatus::Processing);
+        let error = busy_meeting_error(&draining, 1, "deleting this meeting").unwrap();
+        assert!(error.contains("still being transcribed"), "{error}");
     }
 }

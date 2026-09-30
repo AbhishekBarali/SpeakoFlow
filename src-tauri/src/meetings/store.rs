@@ -315,8 +315,20 @@ impl MeetingStore {
     /// duration reflects what was actually captured rather than showing blank.
     ///
     /// Returns the number of meetings reconciled.
+    ///
+    /// Also recovers the recordings of meetings that died before `stop` wrote
+    /// their file names: the files are named after the meeting id, so they can be
+    /// found, and their headers only need the lengths `hound` never got to write.
+    /// Without this they were orphaned — never listed, never deleted, around
+    /// 460 MB an hour.
     pub fn reconcile_interrupted(&self) -> Result<usize> {
         let conn = self.open()?;
+        // Best effort: failing to recover a file must not stop the status fix,
+        // which is what keeps a dead meeting from reading as live.
+        if let Err(e) = self.recover_orphaned_audio(&conn) {
+            warn!("Could not recover interrupted meeting audio: {e}");
+        }
+
         let changed = conn.execute(
             "UPDATE meetings
                 SET status = ?1,
@@ -339,6 +351,75 @@ impl MeetingStore {
             warn!("Reconciled {changed} meeting(s) interrupted by an app restart");
         }
         Ok(changed)
+    }
+
+    /// Backfill `mic_file` / `system_file` for unfinished meetings whose
+    /// recordings exist on disk, repairing each header first.
+    ///
+    /// `interrupted` is included so recordings orphaned by builds before this
+    /// existed are recovered too. A file that is not a WAV this can repair is
+    /// left unreferenced rather than handed to a decoder that will reject it.
+    fn recover_orphaned_audio(&self, conn: &Connection) -> Result<()> {
+        let candidates = {
+            let mut stmt = conn.prepare(
+                "SELECT id, mic_file IS NULL, system_file IS NULL
+                   FROM meetings
+                  WHERE status IN (?1, ?2, ?3)
+                    AND (mic_file IS NULL OR system_file IS NULL)",
+            )?;
+            let rows = stmt
+                .query_map(
+                    params![
+                        MeetingStatus::Recording.as_db_str(),
+                        MeetingStatus::Processing.as_db_str(),
+                        MeetingStatus::Interrupted.as_db_str(),
+                    ],
+                    |row| {
+                        Ok((
+                            row.get::<_, i64>(0)?,
+                            row.get::<_, bool>(1)?,
+                            row.get::<_, bool>(2)?,
+                        ))
+                    },
+                )?
+                .collect::<rusqlite::Result<Vec<_>>>()?;
+            rows
+        };
+
+        for (id, mic_missing, system_missing) in candidates {
+            let wanted = [
+                (mic_missing, "mic_file", format!("meeting_{id}_mic.wav")),
+                (
+                    system_missing,
+                    "system_file",
+                    format!("meeting_{id}_system.wav"),
+                ),
+            ];
+            for (missing, column, file_name) in wanted {
+                if !missing {
+                    continue;
+                }
+                let path = self.audio_path(&file_name);
+                if !path.exists() {
+                    continue;
+                }
+                match repair_wav_header(&path) {
+                    Ok(repaired) => {
+                        // `column` is one of two literals above, never input.
+                        conn.execute(
+                            &format!("UPDATE meetings SET {column} = ?2 WHERE id = ?1"),
+                            params![id, file_name],
+                        )?;
+                        info!(
+                            "Recovered {file_name} for meeting {id}{}",
+                            if repaired { " (header repaired)" } else { "" }
+                        );
+                    }
+                    Err(e) => warn!("Could not recover {file_name} for meeting {id}: {e}"),
+                }
+            }
+        }
+        Ok(())
     }
 
     /* ─────────────────────────── segments ─────────────────────────── */
@@ -883,6 +964,88 @@ fn row_to_meeting(row: &rusqlite::Row<'_>) -> rusqlite::Result<Meeting> {
         diarized: diarized != 0,
         segment_count: row.get(12)?,
     })
+}
+
+/// Make a recording whose writer never finalised readable again.
+///
+/// `hound` writes the RIFF and `data` lengths as zero up front and fills them in
+/// on finalise, so a process that died mid-meeting leaves both at zero and every
+/// decoder reads an empty file. The chunks are walked rather than assuming a
+/// layout: for 32-bit float mono `hound` writes a 40-byte WAVEFORMATEXTENSIBLE
+/// `fmt ` chunk, so its data starts at byte 68, not the 44 of a plain PCM file.
+///
+/// The data length becomes whatever follows the `data` header, rounded down to
+/// whole sample frames — a write cut off mid-sample is trimmed. A header whose
+/// `data` length is already non-zero and fits the file is left alone: that file
+/// was finalised. Returns whether anything was rewritten; an error means this is
+/// not a WAV that can be repaired.
+fn repair_wav_header(path: &Path) -> std::io::Result<bool> {
+    use std::io::{Error, ErrorKind, Read, Seek, SeekFrom, Write};
+
+    fn invalid(what: &str) -> Error {
+        Error::new(ErrorKind::InvalidData, what.to_string())
+    }
+
+    let mut file = fs::OpenOptions::new().read(true).write(true).open(path)?;
+    let len = file.metadata()?.len();
+
+    let mut riff = [0u8; 12];
+    file.read_exact(&mut riff)
+        .map_err(|_| invalid("shorter than a RIFF header"))?;
+    if &riff[0..4] != b"RIFF" || &riff[8..12] != b"WAVE" {
+        return Err(invalid("not a RIFF/WAVE file"));
+    }
+
+    let mut block_align: u64 = 0;
+    let mut pos: u64 = 12;
+    loop {
+        if pos + 8 > len {
+            return Err(invalid("no data chunk"));
+        }
+        let mut header = [0u8; 8];
+        file.seek(SeekFrom::Start(pos))?;
+        file.read_exact(&mut header)?;
+        let size = u64::from(u32::from_le_bytes([
+            header[4], header[5], header[6], header[7],
+        ]));
+        let body = pos + 8;
+
+        if &header[0..4] == b"fmt " {
+            // nBlockAlign: bytes per sample frame, at offset 12 of the body.
+            let mut fmt = [0u8; 14];
+            if size < 14 || body + 14 > len {
+                return Err(invalid("truncated fmt chunk"));
+            }
+            file.read_exact(&mut fmt)?;
+            block_align = u64::from(u16::from_le_bytes([fmt[12], fmt[13]]));
+        } else if &header[0..4] == b"data" {
+            if block_align == 0 {
+                return Err(invalid("data before a usable fmt chunk"));
+            }
+            let available = len - body;
+            if size != 0 && size <= available {
+                return Ok(false);
+            }
+            // Both length fields are u32; the RIFF one also covers the header.
+            let limit = u64::from(u32::MAX) - (body - 8);
+            let data_len = available.min(limit);
+            let data_len = data_len - data_len % block_align;
+
+            file.seek(SeekFrom::Start(4))?;
+            file.write_all(&((body - 8 + data_len) as u32).to_le_bytes())?;
+            file.seek(SeekFrom::Start(pos + 4))?;
+            file.write_all(&(data_len as u32).to_le_bytes())?;
+            // Trim a torn final sample, but never audio past the 4 GiB limit.
+            if available - data_len < block_align {
+                file.set_len(body + data_len)?;
+            }
+            file.sync_all()?;
+            return Ok(true);
+        }
+
+        // Chunks are word-aligned: an odd-sized body is followed by a pad byte.
+        pos = body + size + (size & 1);
+    }
 }
 
 #[cfg(test)]
@@ -1521,5 +1684,172 @@ mod tests {
     fn missing_meeting_reads_as_none() {
         let (store, _dir) = temp_store();
         assert!(store.get_meeting(9_999).unwrap().is_none());
+    }
+
+    /* ───────────────── recordings left behind by a dead process ───────────── */
+
+    /// The spec the recorder writes (see `session::open_wav`).
+    fn meeting_spec() -> hound::WavSpec {
+        hound::WavSpec {
+            channels: 1,
+            sample_rate: 16_000,
+            bits_per_sample: 32,
+            sample_format: hound::SampleFormat::Float,
+        }
+    }
+
+    /// Write the file a recorder killed mid-meeting leaves: `hound`'s header with
+    /// both lengths still zero, the samples, and half of one more sample.
+    fn write_unfinalised_wav(path: &Path, samples: &[f32]) {
+        let mut writer = hound::WavWriter::create(path, meeting_spec()).unwrap();
+        for sample in samples {
+            writer.write_sample(*sample).unwrap();
+        }
+        writer.finalize().unwrap();
+
+        let mut bytes = fs::read(path).unwrap();
+        let data = bytes.windows(4).position(|w| w == b"data").unwrap();
+        bytes[4..8].fill(0);
+        bytes[data + 4..data + 8].fill(0);
+        bytes.extend_from_slice(&[0x12, 0x34]);
+        fs::write(path, bytes).unwrap();
+    }
+
+    fn read_samples(path: &Path) -> Vec<f32> {
+        hound::WavReader::open(path)
+            .unwrap()
+            .samples::<f32>()
+            .collect::<Result<_, _>>()
+            .unwrap()
+    }
+
+    /// The layout the repair walks rather than assumes: 32-bit float makes hound
+    /// write WAVEFORMATEXTENSIBLE, so the data chunk is not at the usual 36.
+    #[test]
+    fn hound_puts_float_mono_data_after_an_extensible_fmt_chunk() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("probe.wav");
+        write_unfinalised_wav(&path, &[0.5]);
+        let bytes = fs::read(&path).unwrap();
+        assert_eq!(&bytes[12..16], b"fmt ");
+        assert_eq!(&bytes[16..20], &40u32.to_le_bytes());
+        assert_eq!(bytes.windows(4).position(|w| w == b"data"), Some(60));
+    }
+
+    #[test]
+    fn an_unfinalised_recording_is_readable_after_repair() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("meeting_1_mic.wav");
+        let samples: Vec<f32> = (0..1_000).map(|i| (i as f32 / 1_000.0) - 0.5).collect();
+        write_unfinalised_wav(&path, &samples);
+
+        // Unrepaired, a decoder sees no audio at all.
+        assert_eq!(hound::WavReader::open(&path).unwrap().len(), 0);
+
+        assert!(repair_wav_header(&path).unwrap());
+        let reader = hound::WavReader::open(&path).unwrap();
+        assert_eq!(reader.spec(), meeting_spec());
+        assert_eq!(
+            read_samples(&path),
+            samples,
+            "the torn tail sample is trimmed"
+        );
+    }
+
+    #[test]
+    fn a_finalised_recording_is_left_untouched() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("done.wav");
+        let mut writer = hound::WavWriter::create(&path, meeting_spec()).unwrap();
+        for sample in [0.1f32, -0.2, 0.3] {
+            writer.write_sample(sample).unwrap();
+        }
+        writer.finalize().unwrap();
+        let before = fs::read(&path).unwrap();
+
+        assert!(!repair_wav_header(&path).unwrap());
+        assert_eq!(fs::read(&path).unwrap(), before);
+    }
+
+    #[test]
+    fn a_file_that_is_not_a_wav_is_refused() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("junk.wav");
+        fs::write(&path, b"definitely not audio").unwrap();
+        assert!(repair_wav_header(&path).is_err());
+        fs::write(&path, b"RIF").unwrap();
+        assert!(repair_wav_header(&path).is_err());
+    }
+
+    /// A meeting killed mid-recording never had its file names written. Startup
+    /// finds the recordings by their deterministic names, repairs them, and puts
+    /// them back on the row, so they can be played, diarized and deleted.
+    #[test]
+    fn reconciling_recovers_the_recordings_of_a_dead_meeting() {
+        let (store, _dir) = temp_store();
+        let id = store.create_meeting("Crashed", 1_000, None).unwrap();
+        let samples = vec![0.25f32; 320];
+        write_unfinalised_wav(
+            &store.audio_path(&format!("meeting_{id}_mic.wav")),
+            &samples,
+        );
+
+        store.reconcile_interrupted().unwrap();
+
+        let meeting = store.get_meeting(id).unwrap().unwrap();
+        assert_eq!(meeting.status, MeetingStatus::Interrupted);
+        let mic_file = meeting.mic_file.expect("the mic recording is recovered");
+        assert_eq!(mic_file, format!("meeting_{id}_mic.wav"));
+        assert_eq!(read_samples(&store.audio_path(&mic_file)), samples);
+        // No system file on disk, so nothing to point at.
+        assert_eq!(meeting.system_file, None);
+
+        // And the recovered file now goes when the meeting does.
+        assert_eq!(store.delete_meeting(id).unwrap().len(), 1);
+    }
+
+    /// Recordings orphaned by earlier builds, on rows already reconciled, are
+    /// recovered on the next launch too.
+    #[test]
+    fn an_already_interrupted_meeting_gets_its_recording_back() {
+        let (store, _dir) = temp_store();
+        let id = store.create_meeting("Old crash", 1_000, None).unwrap();
+        store.reconcile_interrupted().unwrap();
+        write_unfinalised_wav(
+            &store.audio_path(&format!("meeting_{id}_system.wav")),
+            &[0.5; 16],
+        );
+
+        store.reconcile_interrupted().unwrap();
+        assert_eq!(
+            store.get_meeting(id).unwrap().unwrap().system_file,
+            Some(format!("meeting_{id}_system.wav"))
+        );
+    }
+
+    #[test]
+    fn an_unrepairable_file_is_not_put_on_the_row() {
+        let (store, _dir) = temp_store();
+        let id = store.create_meeting("Crashed", 1_000, None).unwrap();
+        fs::write(store.audio_path(&format!("meeting_{id}_mic.wav")), b"").unwrap();
+
+        store.reconcile_interrupted().unwrap();
+        let meeting = store.get_meeting(id).unwrap().unwrap();
+        assert_eq!(meeting.status, MeetingStatus::Interrupted);
+        assert_eq!(meeting.mic_file, None);
+    }
+
+    /// A finished meeting is none of reconciliation's business, even with a file
+    /// of the right name next to it.
+    #[test]
+    fn a_completed_meeting_is_not_given_files() {
+        let (store, _dir) = temp_store();
+        let id = store.create_meeting("Done", 1_000, None).unwrap();
+        store.finish_capture(id, 1_100, None, None).unwrap();
+        store.complete_meeting(id).unwrap();
+        write_unfinalised_wav(&store.audio_path(&format!("meeting_{id}_mic.wav")), &[0.5]);
+
+        store.reconcile_interrupted().unwrap();
+        assert_eq!(store.get_meeting(id).unwrap().unwrap().mic_file, None);
     }
 }

@@ -111,7 +111,20 @@ export interface MeetingState {
   system_audio: boolean;
   system_audio_error: string | null;
   elapsed_ms: number;
+  /** Chunks left out because transcription fell behind (audio still saved). */
+  dropped_chunks: number;
 }
+
+/**
+ * The meeting being recorded right now, or null.
+ *
+ * A stopped meeting whose queued audio is still being transcribed keeps its id
+ * in the state with status `processing`, so "has an id" no longer means "is
+ * recording". Treating it as live showed a recording card whose Stop answered
+ * "No meeting is recording".
+ */
+export const liveMeetingId = (state: MeetingState): number | null =>
+  state.status === "recording" ? state.meeting_id : null;
 
 /** Mirrors `SegmentEvent`, the payload of the `meeting-segment` event. */
 export interface SegmentEvent {

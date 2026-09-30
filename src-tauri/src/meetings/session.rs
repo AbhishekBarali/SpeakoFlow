@@ -15,10 +15,12 @@
 //!   to the transcriber in chunks; transcript rows go to SQLite in batches. The
 //!   only resident audio is the chunk currently being accumulated, which the
 //!   chunker caps.
-//! * **Transcription runs on one worker thread, behind a channel.** Capture
-//!   callbacks must never block — they run on the audio device's thread and
-//!   stalling one drops samples — and Whisper on a 30-second chunk is not fast.
-//!   If transcription falls behind, the queue absorbs it.
+//! * **Transcription runs on one worker thread, behind a bounded channel.**
+//!   Capture callbacks must never block — they run on the audio device's thread
+//!   and stalling one drops samples — and Whisper on a 30-second chunk is not
+//!   fast. The queue absorbs a short stall; an engine that is slower than real
+//!   time for the whole call gets chunks dropped from its transcript instead of
+//!   growing memory for hours (see [`JOB_QUEUE_CAPACITY`]).
 //! * **The two streams never merge.** They are chunked, transcribed and stored
 //!   separately, tagged with the [`SpeakerSource`] they came from. That tag is
 //!   the speaker attribution, and it costs nothing.
@@ -29,9 +31,10 @@ use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use std::io::BufWriter;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
+use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager};
 
 use super::chunker::{AudioChunk, ChunkAccumulator};
@@ -85,6 +88,15 @@ pub struct MeetingLevels {
 /// large enough to matter across thousands of segments.
 const WRITE_BATCH: usize = 4;
 
+/// Finished chunks allowed to wait for the transcriber.
+///
+/// A chunk is up to 30 s of `f32` audio, about 2 MB, so this caps the backlog
+/// near 30 MB and eight minutes of speech. It used to be unbounded: an engine
+/// slower than real time grew memory for the whole call, and `stop` then sat
+/// through the entire backlog. A chunk that finds the queue full is dropped from
+/// the live transcript only; its audio is already in the WAV.
+const JOB_QUEUE_CAPACITY: usize = 16;
+
 /// A newly transcribed segment, pushed to the UI as it happens.
 #[derive(Clone, Debug, Serialize, Deserialize, Type)]
 pub struct SegmentEvent {
@@ -108,6 +120,9 @@ pub struct MeetingState {
     /// Why system audio is unavailable, if it is.
     pub system_audio_error: Option<String>,
     pub elapsed_ms: i64,
+    /// Chunks left out of the transcript because transcription fell too far
+    /// behind. Their audio is still in the recording.
+    pub dropped_chunks: u32,
 }
 
 impl MeetingState {
@@ -119,6 +134,17 @@ impl MeetingState {
             system_audio: false,
             system_audio_error: None,
             elapsed_ms: 0,
+            dropped_chunks: 0,
+        }
+    }
+
+    /// A meeting whose capture has stopped but whose queued chunks are still
+    /// being transcribed.
+    fn stopping(meeting_id: i64) -> Self {
+        Self {
+            meeting_id: Some(meeting_id),
+            status: MeetingStatus::Processing,
+            ..Self::idle()
         }
     }
 }
@@ -337,8 +363,9 @@ struct ActiveSession {
     system_wav: SharedWav,
     mic_file: Option<String>,
     system_file: Option<String>,
-    job_tx: Option<mpsc::Sender<Job>>,
+    job_tx: Option<mpsc::SyncSender<Job>>,
     worker: Option<std::thread::JoinHandle<()>>,
+    dropped_chunks: Arc<AtomicU32>,
 }
 
 /// Tauri-managed owner of the meeting recording lifecycle.
@@ -355,6 +382,27 @@ pub struct MeetingRecorder {
     /// fully drained after stop. Lock-free, so the speech engine's idle checks
     /// never wait on `active` (which `start` holds while opening the mic).
     transcribing: AtomicBool,
+    /// The meeting `stop` has taken out of `active` and is still draining.
+    ///
+    /// Without it `state()` read idle for the whole drain, so a new meeting, a
+    /// delete of this one, or a diarization of its half-written WAV were all
+    /// accepted while the worker was still writing its rows. Lock order is
+    /// `active` then `stopping`, everywhere.
+    stopping: Mutex<Option<i64>>,
+}
+
+/// Clears [`MeetingRecorder::stopping`] however `stop` leaves, panics included,
+/// so one failed stop cannot refuse every later meeting.
+struct StoppingGuard<'a>(&'a Mutex<Option<i64>>);
+
+impl Drop for StoppingGuard<'_> {
+    fn drop(&mut self) {
+        let mut slot = match self.0.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        *slot = None;
+    }
 }
 
 impl MeetingRecorder {
@@ -364,6 +412,7 @@ impl MeetingRecorder {
             store,
             active: Mutex::new(None),
             transcribing: AtomicBool::new(false),
+            stopping: Mutex::new(None),
         }
     }
 
@@ -383,13 +432,19 @@ impl MeetingRecorder {
     }
 
     /// Current state for the UI.
+    ///
+    /// A meeting that has stopped but is still draining reports itself as
+    /// [`MeetingStatus::Processing`] with its id, which is what the delete and
+    /// diarize commands check before touching it.
     pub fn state(&self) -> MeetingState {
         let guard = match self.active.lock() {
             Ok(g) => g,
             Err(_) => return MeetingState::idle(),
         };
         match guard.as_ref() {
-            None => MeetingState::idle(),
+            None => self
+                .stopping_id()
+                .map_or_else(MeetingState::idle, MeetingState::stopping),
             Some(session) => MeetingState {
                 meeting_id: Some(session.meeting_id),
                 status: MeetingStatus::Recording,
@@ -397,7 +452,15 @@ impl MeetingRecorder {
                 system_audio: session.system_stream.is_some(),
                 system_audio_error: session.system_error.clone(),
                 elapsed_ms: session.mic_acc.lock().map(|a| a.position_ms()).unwrap_or(0),
+                dropped_chunks: session.dropped_chunks.load(Ordering::Relaxed),
             },
+        }
+    }
+
+    fn stopping_id(&self) -> Option<i64> {
+        match self.stopping.lock() {
+            Ok(guard) => *guard,
+            Err(poisoned) => *poisoned.into_inner(),
         }
     }
 
@@ -417,6 +480,11 @@ impl MeetingRecorder {
         if guard.is_some() {
             return Err(anyhow!("A meeting is already recording"));
         }
+        if self.stopping_id().is_some() {
+            return Err(anyhow!(
+                "The last meeting is still being transcribed. Try again in a moment."
+            ));
+        }
 
         let started_at = chrono::Utc::now().timestamp();
         let meeting_id = self.store.create_meeting(title, started_at, language)?;
@@ -430,8 +498,9 @@ impl MeetingRecorder {
         let mic_acc = Arc::new(Mutex::new(ChunkAccumulator::default()));
         let system_acc = Arc::new(Mutex::new(ChunkAccumulator::default()));
         let levels = Arc::new(LevelMeter::new());
+        let dropped_chunks = Arc::new(AtomicU32::new(0));
 
-        let (job_tx, job_rx) = mpsc::channel::<Job>();
+        let (job_tx, job_rx) = mpsc::sync_channel::<Job>(JOB_QUEUE_CAPACITY);
         let worker = spawn_worker(
             self.app.clone(),
             Arc::clone(&self.store),
@@ -444,11 +513,13 @@ impl MeetingRecorder {
             None,
             capture_sink(
                 self.app.clone(),
+                meeting_id,
                 SpeakerSource::Mic,
                 Arc::clone(&mic_acc),
                 Arc::clone(&mic_wav),
                 Arc::clone(&paused),
                 Arc::clone(&levels),
+                Arc::clone(&dropped_chunks),
                 job_tx.clone(),
             ),
         ) {
@@ -458,6 +529,10 @@ impl MeetingRecorder {
                 // sample should not appear in the list as an empty entry.
                 let _ = self.store.delete_meeting(meeting_id);
                 let _ = job_tx.send(Job::Finish);
+                // Both files already exist, and with the row gone nothing would
+                // ever delete them.
+                discard_wav(&mic_wav, &self.store.audio_path(&mic_file));
+                discard_wav(&system_wav, &self.store.audio_path(&system_file));
                 return Err(anyhow!("Could not start the microphone: {e}"));
             }
         };
@@ -465,11 +540,13 @@ impl MeetingRecorder {
         // System audio. Failure here is reported, not fatal.
         let (system_stream, system_error) = match start_loopback(capture_sink(
             self.app.clone(),
+            meeting_id,
             SpeakerSource::System,
             Arc::clone(&system_acc),
             Arc::clone(&system_wav),
             Arc::clone(&paused),
             Arc::clone(&levels),
+            Arc::clone(&dropped_chunks),
             job_tx.clone(),
         )) {
             Ok(stream) => {
@@ -500,6 +577,7 @@ impl MeetingRecorder {
             system_file: Some(system_file),
             job_tx: Some(job_tx),
             worker: Some(worker),
+            dropped_chunks,
         });
 
         // Under the lock, so a `stop` (which takes it first) can never clear the
@@ -538,23 +616,48 @@ impl MeetingRecorder {
     /// a truncated transcript:
     ///
     /// 1. stop the capture streams, so no new frames arrive;
-    /// 2. flush both chunkers, so the last thing said is not lost;
-    /// 3. tell the worker to finish and **wait for it**, so every queued chunk is
-    ///    transcribed and written;
-    /// 4. finalise the WAV headers;
-    /// 5. only then mark the meeting as no longer recording.
+    /// 2. finalise the WAV headers and record the capture on the row, before the
+    ///    drain — the drain can take minutes behind a slow engine, and a quit
+    ///    during it must not leave unreadable files that no row references;
+    /// 3. flush both chunkers, so the last thing said is not lost;
+    /// 4. tell the worker to finish and **wait for it**, so every queued chunk is
+    ///    transcribed and written.
+    ///
+    /// From the moment the session leaves `active` until the worker is joined the
+    /// meeting is reported as stopping (see [`Self::stopping`]).
     pub fn stop(&self) -> Result<i64> {
-        let mut session = {
-            let mut guard = self
+        let (session, guard) = {
+            let mut active = self
                 .active
                 .lock()
                 .map_err(|_| anyhow!("Meeting recorder lock poisoned"))?;
-            guard
+            let session = active
                 .take()
-                .ok_or_else(|| anyhow!("No meeting is recording"))?
+                .ok_or_else(|| anyhow!("No meeting is recording"))?;
+            // Under the `active` lock, so there is no instant at which the
+            // meeting is in neither slot and a `start` could slip in.
+            match self.stopping.lock() {
+                Ok(mut slot) => *slot = Some(session.meeting_id),
+                Err(poisoned) => *poisoned.into_inner() = Some(session.meeting_id),
+            }
+            (session, StoppingGuard(&self.stopping))
         };
 
-        // 1. Streams down first.
+        // Tell every window now, not after the drain: the transcription queue
+        // can take minutes, and until this event the Settings window kept its
+        // last "recording" state and offered a Stop that answered "No meeting is
+        // recording". The frontend reads this `processing` state as not live
+        // (`liveMeetingId`).
+        self.emit_state();
+        let outcome = self.finish_session(session);
+        drop(guard);
+        self.emit_state();
+        outcome
+    }
+
+    fn finish_session(&self, mut session: ActiveSession) -> Result<i64> {
+        // 1. Streams down first. `stop` joins each capture thread, so no callback
+        //    runs after this and nothing else is writing the WAVs.
         if let Some(stream) = session.mic_stream.take() {
             stream.stop();
         }
@@ -562,7 +665,25 @@ impl MeetingRecorder {
             stream.stop();
         }
 
-        // 2. Trailing audio.
+        // 2. WAV headers need finalising or the files are unreadable.
+        let mic_file = finalize_wav(&session.mic_wav)
+            .then_some(session.mic_file.clone())
+            .flatten();
+        let system_file = finalize_wav(&session.system_wav)
+            .then_some(session.system_file.clone())
+            .flatten();
+        let ended_at = chrono::Utc::now().timestamp();
+        // Held until the worker is joined: failing to record the outcome must not
+        // skip the drain or leave the speech engine marked busy.
+        let recorded = self.store.finish_capture(
+            session.meeting_id,
+            ended_at,
+            mic_file.as_deref(),
+            system_file.as_deref(),
+        );
+
+        // 3. Trailing audio. Blocking sends: this is not an audio thread, and
+        //    the worker is draining the queue they wait on.
         let job_tx = session.job_tx.take();
         if let Some(tx) = job_tx.as_ref() {
             flush_accumulator(&session.mic_acc, SpeakerSource::Mic, tx);
@@ -571,7 +692,7 @@ impl MeetingRecorder {
         }
         drop(job_tx);
 
-        // 3. Let the queue drain.
+        // 4. Let the queue drain.
         if let Some(worker) = session.worker.take() {
             if worker.join().is_err() {
                 error!("Meeting transcription worker panicked");
@@ -585,31 +706,57 @@ impl MeetingRecorder {
             tm.maybe_unload_immediately("meeting");
         }
 
-        // 4. WAV headers need finalising or the files are unreadable.
-        let mic_file = finalize_wav(&session.mic_wav)
-            .then_some(session.mic_file.clone())
-            .flatten();
-        let system_file = finalize_wav(&session.system_wav)
-            .then_some(session.system_file.clone())
-            .flatten();
+        recorded?;
 
-        // 5. Record the outcome.
-        let ended_at = chrono::Utc::now().timestamp();
-        self.store.finish_capture(
-            session.meeting_id,
-            ended_at,
-            mic_file.as_deref(),
-            system_file.as_deref(),
-        )?;
-
+        let dropped = session.dropped_chunks.load(Ordering::Relaxed);
+        if dropped > 0 {
+            warn!(
+                "Meeting {}: {dropped} chunk(s) left out of the transcript because \
+                 transcription fell behind; the audio is in the recording",
+                session.meeting_id
+            );
+        }
         info!(
             "Meeting {} captured {}s",
             session.meeting_id,
             ended_at - session.started_at
         );
-
-        self.emit_state();
         Ok(session.meeting_id)
+    }
+
+    /// Stop a meeting that is still recording when the app quits.
+    ///
+    /// `app.exit()` ends the process straight after `RunEvent::Exit`, so without
+    /// this the tail was lost, the WAV headers were never written and the row
+    /// never learned its file names, orphaning the recording on disk. The drain
+    /// behind a slow engine can take minutes and quitting must not, so this waits
+    /// at most `timeout`; the WAVs and the row are written before the drain
+    /// starts, so a timeout costs only the transcript of the queued chunks. The
+    /// row stays `processing` and the next launch reconciles it to `interrupted`,
+    /// which is what a meeting cut short by a quit is.
+    pub fn stop_before_exit(self: &Arc<Self>, timeout: Duration) {
+        if !self.is_recording() {
+            return;
+        }
+        let recorder = Arc::clone(self);
+        let (done_tx, done_rx) = mpsc::channel();
+        let spawned = std::thread::Builder::new()
+            .name("meeting-exit-stop".into())
+            .spawn(move || {
+                let _ = done_tx.send(recorder.stop());
+            });
+        if let Err(e) = spawned {
+            error!("Could not stop the meeting at quit: {e}");
+            return;
+        }
+        match done_rx.recv_timeout(timeout) {
+            Ok(Ok(meeting_id)) => info!("Meeting {meeting_id} stopped at quit"),
+            Ok(Err(e)) => warn!("Could not stop the meeting at quit: {e}"),
+            Err(_) => warn!(
+                "Meeting still transcribing after {}s at quit; its recording is saved",
+                timeout.as_secs()
+            ),
+        }
     }
 
     fn emit_state(&self) {
@@ -626,14 +773,17 @@ impl MeetingRecorder {
 /// things — write to disk, update the level meter, accumulate, hand off a
 /// finished chunk — and never transcribes, allocates unboundedly, or touches the
 /// database.
+#[allow(clippy::too_many_arguments)]
 fn capture_sink(
     app: AppHandle,
+    meeting_id: i64,
     source: SpeakerSource,
     accumulator: Arc<Mutex<ChunkAccumulator>>,
     wav: SharedWav,
     paused: Arc<AtomicBool>,
     levels: Arc<LevelMeter>,
-    job_tx: mpsc::Sender<Job>,
+    dropped_chunks: Arc<AtomicU32>,
+    job_tx: mpsc::SyncSender<Job>,
 ) -> impl FnMut(&[f32]) + Send + 'static {
     move |frame: &[f32]| {
         if paused.load(Ordering::Relaxed) {
@@ -663,17 +813,44 @@ fn capture_sink(
         };
 
         if let Some(chunk) = finished {
-            // A closed channel means the session is stopping; dropping the chunk
-            // is correct at that point.
-            let _ = job_tx.send(Job::Chunk { source, chunk });
+            if let Some((dropped, start_ms)) = offer_chunk(&job_tx, &dropped_chunks, source, chunk)
+            {
+                warn!(
+                    "Meeting {meeting_id}: transcription is behind, left the {} chunk at {start_ms}ms \
+                     out of the transcript ({dropped} so far); it is still in the recording",
+                    source.as_db_str(),
+                );
+            }
         }
+    }
+}
+
+/// Queue a finished chunk without ever waiting, and count it if there is no room.
+///
+/// Never a blocking send: this runs on the capture callback, and waiting on the
+/// transcriber would stall the device, so the WAV would lose audio too. Returns
+/// the running drop count and the dropped chunk's start when the queue was full.
+/// A closed channel means the session is stopping, and dropping the chunk is
+/// correct at that point without counting it.
+fn offer_chunk(
+    job_tx: &mpsc::SyncSender<Job>,
+    dropped_chunks: &AtomicU32,
+    source: SpeakerSource,
+    chunk: AudioChunk,
+) -> Option<(u32, i64)> {
+    let start_ms = chunk.start_ms;
+    match job_tx.try_send(Job::Chunk { source, chunk }) {
+        Err(mpsc::TrySendError::Full(_)) => {
+            Some((dropped_chunks.fetch_add(1, Ordering::Relaxed) + 1, start_ms))
+        }
+        Ok(()) | Err(mpsc::TrySendError::Disconnected(_)) => None,
     }
 }
 
 fn flush_accumulator(
     accumulator: &Arc<Mutex<ChunkAccumulator>>,
     source: SpeakerSource,
-    job_tx: &mpsc::Sender<Job>,
+    job_tx: &mpsc::SyncSender<Job>,
 ) {
     if let Ok(mut acc) = accumulator.lock() {
         if let Some(chunk) = acc.flush() {
@@ -849,6 +1026,20 @@ fn finalize_wav(wav: &SharedWav) -> bool {
             }
         },
         None => false,
+    }
+}
+
+/// Close and delete a recording that no row will ever reference.
+///
+/// Closed first because Windows refuses to delete a file that is still open.
+fn discard_wav(wav: &SharedWav, path: &Path) {
+    if let Ok(mut guard) = wav.lock() {
+        drop(guard.take());
+    }
+    match std::fs::remove_file(path) {
+        Ok(()) => {}
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+        Err(e) => warn!("Could not remove meeting audio {path:?}: {e}"),
     }
 }
 
@@ -1125,5 +1316,94 @@ mod tests {
     fn loopback_errors_describe_themselves_for_the_ui() {
         let error = LoopbackError::Unsupported("install BlackHole".into());
         assert_eq!(describe_loopback_error(&error), "install BlackHole");
+    }
+
+    fn chunk(start_ms: i64) -> AudioChunk {
+        AudioChunk {
+            start_ms,
+            end_ms: start_ms + 30_000,
+            samples: vec![0.0; 16],
+        }
+    }
+
+    /// The capture callback must never wait on the transcriber. A full queue
+    /// drops the new chunk and counts it rather than blocking the audio thread.
+    #[test]
+    fn a_full_queue_drops_and_counts_instead_of_blocking() {
+        let (tx, rx) = mpsc::sync_channel::<Job>(1);
+        let dropped = AtomicU32::new(0);
+
+        assert_eq!(
+            offer_chunk(&tx, &dropped, SpeakerSource::Mic, chunk(0)),
+            None
+        );
+        assert_eq!(
+            offer_chunk(&tx, &dropped, SpeakerSource::System, chunk(30_000)),
+            Some((1, 30_000))
+        );
+        assert_eq!(
+            offer_chunk(&tx, &dropped, SpeakerSource::Mic, chunk(60_000)),
+            Some((2, 60_000))
+        );
+        assert_eq!(dropped.load(Ordering::Relaxed), 2);
+
+        // The chunk that fitted is the one the worker sees.
+        match rx.try_recv() {
+            Ok(Job::Chunk { chunk, .. }) => assert_eq!(chunk.start_ms, 0),
+            _ => panic!("the first chunk must be queued"),
+        }
+    }
+
+    /// Once the worker is gone the session is stopping; that is not a transcript
+    /// gap worth reporting.
+    #[test]
+    fn a_closed_queue_is_not_counted_as_a_drop() {
+        let (tx, rx) = mpsc::sync_channel::<Job>(1);
+        drop(rx);
+        let dropped = AtomicU32::new(0);
+        assert_eq!(
+            offer_chunk(&tx, &dropped, SpeakerSource::Mic, chunk(0)),
+            None
+        );
+        assert_eq!(dropped.load(Ordering::Relaxed), 0);
+    }
+
+    /// While the queue drains after stop, the meeting is still busy: the delete
+    /// and diarize commands key on this id.
+    #[test]
+    fn a_stopping_meeting_reports_processing_with_its_id() {
+        let state = MeetingState::stopping(7);
+        assert_eq!(state.meeting_id, Some(7));
+        assert_eq!(state.status, MeetingStatus::Processing);
+        assert!(!state.paused);
+    }
+
+    /// A stop that fails or panics mid-drain must not leave the recorder refusing
+    /// every later meeting.
+    #[test]
+    fn the_stopping_slot_clears_on_every_exit() {
+        let slot = Mutex::new(Some(3));
+        drop(StoppingGuard(&slot));
+        assert_eq!(*slot.lock().unwrap(), None);
+
+        let slot = Arc::new(Mutex::new(Some(4)));
+        let inner = Arc::clone(&slot);
+        let _ = std::thread::spawn(move || {
+            let _guard = StoppingGuard(&inner);
+            panic!("drain failed");
+        })
+        .join();
+        assert_eq!(*slot.lock().unwrap_or_else(|p| p.into_inner()), None);
+    }
+
+    #[test]
+    fn discarding_a_recording_closes_and_deletes_it() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("meeting_1_mic.wav");
+        let wav = open_wav(path.clone());
+        assert!(path.exists());
+        discard_wav(&wav, &path);
+        assert!(!path.exists());
+        assert!(wav.lock().unwrap().is_none());
     }
 }

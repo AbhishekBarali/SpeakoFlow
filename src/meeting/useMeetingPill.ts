@@ -12,6 +12,7 @@ import {
   type MeetingLevels,
   type MeetingState,
   type SegmentEvent,
+  liveMeetingId,
 } from "@/components/settings/meetings/api";
 import {
   itemFromEvent,
@@ -25,6 +26,7 @@ const IDLE_STATE: MeetingState = {
   system_audio: false,
   system_audio_error: null,
   elapsed_ms: 0,
+  dropped_chunks: 0,
 };
 
 const NO_LEVELS: MeetingLevels = { mic: 0, system: 0 };
@@ -78,7 +80,7 @@ export const useMeetingPill = (): MeetingPillModel => {
   const [expanded, setExpandedState] = useState(false);
   const [offer, setOffer] = useState<{ app: string | null } | null>(null);
 
-  const recording = state.meeting_id !== null;
+  const recording = liveMeetingId(state) !== null;
   const paused = state.paused;
 
   /* ── state ── */
@@ -96,7 +98,7 @@ export const useMeetingPill = (): MeetingPillModel => {
     const unlisten = listen<MeetingState>(MEETING_STATE_EVENT, (event) => {
       setState(event.payload);
       // A recording that ended has nothing live left to show.
-      if (event.payload.meeting_id === null) {
+      if (liveMeetingId(event.payload) === null) {
         setItems([]);
         setLevels(NO_LEVELS);
       }

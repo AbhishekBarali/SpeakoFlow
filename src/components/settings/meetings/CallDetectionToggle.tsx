@@ -1,8 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ToggleSwitch } from "@/components/ui/ToggleSwitch";
-import { Switch } from "@/components/ui/Switch";
-import { InfoTip } from "@/components/ui/InfoTip";
 import {
   getCallDetectionStatus,
   getMeetingIndicator,
@@ -49,44 +47,20 @@ const useCallDetection = () => {
   return { supported, enabled, saving, set };
 };
 
-/** As a settings row. */
+/** "Offer to record calls", as a row in a settings group. */
 export const CallDetectionToggle: React.FC = () => {
   const { t } = useTranslation();
   const { supported, enabled, saving, set } = useCallDetection();
   if (!supported) return null;
   return (
-    <div className="rounded-2xl border border-hairline bg-surface elev-card">
-      <ToggleSwitch
-        checked={enabled}
-        onChange={set}
-        isUpdating={saving}
-        label={t("meetings.autoDetect.title")}
-        description={t("meetings.autoDetect.description")}
-        grouped={true}
-      />
-    </div>
-  );
-};
-
-/** As a line on the Meetings hero. */
-export const CallDetectionHeroSwitch: React.FC = () => {
-  const { t } = useTranslation();
-  const { supported, enabled, saving, set } = useCallDetection();
-  if (!supported) return null;
-  return (
-    <div className="flex items-center justify-center gap-2.5">
-      <Switch
-        checked={enabled}
-        onChange={set}
-        disabled={saving}
-        label={t("meetings.autoDetect.title")}
-        tone="onHero"
-      />
-      <span className="text-sm text-white/85">
-        {t("meetings.autoDetect.title")}
-      </span>
-      <InfoTip text={t("meetings.autoDetect.description")} tone="onHero" />
-    </div>
+    <ToggleSwitch
+      checked={enabled}
+      onChange={set}
+      isUpdating={saving}
+      label={t("meetings.autoDetect.title")}
+      description={t("meetings.autoDetect.description")}
+      grouped={true}
+    />
   );
 };
 
@@ -120,24 +94,19 @@ export const useMeetingIndicator = () => {
   return { enabled, saving, set };
 };
 
-/** As a line on the Meetings hero, under "Offer to record calls". */
-export const IndicatorHeroSwitch: React.FC = () => {
+/** "Floating indicator", as a row in a settings group. */
+export const IndicatorToggle: React.FC = () => {
   const { t } = useTranslation();
   const { enabled, saving, set } = useMeetingIndicator();
   if (enabled === null) return null;
   return (
-    <div className="flex items-center justify-center gap-2.5">
-      <Switch
-        checked={enabled}
-        onChange={set}
-        disabled={saving}
-        label={t("meetings.indicator.title")}
-        tone="onHero"
-      />
-      <span className="text-sm text-white/85">
-        {t("meetings.indicator.title")}
-      </span>
-      <InfoTip text={t("meetings.indicator.description")} tone="onHero" />
-    </div>
+    <ToggleSwitch
+      checked={enabled}
+      onChange={set}
+      isUpdating={saving}
+      label={t("meetings.indicator.title")}
+      description={t("meetings.indicator.description")}
+      grouped={true}
+    />
   );
 };

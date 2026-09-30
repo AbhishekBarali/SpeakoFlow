@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Eye, EyeOff, Mic, Pause, Play, Square } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import type { MeetingSpeaker, MeetingState } from "./api";
+import { liveMeetingId, type MeetingSpeaker, type MeetingState } from "./api";
 import { useMeetingIndicator } from "./CallDetectionToggle";
 import { formatClock, type TranscriptItem } from "./speakers";
 import { SystemAudioNotice } from "./SystemAudioNotice";
@@ -46,7 +46,7 @@ export const RecorderCard: React.FC<RecorderCardProps> = ({
 }) => {
   const { t } = useTranslation();
   const indicator = useMeetingIndicator();
-  const recording = state.meeting_id !== null;
+  const recording = liveMeetingId(state) !== null;
   const paused = state.paused;
 
   const anchor = useRef({ elapsed: state.elapsed_ms, at: Date.now() });

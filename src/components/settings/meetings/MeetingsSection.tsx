@@ -2,10 +2,11 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { listen } from "@tauri-apps/api/event";
 import { toast } from "sonner";
+import { Mic } from "lucide-react";
 import { PageHeader, SectionTitle } from "@/components/ui/Page";
 import Badge from "@/components/ui/Badge";
 import { SubPage } from "@/components/ui/SubPage";
-import { Hero } from "@/components/ui/Hero";
+import { Hero, HeroTitle } from "@/components/ui/Hero";
 import { usePageReset } from "@/components/shell/navigation";
 import {
   deleteMeeting,
@@ -24,12 +25,9 @@ import {
   type MeetingSpeaker,
   type MeetingState,
   type SegmentEvent,
+  liveMeetingId,
 } from "./api";
 import { itemFromEvent, type TranscriptItem } from "./speakers";
-import {
-  CallDetectionHeroSwitch,
-  IndicatorHeroSwitch,
-} from "./CallDetectionToggle";
 import { SystemAudioNotice } from "./SystemAudioNotice";
 import { MeetingDetail } from "./MeetingDetail";
 import { MeetingsList } from "./MeetingsList";
@@ -42,6 +40,7 @@ const IDLE_STATE: MeetingState = {
   system_audio: false,
   system_audio_error: null,
   elapsed_ms: 0,
+  dropped_chunks: 0,
 };
 
 /**
@@ -54,9 +53,9 @@ const IDLE_STATE: MeetingState = {
  * running.
  */
 export const MeetingsSection: React.FC<{
-  /** One quiet line on the hero: which models write the transcript and notes. */
-  heroFooter?: React.ReactNode;
-}> = ({ heroFooter }) => {
+  /** Rows under the banner (models, switches), shown while nothing records. */
+  settings?: React.ReactNode;
+}> = ({ settings }) => {
   const { t, i18n } = useTranslation();
 
   const [state, setState] = useState<MeetingState>(IDLE_STATE);
@@ -172,7 +171,7 @@ export const MeetingsSection: React.FC<{
       setState(event.payload);
       // A recording that just ended has nothing live left to show, and its
       // transcript is now readable from the database.
-      if (event.payload.meeting_id === null) setLiveItems([]);
+      if (liveMeetingId(event.payload) === null) setLiveItems([]);
     });
     return () => {
       void unlisten.then((off) => off());
@@ -274,14 +273,14 @@ export const MeetingsSection: React.FC<{
       >
         <MeetingDetail
           meetingId={openId}
-          recordingMeetingId={state.meeting_id}
+          recordingMeetingId={liveMeetingId(state)}
           onChanged={refresh}
         />
       </SubPage>
     );
   }
 
-  const recording = state.meeting_id !== null;
+  const recording = liveMeetingId(state) !== null;
 
   return (
     <div className="w-full">
@@ -314,31 +313,26 @@ export const MeetingsSection: React.FC<{
         />
       ) : (
         <Hero
-          title={t("meetingsPage.hero.title")}
+          art="meetings"
+          title={<HeroTitle i18nKey="meetingsPage.hero.title" />}
           subtitle={t("meetingsPage.hero.subtitle")}
-          aside={
-            // One column the width of its widest line, so the button and the
-            // switch under it share a centre instead of a ragged edge.
-            <div className="inline-grid gap-3.5">
-              <button
-                type="button"
-                onClick={start}
-                disabled={busy !== null}
-                className="glass-button inline-flex h-11 w-full cursor-pointer items-center justify-center gap-2.5 rounded-full px-6 text-[0.9375rem] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:cursor-wait disabled:opacity-70"
-              >
-                <span className="h-2.5 w-2.5 rounded-full bg-[#e5484d]" />
-                {busy === "starting"
-                  ? t("meetings.recorder.starting")
-                  : t("meetings.recorder.start")}
-              </button>
-              <CallDetectionHeroSwitch />
-              <IndicatorHeroSwitch />
-            </div>
+          actions={
+            <button
+              type="button"
+              onClick={start}
+              disabled={busy !== null}
+              className="hero-button inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-full ps-5 pe-6 text-[0.9375rem] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hero-ink focus-visible:ring-offset-2 focus-visible:ring-offset-hero-surface disabled:cursor-wait disabled:opacity-70"
+            >
+              <Mic className="h-4 w-4" aria-hidden="true" />
+              {busy === "starting"
+                ? t("meetings.recorder.starting")
+                : t("meetings.recorder.start")}
+            </button>
           }
-        >
-          {heroFooter}
-        </Hero>
+        />
       )}
+
+      {!recording && settings && <div className="mt-6">{settings}</div>}
 
       <section className="mt-10">
         <SectionTitle title={t("meetings.list.title")} />
@@ -351,7 +345,7 @@ export const MeetingsSection: React.FC<{
             onLoadMore={() => setPages((value) => value + 1)}
             onOpen={setOpenId}
             onDelete={remove}
-            recordingMeetingId={state.meeting_id}
+            recordingMeetingId={liveMeetingId(state)}
           />
         </div>
       </section>

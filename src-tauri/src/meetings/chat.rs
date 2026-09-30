@@ -164,6 +164,26 @@ impl MeetingChat {
             });
         }
     }
+
+    /// Append to the thread only if it still belongs to `meeting_id`.
+    ///
+    /// A turn awaits the model for seconds, and opening another meeting in that
+    /// time re-keys the thread through [`Self::history_for`]; the late answer
+    /// then landed in the other meeting's thread. Checked under the `meeting_id`
+    /// lock, which `history_for` holds while it clears, so the two cannot
+    /// interleave. Returns whether the message was kept.
+    fn push_for(&self, meeting_id: i64, role: &str, content: String) -> bool {
+        let current = match self.meeting_id.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        if *current != Some(meeting_id) {
+            debug!("Dropped a meeting {meeting_id} chat message: another meeting is open");
+            return false;
+        }
+        self.push(role, content);
+        true
+    }
 }
 
 /* ───────────────────────────── pure: the prompt ───────────────────────────── */
@@ -405,8 +425,7 @@ async fn ask_inner(
 
     // Recorded before the request, so a failed or cancelled turn still shows the
     // user what they asked instead of silently discarding it.
-    chat.push("user", question.clone());
-    emit_messages(app, chat);
+    record(app, chat, meeting_id, "user", question.clone());
     emit_state(app, true);
 
     let accumulated = Arc::new(Mutex::new(String::new()));
@@ -447,8 +466,7 @@ async fn ask_inner(
         // Whatever streamed is kept. Dropping it would blank text the user is
         // already reading, and a truncated answer is still an answer.
         if !partial.trim().is_empty() {
-            chat.push("assistant", partial.clone());
-            emit_messages(app, chat);
+            record(app, chat, meeting_id, "assistant", partial.clone());
         }
         return Ok(partial);
     }
@@ -464,8 +482,7 @@ async fn ask_inner(
             if final_text.trim().is_empty() {
                 return Err("The model returned no answer.".to_string());
             }
-            chat.push("assistant", final_text.clone());
-            emit_messages(app, chat);
+            record(app, chat, meeting_id, "assistant", final_text.clone());
             info!("Answered a question about meeting {meeting_id}");
             Ok(final_text)
         }
@@ -474,8 +491,7 @@ async fn ask_inner(
                 // Failed mid-reply. Keep what arrived rather than replacing
                 // readable text with an error.
                 warn!("Meeting {meeting_id} answer failed mid-stream: {error}");
-                chat.push("assistant", partial.clone());
-                emit_messages(app, chat);
+                record(app, chat, meeting_id, "assistant", partial.clone());
                 return Ok(partial);
             }
             Err(error)
@@ -508,6 +524,15 @@ fn token_sink(app: AppHandle, accumulated: Arc<Mutex<String>>) -> impl FnMut(&st
 
 fn emit_messages(app: &AppHandle, chat: &Arc<MeetingChat>) {
     let _ = app.emit(MESSAGES_EVENT, chat.snapshot());
+}
+
+/// Add a message to `meeting_id`'s thread and publish it, or do neither if the
+/// thread now belongs to another meeting — publishing would only re-send that
+/// meeting's unchanged snapshot.
+fn record(app: &AppHandle, chat: &Arc<MeetingChat>, meeting_id: i64, role: &str, content: String) {
+    if chat.push_for(meeting_id, role, content) {
+        emit_messages(app, chat);
+    }
 }
 
 fn emit_state(app: &AppHandle, busy: bool) {
@@ -705,6 +730,26 @@ mod tests {
             chat.history_for(2).is_empty(),
             "a different meeting must start empty"
         );
+    }
+
+    /// An answer about one meeting that arrives after another meeting was opened
+    /// must not land in the new meeting's thread.
+    #[test]
+    fn a_late_answer_for_a_meeting_no_longer_open_is_dropped() {
+        let chat = MeetingChat::new();
+        chat.history_for(1);
+        assert!(chat.push_for(1, "user", "about meeting one".into()));
+
+        // The user opens meeting two while the answer is still streaming.
+        assert!(chat.history_for(2).is_empty());
+        assert!(!chat.push_for(1, "assistant", "an answer about meeting one".into()));
+        assert!(
+            chat.snapshot().is_empty(),
+            "meeting two's thread must stay empty"
+        );
+
+        assert!(chat.push_for(2, "user", "about meeting two".into()));
+        assert_eq!(chat.snapshot().len(), 1);
     }
 
     #[test]
