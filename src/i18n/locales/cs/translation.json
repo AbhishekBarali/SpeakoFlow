@@ -261,7 +261,10 @@
       },
       "accessibility": {
         "title": "Přístup k usnadnění",
-        "description": "Potřebný pro psaní přepsaného textu do vašich aplikací."
+        "description": "Potřebný pro psaní přepsaného textu do vašich aplikací.",
+        "stuckHint": "Už je zapnuto v Nastavení systému? Po aktualizaci si macOS může ponechat oprávnění, které už této verzi neodpovídá.",
+        "reset": "Obnovit oprávnění",
+        "resetDone": "Teď v Nastavení systému znovu zapněte SpeakoFlow."
       },
       "grant": "Udělit oprávnění",
       "granted": "Uděleno",
@@ -269,7 +272,8 @@
       "allGranted": "Vše připraveno!",
       "errors": {
         "checkFailed": "Nepodařilo se zkontrolovat oprávnění. Zkuste to prosím znovu.",
-        "requestFailed": "Nepodařilo se požádat o oprávnění. Zkuste to prosím znovu."
+        "requestFailed": "Nepodařilo se požádat o oprávnění. Zkuste to prosím znovu.",
+        "resetFailed": "Oprávnění se nepodařilo obnovit. Odeberte SpeakoFlow ze seznamu Zpřístupnění a přidejte ho znovu."
       }
     }
   },
@@ -1508,6 +1512,7 @@
       "flowNotConfigured": "Flow potřebuje model asistenta — vloženo jako diktování",
       "flowFailed": "Flow nedokázal nic vygenerovat — nic se nevložilo",
       "flowEmpty": "Po aktivační frázi vyslovte příkaz",
+      "cloudSttFellBack": "Cloudový přepis neodpověděl — použit model v zařízení",
       "cleanupFallback": "Čištění pomocí AI neproběhlo — vložen původní text"
     },
     "listening": "Poslouchám…",

@@ -261,7 +261,10 @@
       },
       "accessibility": {
         "title": "Erişilebilirlik Erişimi",
-        "description": "Transkribe edilen metni uygulamalarınıza yazabilmek için gereklidir."
+        "description": "Transkribe edilen metni uygulamalarınıza yazabilmek için gereklidir.",
+        "stuckHint": "Sistem Ayarları'nda zaten açık mı? Bir güncellemeden sonra macOS, bu sürümle artık eşleşmeyen bir izni tutabilir.",
+        "reset": "İzni sıfırla",
+        "resetDone": "Şimdi Sistem Ayarları'nda SpeakoFlow'u yeniden açın."
       },
       "grant": "İzin Ver",
       "granted": "Verildi",
@@ -269,7 +272,8 @@
       "allGranted": "Her şey hazır!",
       "errors": {
         "checkFailed": "İzinler kontrol edilemedi. Lütfen tekrar deneyin.",
-        "requestFailed": "İzin isteği başarısız oldu. Lütfen tekrar deneyin."
+        "requestFailed": "İzin isteği başarısız oldu. Lütfen tekrar deneyin.",
+        "resetFailed": "İzin sıfırlanamadı. SpeakoFlow'u Erişilebilirlik listesinden kaldırıp yeniden ekleyin."
       }
     }
   },
@@ -1508,6 +1512,7 @@
       "flowNotConfigured": "Flow bir asistan modeline ihtiyaç duyuyor — dikte olarak yapıştırıldı",
       "flowFailed": "Flow oluşturamadı — hiçbir şey yapıştırılmadı",
       "flowEmpty": "Etkinleştirme ifadesinden sonra bir komut söyleyin",
+      "cloudSttFellBack": "Bulut transkripsiyonu yanıt vermedi — cihazdaki model kullanıldı",
       "cleanupFallback": "Yapay zekâ temizleme çalışmadı — ham metin yapıştırıldı"
     },
     "listening": "Dinleniyor…",

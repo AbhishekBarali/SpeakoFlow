@@ -1,4 +1,4 @@
-import i18n from "i18next";
+import i18n, { type BackendModule } from "i18next";
 import { initReactI18next } from "react-i18next";
 import { locale } from "@tauri-apps/plugin-os";
 import { LANGUAGE_METADATA } from "./languages";
@@ -8,24 +8,49 @@ import {
   updateDocumentDirection,
   updateDocumentLanguage,
 } from "@/lib/utils/rtl";
+import en from "./locales/en/translation.json";
 
-// Auto-discover translation files using Vite's glob import
-const localeModules = import.meta.glob<{ default: Record<string, unknown> }>(
+type TranslationTable = Record<string, unknown>;
+
+// Every locale file becomes its own lazily loaded chunk. English, the source and
+// the fallback for any missing key, is bundled; everything else is fetched only
+// when that language is actually selected. All 20 used to be eager, which
+// parsed ~1.8 MB of JSON into every window (settings, the assistant panel, the
+// overlay, the reminder popup, the meeting pill) to show one language.
+const localeLoaders = import.meta.glob<{ default: TranslationTable }>(
   "./locales/*/translation.json",
-  { eager: true },
 );
-
-// Build resources from discovered locale files
-const resources: Record<string, { translation: Record<string, unknown> }> = {};
-for (const [path, module] of Object.entries(localeModules)) {
+const loaders: Record<string, () => Promise<{ default: TranslationTable }>> =
+  {};
+for (const [path, load] of Object.entries(localeLoaders)) {
   const langCode = path.match(/\.\/locales\/(.+)\/translation\.json/)?.[1];
   if (langCode) {
-    resources[langCode] = { translation: module.default };
+    loaders[langCode] = load;
   }
 }
 
+/** i18next backend that resolves a language through its lazy chunk. */
+const lazyLocales: BackendModule = {
+  type: "backend",
+  init: () => {},
+  read: (language, _namespace, callback) => {
+    if (language === "en") {
+      callback(null, en as TranslationTable);
+      return;
+    }
+    const load = loaders[language];
+    if (!load) {
+      callback(null, {});
+      return;
+    }
+    load()
+      .then((module) => callback(null, module.default))
+      .catch((error: unknown) => callback(error as Error, false));
+  },
+};
+
 // Build supported languages list from discovered locales + metadata
-export const SUPPORTED_LANGUAGES = Object.keys(resources)
+export const SUPPORTED_LANGUAGES = Object.keys(loaders)
   .map((code) => {
     const meta = LANGUAGE_METADATA[code];
     if (!meta) {
@@ -73,17 +98,26 @@ const getSupportedLanguage = (
 
 // Initialize i18n with English as default
 // Language will be synced from settings after init
-i18n.use(initReactI18next).init({
-  resources,
-  lng: "en",
-  fallbackLng: "en",
-  interpolation: {
-    escapeValue: false, // React already escapes values
-  },
-  react: {
-    useSuspense: false, // Disable suspense for SSR compatibility
-  },
-});
+i18n
+  .use(lazyLocales)
+  .use(initReactI18next)
+  .init({
+    // English ships in the bundle; other languages arrive through `lazyLocales`
+    // the first time they are selected.
+    resources: { en: { translation: en as TranslationTable } },
+    partialBundledLanguages: true,
+    // Load exactly the selected language (plus the English fallback), not
+    // also its base language — "zh-TW" should not pull in "zh" as well.
+    load: "currentOnly",
+    lng: "en",
+    fallbackLng: "en",
+    interpolation: {
+      escapeValue: false, // React already escapes values
+    },
+    react: {
+      useSuspense: false, // Disable suspense for SSR compatibility
+    },
+  });
 
 // Sync language from app settings
 export const syncLanguageFromSettings = async () => {

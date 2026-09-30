@@ -261,7 +261,10 @@
       },
       "accessibility": {
         "title": "Acesso à Acessibilidade",
-        "description": "Necessário para digitar o texto transcrito em seus aplicativos."
+        "description": "Necessário para digitar o texto transcrito em seus aplicativos.",
+        "stuckHint": "Já está ativado nos Ajustes do Sistema? Depois de uma atualização, o macOS pode manter uma permissão que não corresponde mais a esta versão.",
+        "reset": "Redefinir permissão",
+        "resetDone": "Agora ative o SpeakoFlow novamente nos Ajustes do Sistema."
       },
       "grant": "Conceder Permissão",
       "granted": "Concedido",
@@ -269,7 +272,8 @@
       "allGranted": "Tudo pronto!",
       "errors": {
         "checkFailed": "Erro ao verificar permissões. Por favor, tente novamente.",
-        "requestFailed": "Erro ao solicitar permissão. Por favor, tente novamente."
+        "requestFailed": "Erro ao solicitar permissão. Por favor, tente novamente.",
+        "resetFailed": "Não foi possível redefinir a permissão. Remova o SpeakoFlow da lista de Acessibilidade e adicione-o novamente."
       }
     }
   },
@@ -1508,6 +1512,7 @@
       "flowNotConfigured": "O Flow precisa de um modelo de assistente — colado como ditado",
       "flowFailed": "O Flow não conseguiu gerar — nada foi colado",
       "flowEmpty": "Diga um comando depois da frase de ativação",
+      "cloudSttFellBack": "A transcrição na nuvem não respondeu — foi usado o modelo do dispositivo",
       "cleanupFallback": "A limpeza com IA não rodou — o texto bruto foi colado"
     },
     "listening": "Ouvindo…",

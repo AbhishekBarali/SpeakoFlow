@@ -261,7 +261,10 @@
       },
       "accessibility": {
         "title": "Accesso all'Accessibilità",
-        "description": "Necessario per digitare il testo trascritto nelle tue applicazioni."
+        "description": "Necessario per digitare il testo trascritto nelle tue applicazioni.",
+        "stuckHint": "Già attivato in Impostazioni di Sistema? Dopo un aggiornamento, macOS può mantenere un permesso che non corrisponde più a questa versione.",
+        "reset": "Reimposta permesso",
+        "resetDone": "Ora riattiva SpeakoFlow in Impostazioni di Sistema."
       },
       "grant": "Concedi Permesso",
       "granted": "Concesso",
@@ -269,7 +272,8 @@
       "allGranted": "Tutto pronto!",
       "errors": {
         "checkFailed": "Impossibile verificare i permessi. Riprova.",
-        "requestFailed": "Impossibile richiedere il permesso. Riprova."
+        "requestFailed": "Impossibile richiedere il permesso. Riprova.",
+        "resetFailed": "Impossibile reimpostare il permesso. Rimuovi SpeakoFlow dall'elenco Accessibilità e aggiungilo di nuovo."
       }
     }
   },
@@ -1508,6 +1512,7 @@
       "flowNotConfigured": "Flow richiede un modello per l'assistente — incollato come dettatura",
       "flowFailed": "Flow non è riuscito a generare — non è stato incollato nulla",
       "flowEmpty": "Pronuncia un comando dopo la frase di attivazione",
+      "cloudSttFellBack": "La trascrizione cloud non ha risposto — usato il modello sul dispositivo",
       "cleanupFallback": "La pulizia IA non è stata eseguita — incollato il testo grezzo"
     },
     "listening": "In ascolto…",

@@ -261,7 +261,10 @@
       },
       "accessibility": {
         "title": "Quyền truy cập Trợ năng",
-        "description": "Cần thiết để nhập văn bản đã chuyển đổi vào các ứng dụng của bạn."
+        "description": "Cần thiết để nhập văn bản đã chuyển đổi vào các ứng dụng của bạn.",
+        "stuckHint": "Đã bật trong Cài đặt hệ thống? Sau khi cập nhật, macOS có thể giữ một quyền không còn khớp với phiên bản này.",
+        "reset": "Đặt lại quyền",
+        "resetDone": "Giờ hãy bật lại SpeakoFlow trong Cài đặt hệ thống."
       },
       "grant": "Cấp quyền",
       "granted": "Đã cấp",
@@ -269,7 +272,8 @@
       "allGranted": "Hoàn tất!",
       "errors": {
         "checkFailed": "Không thể kiểm tra quyền. Vui lòng thử lại.",
-        "requestFailed": "Không thể yêu cầu quyền. Vui lòng thử lại."
+        "requestFailed": "Không thể yêu cầu quyền. Vui lòng thử lại.",
+        "resetFailed": "Không thể đặt lại quyền. Hãy xóa SpeakoFlow khỏi danh sách Trợ năng rồi thêm lại."
       }
     }
   },
@@ -1508,6 +1512,7 @@
       "flowNotConfigured": "Flow cần một mô hình trợ lý — đã dán như đọc chính tả",
       "flowFailed": "Flow không tạo được nội dung — không có gì được dán",
       "flowEmpty": "Hãy nói một câu lệnh sau cụm từ kích hoạt",
+      "cloudSttFellBack": "Chuyển giọng nói trên đám mây không phản hồi — đã dùng mô hình trên thiết bị",
       "cleanupFallback": "Dọn dẹp bằng AI không chạy — đã dán văn bản gốc"
     },
     "listening": "Đang lắng nghe…",

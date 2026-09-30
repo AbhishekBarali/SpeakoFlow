@@ -261,7 +261,10 @@
       },
       "accessibility": {
         "title": "Bedienungshilfen-Zugriff",
-        "description": "Erforderlich, um transkribierten Text in deine Anwendungen einzugeben."
+        "description": "Erforderlich, um transkribierten Text in deine Anwendungen einzugeben.",
+        "stuckHint": "Schon in den Systemeinstellungen aktiviert? Nach einem Update kann macOS eine Berechtigung behalten, die nicht mehr zu dieser Version passt.",
+        "reset": "Berechtigung zurücksetzen",
+        "resetDone": "Aktiviere SpeakoFlow jetzt erneut in den Systemeinstellungen."
       },
       "grant": "Berechtigung erteilen",
       "granted": "Erteilt",
@@ -269,7 +272,8 @@
       "allGranted": "Alles bereit!",
       "errors": {
         "checkFailed": "Berechtigungsprüfung fehlgeschlagen. Bitte erneut versuchen.",
-        "requestFailed": "Berechtigungsanfrage fehlgeschlagen. Bitte erneut versuchen."
+        "requestFailed": "Berechtigungsanfrage fehlgeschlagen. Bitte erneut versuchen.",
+        "resetFailed": "Die Berechtigung konnte nicht zurückgesetzt werden. Entferne SpeakoFlow aus der Liste der Bedienungshilfen und füge es erneut hinzu."
       }
     }
   },
@@ -1508,6 +1512,7 @@
       "flowNotConfigured": "Flow braucht ein Assistenzmodell — als Diktat eingefügt",
       "flowFailed": "Flow konnte nichts generieren — es wurde nichts eingefügt",
       "flowEmpty": "Sage nach der Aktivierungsphrase einen Befehl",
+      "cloudSttFellBack": "Cloud-Transkription hat nicht geantwortet — Modell auf dem Gerät verwendet",
       "cleanupFallback": "KI-Bereinigung lief nicht — Rohtext eingefügt"
     },
     "listening": "Hört zu…",

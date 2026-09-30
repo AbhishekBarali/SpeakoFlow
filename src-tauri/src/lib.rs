@@ -31,6 +31,7 @@ mod selection;
 mod settings;
 mod shortcut;
 mod signal_handle;
+mod speech_readiness;
 mod speech_stream;
 mod stt_cloud;
 #[cfg(test)]
@@ -913,6 +914,8 @@ pub fn run(cli_args: CliArgs) {
             commands::check_apple_intelligence_available,
             commands::initialize_enigo,
             commands::initialize_shortcuts,
+            commands::reset_macos_accessibility_permission,
+            commands::open_macos_accessibility_settings,
             commands::models::get_available_models,
             commands::models::get_model_info,
             commands::models::download_model,
@@ -980,6 +983,7 @@ pub fn run(cli_args: CliArgs) {
             commands::history::preview_recording_retention,
             commands::history::enforce_recording_retention,
             commands::history::get_assistant_history_entries,
+            commands::history::get_assistant_history_entry,
             commands::history::delete_assistant_history_entry,
             commands::history::get_usage_stats,
             commands::assistant::assistant_send_text,
@@ -1514,6 +1518,14 @@ pub fn run(cli_args: CliArgs) {
             // The Windows Job Object in `local_llm.rs` is the backstop for the
             // crash / hard-kill paths where even this handler cannot run.
             if let tauri::RunEvent::Exit = &event {
+                // A meeting still recording would otherwise lose its tail and
+                // leave its recordings unfinalised and unreferenced. Bounded,
+                // because draining a transcription backlog can take minutes.
+                if let Some(recorder) =
+                    app.try_state::<std::sync::Arc<meetings::session::MeetingRecorder>>()
+                {
+                    recorder.stop_before_exit(std::time::Duration::from_secs(5));
+                }
                 if let Some(mgr) =
                     app.try_state::<std::sync::Arc<managers::local_llm::LocalLlmManager>>()
                 {

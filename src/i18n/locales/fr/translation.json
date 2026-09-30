@@ -261,7 +261,10 @@
       },
       "accessibility": {
         "title": "Accès à l'accessibilité",
-        "description": "Nécessaire pour taper le texte transcrit dans vos applications."
+        "description": "Nécessaire pour taper le texte transcrit dans vos applications.",
+        "stuckHint": "Déjà activé dans les Réglages Système ? Après une mise à jour, macOS peut conserver une autorisation qui ne correspond plus à cette version.",
+        "reset": "Réinitialiser l'autorisation",
+        "resetDone": "Réactivez maintenant SpeakoFlow dans les Réglages Système."
       },
       "grant": "Accorder l'autorisation",
       "granted": "Accordé",
@@ -269,7 +272,8 @@
       "allGranted": "Tout est prêt !",
       "errors": {
         "checkFailed": "Échec de la vérification des autorisations. Veuillez réessayer.",
-        "requestFailed": "Échec de la demande d'autorisation. Veuillez réessayer."
+        "requestFailed": "Échec de la demande d'autorisation. Veuillez réessayer.",
+        "resetFailed": "Impossible de réinitialiser l'autorisation. Retirez SpeakoFlow de la liste Accessibilité, puis ajoutez-le à nouveau."
       }
     }
   },
@@ -1508,6 +1512,7 @@
       "flowNotConfigured": "Flow a besoin d'un modèle d'assistant — collé comme dictée",
       "flowFailed": "Flow n'a pas pu générer — rien n'a été collé",
       "flowEmpty": "Dites une commande après la phrase d'activation",
+      "cloudSttFellBack": "La transcription cloud n'a pas répondu — modèle local utilisé",
       "cleanupFallback": "Le nettoyage IA ne s'est pas exécuté — texte brut collé"
     },
     "listening": "À l'écoute…",

@@ -261,7 +261,10 @@
       },
       "accessibility": {
         "title": "Hjälpmedelsåtkomst",
-        "description": "Krävs för att skriva transkriberad text i dina program."
+        "description": "Krävs för att skriva transkriberad text i dina program.",
+        "stuckHint": "Redan påslaget i Systeminställningar? Efter en uppdatering kan macOS behålla en behörighet som inte längre matchar den här versionen.",
+        "reset": "Återställ behörighet",
+        "resetDone": "Slå nu på SpeakoFlow igen i Systeminställningar."
       },
       "grant": "Bevilja behörighet",
       "granted": "Beviljad",
@@ -269,7 +272,8 @@
       "allGranted": "Allt klart!",
       "errors": {
         "checkFailed": "Misslyckades med att kontrollera behörigheter. Försök igen.",
-        "requestFailed": "Misslyckades med att begära behörighet. Försök igen."
+        "requestFailed": "Misslyckades med att begära behörighet. Försök igen.",
+        "resetFailed": "Det gick inte att återställa behörigheten. Ta bort SpeakoFlow från listan Hjälpmedel och lägg till det igen."
       }
     }
   },
@@ -1508,6 +1512,7 @@
       "flowNotConfigured": "Flow behöver en assistentmodell — inklistrat som diktering",
       "flowFailed": "Flow kunde inte generera — inget klistrades in",
       "flowEmpty": "Säg ett kommando efter aktiveringsfrasen",
+      "cloudSttFellBack": "Molntranskriberingen svarade inte — använde modellen på enheten",
       "cleanupFallback": "AI-rensningen kördes inte — klistrade in råtexten"
     },
     "listening": "Lyssnar…",

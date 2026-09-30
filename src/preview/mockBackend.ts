@@ -9,10 +9,15 @@
  *
  * URL knobs: ?page=home|history|assistant|meetings|cleanup|dictionary|models
  *            &tab=stt|cleanup|assistant|voice   &settings=<tab>
- *            &stt=device|cloud   &theme=light|dark   &fresh=1 (no history)
+ *            &stt=device|cloud   &theme=light|dark   &lang=<locale>
+ *            &fresh=1 (no history)
  *            &memory=on (assistant memory switched on)
  *            &voice=<engine id> (the voice engine in use; default elevenlabs)
  *            &update=1 (a newer version is available)   &feedback=1 (dialog open)
+ *            &new=1 or &installed=0 (nothing installed or configured)
+ *            &installed=1 (existing setup when previewing onboarding)
+ *            &failDownload=stt|cleanup|assistant|voice|all (comma-separated)
+ *            &failOnce=1 (failed downloads succeed on retry) &failLoad=stt
  */
 import {
   mockConvertFileSrc,
@@ -22,8 +27,13 @@ import {
 import { emit } from "@tauri-apps/api/event";
 
 const params = new URLSearchParams(window.location.search);
-const fresh = params.get("fresh") === "1";
-const voiceEngine = params.get("voice") ?? "elevenlabs";
+const newInstall =
+  params.get("new") === "1" ||
+  params.get("installed") === "0" ||
+  (!!params.get("onboarding") && params.get("installed") !== "1");
+const fresh = params.get("fresh") === "1" || newInstall;
+const voiceEngine =
+  params.get("voice") ?? (newInstall ? "kokoro" : "elevenlabs");
 const onEleven = voiceEngine === "elevenlabs";
 
 (window as unknown as Record<string, unknown>).__TAURI_OS_PLUGIN_INTERNALS__ = {
@@ -234,7 +244,190 @@ const models: Json[] = [
     size_mb: 5530,
     is_custom: true,
   }),
+  // `?onboarding=…`: a fresh machine's catalog, under the ids first-run setup
+  // asks for, with nothing downloaded yet.
+  ...(params.get("onboarding") || newInstall
+    ? [
+        model({
+          id: "parakeet-unified-en-0.6b-gguf",
+          name: "Parakeet Unified EN 0.6B",
+          size_mb: 697,
+          supports_streaming: true,
+        }),
+        model({
+          id: "nemotron-3.5-asr-streaming-0.6b-gguf",
+          name: "Nemotron 3.5 ASR Streaming 0.6B",
+          size_mb: 716,
+          supports_streaming: true,
+          // As in src-tauri/src/catalog/catalog.json.
+          supported_languages: [
+            "en",
+            "es",
+            "fr",
+            "it",
+            "pt",
+            "nl",
+            "de",
+            "tr",
+            "ru",
+            "ar",
+            "hi",
+            "ja",
+            "ko",
+            "vi",
+            "uk",
+            "pl",
+            "sv",
+            "cs",
+            "nb",
+            "da",
+            "bg",
+            "fi",
+            "hr",
+            "sk",
+            "zh",
+            "hu",
+            "ro",
+            "et",
+          ],
+        }),
+        // The rest of the catalog's recommended speech models, as setup's
+        // "More models" lists them (sizes and languages from catalog.json).
+        model({
+          id: "canary-180m-flash-gguf",
+          name: "Canary 180M Flash",
+          size_mb: 208,
+          supported_languages: ["en", "de", "fr", "es"],
+        }),
+        model({
+          id: "cohere-transcribe-03-2026-gguf",
+          name: "Cohere Transcribe",
+          size_mb: 2299,
+          supported_languages: [
+            "en",
+            "de",
+            "fr",
+            "es",
+            "it",
+            "pt",
+            "nl",
+            "pl",
+            "ja",
+            "ko",
+            "zh",
+            "ar",
+            "vi",
+            "el",
+          ],
+        }),
+        model({
+          id: "whisper-medium-gguf",
+          name: "Whisper Medium",
+          size_mb: 793,
+          supported_languages: Array.from({ length: 99 }, (_, i) =>
+            i === 0 ? "en" : `x${i}`,
+          ),
+        }),
+        model({
+          id: "kokoro-82m-native",
+          name: "Kokoro 82M (processor)",
+          engine_type: "NativeTts",
+          size_mb: 350,
+        }),
+        model({
+          id: "kitten-micro-0.8",
+          name: "Kitten Micro",
+          engine_type: "NativeTts",
+          size_mb: 45,
+        }),
+      ]
+    : []),
 ];
+
+// A clean install has no downloaded models, including imported test fixtures.
+if (newInstall) {
+  for (const entry of models) {
+    entry.is_downloaded = false;
+  }
+}
+
+const downloadJob = (entry: Json): string =>
+  entry.engine_type === "NativeTts"
+    ? "voice"
+    : entry.is_cleanup_specialist
+      ? "cleanup"
+      : entry.engine_type === "LlamaCpp"
+        ? "assistant"
+        : "stt";
+
+const matchesFailure = (name: string, modelId: string, entry: Json): boolean =>
+  (params.get(name) ?? "")
+    .split(",")
+    .some((value) =>
+      ["all", modelId, downloadJob(entry)].includes(value.trim()),
+    );
+
+const attempts = new Map<string, number>();
+const activeDownloads = new Map<
+  string,
+  { promise: Promise<null>; cancel: () => void }
+>();
+
+/** A download that walks its progress bar over a few seconds, like the real
+ *  one reports it, then lands. Everything is local; no model URL is fetched. */
+const simulateDownload = (modelId: string): Promise<null> => {
+  const running = activeDownloads.get(modelId);
+  if (running) return running.promise;
+  const entry = models.find((m) => m.id === modelId);
+  if (!entry) return Promise.reject("Unknown preview model");
+  if (entry.is_downloaded) return Promise.resolve(null);
+  const attempt = (attempts.get(modelId) ?? 0) + 1;
+  attempts.set(modelId, attempt);
+  const fail =
+    matchesFailure("failDownload", modelId, entry) &&
+    (params.get("failOnce") !== "1" || attempt === 1);
+  entry.is_downloading = true;
+  let cancel = () => {};
+  const promise = new Promise<null>((resolve, reject) => {
+    const total = Number(entry.size_mb ?? 500) * 1024 * 1024;
+    let downloaded = 0;
+    const timer = setInterval(() => {
+      downloaded = Math.min(total, downloaded + total / 14);
+      entry.partial_size = downloaded;
+      void emit("model-download-progress", {
+        model_id: modelId,
+        downloaded,
+        total,
+        percentage: (downloaded / total) * 100,
+      });
+      if (fail && downloaded >= total / 2) {
+        clearInterval(timer);
+        entry.is_downloading = false;
+        activeDownloads.delete(modelId);
+        const error = "Preview download failed. Try again.";
+        void emit("model-download-failed", { model_id: modelId, error });
+        reject(error);
+      } else if (downloaded >= total) {
+        clearInterval(timer);
+        entry.is_downloaded = true;
+        entry.is_downloading = false;
+        entry.partial_size = 0;
+        activeDownloads.delete(modelId);
+        void emit("model-download-complete", modelId);
+        resolve(null);
+      }
+    }, 220);
+    cancel = () => {
+      clearInterval(timer);
+      entry.is_downloading = false;
+      activeDownloads.delete(modelId);
+      void emit("model-download-cancelled", modelId);
+      reject("Preview download cancelled");
+    };
+  });
+  activeDownloads.set(modelId, { promise, cancel });
+  return promise;
+};
 
 const binding = (id: string, current: string): Json => ({
   id,
@@ -270,6 +463,7 @@ const settings: Json = {
   cloud_stt_send_custom_words: true,
   cloud_stt_no_verbatim: false,
   selected_language: "auto",
+  app_language: params.get("lang") ?? "en",
   translate_to_english: false,
   selected_model: "parakeet-unified-en-0.6b",
   custom_words: fresh
@@ -435,6 +629,45 @@ const settings: Json = {
   replacements_enabled: false,
 };
 
+if (newInstall) {
+  // Optional features have no provider/model selected on first run. Keeping
+  // the ordinary preview's fake cloud choices here would hide the real
+  // onboarding download buttons and make everything look already enabled.
+  Object.assign(settings, {
+    stt_engine_mode: params.get("stt") === "cloud" ? "cloud" : "local",
+    selected_model: "",
+    cloud_stt_api_keys: {},
+    assistant_enabled: false,
+    assistant_provider_id: "builtin",
+    assistant_last_cloud_provider_id: "",
+    assistant_models: { builtin: "" },
+    assistant_ask_screen_access: false,
+    assistant_call_screen_access: false,
+    assistant_tts_enabled: false,
+    assistant_tts_api_key: "",
+    assistant_tts_api_keys: {},
+    assistant_tts_remote_voice: "",
+    assistant_tts_remote_voices: {},
+    assistant_tts_model: "",
+    assistant_tts_models: {},
+    post_process_enabled: false,
+    post_process_provider_id: "builtin",
+    post_process_last_cloud_provider_id: "",
+    post_process_models: { builtin: "" },
+    post_process_api_keys: {},
+  });
+} else if (params.get("onboarding")) {
+  // The ids setup uses are separate from the older main-window fixtures.
+  for (const entry of models) {
+    if (
+      entry.id === "parakeet-unified-en-0.6b-gguf" ||
+      entry.id === "nemotron-3.5-asr-streaming-0.6b-gguf"
+    ) {
+      entry.is_downloaded = true;
+    }
+  }
+}
+
 const cloudProviders: Json[] = [
   {
     id: "elevenlabs",
@@ -555,6 +788,16 @@ const readiness = (): Json => {
   const providerId = settings.post_process_provider_id as string;
   const modelsMap = settings.post_process_models as Record<string, string>;
   const providers = settings.post_process_providers as Json[];
+  if (!(modelsMap[providerId] ?? "").trim()) {
+    return {
+      state: "unavailable",
+      reason: "no_model_configured",
+      source: "dedicated_cleanup_selection",
+      provider_id: providerId,
+      provider_label:
+        providers.find((p) => p.id === providerId)?.label ?? providerId,
+    };
+  }
   return {
     state: "ready",
     source: "dedicated_cleanup_selection",
@@ -571,7 +814,13 @@ const handlers: Record<string, (args: Json) => unknown> = {
   get_default_settings: () => structuredClone(settings),
   get_available_models: () => structuredClone(models),
   get_current_model: () => settings.selected_model,
-  has_any_models_available: () => true,
+  has_any_models_available: () =>
+    models.some(
+      (entry) =>
+        entry.is_downloaded &&
+        (entry.engine_type === "Whisper" ||
+          entry.engine_type === "TranscribeCpp"),
+    ),
   get_transcription_model_status: () => settings.selected_model,
   get_post_process_readiness: () => readiness(),
   get_cloud_stt_providers: () => structuredClone(cloudProviders),
@@ -582,9 +831,14 @@ const handlers: Record<string, (args: Json) => unknown> = {
     ]),
   get_history_entries: () => ({ entries: history, has_more: false }),
   get_assistant_history_entries: () => ({
-    entries: assistantSessions,
+    entries: assistantSessions.map(({ messages, ...summary }) => ({
+      ...summary,
+      message_count: messages.length,
+    })),
     has_more: false,
   }),
+  get_assistant_history_entry: (args) =>
+    assistantSessions.find((session) => session.id === args.id) ?? null,
   get_usage_stats: () =>
     fresh
       ? {
@@ -623,9 +877,11 @@ const handlers: Record<string, (args: Json) => unknown> = {
     system_audio: true,
     system_audio_error: null,
     elapsed_ms: 0,
+    dropped_chunks: 0,
   }),
   get_system_audio_status: () => ({ supported: true, help: null }),
   get_call_detection_status: () => ({ supported: true, enabled: true }),
+  get_meeting_indicator: () => true,
   get_auto_learn_status: () => ({
     supported: true,
     enabled: false,
@@ -697,9 +953,23 @@ const handlers: Record<string, (args: Json) => unknown> = {
     },
   ],
   get_model_folders: () => [],
+  download_model: ({ modelId }) => simulateDownload(modelId as string),
+  cancel_download: ({ modelId }) => {
+    activeDownloads.get(modelId as string)?.cancel();
+    return null;
+  },
+  get_local_voice_status: () => ({
+    route: "webview",
+    webgpu: "unknown",
+    native_supported: true,
+    native_load_failed: false,
+    kokoro_native_ready: false,
+    kitten_ready: false,
+  }),
   get_windows_microphone_permission_status: () => ({
-    supported: false,
-    overall_access: "allowed",
+    supported: params.get("permissions") === "denied",
+    overall_access:
+      params.get("permissions") === "denied" ? "denied" : "allowed",
   }),
   is_recording: () => false,
   is_portable: () => false,
@@ -770,6 +1040,17 @@ const handlers: Record<string, (args: Json) => unknown> = {
     return null;
   },
   set_active_model: ({ modelId }) => {
+    const entry = models.find((item) => item.id === modelId);
+    if (!entry?.is_downloaded)
+      return Promise.reject("The preview model is not installed");
+    if (matchesFailure("failLoad", modelId as string, entry)) {
+      void emit("model-state-changed", {
+        event_type: "loading_failed",
+        model_id: modelId,
+        error: "The preview model could not be loaded",
+      });
+      return Promise.reject("The preview model could not be loaded");
+    }
     settings.selected_model = modelId;
     void emit("model-state-changed", {
       event_type: "loading_completed",
@@ -786,6 +1067,19 @@ const handlers: Record<string, (args: Json) => unknown> = {
     return null;
   },
   set_cleanup_local_model: ({ modelId }) => {
+    const generalPrompts = [
+      "default_improve_transcriptions",
+      "speakoflow_readable",
+    ];
+    const selected = settings.post_process_selected_prompt_id as string;
+    if (modelId === "speakoflow-mini" && generalPrompts.includes(selected)) {
+      settings.post_process_selected_prompt_id = "speakoflow_mini_cleanup";
+    } else if (
+      modelId !== "speakoflow-mini" &&
+      selected === "speakoflow_mini_cleanup"
+    ) {
+      settings.post_process_selected_prompt_id = "speakoflow_readable";
+    }
     settings.post_process_provider_id = "builtin";
     (settings.post_process_models as Json).builtin = modelId;
     return null;

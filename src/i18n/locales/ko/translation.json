@@ -261,7 +261,10 @@
       },
       "accessibility": {
         "title": "접근성 권한",
-        "description": "녹음된 텍스트를 애플리케이션에 입력하기 위해 필요합니다."
+        "description": "녹음된 텍스트를 애플리케이션에 입력하기 위해 필요합니다.",
+        "stuckHint": "시스템 설정에서 이미 켜져 있나요? 업데이트 후 macOS가 이 버전과 더 이상 맞지 않는 권한을 유지할 수 있습니다.",
+        "reset": "권한 재설정",
+        "resetDone": "이제 시스템 설정에서 SpeakoFlow를 다시 켜세요."
       },
       "grant": "권한 부여",
       "granted": "승인됨",
@@ -269,7 +272,8 @@
       "allGranted": "모두 설정 완료!",
       "errors": {
         "checkFailed": "권한 확인에 실패했습니다. 다시 시도해주세요.",
-        "requestFailed": "권한 요청에 실패했습니다. 다시 시도해주세요."
+        "requestFailed": "권한 요청에 실패했습니다. 다시 시도해주세요.",
+        "resetFailed": "권한을 재설정하지 못했습니다. 손쉬운 사용 목록에서 SpeakoFlow를 제거한 후 다시 추가하세요."
       }
     }
   },
@@ -1508,6 +1512,7 @@
       "flowNotConfigured": "Flow에는 어시스턴트 모델이 필요합니다 — 받아쓰기로 붙여넣었습니다",
       "flowFailed": "Flow가 생성하지 못했습니다 — 아무것도 붙여넣지 않았습니다",
       "flowEmpty": "활성화 문구 뒤에 명령을 말하세요",
+      "cloudSttFellBack": "클라우드 전사가 응답하지 않았습니다 — 기기의 모델을 사용했습니다",
       "cleanupFallback": "AI 정리가 실행되지 않았습니다 — 원본 텍스트를 붙여넣었습니다"
     },
     "listening": "듣고 있습니다…",

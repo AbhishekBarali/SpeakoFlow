@@ -357,10 +357,20 @@ Two ways to fix it:
   sudo usermod -aG input $USER
   ```
 
-- **Or switch engines.** Set the keyboard engine to **Tauri** in Settings, which
-  uses the compositor's global-shortcut API and needs no special permissions.
-  (Tauri is already the default engine on Linux, so this only affects you if you
-  switched to handy-keys.)
+- **Or switch engines.** Set the keyboard engine to **Tauri** in Settings. It
+  registers hotkeys through X11 (the `global-hotkey` crate behind Tauri's
+  global-shortcut plugin supports only X11 on Linux) and needs no special
+  permissions. It works in an X11 session and under XWayland, but on Wayland it
+  only sees a hotkey while an X11 window has focus, so in a native Wayland app it
+  can miss the press. (Tauri is already the default engine on Linux, so this only
+  affects you if you switched to handy-keys.)
+
+On Wayland, the reliable route is a shortcut owned by your desktop itself: add a
+custom keyboard shortcut in your desktop's settings (GNOME, KDE, or a `bind` line
+in Sway/Hyprland) that runs `speakoflow --toggle-transcription` (with an
+AppImage, the path to the AppImage followed by the same flag). It reaches the
+running app from any window, on any compositor. `--toggle-post-process` and
+`--cancel` work the same way.
 
 </details>
 

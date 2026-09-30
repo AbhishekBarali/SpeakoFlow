@@ -144,6 +144,93 @@
     "debug": "Diagnostics and developer tools."
   },
   "onboarding": {
+    "flow": {
+      "progress": "Step {{current}} of {{total}}",
+      "steps": {
+        "setup": "Set up",
+        "tour": "Tour",
+        "finish": "Start"
+      }
+    },
+    "setup": {
+      "installed": "Installed",
+      "loadFailed": "Couldn't load the list of models.",
+      "retry": "Try again"
+    },
+    "tour": {
+      "features": "What SpeakoFlow does",
+      "count": "{{current}} of {{total}}",
+      "skip": "Skip tour",
+      "next": "Next",
+      "done": "Continue",
+      "tabs": {
+        "dictate": "Dictation",
+        "ask": "Assistant",
+        "call": "Call"
+      },
+      "keys": {
+        "hold": "Hold to talk",
+        "tap": "Tap to start, tap to stop",
+        "call": "Press to start, again to hang up"
+      },
+      "mail": {
+        "window": "New message",
+        "to": "To",
+        "toValue": "Sara",
+        "subject": "Subject",
+        "subjectValue": "Friday"
+      },
+      "dictate": {
+        "title": "Talk.\nIt types.",
+        "cleanup": "AI cleanup, when you want it",
+        "said": "Hi Sara, can we move our call to Friday? I'll send the budget before then."
+      },
+      "ask": {
+        "title": "Ask for\nanything.",
+        "chips": {
+          "translate": "Translate",
+          "decline": "Write a reply",
+          "explain": "Explain",
+          "anything": "…anything"
+        },
+        "examples": {
+          "translate": {
+            "window": "Messages",
+            "doc": "Can we move our call to Friday?",
+            "question": "Translate this to Spanish",
+            "answer": "¿Podemos pasar nuestra llamada al viernes?"
+          },
+          "decline": {
+            "window": "Mail",
+            "doc": "Hi, are you free to join the planning review on Thursday at 3?",
+            "question": "Write a polite reply saying I can't make Thursday",
+            "answer": "Thanks for the invite! I can't make Thursday at 3, but I'm free Friday morning if that works."
+          },
+          "explain": {
+            "window": "Browser",
+            "doc": "The API returns 429 Too Many Requests.",
+            "question": "What does this mean?",
+            "answer": "You're sending requests faster than the service allows. Wait a moment, then try again more slowly."
+          }
+        }
+      },
+      "call": {
+        "title": "Or just\ntalk it through.",
+        "you": "You",
+        "assistant": "Assistant",
+        "said": "Help me plan a short talk for Friday's team meeting.",
+        "reply": "Sure. Open with the one result you're proudest of, give two reasons it worked, and end on what's next."
+      }
+    },
+    "finish": {
+      "status": {
+        "ready": "Ready",
+        "installing": "Installing…",
+        "percent": "{{percent}}%",
+        "retry": "Retry",
+        "waiting": "Waiting"
+      }
+    },
     "subtitle": "To get started, choose a transcription model",
     "steps": {
       "progress": "Step {{current}} of {{total}}",
@@ -357,7 +444,10 @@
       },
       "accessibility": {
         "title": "Accessibility access",
-        "description": "Required to type transcribed text into your applications."
+        "description": "Required to type transcribed text into your applications.",
+        "stuckHint": "Already switched on in System Settings? After an update, macOS can keep a permission that no longer matches this version.",
+        "reset": "Reset permission",
+        "resetDone": "Now switch SpeakoFlow on again in System Settings."
       },
       "grant": "Grant permission",
       "granted": "Granted",
@@ -365,8 +455,68 @@
       "allGranted": "All set!",
       "errors": {
         "checkFailed": "Couldn't check permissions. Please try again.",
-        "requestFailed": "Couldn't request permission. Please try again."
+        "requestFailed": "Couldn't request permission. Please try again.",
+        "resetFailed": "Couldn't reset the permission. Remove SpeakoFlow from the Accessibility list and add it again."
       }
+    },
+    "frame": {
+      "setup": "Set up",
+      "tour": "Tour",
+      "finish": "Start"
+    },
+    "welcome": {
+      "line": "Talk, and it types. Ask, and it answers.",
+      "start": "Get started",
+      "note": "Takes about a minute."
+    },
+    "speech": {
+      "title": "Pick your voice model",
+      "body": "Runs on this computer. Works offline.",
+      "english": "English",
+      "languages_one": "{{count}} language",
+      "languages_other": "{{count}} languages",
+      "tags": {
+        "english": "Fastest",
+        "languages": "Detects the language",
+        "small": "Smallest",
+        "accurate": "Most accurate",
+        "widest": "Slower"
+      },
+      "more_one": "{{count}} more model",
+      "more_other": "{{count}} more models",
+      "anytime": "You can add more models anytime.",
+      "download": "Download and continue",
+      "continue": "Continue",
+      "later": "Set up later",
+      "loading": "Finding your speech model"
+    },
+    "start": {
+      "ready": {
+        "title": "Try it now"
+      },
+      "downloading": {
+        "title": "Almost ready"
+      },
+      "failed": {
+        "title": "The download stopped"
+      },
+      "none": {
+        "title": "Pick a voice model to start"
+      },
+      "progress": {
+        "of": "{{done}} of {{total}}",
+        "failed": "It didn't finish. Try again?",
+        "underMinute": "Less than a minute left",
+        "minutes_one": "About {{count}} minute left",
+        "minutes_other": "About {{count}} minutes left"
+      },
+      "try": {
+        "label": "Try dictation",
+        "placeholder": "Your words appear here…",
+        "success": "That's it. It works in every app."
+      },
+      "open": "Open SpeakoFlow",
+      "choose": "Choose a voice model"
     }
   },
   "modelSelector": {
@@ -1933,7 +2083,9 @@
     "moreInfo": "More information",
     "change": "Change",
     "saveFailed": "Couldn't save that change. Try again.",
-    "more": "More"
+    "more": "More",
+    "hideTips": "Hide tips",
+    "showTips": "Show tips"
   },
   "accessibility": {
     "permissionsRequired": "Accessibility permissions required",
@@ -1976,7 +2128,9 @@
       "cloudSttFailed": "Cloud transcription failed — check your key and credit in Settings",
       "flowEmpty": "Say a command after the activation phrase",
       "cleanupFallback": "AI cleanup didn't run — pasted the raw text",
-      "cleanupModelRejected": "Your cleanup provider rejected that model — check the model in Settings"
+      "cleanupModelRejected": "Your cleanup provider rejected that model — check the model in Settings",
+      "cloudSttFellBack": "Cloud transcription didn't respond — used the on-device model",
+      "noSpeechModel": "No speech model yet. Pick one on the Models page"
     },
     "listening": "Listening…",
     "locked": "Recording hands-free — press the hotkey again to stop",
@@ -1992,6 +2146,11 @@
       "failed": "Transcription failed",
       "undo": "Undo",
       "retry": "Try again"
+    },
+    "downloading": {
+      "title": "Speech model downloading…",
+      "percent": "Speech model downloading · {{percent}}%",
+      "hint": "Dictation starts working when it's done"
     }
   },
   "reminders": {
@@ -2242,7 +2401,13 @@
       "debug": "Debug"
     },
     "general": {
-      "appearance": "Appearance"
+      "appearance": "Appearance",
+      "onboarding": {
+        "title": "Onboarding",
+        "replay": "First-run setup",
+        "replayInfo": "Walk through setup and the tour again, the way a new install sees them. Models you already have stay installed.",
+        "replayButton": "Show onboarding again"
+      }
     },
     "shortcuts": {
       "intro": "Every shortcut works in any app. Click a shortcut to record a new one.",
@@ -2529,7 +2694,7 @@
       }
     },
     "hero": {
-      "title": "Say it messy. Get it clean.",
+      "title": "Say it messy. Get it <em>clean.</em>",
       "before": "let's meet at ten, actually no, make that eleven, and bring the budget",
       "after": "Let's meet at eleven and bring the budget.",
       "offHint": "Turn on AI cleanup to use this shortcut",
@@ -2559,7 +2724,7 @@
     },
     "addWord": "Add word",
     "hero": {
-      "title": "SpeakoFlow spells the way you do.",
+      "title": "SpeakoFlow spells <em>the way you do.</em>",
       "subtitle": "Add names and jargon it keeps getting wrong."
     }
   },
@@ -2570,7 +2735,7 @@
       "askHold": "Hold, ask your question, let go. The answer appears in a floating panel.",
       "askTap": "Tap, ask your question, tap again. The answer appears in a floating panel.",
       "call": "Talk back and forth hands-free. Press again to hang up.",
-      "title": "Ask anything, from anywhere.",
+      "title": "Ask anything, from <em>anywhere.</em>",
       "ask": "Ask",
       "callLabel": "Call",
       "askHoldShort": "Hold, ask, let go",
@@ -2813,12 +2978,13 @@
     "transcript": "Transcript",
     "notes": "Notes",
     "hero": {
-      "title": "Every call, written down.",
+      "title": "Every call, <em>written down.</em>",
       "subtitle": "Split by speaker, with notes when it ends."
     },
     "transcribedBy": "Transcribed by",
     "notesBy": "Notes by",
-    "modelsTip": "Meetings use your Speech to text model for the transcript and your Assistant model for the notes and questions. Click either to change it."
+    "transcribedByTip": "Writes the transcript. It is your Speech to text model, the same one dictation uses.",
+    "notesByTip": "Writes the notes and the title, and answers questions about a meeting. It is your Assistant model."
   },
   "historyPage": {
     "today": "Today",

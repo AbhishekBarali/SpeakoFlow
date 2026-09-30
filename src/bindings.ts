@@ -961,6 +961,39 @@ async initializeShortcuts() : Promise<Result<null, string>> {
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * Remove this app's own Accessibility entry so macOS will ask again (issue #34).
+ * 
+ * TCC stores a grant together with the code signature it was given to. A build
+ * without a stable signing identity has a different signature every release, so
+ * after an update System Settings still lists SpeakoFlow as switched on (that
+ * row is keyed by bundle identifier) while `AXIsProcessTrusted` answers no for
+ * the new binary. Requesting access again shows nothing, because an entry
+ * already exists; removing it is what lets the next request add a fresh one.
+ * 
+ * Scoped to our own identifier, taken from the app config: `tccutil reset
+ * Accessibility` without one would revoke every app's access on the machine.
+ * No `sudo` — without it the reset applies to the current user's decisions.
+ */
+async resetMacosAccessibilityPermission() : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("reset_macos_accessibility_permission") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Open System Settings at Privacy & Security → Accessibility.
+ */
+async openMacosAccessibilitySettings() : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("open_macos_accessibility_settings") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async getAvailableModels() : Promise<Result<ModelInfo[], string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("get_available_models") };
@@ -1567,6 +1600,18 @@ async enforceRecordingRetention() : Promise<Result<number, string>> {
 async getAssistantHistoryEntries(cursor: number | null, limit: number | null) : Promise<Result<PaginatedAssistantHistory, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("get_assistant_history_entries", { cursor, limit }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * One saved assistant conversation with its messages, loaded when the History
+ * list expands it. `None` when it has been deleted since the list was fetched.
+ */
+async getAssistantHistoryEntry(id: number) : Promise<Result<AssistantHistoryEntry | null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_assistant_history_entry", { id }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -3943,6 +3988,26 @@ updated_at: number;
  */
 title: string; messages: ChatMessage[] }
 /**
+ * One row of the conversation list: what a list row shows, without the
+ * messages. Messages carry base64 screenshot thumbnails and the History page
+ * reloads its list after every assistant turn, so listing whole conversations
+ * moved megabytes per turn to render a title and a count. The messages are
+ * fetched one conversation at a time, when it is expanded.
+ */
+export type AssistantHistorySummary = { id: number; 
+/**
+ * When the conversation was first saved (seconds since epoch).
+ */
+timestamp: number; 
+/**
+ * When the most recent turn was added (seconds since epoch).
+ */
+updated_at: number; 
+/**
+ * Short label derived from the first user message.
+ */
+title: string; message_count: number }
+/**
  * Desired length of the assistant's replies. Appended as a directive to the
  * system prompt at request time, so it works with the single main prompt
  * (no separate summary layer). `Default` injects nothing.
@@ -4588,7 +4653,12 @@ system_audio: boolean;
 /**
  * Why system audio is unavailable, if it is.
  */
-system_audio_error: string | null; elapsed_ms: number }
+system_audio_error: string | null; elapsed_ms: number; 
+/**
+ * Chunks left out of the transcript because transcription fell too far
+ * behind. Their audio is still in the recording.
+ */
+dropped_chunks: number }
 /**
  * How far along a meeting is.
  * 
@@ -4771,7 +4841,7 @@ export type OverlayPosition = "none" | "top" | "bottom"
  * assistant — the streamed reply).
  */
 export type OverlayStyle = "auto" | "none" | "minimal" | "live"
-export type PaginatedAssistantHistory = { entries: AssistantHistoryEntry[]; has_more: boolean }
+export type PaginatedAssistantHistory = { entries: AssistantHistorySummary[]; has_more: boolean }
 export type PaginatedHistory = { entries: HistoryEntry[]; has_more: boolean }
 /**
  * A page of meetings.

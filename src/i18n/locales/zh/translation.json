@@ -261,7 +261,10 @@
       },
       "accessibility": {
         "title": "辅助功能访问",
-        "description": "需要将转录文本输入到您的应用程序中。"
+        "description": "需要将转录文本输入到您的应用程序中。",
+        "stuckHint": "已在系统设置中开启？更新后，macOS 可能会保留一个与此版本不再匹配的权限。",
+        "reset": "重置权限",
+        "resetDone": "现在请在系统设置中重新开启 SpeakoFlow。"
       },
       "grant": "授予权限",
       "granted": "已授予",
@@ -269,7 +272,8 @@
       "allGranted": "全部完成！",
       "errors": {
         "checkFailed": "检查权限失败。请重试。",
-        "requestFailed": "请求权限失败。请重试。"
+        "requestFailed": "请求权限失败。请重试。",
+        "resetFailed": "无法重置权限。请从辅助功能列表中移除 SpeakoFlow，然后重新添加。"
       }
     }
   },
@@ -1508,6 +1512,7 @@
       "flowNotConfigured": "Flow 需要一个助手模型——已作为普通语音输入粘贴",
       "flowFailed": "Flow 无法生成——未粘贴任何内容",
       "flowEmpty": "请在激活短语之后说出指令",
+      "cloudSttFellBack": "云端转写未响应——已改用本机模型",
       "cleanupFallback": "AI 清理未运行——已粘贴原始文本"
     },
     "listening": "正在聆听…",

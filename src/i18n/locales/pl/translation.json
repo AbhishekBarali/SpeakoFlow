@@ -261,7 +261,10 @@
       },
       "accessibility": {
         "title": "Dostęp do dostępności",
-        "description": "Wymagany do wpisywania transkrybowanego tekstu w Twoich aplikacjach."
+        "description": "Wymagany do wpisywania transkrybowanego tekstu w Twoich aplikacjach.",
+        "stuckHint": "Już włączone w Ustawieniach systemowych? Po aktualizacji macOS może zachować uprawnienie, które nie pasuje już do tej wersji.",
+        "reset": "Zresetuj uprawnienie",
+        "resetDone": "Teraz ponownie włącz SpeakoFlow w Ustawieniach systemowych."
       },
       "grant": "Przyznaj uprawnienie",
       "granted": "Przyznano",
@@ -269,7 +272,8 @@
       "allGranted": "Wszystko gotowe!",
       "errors": {
         "checkFailed": "Nie udało się sprawdzić uprawnień. Spróbuj ponownie.",
-        "requestFailed": "Nie udało się poprosić o uprawnienie. Spróbuj ponownie."
+        "requestFailed": "Nie udało się poprosić o uprawnienie. Spróbuj ponownie.",
+        "resetFailed": "Nie udało się zresetować uprawnienia. Usuń SpeakoFlow z listy Dostępność i dodaj go ponownie."
       }
     }
   },
@@ -1508,6 +1512,7 @@
       "flowNotConfigured": "Flow wymaga modelu asystenta — wklejono jako dyktowanie",
       "flowFailed": "Flow nie zdołał nic wygenerować — nic nie wklejono",
       "flowEmpty": "Po frazie aktywującej wypowiedz polecenie",
+      "cloudSttFellBack": "Transkrypcja w chmurze nie odpowiedziała — użyto modelu na urządzeniu",
       "cleanupFallback": "Czyszczenie AI nie zadziałało — wklejono surowy tekst"
     },
     "listening": "Słucham…",
