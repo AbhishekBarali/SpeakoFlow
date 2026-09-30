@@ -663,13 +663,57 @@ pub(crate) fn transcribe_cloud_blocking(
             ""
         }
     );
-    let result = block_on_request(async move { request.transcribe(wav).await });
+    let result = {
+        let request = request.clone();
+        let wav = wav.clone();
+        block_on_request(async move { request.transcribe(wav).await })
+    };
+    // One quick second attempt for a failure that is about the network rather
+    // than the account. Without it a one-second Wi-Fi drop fell straight
+    // through to loading the local model, which costs more time than the retry
+    // and gives a different transcript. A timeout is not retried: it has
+    // already spent the whole timeout, and a second one would double the wait.
+    let result = match result {
+        Err(e) if is_transient_failure(&e) => {
+            warn!("Cloud transcription failed ({e}); retrying once");
+            std::thread::sleep(TRANSIENT_RETRY_DELAY);
+            block_on_request(async move { request.transcribe(wav).await })
+        }
+        other => other,
+    };
     if result.is_ok() {
         // Only a completed round trip proves the route is warm, which is what
         // lets the next recording skip its warm-up.
         note_request_completed();
     }
     result
+}
+
+/// Pause before the one retry of a transient failure, long enough for a
+/// dropped Wi-Fi link or a connection reset to recover.
+const TRANSIENT_RETRY_DELAY: Duration = Duration::from_millis(750);
+
+/// Whether a failed request is worth sending again straight away.
+///
+/// Matches the messages this module builds in `network_error` and `parse_json`:
+/// a connection that could not be made or broke mid-request, a body that could
+/// not be read, and the statuses a provider uses for "try again" (408 and
+/// 5xx). A 429 is left out on purpose: a rate limit rarely clears in under a
+/// second, and the local model finishes the recording sooner. Anything else — a rejected key, no credit, an unknown model — fails the
+/// same way every time, and a timeout has already cost the full wait.
+fn is_transient_failure(message: &str) -> bool {
+    if message.starts_with("Could not reach ")
+        || message.contains(" request failed: ")
+        || message.contains(" returned an unreadable response")
+    {
+        return true;
+    }
+    // "<label> returned <status>: <body>" — the label never contains " returned ".
+    message
+        .split_once(" returned ")
+        .and_then(|(_, rest)| rest.get(..3))
+        .and_then(|code| code.parse::<u16>().ok())
+        .is_some_and(|code| code == 408 || (500..600).contains(&code))
 }
 
 /// Everything one cloud request needs, owned so it can cross a thread boundary
@@ -996,10 +1040,20 @@ impl CloudRequest {
         response: reqwest::Response,
     ) -> Result<T, String> {
         let status = response.status();
-        let body = response
-            .text()
-            .await
-            .map_err(|e| format!("{} returned an unreadable response: {e}", self.label))?;
+        let body = response.text().await.map_err(|e| {
+            // The client timeout covers the whole exchange, so a slow body
+            // times out here rather than at `send`. Reported as a timeout so it
+            // is not retried: it has already cost the full wait.
+            if e.is_timeout() {
+                format!(
+                    "{} did not respond within {}s",
+                    self.label,
+                    self.timeout.as_secs()
+                )
+            } else {
+                format!("{} returned an unreadable response: {e}", self.label)
+            }
+        })?;
         if !status.is_success() {
             return Err(format!(
                 "{} returned {}: {}",
@@ -1201,6 +1255,37 @@ fn looks_like_transcription_model(id: &str) -> bool {
 mod tests {
     use super::*;
     use crate::settings::{get_default_settings, SttEngineMode};
+
+    #[test]
+    fn only_network_and_retryable_status_failures_are_retried() {
+        // Network-side: retried.
+        assert!(is_transient_failure(
+            "Could not reach Azure AI Speech: error sending request"
+        ));
+        assert!(is_transient_failure(
+            "OpenAI request failed: connection reset by peer"
+        ));
+        assert!(is_transient_failure(
+            "Deepgram returned an unreadable response: unexpected EOF"
+        ));
+        assert!(is_transient_failure(
+            "OpenRouter returned 503 Service Unavailable: overloaded"
+        ));
+        assert!(!is_transient_failure(
+            "ElevenLabs returned 429 Too Many Requests: slow down"
+        ));
+        // Account-side, or already slow: not retried.
+        assert!(!is_transient_failure(
+            "Azure AI Speech returned 401 Unauthorized: invalid key"
+        ));
+        assert!(!is_transient_failure(
+            "OpenAI returned 400 Bad Request: unknown model"
+        ));
+        assert!(!is_transient_failure("Groq did not respond within 30s"));
+        assert!(!is_transient_failure(
+            "OpenAI returned an unexpected response: missing field"
+        ));
+    }
 
     fn cloud_settings() -> AppSettings {
         let mut settings = get_default_settings();

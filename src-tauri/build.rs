@@ -23,6 +23,26 @@ fn main() {
         println!("cargo:rustc-link-arg=-Wl,-rpath,$ORIGIN/../lib");
     }
 
+    // Windows: load `vulkan-1.dll` on first use instead of at process start.
+    //
+    // The whisper.cpp engine inside transcribe-rs is statically linked with its
+    // Vulkan backend, which put `vulkan-1.dll` on the executable's import table.
+    // Windows resolves that table before any of our code runs, so a PC without
+    // the Vulkan runtime (no GPU driver installed, a VM, some older GPUs) got a
+    // system error box and the app never opened (issue #39). Delay-loaded, the
+    // DLL is only touched when Whisper's Vulkan code first runs, and
+    // `managers::transcription::vulkan_runtime_available` keeps that code from
+    // running on a PC without it: the app starts, Parakeet and cloud
+    // transcription work, and a Whisper model explains what it needs. The
+    // Parakeet/transcribe.cpp side already loads its Vulkan backend as an
+    // optional module, so it never needed this.
+    if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows")
+        && std::env::var("CARGO_CFG_TARGET_ENV").as_deref() == Ok("msvc")
+    {
+        println!("cargo:rustc-link-arg=/DELAYLOAD:vulkan-1.dll");
+        println!("cargo:rustc-link-arg=delayimp.lib");
+    }
+
     // Intel macOS is the one target that links ONNX Runtime DYNAMICALLY: pykeio's
     // `ort` dropped prebuilt x86_64-apple-darwin binaries, so transcribe-rs's
     // `onnx` feature has no static ORT to embed there and CI links against a

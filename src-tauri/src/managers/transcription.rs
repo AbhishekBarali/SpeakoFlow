@@ -48,6 +48,21 @@ fn meeting_is_recording(app: &AppHandle) -> bool {
         .is_some_and(|recorder| recorder.uses_speech_engine())
 }
 
+thread_local! {
+    /// Set when the last `transcribe` on this thread fell back from the cloud
+    /// to the local model. Thread-local because `transcribe` is synchronous and
+    /// runs on its caller's thread, so a dictation reads its own answer and a
+    /// meeting chunk transcribing on another thread cannot leak into it.
+    static CLOUD_FELL_BACK: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Whether the last `transcribe` on this thread finished on the local model
+/// because the cloud request failed. Reading clears it. Call it on the same
+/// thread as `transcribe`, with no `.await` in between.
+pub fn take_cloud_fallback() -> bool {
+    CLOUD_FELL_BACK.with(|flag| flag.replace(false))
+}
+
 /// Incremental live-transcription text pushed to the recording overlay while a
 /// streaming recording is in progress. Emitted as an UNTYPED Tauri event
 /// ("stream-text") to match the existing "mic-level" pattern — intentionally
@@ -261,20 +276,27 @@ pub struct LoadingGuard {
 /// Marks the engine as taken out of its slot for a transcription or a live
 /// stream. While it is out the slot reads empty, and without this mark
 /// `initiate_model_load` took that for "not loaded" and started a second full
-/// copy of the model. Cleared on drop, so a panicking lease cannot leave the
+/// copy of the model. Released on drop, so a panicking lease cannot leave the
 /// mark behind and block every later load.
-struct EngineLease(Arc<AtomicBool>);
+///
+/// A count, not a flag: a meeting chunk can take the engine the moment a live
+/// stream hands it back, while the stream's own lease is still being dropped,
+/// and a flag cleared by that late drop read "not leased" with the engine out.
+struct EngineLease(Arc<AtomicUsize>);
+
+/// How long a transcription waits for an engine another one is using.
+const ENGINE_LEASE_WAIT: Duration = Duration::from_secs(60);
 
 impl EngineLease {
-    fn new(flag: &Arc<AtomicBool>) -> Self {
-        flag.store(true, Ordering::SeqCst);
-        Self(flag.clone())
+    fn new(count: &Arc<AtomicUsize>) -> Self {
+        count.fetch_add(1, Ordering::SeqCst);
+        Self(count.clone())
     }
 }
 
 impl Drop for EngineLease {
     fn drop(&mut self) {
-        self.0.store(false, Ordering::SeqCst);
+        self.0.fetch_sub(1, Ordering::SeqCst);
     }
 }
 
@@ -302,8 +324,8 @@ pub struct TranscriptionManager {
     watcher_handle: Arc<Mutex<Option<thread::JoinHandle<()>>>>,
     is_loading: Arc<Mutex<bool>>,
     loading_condvar: Arc<Condvar>,
-    /// Set while the engine is out of `engine` on lease; see [`EngineLease`].
-    engine_leased: Arc<AtomicBool>,
+    /// How many holders have the engine out of `engine`; see [`EngineLease`].
+    engine_leased: Arc<AtomicUsize>,
     /// Router for the opt-in live/streaming transcription path. Shared with the
     /// `AudioRecordingManager` so the recorder can feed frames into an active
     /// stream. When no stream is active, feeding is a cheap no-op.
@@ -326,7 +348,7 @@ impl TranscriptionManager {
             watcher_handle: Arc::new(Mutex::new(None)),
             is_loading: Arc::new(Mutex::new(false)),
             loading_condvar: Arc::new(Condvar::new()),
-            engine_leased: Arc::new(AtomicBool::new(false)),
+            engine_leased: Arc::new(AtomicUsize::new(0)),
             stream_router,
         };
 
@@ -430,6 +452,12 @@ impl TranscriptionManager {
     pub fn is_model_loaded(&self) -> bool {
         let engine = self.lock_engine();
         engine.is_some()
+    }
+
+    /// Whether the engine is out of its slot, in use by another transcription.
+    /// Such an engine is loaded; its holder puts it back when done.
+    fn engine_is_leased(&self) -> bool {
+        self.engine_leased.load(Ordering::SeqCst) > 0
     }
 
     /// Atomically check whether a model load is in progress and, if not, mark
@@ -591,6 +619,10 @@ impl TranscriptionManager {
 
         let loaded_engine = match model_info.engine_type {
             EngineType::Whisper => {
+                if !vulkan_runtime_available() {
+                    emit_loading_failed(WHISPER_NEEDS_VULKAN);
+                    return Err(anyhow::anyhow!(WHISPER_NEEDS_VULKAN));
+                }
                 let engine = WhisperEngine::load(&model_path).map_err(|e| {
                     let error_msg = format!("Failed to load whisper model {}: {}", model_id, e);
                     emit_loading_failed(&error_msg);
@@ -766,7 +798,7 @@ impl TranscriptionManager {
         }
         let mut is_loading = self.is_loading.lock().unwrap();
         // A leased engine is loaded, just in use; `transcribe` waits for it.
-        if *is_loading || self.is_model_loaded() || self.engine_leased.load(Ordering::SeqCst) {
+        if *is_loading || self.is_model_loaded() || self.engine_is_leased() {
             return;
         }
 
@@ -814,7 +846,7 @@ impl TranscriptionManager {
                 .is_some_and(|a| a.is_recording())
                 || meeting_is_recording(&this.app_handle);
             if recording
-                || this.engine_leased.load(Ordering::SeqCst)
+                || this.engine_is_leased()
                 || !this.is_model_loaded()
                 || !crate::stt_cloud::cloud_stt_active(&get_settings(&this.app_handle))
             {
@@ -846,6 +878,23 @@ impl TranscriptionManager {
             while *is_loading {
                 is_loading = self.loading_condvar.wait(is_loading).unwrap();
             }
+            // An engine out on lease (a meeting chunk that fell back a moment
+            // earlier, during the same outage) is loaded, not missing. Loading
+            // here would put a second full copy of the model in memory, and the
+            // holder's put-back would then clobber it.
+            let deadline = std::time::Instant::now() + ENGINE_LEASE_WAIT;
+            while !self.is_model_loaded() && self.engine_is_leased() {
+                if std::time::Instant::now() >= deadline {
+                    return Err(anyhow::anyhow!(
+                        "the local model is busy with another transcription"
+                    ));
+                }
+                let (guard, _) = self
+                    .loading_condvar
+                    .wait_timeout(is_loading, Duration::from_millis(50))
+                    .unwrap_or_else(|e| e.into_inner());
+                is_loading = guard;
+            }
             if self.is_model_loaded() {
                 return self
                     .get_current_model()
@@ -873,6 +922,7 @@ impl TranscriptionManager {
     }
 
     pub fn transcribe(&self, mut audio: Vec<f32>) -> Result<String> {
+        CLOUD_FELL_BACK.with(|flag| flag.set(false));
         #[cfg(debug_assertions)]
         if std::env::var("HANDY_FORCE_TRANSCRIPTION_FAILURE").is_ok() {
             return Err(anyhow::anyhow!(
@@ -959,11 +1009,12 @@ impl TranscriptionManager {
                         // "no model loaded" only describes a consequence of it.
                         match self.load_fallback_engine(&settings) {
                             Ok(model_id) => {
+                                CLOUD_FELL_BACK.with(|flag| flag.set(true));
                                 warn!(
                                     "Falling back to the local model '{}' for this \
-                                     recording — {} rejected the request. Fix the key \
-                                     in Settings → Models → Cloud transcription, or \
-                                     switch transcription back to On my device.",
+                                     recording — {} did not transcribe it. If this \
+                                     keeps happening, check the key and credit in \
+                                     Settings → Models → Cloud transcription.",
                                     model_id, cfg.provider.label
                                 );
                             }
@@ -992,9 +1043,22 @@ impl TranscriptionManager {
                 is_loading = self.loading_condvar.wait(is_loading).unwrap();
             }
 
-            let engine_guard = self.lock_engine();
-            if engine_guard.is_none() {
-                return Err(anyhow::anyhow!("Model is not loaded for transcription."));
+            // The engine can be out on lease to another transcription — a
+            // meeting chunk while the user dictates, or the other way round.
+            // That used to fail this one outright ("not loaded"), which dropped
+            // a dictation or left a 30-second hole in a meeting transcript. Wait
+            // for it to come back instead, bounded so a lease held by a long
+            // live-transcribed recording cannot hang the caller indefinitely.
+            let deadline = std::time::Instant::now() + ENGINE_LEASE_WAIT;
+            while self.lock_engine().is_none() {
+                if !self.engine_is_leased() || std::time::Instant::now() >= deadline {
+                    return Err(anyhow::anyhow!("Model is not loaded for transcription."));
+                }
+                let (guard, _) = self
+                    .loading_condvar
+                    .wait_timeout(is_loading, Duration::from_millis(50))
+                    .unwrap_or_else(|e| e.into_inner());
+                is_loading = guard;
             }
         }
 
@@ -1177,9 +1241,14 @@ impl TranscriptionManager {
 
             match transcribe_result {
                 Ok(inner_result) => {
-                    // Success or normal error — put the engine back
+                    // Success or normal error — put the engine back, unless a
+                    // newer one was loaded into the slot meanwhile (a model
+                    // switch); then this lease is stale and is dropped, as the
+                    // stream worker already does.
                     let mut engine_guard = self.lock_engine();
-                    *engine_guard = Some(engine);
+                    if engine_guard.is_none() {
+                        *engine_guard = Some(engine);
+                    }
                     inner_result?
                 }
                 Err(panic_payload) => {
@@ -1497,14 +1566,17 @@ impl TranscriptionManager {
 
         // Lease the engine out of the mutex for the whole stream, exactly like
         // transcribe() borrows it for a single call.
-        let mut leased = {
+        let (mut leased, _lease) = {
             let mut guard = self.lock_engine();
-            guard.take()
+            let leased = guard.take();
+            // Counted before the slot lock is released, so no waiter can see an
+            // empty slot with a zero count while this worker holds the engine.
+            // Held for the whole worker; the engine is back in its slot by then.
+            let lease = leased
+                .is_some()
+                .then(|| EngineLease::new(&self.engine_leased));
+            (leased, lease)
         };
-        // Held for the whole worker; the engine is back in its slot by then.
-        let _lease = leased
-            .is_some()
-            .then(|| EngineLease::new(&self.engine_leased));
 
         // Decide the streaming path from the leased engine (see the fn doc).
         enum StreamPath {
@@ -2431,6 +2503,54 @@ pub struct GpuDeviceOption {
 
 static GPU_DEVICES: OnceLock<Vec<GpuDeviceOption>> = OnceLock::new();
 
+/// Whether the Vulkan runtime (`vulkan-1.dll`) is installed.
+///
+/// Windows only; elsewhere this is always true (macOS has no Vulkan build, and
+/// on Linux `libvulkan1` is a package dependency). The Windows executable
+/// delay-loads `vulkan-1.dll` (see `build.rs`), and the Whisper engine's
+/// statically linked ggml calls into it the first time it initialises —
+/// including for a CPU-only Whisper load, because ggml registers every compiled
+/// backend up front. On a PC without the runtime that call would fail inside
+/// native code and take the app down, so every path into Whisper checks this
+/// first: device listing reports no Whisper GPUs and a Whisper model refuses to
+/// load with a message that says what to install.
+///
+/// The library is loaded the same way the delay-load helper would load it and
+/// then kept loaded, so the later delay-load resolves to this same module.
+pub fn vulkan_runtime_available() -> bool {
+    #[cfg(windows)]
+    {
+        static AVAILABLE: OnceLock<bool> = OnceLock::new();
+        *AVAILABLE.get_or_init(|| {
+            // SAFETY: this is the system Vulkan loader, loaded exactly as the
+            // delay-load stub would load it on first use anyway.
+            match unsafe { libloading::Library::new("vulkan-1.dll") } {
+                Ok(library) => {
+                    std::mem::forget(library);
+                    true
+                }
+                Err(e) => {
+                    warn!(
+                        "The Vulkan runtime (vulkan-1.dll) is not installed ({e}); \
+                         Whisper models are unavailable until the graphics driver \
+                         provides it"
+                    );
+                    false
+                }
+            }
+        })
+    }
+    #[cfg(not(windows))]
+    {
+        true
+    }
+}
+
+/// Shown when a Whisper model is picked on a PC without the Vulkan runtime.
+pub const WHISPER_NEEDS_VULKAN: &str = "Whisper models need Vulkan, which comes with your \
+    graphics driver, and it isn't installed on this PC. Update your graphics driver (NVIDIA, \
+    AMD or Intel) and restart SpeakoFlow, or choose a Parakeet model, which works without it.";
+
 /// Both device lists, as produced by one enumeration pass. Serialized to a
 /// single JSON line so the Linux out-of-process probe can hand them back to the
 /// parent (see `probe_devices_out_of_process`).
@@ -2452,6 +2572,11 @@ pub struct DeviceProbe {
 /// listing rather than the app.
 fn enumerate_whisper_gpu_devices() -> Vec<GpuDeviceOption> {
     use transcribe_rs::whisper_cpp::gpu::list_gpu_devices;
+
+    // Listing initialises Whisper's Vulkan backend; see `vulkan_runtime_available`.
+    if !vulkan_runtime_available() {
+        return Vec::new();
+    }
 
     // ggml's Vulkan backend uses FMA3 instructions internally.
     // On older CPUs without FMA3 (e.g. Sandy Bridge Xeons) this causes
