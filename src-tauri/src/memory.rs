@@ -18,7 +18,7 @@
 use crate::llm_client::{self, ChatMessage};
 use crate::settings::{AppSettings, MemoryConfidence, MemoryNote, PostProcessProvider, UserMemory};
 use log::{debug, warn};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 /// Hard cap on stored notes. Beyond this, consolidation prunes the weakest
 /// (oldest, lowest-confidence) first so the store never grows without bound. A
@@ -147,15 +147,43 @@ pub fn today_iso() -> String {
     chrono::Utc::now().format("%Y-%m-%d").to_string()
 }
 
-/// A reasonably-unique note id (avoids a uuid dependency; mirrors the
-/// character-id helper).
+/// A note id that is unique within this process (avoids a uuid dependency;
+/// mirrors the character-id helper).
+///
+/// The clock alone is not enough: a distillation pass mints its candidates in a
+/// tight loop, and Windows' clock ticks in 100 ns steps, so two notes could get
+/// the same id — and [`merge_memory`] identifies notes by id. Each id is
+/// therefore at least one past the previous one.
 pub fn new_note_id() -> String {
+    use std::sync::atomic::{AtomicU64, Ordering};
     use std::time::{SystemTime, UNIX_EPOCH};
-    let nanos = SystemTime::now()
+    static LAST: AtomicU64 = AtomicU64::new(0);
+
+    let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_nanos())
+        .map(|d| d.as_nanos() as u64)
         .unwrap_or(0);
-    format!("mem-{:x}", nanos)
+    let previous = LAST
+        .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |last| {
+            Some(now.max(last.saturating_add(1)))
+        })
+        .unwrap_or(now);
+    format!("mem-{:x}", now.max(previous.saturating_add(1)))
+}
+
+/// Held across every background read-modify-write of the settings store.
+///
+/// `write_settings` stores the whole `AppSettings`, so two writers that each
+/// read, change one field and write back drop whichever change landed first.
+/// Memory distillation and correction learning both do that from background
+/// threads, where nothing else orders them against each other.
+static SETTINGS_WRITE: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+pub(crate) fn lock_settings_write() -> std::sync::MutexGuard<'static, ()> {
+    // The guarded data is `()`, so a panic mid-write leaves nothing to repair.
+    SETTINGS_WRITE
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
 /// Numeric weight for confidence, used in ordering.
@@ -382,6 +410,85 @@ fn prune(notes: &mut Vec<MemoryNote>) {
             .then_with(|| b.updated.cmp(&a.updated))
     });
     notes.truncate(MAX_NOTES);
+}
+
+// ---------------------------------------------------------------------------
+// Merging a finished pass into the memory as it stands now
+// ---------------------------------------------------------------------------
+
+/// Whether a note is unchanged. `MemoryNote` has no `PartialEq`, and every
+/// field counts: an edit in Settings rewrites the text and the date.
+fn same_note(a: &MemoryNote, b: &MemoryNote) -> bool {
+    a.text == b.text
+        && a.updated == b.updated
+        && a.confidence == b.confidence
+        && a.source == b.source
+}
+
+/// Fold what a distillation pass produced into the memory as it is stored
+/// *now*, instead of replacing it.
+///
+/// A pass starts from a snapshot (`base`), spends seconds to minutes in the
+/// model, and returns `ours`. Meanwhile the user may have edited or deleted
+/// notes in Settings, and another pass may have stored its own result, so the
+/// store (`theirs`) is no longer `base`. Writing `ours` back would resurrect
+/// deleted notes and undo edits. Whatever changed in the store since `base`
+/// wins; the pass contributes only what it changed relative to `base`:
+///
+/// - a note gone from the store stays gone, even if the pass refreshed it;
+/// - a note changed in the store keeps that version, even if the pass changed
+///   or dropped it;
+/// - a note the store left alone takes the pass's version, or is dropped if the
+///   pass merged, decayed, or pruned it away;
+/// - a note the pass added is appended, unless the store already holds a near
+///   duplicate (two overlapping passes over the same conversation);
+/// - the summary keeps the store's value if it changed since `base`.
+pub fn merge_memory(base: &UserMemory, ours: UserMemory, theirs: UserMemory) -> UserMemory {
+    let base_notes: HashMap<&str, &MemoryNote> =
+        base.notes.iter().map(|n| (n.id.as_str(), n)).collect();
+    let ours_notes: HashMap<&str, &MemoryNote> =
+        ours.notes.iter().map(|n| (n.id.as_str(), n)).collect();
+    let theirs_ids: HashSet<String> = theirs.notes.iter().map(|n| n.id.clone()).collect();
+
+    let about_you = if theirs.about_you != base.about_you {
+        theirs.about_you
+    } else {
+        ours.about_you.clone()
+    };
+
+    let mut notes: Vec<MemoryNote> = Vec::with_capacity(theirs.notes.len());
+    for current in theirs.notes {
+        let Some(original) = base_notes.get(current.id.as_str()) else {
+            // Added after the pass started, by the user or another pass.
+            notes.push(current);
+            continue;
+        };
+        if !same_note(&current, original) {
+            notes.push(current);
+            continue;
+        }
+        if let Some(produced) = ours_notes.get(current.id.as_str()) {
+            notes.push((*produced).clone());
+        }
+    }
+
+    for produced in &ours.notes {
+        let id = produced.id.as_str();
+        if base_notes.contains_key(id) || theirs_ids.contains(id) {
+            continue;
+        }
+        let tokens = tokenize(&produced.text);
+        let duplicate = notes.iter().any(|n| {
+            n.text.eq_ignore_ascii_case(&produced.text)
+                || jaccard(&tokenize(&n.text), &tokens) >= DEDUPE_THRESHOLD
+        });
+        if !duplicate {
+            notes.push(produced.clone());
+        }
+    }
+
+    prune(&mut notes);
+    UserMemory { about_you, notes }
 }
 
 // ---------------------------------------------------------------------------
@@ -660,18 +767,280 @@ pub async fn distill_and_store(app: tauri::AppHandle, messages: Vec<ChatMessage>
         }
     }
 
-    let existing = settings.assistant_memory.clone();
-    match distill(&provider, api_key, &model, existing, &messages).await {
-        Ok(updated) => {
-            // Re-read settings to avoid clobbering a concurrent edit, then write
-            // just the memory back.
-            let mut latest = crate::settings::get_settings(&app);
-            latest.assistant_memory = updated;
-            crate::settings::write_settings(&app, latest);
-            use tauri::Emitter;
-            let _ = app.emit("assistant-settings-changed", ());
-            debug!("Memory: distillation stored");
+    let base = settings.assistant_memory.clone();
+    let produced = match distill(&provider, api_key, &model, base.clone(), &messages).await {
+        Ok(produced) => produced,
+        Err(e) => {
+            debug!("Memory: distillation skipped ({e})");
+            return;
         }
-        Err(e) => debug!("Memory: distillation skipped ({e})"),
+    };
+
+    // The pass ran for seconds to minutes on `base`; the store may have moved
+    // on since (an edit or delete in Settings, another pass), so merge into
+    // what is stored now rather than overwrite it.
+    {
+        let _write = lock_settings_write();
+        let mut latest = crate::settings::get_settings(&app);
+        if !latest.assistant_memory_enabled || latest.assistant_memory_incognito {
+            debug!("Memory: turned off while distilling; discarding the pass");
+            return;
+        }
+        let current = std::mem::take(&mut latest.assistant_memory);
+        latest.assistant_memory = merge_memory(&base, produced, current);
+        crate::settings::write_settings(&app, latest);
+    }
+    use tauri::Emitter;
+    let _ = app.emit("assistant-settings-changed", ());
+    debug!("Memory: distillation stored");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn note(id: &str, text: &str) -> MemoryNote {
+        MemoryNote {
+            id: id.to_string(),
+            text: text.to_string(),
+            updated: "2026-09-01".to_string(),
+            confidence: MemoryConfidence::Medium,
+            source: "auto".to_string(),
+        }
+    }
+
+    fn memory(about_you: &str, notes: &[MemoryNote]) -> UserMemory {
+        UserMemory {
+            about_you: about_you.to_string(),
+            notes: notes.to_vec(),
+        }
+    }
+
+    fn ids(memory: &UserMemory) -> Vec<&str> {
+        memory.notes.iter().map(|n| n.id.as_str()).collect()
+    }
+
+    fn text_of<'a>(memory: &'a UserMemory, id: &str) -> Option<&'a str> {
+        memory
+            .notes
+            .iter()
+            .find(|n| n.id == id)
+            .map(|n| n.text.as_str())
+    }
+
+    fn base() -> UserMemory {
+        memory(
+            "Studies for exams.",
+            &[
+                note("a", "Prefers metric units."),
+                note("b", "Writes Rust at work."),
+                note("c", "Lives in Kathmandu."),
+            ],
+        )
+    }
+
+    /// With nothing changed in the store, the pass's result is stored as is.
+    #[test]
+    fn untouched_store_takes_the_pass_result() {
+        let mut ours = base();
+        ours.about_you = "Studies for exams and builds SpeakoFlow.".to_string();
+        ours.notes[1].text = "Writes Rust and TypeScript at work.".to_string();
+        ours.notes.push(note("d", "Is building a Tauri app."));
+
+        let merged = merge_memory(&base(), ours, base());
+
+        assert_eq!(merged.about_you, "Studies for exams and builds SpeakoFlow.");
+        assert_eq!(ids(&merged), ["a", "b", "c", "d"]);
+        assert_eq!(
+            text_of(&merged, "b"),
+            Some("Writes Rust and TypeScript at work.")
+        );
+    }
+
+    #[test]
+    fn a_note_deleted_by_the_user_stays_deleted() {
+        let mut theirs = base();
+        theirs.notes.retain(|n| n.id != "b");
+
+        let merged = merge_memory(&base(), base(), theirs);
+
+        assert_eq!(ids(&merged), ["a", "c"]);
+    }
+
+    /// The pass re-confirmed the note (consolidation rewrites it in place), but
+    /// the user had already deleted it.
+    #[test]
+    fn a_deleted_note_the_pass_refreshed_stays_deleted() {
+        let mut ours = base();
+        ours.notes[1].text = "Writes Rust at work every day.".to_string();
+        ours.notes[1].updated = "2026-09-29".to_string();
+        let mut theirs = base();
+        theirs.notes.retain(|n| n.id != "b");
+
+        let merged = merge_memory(&base(), ours, theirs);
+
+        assert_eq!(ids(&merged), ["a", "c"]);
+    }
+
+    #[test]
+    fn the_users_edit_survives_a_pass_that_left_the_note_alone() {
+        let mut theirs = base();
+        theirs.notes[0].text = "Prefers imperial units.".to_string();
+        theirs.notes[0].updated = "2026-09-29".to_string();
+
+        let merged = merge_memory(&base(), base(), theirs);
+
+        assert_eq!(text_of(&merged, "a"), Some("Prefers imperial units."));
+    }
+
+    #[test]
+    fn the_users_edit_beats_the_pass_edit() {
+        let mut ours = base();
+        ours.notes[0].text = "Prefers metric units everywhere.".to_string();
+        let mut theirs = base();
+        theirs.notes[0].text = "Prefers imperial units.".to_string();
+
+        let merged = merge_memory(&base(), ours, theirs);
+
+        assert_eq!(text_of(&merged, "a"), Some("Prefers imperial units."));
+    }
+
+    /// A change to confidence alone is still an edit, not something the pass
+    /// may silently overwrite.
+    #[test]
+    fn a_confidence_change_counts_as_an_edit() {
+        let mut ours = base();
+        ours.notes[0].text = "Prefers metric units everywhere.".to_string();
+        let mut theirs = base();
+        theirs.notes[0].confidence = MemoryConfidence::High;
+
+        let merged = merge_memory(&base(), ours, theirs);
+
+        let a = merged.notes.iter().find(|n| n.id == "a").unwrap();
+        assert_eq!(a.text, "Prefers metric units.");
+        assert_eq!(a.confidence, MemoryConfidence::High);
+    }
+
+    /// The pass merged or decayed the note away, but the user had edited it.
+    #[test]
+    fn a_note_the_user_edited_survives_the_pass_removing_it() {
+        let mut ours = base();
+        ours.notes.retain(|n| n.id != "c");
+        let mut theirs = base();
+        theirs.notes[2].text = "Lives in Pokhara.".to_string();
+
+        let merged = merge_memory(&base(), ours, theirs);
+
+        assert_eq!(ids(&merged), ["a", "b", "c"]);
+        assert_eq!(text_of(&merged, "c"), Some("Lives in Pokhara."));
+    }
+
+    #[test]
+    fn a_note_the_pass_removed_and_the_user_left_alone_is_removed() {
+        let mut ours = base();
+        ours.notes.retain(|n| n.id != "c");
+
+        let merged = merge_memory(&base(), ours, base());
+
+        assert_eq!(ids(&merged), ["a", "b"]);
+    }
+
+    #[test]
+    fn notes_added_on_both_sides_are_all_kept() {
+        let mut ours = base();
+        ours.notes.push(note("pass", "Is building a Tauri app."));
+        let mut theirs = base();
+        theirs.notes.push(note("user", "Has a cat named Momo."));
+
+        let merged = merge_memory(&base(), ours, theirs);
+
+        assert_eq!(ids(&merged), ["a", "b", "c", "user", "pass"]);
+    }
+
+    /// Two passes over the same conversation overlap: the first stored its
+    /// facts while the second was still running. Neither pass is lost, and the
+    /// fact both learned is kept once.
+    #[test]
+    fn overlapping_passes_keep_both_and_do_not_duplicate() {
+        let mut first = base();
+        first
+            .notes
+            .push(note("first-1", "Is building a Tauri app."));
+        first.notes.push(note("first-2", "Drinks black coffee."));
+        let stored = merge_memory(&base(), first, base());
+
+        let mut second = base();
+        second
+            .notes
+            .push(note("second-1", "Is building a Tauri app."));
+        second.notes.push(note("second-2", "Runs every morning."));
+        let merged = merge_memory(&base(), second, stored);
+
+        assert_eq!(
+            ids(&merged),
+            ["a", "b", "c", "first-1", "first-2", "second-2"]
+        );
+    }
+
+    #[test]
+    fn the_users_summary_edit_survives() {
+        let mut ours = base();
+        ours.about_you = "Studies for exams and builds apps.".to_string();
+        let mut theirs = base();
+        theirs.about_you = "A student in Nepal.".to_string();
+
+        let merged = merge_memory(&base(), ours, theirs);
+
+        assert_eq!(merged.about_you, "A student in Nepal.");
+    }
+
+    #[test]
+    fn a_summary_the_user_cleared_stays_cleared() {
+        let mut ours = base();
+        ours.about_you = "Studies for exams and builds apps.".to_string();
+        let mut theirs = base();
+        theirs.about_you = String::new();
+
+        let merged = merge_memory(&base(), ours, theirs);
+
+        assert_eq!(merged.about_you, "");
+    }
+
+    /// "Clear memory" mid-pass: nothing the user wiped comes back.
+    #[test]
+    fn clearing_memory_mid_pass_keeps_the_old_notes_gone() {
+        let mut ours = base();
+        ours.notes[0].text = "Prefers metric units everywhere.".to_string();
+        ours.notes.push(note("d", "Is building a Tauri app."));
+
+        let merged = merge_memory(&base(), ours, UserMemory::default());
+
+        assert_eq!(merged.about_you, "");
+        assert_eq!(ids(&merged), ["d"]);
+    }
+
+    #[test]
+    fn the_merge_respects_the_note_cap() {
+        let many: Vec<MemoryNote> = (0..MAX_NOTES)
+            .map(|i| {
+                note(
+                    &format!("n{i}"),
+                    &format!("Distinct fact number {i} zz{i}."),
+                )
+            })
+            .collect();
+        let base = memory("", &many);
+        let mut ours = base.clone();
+        ours.notes.push(note("extra", "Is building a Tauri app."));
+
+        let merged = merge_memory(&base, ours, base.clone());
+
+        assert_eq!(merged.notes.len(), MAX_NOTES);
+    }
+
+    #[test]
+    fn note_ids_are_unique_when_minted_back_to_back() {
+        let minted: HashSet<String> = (0..1_000).map(|_| new_note_id()).collect();
+        assert_eq!(minted.len(), 1_000);
     }
 }

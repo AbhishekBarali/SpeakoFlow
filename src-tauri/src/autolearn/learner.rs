@@ -104,6 +104,10 @@ fn known_words(settings: &crate::settings::AppSettings) -> HashSet<String> {
 
 /// Store the learned words.
 fn remember(app: &AppHandle, corrections: &[Correction]) {
+    // Read and write under the shared lock: this runs on the watcher thread, and
+    // an unordered whole-settings write from a memory distillation landing in
+    // between would drop one of the two changes.
+    let write = crate::memory::lock_settings_write();
     let mut settings = crate::settings::get_settings(app);
     let known = known_words(&settings);
     let mut added = Vec::new();
@@ -132,6 +136,7 @@ fn remember(app: &AppHandle, corrections: &[Correction]) {
     }
 
     crate::settings::write_settings(app, settings);
+    drop(write);
     let _ = app.emit(LEARNED_EVENT, added);
 }
 
